@@ -1,0 +1,93 @@
+<script server>
+const requestUrl = (typeof requestContext !== 'undefined' && requestContext.url)
+  ? requestContext.url()
+  : 'http://localhost/'
+
+let currentPath = '/'
+try {
+  currentPath = new URL(requestUrl).pathname
+}
+catch {
+  currentPath = '/'
+}
+
+const navLinks = [
+  { href: '/', label: 'Composer', shortcut: '1' },
+  { href: '/queue', label: 'Queue', shortcut: '2' },
+  { href: '/timeline', label: 'Timeline', shortcut: '3' },
+  { href: '/analytics', label: 'Analytics', shortcut: '4' },
+  { href: '/accounts', label: 'Accounts', shortcut: '5' },
+  { href: '/settings', label: 'Settings', shortcut: '6' },
+].map((link) => ({
+  ...link,
+  active: link.href === '/'
+    ? currentPath === '/'
+    : currentPath === link.href || currentPath.startsWith(`${link.href}/`),
+}))
+
+const channels = [
+  { name: 'Bluesky', state: 'Connected', tone: 'active' },
+  { name: 'Twitter/X', state: 'Planned', tone: 'muted' },
+  { name: 'Mastodon', state: 'Planned', tone: 'muted' },
+  { name: 'Instagram', state: 'Later', tone: 'muted' },
+  { name: 'TikTok', state: 'Later', tone: 'muted' },
+]
+</script>
+
+<!DOCTYPE html>
+<html lang="en" class="bg-zinc-50 text-neutral-950">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="@yield('description', 'Postline is a clean personal workspace for social publishing.')">
+    <title>@yield('title', 'Postline')</title>
+    <script>window.STX_ROUTER_OPTIONS = { container: '[data-postline-app]' };</script>
+  </head>
+  <body class="min-w-80 min-h-screen bg-zinc-50 font-sans text-neutral-950 antialiased">
+    <div class="grid min-h-screen grid-cols-1 lg:grid-cols-[232px_minmax(0,1fr)]" data-postline-app>
+      <aside class="border-zinc-200 border-b bg-white/80 p-4 lg:border-b-0 lg:border-r" aria-label="Postline">
+        <a
+          class="mb-5 flex items-center gap-2.5 rounded-lg px-2 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+          href="/"
+          data-stx-link
+          data-stx-exact-active-class="text-neutral-950"
+          aria-label="Postline composer"
+        >
+          <span class="grid h-7 w-7 place-items-center rounded-md bg-neutral-950 text-xs font-bold text-white">P</span>
+          <span class="text-[15px] font-bold">Postline</span>
+        </a>
+
+        <nav class="grid gap-1" aria-label="Primary" data-stx-nav data-testid="postline-nav">
+          @foreach (navLinks as link)
+            <a
+              href="{{ link.href }}"
+              data-stx-link
+              data-stx-active-class="bg-blue-50 text-neutral-950"
+              data-stx-exact-active-class="bg-blue-50 text-neutral-950"
+              class="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-zinc-100 focus-visible:bg-zinc-100 focus-visible:outline-none {{ link.active ? 'bg-blue-50 text-neutral-950' : 'text-zinc-500' }}"
+              aria-current="{{ link.active ? 'page' : 'false' }}"
+            >
+              <span class="font-semibold">{{ link.label }}</span>
+              <span class="text-[11px] text-zinc-400">{{ link.shortcut }}</span>
+            </a>
+          @endforeach
+        </nav>
+
+        <section class="mt-6 border-zinc-200 border-t pt-4" aria-label="Channels">
+          <h2 class="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Channels</h2>
+          @foreach (channels as channel)
+            <div class="flex items-center justify-between px-2 py-2 text-[13px] text-neutral-950">
+              <span>{{ channel.name }}</span>
+              <span class="rounded-full border px-2 py-0.5 text-[11px] {{ channel.tone === 'active' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-zinc-200 text-zinc-500' }}">{{ channel.state }}</span>
+            </div>
+          @endforeach
+        </section>
+      </aside>
+
+      <main class="min-w-0 p-3 sm:p-5" data-postline-router>
+        @yield('content')
+      </main>
+    </div>
+    @stack('scripts')
+  </body>
+</html>

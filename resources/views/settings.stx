@@ -1,0 +1,52 @@
+@extends('layouts/postline')
+
+@section('title', 'Postline - Settings')
+@section('description', 'Configure Postline publishing defaults.')
+
+@section('content')
+  <section class="grid gap-5" data-postline-page="settings" data-testid="settings-page">
+    <header class="flex min-h-11 items-center justify-between gap-4">
+      <div>
+        <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Settings</p>
+        <h1 class="m-0 text-[22px] font-bold tracking-normal text-neutral-950">Publishing defaults</h1>
+      </div>
+      <button class="inline-flex h-9 items-center justify-center rounded-md bg-neutral-950 px-4 font-bold text-white" type="button">Save</button>
+    </header>
+
+    <div class="grid gap-3.5 lg:grid-cols-2">
+      <section class="rounded-lg border border-zinc-200 bg-white pb-3.5 shadow-[0_18px_54px_rgba(24,31,42,0.10)]">
+        <header class="flex items-center justify-between gap-3 border-zinc-200 border-b p-3.5">
+          <strong class="text-[13px]">Schedule</strong>
+          <span class="text-xs text-zinc-500">Local time</span>
+        </header>
+        <label class="flex items-center justify-between gap-4 border-zinc-200 border-t p-3.5 text-[13px] text-slate-700">
+          <span>Default posting window</span>
+          <select class="min-h-8 rounded-md border border-zinc-200 bg-white px-2.5" aria-label="Default posting window">
+            <option>Morning, 9:00 AM</option>
+            <option>Afternoon, 3:30 PM</option>
+            <option>Evening, 7:00 PM</option>
+          </select>
+        </label>
+        <label class="flex items-center justify-between gap-4 border-zinc-200 border-t p-3.5 text-[13px] text-slate-700">
+          <span>Require approval before publish</span>
+          <input type="checkbox" checked>
+        </label>
+      </section>
+
+      <section class="rounded-lg border border-zinc-200 bg-white pb-3.5 shadow-[0_18px_54px_rgba(24,31,42,0.10)]">
+        <header class="flex items-center justify-between gap-3 border-zinc-200 border-b p-3.5">
+          <strong class="text-[13px]">Drivers</strong>
+          <span class="text-xs text-zinc-500">Enabled</span>
+        </header>
+        <label class="flex items-center justify-between gap-4 border-zinc-200 border-t p-3.5 text-[13px] text-slate-700">
+          <span>Bluesky timeline sync</span>
+          <input type="checkbox" checked>
+        </label>
+        <label class="flex items-center justify-between gap-4 border-zinc-200 border-t p-3.5 text-[13px] text-slate-700">
+          <span>Cross-post drafts</span>
+          <input type="checkbox">
+        </label>
+      </section>
+    </div>
+  </section>
+@endsection

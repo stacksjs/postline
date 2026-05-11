@@ -1,0 +1,65 @@
+@extends('layouts/postline')
+
+@section('title', 'Postline - Queue')
+@section('description', 'Review scheduled and drafted social posts in Postline.')
+
+<script server>
+const scheduledPosts = [
+  {
+    time: 'Today 3:30 PM',
+    channel: 'Bluesky',
+    status: 'Ready',
+    text: 'Working on a calmer way to plan posts: drafts, timelines, scheduling, and publishing in one native-feeling place.',
+    note: 'Auto-publish when the Bluesky driver token is present.',
+  },
+  {
+    time: 'Tomorrow 9:00 AM',
+    channel: 'Bluesky',
+    status: 'Draft',
+    text: 'Tiny systems compound. A clean publishing queue might be the difference between ideas fading and ideas shipping.',
+    note: 'Needs final copy pass.',
+  },
+  {
+    time: 'Friday 11:15 AM',
+    channel: 'Mastodon',
+    status: 'Planned',
+    text: 'Cross-posting should feel intentional, not like copy/paste chores across six tabs.',
+    note: 'Driver support planned after Bluesky settles.',
+  },
+]
+</script>
+
+@section('content')
+  <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
+    <header class="flex min-h-11 items-center justify-between gap-4">
+      <div>
+        <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Queue</p>
+        <h1 class="m-0 text-[22px] font-bold tracking-normal text-neutral-950">Scheduled posts</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="/" data-stx-link class="inline-flex h-9 items-center justify-center rounded-md border border-zinc-200 bg-white px-3 font-bold text-neutral-950 shadow-sm">New post</a>
+        <button class="inline-flex h-9 items-center justify-center rounded-md bg-neutral-950 px-4 font-bold text-white" type="button">Optimize times</button>
+      </div>
+    </header>
+
+    <section class="rounded-lg border border-zinc-200 bg-white shadow-[0_18px_54px_rgba(24,31,42,0.10)]">
+      <header class="flex items-center justify-between gap-3 border-zinc-200 border-b p-3.5">
+        <strong class="text-[13px]">Upcoming</strong>
+        <span class="text-xs text-zinc-500">3 posts</span>
+      </header>
+      <div class="grid gap-2.5 p-3">
+        @foreach (scheduledPosts as post)
+          <article class="flex items-center justify-between gap-5 rounded-lg border border-zinc-200 bg-white p-3">
+            <div>
+              <span class="text-xs font-bold">{{ post.time }}</span>
+              <h2 class="my-1.5 text-[15px] font-bold">{{ post.channel }} / {{ post.status }}</h2>
+              <p class="m-0 text-[13px] leading-normal text-slate-700">{{ post.text }}</p>
+              <span class="mt-1.5 block text-xs text-zinc-500">{{ post.note }}</span>
+            </div>
+            <button class="inline-flex h-8 items-center justify-center rounded-md border border-zinc-200 bg-white px-3 text-xs font-bold text-neutral-950 shadow-sm" type="button">Edit</button>
+          </article>
+        @endforeach
+      </div>
+    </section>
+  </section>
+@endsection
