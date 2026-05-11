@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "post_targets_post_targets_provider_status_index" ON "post_targets" ("provider", "status");

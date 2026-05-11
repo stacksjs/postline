@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "timeline_items_timeline_items_provider_posted_at_index" ON "timeline_items" ("provider", "posted_at");

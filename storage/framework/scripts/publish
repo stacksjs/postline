@@ -1,0 +1,69 @@
+#!/bin/sh
+
+# Publishes every framework/core/* package to npm, skipping anything marked
+# `"private": true` (deploy/, development/, etc.) so we don't waste a CI cycle
+# on a publish that would fail. Each `bun publish` runs the package's own
+# `prepublishOnly` script — so dist gets rebuilt right before it ships.
+#
+# Tracks per-package outcomes and exits non-zero if any non-private package
+# fails to publish, so the GH Actions release workflow surfaces the breakage
+# instead of silently shipping a partial release.
+
+set -u
+
+script_dir=$(realpath $(dirname "$0"))
+core_dir="$script_dir/../core"
+
+# `find -maxdepth 1 -type d` would also list core/ itself; trim with -mindepth.
+dirs=$(find "$core_dir" -mindepth 1 -maxdepth 1 -type d)
+
+if [ -z "$dirs" ]; then
+  echo "No core packages found at $core_dir"
+  exit 1
+fi
+
+published=""
+skipped=""
+failed=""
+
+for dir in $dirs; do
+  pkg="$dir/package.json"
+  [ -f "$pkg" ] || continue
+
+  name=$(basename "$dir")
+
+  # `bun publish` rejects private packages with a helpful error, but skipping
+  # them here keeps the release log clean and avoids the GH Actions step
+  # showing a forest of red `Failed to publish development` lines.
+  if grep -q '"private"[[:space:]]*:[[:space:]]*true' "$pkg"; then
+    skipped="$skipped $name"
+    continue
+  fi
+
+  printf '\n🏗️  Releasing %s\n' "$name"
+  printf '📦 %s\n' "$dir"
+
+  log_file="${TMPDIR:-/tmp}/stacks-publish-$name-$$.log"
+
+  if (cd "$dir" && bun publish --access public) >"$log_file" 2>&1; then
+    published="$published $name"
+    printf '✅ %s published\n\n' "$name"
+  else
+    failed="$failed $name"
+    printf 'Publish output for %s (last 160 lines):\n' "$name"
+    tail -n 160 "$log_file"
+    printf '❌ %s failed to publish\n\n' "$name"
+  fi
+
+  rm -f "$log_file"
+done
+
+printf '\n────── Publish summary ──────\n'
+[ -n "$published" ] && printf 'Published:%s\n' "$published"
+[ -n "$skipped" ]   && printf 'Skipped (private):%s\n' "$skipped"
+[ -n "$failed" ]    && printf 'Failed:%s\n' "$failed"
+
+# Exit non-zero so CI marks the job as failed when any non-private publish
+# breaks. The previous behaviour (always exit 0) silently shipped partial
+# releases — see the i18n version drift fixed in this same change.
+[ -z "$failed" ]

@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS "posts_posts_status_scheduled_at_index" ON "posts" ("status", "scheduled_at");
