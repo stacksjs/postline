@@ -1,5 +1,21 @@
 # Stacks Changelog
 
+## v0.70.38...v0.70.39
+
+[compare changes](https://github.com/stacksjs/stacks/compare/v0.70.38...v0.70.39)
+
+### 🩹 Fixes
+
+- **ci:** Build framework declarations before typecheck ([0d7a3f5](https://github.com/stacksjs/stacks/commit/0d7a3f5))
+
+### 🏡 Chore
+
+- Release v0.70.39 ([63f69d1](https://github.com/stacksjs/stacks/commit/63f69d1))
+
+### ❤️ Contributors
+
+- Chris ([@chrisbbreuer](https://github.com/chrisbbreuer))
+
 ## v0.70.0...v0.70.1
 
 [compare changes](https://github.com/stacksjs/stacks/compare/v0.70.0...v0.70.1)

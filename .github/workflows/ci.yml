@@ -44,7 +44,7 @@ jobs:
         run: bun install
 
       - name: Lint
-        run: bunx --bun pickier lint . --config pickier.config.ts --max-warnings 9999
+        run: bun run lint
 
   typecheck:
     runs-on: ${{ matrix.os }}
@@ -73,7 +73,7 @@ jobs:
         run: bun install
 
       - name: Typecheck
-        run: bunx --bun tsc --noEmit
+        run: bun run typecheck
 
   test:
     runs-on: ${{ matrix.os }}
@@ -127,7 +127,7 @@ jobs:
       - name: Test Suite
         env:
           AWS_DYNAMODB_ENDPOINT: http://localhost:8000
-        run: bun test
+        run: bun run test
 
   release-check:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

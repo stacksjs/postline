@@ -1,4 +1,36 @@
 # Changelog
+[Compare changes](https://github.com/stacksjs/postline/compare/v0.70.39...v0.70.40)
+
+### 🐛 Bug Fixes
+
+- **ci**: use app-aware quality commands ([11298b8](https://github.com/stacksjs/postline/commit/11298b8)) _(by Chris <chrisbreuer93@gmail.com>)_
+
+### 📚 Documentation
+
+- update changelog for v0.70.39 ([00f9177](https://github.com/stacksjs/postline/commit/00f9177)) _(by Chris <chrisbreuer93@gmail.com>)_
+
+### 🧹 Chores
+
+- release v0.70.40 ([edc54dd](https://github.com/stacksjs/postline/commit/edc54dd)) _(by Chris <chrisbreuer93@gmail.com>)_
+
+### Contributors
+
+- _Chris <chrisbreuer93@gmail.com>_
+
+[Compare changes](https://github.com/stacksjs/postline/compare/v0.70.38...v0.70.39)
+
+### 🐛 Bug Fixes
+
+- **ci**: build framework declarations before typecheck ([0d7a3f5](https://github.com/stacksjs/postline/commit/0d7a3f5)) _(by Chris <chrisbreuer93@gmail.com>)_
+
+### 🧹 Chores
+
+- release v0.70.39 ([3af27d4](https://github.com/stacksjs/postline/commit/3af27d4)) _(by Chris <chrisbreuer93@gmail.com>)_
+
+### Contributors
+
+- _Chris <chrisbreuer93@gmail.com>_
+
 [Compare changes](https://github.com/stacksjs/stacks/compare/v0.70.36...v0.70.37)
 
 ### 📚 Documentation

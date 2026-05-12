@@ -13,17 +13,17 @@ const stats = [
 
 @section('content')
   <section class="grid gap-5" data-postline-page="analytics" data-testid="analytics-page">
-    <header class="flex min-h-11 items-center justify-between gap-4">
+    <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
-        <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Analytics</p>
-        <h1 class="m-0 text-[22px] font-bold tracking-normal text-neutral-950">Publishing signals</h1>
+        <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Analytics</p>
+        <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Publishing signals</h1>
       </div>
-      <button class="inline-flex h-9 items-center justify-center rounded-md bg-neutral-950 px-4 font-bold text-white" type="button">Export</button>
+      <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-white bg-neutral-950 rounded-md" type="button">Export</button>
     </header>
 
     <div class="grid gap-3.5 lg:grid-cols-3">
       @foreach (stats as stat)
-        <article class="grid gap-2 rounded-lg border border-zinc-200 bg-white p-3.5 shadow-[0_18px_54px_rgba(24,31,42,0.10)]">
+        <article class="grid gap-2 p-3.5 bg-white border border-zinc-200 rounded-lg shadow-[0_18px_54px_rgba(24,31,42,0.10)]">
           <span class="text-xs text-zinc-500">{{ stat.label }}</span>
           <strong class="text-2xl">{{ stat.value }}</strong>
           <span class="text-xs text-zinc-500">{{ stat.trend }}</span>
@@ -31,12 +31,12 @@ const stats = [
       @endforeach
     </div>
 
-    <section class="rounded-lg border border-zinc-200 bg-white pb-3.5 shadow-[0_18px_54px_rgba(24,31,42,0.10)]">
-      <header class="flex items-center justify-between gap-3 border-zinc-200 border-b p-3.5">
+    <section class="pb-3.5 bg-white border border-zinc-200 rounded-lg shadow-[0_18px_54px_rgba(24,31,42,0.10)]">
+      <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
         <strong class="text-[13px]">What is working</strong>
         <span class="text-xs text-zinc-500">Last 30 days</span>
       </header>
-      <p class="m-0 p-3.5 text-[13px] leading-normal text-slate-700">Short, concrete posts are outperforming general updates. Bluesky is carrying the current response rate, so the next scheduling pass should keep that channel as the primary publishing target.</p>
+      <p class="m-0 p-3.5 leading-normal text-[13px] text-slate-700">Short, concrete posts are outperforming general updates. Bluesky is carrying the current response rate, so the next scheduling pass should keep that channel as the primary publishing target.</p>
     </section>
   </section>
 @endsection
