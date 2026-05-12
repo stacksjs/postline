@@ -47,9 +47,16 @@ const timelineItems = [
     <header class="flex gap-4 items-center justify-between min-h-11">
       <p class="m-0 font-medium text-[15px] text-zinc-500">Composer</p>
       <div class="flex gap-2 items-center">
-        <button class="inline-flex items-center justify-center h-10 w-10 font-bold text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Search posts" title="Search posts" data-composer-search>S</button>
-        <button class="inline-flex items-center justify-center h-10 w-10 font-bold text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Refresh timeline" title="Refresh timeline" data-composer-refresh>R</button>
-        <button class="inline-flex items-center justify-center px-5 h-10 font-bold text-white bg-neutral-950 rounded-xl" type="button" data-bluesky-publish-top>Publish</button>
+        <button class="inline-flex items-center justify-center h-10 w-10 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Search posts" title="Search posts" data-composer-search>
+          <span class="h-4 w-4 i-hugeicons-search-01" aria-hidden="true"></span>
+        </button>
+        <button class="inline-flex items-center justify-center h-10 w-10 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Refresh timeline" title="Refresh timeline" data-composer-refresh>
+          <span class="h-4 w-4 i-hugeicons-refresh" aria-hidden="true"></span>
+        </button>
+        <button class="inline-flex gap-2 items-center justify-center px-5 h-10 font-bold text-white bg-neutral-950 rounded-xl" type="button" data-bluesky-publish-top>
+          <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
+          <span>Publish</span>
+        </button>
       </div>
     </header>
 
@@ -75,8 +82,13 @@ const timelineItems = [
           <div class="grid content-start gap-5" data-composer-posts>
             <article class="grid gap-2 pb-4 last:pb-0 border-b border-zinc-100 last:border-b-0" data-composer-post data-active="true">
               <header class="flex gap-3 items-center justify-between">
-                <button class="inline-flex items-center px-2.5 min-h-7 font-bold text-white text-xs bg-neutral-950 rounded-lg" type="button" data-select-post>Post 1</button>
-                <button class="hidden items-center justify-center h-7 w-7 font-bold text-xs text-zinc-500 bg-white border border-zinc-200 rounded-lg shadow-sm" type="button" aria-label="Remove post" title="Remove post" data-remove-post>x</button>
+                <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-bold text-white text-xs bg-neutral-950 rounded-lg" type="button" data-select-post>
+                  <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
+                  <span data-post-label>Post 1</span>
+                </button>
+                <button class="hidden items-center justify-center h-7 w-7 text-zinc-500 bg-white border border-zinc-200 rounded-lg shadow-sm" type="button" aria-label="Remove post" title="Remove post" data-remove-post>
+                  <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
+                </button>
               </header>
               <textarea class="min-h-36 w-full leading-relaxed text-[21px] text-neutral-950 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" maxlength="300" data-bluesky-text>Working on a calmer way to plan posts: drafts, timelines, scheduling, and publishing in one native-feeling place.</textarea>
               <div class="hidden overflow-hidden bg-zinc-50 border border-zinc-200 rounded-2xl" data-link-preview></div>
@@ -87,9 +99,16 @@ const timelineItems = [
         <footer class="flex gap-3 items-center justify-between p-3.5 border-t border-zinc-200">
           <span class="text-xs text-zinc-500" data-bluesky-count>118 / 300 characters</span>
           <div class="flex gap-2 items-center">
-            <button class="inline-flex items-center justify-center h-9 w-9 font-bold text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Add post" title="Add post" data-add-post>+</button>
-            <button class="inline-flex items-center justify-center h-9 w-9 font-bold text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Preview post" title="Preview post" data-preview-post>P</button>
-            <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-white bg-neutral-950 rounded-xl" type="button" data-bluesky-publish>Publish</button>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Add post" title="Add post" data-add-post>
+              <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
+            </button>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Preview post" title="Preview post" data-preview-post>
+              <span class="h-4 w-4 i-hugeicons-view" aria-hidden="true"></span>
+            </button>
+            <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-white bg-neutral-950 rounded-xl" type="button" data-bluesky-publish>
+              <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
+              <span>Publish</span>
+            </button>
           </div>
         </footer>
       </section>
@@ -146,6 +165,8 @@ const timelineItems = [
     ;(() => {
       const root = document.querySelector('[data-testid="composer-page"]')
       if (!root) return
+      if (root.dataset.composerReady === 'true') return
+      root.dataset.composerReady = 'true'
 
       const count = root.querySelector('[data-bluesky-count]')
       const status = root.querySelector('[data-bluesky-status]')
@@ -158,9 +179,13 @@ const timelineItems = [
       const modeButtons = Array.from(root.querySelectorAll('[data-composer-mode]'))
       const linkPreviewCache = new Map()
       const urlPattern = /https?:\/\/[^\s<>"']+/i
+      const draftKey = 'postline:composer-draft:v1'
       let activePost = root.querySelector('[data-composer-post]')
       let postCounter = root.querySelectorAll('[data-composer-post]').length
+      let activeMode = modeButtons.find(button => button.classList.contains('bg-white'))?.dataset.composerMode || 'single'
+      let savedActiveIndex = 0
       let previewTimer
+      let draftSaveTimer
 
       const setStatus = (message, tone = 'neutral') => {
         if (!status) return
@@ -184,6 +209,77 @@ const timelineItems = [
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;')
+
+      const postTemplate = (number, text = '') => `
+        <header class="flex gap-3 items-center justify-between">
+          <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-bold text-xs text-zinc-600 bg-zinc-100 rounded-lg" type="button" data-select-post>
+            <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
+            <span data-post-label>Post ${number}</span>
+          </button>
+          <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500 bg-white border border-zinc-200 rounded-lg shadow-sm" type="button" aria-label="Remove post" title="Remove post" data-remove-post>
+            <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
+          </button>
+        </header>
+        <textarea class="min-h-36 w-full leading-relaxed text-[21px] text-neutral-950 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body ${number}" maxlength="300" data-bluesky-text>${escapeHtml(text)}</textarea>
+        <div class="hidden overflow-hidden bg-zinc-50 border border-zinc-200 rounded-2xl" data-link-preview></div>
+      `
+
+      const createPost = (number, text = '') => {
+        const post = document.createElement('article')
+        post.className = 'grid gap-2 pb-4 last:pb-0 border-b border-zinc-100 last:border-b-0'
+        post.dataset.composerPost = ''
+        post.dataset.active = 'false'
+        post.innerHTML = postTemplate(number, text)
+        return post
+      }
+
+      const readDraft = () => {
+        try {
+          const draft = JSON.parse(localStorage.getItem(draftKey) || 'null')
+          if (!draft || !Array.isArray(draft.posts) || draft.posts.length === 0) return null
+
+          return {
+            activeIndex: Number.isFinite(draft.activeIndex) ? draft.activeIndex : 0,
+            mode: ['single', 'thread', 'draft'].includes(draft.mode) ? draft.mode : 'single',
+            posts: draft.posts
+              .slice(0, 24)
+              .map(post => ({ text: String(post?.text || '').slice(0, 300) })),
+          }
+        }
+        catch {
+          return null
+        }
+      }
+
+      const saveDraft = () => {
+        try {
+          const posts = allPosts()
+          localStorage.setItem(draftKey, JSON.stringify({
+            activeIndex: Math.max(0, posts.indexOf(activePost)),
+            mode: activeMode,
+            posts: posts.map(post => ({ text: textareaFor(post)?.value || '' })),
+            updatedAt: new Date().toISOString(),
+            version: 1,
+          }))
+        }
+        catch {}
+      }
+
+      const queueDraftSave = () => {
+        clearTimeout(draftSaveTimer)
+        draftSaveTimer = setTimeout(saveDraft, 100)
+      }
+
+      const restoreDraft = () => {
+        const draft = readDraft()
+        if (!draft || !postsRoot) return
+
+        postsRoot.replaceChildren(...draft.posts.map((post, index) => createPost(index + 1, post.text)))
+        activeMode = draft.mode
+        savedActiveIndex = Math.max(0, Math.min(draft.activeIndex, draft.posts.length - 1))
+        postCounter = draft.posts.length
+        activePost = allPosts()[savedActiveIndex] || root.querySelector('[data-composer-post]')
+      }
 
       const updateCount = () => {
         const textarea = activeTextarea()
@@ -260,16 +356,17 @@ const timelineItems = [
         allPosts().forEach((post, index) => {
           const number = index + 1
           const select = post.querySelector('[data-select-post]')
+          const label = select?.querySelector('[data-post-label]')
           const remove = post.querySelector('[data-remove-post]')
           const textarea = textareaFor(post)
-          if (select) select.textContent = `Post ${number}`
+          if (label) label.textContent = `Post ${number}`
           if (textarea) textarea.setAttribute('aria-label', `Post body ${number}`)
           remove?.classList.toggle('hidden', allPosts().length === 1)
           remove?.classList.toggle('inline-flex', allPosts().length > 1)
         })
       }
 
-      const selectPost = (post) => {
+      const selectPost = (post, options = {}) => {
         if (!post) return
         activePost = post
         allPosts().forEach((item) => {
@@ -287,27 +384,19 @@ const timelineItems = [
         })
         updateCount()
         void updateLinkPreview(post)
+        if (!options.skipSave) queueDraftSave()
       }
 
-      const addPost = () => {
-        const post = document.createElement('article')
-        post.className = 'grid gap-2 pb-4 last:pb-0 border-b border-zinc-100 last:border-b-0'
-        post.dataset.composerPost = ''
-        post.dataset.active = 'false'
+      const addPost = (options = {}) => {
         postCounter += 1
-        post.innerHTML = `
-          <header class="flex gap-3 items-center justify-between">
-            <button class="inline-flex items-center px-2.5 min-h-7 font-bold text-xs text-zinc-600 bg-zinc-100 rounded-lg" type="button" data-select-post>Post ${postCounter}</button>
-            <button class="inline-flex items-center justify-center h-7 w-7 font-bold text-xs text-zinc-500 bg-white border border-zinc-200 rounded-lg shadow-sm" type="button" aria-label="Remove post" title="Remove post" data-remove-post>x</button>
-          </header>
-          <textarea class="min-h-36 w-full leading-relaxed text-[21px] text-neutral-950 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body ${postCounter}" maxlength="300" data-bluesky-text></textarea>
-          <div class="hidden overflow-hidden bg-zinc-50 border border-zinc-200 rounded-2xl" data-link-preview></div>
-        `
+        const post = createPost(postCounter, options.text || '')
         postsRoot?.append(post)
         renamePosts()
-        selectPost(post)
-        textareaFor(post)?.focus()
-        setStatus(`Added post ${allPosts().length}.`, 'success')
+        selectPost(post, { skipSave: true })
+        if (options.focus !== false) textareaFor(post)?.focus()
+        if (options.announce !== false) setStatus(`Added post ${allPosts().length}.`, 'success')
+        if (options.save !== false) saveDraft()
+        return post
       }
 
       const removePost = (post) => {
@@ -317,20 +406,26 @@ const timelineItems = [
           : post.previousElementSibling
         post.remove()
         renamePosts()
-        selectPost(next || root.querySelector('[data-composer-post]'))
+        selectPost(next || root.querySelector('[data-composer-post]'), { skipSave: true })
         setStatus(`Removed post. ${allPosts().length} remaining.`, 'success')
+        saveDraft()
       }
 
-      const setMode = (mode) => {
+      const setMode = (mode, options = {}) => {
+        const nextMode = ['single', 'thread', 'draft'].includes(mode) ? mode : 'single'
+        activeMode = nextMode
         modeButtons.forEach((button) => {
-          const active = button.dataset.composerMode === mode
+          const active = button.dataset.composerMode === nextMode
           button.classList.toggle('bg-white', active)
           button.classList.toggle('text-neutral-950', active)
           button.classList.toggle('shadow-sm', active)
           button.classList.toggle('text-zinc-500', !active)
         })
-        if (mode === 'thread' && allPosts().length === 1) addPost()
-        else setStatus(`${mode[0].toUpperCase()}${mode.slice(1)} mode selected.`, 'success')
+        if (nextMode === 'thread' && allPosts().length === 1 && !options.skipThreadPost) {
+          addPost({ announce: false, focus: false, save: false })
+        }
+        if (!options.silent) setStatus(`${nextMode[0].toUpperCase()}${nextMode.slice(1)} mode selected.`, 'success')
+        if (!options.skipSave) saveDraft()
       }
 
       const publish = async () => {
@@ -363,6 +458,8 @@ const timelineItems = [
           setStatus(url ? `Published: ${url}` : 'Published to Bluesky.', 'success')
           textarea.value = ''
           updateCount()
+          renderLinkPreview(activePost, null)
+          saveDraft()
         }
         catch (error) {
           setStatus(error instanceof Error ? error.message : String(error), 'error')
@@ -383,8 +480,9 @@ const timelineItems = [
         const target = event.target
         if (!(target instanceof HTMLTextAreaElement)) return
         const post = target.closest('[data-composer-post]')
-        selectPost(post)
+        selectPost(post, { skipSave: true })
         queuePreviewUpdate(post)
+        queueDraftSave()
       })
       postsRoot?.addEventListener('focusin', (event) => {
         const target = event.target
@@ -421,8 +519,11 @@ const timelineItems = [
       })
       modeButtons.forEach(button => button.addEventListener('click', () => setMode(button.dataset.composerMode || 'single')))
       buttons.forEach(button => button.addEventListener('click', publish))
+      window.addEventListener('beforeunload', saveDraft)
+      restoreDraft()
+      setMode(activeMode, { silent: true, skipSave: true, skipThreadPost: true })
       renamePosts()
-      selectPost(activePost)
+      selectPost(allPosts()[savedActiveIndex] || activePost, { skipSave: true })
       updateCount()
       void updateLinkPreview(activePost)
     })()
