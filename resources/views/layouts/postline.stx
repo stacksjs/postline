@@ -34,7 +34,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="@yield('description', 'Postline is a clean personal workspace for social publishing.')">
     <title>@yield('title', 'Postline')</title>
-    <script>window.STX_ROUTER_OPTIONS = { container: '[data-postline-app]' };</script>
+    <script>window.STX_ROUTER_OPTIONS = { container: '[data-postline-app]', viewTransitions: false };</script>
   </head>
   <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-[#f4f4f3]">
     <div class="grid grid-cols-1 lg:grid-cols-[286px_minmax(0,1fr)] min-h-screen" data-postline-app>
