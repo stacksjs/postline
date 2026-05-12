@@ -29,7 +29,7 @@
 
         <nav class="overflow-y-auto flex-1 p-2">
           <div class="space-y-0.5">
-            <button @click="navigateToRoot()" class="flex items-center px-2.5 py-1.5 w-full font-medium text-[13px] rounded-md transition-colors text-stone-600 dark:text-neutral-300 hover:bg-stone-200/50 dark:hover:bg-neutral-700">
+            <button @click="navigateToRoot()" class="flex items-center px-2.5 py-1.5 w-full font-medium text-[13px] text-stone-600 dark:text-neutral-300 hover:bg-stone-200/50 dark:hover:bg-neutral-700 rounded-md transition-colors">
               <div class="mr-2.5 h-4 w-4 text-stone-500 dark:text-neutral-500 i-hugeicons-home-02"></div>
               Home
             </button>
@@ -121,7 +121,7 @@
               <li>
                 <div class="flex items-center">
                   <span :show="index > 0" class="mx-1 text-gray-400 dark:text-neutral-500">/</span>
-                  <button @click="navigateToPath(index)" class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-gray-300">{{ path }}</button>
+                  <button @click="navigateToPath(index)" class="font-medium text-gray-500 text-sm dark:text-neutral-400 hover:text-gray-700 dark:hover:text-gray-300">{{ path }}</button>
                 </div>
               </li>
             </template>
@@ -138,7 +138,7 @@
 
         <div :show="filteredItems().length > 0 && viewMode() === 'grid'" class="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           <template :for="item in filteredItems()">
-            <div @click="onItemClick(item)" class="relative group p-4 rounded-lg border cursor-pointer transition-all duration-200 bg-white border-gray-200 hover:border-gray-300 dark:bg-neutral-800 dark:border-neutral-700">
+            <div @click="onItemClick(item)" class="relative p-4 bg-white dark:bg-neutral-800 border border-gray-200 rounded-lg dark:border-neutral-700 hover:border-gray-300 duration-200 transition-all cursor-pointer group">
               <div class="flex justify-center mb-4">
                 <div class="{{ itemIconClass(item) }} h-12 w-12"></div>
               </div>
@@ -170,7 +170,7 @@
             </thead>
             <tbody class="bg-white dark:bg-neutral-800 divide-stone-100 divide-y dark:divide-neutral-700">
               <template :for="item in filteredItems()">
-                <tr @click="onItemClick(item)" class="cursor-pointer hover:bg-stone-50/50 dark:hover:bg-neutral-700/50 transition-colors">
+                <tr @click="onItemClick(item)" class="hover:bg-stone-50/50 dark:hover:bg-neutral-700/50 transition-colors cursor-pointer">
                   <td class="pl-6 pr-3 py-3.5 text-sm whitespace-nowrap">
                     <div class="flex items-center">
                       <div class="{{ itemIconClass(item) }} h-5 w-5 mr-3"></div>
@@ -218,7 +218,7 @@
       <div class="inline-block overflow-hidden pb-4 pt-5 px-4 sm:my-8 sm:p-6 sm:max-w-lg sm:w-full text-left bg-white dark:bg-neutral-800 rounded-lg shadow-xl align-bottom sm:align-middle">
         <h3 class="font-medium leading-6 text-gray-900 text-lg dark:text-white">Upload Files</h3>
         <p class="mt-2 text-gray-500 text-sm dark:text-neutral-400">Select files to upload to the current folder.</p>
-        <div class="mt-4 flex justify-center pb-6 pt-5 px-6 border-2 border-dashed border-gray-300 rounded-md dark:border-neutral-600">
+        <div class="flex justify-center mt-4 pb-6 pt-5 px-6 border-2 border-dashed border-gray-300 rounded-md dark:border-neutral-600">
           <div class="space-y-1 text-center">
             <div class="mx-auto h-12 w-12 text-gray-400 dark:text-neutral-500 i-hugeicons-upload-01"></div>
             <div class="flex text-gray-600 text-sm dark:text-neutral-400">
