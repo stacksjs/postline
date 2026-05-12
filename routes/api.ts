@@ -15,3 +15,11 @@ import { response, route } from '@stacksjs/router'
 // Your custom routes go here:
 route.get('/', () => response.text('hello world'))
 route.get('/coming-soon', 'Controllers/ComingSoonController@index')
+
+route.group({ prefix: '/api/postline/bluesky' }, () => {
+  route.get('/status', 'Actions/Postline/BlueskyStatusAction').skipCsrf()
+  route.post('/connect', 'Actions/Postline/BlueskyConnectAction').skipCsrf()
+  route.post('/publish', 'Actions/Postline/BlueskyPublishAction').skipCsrf()
+  route.get('/link-preview', 'Actions/Postline/BlueskyLinkPreviewAction').skipCsrf()
+  route.get('/timeline', 'Actions/Postline/BlueskyTimelineAction').skipCsrf()
+})

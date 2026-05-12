@@ -47,9 +47,9 @@
             "hasDefault": true,
             "defaultValue": "public",
             "enumValues": [
-              "public",
               "followers",
-              "private"
+              "private",
+              "public"
             ]
           },
           {
@@ -108,12 +108,12 @@
             "hasDefault": false,
             "enumValues": [
               "bluesky",
-              "twitter",
-              "mastodon",
               "facebook",
               "instagram",
+              "linkedin",
+              "mastodon",
               "tiktok",
-              "linkedin"
+              "twitter"
             ]
           },
           {
@@ -126,10 +126,10 @@
             "defaultValue": "draft",
             "enumValues": [
               "draft",
-              "scheduled",
-              "publishing",
-              "published",
               "failed",
+              "published",
+              "publishing",
+              "scheduled",
               "skipped"
             ]
           },
@@ -290,12 +290,12 @@
             "defaultValue": "bluesky",
             "enumValues": [
               "bluesky",
-              "twitter",
-              "mastodon",
               "facebook",
               "instagram",
+              "linkedin",
+              "mastodon",
               "tiktok",
-              "linkedin"
+              "twitter"
             ]
           },
           {
@@ -317,8 +317,8 @@
             "enumValues": [
               "connected",
               "expired",
-              "revoked",
-              "missing"
+              "missing",
+              "revoked"
             ]
           },
           {
@@ -418,8 +418,8 @@
             "defaultValue": "image",
             "enumValues": [
               "image",
-              "video",
-              "link"
+              "link",
+              "video"
             ]
           },
           {
@@ -524,12 +524,12 @@
             "defaultValue": "bluesky",
             "enumValues": [
               "bluesky",
-              "twitter",
-              "mastodon",
               "facebook",
               "instagram",
+              "linkedin",
+              "mastodon",
               "tiktok",
-              "linkedin"
+              "twitter"
             ]
           },
           {
@@ -694,12 +694,12 @@
             "hasDefault": false,
             "enumValues": [
               "bluesky",
-              "twitter",
-              "mastodon",
               "facebook",
               "instagram",
+              "linkedin",
+              "mastodon",
               "tiktok",
-              "linkedin"
+              "twitter"
             ]
           },
           {
@@ -720,8 +720,8 @@
             "defaultValue": "planned",
             "enumValues": [
               "active",
-              "planned",
-              "disabled"
+              "disabled",
+              "planned"
             ]
           },
           {
@@ -820,12 +820,12 @@
             "hasDefault": true,
             "defaultValue": "draft",
             "enumValues": [
+              "archived",
               "draft",
-              "scheduled",
-              "publishing",
-              "published",
               "failed",
-              "archived"
+              "published",
+              "publishing",
+              "scheduled"
             ]
           },
           {
@@ -870,9 +870,9 @@
             "hasDefault": true,
             "defaultValue": "composer",
             "enumValues": [
+              "api",
               "composer",
-              "import",
-              "api"
+              "import"
             ]
           },
           {
@@ -941,7 +941,7 @@
       }
     ]
   },
-  "hash": "f58eb7f5849b90a72951ac803c6005b529e4bd5d6288bfe37e491b7fb195317f",
+  "hash": "24e8b34737052fd8fc42e954a6a5a7efcf9eb531919ac05a3fc1e9055921ff4c",
   "dialect": "sqlite",
-  "updatedAt": "2026-05-11T21:00:05.218Z"
+  "updatedAt": "2026-05-11T23:08:38.055Z"
 }

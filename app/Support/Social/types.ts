@@ -9,13 +9,32 @@ export type SocialProvider =
 
 export interface SocialIdentityCredentials {
   handle: string
+  did?: string
   accessToken?: string
   refreshToken?: string
+}
+
+export interface BlueskySessionCredentials {
+  identifier: string
+  password: string
+}
+
+export interface BlueskySession {
+  did: string
+  handle: string
+  displayName?: string
+  accessJwt: string
+  refreshJwt: string
 }
 
 export interface PublishPostInput {
   text: string
   scheduledAt?: string
+  external?: {
+    uri: string
+    title: string
+    description?: string
+  }
   media?: Array<{
     url: string
     altText?: string
@@ -51,6 +70,8 @@ export interface TimelineResult {
 export interface SocialDriver {
   provider: SocialProvider
   characterLimit: number
+  createSession?: (credentials: BlueskySessionCredentials) => Promise<BlueskySession>
+  refreshSession?: (refreshToken: string) => Promise<BlueskySession>
   publish(identity: SocialIdentityCredentials, post: PublishPostInput): Promise<PublishedPost>
   timeline(identity: SocialIdentityCredentials, query?: TimelineQuery): Promise<TimelineResult>
 }

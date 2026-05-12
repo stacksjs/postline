@@ -1,3 +1,4 @@
+import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { mail, template } from '@stacksjs/email'
 import { log } from '@stacksjs/logging'
@@ -6,7 +7,7 @@ export default new Action({
   name: 'SendWelcomeEmail',
   description: 'Sends a welcome email to newly registered users',
 
-  async handle(request) {
+  async handle(request: RequestInstance) {
     const to = request.get('to')
     const name = request.get('name') || 'there'
 
