@@ -73,7 +73,7 @@ jobs:
         run: bun install
 
       - name: Typecheck
-        run: bunx --bun tsc --noEmit
+        run: bun run typecheck
 
   test:
     runs-on: ${{ matrix.os }}
