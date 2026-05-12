@@ -1,31 +1,44 @@
 # Changelog
-[Compare changes](https://github.com/stacksjs/postline/compare/v0.70.39...v0.70.40)
 
-### 🐛 Bug Fixes
+[Compare changes](https://github.com/stacksjs/stacks/compare/v0.70.38...v0.70.39)
 
-- **ci**: use app-aware quality commands ([11298b8](https://github.com/stacksjs/postline/commit/11298b8)) _(by Chris <chrisbreuer93@gmail.com>)_
+## 🐛 Bug Fixes
+
+- **framework**: emit env and logging root declarations ([12d70af](https://github.com/stacksjs/stacks/commit/12d70af)) _(by Chris <chrisbreuer93@gmail.com>)_
 
 ### 📚 Documentation
 
-- update changelog for v0.70.39 ([00f9177](https://github.com/stacksjs/postline/commit/00f9177)) _(by Chris <chrisbreuer93@gmail.com>)_
+- update changelog for v0.70.38 ([eba318b](https://github.com/stacksjs/stacks/commit/eba318b)) _(by Chris <chrisbreuer93@gmail.com>)_
 
 ### 🧹 Chores
 
-- release v0.70.40 ([edc54dd](https://github.com/stacksjs/postline/commit/edc54dd)) _(by Chris <chrisbreuer93@gmail.com>)_
+- release v0.70.39 ([75d7ef2](https://github.com/stacksjs/stacks/commit/75d7ef2)) _(by Chris <chrisbreuer93@gmail.com>)_
 
 ### Contributors
 
 - _Chris <chrisbreuer93@gmail.com>_
 
-[Compare changes](https://github.com/stacksjs/postline/compare/v0.70.38...v0.70.39)
+[Compare changes](https://github.com/stacksjs/stacks/compare/v0.70.37...v0.70.38)
+
+## 🚀 Features
+
+- **socials**: add bluesky publishing driver ([ace2fdf](https://github.com/stacksjs/stacks/commit/ace2fdf)) _(by Chris <chrisbreuer93@gmail.com>)_
 
 ### 🐛 Bug Fixes
 
-- **ci**: build framework declarations before typecheck ([0d7a3f5](https://github.com/stacksjs/postline/commit/0d7a3f5)) _(by Chris <chrisbreuer93@gmail.com>)_
+- **framework**: harden declaration builds ([ef51420](https://github.com/stacksjs/stacks/commit/ef51420)) _(by Chris <chrisbreuer93@gmail.com>)_
+
+### 📚 Documentation
+
+- update changelog for v0.70.37 ([6c870ab](https://github.com/stacksjs/stacks/commit/6c870ab)) _(by Chris <chrisbreuer93@gmail.com>)_
+
+### 🤖 Continuous Integration
+
+- skip deploys without aws credentials ([bdb98a8](https://github.com/stacksjs/stacks/commit/bdb98a8)) _(by Chris <chrisbreuer93@gmail.com>)_
 
 ### 🧹 Chores
 
-- release v0.70.39 ([3af27d4](https://github.com/stacksjs/postline/commit/3af27d4)) _(by Chris <chrisbreuer93@gmail.com>)_
+- release v0.70.38 ([c989eba](https://github.com/stacksjs/stacks/commit/c989eba)) _(by Chris <chrisbreuer93@gmail.com>)_
 
 ### Contributors
 
@@ -33,7 +46,7 @@
 
 [Compare changes](https://github.com/stacksjs/stacks/compare/v0.70.36...v0.70.37)
 
-### 📚 Documentation
+## 📚 Documentation
 
 - update changelog for v0.70.36 ([0ac09a0](https://github.com/stacksjs/stacks/commit/0ac09a0)) _(by Chris <chrisbreuer93@gmail.com>)_
 
