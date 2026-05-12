@@ -5,7 +5,7 @@
 
 <script server>
 const accounts = [
-  { name: 'Bluesky', handle: 'chris.bsky.social', status: 'Connected', detail: 'Publish and timeline driver ready.' },
+  { name: 'Bluesky', handle: 'Not connected', status: 'Setup', detail: 'Add an app password to publish and sync your timeline.' },
   { name: 'Twitter/X', handle: 'Not connected', status: 'Planned', detail: 'Waiting on the next driver adapter.' },
   { name: 'Mastodon', handle: 'Not connected', status: 'Planned', detail: 'Federated posting support is next in line.' },
   { name: 'Instagram', handle: 'Not connected', status: 'Later', detail: 'Media-first workflow needs a separate approval step.' },
@@ -14,24 +14,39 @@ const accounts = [
 
 @section('content')
   <section class="grid gap-5" data-postline-page="accounts" data-testid="accounts-page">
-    <header class="flex min-h-11 items-center justify-between gap-4">
+    <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
-        <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Accounts</p>
-        <h1 class="m-0 text-[22px] font-bold tracking-normal text-neutral-950">Publishing drivers</h1>
+        <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Accounts</p>
+        <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Publishing drivers</h1>
       </div>
-      <button class="inline-flex h-9 items-center justify-center rounded-md bg-neutral-950 px-4 font-bold text-white" type="button">Connect</button>
+      <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-white bg-neutral-950 rounded-md" type="submit" form="bluesky-connect-form">Connect</button>
     </header>
 
-    <section class="rounded-lg border border-zinc-200 bg-white shadow-[0_18px_54px_rgba(24,31,42,0.10)]">
-      <header class="flex items-center justify-between gap-3 border-zinc-200 border-b p-3.5">
+    <form id="bluesky-connect-form" class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] p-3.5 bg-white border border-zinc-200 rounded-lg shadow-[0_18px_54px_rgba(24,31,42,0.10)]" data-bluesky-connect-form>
+      <label class="grid gap-1.5">
+        <span class="font-bold text-xs text-zinc-500">Bluesky handle</span>
+        <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-md focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="identifier" placeholder="name.bsky.social" autocomplete="username" data-bluesky-identifier>
+      </label>
+      <label class="grid gap-1.5">
+        <span class="font-bold text-xs text-zinc-500">App password</span>
+        <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-md focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password" type="password" autocomplete="current-password" data-bluesky-password>
+      </label>
+      <div class="flex items-end">
+        <button class="inline-flex items-center justify-center px-4 h-10 w-full sm:w-auto font-bold text-sm text-white bg-neutral-950 rounded-md" type="submit">Save</button>
+      </div>
+      <div class="hidden sm:col-span-3 px-3 py-2 text-emerald-700 text-red-700 text-sm text-zinc-600 bg-emerald-50 bg-red-50 bg-slate-50 border border-emerald-200 border-red-200 border-zinc-200 rounded-md" role="status" data-bluesky-connect-status></div>
+    </form>
+
+    <section class="bg-white border border-zinc-200 rounded-lg shadow-[0_18px_54px_rgba(24,31,42,0.10)]">
+      <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
         <strong class="text-[13px]">Channels</strong>
         <span class="text-xs text-zinc-500">Driver based</span>
       </header>
       <div class="grid gap-2.5 p-3">
         @foreach (accounts as account)
-          <article class="flex items-center justify-between gap-5 rounded-lg border border-zinc-200 bg-white p-3">
+          <article class="flex gap-5 items-center justify-between p-3 bg-white border border-zinc-200 rounded-lg">
             <div>
-              <h2 class="my-0 text-[15px] font-bold">{{ account.name }}</h2>
+              <h2 class="my-0 font-bold text-[15px]">{{ account.name }}</h2>
               <p class="my-1.5 text-[13px] text-slate-700">{{ account.handle }}</p>
               <span class="text-xs text-zinc-500">{{ account.detail }}</span>
             </div>
@@ -41,4 +56,64 @@ const accounts = [
       </div>
     </section>
   </section>
+
+  <script>
+    ;(() => {
+      const root = document.querySelector('[data-testid="accounts-page"]')
+      if (!root) return
+
+      const form = root.querySelector('[data-bluesky-connect-form]')
+      const identifier = root.querySelector('[data-bluesky-identifier]')
+      const password = root.querySelector('[data-bluesky-password]')
+      const status = root.querySelector('[data-bluesky-connect-status]')
+
+      const setStatus = (message, tone = 'neutral') => {
+        if (!status) return
+        status.textContent = message
+        status.classList.remove('hidden', 'border-emerald-200', 'bg-emerald-50', 'text-emerald-700', 'border-red-200', 'bg-red-50', 'text-red-700', 'border-zinc-200', 'bg-slate-50', 'text-zinc-600')
+        if (tone === 'success') status.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-700')
+        else if (tone === 'error') status.classList.add('border-red-200', 'bg-red-50', 'text-red-700')
+        else status.classList.add('border-zinc-200', 'bg-slate-50', 'text-zinc-600')
+      }
+
+      const refreshStatus = async () => {
+        try {
+          const response = await fetch('/api/postline/bluesky/status')
+          const payload = await response.json()
+          if (payload.ok && payload.data?.handle) {
+            if (identifier) identifier.value = payload.data.handle
+            setStatus(
+              payload.data.connected
+                ? `${payload.data.handle} is connected.`
+                : `${payload.data.handle} needs an app password to publish.`,
+              payload.data.connected ? 'success' : 'neutral',
+            )
+          }
+        }
+        catch {}
+      }
+
+      form?.addEventListener('submit', async (event) => {
+        event.preventDefault()
+        const body = new FormData(form)
+        setStatus('Connecting...')
+
+        try {
+          const response = await fetch('/api/postline/bluesky/connect', {
+            method: 'POST',
+            body,
+          })
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky connect failed.')
+          if (password) password.value = ''
+          setStatus(`${payload.data.handle} connected.`, 'success')
+        }
+        catch (error) {
+          setStatus(error instanceof Error ? error.message : String(error), 'error')
+        }
+      })
+
+      refreshStatus()
+    })()
+  </script>
 @endsection

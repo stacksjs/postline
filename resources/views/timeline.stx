@@ -28,31 +28,98 @@ const timelineItems = [
 
 @section('content')
   <section class="grid gap-5" data-postline-page="timeline" data-testid="timeline-page">
-    <header class="flex min-h-11 items-center justify-between gap-4">
+    <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
-        <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Timeline</p>
-        <h1 class="m-0 text-[22px] font-bold tracking-normal text-neutral-950">Bluesky home</h1>
+        <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Timeline</p>
+        <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Bluesky home</h1>
       </div>
-      <div class="flex items-center gap-2">
-        <button class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-zinc-200 bg-white font-bold text-neutral-950 shadow-sm" type="button" aria-label="Refresh timeline" title="Refresh timeline">R</button>
-        <button class="inline-flex h-9 items-center justify-center rounded-md bg-neutral-950 px-4 font-bold text-white" type="button">Post reply</button>
+      <div class="flex gap-2 items-center">
+        <button class="inline-flex items-center justify-center h-9 w-9 font-bold text-neutral-950 bg-white border border-zinc-200 rounded-md shadow-sm" type="button" aria-label="Refresh timeline" title="Refresh timeline" data-bluesky-timeline-refresh>R</button>
+        <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-white bg-neutral-950 rounded-md" type="button">Post reply</button>
       </div>
     </header>
 
-    <section class="grid max-w-3xl gap-3" aria-label="Bluesky timeline">
+    <div class="hidden px-3 py-2 max-w-3xl text-emerald-700 text-red-700 text-sm text-zinc-600 bg-emerald-50 bg-red-50 bg-slate-50 border border-emerald-200 border-red-200 border-zinc-200 rounded-md" role="status" data-bluesky-timeline-status></div>
+
+    <section class="grid gap-3 max-w-3xl" aria-label="Bluesky timeline" data-bluesky-timeline-list>
       @foreach (timelineItems as item)
-        <article class="rounded-lg border border-zinc-200 bg-white p-3.5 shadow-[0_18px_54px_rgba(24,31,42,0.10)]">
-          <header class="mb-3 flex items-center justify-between gap-3">
+        <article class="p-3.5 bg-white border border-zinc-200 rounded-lg shadow-[0_18px_54px_rgba(24,31,42,0.10)]">
+          <header class="flex gap-3 items-center justify-between mb-3">
             <div>
-              <span class="block text-xs font-bold">{{ item.author }}</span>
+              <span class="block font-bold text-xs">{{ item.author }}</span>
               <span class="text-xs text-zinc-500">{{ item.label }}</span>
             </div>
-            <button class="inline-flex h-8 items-center justify-center rounded-md border border-zinc-200 bg-white px-3 text-xs font-bold text-neutral-950 shadow-sm" type="button">Reply</button>
+            <button class="inline-flex items-center justify-center px-3 h-8 font-bold text-neutral-950 text-xs bg-white border border-zinc-200 rounded-md shadow-sm" type="button">Reply</button>
           </header>
-          <p class="m-0 text-[13px] leading-normal text-slate-700">{{ item.text }}</p>
+          <p class="m-0 leading-normal text-[13px] text-slate-700">{{ item.text }}</p>
           <footer class="mt-3 text-xs text-zinc-500">{{ item.meta }}</footer>
         </article>
       @endforeach
     </section>
   </section>
+
+  <script>
+    ;(() => {
+      const root = document.querySelector('[data-testid="timeline-page"]')
+      if (!root) return
+
+      const button = root.querySelector('[data-bluesky-timeline-refresh]')
+      const list = root.querySelector('[data-bluesky-timeline-list]')
+      const status = root.querySelector('[data-bluesky-timeline-status]')
+
+      const setStatus = (message, tone = 'neutral') => {
+        if (!status) return
+        status.textContent = message
+        status.classList.remove('hidden', 'border-emerald-200', 'bg-emerald-50', 'text-emerald-700', 'border-red-200', 'bg-red-50', 'text-red-700', 'border-zinc-200', 'bg-slate-50', 'text-zinc-600')
+        if (tone === 'success') status.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-700')
+        else if (tone === 'error') status.classList.add('border-red-200', 'bg-red-50', 'text-red-700')
+        else status.classList.add('border-zinc-200', 'bg-slate-50', 'text-zinc-600')
+      }
+
+      const escapeHtml = (value) => String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;')
+
+      const renderItems = (items) => {
+        if (!list || !Array.isArray(items)) return
+        list.innerHTML = items.map(item => `
+          <article class="p-3.5 bg-white border border-zinc-200 rounded-lg shadow-[0_18px_54px_rgba(24,31,42,0.10)]">
+            <header class="flex gap-3 items-center justify-between mb-3">
+              <div>
+                <span class="block font-bold text-xs">${escapeHtml(item.authorHandle)}</span>
+                <span class="text-xs text-zinc-500">${escapeHtml(item.authorName || 'Bluesky')}</span>
+              </div>
+              <a class="inline-flex items-center justify-center px-3 h-8 font-bold text-neutral-950 text-xs bg-white border border-zinc-200 rounded-md shadow-sm" href="https://bsky.app/profile/${encodeURIComponent(item.authorHandle)}" target="_blank" rel="noreferrer">Open</a>
+            </header>
+            <p class="m-0 leading-normal text-[13px] text-slate-700 whitespace-pre-wrap">${escapeHtml(item.body)}</p>
+            <footer class="mt-3 text-xs text-zinc-500">${item.likeCount} likes / ${item.repostCount} reposts / ${item.replyCount} replies</footer>
+          </article>
+        `).join('')
+      }
+
+      const refresh = async () => {
+        button?.setAttribute('disabled', 'disabled')
+        setStatus('Syncing Bluesky timeline...')
+
+        try {
+          const response = await fetch('/api/postline/bluesky/timeline?limit=30')
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky timeline sync failed.')
+          renderItems(payload.data.items)
+          setStatus(`Synced ${payload.data.saved} timeline posts.`, 'success')
+        }
+        catch (error) {
+          setStatus(error instanceof Error ? error.message : String(error), 'error')
+        }
+        finally {
+          button?.removeAttribute('disabled')
+        }
+      }
+
+      button?.addEventListener('click', refresh)
+    })()
+  </script>
 @endsection

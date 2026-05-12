@@ -1,6 +1,7 @@
 @extends('layouts/postline')
 
 @section('title', 'Postline - Composer')
+@section('shell-title', 'Create Bluesky scheduler')
 @section('description', 'Write, schedule, publish, and review social posts from a clean personal workspace.')
 
 <script server>
@@ -43,63 +44,71 @@ const timelineItems = [
 
 @section('content')
   <section class="grid gap-5" data-postline-page="composer" data-testid="composer-page">
-    <header class="flex min-h-11 items-center justify-between gap-4">
-      <div>
-        <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Composer</p>
-        <h1 class="m-0 text-[22px] font-bold tracking-normal text-neutral-950">Write the next post</h1>
-      </div>
-      <div class="flex items-center gap-2">
-        <button class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-zinc-200 bg-white font-bold text-neutral-950 shadow-sm" type="button" aria-label="Search posts" title="Search posts">S</button>
-        <button class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-zinc-200 bg-white font-bold text-neutral-950 shadow-sm" type="button" aria-label="Refresh timeline" title="Refresh timeline">R</button>
-        <button class="inline-flex h-9 items-center justify-center rounded-md bg-neutral-950 px-4 font-bold text-white" type="button">Schedule</button>
+    <header class="flex gap-4 items-center justify-between min-h-11">
+      <p class="m-0 font-medium text-[15px] text-zinc-500">Composer</p>
+      <div class="flex gap-2 items-center">
+        <button class="inline-flex items-center justify-center h-10 w-10 font-bold text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Search posts" title="Search posts" data-composer-search>S</button>
+        <button class="inline-flex items-center justify-center h-10 w-10 font-bold text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Refresh timeline" title="Refresh timeline" data-composer-refresh>R</button>
+        <button class="inline-flex items-center justify-center px-5 h-10 font-bold text-white bg-neutral-950 rounded-xl" type="button" data-bluesky-publish-top>Publish</button>
       </div>
     </header>
 
-    <div class="grid gap-4 xl:grid-cols-[minmax(360px,1.1fr)_minmax(320px,0.9fr)]">
-      <section class="grid min-h-[560px] grid-rows-[auto_1fr_auto] rounded-lg border border-zinc-200 bg-white shadow-[0_18px_54px_rgba(24,31,42,0.10)]" aria-label="Post composer">
-        <header class="flex items-center justify-between gap-3 border-zinc-200 border-b p-3.5">
+    <div class="hidden bottom-6 fixed right-6 z-50 px-3.5 py-2.5 max-w-md text-sm bg-white border border-zinc-200 rounded-2xl shadow-[0_18px_54px_rgba(24,31,42,0.16)]" role="status" data-bluesky-status></div>
+
+    <div class="grid gap-4 xl:grid-cols-[minmax(420px,1.08fr)_minmax(320px,0.92fr)]">
+      <section class="grid grid-rows-[auto_1fr_auto] min-h-[560px] bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Post composer">
+        <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
           <strong class="text-[13px]">New post</strong>
-          <div class="grid grid-cols-3 rounded-md border border-zinc-200 bg-slate-100 p-0.5" role="group" aria-label="Post mode">
-            <button class="min-w-19 rounded px-2.5 py-1.5 bg-white text-xs text-neutral-950 shadow-sm" type="button">Single</button>
-            <button class="min-w-19 rounded px-2.5 py-1.5 text-xs text-zinc-500" type="button">Thread</button>
-            <button class="min-w-19 rounded px-2.5 py-1.5 text-xs text-zinc-500" type="button">Draft</button>
+          <div class="grid grid-cols-3 p-0.5 bg-zinc-100 border border-zinc-200 rounded-xl" role="group" aria-label="Post mode">
+            <button class="px-2.5 py-1.5 min-w-19 text-neutral-950 text-xs bg-white rounded-lg shadow-sm" type="button" data-composer-mode="single">Single</button>
+            <button class="px-2.5 py-1.5 min-w-19 text-xs text-zinc-500 rounded-lg" type="button" data-composer-mode="thread">Thread</button>
+            <button class="px-2.5 py-1.5 min-w-19 text-xs text-zinc-500 rounded-lg" type="button" data-composer-mode="draft">Draft</button>
           </div>
         </header>
 
         <div class="grid grid-rows-[auto_1fr] p-3.5">
-          <div class="mb-3 flex flex-wrap gap-2">
-            <div class="flex min-h-8 items-center rounded-md border border-zinc-200 bg-slate-50 px-2.5 text-xs text-zinc-500">Bluesky</div>
-            <div class="flex min-h-8 items-center rounded-md border border-zinc-200 bg-slate-50 px-2.5 text-xs text-zinc-500">Today 3:30 PM</div>
-            <div class="flex min-h-8 items-center rounded-md border border-zinc-200 bg-slate-50 px-2.5 text-xs text-zinc-500">Public</div>
+          <div class="flex flex-wrap gap-2 mb-3">
+            <div class="flex items-center px-2.5 min-h-8 text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-xl">Bluesky</div>
+            <div class="flex items-center px-2.5 min-h-8 text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-xl">Today 3:30 PM</div>
+            <div class="flex items-center px-2.5 min-h-8 text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-xl">Public</div>
           </div>
-          <textarea class="min-h-80 w-full resize-none border-0 text-[21px] leading-relaxed text-neutral-950 outline-none" spellcheck="true" aria-label="Post body">Working on a calmer way to plan posts: drafts, timelines, scheduling, and publishing in one native-feeling place.</textarea>
+          <div class="grid content-start gap-5" data-composer-posts>
+            <article class="grid gap-2 pb-4 last:pb-0 border-b border-zinc-100 last:border-b-0" data-composer-post data-active="true">
+              <header class="flex gap-3 items-center justify-between">
+                <button class="inline-flex items-center px-2.5 min-h-7 font-bold text-white text-xs bg-neutral-950 rounded-lg" type="button" data-select-post>Post 1</button>
+                <button class="hidden items-center justify-center h-7 w-7 font-bold text-xs text-zinc-500 bg-white border border-zinc-200 rounded-lg shadow-sm" type="button" aria-label="Remove post" title="Remove post" data-remove-post>x</button>
+              </header>
+              <textarea class="min-h-36 w-full leading-relaxed text-[21px] text-neutral-950 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" maxlength="300" data-bluesky-text>Working on a calmer way to plan posts: drafts, timelines, scheduling, and publishing in one native-feeling place.</textarea>
+              <div class="hidden overflow-hidden bg-zinc-50 border border-zinc-200 rounded-2xl" data-link-preview></div>
+            </article>
+          </div>
         </div>
 
-        <footer class="flex items-center justify-between gap-3 border-zinc-200 border-t p-3.5">
-          <span class="text-xs text-zinc-500">118 / 300 characters</span>
-          <div class="flex items-center gap-2">
-            <button class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-zinc-200 bg-white font-bold text-neutral-950 shadow-sm" type="button" aria-label="Attach media" title="Attach media">+</button>
-            <button class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-zinc-200 bg-white font-bold text-neutral-950 shadow-sm" type="button" aria-label="Preview post" title="Preview post">P</button>
-            <button class="inline-flex h-9 items-center justify-center rounded-md bg-neutral-950 px-4 font-bold text-white" type="button">Publish</button>
+        <footer class="flex gap-3 items-center justify-between p-3.5 border-t border-zinc-200">
+          <span class="text-xs text-zinc-500" data-bluesky-count>118 / 300 characters</span>
+          <div class="flex gap-2 items-center">
+            <button class="inline-flex items-center justify-center h-9 w-9 font-bold text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Add post" title="Add post" data-add-post>+</button>
+            <button class="inline-flex items-center justify-center h-9 w-9 font-bold text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Preview post" title="Preview post" data-preview-post>P</button>
+            <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-white bg-neutral-950 rounded-xl" type="button" data-bluesky-publish>Publish</button>
           </div>
         </footer>
       </section>
 
       <div class="grid gap-4">
-        <section class="rounded-lg border border-zinc-200 bg-white shadow-[0_18px_54px_rgba(24,31,42,0.10)]" aria-label="Schedule queue">
-          <header class="flex items-center justify-between gap-3 border-zinc-200 border-b p-3.5">
+        <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Schedule queue">
+          <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
             <strong class="text-[13px]">Queue</strong>
-            <a href="/queue" data-stx-link class="text-xs font-bold text-blue-600">3 upcoming</a>
+            <a href="/queue" data-stx-link class="font-bold text-blue-600 text-xs">3 upcoming</a>
           </header>
-          <div class="grid gap-2.5 p-3">
+          <div class="grid gap-2.5 p-3" data-queue-list>
             @foreach (scheduledPosts as post)
-              <article class="rounded-lg border border-zinc-200 bg-white p-3">
-                <header class="mb-2 flex items-center justify-between gap-3">
-                  <span class="text-xs font-bold">{{ post.time }}</span>
-                  <span class="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-700">{{ post.status }}</span>
+              <article class="p-3 bg-white border border-zinc-200 rounded-2xl">
+                <header class="flex gap-3 items-center justify-between mb-2">
+                  <span class="font-bold text-xs">{{ post.time }}</span>
+                  <span class="px-2 py-1 font-bold text-[11px] text-blue-700 bg-blue-50 rounded-full">{{ post.status }}</span>
                 </header>
-                <p class="m-0 text-[13px] leading-normal text-slate-700">{{ post.text }}</p>
-                <footer class="mt-2.5 flex items-center justify-between text-xs text-zinc-500">
+                <p class="m-0 leading-normal text-[13px] text-slate-700">{{ post.text }}</p>
+                <footer class="flex items-center justify-between mt-2.5 text-xs text-zinc-500">
                   <span>{{ post.channel }}</span>
                   <span>Edit</span>
                 </footer>
@@ -108,20 +117,20 @@ const timelineItems = [
           </div>
         </section>
 
-        <section class="rounded-lg border border-zinc-200 bg-white shadow-[0_18px_54px_rgba(24,31,42,0.10)]" aria-label="Timeline preview">
-          <header class="flex items-center justify-between gap-3 border-zinc-200 border-b p-3.5">
+        <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Timeline preview">
+          <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
             <strong class="text-[13px]">Timeline</strong>
-            <a href="/timeline" data-stx-link class="text-xs font-bold text-blue-600">Bluesky home</a>
+            <a href="/timeline" data-stx-link class="font-bold text-blue-600 text-xs">Bluesky home</a>
           </header>
           <div class="grid gap-2.5 p-3">
             @foreach (timelineItems as item)
-              <article class="rounded-lg border border-zinc-200 bg-white p-3">
-                <header class="mb-2 flex items-center justify-between gap-3">
-                  <span class="text-xs font-bold">{{ item.author }}</span>
+              <article class="p-3 bg-white border border-zinc-200 rounded-2xl">
+                <header class="flex gap-3 items-center justify-between mb-2">
+                  <span class="font-bold text-xs">{{ item.author }}</span>
                   <span class="text-xs text-zinc-500">{{ item.label }}</span>
                 </header>
-                <p class="m-0 text-[13px] leading-normal text-slate-700">{{ item.text }}</p>
-                <footer class="mt-2.5 flex items-center justify-between text-xs text-zinc-500">
+                <p class="m-0 leading-normal text-[13px] text-slate-700">{{ item.text }}</p>
+                <footer class="flex items-center justify-between mt-2.5 text-xs text-zinc-500">
                   <span>{{ item.meta }}</span>
                   <span>Reply</span>
                 </footer>
@@ -132,4 +141,290 @@ const timelineItems = [
       </div>
     </div>
   </section>
+
+  <script>
+    ;(() => {
+      const root = document.querySelector('[data-testid="composer-page"]')
+      if (!root) return
+
+      const count = root.querySelector('[data-bluesky-count]')
+      const status = root.querySelector('[data-bluesky-status]')
+      const buttons = Array.from(root.querySelectorAll('[data-bluesky-publish], [data-bluesky-publish-top]'))
+      const postsRoot = root.querySelector('[data-composer-posts]')
+      const addPostButton = root.querySelector('[data-add-post]')
+      const previewButton = root.querySelector('[data-preview-post]')
+      const refreshButton = root.querySelector('[data-composer-refresh]')
+      const searchButton = root.querySelector('[data-composer-search]')
+      const modeButtons = Array.from(root.querySelectorAll('[data-composer-mode]'))
+      const linkPreviewCache = new Map()
+      const urlPattern = /https?:\/\/[^\s<>"']+/i
+      let activePost = root.querySelector('[data-composer-post]')
+      let postCounter = root.querySelectorAll('[data-composer-post]').length
+      let previewTimer
+
+      const setStatus = (message, tone = 'neutral') => {
+        if (!status) return
+        status.textContent = message
+        status.classList.remove('hidden', 'border-emerald-200', 'bg-emerald-50', 'text-emerald-700', 'border-red-200', 'bg-red-50', 'text-red-700', 'border-zinc-200', 'bg-white', 'text-zinc-700')
+        if (tone === 'success') status.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-700')
+        else if (tone === 'error') status.classList.add('border-red-200', 'bg-red-50', 'text-red-700')
+        else status.classList.add('border-zinc-200', 'bg-white', 'text-zinc-700')
+      }
+
+      const textareaFor = post => post?.querySelector('[data-bluesky-text]')
+      const previewFor = post => post?.querySelector('[data-link-preview]')
+      const allPosts = () => Array.from(root.querySelectorAll('[data-composer-post]'))
+      const activeTextarea = () => textareaFor(activePost) || root.querySelector('[data-bluesky-text]')
+      const activePreview = () => previewFor(activePost)
+      const firstUrl = value => value.match(urlPattern)?.[0]?.replace(/[),.;]+$/, '')
+
+      const escapeHtml = value => String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+
+      const updateCount = () => {
+        const textarea = activeTextarea()
+        if (!textarea || !count) return
+        count.textContent = `${textarea.value.length} / 300 characters - ${allPosts().length} post${allPosts().length === 1 ? '' : 's'}`
+      }
+
+      const renderLinkPreview = (post, preview) => {
+        const container = previewFor(post)
+        if (!container) return
+
+        if (!preview) {
+          container.classList.add('hidden')
+          container.innerHTML = ''
+          delete post.dataset.externalUri
+          delete post.dataset.externalTitle
+          delete post.dataset.externalDescription
+          return
+        }
+
+        post.dataset.externalUri = preview.url
+        post.dataset.externalTitle = preview.title
+        post.dataset.externalDescription = preview.description || ''
+        container.classList.remove('hidden')
+        container.innerHTML = `
+          ${preview.image ? `<div class="h-28 bg-center bg-cover bg-zinc-100 border-b border-zinc-200" style="background-image:url('${escapeHtml(preview.image)}')"></div>` : ''}
+          <div class="grid gap-1 p-3">
+            <div class="font-bold text-[11px] text-zinc-500 uppercase">${escapeHtml(preview.domain)}</div>
+            <div class="font-bold text-neutral-950 text-sm">${escapeHtml(preview.title)}</div>
+            ${preview.description ? `<div class="leading-normal line-clamp-2 text-[13px] text-zinc-600">${escapeHtml(preview.description)}</div>` : ''}
+          </div>
+        `
+      }
+
+      const updateLinkPreview = async (post = activePost) => {
+        const textarea = textareaFor(post)
+        if (!post || !textarea) return
+        const url = firstUrl(textarea.value)
+        if (!url) {
+          renderLinkPreview(post, null)
+          return
+        }
+
+        if (post.dataset.previewUrl === url && post.dataset.externalTitle) return
+        post.dataset.previewUrl = url
+
+        try {
+          if (!linkPreviewCache.has(url)) {
+            const response = await fetch(`/api/postline/bluesky/link-preview?url=${encodeURIComponent(url)}`)
+            const payload = await response.json()
+            if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not render link preview.')
+            linkPreviewCache.set(url, payload.data)
+          }
+          renderLinkPreview(post, linkPreviewCache.get(url))
+        }
+        catch {
+          renderLinkPreview(post, {
+            url,
+            domain: new URL(url).hostname.replace(/^www\./, ''),
+            title: url,
+            description: '',
+          })
+        }
+      }
+
+      const queuePreviewUpdate = (post = activePost) => {
+        clearTimeout(previewTimer)
+        previewTimer = setTimeout(() => {
+          void updateLinkPreview(post)
+        }, 250)
+      }
+
+      const renamePosts = () => {
+        allPosts().forEach((post, index) => {
+          const number = index + 1
+          const select = post.querySelector('[data-select-post]')
+          const remove = post.querySelector('[data-remove-post]')
+          const textarea = textareaFor(post)
+          if (select) select.textContent = `Post ${number}`
+          if (textarea) textarea.setAttribute('aria-label', `Post body ${number}`)
+          remove?.classList.toggle('hidden', allPosts().length === 1)
+          remove?.classList.toggle('inline-flex', allPosts().length > 1)
+        })
+      }
+
+      const selectPost = (post) => {
+        if (!post) return
+        activePost = post
+        allPosts().forEach((item) => {
+          const active = item === post
+          const select = item.querySelector('[data-select-post]')
+          item.dataset.active = active ? 'true' : 'false'
+          item.classList.toggle('border-neutral-950', active)
+          item.classList.toggle('border-blue-300', active)
+          item.classList.toggle('shadow-sm', active)
+          item.classList.toggle('border-zinc-200', !active)
+          select?.classList.toggle('bg-neutral-950', active)
+          select?.classList.toggle('text-white', active)
+          select?.classList.toggle('bg-zinc-100', !active)
+          select?.classList.toggle('text-zinc-600', !active)
+        })
+        updateCount()
+        void updateLinkPreview(post)
+      }
+
+      const addPost = () => {
+        const post = document.createElement('article')
+        post.className = 'grid gap-2 pb-4 last:pb-0 border-b border-zinc-100 last:border-b-0'
+        post.dataset.composerPost = ''
+        post.dataset.active = 'false'
+        postCounter += 1
+        post.innerHTML = `
+          <header class="flex gap-3 items-center justify-between">
+            <button class="inline-flex items-center px-2.5 min-h-7 font-bold text-xs text-zinc-600 bg-zinc-100 rounded-lg" type="button" data-select-post>Post ${postCounter}</button>
+            <button class="inline-flex items-center justify-center h-7 w-7 font-bold text-xs text-zinc-500 bg-white border border-zinc-200 rounded-lg shadow-sm" type="button" aria-label="Remove post" title="Remove post" data-remove-post>x</button>
+          </header>
+          <textarea class="min-h-36 w-full leading-relaxed text-[21px] text-neutral-950 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body ${postCounter}" maxlength="300" data-bluesky-text></textarea>
+          <div class="hidden overflow-hidden bg-zinc-50 border border-zinc-200 rounded-2xl" data-link-preview></div>
+        `
+        postsRoot?.append(post)
+        renamePosts()
+        selectPost(post)
+        textareaFor(post)?.focus()
+        setStatus(`Added post ${allPosts().length}.`, 'success')
+      }
+
+      const removePost = (post) => {
+        if (!post || allPosts().length === 1) return
+        const next = post.nextElementSibling?.matches('[data-composer-post]')
+          ? post.nextElementSibling
+          : post.previousElementSibling
+        post.remove()
+        renamePosts()
+        selectPost(next || root.querySelector('[data-composer-post]'))
+        setStatus(`Removed post. ${allPosts().length} remaining.`, 'success')
+      }
+
+      const setMode = (mode) => {
+        modeButtons.forEach((button) => {
+          const active = button.dataset.composerMode === mode
+          button.classList.toggle('bg-white', active)
+          button.classList.toggle('text-neutral-950', active)
+          button.classList.toggle('shadow-sm', active)
+          button.classList.toggle('text-zinc-500', !active)
+        })
+        if (mode === 'thread' && allPosts().length === 1) addPost()
+        else setStatus(`${mode[0].toUpperCase()}${mode.slice(1)} mode selected.`, 'success')
+      }
+
+      const publish = async () => {
+        const textarea = activeTextarea()
+        if (!textarea) return
+        const text = textarea.value.trim()
+        if (!text) {
+          setStatus('Write something before publishing.', 'error')
+          textarea.focus()
+          return
+        }
+        const body = new FormData()
+        body.set('text', text)
+        if (activePost?.dataset.externalUri && activePost.dataset.externalTitle) {
+          body.set('external_uri', activePost.dataset.externalUri)
+          body.set('external_title', activePost.dataset.externalTitle)
+          body.set('external_description', activePost.dataset.externalDescription || '')
+        }
+        buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
+        setStatus('Publishing to Bluesky...')
+
+        try {
+          const response = await fetch('/api/postline/bluesky/publish', {
+            method: 'POST',
+            body,
+          })
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky publish failed.')
+          const url = payload.data?.post?.url
+          setStatus(url ? `Published: ${url}` : 'Published to Bluesky.', 'success')
+          textarea.value = ''
+          updateCount()
+        }
+        catch (error) {
+          setStatus(error instanceof Error ? error.message : String(error), 'error')
+        }
+        finally {
+          buttons.forEach(button => button.removeAttribute('disabled'))
+        }
+      }
+
+      postsRoot?.addEventListener('click', (event) => {
+        const target = event.target
+        if (!(target instanceof HTMLElement)) return
+        const post = target.closest('[data-composer-post]')
+        if (target.closest('[data-select-post]')) selectPost(post)
+        if (target.closest('[data-remove-post]')) removePost(post)
+      })
+      postsRoot?.addEventListener('input', (event) => {
+        const target = event.target
+        if (!(target instanceof HTMLTextAreaElement)) return
+        const post = target.closest('[data-composer-post]')
+        selectPost(post)
+        queuePreviewUpdate(post)
+      })
+      postsRoot?.addEventListener('focusin', (event) => {
+        const target = event.target
+        if (!(target instanceof HTMLTextAreaElement)) return
+        const post = target.closest('[data-composer-post]')
+        selectPost(post)
+        updateCount()
+      })
+      addPostButton?.addEventListener('click', addPost)
+      previewButton?.addEventListener('click', () => {
+        const text = activeTextarea()?.value.trim()
+        void updateLinkPreview()
+        setStatus(text ? `Preview: ${text}` : 'Nothing to preview yet.', text ? 'success' : 'error')
+      })
+      refreshButton?.addEventListener('click', async () => {
+        refreshButton.setAttribute('disabled', 'disabled')
+        setStatus('Checking Bluesky connection...')
+        try {
+          const response = await fetch('/api/postline/bluesky/status')
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not check Bluesky.')
+          setStatus(payload.data?.canPublish ? 'Bluesky is ready to publish.' : 'Bluesky needs an app password before publishing.', payload.data?.canPublish ? 'success' : 'error')
+        }
+        catch (error) {
+          setStatus(error instanceof Error ? error.message : String(error), 'error')
+        }
+        finally {
+          refreshButton.removeAttribute('disabled')
+        }
+      })
+      searchButton?.addEventListener('click', () => {
+        const text = activeTextarea()?.value.trim()
+        setStatus(text ? `Searching local drafts for: ${text.slice(0, 80)}` : 'Write a phrase first, then search local drafts.', text ? 'success' : 'error')
+      })
+      modeButtons.forEach(button => button.addEventListener('click', () => setMode(button.dataset.composerMode || 'single')))
+      buttons.forEach(button => button.addEventListener('click', publish))
+      renamePosts()
+      selectPost(activePost)
+      updateCount()
+      void updateLinkPreview(activePost)
+    })()
+  </script>
 @endsection
