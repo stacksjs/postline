@@ -42,9 +42,15 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
       }
 
       html.has-native-sidebar [data-postline-sidebar] {
-        background-color: rgba(243, 243, 241, 0.34) !important;
-        -webkit-backdrop-filter: blur(30px) saturate(1.45);
-        backdrop-filter: blur(30px) saturate(1.45);
+        background-color: rgba(246, 246, 244, 0.90) !important;
+        -webkit-backdrop-filter: blur(24px) saturate(1.08);
+        backdrop-filter: blur(24px) saturate(1.08);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        html.has-native-sidebar [data-postline-sidebar] {
+          background-color: rgba(24, 24, 23, 0.88) !important;
+        }
       }
     </style>
   </head>
@@ -109,18 +115,20 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
         </a>
       </aside>
 
-      <section class="overflow-hidden min-h-screen min-w-0 bg-white/96 border-l border-t border-zinc-200/80 rounded-tl-[28px] shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace>
-        <header class="flex items-center justify-between px-5 lg:px-6 min-h-[56px] border-b border-zinc-200">
-          <h1 class="m-0 font-semibold text-[21px] text-zinc-900 tracking-normal">@yield('shell-title', 'Create Bluesky scheduler')</h1>
-          <div class="flex gap-3 items-center text-zinc-500">
-            <button class="hidden sm:inline-flex items-center px-3 h-9 font-medium text-sm bg-white border border-zinc-200 rounded-xl shadow-sm" type="button">Review</button>
-          </div>
-        </header>
+      <div class="min-w-0 bg-white" data-postline-content-shell>
+        <section class="overflow-hidden min-h-screen min-w-0 bg-white border-l border-t border-zinc-200/80 rounded-tl-[28px] shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace>
+          <header class="flex items-center justify-between px-5 lg:px-6 min-h-[56px] border-b border-zinc-200">
+            <h1 class="m-0 font-semibold text-[21px] text-zinc-900 tracking-normal">@yield('shell-title', 'Create Bluesky scheduler')</h1>
+            <div class="flex gap-3 items-center text-zinc-500">
+              <button class="hidden sm:inline-flex items-center px-3 h-9 font-medium text-sm bg-white border border-zinc-200 rounded-xl shadow-sm" type="button">Review</button>
+            </div>
+          </header>
 
-        <main class="p-3.5 sm:p-4 min-w-0" data-postline-router>
-          @yield('content')
-        </main>
-      </section>
+          <main class="p-3.5 sm:p-4 min-w-0" data-postline-router>
+            @yield('content')
+          </main>
+        </section>
+      </div>
     </div>
     <script>
       ;(() => {
