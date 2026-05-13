@@ -28,7 +28,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
 </script>
 
 <!DOCTYPE html>
-<html lang="en" class="text-neutral-950 bg-[linear-gradient(112deg,#fbfbfa_0%,#f1f1ef_48%,#e8ebe7_100%)]">
+<html lang="en" class="text-neutral-950 bg-transparent">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -36,16 +36,16 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
     <title>@yield('title', 'Postline')</title>
     <script>window.STX_ROUTER_OPTIONS = { container: '[data-postline-workspace]', viewTransitions: false };</script>
   </head>
-  <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-[linear-gradient(112deg,#fbfbfa_0%,#f1f1ef_48%,#e8ebe7_100%)]">
+  <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-transparent">
     <div class="grid grid-cols-1 lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] min-h-screen transition-[grid-template-columns] duration-200 ease-out" data-postline-app data-postline-shell>
-      <aside class="flex sticky top-0 flex-col p-5 h-screen overflow-hidden bg-[#f3f3f1]/72 backdrop-blur-3xl backdrop-saturate-150 transition-[width,padding] duration-200 ease-out" aria-label="Postline" data-postline-sidebar>
-        <div class="absolute inset-0 pointer-events-none bg-[linear-gradient(112deg,rgba(255,255,255,0.42)_0%,rgba(255,255,255,0.10)_42%,rgba(226,226,222,0.34)_100%)]"></div>
-        <div class="relative z-10 flex items-center justify-between min-h-8 mb-4">
+      <aside class="flex sticky top-0 flex-col px-5 pt-3.5 pb-5 h-screen overflow-hidden bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 transition-[width,padding] duration-200 ease-out" aria-label="Postline" data-postline-sidebar>
+        <div class="absolute inset-0 pointer-events-none bg-[linear-gradient(112deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_45%,rgba(226,226,222,0.16)_100%)]"></div>
+        <div class="relative z-10 flex items-center justify-end min-h-7 mb-5" data-shell-controls-row>
           <div class="flex items-center gap-2">
-            <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 rounded-full transition-colors hover:text-zinc-900 hover:bg-white/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50" type="button" aria-label="Go back" data-shell-back>
+            <button class="hidden inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 rounded-full transition-colors hover:text-zinc-900 hover:bg-white/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50" type="button" aria-label="Go back" data-shell-back data-native-shell-control>
               <span class="h-5 w-5 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 rounded-full transition-colors hover:text-zinc-900 hover:bg-white/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50" type="button" aria-label="Go forward" data-shell-forward>
+            <button class="hidden inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 rounded-full transition-colors hover:text-zinc-900 hover:bg-white/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50" type="button" aria-label="Go forward" data-shell-forward data-native-shell-control>
               <span class="h-5 w-5 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
             </button>
             <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 rounded-full transition-colors hover:text-zinc-900 hover:bg-white/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50" type="button" aria-label="Collapse sidebar" aria-expanded="true" data-sidebar-collapse>
@@ -97,15 +97,15 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
         </a>
       </aside>
 
-      <section class="lg:my-1.5 min-w-0 bg-white lg:rounded-l-[32px] shadow-[-12px_0_40px_rgba(0,0,0,0.06)]" aria-label="Postline workspace" data-postline-workspace>
-        <header class="flex items-center justify-between px-5 lg:px-7 min-h-[72px] border-b border-zinc-200">
-          <h1 class="m-0 font-semibold text-[23px] text-zinc-900 tracking-normal">@yield('shell-title', 'Create Bluesky scheduler')</h1>
+      <section class="my-1 mr-1 min-w-0 overflow-hidden bg-white/96 border border-zinc-200/80 rounded-[28px] shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace>
+        <header class="flex items-center justify-between px-5 lg:px-6 min-h-[56px] border-b border-zinc-200">
+          <h1 class="m-0 font-semibold text-[21px] text-zinc-900 tracking-normal">@yield('shell-title', 'Create Bluesky scheduler')</h1>
           <div class="flex gap-3 items-center text-zinc-500">
             <button class="hidden sm:inline-flex items-center px-3 h-9 font-medium text-sm bg-white border border-zinc-200 rounded-xl shadow-sm" type="button">Review</button>
           </div>
         </header>
 
-        <main class="p-4 sm:p-6 min-w-0" data-postline-router>
+        <main class="p-3.5 sm:p-4 min-w-0" data-postline-router>
           @yield('content')
         </main>
       </section>
@@ -122,7 +122,9 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           shell?.style.setProperty('--postline-sidebar-width', collapsed ? '88px' : '286px')
           sidebar?.classList.toggle('items-center', collapsed)
           sidebar?.classList.toggle('p-4', collapsed)
-          sidebar?.classList.toggle('p-5', !collapsed)
+          sidebar?.classList.toggle('px-5', !collapsed)
+          sidebar?.classList.toggle('pt-3.5', !collapsed)
+          sidebar?.classList.toggle('pb-5', !collapsed)
 
           document.querySelectorAll('[data-sidebar-expanded]').forEach(element => {
             element.classList.toggle('hidden', collapsed)
@@ -132,6 +134,8 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           button?.setAttribute('aria-expanded', String(!collapsed))
           collapseIcon?.classList.toggle('hidden', collapsed)
           expandIcon?.classList.toggle('hidden', !collapsed)
+          if (collapseIcon) collapseIcon.style.display = collapsed ? 'none' : ''
+          if (expandIcon) expandIcon.style.display = collapsed ? '' : 'none'
           window.localStorage?.setItem('postline.sidebar.collapsed', collapsed ? 'true' : 'false')
         }
 
@@ -161,10 +165,46 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           })
         }
 
+        const isNativeShell = () =>
+          document.documentElement.classList.contains('has-native-sidebar') ||
+          window.craft?.__craft_bridge_loaded === true ||
+          !!window.craft?.window ||
+          !!window.webkit?.messageHandlers?.craft
+
+        const syncNativeShell = () => {
+          const row = document.querySelector('[data-shell-controls-row]')
+          const sidebar = document.querySelector('[data-postline-sidebar]')
+          if (!row || !sidebar) return
+
+          if (isNativeShell()) {
+            document.querySelectorAll('[data-native-shell-control]').forEach(element => {
+              element.classList.remove('hidden')
+              element.style.display = ''
+            })
+            row.style.position = 'absolute'
+            row.style.top = '14px'
+            row.style.left = '138px'
+            row.style.right = 'auto'
+            row.style.marginBottom = '0'
+            sidebar.style.paddingTop = '82px'
+            return
+          }
+
+          document.querySelectorAll('[data-native-shell-control]').forEach(element => {
+            element.classList.add('hidden')
+            element.style.display = 'none'
+          })
+          row.removeAttribute('style')
+          sidebar.style.removeProperty('padding-top')
+        }
+
         bindSidebarCollapse()
         bindShellHistory()
+        syncNativeShell()
         window.addEventListener('stx:load', bindShellHistory)
         window.addEventListener('stx:load', bindSidebarCollapse)
+        window.addEventListener('stx:load', syncNativeShell)
+        window.addEventListener('craft:ready', syncNativeShell)
       })()
     </script>
     @stack('scripts')

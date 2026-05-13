@@ -43,17 +43,17 @@ const timelineItems = [
 </script>
 
 @section('content')
-  <section class="grid gap-5" data-postline-page="composer" data-testid="composer-page">
-    <header class="flex gap-4 items-center justify-between min-h-11">
+  <section class="grid gap-3.5" data-postline-page="composer" data-testid="composer-page">
+    <header class="flex gap-4 items-center justify-between min-h-9">
       <p class="m-0 font-medium text-[15px] text-zinc-500">Composer</p>
       <div class="flex gap-2 items-center">
-        <button class="inline-flex items-center justify-center h-10 w-10 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Search posts" title="Search posts" data-composer-search>
+        <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Search posts" title="Search posts" data-composer-search>
           <span class="h-4 w-4 i-hugeicons-search-01" aria-hidden="true"></span>
         </button>
-        <button class="inline-flex items-center justify-center h-10 w-10 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Refresh timeline" title="Refresh timeline" data-composer-refresh>
+        <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Refresh timeline" title="Refresh timeline" data-composer-refresh>
           <span class="h-4 w-4 i-hugeicons-refresh" aria-hidden="true"></span>
         </button>
-        <button class="inline-flex gap-2 items-center justify-center px-5 h-10 font-bold text-white bg-neutral-950 rounded-xl" type="button" data-bluesky-publish-top>
+        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-sm text-white bg-neutral-950 rounded-xl" type="button" data-bluesky-publish-top>
           <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
           <span>Publish</span>
         </button>
@@ -62,9 +62,9 @@ const timelineItems = [
 
     <div class="hidden bottom-6 fixed right-6 z-50 px-3.5 py-2.5 max-w-md text-sm bg-white border border-zinc-200 rounded-2xl shadow-[0_18px_54px_rgba(24,31,42,0.16)]" role="status" data-bluesky-status></div>
 
-    <div class="grid gap-4 xl:grid-cols-[minmax(420px,1.08fr)_minmax(320px,0.92fr)]">
-      <section class="grid grid-rows-[auto_1fr_auto] min-h-[560px] bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Post composer">
-        <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
+    <div class="grid gap-3.5 xl:grid-cols-[minmax(380px,1.08fr)_minmax(300px,0.92fr)]">
+      <section class="grid grid-rows-[auto_1fr_auto] min-h-[clamp(380px,calc(100vh-152px),500px)] bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Post composer">
+        <header class="flex gap-3 items-center justify-between p-3 border-b border-zinc-200">
           <strong class="text-[13px]">New post</strong>
           <div class="grid grid-cols-3 p-0.5 bg-zinc-100 border border-zinc-200 rounded-xl" role="group" aria-label="Post mode">
             <button class="px-2.5 py-1.5 min-w-19 text-neutral-950 text-xs bg-white rounded-lg shadow-sm" type="button" data-composer-mode="single">Single</button>
@@ -73,14 +73,14 @@ const timelineItems = [
           </div>
         </header>
 
-        <div class="grid grid-rows-[auto_1fr] p-3.5">
-          <div class="flex flex-wrap gap-2 mb-3">
+        <div class="grid grid-rows-[auto_1fr] p-3">
+          <div class="flex flex-wrap gap-2 mb-2.5">
             <div class="flex items-center px-2.5 min-h-8 text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-xl">Bluesky</div>
             <div class="flex items-center px-2.5 min-h-8 text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-xl">Today 3:30 PM</div>
             <div class="flex items-center px-2.5 min-h-8 text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-xl">Public</div>
           </div>
-          <div class="grid content-start gap-5" data-composer-posts>
-            <article class="grid gap-2 pb-4 last:pb-0 border-b border-zinc-100 last:border-b-0" data-composer-post data-active="true">
+          <div class="grid content-start gap-4" data-composer-posts>
+            <article class="grid gap-2 pb-3 last:pb-0 border-b border-zinc-100 last:border-b-0" data-composer-post data-active="true">
               <header class="flex gap-3 items-center justify-between">
                 <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-bold text-white text-xs bg-neutral-950 rounded-lg" type="button" data-select-post>
                   <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
@@ -90,13 +90,13 @@ const timelineItems = [
                   <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
                 </button>
               </header>
-              <textarea class="min-h-36 w-full leading-relaxed text-[21px] text-neutral-950 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" maxlength="300" data-bluesky-text>Working on a calmer way to plan posts: drafts, timelines, scheduling, and publishing in one native-feeling place.</textarea>
+              <textarea class="min-h-28 w-full leading-relaxed text-[19px] text-neutral-950 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" maxlength="300" data-bluesky-text>Working on a calmer way to plan posts: drafts, timelines, scheduling, and publishing in one native-feeling place.</textarea>
               <div class="hidden overflow-hidden bg-zinc-50 border border-zinc-200 rounded-2xl" data-link-preview></div>
             </article>
           </div>
         </div>
 
-        <footer class="flex gap-3 items-center justify-between p-3.5 border-t border-zinc-200">
+        <footer class="flex gap-3 items-center justify-between p-3 border-t border-zinc-200">
           <span class="text-xs text-zinc-500" data-bluesky-count>118 / 300 characters</span>
           <div class="flex gap-2 items-center">
             <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Add post" title="Add post" data-add-post>
