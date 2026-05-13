@@ -35,6 +35,18 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
     <meta name="description" content="@yield('description', 'Postline is a clean personal workspace for social publishing.')">
     <title>@yield('title', 'Postline')</title>
     <script>window.STX_ROUTER_OPTIONS = { container: '[data-postline-workspace]', viewTransitions: false };</script>
+    <style>
+      html.has-native-sidebar,
+      html.has-native-sidebar body {
+        background: transparent;
+      }
+
+      html.has-native-sidebar [data-postline-sidebar] {
+        background-color: rgba(243, 243, 241, 0.42);
+        -webkit-backdrop-filter: blur(30px) saturate(1.45);
+        backdrop-filter: blur(30px) saturate(1.45);
+      }
+    </style>
   </head>
   <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-[#f3f3f1]">
     <div class="grid grid-cols-1 lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] min-h-screen transition-[grid-template-columns] duration-200 ease-out" data-postline-app data-postline-shell>
