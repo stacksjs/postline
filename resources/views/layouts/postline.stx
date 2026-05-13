@@ -38,29 +38,29 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
     <style>
       html.has-native-sidebar,
       html.has-native-sidebar body {
-        background: transparent;
+        background: transparent !important;
       }
 
       html.has-native-sidebar [data-postline-sidebar] {
-        background-color: rgba(243, 243, 241, 0.42);
+        background-color: rgba(243, 243, 241, 0.34) !important;
         -webkit-backdrop-filter: blur(30px) saturate(1.45);
         backdrop-filter: blur(30px) saturate(1.45);
       }
     </style>
   </head>
   <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-[#f3f3f1]">
-    <div class="grid grid-cols-1 lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] min-h-screen transition-[grid-template-columns] duration-200 ease-out" data-postline-app data-postline-shell>
-      <aside class="relative flex sticky top-0 flex-col px-5 pt-[80px] pb-5 h-screen overflow-hidden bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 transition-[width,padding] duration-200 ease-out" aria-label="Postline" data-postline-sidebar>
-        <div class="absolute inset-0 pointer-events-none bg-[linear-gradient(112deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_45%,rgba(226,226,222,0.16)_100%)]"></div>
-        <div class="absolute top-3.5 right-5 z-20 flex items-center min-h-7" data-shell-controls-row>
-          <div class="flex items-center gap-2">
-            <button class="hidden inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 rounded-full transition-colors hover:text-zinc-900 hover:bg-white/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50" type="button" aria-label="Go back" data-shell-back data-native-shell-control>
+    <div class="grid grid-cols-1 lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] min-h-screen duration-200 ease-out transition-[grid-template-columns]" data-postline-app data-postline-shell>
+      <aside class="flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[80px] px-5 h-screen bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-200 ease-out transition-[width,padding]" aria-label="Postline" data-postline-sidebar>
+        <div class="absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_45%,rgba(226,226,222,0.16)_100%)] pointer-events-none"></div>
+        <div class="flex absolute right-5 top-3.5 z-20 items-center min-h-7" data-shell-controls-row>
+          <div class="flex gap-2 items-center">
+            <button class="hidden inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 hover:text-zinc-900 hover:bg-white/35 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="Go back" data-shell-back data-native-shell-control>
               <span class="h-5 w-5 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
             </button>
-            <button class="hidden inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 rounded-full transition-colors hover:text-zinc-900 hover:bg-white/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50" type="button" aria-label="Go forward" data-shell-forward data-native-shell-control>
+            <button class="hidden inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 hover:text-zinc-900 hover:bg-white/35 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="Go forward" data-shell-forward data-native-shell-control>
               <span class="h-5 w-5 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 rounded-full transition-colors hover:text-zinc-900 hover:bg-white/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50" type="button" aria-label="Collapse sidebar" aria-expanded="true" data-sidebar-collapse>
+            <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 hover:text-zinc-900 hover:bg-white/35 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="Collapse sidebar" aria-expanded="true" data-sidebar-collapse>
               <span class="h-5 w-5 i-hugeicons-sidebar-left" aria-hidden="true" data-sidebar-collapse-icon="collapse"></span>
               <span class="hidden h-5 w-5 i-hugeicons-sidebar-right" aria-hidden="true" data-sidebar-collapse-icon="expand"></span>
             </button>
@@ -68,7 +68,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
         </div>
 
         <a
-          class="relative z-10 flex gap-3 items-center mb-7 px-2 py-2 text-zinc-800 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
+          class="flex relative z-10 gap-3 items-center mb-7 px-2 py-2 text-zinc-800 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
           href="/"
           data-stx-link
           data-stx-exact-active-class="text-neutral-950"
@@ -78,7 +78,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           <span class="font-semibold text-[18px]" data-sidebar-expanded>Postline</span>
         </a>
 
-        <nav class="relative z-10 grid gap-1.5" aria-label="Primary" data-stx-nav data-testid="postline-nav">
+        <nav class="grid relative z-10 gap-1.5" aria-label="Primary" data-stx-nav data-testid="postline-nav">
           @foreach (navLinks as link)
             <a
               href="{{ link.href }}"
@@ -109,7 +109,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
         </a>
       </aside>
 
-      <section class="min-w-0 min-h-screen overflow-hidden bg-white/96 border-l border-t border-zinc-200/80 rounded-tl-[28px] shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace>
+      <section class="overflow-hidden min-h-screen min-w-0 bg-white/96 border-l border-t border-zinc-200/80 rounded-tl-[28px] shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace>
         <header class="flex items-center justify-between px-5 lg:px-6 min-h-[56px] border-b border-zinc-200">
           <h1 class="m-0 font-semibold text-[21px] text-zinc-900 tracking-normal">@yield('shell-title', 'Create Bluesky scheduler')</h1>
           <div class="flex gap-3 items-center text-zinc-500">
