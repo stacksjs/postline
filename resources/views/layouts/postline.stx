@@ -12,11 +12,11 @@ catch {
 }
 
 const navLinks = [
-  { href: '/', label: 'Composer', shortcut: '1' },
-  { href: '/queue', label: 'Queue', shortcut: '2' },
-  { href: '/timeline', label: 'Timeline', shortcut: '3' },
-  { href: '/analytics', label: 'Analytics', shortcut: '4' },
-  { href: '/accounts', label: 'Accounts', shortcut: '5' },
+  { href: '/', label: 'Composer', shortcut: '1', icon: 'i-hugeicons-edit-02' },
+  { href: '/queue', label: 'Queue', shortcut: '2', icon: 'i-hugeicons-calendar-03' },
+  { href: '/timeline', label: 'Timeline', shortcut: '3', icon: 'i-hugeicons-news' },
+  { href: '/analytics', label: 'Analytics', shortcut: '4', icon: 'i-hugeicons-chart-line-data-01' },
+  { href: '/accounts', label: 'Accounts', shortcut: '5', icon: 'i-hugeicons-user-multiple' },
 ].map((link) => ({
   ...link,
   active: link.href === '/'
@@ -28,40 +28,57 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
 </script>
 
 <!DOCTYPE html>
-<html lang="en" class="text-neutral-950 bg-[#f4f4f3]">
+<html lang="en" class="text-neutral-950 bg-[linear-gradient(112deg,#fbfbfa_0%,#f1f1ef_48%,#e8ebe7_100%)]">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="@yield('description', 'Postline is a clean personal workspace for social publishing.')">
     <title>@yield('title', 'Postline')</title>
-    <script>window.STX_ROUTER_OPTIONS = { container: '[data-postline-app]', viewTransitions: false };</script>
+    <script>window.STX_ROUTER_OPTIONS = { container: '[data-postline-workspace]', viewTransitions: false };</script>
   </head>
-  <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-[#f4f4f3]">
-    <div class="grid grid-cols-1 lg:grid-cols-[286px_minmax(0,1fr)] min-h-screen" data-postline-app>
-      <aside class="flex sticky top-0 flex-col p-5 h-screen bg-[#f4f4f3]" aria-label="Postline">
+  <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-[linear-gradient(112deg,#fbfbfa_0%,#f1f1ef_48%,#e8ebe7_100%)]">
+    <div class="grid grid-cols-1 lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] min-h-screen transition-[grid-template-columns] duration-200 ease-out" data-postline-app data-postline-shell>
+      <aside class="flex sticky top-0 flex-col p-5 h-screen overflow-hidden bg-[#f3f3f1]/72 backdrop-blur-3xl backdrop-saturate-150 transition-[width,padding] duration-200 ease-out" aria-label="Postline" data-postline-sidebar>
+        <div class="absolute inset-0 pointer-events-none bg-[linear-gradient(112deg,rgba(255,255,255,0.42)_0%,rgba(255,255,255,0.10)_42%,rgba(226,226,222,0.34)_100%)]"></div>
+        <div class="relative z-10 flex items-center justify-between min-h-8 mb-4">
+          <div class="flex items-center gap-2">
+            <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 rounded-full transition-colors hover:text-zinc-900 hover:bg-white/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50" type="button" aria-label="Go back" data-shell-back>
+              <span class="h-5 w-5 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
+            </button>
+            <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 rounded-full transition-colors hover:text-zinc-900 hover:bg-white/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50" type="button" aria-label="Go forward" data-shell-forward>
+              <span class="h-5 w-5 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
+            </button>
+            <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 rounded-full transition-colors hover:text-zinc-900 hover:bg-white/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50" type="button" aria-label="Collapse sidebar" aria-expanded="true" data-sidebar-collapse>
+              <span class="h-5 w-5 i-hugeicons-sidebar-left" aria-hidden="true" data-sidebar-collapse-icon="collapse"></span>
+              <span class="hidden h-5 w-5 i-hugeicons-sidebar-right" aria-hidden="true" data-sidebar-collapse-icon="expand"></span>
+            </button>
+          </div>
+        </div>
+
         <a
-          class="flex gap-3 items-center mb-6 px-2 py-2 text-zinc-800 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
+          class="relative z-10 flex gap-3 items-center mb-7 px-2 py-2 text-zinc-800 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
           href="/"
           data-stx-link
           data-stx-exact-active-class="text-neutral-950"
           aria-label="Postline composer"
         >
           <span class="grid place-items-center h-9 w-9 font-bold text-sm text-white bg-neutral-950 rounded-xl">P</span>
-          <span class="font-semibold text-[18px]">Postline</span>
+          <span class="font-semibold text-[18px]" data-sidebar-expanded>Postline</span>
         </a>
 
-        <nav class="grid gap-1.5" aria-label="Primary" data-stx-nav data-testid="postline-nav">
+        <nav class="relative z-10 grid gap-1.5" aria-label="Primary" data-stx-nav data-testid="postline-nav">
           @foreach (navLinks as link)
             <a
               href="{{ link.href }}"
               data-stx-link
-              data-stx-active-class="text-zinc-950 bg-zinc-200/80"
-              data-stx-exact-active-class="text-zinc-950 bg-zinc-200/80"
-              class="flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-left text-[17px] transition-colors hover:bg-zinc-200/60 focus-visible:bg-zinc-200/60 focus-visible:outline-none {{ link.active ? 'bg-zinc-200/80 text-zinc-950' : 'text-zinc-700' }}"
+              data-stx-active-class="text-zinc-950 bg-[#e8e8e6]/90"
+              data-stx-exact-active-class="text-zinc-950 bg-[#e8e8e6]/90"
+              class="flex w-full items-center gap-3 rounded-[18px] px-4 py-3 text-left text-[17px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ link.active ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
               aria-current="{{ link.active ? 'page' : 'false' }}"
             >
-              <span class="font-medium truncate">{{ link.label }}</span>
-              <span class="px-2 py-0.5 text-[13px] text-zinc-500 bg-white/70 rounded-full">{{ link.shortcut }}</span>
+              <span class="h-5 w-5 {{ link.icon }} {{ link.active ? 'text-zinc-900' : 'text-zinc-600' }}" aria-hidden="true"></span>
+              <span class="flex-1 font-medium truncate" data-sidebar-expanded>{{ link.label }}</span>
+              <span class="px-2.5 py-0.5 text-[13px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>{{ link.shortcut }}</span>
             </a>
           @endforeach
         </nav>
@@ -69,17 +86,18 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
         <a
           href="/settings"
           data-stx-link
-          data-stx-active-class="text-zinc-950 bg-zinc-200/80"
-          data-stx-exact-active-class="text-zinc-950 bg-zinc-200/80"
-          class="mt-auto flex w-full items-center justify-between rounded-[18px] px-4 py-3 text-left text-[17px] transition-colors hover:bg-zinc-200/60 focus-visible:bg-zinc-200/60 focus-visible:outline-none {{ settingsActive ? 'bg-zinc-200/80 text-zinc-950' : 'text-zinc-700' }}"
+          data-stx-active-class="text-zinc-950 bg-[#e8e8e6]/90"
+          data-stx-exact-active-class="text-zinc-950 bg-[#e8e8e6]/90"
+          class="relative z-10 mt-auto flex w-full items-center gap-3 rounded-[18px] px-4 py-3 text-left text-[17px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ settingsActive ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
           aria-current="{{ settingsActive ? 'page' : 'false' }}"
         >
-          <span class="font-medium">Settings</span>
-          <span class="px-2 py-0.5 text-[13px] text-zinc-500 bg-white/70 rounded-full">6</span>
+          <span class="h-5 w-5 i-hugeicons-settings-02 {{ settingsActive ? 'text-zinc-900' : 'text-zinc-600' }}" aria-hidden="true"></span>
+          <span class="flex-1 font-medium" data-sidebar-expanded>Settings</span>
+          <span class="px-2.5 py-0.5 text-[13px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>6</span>
         </a>
       </aside>
 
-      <section class="lg:my-1.5 min-w-0 bg-white lg:rounded-l-[32px] shadow-[-12px_0_40px_rgba(0,0,0,0.06)]" aria-label="Postline workspace">
+      <section class="lg:my-1.5 min-w-0 bg-white lg:rounded-l-[32px] shadow-[-12px_0_40px_rgba(0,0,0,0.06)]" aria-label="Postline workspace" data-postline-workspace>
         <header class="flex items-center justify-between px-5 lg:px-7 min-h-[72px] border-b border-zinc-200">
           <h1 class="m-0 font-semibold text-[23px] text-zinc-900 tracking-normal">@yield('shell-title', 'Create Bluesky scheduler')</h1>
           <div class="flex gap-3 items-center text-zinc-500">
@@ -92,6 +110,63 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
         </main>
       </section>
     </div>
+    <script>
+      ;(() => {
+        const syncSidebarCollapse = (collapsed) => {
+          const shell = document.querySelector('[data-postline-shell]')
+          const sidebar = document.querySelector('[data-postline-sidebar]')
+          const button = document.querySelector('[data-sidebar-collapse]')
+          const collapseIcon = document.querySelector('[data-sidebar-collapse-icon="collapse"]')
+          const expandIcon = document.querySelector('[data-sidebar-collapse-icon="expand"]')
+
+          shell?.style.setProperty('--postline-sidebar-width', collapsed ? '88px' : '286px')
+          sidebar?.classList.toggle('items-center', collapsed)
+          sidebar?.classList.toggle('p-4', collapsed)
+          sidebar?.classList.toggle('p-5', !collapsed)
+
+          document.querySelectorAll('[data-sidebar-expanded]').forEach(element => {
+            element.classList.toggle('hidden', collapsed)
+          })
+
+          button?.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar')
+          button?.setAttribute('aria-expanded', String(!collapsed))
+          collapseIcon?.classList.toggle('hidden', collapsed)
+          expandIcon?.classList.toggle('hidden', !collapsed)
+          window.localStorage?.setItem('postline.sidebar.collapsed', collapsed ? 'true' : 'false')
+        }
+
+        const bindSidebarCollapse = () => {
+          document.querySelectorAll('[data-sidebar-collapse]').forEach(button => {
+            if (button.dataset.bound === 'true') return
+            button.dataset.bound = 'true'
+            const initial = window.localStorage?.getItem('postline.sidebar.collapsed') === 'true'
+            syncSidebarCollapse(initial)
+            button.addEventListener('click', () => {
+              const collapsed = button.getAttribute('aria-expanded') === 'true'
+              syncSidebarCollapse(collapsed)
+            })
+          })
+        }
+
+        const bindShellHistory = () => {
+          document.querySelectorAll('[data-shell-back]').forEach(button => {
+            if (button.dataset.bound === 'true') return
+            button.dataset.bound = 'true'
+            button.addEventListener('click', () => window.history.back())
+          })
+          document.querySelectorAll('[data-shell-forward]').forEach(button => {
+            if (button.dataset.bound === 'true') return
+            button.dataset.bound = 'true'
+            button.addEventListener('click', () => window.history.forward())
+          })
+        }
+
+        bindSidebarCollapse()
+        bindShellHistory()
+        window.addEventListener('stx:load', bindShellHistory)
+        window.addEventListener('stx:load', bindSidebarCollapse)
+      })()
+    </script>
     @stack('scripts')
   </body>
 </html>
