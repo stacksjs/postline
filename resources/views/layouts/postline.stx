@@ -81,7 +81,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           aria-label="Postline composer"
         >
           <span class="grid place-items-center h-9 w-9 font-bold text-sm text-white bg-neutral-950 rounded-xl">P</span>
-          <span class="font-semibold text-[18px]" data-sidebar-expanded>Postline</span>
+          <span class="font-semibold text-[17px]" data-sidebar-expanded>Postline</span>
         </a>
 
         <nav class="grid relative z-10 gap-1.5" aria-label="Primary" data-stx-nav data-testid="postline-nav">
@@ -91,12 +91,12 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
               data-stx-link
               data-stx-active-class="text-zinc-950 bg-[#e8e8e6]/90"
               data-stx-exact-active-class="text-zinc-950 bg-[#e8e8e6]/90"
-              class="flex w-full items-center gap-3 rounded-[18px] px-4 py-3 text-left text-[17px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ link.active ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
+              class="flex w-full items-center gap-3 rounded-[17px] px-4 py-2.5 text-left text-[15px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ link.active ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
               aria-current="{{ link.active ? 'page' : 'false' }}"
             >
               <span class="h-5 w-5 {{ link.icon }} {{ link.active ? 'text-zinc-900' : 'text-zinc-600' }}" aria-hidden="true"></span>
               <span class="flex-1 font-medium truncate" data-sidebar-expanded>{{ link.label }}</span>
-              <span class="px-2.5 py-0.5 text-[13px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>{{ link.shortcut }}</span>
+              <span class="grid place-items-center px-1.5 h-6 min-w-6 text-[12px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>{{ link.shortcut }}</span>
             </a>
           @endforeach
         </nav>
@@ -106,16 +106,16 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           data-stx-link
           data-stx-active-class="text-zinc-950 bg-[#e8e8e6]/90"
           data-stx-exact-active-class="text-zinc-950 bg-[#e8e8e6]/90"
-          class="relative z-10 mt-auto flex w-full items-center gap-3 rounded-[18px] px-4 py-3 text-left text-[17px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ settingsActive ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
+          class="relative z-10 mt-auto flex w-full items-center gap-3 rounded-[17px] px-4 py-2.5 text-left text-[15px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ settingsActive ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
           aria-current="{{ settingsActive ? 'page' : 'false' }}"
         >
           <span class="h-5 w-5 i-hugeicons-settings-02 {{ settingsActive ? 'text-zinc-900' : 'text-zinc-600' }}" aria-hidden="true"></span>
           <span class="flex-1 font-medium" data-sidebar-expanded>Settings</span>
-          <span class="px-2.5 py-0.5 text-[13px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>6</span>
+          <span class="grid place-items-center px-1.5 h-6 min-w-6 text-[12px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>6</span>
         </a>
       </aside>
 
-      <div class="min-w-0 bg-white" data-postline-content-shell>
+      <div class="min-w-0 bg-[#f3f3f1]" data-postline-content-shell>
         <section class="overflow-hidden min-h-screen min-w-0 bg-white border-l border-t border-zinc-200/80 rounded-tl-[28px] shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace>
           <header class="flex items-center justify-between px-5 lg:px-6 min-h-[56px] border-b border-zinc-200" data-window-drag-region>
             <h1 class="m-0 font-semibold text-[21px] text-zinc-900 tracking-normal">@yield('shell-title', 'Create Bluesky scheduler')</h1>
@@ -203,7 +203,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
               element.classList.toggle('hidden', collapsed)
               element.style.display = collapsed ? 'none' : ''
             })
-            row.style.top = '15px'
+            row.style.top = '7px'
             row.style.left = collapsed ? '30px' : '174px'
             row.style.right = 'auto'
             sidebar.style.paddingTop = '80px'
@@ -222,11 +222,37 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           document.querySelectorAll('[data-window-drag-region]').forEach(region => {
             if (region.dataset.dragBound === 'true') return
             region.dataset.dragBound = 'true'
-            region.addEventListener('mousedown', event => {
+            let dragging = false
+            let lastX = 0
+            let lastY = 0
+
+            const stopDrag = () => {
+              dragging = false
+            }
+
+            region.addEventListener('pointerdown', event => {
               if (event.button !== 0 || !isNativeShell()) return
               if (event.target.closest('a, button, input, textarea, select, [role="button"], [data-no-window-drag]')) return
-              window.craft?.window?.startDrag?.()
+              event.preventDefault()
+              dragging = true
+              lastX = event.screenX
+              lastY = event.screenY
+              region.setPointerCapture?.(event.pointerId)
             })
+
+            region.addEventListener('pointermove', event => {
+              if (!dragging) return
+              event.preventDefault()
+              const dx = event.screenX - lastX
+              const dy = event.screenY - lastY
+              lastX = event.screenX
+              lastY = event.screenY
+              if (dx || dy) window.craft?.window?.moveBy?.(dx, dy)
+            })
+
+            region.addEventListener('pointerup', stopDrag)
+            region.addEventListener('pointercancel', stopDrag)
+            region.addEventListener('lostpointercapture', stopDrag)
           })
         }
 
