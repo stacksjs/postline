@@ -59,7 +59,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
       <aside class="flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[80px] px-5 h-screen bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-200 ease-out transition-[width,padding]" aria-label="Postline" data-postline-sidebar data-window-drag-region>
         <div class="absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_45%,rgba(226,226,222,0.16)_100%)] pointer-events-none"></div>
         <div class="flex absolute right-5 top-3.5 z-20 items-center min-h-7" data-shell-controls-row>
-          <div class="flex gap-2 items-center">
+          <div class="flex gap-1.5 items-center">
             <button class="hidden inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 hover:text-zinc-900 hover:bg-white/35 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="Go back" data-shell-back data-native-shell-control>
               <span class="h-5 w-5 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
             </button>
@@ -67,8 +67,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
               <span class="h-5 w-5 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
             </button>
             <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 hover:text-zinc-900 hover:bg-white/35 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="Collapse sidebar" aria-expanded="true" data-sidebar-collapse>
-              <span class="h-5 w-5 i-hugeicons-sidebar-left" aria-hidden="true" data-sidebar-collapse-icon="collapse"></span>
-              <span class="hidden h-5 w-5 i-hugeicons-sidebar-right" aria-hidden="true" data-sidebar-collapse-icon="expand"></span>
+              <span class="h-5 w-5 transition-transform i-hugeicons-sidebar-left" aria-hidden="true" data-sidebar-collapse-icon></span>
             </button>
           </div>
         </div>
@@ -81,7 +80,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           aria-label="Postline composer"
         >
           <span class="grid place-items-center h-9 w-9 font-bold text-sm text-white bg-neutral-950 rounded-xl">P</span>
-          <span class="font-semibold text-[17px]" data-sidebar-expanded>Postline</span>
+          <span class="font-semibold text-[16px]" data-sidebar-expanded>Postline</span>
         </a>
 
         <nav class="grid relative z-10 gap-1.5" aria-label="Primary" data-stx-nav data-testid="postline-nav">
@@ -91,12 +90,12 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
               data-stx-link
               data-stx-active-class="text-zinc-950 bg-[#e8e8e6]/90"
               data-stx-exact-active-class="text-zinc-950 bg-[#e8e8e6]/90"
-              class="flex w-full items-center gap-3 rounded-[17px] px-4 py-2.5 text-left text-[15px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ link.active ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
+              class="flex w-full items-center gap-3 rounded-[16px] px-3.5 py-2 text-left text-[14px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ link.active ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
               aria-current="{{ link.active ? 'page' : 'false' }}"
             >
-              <span class="h-5 w-5 {{ link.icon }} {{ link.active ? 'text-zinc-900' : 'text-zinc-600' }}" aria-hidden="true"></span>
+              <span class="h-[18px] w-[18px] {{ link.icon }} {{ link.active ? 'text-zinc-900' : 'text-zinc-600' }}" aria-hidden="true"></span>
               <span class="flex-1 font-medium truncate" data-sidebar-expanded>{{ link.label }}</span>
-              <span class="grid place-items-center px-1.5 h-6 min-w-6 text-[12px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>{{ link.shortcut }}</span>
+              <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>{{ link.shortcut }}</span>
             </a>
           @endforeach
         </nav>
@@ -106,12 +105,12 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           data-stx-link
           data-stx-active-class="text-zinc-950 bg-[#e8e8e6]/90"
           data-stx-exact-active-class="text-zinc-950 bg-[#e8e8e6]/90"
-          class="relative z-10 mt-auto flex w-full items-center gap-3 rounded-[17px] px-4 py-2.5 text-left text-[15px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ settingsActive ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
+          class="relative z-10 mt-auto flex w-full items-center gap-3 rounded-[16px] px-3.5 py-2 text-left text-[14px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ settingsActive ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
           aria-current="{{ settingsActive ? 'page' : 'false' }}"
         >
-          <span class="h-5 w-5 i-hugeicons-settings-02 {{ settingsActive ? 'text-zinc-900' : 'text-zinc-600' }}" aria-hidden="true"></span>
+          <span class="h-[18px] w-[18px] i-hugeicons-settings-02 {{ settingsActive ? 'text-zinc-900' : 'text-zinc-600' }}" aria-hidden="true"></span>
           <span class="flex-1 font-medium" data-sidebar-expanded>Settings</span>
-          <span class="grid place-items-center px-1.5 h-6 min-w-6 text-[12px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>6</span>
+          <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>6</span>
         </a>
       </aside>
 
@@ -136,8 +135,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           const shell = document.querySelector('[data-postline-shell]')
           const sidebar = document.querySelector('[data-postline-sidebar]')
           const button = document.querySelector('[data-sidebar-collapse]')
-          const collapseIcon = document.querySelector('[data-sidebar-collapse-icon="collapse"]')
-          const expandIcon = document.querySelector('[data-sidebar-collapse-icon="expand"]')
+          const collapseIcon = document.querySelector('[data-sidebar-collapse-icon]')
 
           shell?.style.setProperty('--postline-sidebar-width', collapsed ? '88px' : '286px')
           sidebar?.classList.toggle('items-center', collapsed)
@@ -152,10 +150,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
 
           button?.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar')
           button?.setAttribute('aria-expanded', String(!collapsed))
-          collapseIcon?.classList.toggle('hidden', collapsed)
-          expandIcon?.classList.toggle('hidden', !collapsed)
-          if (collapseIcon) collapseIcon.style.display = collapsed ? 'none' : ''
-          if (expandIcon) expandIcon.style.display = collapsed ? '' : 'none'
+          collapseIcon?.classList.toggle('rotate-180', collapsed)
           window.localStorage?.setItem('postline.sidebar.collapsed', collapsed ? 'true' : 'false')
           syncNativeShell()
         }
@@ -200,12 +195,14 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
 
           if (isNativeShell()) {
             document.querySelectorAll('[data-native-shell-control]').forEach(element => {
-              element.classList.toggle('hidden', collapsed)
-              element.style.display = collapsed ? 'none' : ''
+              element.classList.remove('hidden')
+              element.style.display = ''
             })
-            row.style.top = '7px'
-            row.style.left = collapsed ? '30px' : '174px'
+            row.style.position = 'fixed'
+            row.style.top = '16px'
+            row.style.left = '110px'
             row.style.right = 'auto'
+            row.style.zIndex = '80'
             sidebar.style.paddingTop = '80px'
             return
           }
@@ -215,6 +212,8 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
             element.style.display = 'none'
           })
           row.removeAttribute('style')
+          row.style.removeProperty('position')
+          row.style.removeProperty('z-index')
           sidebar.style.removeProperty('padding-top')
         }
 
