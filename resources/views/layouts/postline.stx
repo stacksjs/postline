@@ -42,21 +42,21 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
       }
 
       html.has-native-sidebar [data-postline-sidebar] {
-        background-color: rgba(246, 246, 244, 0.90) !important;
+        background-color: rgba(246, 246, 244, 0.18) !important;
         -webkit-backdrop-filter: blur(24px) saturate(1.08);
         backdrop-filter: blur(24px) saturate(1.08);
       }
 
       @media (prefers-color-scheme: dark) {
         html.has-native-sidebar [data-postline-sidebar] {
-          background-color: rgba(24, 24, 23, 0.88) !important;
+          background-color: rgba(24, 24, 23, 0.18) !important;
         }
       }
     </style>
   </head>
   <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-[#f3f3f1]">
     <div class="grid grid-cols-1 lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] min-h-screen duration-200 ease-out transition-[grid-template-columns]" data-postline-app data-postline-shell>
-      <aside class="flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[80px] px-5 h-screen bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-200 ease-out transition-[width,padding]" aria-label="Postline" data-postline-sidebar>
+      <aside class="flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[80px] px-5 h-screen bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-200 ease-out transition-[width,padding]" aria-label="Postline" data-postline-sidebar data-window-drag-region>
         <div class="absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_45%,rgba(226,226,222,0.16)_100%)] pointer-events-none"></div>
         <div class="flex absolute right-5 top-3.5 z-20 items-center min-h-7" data-shell-controls-row>
           <div class="flex gap-2 items-center">
@@ -117,7 +117,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
 
       <div class="min-w-0 bg-white" data-postline-content-shell>
         <section class="overflow-hidden min-h-screen min-w-0 bg-white border-l border-t border-zinc-200/80 rounded-tl-[28px] shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace>
-          <header class="flex items-center justify-between px-5 lg:px-6 min-h-[56px] border-b border-zinc-200">
+          <header class="flex items-center justify-between px-5 lg:px-6 min-h-[56px] border-b border-zinc-200" data-window-drag-region>
             <h1 class="m-0 font-semibold text-[21px] text-zinc-900 tracking-normal">@yield('shell-title', 'Create Bluesky scheduler')</h1>
             <div class="flex gap-3 items-center text-zinc-500">
               <button class="hidden sm:inline-flex items-center px-3 h-9 font-medium text-sm bg-white border border-zinc-200 rounded-xl shadow-sm" type="button">Review</button>
@@ -157,6 +157,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           if (collapseIcon) collapseIcon.style.display = collapsed ? 'none' : ''
           if (expandIcon) expandIcon.style.display = collapsed ? '' : 'none'
           window.localStorage?.setItem('postline.sidebar.collapsed', collapsed ? 'true' : 'false')
+          syncNativeShell()
         }
 
         const bindSidebarCollapse = () => {
@@ -195,14 +196,15 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           const row = document.querySelector('[data-shell-controls-row]')
           const sidebar = document.querySelector('[data-postline-sidebar]')
           if (!row || !sidebar) return
+          const collapsed = window.localStorage?.getItem('postline.sidebar.collapsed') === 'true'
 
           if (isNativeShell()) {
             document.querySelectorAll('[data-native-shell-control]').forEach(element => {
-              element.classList.remove('hidden')
-              element.style.display = ''
+              element.classList.toggle('hidden', collapsed)
+              element.style.display = collapsed ? 'none' : ''
             })
             row.style.top = '15px'
-            row.style.left = '174px'
+            row.style.left = collapsed ? '30px' : '174px'
             row.style.right = 'auto'
             sidebar.style.paddingTop = '80px'
             return
@@ -216,11 +218,25 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           sidebar.style.removeProperty('padding-top')
         }
 
+        const bindWindowDragRegions = () => {
+          document.querySelectorAll('[data-window-drag-region]').forEach(region => {
+            if (region.dataset.dragBound === 'true') return
+            region.dataset.dragBound = 'true'
+            region.addEventListener('mousedown', event => {
+              if (event.button !== 0 || !isNativeShell()) return
+              if (event.target.closest('a, button, input, textarea, select, [role="button"], [data-no-window-drag]')) return
+              window.craft?.window?.startDrag?.()
+            })
+          })
+        }
+
         bindSidebarCollapse()
         bindShellHistory()
+        bindWindowDragRegions()
         syncNativeShell()
         window.addEventListener('stx:load', bindShellHistory)
         window.addEventListener('stx:load', bindSidebarCollapse)
+        window.addEventListener('stx:load', bindWindowDragRegions)
         window.addEventListener('stx:load', syncNativeShell)
         window.addEventListener('craft:ready', syncNativeShell)
       })()
