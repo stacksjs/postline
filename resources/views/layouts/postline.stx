@@ -61,19 +61,19 @@
       }
 
       html.has-native-sidebar.postline-sidebar-collapsed [data-postline-workspace] > header {
-        padding-left: var(--postline-native-title-inset, 316px) !important;
+        padding-left: var(--postline-native-title-inset, 206px) !important;
       }
 
       [data-postline-workspace] [data-shell-title] {
         margin: 0 !important;
-        font-size: 19px !important;
-        line-height: 26px !important;
-        font-weight: 600 !important;
+        font-size: 15px !important;
+        line-height: 22px !important;
+        font-weight: 500 !important;
         letter-spacing: 0 !important;
       }
 
       html.has-native-sidebar [data-postline-workspace] > header {
-        transition: padding-left 160ms ease;
+        transition: none !important;
       }
     </style>
   </head>
@@ -84,10 +84,10 @@
       <div class="min-w-0 bg-[#f3f3f1]" data-postline-content-shell>
         <section class="overflow-hidden min-h-screen min-w-0 bg-white border-l border-t border-zinc-200/80 rounded-tl-[28px] shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace>
           <header class="flex items-center justify-between px-5 lg:px-6 min-h-[56px] border-b border-zinc-200" data-window-drag-region>
-            <div class="flex gap-3 items-center min-w-0">
-              <h1 class="m-0 font-semibold text-lg leading-7 text-zinc-900 tracking-normal truncate" data-shell-title>@yield('shell-title', 'Create Bluesky scheduler')</h1>
-              <button class="inline-flex items-center justify-center shrink-0 h-7 w-7 text-zinc-500 rounded-full hover:text-zinc-900 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="More workspace actions">
-                <span class="h-5 w-5 i-hugeicons-more-horizontal" aria-hidden="true"></span>
+            <div class="flex gap-2.5 items-center min-w-0">
+              <div class="m-0 font-medium text-[15px] leading-[22px] text-zinc-900 tracking-normal truncate" role="heading" aria-level="1" data-shell-title>@yield('shell-title', 'Create Bluesky scheduler')</div>
+              <button class="inline-flex items-center justify-center shrink-0 h-6 w-6 text-zinc-500 rounded-full hover:text-zinc-900 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="More workspace actions">
+                <span class="h-4 w-4 i-hugeicons-more-horizontal" aria-hidden="true"></span>
               </button>
             </div>
             <div class="flex gap-3 items-center text-zinc-500">
