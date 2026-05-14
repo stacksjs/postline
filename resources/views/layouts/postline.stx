@@ -60,14 +60,14 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
         <div class="absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_45%,rgba(226,226,222,0.16)_100%)] pointer-events-none"></div>
         <div class="flex absolute right-5 top-3.5 z-20 items-center min-h-7" data-shell-controls-row>
           <div class="flex gap-1.5 items-center">
+            <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 hover:text-zinc-900 hover:bg-white/35 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="Collapse sidebar" aria-expanded="true" data-sidebar-collapse>
+              <span class="h-5 w-5 transition-transform i-hugeicons-sidebar-left" aria-hidden="true" data-sidebar-collapse-icon></span>
+            </button>
             <button class="hidden inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 hover:text-zinc-900 hover:bg-white/35 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="Go back" data-shell-back data-native-shell-control>
               <span class="h-5 w-5 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
             </button>
             <button class="hidden inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 hover:text-zinc-900 hover:bg-white/35 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="Go forward" data-shell-forward data-native-shell-control>
               <span class="h-5 w-5 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
-            </button>
-            <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 hover:text-zinc-900 hover:bg-white/35 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="Collapse sidebar" aria-expanded="true" data-sidebar-collapse>
-              <span class="h-5 w-5 transition-transform i-hugeicons-sidebar-left" aria-hidden="true" data-sidebar-collapse-icon></span>
             </button>
           </div>
         </div>
@@ -194,13 +194,19 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           const collapsed = window.localStorage?.getItem('postline.sidebar.collapsed') === 'true'
 
           if (isNativeShell()) {
+            if (window.__craftWebChromeControls === true) {
+              row.style.display = 'none'
+              sidebar.style.paddingTop = '80px'
+              return
+            }
+
             document.querySelectorAll('[data-native-shell-control]').forEach(element => {
               element.classList.remove('hidden')
               element.style.display = ''
             })
             row.style.position = 'fixed'
             row.style.top = '16px'
-            row.style.left = '110px'
+            row.style.left = '88px'
             row.style.right = 'auto'
             row.style.zIndex = '80'
             sidebar.style.paddingTop = '80px'
@@ -212,6 +218,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
             element.style.display = 'none'
           })
           row.removeAttribute('style')
+          row.style.removeProperty('display')
           row.style.removeProperty('position')
           row.style.removeProperty('z-index')
           sidebar.style.removeProperty('padding-top')
