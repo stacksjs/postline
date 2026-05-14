@@ -63,6 +63,18 @@
       html.has-native-sidebar.postline-sidebar-collapsed [data-postline-workspace] > header {
         padding-left: var(--postline-native-title-inset, 316px) !important;
       }
+
+      [data-postline-workspace] [data-shell-title] {
+        margin: 0 !important;
+        font-size: 19px !important;
+        line-height: 26px !important;
+        font-weight: 600 !important;
+        letter-spacing: 0 !important;
+      }
+
+      html.has-native-sidebar [data-postline-workspace] > header {
+        transition: padding-left 160ms ease;
+      }
     </style>
   </head>
   <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-[#f3f3f1]">
@@ -73,7 +85,7 @@
         <section class="overflow-hidden min-h-screen min-w-0 bg-white border-l border-t border-zinc-200/80 rounded-tl-[28px] shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace>
           <header class="flex items-center justify-between px-5 lg:px-6 min-h-[56px] border-b border-zinc-200" data-window-drag-region>
             <div class="flex gap-3 items-center min-w-0">
-              <h1 class="m-0 font-semibold text-[21px] text-zinc-900 tracking-normal truncate">@yield('shell-title', 'Create Bluesky scheduler')</h1>
+              <h1 class="m-0 font-semibold text-lg leading-7 text-zinc-900 tracking-normal truncate" data-shell-title>@yield('shell-title', 'Create Bluesky scheduler')</h1>
               <button class="inline-flex items-center justify-center shrink-0 h-7 w-7 text-zinc-500 rounded-full hover:text-zinc-900 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="More workspace actions">
                 <span class="h-5 w-5 i-hugeicons-more-horizontal" aria-hidden="true"></span>
               </button>
@@ -173,12 +185,10 @@
               return
             }
 
-            window.requestAnimationFrame(() => {
-              const rowRight = row.getBoundingClientRect().right
-              const workspaceLeft = workspace.getBoundingClientRect().left
-              const inset = Math.max(56, Math.ceil(rowRight - workspaceLeft + 28))
-              header.style.setProperty('--postline-native-title-inset', `${inset}px`)
-            })
+            const rowRight = row.getBoundingClientRect().right
+            const workspaceLeft = workspace.getBoundingClientRect().left
+            const inset = Math.max(48, Math.ceil(rowRight - workspaceLeft + 22))
+            header.style.setProperty('--postline-native-title-inset', `${inset}px`)
           }
 
           if (isNativeShell()) {
