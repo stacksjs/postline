@@ -61,7 +61,7 @@
       }
 
       html.has-native-sidebar.postline-sidebar-collapsed [data-postline-workspace] > header {
-        padding-left: 144px !important;
+        padding-left: var(--postline-native-title-inset, 316px) !important;
       }
     </style>
   </head>
@@ -72,7 +72,12 @@
       <div class="min-w-0 bg-[#f3f3f1]" data-postline-content-shell>
         <section class="overflow-hidden min-h-screen min-w-0 bg-white border-l border-t border-zinc-200/80 rounded-tl-[28px] shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace>
           <header class="flex items-center justify-between px-5 lg:px-6 min-h-[56px] border-b border-zinc-200" data-window-drag-region>
-            <h1 class="m-0 font-semibold text-[21px] text-zinc-900 tracking-normal">@yield('shell-title', 'Create Bluesky scheduler')</h1>
+            <div class="flex gap-3 items-center min-w-0">
+              <h1 class="m-0 font-semibold text-[21px] text-zinc-900 tracking-normal truncate">@yield('shell-title', 'Create Bluesky scheduler')</h1>
+              <button class="inline-flex items-center justify-center shrink-0 h-7 w-7 text-zinc-500 rounded-full hover:text-zinc-900 hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="More workspace actions">
+                <span class="h-5 w-5 i-hugeicons-more-horizontal" aria-hidden="true"></span>
+              </button>
+            </div>
             <div class="flex gap-3 items-center text-zinc-500">
               <button class="hidden sm:inline-flex items-center px-3 h-9 font-medium text-sm bg-white border border-zinc-200 rounded-xl shadow-sm" type="button">Review</button>
             </div>
@@ -155,13 +160,32 @@
         const syncNativeShell = () => {
           const row = document.querySelector('[data-shell-controls-row]')
           const sidebar = document.querySelector('[data-postline-sidebar]')
+          const workspace = document.querySelector('[data-postline-workspace]')
+          const header = workspace?.querySelector('header')
           if (!row || !sidebar) return
           const collapsed = window.localStorage?.getItem('postline.sidebar.collapsed') === 'true'
+
+          const syncTitleInset = () => {
+            if (!header || !workspace) return
+
+            if (!isNativeShell() || !collapsed || row.style.display === 'none') {
+              header.style.removeProperty('--postline-native-title-inset')
+              return
+            }
+
+            window.requestAnimationFrame(() => {
+              const rowRight = row.getBoundingClientRect().right
+              const workspaceLeft = workspace.getBoundingClientRect().left
+              const inset = Math.max(56, Math.ceil(rowRight - workspaceLeft + 28))
+              header.style.setProperty('--postline-native-title-inset', `${inset}px`)
+            })
+          }
 
           if (isNativeShell()) {
             if (window.__craftWebChromeControls === true) {
               row.style.display = 'none'
               sidebar.style.paddingTop = '80px'
+              syncTitleInset()
               return
             }
 
@@ -175,6 +199,7 @@
             row.style.right = 'auto'
             row.style.zIndex = '80'
             sidebar.style.paddingTop = '80px'
+            syncTitleInset()
             return
           }
 
@@ -185,6 +210,7 @@
             row.style.right = 'auto'
             row.style.zIndex = '80'
             sidebar.style.paddingTop = '0px'
+            syncTitleInset()
             return
           }
 
@@ -197,6 +223,7 @@
           row.style.removeProperty('position')
           row.style.removeProperty('z-index')
           sidebar.style.removeProperty('padding-top')
+          syncTitleInset()
         }
 
         const bindWindowDragRegions = () => {
