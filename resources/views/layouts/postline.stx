@@ -32,10 +32,23 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
     <meta name="description" content="@yield('description', 'Postline is a clean personal workspace for social publishing.')">
     <title>@yield('title', 'Postline')</title>
+    <script>
+      ;(() => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        document.documentElement.classList.remove('dark')
+        try { window.localStorage?.setItem('theme', 'light') } catch {}
+      })()
+    </script>
     <script>window.STX_ROUTER_OPTIONS = { container: '[data-postline-workspace]', viewTransitions: false };</script>
     <style>
+      :root {
+        color-scheme: light;
+        background: #f3f3f1;
+      }
+
       html.has-native-sidebar,
       html.has-native-sidebar body {
         background: transparent !important;
@@ -47,16 +60,18 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
         backdrop-filter: blur(24px) saturate(1.08);
       }
 
-      @media (prefers-color-scheme: dark) {
-        html.has-native-sidebar [data-postline-sidebar] {
-          background-color: rgba(24, 24, 23, 0.18) !important;
-        }
+      html.has-native-sidebar [data-postline-content-shell] {
+        background: #f3f3f1 !important;
+      }
+
+      html.has-native-sidebar [data-postline-workspace] {
+        background: #fff !important;
       }
     </style>
   </head>
   <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-[#f3f3f1]">
     <div class="grid grid-cols-1 lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] min-h-screen duration-200 ease-out transition-[grid-template-columns]" data-postline-app data-postline-shell>
-      <aside class="flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[80px] px-5 h-screen bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-200 ease-out transition-[width,padding]" aria-label="Postline" data-postline-sidebar data-window-drag-region>
+      <aside class="flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[80px] px-5 h-screen min-w-0 bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-200 ease-out transition-[width,padding,opacity]" aria-label="Postline" data-postline-sidebar data-window-drag-region>
         <div class="absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_45%,rgba(226,226,222,0.16)_100%)] pointer-events-none"></div>
         <div class="flex absolute right-5 top-3.5 z-20 items-center min-h-7" data-shell-controls-row>
           <div class="flex gap-1.5 items-center">
@@ -137,12 +152,14 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           const button = document.querySelector('[data-sidebar-collapse]')
           const collapseIcon = document.querySelector('[data-sidebar-collapse-icon]')
 
-          shell?.style.setProperty('--postline-sidebar-width', collapsed ? '88px' : '286px')
-          sidebar?.classList.toggle('items-center', collapsed)
-          sidebar?.classList.toggle('p-4', collapsed)
+          shell?.style.setProperty('--postline-sidebar-width', collapsed ? '0px' : '286px')
+          sidebar?.classList.toggle('opacity-0', collapsed)
+          sidebar?.classList.toggle('pointer-events-none', collapsed)
           sidebar?.classList.toggle('px-5', !collapsed)
           sidebar?.classList.toggle('pt-[80px]', !collapsed)
           sidebar?.classList.toggle('pb-5', !collapsed)
+          sidebar?.setAttribute('aria-hidden', String(collapsed))
+          if (sidebar) sidebar.style.width = collapsed ? '0px' : ''
 
           document.querySelectorAll('[data-sidebar-expanded]').forEach(element => {
             element.classList.toggle('hidden', collapsed)
@@ -152,6 +169,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           button?.setAttribute('aria-expanded', String(!collapsed))
           collapseIcon?.classList.toggle('rotate-180', collapsed)
           window.localStorage?.setItem('postline.sidebar.collapsed', collapsed ? 'true' : 'false')
+          window.craft?.window?.setWebSidebarCollapsed?.(collapsed).catch?.(() => {})
           syncNativeShell()
         }
 
@@ -231,9 +249,25 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
             let dragging = false
             let lastX = 0
             let lastY = 0
+            let pendingX = 0
+            let pendingY = 0
+            let dragFrame = 0
+
+            const flushDrag = () => {
+              dragFrame = 0
+              const dx = pendingX
+              const dy = pendingY
+              pendingX = 0
+              pendingY = 0
+              if (dx || dy) window.craft?.window?.moveBy?.(dx, dy).catch?.(() => {})
+            }
 
             const stopDrag = () => {
               dragging = false
+              if (dragFrame) {
+                cancelAnimationFrame(dragFrame)
+                flushDrag()
+              }
             }
 
             region.addEventListener('pointerdown', event => {
@@ -253,7 +287,9 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
               const dy = event.screenY - lastY
               lastX = event.screenX
               lastY = event.screenY
-              if (dx || dy) window.craft?.window?.moveBy?.(dx, dy)
+              pendingX += dx
+              pendingY += dy
+              if (!dragFrame) dragFrame = requestAnimationFrame(flushDrag)
             })
 
             region.addEventListener('pointerup', stopDrag)
