@@ -1,32 +1,3 @@
-<script server>
-const requestUrl = (typeof requestContext !== 'undefined' && requestContext.url)
-  ? requestContext.url()
-  : 'http://localhost/'
-
-let currentPath = '/'
-try {
-  currentPath = new URL(requestUrl).pathname
-}
-catch {
-  currentPath = '/'
-}
-
-const navLinks = [
-  { href: '/', label: 'Composer', shortcut: '1', icon: 'i-hugeicons-edit-02' },
-  { href: '/queue', label: 'Queue', shortcut: '2', icon: 'i-hugeicons-calendar-03' },
-  { href: '/timeline', label: 'Timeline', shortcut: '3', icon: 'i-hugeicons-news' },
-  { href: '/analytics', label: 'Analytics', shortcut: '4', icon: 'i-hugeicons-chart-line-data-01' },
-  { href: '/accounts', label: 'Accounts', shortcut: '5', icon: 'i-hugeicons-user-multiple' },
-].map((link) => ({
-  ...link,
-  active: link.href === '/'
-    ? currentPath === '/'
-    : currentPath === link.href || currentPath.startsWith(`${link.href}/`),
-}))
-
-const settingsActive = currentPath === '/settings' || currentPath.startsWith('/settings/')
-</script>
-
 <!DOCTYPE html>
 <html lang="en" class="text-neutral-950 bg-[#f3f3f1]">
   <head>
@@ -39,7 +10,13 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
       ;(() => {
         document.documentElement.setAttribute('data-theme', 'light')
         document.documentElement.classList.remove('dark')
-        try { window.localStorage?.setItem('theme', 'light') } catch {}
+        try {
+          window.localStorage?.setItem('theme', 'light')
+          const sidebarCollapsed = window.localStorage?.getItem('postline.sidebar.collapsed') === 'true'
+          document.documentElement.classList.toggle('postline-sidebar-collapsed', sidebarCollapsed)
+          document.documentElement.dataset.stxSidebarCollapsed = sidebarCollapsed ? 'true' : 'false'
+          document.documentElement.style.setProperty('--postline-sidebar-width', sidebarCollapsed ? '0px' : '286px')
+        } catch {}
       })()
     </script>
     <script>window.STX_ROUTER_OPTIONS = { container: '[data-postline-workspace]', viewTransitions: false };</script>
@@ -67,67 +44,30 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
       html.has-native-sidebar [data-postline-workspace] {
         background: #fff !important;
       }
+
+      html.postline-sidebar-collapsed [data-postline-content-shell],
+      html.postline-sidebar-collapsed [data-postline-workspace] {
+        background: #fff !important;
+      }
+
+      html.postline-sidebar-collapsed [data-postline-workspace] {
+        border-top-left-radius: 0 !important;
+        border-left-color: transparent !important;
+        box-shadow: none !important;
+      }
+
+      html.postline-sidebar-collapsed [data-postline-workspace] > header {
+        padding-left: 56px !important;
+      }
+
+      html.has-native-sidebar.postline-sidebar-collapsed [data-postline-workspace] > header {
+        padding-left: 144px !important;
+      }
     </style>
   </head>
   <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-[#f3f3f1]">
     <div class="grid grid-cols-1 lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] min-h-screen duration-200 ease-out transition-[grid-template-columns]" data-postline-app data-postline-shell>
-      <aside class="flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[80px] px-5 h-screen min-w-0 bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-200 ease-out transition-[width,padding,opacity]" aria-label="Postline" data-postline-sidebar data-window-drag-region>
-        <div class="absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_45%,rgba(226,226,222,0.16)_100%)] pointer-events-none"></div>
-        <div class="flex absolute right-5 top-3.5 z-20 items-center min-h-7" data-shell-controls-row>
-          <div class="flex gap-1.5 items-center">
-            <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 hover:text-zinc-900 hover:bg-white/35 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="Collapse sidebar" aria-expanded="true" data-sidebar-collapse>
-              <span class="h-5 w-5 transition-transform i-hugeicons-sidebar-left" aria-hidden="true" data-sidebar-collapse-icon></span>
-            </button>
-            <button class="hidden inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 hover:text-zinc-900 hover:bg-white/35 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="Go back" data-shell-back data-native-shell-control>
-              <span class="h-5 w-5 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
-            </button>
-            <button class="hidden inline-flex items-center justify-center h-7 w-7 text-zinc-500/80 hover:text-zinc-900 hover:bg-white/35 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/50 transition-colors" type="button" aria-label="Go forward" data-shell-forward data-native-shell-control>
-              <span class="h-5 w-5 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
-            </button>
-          </div>
-        </div>
-
-        <a
-          class="flex relative z-10 gap-3 items-center mb-7 px-2 py-2 text-zinc-800 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
-          href="/"
-          data-stx-link
-          data-stx-exact-active-class="text-neutral-950"
-          aria-label="Postline composer"
-        >
-          <span class="grid place-items-center h-9 w-9 font-bold text-sm text-white bg-neutral-950 rounded-xl">P</span>
-          <span class="font-semibold text-[16px]" data-sidebar-expanded>Postline</span>
-        </a>
-
-        <nav class="grid relative z-10 gap-1.5" aria-label="Primary" data-stx-nav data-testid="postline-nav">
-          @foreach (navLinks as link)
-            <a
-              href="{{ link.href }}"
-              data-stx-link
-              data-stx-active-class="text-zinc-950 bg-[#e8e8e6]/90"
-              data-stx-exact-active-class="text-zinc-950 bg-[#e8e8e6]/90"
-              class="flex w-full items-center gap-3 rounded-[16px] px-3.5 py-2 text-left text-[14px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ link.active ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
-              aria-current="{{ link.active ? 'page' : 'false' }}"
-            >
-              <span class="h-[18px] w-[18px] {{ link.icon }} {{ link.active ? 'text-zinc-900' : 'text-zinc-600' }}" aria-hidden="true"></span>
-              <span class="flex-1 font-medium truncate" data-sidebar-expanded>{{ link.label }}</span>
-              <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>{{ link.shortcut }}</span>
-            </a>
-          @endforeach
-        </nav>
-
-        <a
-          href="/settings"
-          data-stx-link
-          data-stx-active-class="text-zinc-950 bg-[#e8e8e6]/90"
-          data-stx-exact-active-class="text-zinc-950 bg-[#e8e8e6]/90"
-          class="relative z-10 mt-auto flex w-full items-center gap-3 rounded-[16px] px-3.5 py-2 text-left text-[14px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ settingsActive ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
-          aria-current="{{ settingsActive ? 'page' : 'false' }}"
-        >
-          <span class="h-[18px] w-[18px] i-hugeicons-settings-02 {{ settingsActive ? 'text-zinc-900' : 'text-zinc-600' }}" aria-hidden="true"></span>
-          <span class="flex-1 font-medium" data-sidebar-expanded>Settings</span>
-          <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>6</span>
-        </a>
-      </aside>
+      <PostlineSidebar />
 
       <div class="min-w-0 bg-[#f3f3f1]" data-postline-content-shell>
         <section class="overflow-hidden min-h-screen min-w-0 bg-white border-l border-t border-zinc-200/80 rounded-tl-[28px] shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace>
@@ -153,15 +93,22 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           const collapseIcon = document.querySelector('[data-sidebar-collapse-icon]')
 
           shell?.style.setProperty('--postline-sidebar-width', collapsed ? '0px' : '286px')
-          sidebar?.classList.toggle('opacity-0', collapsed)
-          sidebar?.classList.toggle('pointer-events-none', collapsed)
+          document.documentElement.style.setProperty('--postline-sidebar-width', collapsed ? '0px' : '286px')
+          document.documentElement.classList.toggle('postline-sidebar-collapsed', collapsed)
+          document.documentElement.dataset.stxSidebarCollapsed = collapsed ? 'true' : 'false'
+          if (shell?.dataset) shell.dataset.sidebarCollapsed = collapsed ? 'true' : 'false'
+          sidebar?.classList.remove('opacity-0', 'pointer-events-none')
           sidebar?.classList.toggle('px-5', !collapsed)
           sidebar?.classList.toggle('pt-[80px]', !collapsed)
           sidebar?.classList.toggle('pb-5', !collapsed)
           sidebar?.setAttribute('aria-hidden', String(collapsed))
           if (sidebar) sidebar.style.width = collapsed ? '0px' : ''
+          if (sidebar) sidebar.style.overflow = collapsed ? 'visible' : ''
 
           document.querySelectorAll('[data-sidebar-expanded]').forEach(element => {
+            element.classList.toggle('hidden', collapsed)
+          })
+          document.querySelectorAll('[data-sidebar-collapsible-content]').forEach(element => {
             element.classList.toggle('hidden', collapsed)
           })
 
@@ -228,6 +175,16 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
             row.style.right = 'auto'
             row.style.zIndex = '80'
             sidebar.style.paddingTop = '80px'
+            return
+          }
+
+          if (collapsed) {
+            row.style.position = 'fixed'
+            row.style.top = '14px'
+            row.style.left = '14px'
+            row.style.right = 'auto'
+            row.style.zIndex = '80'
+            sidebar.style.paddingTop = '0px'
             return
           }
 
