@@ -25,34 +25,26 @@ const timelineItems = [
   },
 ]
 
-const streams = [
-  { label: 'Home', value: 'Bluesky', state: 'Live' },
-  { label: 'Mentions', value: '@stacksjs.com', state: 'Quiet' },
-  { label: 'Saved', value: 'Design systems', state: '12' },
-]
 </script>
 
 @section('content')
-  <section class="grid gap-4" data-postline-page="timeline" data-testid="timeline-page">
-    <header class="flex flex-wrap gap-3 items-center justify-between min-h-9">
-      <div>
-        <p class="m-0 font-medium text-[14px] text-zinc-500">Timeline</p>
-      </div>
-      <div class="flex gap-2 items-center">
-        <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Refresh timeline" title="Refresh timeline" data-bluesky-timeline-refresh>
-          <span class="h-4 w-4 i-hugeicons-refresh" aria-hidden="true"></span>
-        </button>
-        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-sm text-white bg-neutral-950 rounded-xl" type="button">
-          <span class="h-4 w-4 i-hugeicons-message-add-01" aria-hidden="true"></span>
-          <span>Reply</span>
-        </button>
-      </div>
-    </header>
-
+  <section class="grid gap-3.5" data-postline-page="timeline" data-testid="timeline-page">
     <div class="hidden px-3 py-2 text-emerald-700 text-red-700 text-sm text-zinc-600 bg-emerald-50 bg-red-50 bg-slate-50 border border-emerald-200 border-red-200 border-zinc-200 rounded-xl" role="status" data-bluesky-timeline-status></div>
 
-    <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_300px]">
-      <section class="grid gap-2.5" aria-label="Bluesky timeline" data-bluesky-timeline-list>
+    <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Bluesky timeline">
+      <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
+        <strong class="text-[13px]">Timeline</strong>
+        <div class="flex gap-2 items-center">
+          <button class="inline-flex items-center justify-center h-8 w-8 text-neutral-950 bg-white border border-zinc-200 rounded-lg shadow-sm" type="button" aria-label="Refresh timeline" title="Refresh timeline" data-bluesky-timeline-refresh>
+            <span class="h-3.5 w-3.5 i-hugeicons-refresh" aria-hidden="true"></span>
+          </button>
+          <button class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-bold text-xs text-white bg-neutral-950 rounded-lg" type="button">
+            <span class="h-3.5 w-3.5 i-hugeicons-message-add-01" aria-hidden="true"></span>
+            <span>Reply</span>
+          </button>
+        </div>
+      </header>
+      <div class="grid gap-2.5 p-3" data-bluesky-timeline-list>
         @foreach (timelineItems as item)
           <article class="p-3.5 bg-white border border-zinc-200 rounded-2xl shadow-sm">
             <header class="flex gap-3 items-center justify-between mb-3">
@@ -69,38 +61,8 @@ const streams = [
             <footer class="mt-3 text-xs text-zinc-500">{{ item.meta }}</footer>
           </article>
         @endforeach
-      </section>
-
-      <aside class="grid content-start gap-3.5">
-        <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
-          <header class="p-3.5 border-b border-zinc-200">
-            <strong class="text-[13px]">Streams</strong>
-          </header>
-          <div class="grid gap-2 p-3">
-            @foreach (streams as stream)
-              <article class="flex items-center justify-between p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl">
-                <span class="grid gap-0.5">
-                  <strong class="text-xs">{{ stream.label }}</strong>
-                  <span class="text-[11px] text-zinc-500">{{ stream.value }}</span>
-                </span>
-                <span class="text-xs text-zinc-500">{{ stream.state }}</span>
-              </article>
-            @endforeach
-          </div>
-        </section>
-
-        <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
-          <header class="p-3.5 border-b border-zinc-200">
-            <strong class="text-[13px]">Filters</strong>
-          </header>
-          <div class="flex flex-wrap gap-2 p-3">
-            <button class="px-2.5 h-8 text-xs text-neutral-950 bg-zinc-100 rounded-full" type="button">Links</button>
-            <button class="px-2.5 h-8 text-xs text-neutral-950 bg-zinc-100 rounded-full" type="button">Replies</button>
-            <button class="px-2.5 h-8 text-xs text-neutral-950 bg-zinc-100 rounded-full" type="button">Mentions</button>
-          </div>
-        </section>
-      </aside>
-    </div>
+      </div>
+    </section>
   </section>
 
   <script>

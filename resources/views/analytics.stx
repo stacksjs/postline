@@ -18,17 +18,7 @@ const channelSplits = [
 </script>
 
 @section('content')
-  <section class="grid gap-4" data-postline-page="analytics" data-testid="analytics-page">
-    <header class="flex flex-wrap gap-3 items-center justify-between min-h-9">
-      <div>
-        <p class="m-0 font-medium text-[14px] text-zinc-500">Analytics</p>
-      </div>
-      <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-sm text-white bg-neutral-950 rounded-xl" type="button">
-        <span class="h-4 w-4 i-hugeicons-download-04" aria-hidden="true"></span>
-        <span>Export</span>
-      </button>
-    </header>
-
+  <section class="grid gap-3.5" data-postline-page="analytics" data-testid="analytics-page">
     <div class="grid gap-3.5 lg:grid-cols-3">
       @foreach (stats as stat)
         <article class="grid gap-2 p-3.5 bg-white border border-zinc-200 rounded-2xl shadow-sm">
@@ -43,7 +33,10 @@ const channelSplits = [
       <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
         <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
           <strong class="text-[13px]">Response trend</strong>
-          <span class="text-xs text-zinc-500">Last 30 days</span>
+          <button class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-bold text-xs text-white bg-neutral-950 rounded-lg" type="button">
+            <span class="h-3.5 w-3.5 i-hugeicons-download-04" aria-hidden="true"></span>
+            <span>Export</span>
+          </button>
         </header>
         <div class="p-3.5">
           <svg class="block w-full h-auto" viewBox="0 0 640 220" role="img" aria-label="Postline response trend chart" data-analytics-chart>

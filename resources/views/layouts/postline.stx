@@ -68,7 +68,7 @@
 
       <div class="min-w-0 bg-[#f3f3f1]" data-postline-content-shell>
         <section class="overflow-hidden min-h-screen min-w-0 bg-[#f3f3f1] border-l border-t border-zinc-200/80 rounded-tl-[28px] shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace data-window-drag-region>
-          <main class="p-3.5 pt-16 sm:p-4 sm:pt-16 min-w-0" data-postline-router>
+          <main class="p-3.5 sm:p-4 min-w-0" data-postline-router>
             @yield('content')
           </main>
         </section>

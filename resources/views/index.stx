@@ -3,65 +3,11 @@
 @section('title', 'Postline - Composer')
 @section('description', 'Write, schedule, publish, and review social posts from a clean personal workspace.')
 
-<script server>
-const scheduledPosts = [
-  {
-    time: 'Today 3:30 PM',
-    channel: 'Bluesky',
-    status: 'Ready',
-    text: 'Working on a calmer way to plan posts: drafts, timelines, scheduling, and publishing in one native-feeling place.',
-  },
-  {
-    time: 'Tomorrow 9:00 AM',
-    channel: 'Bluesky',
-    status: 'Draft',
-    text: 'Tiny systems compound. A clean publishing queue might be the difference between ideas fading and ideas shipping.',
-  },
-  {
-    time: 'Friday 11:15 AM',
-    channel: 'Mastodon',
-    status: 'Planned',
-    text: 'Cross-posting should feel intentional, not like copy/paste chores across six tabs.',
-  },
-]
-
-const timelineItems = [
-  {
-    author: 'jay.bsky.social',
-    label: 'Design systems',
-    text: 'The best writing tools stay out of the way until you need structure.',
-    meta: '42 likes / 8 reposts',
-  },
-  {
-    author: 'maya.bsky.social',
-    label: 'Indie tools',
-    text: 'Scheduling is really a promise to your future self. Good software makes the promise easy to keep.',
-    meta: '128 likes / 21 replies',
-  },
-]
-</script>
-
 @section('content')
-  <section class="grid gap-4" data-postline-page="composer" data-testid="composer-page">
-    <header class="flex flex-wrap gap-3 items-center justify-between min-h-9">
-      <p class="m-0 font-medium text-[14px] text-zinc-500">Composer</p>
-      <div class="flex gap-2 items-center">
-        <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Search posts" title="Search posts" data-composer-search>
-          <span class="h-4 w-4 i-hugeicons-search-01" aria-hidden="true"></span>
-        </button>
-        <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Refresh timeline" title="Refresh timeline" data-composer-refresh>
-          <span class="h-4 w-4 i-hugeicons-refresh" aria-hidden="true"></span>
-        </button>
-        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-sm text-white bg-neutral-950 rounded-xl" type="button" data-bluesky-publish-top>
-          <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
-          <span>Publish</span>
-        </button>
-      </div>
-    </header>
-
+  <section class="grid gap-3.5" data-postline-page="composer" data-testid="composer-page">
     <div class="hidden bottom-6 fixed right-6 z-50 px-3.5 py-2.5 max-w-md text-sm bg-white border border-zinc-200 rounded-2xl shadow-[0_18px_54px_rgba(24,31,42,0.16)]" role="status" data-bluesky-status></div>
 
-    <div class="grid gap-3.5 items-start lg:grid-cols-2 2xl:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)]">
+    <div class="grid">
       <section class="grid content-start grid-rows-[auto_auto_auto] self-start bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Post composer">
         <header class="flex gap-3 items-center justify-between p-3 border-b border-zinc-200">
           <strong class="text-[13px]">New post</strong>
@@ -112,51 +58,6 @@ const timelineItems = [
         </footer>
       </section>
 
-      <div class="grid gap-3.5">
-        <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Schedule queue">
-          <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
-            <strong class="text-[13px]">Queue</strong>
-            <a href="/queue" data-stx-link class="font-bold text-blue-600 text-xs">3 upcoming</a>
-          </header>
-          <div class="grid gap-2.5 p-3" data-queue-list>
-            @foreach (scheduledPosts as post)
-              <article class="p-3 bg-white border border-zinc-200 rounded-2xl">
-                <header class="flex gap-3 items-center justify-between mb-2">
-                  <span class="font-bold text-xs">{{ post.time }}</span>
-                  <span class="px-2 py-1 font-bold text-[11px] text-blue-700 bg-blue-50 rounded-full">{{ post.status }}</span>
-                </header>
-                <p class="m-0 leading-normal text-[13px] text-slate-700">{{ post.text }}</p>
-                <footer class="flex items-center justify-between mt-2.5 text-xs text-zinc-500">
-                  <span>{{ post.channel }}</span>
-                  <span>Edit</span>
-                </footer>
-              </article>
-            @endforeach
-          </div>
-        </section>
-
-        <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Timeline preview">
-          <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
-            <strong class="text-[13px]">Timeline</strong>
-            <a href="/timeline" data-stx-link class="font-bold text-blue-600 text-xs">Bluesky home</a>
-          </header>
-          <div class="grid gap-2.5 p-3">
-            @foreach (timelineItems as item)
-              <article class="p-3 bg-white border border-zinc-200 rounded-2xl">
-                <header class="flex gap-3 items-center justify-between mb-2">
-                  <span class="font-bold text-xs">{{ item.author }}</span>
-                  <span class="text-xs text-zinc-500">{{ item.label }}</span>
-                </header>
-                <p class="m-0 leading-normal text-[13px] text-slate-700">{{ item.text }}</p>
-                <footer class="flex items-center justify-between mt-2.5 text-xs text-zinc-500">
-                  <span>{{ item.meta }}</span>
-                  <span>Reply</span>
-                </footer>
-              </article>
-            @endforeach
-          </div>
-        </section>
-      </div>
     </div>
   </section>
 
