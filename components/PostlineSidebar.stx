@@ -28,7 +28,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
 </script>
 
 <template>
-  <aside class="flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[80px] px-5 h-screen min-w-0 bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-200 ease-out transition-[width,padding]" aria-label="Postline" data-postline-sidebar data-window-drag-region>
+  <aside class="flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[68px] px-5 h-screen min-w-0 bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-200 ease-out transition-[width,padding]" aria-label="Postline" data-postline-sidebar data-window-drag-region>
     <div class="absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_45%,rgba(226,226,222,0.16)_100%)] pointer-events-none"></div>
     <div class="flex absolute right-5 top-3.5 z-20 items-center min-h-7" data-shell-controls-row>
       <div class="flex gap-1.5 items-center">
@@ -45,7 +45,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
     </div>
 
     <a
-      class="flex relative z-10 gap-3 items-center mb-7 px-2 py-2 text-zinc-800 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
+      class="flex relative z-10 gap-3 items-center mb-5 px-2 py-2 text-zinc-800 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
       href="/"
       data-stx-link
       data-stx-exact-active-class="text-neutral-950"
@@ -53,17 +53,17 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
       aria-label="Postline composer"
     >
       <span class="grid place-items-center h-9 w-9 font-bold text-sm text-white bg-neutral-950 rounded-xl">P</span>
-      <span class="font-semibold text-[16px]" data-sidebar-expanded>Postline</span>
+      <span class="font-semibold text-[15px]" data-sidebar-expanded>Postline</span>
     </a>
 
-    <nav class="grid relative z-10 gap-1.5" aria-label="Primary" data-stx-nav data-testid="postline-nav" data-sidebar-collapsible-content="true">
+    <nav class="grid relative z-10 gap-1" aria-label="Primary" data-stx-nav data-testid="postline-nav" data-sidebar-collapsible-content="true">
       @foreach (navLinks as link)
         <a
           href="{{ link.href }}"
           data-stx-link
           data-stx-active-class="text-zinc-950 bg-[#e8e8e6]/90"
           data-stx-exact-active-class="text-zinc-950 bg-[#e8e8e6]/90"
-          class="flex w-full items-center gap-3 rounded-[16px] px-3.5 py-2 text-left text-[14px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ link.active ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
+          class="flex w-full items-center gap-3 rounded-[14px] px-3 py-1.5 text-left text-[13.5px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ link.active ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
           aria-current="{{ link.active ? 'page' : 'false' }}"
         >
           <span class="h-[18px] w-[18px] {{ link.icon }} {{ link.active ? 'text-zinc-900' : 'text-zinc-600' }}" aria-hidden="true"></span>
@@ -79,7 +79,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
       data-stx-active-class="text-zinc-950 bg-[#e8e8e6]/90"
       data-stx-exact-active-class="text-zinc-950 bg-[#e8e8e6]/90"
       data-sidebar-collapsible-content="true"
-      class="relative z-10 mt-auto flex w-full items-center gap-3 rounded-[16px] px-3.5 py-2 text-left text-[14px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ settingsActive ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
+      class="relative z-10 mt-auto flex w-full items-center gap-3 rounded-[14px] px-3 py-1.5 text-left text-[13.5px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ settingsActive ? 'bg-[#e8e8e6]/90 text-zinc-950' : 'text-zinc-700' }}"
       aria-current="{{ settingsActive ? 'page' : 'false' }}"
     >
       <span class="h-[18px] w-[18px] i-hugeicons-settings-02 {{ settingsActive ? 'text-zinc-900' : 'text-zinc-600' }}" aria-hidden="true"></span>

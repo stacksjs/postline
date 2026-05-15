@@ -75,6 +75,10 @@
       html.has-native-sidebar [data-postline-workspace] > header {
         transition: none !important;
       }
+
+      html.has-native-sidebar [data-postline-shell] {
+        transition: none !important;
+      }
     </style>
   </head>
   <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-[#f3f3f1]">
@@ -116,7 +120,7 @@
           if (shell?.dataset) shell.dataset.sidebarCollapsed = collapsed ? 'true' : 'false'
           sidebar?.classList.remove('opacity-0', 'pointer-events-none')
           sidebar?.classList.toggle('px-5', !collapsed)
-          sidebar?.classList.toggle('pt-[80px]', !collapsed)
+          sidebar?.classList.toggle('pt-[68px]', !collapsed)
           sidebar?.classList.toggle('pb-5', !collapsed)
           sidebar?.setAttribute('aria-hidden', String(collapsed))
           if (sidebar) sidebar.style.width = collapsed ? '0px' : ''
@@ -194,7 +198,7 @@
           if (isNativeShell()) {
             if (window.__craftWebChromeControls === true) {
               row.style.display = 'none'
-              sidebar.style.paddingTop = '80px'
+              sidebar.style.paddingTop = '68px'
               syncTitleInset()
               return
             }
@@ -208,7 +212,7 @@
             row.style.left = '88px'
             row.style.right = 'auto'
             row.style.zIndex = '80'
-            sidebar.style.paddingTop = '80px'
+            sidebar.style.paddingTop = '68px'
             syncTitleInset()
             return
           }
