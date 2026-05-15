@@ -117,6 +117,55 @@ async function proxyToApi(req: Request, apiBase: string): Promise<Response> {
   })
 }
 
+async function serveTypeScriptAsset(pathname: string): Promise<Response | null> {
+  if (!pathname.startsWith('/assets/'))
+    return null
+
+  const candidates = [
+    projectPath(`resources${pathname}`),
+    projectPath(pathname.slice(1)),
+    projectPath(`public${pathname}`),
+  ]
+
+  for (const candidate of candidates) {
+    const ext = candidate.split('.').pop()?.toLowerCase()
+    if (!['ts', 'tsx', 'mts'].includes(ext ?? ''))
+      continue
+
+    if (!await Bun.file(candidate).exists())
+      continue
+
+    const build = await Bun.build({
+      entrypoints: [candidate],
+      bundle: true,
+      format: 'esm',
+      target: 'browser',
+      sourcemap: 'none',
+      minify: false,
+    })
+
+    if (!build.success || build.outputs.length === 0) {
+      const logs = build.logs.map(log => log.message || String(log)).join('\n')
+      return new Response(logs || 'Unable to bundle TypeScript asset.', {
+        status: 500,
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+        },
+      })
+    }
+
+    return new Response(await build.outputs[0].text(), {
+      headers: {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
+    })
+  }
+
+  return null
+}
+
 async function startDefaultServer() {
   let serve: any
   // Prefer the project-vendored pantry copy so framework patches and
@@ -190,6 +239,10 @@ async function startDefaultServer() {
       // with a 404 page since it doesn't know about bun-router actions.
       if (url.pathname.startsWith('/api/'))
         return proxyToApi(req, apiBase)
+
+      const assetResponse = await serveTypeScriptAsset(url.pathname)
+      if (assetResponse)
+        return assetResponse
 
       // Stash cookies + url so server-script blocks rendering this
       // request can pull them via globalThis.requestContext. We use
