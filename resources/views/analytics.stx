@@ -90,8 +90,4 @@ const channelSplits = [
       <p class="m-0 p-3.5 leading-normal text-[13px] text-slate-700">Short, concrete posts are outperforming general updates. Bluesky is carrying the current response rate, so the next scheduling pass should keep that channel as the primary publishing target.</p>
     </section>
   </section>
-
-  <script type="module">
-    import '/assets/scripts/postline-analytics.ts'
-  </script>
 @endsection

@@ -18,7 +18,8 @@ const points: Point[] = [
 
 function renderAnalyticsChart(): void {
   const chart = document.querySelector<SVGSVGElement>('[data-analytics-chart]')
-  if (!chart || chart.dataset.rendered === 'true') return
+  const existingPath = chart?.querySelector<SVGPathElement>('[data-chart-line]')?.getAttribute('d')
+  if (!chart || (chart.dataset.rendered === 'true' && existingPath)) return
 
   const width = 640
   const height = 220
@@ -65,5 +66,35 @@ function renderAnalyticsChart(): void {
   chart.dataset.rendered = 'true'
 }
 
-renderAnalyticsChart()
-window.addEventListener('stx:load', renderAnalyticsChart)
+let renderFrame = 0
+
+function scheduleAnalyticsRender(): void {
+  if (renderFrame) return
+
+  renderFrame = window.requestAnimationFrame(() => {
+    renderFrame = 0
+    renderAnalyticsChart()
+  })
+}
+
+function watchAnalyticsChartMounts(): void {
+  scheduleAnalyticsRender()
+
+  const target = document.body || document.documentElement
+  if (!target) return
+
+  const observer = new MutationObserver(() => {
+    if (document.querySelector('[data-analytics-chart]:not([data-rendered="true"])'))
+      scheduleAnalyticsRender()
+  })
+
+  observer.observe(target, { childList: true, subtree: true })
+}
+
+if (document.readyState === 'loading')
+  document.addEventListener('DOMContentLoaded', watchAnalyticsChartMounts, { once: true })
+else
+  watchAnalyticsChartMounts()
+
+window.addEventListener('stx:load', scheduleAnalyticsRender)
+document.addEventListener('stx:load', scheduleAnalyticsRender)

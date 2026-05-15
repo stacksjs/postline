@@ -74,6 +74,7 @@
         </section>
       </div>
     </div>
+    <script type="module" src="/assets/scripts/postline-analytics.ts"></script>
     <script>
       ;(() => {
         const syncSidebarCollapse = (collapsed) => {
