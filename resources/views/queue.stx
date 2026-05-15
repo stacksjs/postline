@@ -27,39 +27,87 @@ const scheduledPosts = [
     note: 'Driver support planned after Bluesky settles.',
   },
 ]
+
+const timeSlots = [
+  { label: 'Morning', value: '9:00 AM', count: '2 posts' },
+  { label: 'Afternoon', value: '3:30 PM', count: '1 post' },
+  { label: 'Evening', value: '6:15 PM', count: 'Open' },
+]
 </script>
 
 @section('content')
-  <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
-    <header class="flex gap-4 items-center justify-between min-h-11">
+  <section class="grid gap-4" data-postline-page="queue" data-testid="queue-page">
+    <header class="flex flex-wrap gap-3 items-center justify-between min-h-9">
       <div>
-        <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Queue</p>
-        <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Scheduled posts</h1>
+        <p class="m-0 font-medium text-[14px] text-zinc-500">Queue</p>
       </div>
       <div class="flex gap-2 items-center">
-        <a href="/" data-stx-link class="inline-flex items-center justify-center px-3 h-9 font-bold text-neutral-950 bg-white border border-zinc-200 rounded-md shadow-sm">New post</a>
-        <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-white bg-neutral-950 rounded-md" type="button">Optimize times</button>
+        <a href="/" data-stx-link class="inline-flex gap-2 items-center justify-center px-3 h-9 font-bold text-sm text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm">
+          <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
+          <span>New</span>
+        </a>
+        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-sm text-white bg-neutral-950 rounded-xl" type="button">
+          <span class="h-4 w-4 i-hugeicons-magic-wand-01" aria-hidden="true"></span>
+          <span>Optimize</span>
+        </button>
       </div>
     </header>
 
-    <section class="bg-white border border-zinc-200 rounded-lg shadow-[0_18px_54px_rgba(24,31,42,0.10)]">
-      <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
-        <strong class="text-[13px]">Upcoming</strong>
-        <span class="text-xs text-zinc-500">3 posts</span>
-      </header>
-      <div class="grid gap-2.5 p-3">
-        @foreach (scheduledPosts as post)
-          <article class="flex gap-5 items-center justify-between p-3 bg-white border border-zinc-200 rounded-lg">
-            <div>
-              <span class="font-bold text-xs">{{ post.time }}</span>
-              <h2 class="my-1.5 font-bold text-[15px]">{{ post.channel }} / {{ post.status }}</h2>
+    <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
+        <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
+          <strong class="text-[13px]">Upcoming</strong>
+          <span class="px-2 py-1 font-bold text-[11px] text-blue-700 bg-blue-50 rounded-full">3 posts</span>
+        </header>
+        <div class="grid gap-2.5 p-3">
+          @foreach (scheduledPosts as post)
+            <article class="grid gap-2.5 p-3.5 bg-white border border-zinc-200 rounded-2xl">
+              <header class="flex gap-3 items-center justify-between">
+                <div class="grid gap-1">
+                  <span class="font-bold text-xs">{{ post.time }}</span>
+                  <span class="text-xs text-zinc-500">{{ post.channel }}</span>
+                </div>
+                <span class="px-2 py-1 font-bold text-[11px] text-blue-700 bg-blue-50 rounded-full">{{ post.status }}</span>
+              </header>
               <p class="m-0 leading-normal text-[13px] text-slate-700">{{ post.text }}</p>
-              <span class="block mt-1.5 text-xs text-zinc-500">{{ post.note }}</span>
-            </div>
-            <button class="inline-flex items-center justify-center px-3 h-8 font-bold text-neutral-950 text-xs bg-white border border-zinc-200 rounded-md shadow-sm" type="button">Edit</button>
-          </article>
-        @endforeach
-      </div>
-    </section>
+              <footer class="flex items-center justify-between text-xs text-zinc-500">
+                <span>{{ post.note }}</span>
+                <button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-neutral-950 bg-white border border-zinc-200 rounded-lg shadow-sm" type="button">Edit</button>
+              </footer>
+            </article>
+          @endforeach
+        </div>
+      </section>
+
+      <aside class="grid content-start gap-3.5">
+        <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
+          <header class="p-3.5 border-b border-zinc-200">
+            <strong class="text-[13px]">Slots</strong>
+          </header>
+          <div class="grid gap-2 p-3">
+            @foreach (timeSlots as slot)
+              <article class="flex items-center justify-between p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl">
+                <span class="grid gap-0.5">
+                  <strong class="text-xs">{{ slot.value }}</strong>
+                  <span class="text-[11px] text-zinc-500">{{ slot.label }}</span>
+                </span>
+                <span class="text-xs text-zinc-500">{{ slot.count }}</span>
+              </article>
+            @endforeach
+          </div>
+        </section>
+
+        <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
+          <header class="p-3.5 border-b border-zinc-200">
+            <strong class="text-[13px]">Drivers</strong>
+          </header>
+          <div class="grid gap-2 p-3 text-xs text-zinc-500">
+            <div class="flex items-center justify-between"><span>Bluesky</span><span class="font-bold text-emerald-700">Ready</span></div>
+            <div class="flex items-center justify-between"><span>Mastodon</span><span>Planned</span></div>
+            <div class="flex items-center justify-between"><span>Twitter/X</span><span>Later</span></div>
+          </div>
+        </section>
+      </aside>
+    </div>
   </section>
 @endsection

@@ -1,7 +1,6 @@
 @extends('layouts/postline')
 
 @section('title', 'Postline - Composer')
-@section('shell-title', 'Create Bluesky scheduler')
 @section('description', 'Write, schedule, publish, and review social posts from a clean personal workspace.')
 
 <script server>
@@ -43,9 +42,9 @@ const timelineItems = [
 </script>
 
 @section('content')
-  <section class="grid gap-3.5" data-postline-page="composer" data-testid="composer-page">
-    <header class="flex gap-4 items-center justify-between min-h-9">
-      <p class="m-0 font-medium text-[15px] text-zinc-500">Composer</p>
+  <section class="grid gap-4" data-postline-page="composer" data-testid="composer-page">
+    <header class="flex flex-wrap gap-3 items-center justify-between min-h-9">
+      <p class="m-0 font-medium text-[14px] text-zinc-500">Composer</p>
       <div class="flex gap-2 items-center">
         <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Search posts" title="Search posts" data-composer-search>
           <span class="h-4 w-4 i-hugeicons-search-01" aria-hidden="true"></span>
@@ -62,7 +61,7 @@ const timelineItems = [
 
     <div class="hidden bottom-6 fixed right-6 z-50 px-3.5 py-2.5 max-w-md text-sm bg-white border border-zinc-200 rounded-2xl shadow-[0_18px_54px_rgba(24,31,42,0.16)]" role="status" data-bluesky-status></div>
 
-    <div class="grid gap-3.5 items-start xl:grid-cols-[minmax(380px,1.08fr)_minmax(300px,0.92fr)]">
+    <div class="grid gap-3.5 items-start lg:grid-cols-2 2xl:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)]">
       <section class="grid content-start grid-rows-[auto_auto_auto] self-start bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Post composer">
         <header class="flex gap-3 items-center justify-between p-3 border-b border-zinc-200">
           <strong class="text-[13px]">New post</strong>
@@ -113,7 +112,7 @@ const timelineItems = [
         </footer>
       </section>
 
-      <div class="grid gap-4">
+      <div class="grid gap-3.5">
         <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Schedule queue">
           <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
             <strong class="text-[13px]">Queue</strong>
