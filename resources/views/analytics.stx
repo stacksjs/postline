@@ -39,12 +39,19 @@ const channelSplits = [
           </button>
         </header>
         <div class="p-3.5">
-          <svg class="block w-full h-auto" viewBox="0 0 640 220" role="img" aria-label="Postline response trend chart" data-analytics-chart>
-            <rect x="0" y="0" width="640" height="220" rx="16" fill="#fafafa"></rect>
+          <svg class="block w-full h-auto" viewBox="0 0 640 280" role="img" aria-label="Postline response trend chart" data-analytics-chart>
+            <desc>Responses over the last 30 days with publishing dates on the x axis and response counts on the y axis.</desc>
+            <rect x="0" y="0" width="640" height="280" rx="16" fill="#fafafa"></rect>
+            <g data-chart-legend></g>
             <g data-chart-grid></g>
+            <g data-chart-y-axis></g>
+            <g data-chart-x-axis></g>
+            <g data-chart-labels></g>
             <path data-chart-area fill="rgba(37, 99, 235, 0.10)"></path>
             <path data-chart-line fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
             <g data-chart-points></g>
+            <g data-chart-hover aria-hidden="true"></g>
+            <rect data-chart-hit-area x="0" y="0" width="640" height="280" fill="transparent" tabindex="0" role="application" aria-label="Hover or focus the response trend chart for point details."></rect>
           </svg>
         </div>
       </section>
