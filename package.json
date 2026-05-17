@@ -76,10 +76,10 @@
     "stacks": "workspace:*"
   },
   "devDependencies": {
-    "@iconify-json/hugeicons": "^1.2.27",
-    "@stacksjs/dtsx": "^0.9.23",
+    "@iconify-json/hugeicons": "^1.2.28",
+    "@stacksjs/dtsx": "^0.9.25",
     "better-dx": "^0.2.12",
-    "bun-plugin-dtsx": "^0.9.23"
+    "bun-plugin-dtsx": "^0.9.25"
   },
   "workspaces": [
     "storage/framework",

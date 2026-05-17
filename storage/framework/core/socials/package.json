@@ -49,6 +49,6 @@
   "devDependencies": {
     "better-dx": "^0.2.12",
     "@stacksjs/error-handling": "workspace:*",
-    "@stacksjs/router": "workspace:*"
+    "@stacksjs/router": "workspace:*0.70.45"
   }
 }
