@@ -32,7 +32,7 @@ export * from './define-model'
 
 // Auto-configure the ORM database connection from project config.
 // This ensures model queries work without manual configureOrm() calls.
-import { configureOrm } from 'bun-query-builder'
+import { configureOrm } from '@stacksjs/query-builder'
 
 function autoConfigureOrm(): void {
   try {
@@ -76,7 +76,13 @@ async function loadUserlandModel(modelName: string, subdirs: string[] = ['']): P
       return (await import(userPath)).default
     }
   }
-  catch { /* fall through to framework default */ }
+  catch (err) {
+    // Pre-fix this was a bare `catch {}` — a typo'd user model silently
+    // fell through to the framework default, so the dev's customizations
+    // appeared to "not be applied" with no log line indicating why.
+    // Surface the actual import error so they can fix it.
+    console.error(`[orm] Failed to import userland model ${modelName} from ${userPath} — falling back to framework default. Reason:`, err)
+  }
   // 2) Framework default at storage/framework/defaults/app/Models/<Name>.ts
   //    Defaults are organised in subdirectories (commerce/, Content/,
   //    realtime/) so each model is searched in the relevant subdir first
@@ -89,171 +95,317 @@ async function loadUserlandModel(modelName: string, subdirs: string[] = ['']): P
         return (await import(defaultPath)).default
       }
     }
-    catch { /* try next subdir */ }
+    catch (err) {
+      // Same fix as above for the framework-default branch — a broken
+      // default shouldn't be invisible.
+      console.error(`[orm] Failed to import framework default model ${modelName} from ${defaultPath} — trying next subdir. Reason:`, err)
+    }
   }
   return null
 }
 
-export const User = await loadUserlandModel('User')
+// =============================================================================
+// Lazy model exports.
+//
+// The eager `export const User = await loadUserlandModel('User')` pattern that
+// used to live here deadlocked on the ESM cycle between this module and the
+// user's model files: `app/Models/User.ts` statically imports `{ defineModel }`
+// from `@stacksjs/orm` (this file), and Bun's dynamic `await import(userPath)`
+// from inside orm's evaluation waits for User.ts to finish — which can't,
+// because it's transitively waiting on orm to finish.
+//
+// Pre-fix this only "worked" because the trait files threw TDZ during User.ts
+// evaluation, breaking the cycle by failing fast. Once the trait TDZ was fixed
+// the cycle had to actually resolve, and it couldn't.
+//
+// New pattern: schedule the model loads as a microtask that runs AFTER orm's
+// own static-import graph finishes. By the time the microtask fires, all
+// participating modules (database, validation, define-model, the traits) are
+// fully bound, and the dynamic `await import(userPath)` no longer cycles back
+// into a half-loaded module. Each export is a Proxy that forwards to the
+// loaded model once available; per-request code (HTTP actions, jobs) is
+// always called long after the microtask queue has drained, so `User.where(...)`
+// at request time works transparently. Code that touches the exports at
+// MODULE LOAD time (e.g. a top-level `const adminCount = await User.count()`
+// in someone's startup script) should `await ormReady` first.
+// =============================================================================
 
-// Same lazy-export pattern for the two queue framework models. The CLI
-// commands `buddy queue:status`, `queue:failed`, `queue:flush`,
-// `queue:inspect`, `queue:monitor`, `queue:clear` import them as
-// `import { Job, FailedJob } from '@stacksjs/orm'`. Prefer the userland
-// publication (`app/Models/Job.ts`, dropped in by `buddy publish:model
-// Job`) so projects that customize the queue model — renamed columns,
-// extra observers, custom traits — see their version.
-export const Job = await loadUserlandModel('Job')
-export const FailedJob = await loadUserlandModel('FailedJob')
+const _loaded: Record<string, any> = {}
+
+let _readyResolve: () => void = () => {}
+/**
+ * Resolves once all framework-default models have been loaded into the
+ * lazy-export proxies. Server bootstrap code that wants to ensure model
+ * exports are populated before serving the first request should
+ * `await ormReady` early. Per-request code doesn't need to — by the
+ * time any HTTP handler runs, the microtask queue has long drained.
+ */
+export const ormReady: Promise<void> = new Promise<void>((resolve) => { _readyResolve = resolve })
+
+/**
+ * Returns a Proxy that lazily forwards every property access to the
+ * loaded model in `_loaded[name]`. Returns `undefined` before the
+ * deferred load completes — callers that need the load to finish
+ * first should `await ormReady`.
+ */
+function lazyModel(name: string): any {
+  // The Proxy target is a function so the proxy itself is callable
+  // (in case any consumer treats a model as a constructor).
+  return new Proxy(function _modelStub() {} as any, {
+    get(_target, prop) {
+      // Thenable guard — without it, `await User` would call
+      // `User.then`, which we'd forward to the underlying (often
+      // function-like bun-query-builder) value, causing JS to treat
+      // this Proxy as a Promise and infinite-loop on resolution.
+      if (prop === 'then')
+        return undefined
+      const m = _loaded[name]
+      if (m == null)
+        return undefined
+      const value = (m as any)[prop]
+      // Bind methods to the underlying model so `this` is correct
+      // when the Proxy is the receiver.
+      return typeof value === 'function' ? value.bind(m) : value
+    },
+    set(_target, prop, value) {
+      const m = _loaded[name]
+      if (m == null)
+        return false
+      ;(m as any)[prop] = value
+      return true
+    },
+    has(_target, prop) {
+      const m = _loaded[name]
+      return m == null ? false : prop in (m as any)
+    },
+    apply(_target, thisArg, args) {
+      const m = _loaded[name]
+      if (m == null || typeof m !== 'function')
+        return undefined
+      return (m as Function).apply(thisArg, args)
+    },
+  })
+}
+
+export const User: any = lazyModel('User')
+
+// Queue framework models. The CLI commands `buddy queue:status`,
+// `queue:failed`, `queue:flush`, `queue:inspect`, `queue:monitor`,
+// `queue:clear` import them as `import { Job, FailedJob } from
+// '@stacksjs/orm'`. Prefer the userland publication
+// (`app/Models/Job.ts`, dropped in by `buddy publish:model Job`) so
+// projects that customize the queue model see their version.
+//
+// Gated on the 'queue' feature flag — projects that don't run a queue
+// (most marketing sites, plain CMS apps) leave it off and skip the
+// defineModel pipeline for these two entirely. The lazyModel proxy
+// returns `undefined` for unloaded models, and the CLI queue commands
+// can check `await ormReady; if (!Job) throw …` to surface a clear
+// "run ./buddy queue:install" error.
+export const Job: any = lazyModel('Job')
+export const FailedJob: any = lazyModel('FailedJob')
 
 // ---------------------------------------------------------------------------
-// Auto-load every other framework model. Each name is paired with the
-// subdirectory it lives in under `storage/framework/defaults/app/Models/`.
+// Auto-load every other framework model. Each row is `[name, subdirs, feature]`:
+//   - `name`     : the model class, used as the file basename and the export
+//   - `subdirs`  : where to look under `storage/framework/defaults/app/Models/`
+//   - `feature`  : which feature bundle owns this model — only loaded when
+//                  that bundle's `config/<feature>.ts` has `enabled: true`.
+//                  Apps that haven't run `./buddy commerce:install` skip
+//                  every entry tagged 'commerce' entirely (no migrations
+//                  needed, no defineModel pipeline, no boot cost).
+//
 // The root namespace is searched first (so a flattened user override wins),
 // then the subdir for the framework default. Loaded sequentially so the
 // schema-TDZ cycle the original `User`-only export was guarding against
 // stays neutralised.
 // ---------------------------------------------------------------------------
-const FRAMEWORK_MODEL_MANIFEST: Array<[name: string, subdirs: string[]]> = [
-  // Auth / core
-  ['Team', ['']],
-  ['Subscriber', ['']],
-  ['SubscriberEmail', ['']],
-  ['Subscription', ['']],
+const FRAMEWORK_MODEL_MANIFEST: Array<[name: string, subdirs: string[], feature: string]> = [
+  // Auth
+  ['Team', [''], 'auth'],
+  ['Subscriber', [''], 'auth'],
+  ['SubscriberEmail', [''], 'auth'],
+  ['Subscription', [''], 'auth'],
 
-  // Content (note: capital "Content/" subdir on disk)
-  ['Post', ['Content']],
-  ['Page', ['Content']],
-  ['Author', ['Content']],
-  ['Comment', ['']],
-  ['Tag', ['']],
+  // CMS (Content subdir on disk uses the capital C)
+  ['Post', ['Content'], 'cms'],
+  ['Page', ['Content'], 'cms'],
+  ['Author', ['Content'], 'cms'],
+  ['Comment', [''], 'cms'],
+  ['Tag', [''], 'cms'],
 
-  // App / operations
-  ['Activity', ['']],
-  ['Deployment', ['']],
-  ['Release', ['']],
-  ['Notification', ['']],
-  ['Log', ['']],
-  ['Request', ['']],
-  ['Error', ['']],
-  ['Websocket', ['realtime']],
+  // Dashboard (admin SPA + monitoring dashboards)
+  ['Activity', [''], 'dashboard'],
+  ['Deployment', [''], 'dashboard'],
+  ['Release', [''], 'dashboard'],
+  ['Notification', [''], 'dashboard'],
+  ['Log', [''], 'dashboard'],
+  ['Request', [''], 'dashboard'],
 
-  // Marketing
-  ['Campaign', ['']],
-  ['CampaignSend', ['']],
-  ['EmailList', ['']],
-  ['EmailListSubscriber', ['']],
-  ['SocialPost', ['']],
+  // Monitoring (Error model can be used standalone without the rest of dashboard)
+  ['Error', [''], 'monitoring'],
 
-  // Payments (top-level)
-  ['PaymentMethod', ['']],
-  ['PaymentProduct', ['']],
-  ['PaymentTransaction', ['']],
+  // Realtime (websocket broadcaster)
+  ['Websocket', ['realtime'], 'realtime'],
+
+  // Marketing (email lists, campaigns, social posts)
+  ['Campaign', [''], 'marketing'],
+  ['CampaignSend', [''], 'marketing'],
+  ['EmailList', [''], 'marketing'],
+  ['EmailListSubscriber', [''], 'marketing'],
+  ['SocialPost', [''], 'marketing'],
+
+  // Payments (top-level — used by commerce checkout and by standalone billing)
+  ['PaymentMethod', [''], 'commerce'],
+  ['PaymentProduct', [''], 'commerce'],
+  ['PaymentTransaction', [''], 'commerce'],
 
   // Commerce
-  ['Order', ['commerce']],
-  ['OrderItem', ['commerce']],
-  ['Cart', ['commerce']],
-  ['CartItem', ['commerce']],
-  ['Customer', ['commerce']],
-  ['Product', ['commerce']],
-  ['ProductVariant', ['commerce']],
-  ['ProductUnit', ['commerce']],
-  ['Manufacturer', ['commerce']],
-  ['Category', ['commerce']],
-  ['Coupon', ['commerce']],
-  ['GiftCard', ['commerce']],
-  ['LicenseKey', ['commerce']],
-  ['Review', ['commerce']],
-  ['Receipt', ['commerce']],
-  ['PrintDevice', ['commerce']],
-  ['ShippingMethod', ['commerce']],
-  ['ShippingRate', ['commerce']],
-  ['ShippingZone', ['commerce']],
-  ['DeliveryRoute', ['commerce']],
-  ['DigitalDelivery', ['commerce']],
-  ['Driver', ['commerce']],
-  ['TaxRate', ['commerce']],
-  ['WaitlistProduct', ['commerce']],
-  ['WaitlistRestaurant', ['commerce']],
-  ['LoyaltyPoint', ['commerce']],
-  ['LoyaltyReward', ['commerce']],
-  ['Payment', ['commerce']],
-  ['Transaction', ['commerce']],
+  ['Order', ['commerce'], 'commerce'],
+  ['OrderItem', ['commerce'], 'commerce'],
+  ['Cart', ['commerce'], 'commerce'],
+  ['CartItem', ['commerce'], 'commerce'],
+  ['Customer', ['commerce'], 'commerce'],
+  ['Product', ['commerce'], 'commerce'],
+  ['ProductVariant', ['commerce'], 'commerce'],
+  ['ProductUnit', ['commerce'], 'commerce'],
+  ['Manufacturer', ['commerce'], 'commerce'],
+  ['Category', ['commerce'], 'commerce'],
+  ['Coupon', ['commerce'], 'commerce'],
+  ['GiftCard', ['commerce'], 'commerce'],
+  ['LicenseKey', ['commerce'], 'commerce'],
+  ['Review', ['commerce'], 'commerce'],
+  ['Receipt', ['commerce'], 'commerce'],
+  ['PrintDevice', ['commerce'], 'commerce'],
+  ['ShippingMethod', ['commerce'], 'commerce'],
+  ['ShippingRate', ['commerce'], 'commerce'],
+  ['ShippingZone', ['commerce'], 'commerce'],
+  ['DeliveryRoute', ['commerce'], 'commerce'],
+  ['DigitalDelivery', ['commerce'], 'commerce'],
+  ['Driver', ['commerce'], 'commerce'],
+  ['TaxRate', ['commerce'], 'commerce'],
+  ['WaitlistProduct', ['commerce'], 'commerce'],
+  ['WaitlistRestaurant', ['commerce'], 'commerce'],
+  ['LoyaltyPoint', ['commerce'], 'commerce'],
+  ['LoyaltyReward', ['commerce'], 'commerce'],
+  ['Payment', ['commerce'], 'commerce'],
+  ['Transaction', ['commerce'], 'commerce'],
 ]
 
-const _autoLoaded: Record<string, any> = {}
-for (const [name, subdirs] of FRAMEWORK_MODEL_MANIFEST) {
-  // eslint-disable-next-line no-await-in-loop
-  const M = await loadUserlandModel(name, subdirs)
-  if (M) _autoLoaded[name] = M
-}
+// Schedule deferred loads. The microtask runs AFTER orm's own static-import
+// graph finishes — by which point @stacksjs/config (where `feature()` lives)
+// AND every user model file's static `import { defineModel } from
+// '@stacksjs/orm'` have resolved cleanly. No cycle deadlock, no TDZ flood,
+// no eager-pre-init pipeline.
+queueMicrotask(async () => {
+  try {
+    const { feature } = await import('@stacksjs/config')
 
-export const Activity = _autoLoaded.Activity
-export const Author = _autoLoaded.Author
-export const Campaign = _autoLoaded.Campaign
-export const Cart = _autoLoaded.Cart
-export const CartItem = _autoLoaded.CartItem
-export const Category = _autoLoaded.Category
-export const Comment = _autoLoaded.Comment
-export const Coupon = _autoLoaded.Coupon
-export const Customer = _autoLoaded.Customer
-export const DeliveryRoute = _autoLoaded.DeliveryRoute
-export const Deployment = _autoLoaded.Deployment
-export const DigitalDelivery = _autoLoaded.DigitalDelivery
-export const Driver = _autoLoaded.Driver
-export const CampaignSend = _autoLoaded.CampaignSend
-export const EmailList = _autoLoaded.EmailList
-export const EmailListSubscriber = _autoLoaded.EmailListSubscriber
-export const ErrorModel = _autoLoaded.Error
-export const GiftCard = _autoLoaded.GiftCard
-export const LicenseKey = _autoLoaded.LicenseKey
-export const Log = _autoLoaded.Log
-export const LoyaltyPoint = _autoLoaded.LoyaltyPoint
-export const LoyaltyReward = _autoLoaded.LoyaltyReward
-export const Manufacturer = _autoLoaded.Manufacturer
-export const Notification = _autoLoaded.Notification
-export const Order = _autoLoaded.Order
-export const OrderItem = _autoLoaded.OrderItem
-export const Page = _autoLoaded.Page
-export const Payment = _autoLoaded.Payment
-export const PaymentMethod = _autoLoaded.PaymentMethod
-export const PaymentProduct = _autoLoaded.PaymentProduct
-export const PaymentTransaction = _autoLoaded.PaymentTransaction
-export const Post = _autoLoaded.Post
-export const PrintDevice = _autoLoaded.PrintDevice
-export const Product = _autoLoaded.Product
-export const ProductUnit = _autoLoaded.ProductUnit
-export const ProductVariant = _autoLoaded.ProductVariant
-export const Receipt = _autoLoaded.Receipt
-export const Release = _autoLoaded.Release
-export const Request = _autoLoaded.Request
-export const Review = _autoLoaded.Review
-export const ShippingMethod = _autoLoaded.ShippingMethod
-export const ShippingRate = _autoLoaded.ShippingRate
-export const ShippingZone = _autoLoaded.ShippingZone
-export const SocialPost = _autoLoaded.SocialPost
-export const Subscriber = _autoLoaded.Subscriber
-export const SubscriberEmail = _autoLoaded.SubscriberEmail
-export const Subscription = _autoLoaded.Subscription
-export const Tag = _autoLoaded.Tag
-export const TaxRate = _autoLoaded.TaxRate
-export const Team = _autoLoaded.Team
-export const Transaction = _autoLoaded.Transaction
-export const WaitlistProduct = _autoLoaded.WaitlistProduct
-export const WaitlistRestaurant = _autoLoaded.WaitlistRestaurant
-export const Websocket = _autoLoaded.Websocket
+    // User always loads (gated on 'core' which is implicitly true). Done
+    // first because so many framework packages statically import User.
+    const userModel = await loadUserlandModel('User')
+    if (userModel) _loaded.User = userModel
 
-// Inject every loaded model onto globalThis so dashboard `<script server>`
+    if (feature('queue')) {
+      const job = await loadUserlandModel('Job')
+      if (job) _loaded.Job = job
+      const failedJob = await loadUserlandModel('FailedJob')
+      if (failedJob) _loaded.FailedJob = failedJob
+    }
+
+    for (const [name, subdirs, featureFlag] of FRAMEWORK_MODEL_MANIFEST) {
+      if (!feature(featureFlag)) continue
+      // eslint-disable-next-line no-await-in-loop
+      const M = await loadUserlandModel(name, subdirs)
+      if (M) _loaded[name] = M
+    }
+  }
+  catch (err) {
+    // A failed deferred load shouldn't hang `ormReady` forever — surface
+    // the error and resolve anyway so any waiters proceed and can report
+    // the missing model in their own context.
+    console.error('[orm] deferred model load failed:', err)
+  }
+  finally {
+    _readyResolve()
+  }
+})
+
+export const Activity: any = lazyModel('Activity')
+export const Author: any = lazyModel('Author')
+export const Campaign: any = lazyModel('Campaign')
+export const Cart: any = lazyModel('Cart')
+export const CartItem: any = lazyModel('CartItem')
+export const Category: any = lazyModel('Category')
+export const Comment: any = lazyModel('Comment')
+export const Coupon: any = lazyModel('Coupon')
+export const Customer: any = lazyModel('Customer')
+export const DeliveryRoute: any = lazyModel('DeliveryRoute')
+export const Deployment: any = lazyModel('Deployment')
+export const DigitalDelivery: any = lazyModel('DigitalDelivery')
+export const Driver: any = lazyModel('Driver')
+export const CampaignSend: any = lazyModel('CampaignSend')
+export const EmailList: any = lazyModel('EmailList')
+export const EmailListSubscriber: any = lazyModel('EmailListSubscriber')
+export const ErrorModel: any = lazyModel('Error')
+export const GiftCard: any = lazyModel('GiftCard')
+export const LicenseKey: any = lazyModel('LicenseKey')
+export const Log: any = lazyModel('Log')
+export const LoyaltyPoint: any = lazyModel('LoyaltyPoint')
+export const LoyaltyReward: any = lazyModel('LoyaltyReward')
+export const Manufacturer: any = lazyModel('Manufacturer')
+export const Notification: any = lazyModel('Notification')
+export const Order: any = lazyModel('Order')
+export const OrderItem: any = lazyModel('OrderItem')
+export const Page: any = lazyModel('Page')
+export const Payment: any = lazyModel('Payment')
+export const PaymentMethod: any = lazyModel('PaymentMethod')
+export const PaymentProduct: any = lazyModel('PaymentProduct')
+export const PaymentTransaction: any = lazyModel('PaymentTransaction')
+export const Post: any = lazyModel('Post')
+export const PrintDevice: any = lazyModel('PrintDevice')
+export const Product: any = lazyModel('Product')
+export const ProductUnit: any = lazyModel('ProductUnit')
+export const ProductVariant: any = lazyModel('ProductVariant')
+export const Receipt: any = lazyModel('Receipt')
+export const Release: any = lazyModel('Release')
+export const Request: any = lazyModel('Request')
+export const Review: any = lazyModel('Review')
+export const ShippingMethod: any = lazyModel('ShippingMethod')
+export const ShippingRate: any = lazyModel('ShippingRate')
+export const ShippingZone: any = lazyModel('ShippingZone')
+export const SocialPost: any = lazyModel('SocialPost')
+export const Subscriber: any = lazyModel('Subscriber')
+export const SubscriberEmail: any = lazyModel('SubscriberEmail')
+export const Subscription: any = lazyModel('Subscription')
+export const Tag: any = lazyModel('Tag')
+export const TaxRate: any = lazyModel('TaxRate')
+export const Team: any = lazyModel('Team')
+export const Transaction: any = lazyModel('Transaction')
+export const WaitlistProduct: any = lazyModel('WaitlistProduct')
+export const WaitlistRestaurant: any = lazyModel('WaitlistRestaurant')
+export const Websocket: any = lazyModel('Websocket')
+
+// Inject every model Proxy onto globalThis so dashboard `<script server>`
 // blocks can reference them as bare names (e.g. `await Order.all()`) without
 // having to import. The STX engine evaluates server scripts inside an
 // AsyncFunction wrapper, which inherits from globalThis — assigning here
-// makes the names visible to every page render after orm has loaded.
+// makes the names visible to every page render. The values are Proxies that
+// forward to `_loaded[name]` at access time; until the deferred microtask
+// populates `_loaded`, every method access returns undefined. By the time
+// any stx page render fires (request time), the microtask queue has long
+// drained, so `await Order.all()` resolves transparently.
 const _allExports: Record<string, any> = {
-  User,
-  Job,
-  FailedJob,
-  ..._autoLoaded,
+  User, Job, FailedJob,
+  Activity, Author, Campaign, CampaignSend, Cart, CartItem, Category,
+  Comment, Coupon, Customer, DeliveryRoute, Deployment, DigitalDelivery,
+  Driver, EmailList, EmailListSubscriber, ErrorModel, GiftCard, LicenseKey,
+  Log, LoyaltyPoint, LoyaltyReward, Manufacturer, Notification, Order,
+  OrderItem, Page, Payment, PaymentMethod, PaymentProduct, PaymentTransaction,
+  Post, PrintDevice, Product, ProductUnit, ProductVariant, Receipt, Release,
+  Request, Review, ShippingMethod, ShippingRate, ShippingZone, SocialPost,
+  Subscriber, SubscriberEmail, Subscription, Tag, TaxRate, Team, Transaction,
+  WaitlistProduct, WaitlistRestaurant, Websocket,
 }
 const g = globalThis as Record<string, any>
 for (const [name, M] of Object.entries(_allExports)) {
@@ -303,32 +455,79 @@ export type {
   InferRelationNames,
   InferTableName,
   ModelDefinition,
-} from 'bun-query-builder'
+} from '@stacksjs/query-builder'
 
-// The following type utilities are referenced by the framework but are not
-// yet exported by the installed `bun-query-builder` version. Until upstream
-// catches up we ship structural stubs so consumer code still type-checks.
-// These intentionally fall back to `any` to avoid spurious narrowing errors;
-// once `bun-query-builder` exports the real shapes, remove these stubs.
-export type InferFillableAttributes<_M> = any
-export type InferNumericColumns<_M> = string
-export type InferColumnNames<_M> = string
-export type ModelRow<_M> = any
-export type ModelRowLoose<_M> = any
-export type ModelCreateData<_M> = any
-export type ModelCreateDataLoose<_M> = any
+// `InferFillableAttributes`, `InferNumericColumns`, `InferColumnNames`,
+// `ModelRow`, `ModelRowLoose`, `ModelCreateData`, `ModelCreateDataLoose`,
+// `NewModelData`, and `UpdateModelData` are exported via
+// `export * from './model-types'` above. They're real conditional types
+// over `Def<T>` (the model-definition extracted from a `defineModel()`
+// return value) — see `model-types.ts` for the implementations.
+// Previously this file re-declared them as `any` stubs which shadowed
+// the typed versions; stacksjs/stacks#1863 (T-1) restored the real types.
 
 // ---------------------------------------------------------------------------
-// Model row types — inferred from model definitions via bun-query-builder.
-// These replace hand-written interfaces and stay in sync automatically.
-// Consumers: import type { UserModel, NewUser } from '@stacksjs/orm'
+// Blessed framework-default model row types.
+//
+// Most consumer code reaches for `ModelRow<typeof User>` /
+// `NewModelData<typeof User>` directly — those are the preferred,
+// project-aware patterns and they automatically reflect any
+// customisation made to `app/Models/User.ts`.
+//
+// `UserModel` / `NewUser` are exported as "blessed" aliases for the
+// framework's default User model so legacy framework code (~220 call
+// sites across the cms / commerce / payments / dashboard packages)
+// keeps typechecking against a real shape rather than `any`. Project
+// code that ships its own User model with extra columns should
+// augment via TypeScript module augmentation:
+//
+// @example
+// // anywhere in your project (e.g. app/types.d.ts)
+// declare module '@stacksjs/orm' {
+//   interface UserModel extends ModelRow<typeof MyUser> {}
+//   interface NewUser extends NewModelData<typeof MyUser> {}
+// }
+//
+// Each is declared as an `interface` (not a `type`) so module
+// augmentation can extend it from project code.
 // ---------------------------------------------------------------------------
 
-/** User model row type — inferred from the User model definition. */
-export type UserModel = ModelRowLoose<unknown>
+/**
+ * Framework-default User row shape. Matches the attributes declared on
+ * `storage/framework/defaults/app/Models/User.ts` plus the system
+ * fields contributed by `useUuid` / `useTimestamps` / `useAuth` traits.
+ *
+ * For project-specific narrowing, prefer `ModelRow<typeof User>` so
+ * any added attributes flow through automatically.
+ */
+export interface UserModel {
+  id: number
+  uuid: string
+  name: string
+  email: string
+  password: string
+  avatar?: string | null
+  email_verified_at?: string | null
+  two_factor_secret?: string | null
+  public_key?: string | null
+  created_at: string
+  updated_at: string | null
+  [key: string]: unknown
+}
 
-/** Data required to create a new User — inferred fillable attributes. */
-export type NewUser = ModelCreateDataLoose<unknown>
+/**
+ * Framework-default insertable User shape — fillable attributes from
+ * the default User model, all optional (DB-side defaults can fill in
+ * the rest). For project-specific narrowing, prefer
+ * `NewModelData<typeof User>`.
+ */
+export interface NewUser {
+  name?: string
+  email?: string
+  password?: string
+  avatar?: string | null
+  [key: string]: unknown
+}
 
 // ---------------------------------------------------------------------------
 // Polymorphic trait table types — used by @stacksjs/cms and database drivers.

@@ -356,36 +356,6 @@ function isStaticAsset(pathname: string): boolean {
   return ext in mimeTypes && ext !== '.html' && ext !== '.htm'
 }
 
-async function bundleTypeScriptAsset(assetPath: string): Promise<Response> {
-  const build = await Bun.build({
-    entrypoints: [assetPath],
-    bundle: true,
-    format: 'esm',
-    target: 'browser',
-    sourcemap: 'none',
-    minify: false,
-  })
-
-  if (!build.success || build.outputs.length === 0) {
-    const logs = build.logs.map(log => log.message || String(log)).join('\n')
-    return new Response(logs || 'Unable to bundle TypeScript asset.', {
-      status: 500,
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'no-cache',
-      },
-    })
-  }
-
-  return new Response(await build.outputs[0].text(), {
-    headers: {
-      'Content-Type': 'application/javascript; charset=utf-8',
-      'Cache-Control': 'no-cache',
-      'Access-Control-Allow-Origin': '*',
-    },
-  })
-}
-
 const server = Bun.serve({
   port: process.env.PORT || 80,
   development: false,
@@ -435,9 +405,20 @@ const server = Bun.serve({
         try {
           const file = Bun.file(assetPath)
           if (await file.exists()) {
+            // Transpile TypeScript files to JavaScript
             const ext = pathname.substring(pathname.lastIndexOf('.')).toLowerCase()
-            if (ext === '.ts' || ext === '.mts') return bundleTypeScriptAsset(assetPath)
-
+            if (ext === '.ts' || ext === '.mts') {
+              const tsCode = await file.text()
+              const transpiler = new Bun.Transpiler({ loader: 'ts' })
+              const jsCode = transpiler.transformSync(tsCode)
+              return new Response(jsCode, {
+                headers: {
+                  'Content-Type': 'application/javascript; charset=utf-8',
+                  'Cache-Control': 'public, max-age=31536000, immutable',
+                  'Access-Control-Allow-Origin': '*',
+                }
+              })
+            }
             return new Response(file, {
               headers: {
                 'Content-Type': getMimeType(pathname),

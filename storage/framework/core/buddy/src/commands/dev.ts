@@ -1,11 +1,17 @@
 import type { CLI, DevOptions } from '@stacksjs/types'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
-import { bold, cyan, dim, green, intro, log, onUnknownSubcommand, outro, prompts, runCommand } from "@stacksjs/cli"
+import { bold, cyan, dim, green, intro, log, onUnknownSubcommand, outro, prompts, runCommand, yellow } from "@stacksjs/cli"
+import { homedir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Action } from '@stacksjs/enums'
 import { libsPath, projectPath } from '@stacksjs/path'
 import { ExitCode } from '@stacksjs/types'
 import { version } from '../../package.json'
+
+// rpx registry ids written by this `./buddy dev` session — cleared on shutdown.
+let activeRpxRegistryIds: string[] = []
 
 // Lazy-load @stacksjs/actions to avoid triggering bun-router config warnings at CLI startup
 let _actions: typeof import('@stacksjs/actions') | undefined
@@ -343,11 +349,20 @@ export async function startDevelopmentServer(_options: DevOptions, _startTime?: 
   console.log(`  ${bold(cyan('stacks'))} ${dim(`v${version}`)}`)
   console.log()
   console.log(`  ${green('➜')}  ${bold('Frontend')}:    ${cyan(frontendUrl)}`)
+  if (hasCustomDomain) {
+    console.log(`  ${dim('➜')}  ${dim('Local')}:       ${dim(`http://localhost:${frontendPort}`)}`)
+  }
   if (nativeMode) {
     console.log(`  ${green('➜')}  ${bold('Native')}:      ${cyan(`Craft → http://localhost:${frontendPort}`)}`)
   }
   console.log(`  ${green('➜')}  ${bold('API')}:         ${cyan(apiUrl)}`)
+  if (hasCustomDomain) {
+    console.log(`  ${dim('➜')}  ${dim('Local API')}:   ${dim(`http://localhost:${apiPort}`)}`)
+  }
   console.log(`  ${green('➜')}  ${bold('Docs')}:        ${cyan(docsUrl)}`)
+  if (hasCustomDomain) {
+    console.log(`  ${dim('➜')}  ${dim('Local docs')}:  ${dim(`http://localhost:${docsPort}`)}`)
+  }
   if (includeDashboard) {
     console.log(`  ${green('➜')}  ${bold('Dashboard')}:   ${cyan(dashboardUrl)}`)
   }
@@ -391,6 +406,8 @@ export async function startDevelopmentServer(_options: DevOptions, _startTime?: 
     if (isExiting) return
     isExiting = true
     closeNativeApp?.()
+    void unregisterRpxProxies(activeRpxRegistryIds)
+    activeRpxRegistryIds.length = 0
     try { process.kill(-process.pid, 'SIGTERM') }
     catch {
       // Process group may not exist (e.g., not session leader) — try the
@@ -454,6 +471,20 @@ export async function startDevelopmentServer(_options: DevOptions, _startTime?: 
       // grep through it from the terminal.
       if (process.env.STACKS_PRINT_ROUTES === '1') {
         await printRegisteredRoutes(apiPort).catch(() => { /* best effort */ })
+      }
+      // Re-register HTTPS routes once backends are listening. Early registration
+      // can be reaped by rpx PID-GC when entries carried a short-lived pid; we
+      // also refresh here so the routing table matches live ports.
+      if (hasCustomDomain && domain) {
+        await registerRpxProxiesForDomain({
+          domain,
+          frontendPort,
+          apiPort,
+          docsPort,
+          dashboardPort,
+          includeDashboard,
+          options,
+        }).catch(() => { /* startReverseProxy already warned */ })
       }
     })
     .catch(() => { /* swallow — verbose-mode error handlers below already log */ })
@@ -755,65 +786,182 @@ async function waitForPort(port: number, timeoutMs: number): Promise<boolean> {
 }
 
 /**
- * Start the reverse proxies (rpx) to enable HTTPS with custom domains.
- * Proxies frontend, API, docs, and dashboard subdomains.
- * rpx wraps tlsx and handles SSL (certs, hosts, trust) automatically.
+ * Resolve how to start the rpx daemon. Buddy is invoked as `bun …/buddy`, so
+ * rpx's default spawn (`process.argv[1] + 'daemon:start'`) would incorrectly
+ * run `buddy daemon:start`. The published `dist/bin/cli.js` also ships a
+ * duplicate shebang that Bun 1.3.x rejects — prefer a compiled `rpx` binary
+ * or our bootstrap script.
+ */
+async function resolveRpxDaemonSpawnCommand(): Promise<string[]> {
+  const fromEnv = process.env.RPX_BIN || process.env.STACKS_RPX_BIN
+  if (fromEnv && existsSync(fromEnv))
+    return [fromEnv, 'daemon:start']
+
+  const toolsBinary = join(homedir(), 'Code/Tools/rpx/packages/rpx/bin/rpx')
+  if (existsSync(toolsBinary))
+    return [toolsBinary, 'daemon:start']
+
+  const bootstrap = join(dirname(fileURLToPath(import.meta.url)), '../scripts/rpx-daemon-bootstrap.ts')
+  if (existsSync(bootstrap))
+    return [process.execPath, bootstrap]
+
+  const pkgUrl = import.meta.resolve('@stacksjs/rpx/package.json')
+  const cli = join(dirname(fileURLToPath(pkgUrl)), 'dist/bin/cli.js')
+  return [process.execPath, cli, 'daemon:start']
+}
+
+type RpxProxySpec = {
+  id: string
+  from: string
+  to: string
+  pathRewrites?: Array<{ from: string, to: string, stripPrefix?: boolean }>
+}
+
+function buildRpxProxySpecs(input: {
+  domain: string
+  frontendPort: number
+  apiPort: number
+  docsPort: number
+  dashboardPort: number
+  includeDashboard: boolean
+}): RpxProxySpec[] {
+  const { domain, frontendPort, apiPort, docsPort, dashboardPort, includeDashboard } = input
+  const apiDomain = `api.${domain}`
+  const docsDomain = `docs.${domain}`
+  const dashboardDomain = `dashboard.${domain}`
+
+  return [
+    // Forward /api/** straight to the API server, preserving the prefix.
+    // Both user routes (registered through `routes/api.ts` — auto-prefixed
+    // with /api by the route-loader, see stacksjs/stacks#1835) and
+    // framework routes (which use explicit `route.group({ prefix: '/api/...' })`)
+    // expect the /api segment to be present at registration time, so
+    // `stripPrefix` must stay `false` or the API would see /cart/add and
+    // 404. The frontend's stx-serve has a fallback proxy for direct
+    // localhost:PORT access.
+    {
+      id: `${domain}-frontend`,
+      from: `localhost:${frontendPort}`,
+      to: domain,
+      pathRewrites: [{ from: '/api', to: `localhost:${apiPort}`, stripPrefix: false }],
+    },
+    { id: `${domain}-api`, from: `localhost:${apiPort}`, to: apiDomain },
+    { id: `${domain}-docs`, from: `localhost:${docsPort}`, to: docsDomain },
+    ...(includeDashboard
+      ? [{ id: `${domain}-dashboard`, from: `localhost:${dashboardPort}`, to: dashboardDomain }]
+      : []),
+  ]
+}
+
+async function unregisterRpxProxies(ids: string[]): Promise<void> {
+  if (ids.length === 0)
+    return
+  try {
+    const { removeEntry } = await import('@stacksjs/rpx')
+    for (const id of ids)
+      await removeEntry(id).catch(() => { /* already gone */ })
+  }
+  catch { /* rpx not installed */ }
+}
+
+/**
+ * Register proxy routes with the rpx daemon. Entries are written **without**
+ * a pid so the daemon's PID-GC does not delete them when a short-lived parent
+ * exits — we unregister explicitly on `./buddy dev` shutdown instead.
+ */
+async function registerRpxProxiesForDomain(input: {
+  domain: string
+  frontendPort: number
+  apiPort: number
+  docsPort: number
+  dashboardPort: number
+  includeDashboard: boolean
+  options: DevOptions
+}): Promise<void> {
+  const { domain, frontendPort, apiPort, docsPort, dashboardPort, includeDashboard, options } = input
+  const verbose = options.verbose ?? false
+  const proxies = buildRpxProxySpecs({ domain, frontendPort, apiPort, docsPort, dashboardPort, includeDashboard })
+  const hosts = [
+    domain,
+    `api.${domain}`,
+    `docs.${domain}`,
+    ...(includeDashboard ? [`dashboard.${domain}`] : []),
+  ]
+
+  const { addHosts, ensureDaemonRunning, writeEntry } = await import('@stacksjs/rpx')
+  const spawnCommand = await resolveRpxDaemonSpawnCommand()
+  const spawnEnv = process.env.SUDO_PASSWORD
+    ? { SUDO_PASSWORD: process.env.SUDO_PASSWORD }
+    : undefined
+
+  await addHosts(hosts, verbose).catch((err) => {
+    log.warn(`Could not update /etc/hosts for ${hosts.join(', ')}: ${(err as Error).message}`)
+    log.warn('Add 127.0.0.1 entries manually or set SUDO_PASSWORD in .env')
+  })
+
+  await ensureDaemonRunning({
+    spawnCommand,
+    startupTimeoutMs: 60000,
+    spawnEnv,
+    verbose,
+  })
+
+  const createdAt = new Date().toISOString()
+  for (const proxy of proxies) {
+    await writeEntry({
+      id: proxy.id,
+      from: proxy.from,
+      to: proxy.to,
+      cwd: process.cwd(),
+      createdAt,
+      pathRewrites: proxy.pathRewrites,
+    }, undefined, verbose)
+    if (!activeRpxRegistryIds.includes(proxy.id))
+      activeRpxRegistryIds.push(proxy.id)
+    console.log(`  ${dim('➜')}  ${dim('Proxy')}:       ${dim(`https://${proxy.to} → ${proxy.from}`)}`)
+  }
+}
+
+/**
+ * Register this stacks project's frontends with the rpx daemon so each app is
+ * reachable at `https://<subdomain>.<APP_URL>` over the daemon's shared :443.
  */
 async function startReverseProxy(options: DevOptions): Promise<void> {
   const appUrl = process.env.APP_URL
 
-  // Skip if no APP_URL is set or if it's localhost
-  if (!appUrl || appUrl === 'localhost' || appUrl.includes('localhost:')) {
+  if (!appUrl || appUrl === 'localhost' || appUrl.includes('localhost:'))
     return
-  }
 
   const domain = appUrl.replace(/^https?:\/\//, '')
-  const apiDomain = `api.${domain}`
-  const docsDomain = `docs.${domain}`
-  const dashboardDomain = `dashboard.${domain}`
   const frontendPort = Number(process.env.PORT) || 3000
   const apiPort = Number(process.env.PORT_API) || 3008
   const docsPort = Number(process.env.PORT_DOCS) || 3006
   const dashboardPort = Number(process.env.PORT_ADMIN) || 3002
-  const sslBasePath = `${process.env.HOME}/.stacks/ssl`
-  const verbose = options.verbose ?? false
-
-  // Mirror the dashboard opt-in from startDevelopmentServer — when the
-  // dashboard isn't being launched, don't ask rpx to issue a cert for
-  // its subdomain (the proxy entry would just point at a port nothing
-  // is bound to).
   const includeDashboard = process.env.STACKS_DEV_DASHBOARD === '1'
 
   try {
-    const { startProxies } = await import('@stacksjs/rpx')
-
-    // Use multi-proxy mode so rpx generates a SINGLE cert covering all domains
-    await startProxies({
-      proxies: [
-        // Forward /api/** straight to the API server, preserving the prefix.
-        // The API registers its routes as /api/cart/add, /api/checkout/place,
-        // etc., so stripPrefix must be false — otherwise the API would see
-        // /cart/add and 404. The frontend's stx-serve also has a fallback
-        // proxy for direct localhost:PORT access.
-        { from: `localhost:${frontendPort}`, to: domain, cleanUrls: false, pathRewrites: [{ from: '/api', to: `localhost:${apiPort}`, stripPrefix: false }] },
-        { from: `localhost:${apiPort}`, to: apiDomain, cleanUrls: false },
-        { from: `localhost:${docsPort}`, to: docsDomain, cleanUrls: false },
-        ...(includeDashboard
-          ? [{ from: `localhost:${dashboardPort}`, to: dashboardDomain, cleanUrls: false }]
-          : []),
-      ],
-      https: {
-        basePath: sslBasePath,
-        validityDays: 825,
-      },
-      regenerateUntrustedCerts: false,
-      verbose,
+    await registerRpxProxiesForDomain({
+      domain,
+      frontendPort,
+      apiPort,
+      docsPort,
+      dashboardPort,
+      includeDashboard,
+      options,
     })
   }
   catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.log()
+    console.log(`  ${yellow('⚠')}  ${yellow('HTTPS proxy (rpx) unavailable — use the Local URLs above')}`)
+    console.log(`  ${dim('    ')}${dim(message)}`)
+    console.log(`  ${dim('    ')}${dim('Fix: set SUDO_PASSWORD in .env (for /etc/hosts + :443), then restart `./buddy dev`')}`)
+    console.log(`  ${dim('    ')}${dim('Trust certs once: `bunx tlsx trust` (or install the rpx Root CA from ~/.stacks/rpx)')}`)
+    console.log(`  ${dim('    ')}${dim('Manual daemon: `~/Code/Tools/rpx/packages/rpx/bin/rpx daemon:start`')}`)
+    console.log()
     if (options.verbose) {
-      log.warn('Reverse proxy not available, skipping HTTPS')
-      log.warn(String(error))
+      log.warn('rpx daemon not available, skipping HTTPS')
+      log.warn(message)
     }
   }
 }

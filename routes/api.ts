@@ -16,7 +16,7 @@ import { response, route } from '@stacksjs/router'
 route.get('/', () => response.text('hello world'))
 route.get('/coming-soon', 'Controllers/ComingSoonController@index')
 
-route.group({ prefix: '/api/postline/bluesky' }, () => {
+route.group({ prefix: '/postline/bluesky' }, () => {
   route.get('/status', 'Actions/Postline/BlueskyStatusAction').skipCsrf()
   route.post('/connect', 'Actions/Postline/BlueskyConnectAction').skipCsrf()
   route.post('/publish', 'Actions/Postline/BlueskyPublishAction').skipCsrf()

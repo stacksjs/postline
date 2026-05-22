@@ -1,25 +1,15 @@
 @extends('layouts/default')
 
 @section('content')
-<script server>
-const dateRanges = [
-  { id: 'last7days', name: 'Last 7 Days' },
-  { id: 'last30days', name: 'Last 30 Days' },
-  { id: 'thisMonth', name: 'This Month' },
-  { id: 'lastMonth', name: 'Last Month' },
-  { id: 'thisYear', name: 'This Year' },
-]
-</script>
-
 @title('Dashboard - Events & Goals')
 <PageLayout>
   <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
     <div class="flex items-center space-x-2">
       <div class="h-5 w-5 text-gray-500 dark:text-neutral-400 i-hugeicons-calendar-03"></div>
       <select x-model="selectedDateRange" class="block pl-3 pr-10 py-1.5 text-gray-900 sm:leading-6 sm:text-sm dark:text-white dark:bg-neutral-800 border-0 ring-1 ring-gray-300 ring-inset rounded-md dark:ring-neutral-700 focus:ring-2 focus:ring-blue-600">
-        @foreach(dateRanges as range)
-          <option value="{{ range.id }}">{{ range.name }}</option>
-        @endforeach
+        <template :for="range in dateRanges">
+          <option :value="range.id">{{ range.name }}</option>
+        </template>
       </select>
       <span class="text-gray-500 text-sm dark:text-neutral-400">{{ dateRangeDisplay() }}</span>
     </div>
@@ -167,7 +157,7 @@ stacks.trackEvent('purchase completed', {
   </div>
 
   <div :show="showEventDetails()" @click.self="closeEventDetails()" class="flex fixed inset-0 z-50 items-center justify-center p-4 bg-black bg-opacity-50">
-    <div class="overflow-y-auto p-6 max-h-[90vh] sm:max-w-3xl w-full bg-white dark:bg-neutral-800 rounded-lg shadow-xl">
+    <div class="overflow-y-auto p-6 max-h-[90vh] w-full sm:max-w-3xl bg-white dark:bg-neutral-800 rounded-lg shadow-xl">
       <div class="flex items-start justify-between">
         <div>
           <h3 class="font-semibold text-gray-900 text-xl dark:text-white">{{ selectedEvent()?.name }}</h3>
@@ -219,7 +209,7 @@ stacks.trackEvent('{{ selectedEventName() }}', {
   </div>
 
   <div :show="showCreateEventModal()" @click.self="closeCreateEvent()" class="flex fixed inset-0 z-50 items-center justify-center p-4 bg-black bg-opacity-50">
-    <div class="overflow-y-auto p-6 max-h-[90vh] sm:max-w-lg w-full bg-white dark:bg-neutral-800 rounded-lg shadow-xl">
+    <div class="overflow-y-auto p-6 max-h-[90vh] w-full sm:max-w-lg bg-white dark:bg-neutral-800 rounded-lg shadow-xl">
       <div class="flex items-start justify-between">
         <div>
           <h3 class="font-semibold text-gray-900 text-xl dark:text-white">Create New Event</h3>
@@ -262,7 +252,7 @@ stacks.trackEvent('{{ selectedEventName() }}', {
   </div>
 
   <div :show="showDeleteConfirmModal()" @click.self="cancelDelete()" class="flex fixed inset-0 z-50 items-center justify-center p-4 bg-black bg-opacity-50">
-    <div class="overflow-y-auto p-6 max-h-[90vh] sm:max-w-lg w-full bg-white dark:bg-neutral-800 rounded-lg shadow-xl">
+    <div class="overflow-y-auto p-6 max-h-[90vh] w-full sm:max-w-lg bg-white dark:bg-neutral-800 rounded-lg shadow-xl">
       <div class="flex items-center justify-center mx-auto h-12 w-12 bg-red-100 dark:bg-red-900 rounded-full">
         <div class="h-6 w-6 text-red-600 dark:text-red-400 i-hugeicons-alert-02"></div>
       </div>
@@ -279,6 +269,16 @@ stacks.trackEvent('{{ selectedEventName() }}', {
 </PageLayout>
 
 <script client>
+// Date range options — moved out of the former `<script server>` block
+// (stacksjs/stacks#1838).
+const dateRanges = [
+  { id: 'last7days', name: 'Last 7 Days' },
+  { id: 'last30days', name: 'Last 30 Days' },
+  { id: 'thisMonth', name: 'This Month' },
+  { id: 'lastMonth', name: 'Last Month' },
+  { id: 'thisYear', name: 'This Year' },
+]
+
 interface Event {
   id: string
   name: string

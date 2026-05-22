@@ -6,8 +6,8 @@
  * driver switching between SQLite, MySQL, and PostgreSQL.
  */
 
-import type { QueryBuilder, QueryBuilderConfig, SupportedDialect } from 'bun-query-builder'
-import { createQueryBuilder, setConfig } from 'bun-query-builder'
+import type { QueryBuilder, QueryBuilderConfig, SupportedDialect } from '@stacksjs/query-builder'
+import { createQueryBuilder, setConfig } from '@stacksjs/query-builder'
 import { env as stacksEnv } from '@stacksjs/env'
 
 export interface DatabaseConnectionConfig {
@@ -169,11 +169,20 @@ export class Database {
   }
 
   /**
-   * Close the database connection
+   * Close the database connection.
+   *
+   * Returns a `Promise<void>` that resolves once the underlying
+   * `bun-query-builder` close call has drained its connections.
+   * Previously this was `close(): void` and the underlying async
+   * `close()` was called without `await`, so the method returned
+   * before pooled connections were released — callers waiting on
+   * `await database.close()` saw an immediate resolve and the
+   * process could exit mid-shutdown with sockets still open
+   * (stacksjs/stacks#1862 L-36).
    */
-  close(): void {
-    if (this._queryBuilder && typeof (this._queryBuilder as any).close === 'function') {
-      (this._queryBuilder as any).close()
+  async close(): Promise<void> {
+    if (this._queryBuilder && typeof (this._queryBuilder as { close?: () => Promise<void> | void }).close === 'function') {
+      await (this._queryBuilder as { close: () => Promise<void> | void }).close()
     }
     this._queryBuilder = null
     this._initialized = false

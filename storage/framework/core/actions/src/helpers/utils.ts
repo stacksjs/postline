@@ -197,72 +197,26 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
             headers: out,
           })
         }
-        const serveTypeScriptAsset = async (pathname: string): Promise<Response | null> => {
-          if (!pathname.startsWith('/assets/'))
-            return null
-
-          const candidates = [
-            p.projectPath(`resources${pathname}`),
-            p.projectPath(pathname.slice(1)),
-            p.projectPath(`public${pathname}`),
-          ]
-
-          for (const candidate of candidates) {
-            const ext = candidate.split('.').pop()?.toLowerCase()
-            if (!['ts', 'tsx', 'mts'].includes(ext ?? ''))
-              continue
-
-            if (!await Bun.file(candidate).exists())
-              continue
-
-            const build = await Bun.build({
-              entrypoints: [candidate],
-              bundle: true,
-              format: 'esm',
-              target: 'browser',
-              sourcemap: 'none',
-              minify: false,
-            })
-
-            if (!build.success || build.outputs.length === 0) {
-              const logs = build.logs.map(log => log.message || String(log)).join('\n')
-              return new Response(logs || 'Unable to bundle TypeScript asset.', {
-                status: 500,
-                headers: {
-                  'Content-Type': 'text/plain; charset=utf-8',
-                  'Cache-Control': 'no-store, no-cache, must-revalidate',
-                },
-              })
-            }
-
-            return new Response(await build.outputs[0].text(), {
-              headers: {
-                'Content-Type': 'application/javascript; charset=utf-8',
-                'Cache-Control': 'no-store, no-cache, must-revalidate',
-              },
-            })
-          }
-
-          return null
-        }
 
         // Layouts/partials live alongside views by default
         // (resources/views/layouts, resources/views/components). Older
         // scaffolds put them at resources/layouts and resources/components,
         // so we prefer the new layout when present and fall back to the
         // legacy paths otherwise.
-        const firstExisting = async (candidates: [string, ...string[]]): Promise<string> => {
+        // existsSync, not `Bun.file(dir).exists()` — `Bun.file` is file-only
+        // and returns false for any directory, which would cause every
+        // candidate to fall through to candidates[0] and silently break
+        // projects whose layouts/components live at the legacy paths
+        // (`resources/{layouts,components}/`).
+        const firstExisting = (candidates: [string, ...string[]]): string => {
           for (const candidate of candidates) {
-            try {
-              if (await Bun.file(p.projectPath(candidate)).exists())
-                return candidate
-            }
-            catch { /* ignore */ }
+            if (existsSync(p.projectPath(candidate)))
+              return candidate
           }
           return candidates[0]
         }
-        const layoutsDir = await firstExisting(['resources/views/layouts', 'resources/layouts'])
-        const partialsDir = await firstExisting(['resources/views/components', 'resources/components'])
+        const layoutsDir = firstExisting(['resources/views/layouts', 'resources/layouts'])
+        const partialsDir = firstExisting(['resources/views/components', 'resources/components'])
 
         await serve({
           patterns: ['resources/views', 'storage/framework/defaults/resources/views'],
@@ -291,9 +245,6 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
             const url = new URL(req.url)
             if (url.pathname.startsWith('/api/'))
               return proxyToApi(req)
-            const assetResponse = await serveTypeScriptAsset(url.pathname)
-            if (assetResponse)
-              return assetResponse
             requestStore.enterWith({
               cookies: parseCookies(req),
               url: req.url,

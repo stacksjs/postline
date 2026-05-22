@@ -13,6 +13,8 @@ import {
   renderProductionErrorPage,
   type ErrorPageConfig,
 } from '@stacksjs/error-handling'
+import { isApiRequest } from './api-shape'
+import { getCurrentRequest } from './request-context'
 
 /**
  * Standard error response structure used across all JSON error responses.
@@ -41,39 +43,88 @@ function buildErrorJson(opts: {
   return JSON.stringify(body)
 }
 
+/**
+ * Single source of truth for "is this deployment allowed to surface
+ * debug info (stack traces, recent queries, error names) to API
+ * clients?" Default-deny: only an explicit `APP_ENV='development'`
+ * (or `NODE_ENV='development'` when APP_ENV is unset) opts in.
+ *
+ * The previous predicates were asymmetric: `isDevelopment` checked
+ * `APP_ENV !== 'production' && NODE_ENV !== 'production'`, which
+ * treated `APP_ENV='staging'` as "development" and leaked stack
+ * traces + recent-query shapes to staging API clients. Staging
+ * deployments often touch real data and real third-party tokens, so
+ * those leaks are exploitable. See stacksjs/stacks#1859 H-10.
+ */
+function isDebugAllowed(): boolean {
+  const appEnv = (process.env.APP_ENV ?? '').toLowerCase()
+  if (appEnv === 'development') return true
+  if (!appEnv && process.env.NODE_ENV === 'development') return true
+  return false
+}
+
 function getJsonHeaders(): Record<string, string> {
-  const isDev = process.env.APP_ENV !== 'production' && process.env.NODE_ENV !== 'production'
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (isDev) {
-    const appUrl = process.env.APP_URL ? `https://${process.env.APP_URL}` : '*'
-    headers['Access-Control-Allow-Origin'] = appUrl
-  }
-  return headers
+  // CORS headers used to be emitted here directly using `APP_URL` env,
+  // independent of the configured CORS policy. That meant error
+  // responses could advertise different allowed origins than success
+  // responses (and in dev defaulted to `*` regardless of policy).
+  // The router's post-response CORS wrapper now owns all CORS header
+  // injection, applying the configured policy uniformly to success
+  // and error paths. See stacksjs/stacks#1859 H-3.
+  return { 'Content-Type': 'application/json' }
 }
 
 function getJsonHeadersFull(): Record<string, string> {
-  const headers = getJsonHeaders()
-  if (headers['Access-Control-Allow-Origin']) {
-    headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
-    headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-  }
-  return headers
+  // Same rationale as `getJsonHeaders` — defer CORS to the post-response
+  // wrapper rather than emit policy-inconsistent headers from here.
+  return getJsonHeaders()
 }
 
-// Circular buffer for tracked queries (avoids O(n) shift on every insert)
+// Circular buffer for tracked queries (avoids O(n) shift on every insert).
+// State is scoped per-request via the ALS-backed request context; when
+// no request is in scope (CLI scripts, queued jobs, tests outside
+// `runWithRequest`) a single process-wide fallback bucket is used so
+// the helpers still work — but error pages and N+1 detection inside a
+// request never cross-contaminate with state from a concurrent request
+// running on the same worker (stacksjs/stacks#1863 T-5, #1859 H-4).
 const MAX_QUERIES = 50
-const queryBuffer: Array<{ query: string; time?: number; connection?: string } | null> = new Array(MAX_QUERIES).fill(null)
-let queryWriteIndex = 0
-let queryCount = 0
-
-// Per-request normalized-query histogram. The signature here is
-// "normalize the query enough that two `SELECT * FROM posts WHERE
-// id = $1` calls collapse to one bucket regardless of bound values"
-// so we can detect when the same shape fires N times in a single
-// request — the canonical N+1 signature.
-const queryShapeCounts = new Map<string, number>()
 const N1_THRESHOLD = 5
-let n1Warned = new Set<string>()
+
+interface QueryTrack {
+  buffer: Array<{ query: string, time?: number, connection?: string } | null>
+  writeIndex: number
+  count: number
+  shapeCounts: Map<string, number>
+  n1Warned: Set<string>
+}
+
+function newQueryTrack(): QueryTrack {
+  return {
+    buffer: new Array(MAX_QUERIES).fill(null),
+    writeIndex: 0,
+    count: 0,
+    shapeCounts: new Map<string, number>(),
+    n1Warned: new Set<string>(),
+  }
+}
+
+const REQUEST_QUERY_TRACK_KEY = Symbol.for('stacks.queryTracking')
+
+// Used only when no request is in scope. Cleared lazily — tests that
+// don't go through `runWithRequest` can still call `clearTrackedQueries()`
+// to reset between assertions.
+let fallbackTrack: QueryTrack = newQueryTrack()
+
+function getQueryTrack(): QueryTrack {
+  const req = getCurrentRequest() as (EnhancedRequest & { [k: symbol]: unknown }) | undefined
+  if (!req) return fallbackTrack
+  let track = req[REQUEST_QUERY_TRACK_KEY] as QueryTrack | undefined
+  if (!track) {
+    track = newQueryTrack()
+    ;(req as Record<symbol, unknown>)[REQUEST_QUERY_TRACK_KEY] = track
+  }
+  return track
+}
 
 /**
  * Normalize a query string for shape-comparison. Strips bound values
@@ -106,21 +157,22 @@ function normalizeQueryShape(query: string): string {
  * is highly correlated with missing eager loading.
  */
 export function trackQuery(query: string, time?: number, connection?: string): void {
-  queryBuffer[queryWriteIndex] = { query, time, connection }
-  queryWriteIndex = (queryWriteIndex + 1) % MAX_QUERIES
-  if (queryCount < MAX_QUERIES) queryCount++
+  const track = getQueryTrack()
+  track.buffer[track.writeIndex] = { query, time, connection }
+  track.writeIndex = (track.writeIndex + 1) % MAX_QUERIES
+  if (track.count < MAX_QUERIES) track.count++
 
   // N+1 heuristic — only active in dev. The check is deliberately cheap
   // (one normalize + map increment per query) so we can leave it on by
   // default without measurably increasing query latency.
-  if (process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production') return
+  if (!isDebugAllowed()) return
   const shape = normalizeQueryShape(query)
   // Skip framework's own bookkeeping queries (query_logs INSERT, EXPLAIN).
   if (shape.startsWith('INSERT INTO QUERY_LOGS') || shape.startsWith('EXPLAIN')) return
-  const next = (queryShapeCounts.get(shape) ?? 0) + 1
-  queryShapeCounts.set(shape, next)
-  if (next === N1_THRESHOLD + 1 && !n1Warned.has(shape)) {
-    n1Warned.add(shape)
+  const next = (track.shapeCounts.get(shape) ?? 0) + 1
+  track.shapeCounts.set(shape, next)
+  if (next === N1_THRESHOLD + 1 && !track.n1Warned.has(shape)) {
+    track.n1Warned.add(shape)
     // Lazy import so this file stays free of @stacksjs/logging in case
     // logging is the failing component during error rendering.
     import('@stacksjs/logging').then(({ log }) => {
@@ -133,36 +185,45 @@ export function trackQuery(query: string, time?: number, connection?: string): v
 }
 
 /**
- * Get tracked queries in insertion order
+ * Get tracked queries in insertion order (for the active request, or
+ * the fallback bucket when called outside a request scope).
  */
-function getRecentQueries(): Array<{ query: string; time?: number; connection?: string }> {
-  if (queryCount === 0) return []
-  const result: Array<{ query: string; time?: number; connection?: string }> = []
-  const start = queryCount < MAX_QUERIES ? 0 : queryWriteIndex
-  for (let i = 0; i < queryCount; i++) {
-    const entry = queryBuffer[(start + i) % MAX_QUERIES]
+function getRecentQueries(): Array<{ query: string, time?: number, connection?: string }> {
+  const track = getQueryTrack()
+  if (track.count === 0) return []
+  const result: Array<{ query: string, time?: number, connection?: string }> = []
+  const start = track.count < MAX_QUERIES ? 0 : track.writeIndex
+  for (let i = 0; i < track.count; i++) {
+    const entry = track.buffer[(start + i) % MAX_QUERIES]
     if (entry) result.push(entry)
   }
   return result
 }
 
 /**
- * Snapshot of query shape counts. Useful for tests asserting that an
- * action ran a single query for `posts` instead of one-per-user.
+ * Snapshot of query shape counts for the active request. Useful for
+ * tests asserting that an action ran a single query for `posts`
+ * instead of one-per-user.
  */
 export function getQueryShapeCounts(): ReadonlyMap<string, number> {
-  return new Map(queryShapeCounts)
+  return new Map(getQueryTrack().shapeCounts)
 }
 
 /**
- * Clear tracked queries (e.g., after successful response)
+ * Reset query tracking for the active scope.
+ *
+ * Inside a request, this clears the per-request tracking object — but
+ * the object is also auto-collected when the request goes out of scope,
+ * so the explicit call is mainly useful for tests that re-use a single
+ * request. Outside a request, this clears the process-wide fallback.
  */
 export function clearTrackedQueries(): void {
-  queryBuffer.fill(null)
-  queryWriteIndex = 0
-  queryCount = 0
-  queryShapeCounts.clear()
-  n1Warned = new Set<string>()
+  const req = getCurrentRequest() as (EnhancedRequest & { [k: symbol]: unknown }) | undefined
+  if (req && req[REQUEST_QUERY_TRACK_KEY]) {
+    ;(req as Record<symbol, unknown>)[REQUEST_QUERY_TRACK_KEY] = newQueryTrack()
+    return
+  }
+  fallbackTrack = newQueryTrack()
 }
 
 /**
@@ -263,7 +324,7 @@ function sanitizeData(data: unknown, depth = 0, seen: WeakSet<object> = new Weak
  * Get request body from enhanced request (already parsed)
  */
 function getRequestBody(request: Request | EnhancedRequest): unknown {
-  const req = request as any
+  const req = request as EnhancedRequest
   if (req.jsonBody) {
     return sanitizeData(req.jsonBody)
   }
@@ -276,15 +337,17 @@ function getRequestBody(request: Request | EnhancedRequest): unknown {
 /**
  * Get user context from authenticated user on request
  */
-async function getUserContext(request: Request | EnhancedRequest): Promise<{ id?: string | number; email?: string; name?: string } | undefined> {
-  const req = request as any
-  // Check if user was set by auth middleware
-  if (req._authenticatedUser) {
-    const user = req._authenticatedUser
+async function getUserContext(request: Request | EnhancedRequest): Promise<{ id?: string | number, email?: string, name?: string } | undefined> {
+  const req = request as EnhancedRequest
+  // Check if user was set by auth middleware. The shape is project-
+  // defined (`_authenticatedUser` is typed `unknown` in the request
+  // augmentation), so narrow to the fields we actually read.
+  const authed = req._authenticatedUser as { id?: string | number, email?: string, name?: string, username?: string } | undefined
+  if (authed) {
     return {
-      id: user.id,
-      email: user.email,
-      name: user.name || user.username,
+      id: authed.id,
+      email: authed.email,
+      name: authed.name || authed.username,
     }
   }
   return undefined
@@ -308,12 +371,16 @@ export async function createErrorResponse(
 ): Promise<Response> {
   const status = options?.status || 500
   log.debug(`[error] ${status} ${error.message}`)
-  const isDevelopment = process.env.APP_ENV !== 'production' && process.env.NODE_ENV !== 'production'
+  const debugAllowed = isDebugAllowed()
 
-  if (!isDevelopment) {
-    // Production: return simple JSON or HTML error
-    const acceptHeader = request.headers.get('Accept') || ''
-    if (acceptHeader.includes('application/json')) {
+  if (!debugAllowed) {
+    // Production OR staging: JSON-first. Only render the HTML production
+    // error page
+    // when the client explicitly opted into HTML (top-level browser nav).
+    // The old check required `Accept: application/json` literally, which
+    // missed `Accept: */*` (curl + fetch default) and silently leaked an
+    // HTML page to JSON-consuming clients.
+    if (isApiRequest(request)) {
       return new Response(
         buildErrorJson({
           error: 'Internal Server Error',
@@ -374,17 +441,20 @@ export async function createErrorResponse(
       handler.addQuery(query.query, query.time, query.connection)
     }
 
-    // Check if request wants JSON (API request)
-    const acceptHeader = request.headers.get('Accept') || ''
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production'
-    if (acceptHeader.includes('application/json') && !acceptHeader.includes('text/html')) {
-      // Return JSON error for API requests. In production, strip the
-      // stack trace and recent-queries log — those leak file paths,
+    // Decide JSON vs HTML via the shared `isApiRequest()` predicate so
+    // every response path (errors, formatResult, 404s) makes the same call.
+    // The Ignition-style HTML page only renders for explicit top-level
+    // browser navigations; everything else — fetch, curl, API clients —
+    // gets JSON.
+    if (isApiRequest(request)) {
+      // Return JSON error for API requests. Outside development, strip
+      // the stack trace and recent-queries log — those leak file paths,
       // function names, query shapes, and (potentially) parameter
       // values that an attacker can use to fingerprint the deployment.
-      // The dev/staging response keeps them for fast debugging.
+      // Staging used to receive the dev payload here, which leaked
+      // details on shared infra (stacksjs/stacks#1859 H-10).
       const details: Record<string, unknown> = { handler: options?.handlerPath }
-      if (!isProduction) {
+      if (isDebugAllowed()) {
         details.stack = error.stack?.split('\n').slice(0, 10)
         details.queries = getRecentQueries().slice(-10)
       }
@@ -405,7 +475,7 @@ export async function createErrorResponse(
     // see consistent behavior with successful responses.
     const corsOrigin = process.env.APP_URL
       ? (process.env.APP_URL.startsWith('http') ? process.env.APP_URL : `https://${process.env.APP_URL}`)
-      : (isProduction ? request.headers.get('origin') ?? 'null' : '*')
+      : (isDebugAllowed() ? '*' : request.headers.get('origin') ?? 'null')
     const html = handler.render(error, status)
     return new Response(html, {
       status,
@@ -451,7 +521,7 @@ export async function createMiddlewareErrorResponse(
   request: Request | EnhancedRequest,
 ): Promise<Response> {
   const status = error.statusCode ?? error.status ?? 500
-  const isDevelopment = process.env.APP_ENV !== 'production' && process.env.NODE_ENV !== 'production'
+  const isDevelopment = isDebugAllowed()
 
   // For 4xx errors, return JSON in both dev and prod
   if (status >= 400 && status < 500) {
@@ -506,12 +576,25 @@ export async function createNotFoundResponse(
   path: string,
   request: Request | EnhancedRequest,
 ): Promise<Response> {
-  const isDevelopment = process.env.APP_ENV !== 'production' && process.env.NODE_ENV !== 'production'
+  const isDevelopment = isDebugAllowed()
 
   if (isDevelopment) {
     const error = new Error(`Route not found: ${path}`)
     error.name = 'NotFoundError'
     return await createErrorResponse(error, request, { status: 404 })
+  }
+
+  // Production: JSON-first 404. Only render the HTML production page when
+  // the client explicitly opted into HTML (top-level browser nav).
+  if (isApiRequest(request)) {
+    return new Response(
+      buildErrorJson({
+        error: 'NotFound',
+        message: `Route not found: ${path}`,
+        status: 404,
+      }),
+      { status: 404, headers: getJsonHeaders() },
+    )
   }
 
   return new Response(renderProductionErrorPage(404), {

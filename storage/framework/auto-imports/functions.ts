@@ -2,6 +2,8 @@
 
 export { increment, decrement, reset, count } from '../../../resources/functions/counter'
 export { toggleDark, isDark, preferredDark } from '../../../resources/functions/dark'
+export { useDirectUpload } from '../defaults/functions/uploads'
+export type { PresignResponse, DirectUploadResult, UseDirectUploadOptions, UseDirectUploadHandle } from '../defaults/functions/uploads'
 export { useAnalytics } from '../defaults/functions/analytics'
 export type { AnalyticsOverview, TrafficDataPoint, PageData, ReferrerData, DeviceData, BrowserData, CountryData } from '../defaults/functions/analytics'
 export { useGlobalSearch } from '../defaults/functions/search'

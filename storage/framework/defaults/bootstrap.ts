@@ -21,70 +21,64 @@
  * @see storage/framework/core/router/src/route-loader.ts:loadFrameworkRoutes
  */
 
+import { feature } from '@stacksjs/config'
 import { frameworkPath } from '@stacksjs/path'
 import { route } from '@stacksjs/router'
+import MaintenanceMiddleware from './app/Middleware/Maintenance'
 
-route.use(async (request, next) => {
-  const {
-    activeSiteModePayload,
-    bypassCookieValue,
-    hasValidBypassCookie,
-    isAllowedIp,
-    isSecretPath,
-    siteModeResponse,
-  } = await import('@stacksjs/server')
+// RBAC: wire the bun-query-builder-backed store so `hasRole(user, …)` and
+// friends from `@stacksjs/auth` actually hit the database (otherwise every
+// call throws "RBAC store not configured"). The store is a thin adapter
+// over the `roles` / `permissions` / `user_roles` / `user_permissions` /
+// `role_permissions` tables created by migrations 0000000101–0000000105.
+// Registered unconditionally because the auth middleware + Role middleware
+// both reach for the helpers at request time regardless of which feature
+// the project opts into.
+import { createBqbRbacStore, setRbacStore } from '@stacksjs/auth'
 
-  const payload = await activeSiteModePayload()
-  if (!payload)
-    return next()
+setRbacStore(createBqbRbacStore())
 
-  const url = new URL(request.url)
-  const cookies = parseCookies(request.headers.get('cookie') || '')
-  const ip = getClientIp(request)
+// Global maintenance / coming-soon gate. Registered first so the
+// `buddy down` / `buddy coming-soon` (and their env-var equivalents)
+// state files intercept every request before any other middleware or
+// route runs.
+//
+// The middleware is a thin wrapper around `maintenanceGate()` in
+// @stacksjs/server, which is also called from the dev server's
+// `onRequest` hook — so dev and prod use one implementation. The gate
+// itself reads `activeSiteModePayload()` so it covers both maintenance
+// and coming-soon modes (plus `APP_MAINTENANCE` / `APP_COMING_SOON`
+// env overrides) without the bootstrap needing to know the details.
+//
+// `toRouterHandler()` adapts the Middleware contract (return void to
+// continue, throw a Response to short-circuit) to bun-router's
+// `(req, next) => Response` shape. Without the adapter, `handle` would
+// return `undefined`, bun-router's chain treats that as a short-circuit
+// to an empty 200, and every route returns `200 OK Content-Length: 0`.
+route.use(MaintenanceMiddleware.toRouterHandler() as any)
 
-  if (payload.secret && isSecretPath(url.pathname, payload.secret)) {
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: '/',
-        'Set-Cookie': bypassCookieValue(payload.secret, payload.mode),
-      },
-    })
-  }
-
-  const hasBypass = payload.secret && hasValidBypassCookie(cookies, payload.secret, payload.mode)
-  if (hasBypass || isAllowedIp(ip, payload.allowed))
-    return next()
-
-  return siteModeResponse(payload)
-})
-
-// Dashboard, auth, password, email, etc. Currently lives as a single
-// 687-line routes file under defaults/routes/dashboard.ts. As each
-// subdomain grows it can split into smaller files (auth.ts, email.ts,
-// commerce.ts) and each gets its own register() line — or moves into a
-// dedicated workspace package whose index.ts self-registers.
-await route.register(frameworkPath('defaults/routes/dashboard.ts'))
-
-function getClientIp(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for')
-  if (forwarded)
-    return forwarded.split(',')[0]?.trim() || '127.0.0.1'
-
-  return request.headers.get('x-real-ip') || '127.0.0.1'
-}
-
-function parseCookies(cookieHeader: string): Record<string, string> {
-  const cookies: Record<string, string> = {}
-
-  if (!cookieHeader)
-    return cookies
-
-  for (const cookie of cookieHeader.split(';')) {
-    const [name, ...rest] = cookie.split('=')
-    if (name)
-      cookies[name.trim()] = rest.join('=').trim()
-  }
-
-  return cookies
+// Feature-gated route registration. The dashboard.ts file currently bundles
+// ~687 lines covering auth, password reset, email subscribe, storefront
+// cart/checkout, reviews, sitemap, AI, voice, and the admin dashboard's
+// REST surface. Until that file is split per-feature (auth.ts, marketing.ts,
+// commerce.ts, monitoring.ts), the whole thing loads when `dashboard` is
+// activated and stays inert otherwise.
+//
+// Apps that need only a slice — e.g. a marketing site that wants
+// `/api/email/subscribe` and `/api/contact` but not the rest — can either
+//   1. Activate `dashboard` and live with the over-broad register; the
+//      action handlers for routes you don't hit never fire, and their
+//      models stay un-loaded as long as the corresponding feature flag
+//      (`commerce`, `cms`, `monitoring`) is off, so there's no hidden
+//      cost beyond the bun-router route-table entries.
+//   2. Define the routes they want directly in `routes/api.ts` —
+//      first-registration-wins means the user version takes priority.
+//
+// Once the per-feature route split lands, each `if (feature('X'))` block
+// below registers just the X-specific routes file.
+if (feature('dashboard')) {
+  await route.register(frameworkPath('defaults/routes/dashboard.ts'))
+  // JSON endpoints for the dev dashboard UI. Kept separate from the view
+  // routes above so the data layer is one obvious file to grep.
+  await route.register(frameworkPath('defaults/routes/dashboard-api.ts'))
 }
