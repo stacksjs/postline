@@ -3,56 +3,53 @@
 @section('title', 'Postline - Accounts')
 @section('description', 'Manage social publishing accounts and drivers in Postline.')
 
-<script server>
-const accounts = [
-  { name: 'Bluesky', handle: 'Not connected', status: 'Setup', detail: 'Add an app password to publish and sync your timeline.' },
-  { name: 'Twitter/X', handle: 'Not connected', status: 'Planned', detail: 'Waiting on the next driver adapter.' },
-  { name: 'Mastodon', handle: 'Not connected', status: 'Planned', detail: 'Federated posting support is next in line.' },
-  { name: 'Instagram', handle: 'Not connected', status: 'Later', detail: 'Media-first workflow needs a separate approval step.' },
-]
-</script>
-
 @section('content')
   <section class="grid gap-5" data-postline-page="accounts" data-testid="accounts-page">
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Accounts</p>
         <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Publishing drivers</h1>
+        <p class="mt-1.5 mb-0 text-[13px] text-zinc-600">Connect Bluesky with an app password to publish from Postline.</p>
       </div>
-      <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-white bg-neutral-950 rounded-md" type="submit" form="bluesky-connect-form">Connect</button>
     </header>
 
-    <form id="bluesky-connect-form" class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] p-3.5 bg-white border border-zinc-200 rounded-lg shadow-[0_18px_54px_rgba(24,31,42,0.10)]" data-bluesky-connect-form>
+    <form id="bluesky-connect-form" class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] p-4 bg-white border border-zinc-200 rounded-2xl shadow-sm" data-bluesky-connect-form>
       <label class="grid gap-1.5">
         <span class="font-bold text-xs text-zinc-500">Bluesky handle</span>
-        <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-md focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="identifier" placeholder="name.bsky.social" autocomplete="username" data-bluesky-identifier>
+        <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="identifier" placeholder="name.bsky.social" autocomplete="username" data-bluesky-identifier required>
       </label>
       <label class="grid gap-1.5">
         <span class="font-bold text-xs text-zinc-500">App password</span>
-        <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-md focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password" type="password" autocomplete="current-password" data-bluesky-password>
+        <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password" type="password" autocomplete="current-password" placeholder="xxxx-xxxx-xxxx-xxxx" data-bluesky-password required>
       </label>
       <div class="flex items-end">
-        <button class="inline-flex items-center justify-center px-4 h-10 w-full sm:w-auto font-bold text-sm text-white bg-neutral-950 rounded-md" type="submit">Save</button>
+        <button class="inline-flex items-center justify-center px-4 h-10 w-full sm:w-auto font-bold text-sm text-white bg-neutral-950 rounded-xl disabled:opacity-50" type="submit" data-bluesky-connect-submit>Connect Bluesky</button>
       </div>
-      <div class="hidden sm:col-span-3 px-3 py-2 text-emerald-700 text-red-700 text-sm text-zinc-600 bg-emerald-50 bg-red-50 bg-slate-50 border border-emerald-200 border-red-200 border-zinc-200 rounded-md" role="status" data-bluesky-connect-status></div>
+      <p class="sm:col-span-3 m-0 text-xs text-zinc-500">Create an app password in Bluesky Settings → Privacy and security → App passwords.</p>
     </form>
 
-    <section class="bg-white border border-zinc-200 rounded-lg shadow-[0_18px_54px_rgba(24,31,42,0.10)]">
-      <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
+    <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm" data-bluesky-channel-card>
+      <header class="flex gap-3 items-center justify-between p-4 border-b border-zinc-200">
         <strong class="text-[13px]">Channels</strong>
-        <span class="text-xs text-zinc-500">Driver based</span>
+        <span class="text-xs text-zinc-500" data-bluesky-channel-pill>Loading…</span>
       </header>
-      <div class="grid gap-2.5 p-3">
-        @foreach (accounts as account)
-          <article class="flex gap-5 items-center justify-between p-3 bg-white border border-zinc-200 rounded-lg">
-            <div>
-              <h2 class="my-0 font-bold text-[15px]">{{ account.name }}</h2>
-              <p class="my-1.5 text-[13px] text-slate-700">{{ account.handle }}</p>
-              <span class="text-xs text-zinc-500">{{ account.detail }}</span>
-            </div>
-            <span class="whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] {{ account.status === 'Connected' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-zinc-200 text-zinc-500' }}">{{ account.status }}</span>
-          </article>
-        @endforeach
+      <div class="grid gap-2.5 p-3" data-bluesky-channels>
+        <article class="flex gap-5 items-center justify-between p-3.5 bg-white border border-zinc-200 rounded-xl" data-channel="bluesky">
+          <div>
+            <h2 class="my-0 font-bold text-[15px]">Bluesky</h2>
+            <p class="my-1.5 text-[13px] text-slate-700" data-bluesky-channel-handle>Not connected</p>
+            <span class="text-xs text-zinc-500" data-bluesky-channel-detail>Add an app password to publish and sync your timeline.</span>
+          </div>
+          <span class="whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold border-zinc-200 text-zinc-500" data-bluesky-channel-status>Setup</span>
+        </article>
+        <article class="flex gap-5 items-center justify-between p-3.5 bg-zinc-50/80 border border-zinc-200 rounded-xl opacity-80">
+          <div>
+            <h2 class="my-0 font-bold text-[15px] text-zinc-700">Twitter/X</h2>
+            <p class="my-1.5 text-[13px] text-zinc-600">Planned</p>
+            <span class="text-xs text-zinc-500">Driver adapter coming after Bluesky is stable.</span>
+          </div>
+          <span class="whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold border-zinc-200 text-zinc-500">Planned</span>
+        </article>
       </div>
     </section>
   </section>
@@ -65,55 +62,81 @@ const accounts = [
       const form = root.querySelector('[data-bluesky-connect-form]')
       const identifier = root.querySelector('[data-bluesky-identifier]')
       const password = root.querySelector('[data-bluesky-password]')
-      const status = root.querySelector('[data-bluesky-connect-status]')
+      const submit = root.querySelector('[data-bluesky-connect-submit]')
+      const handle = root.querySelector('[data-bluesky-channel-handle]')
+      const detail = root.querySelector('[data-bluesky-channel-detail]')
+      const status = root.querySelector('[data-bluesky-channel-status]')
+      const pill = root.querySelector('[data-bluesky-channel-pill]')
+      const toast = window.postlineToast?.show
+      const blueskyApi = window.postlineBluesky
 
-      const setStatus = (message, tone = 'neutral') => {
-        if (!status) return
-        status.textContent = message
-        status.classList.remove('hidden', 'border-emerald-200', 'bg-emerald-50', 'text-emerald-700', 'border-red-200', 'bg-red-50', 'text-red-700', 'border-zinc-200', 'bg-slate-50', 'text-zinc-600')
-        if (tone === 'success') status.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-700')
-        else if (tone === 'error') status.classList.add('border-red-200', 'bg-red-50', 'text-red-700')
-        else status.classList.add('border-zinc-200', 'bg-slate-50', 'text-zinc-600')
+      const notify = (message, tone = 'neutral', options = {}) => {
+        if (toast) toast({ message, tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info', title: options.title })
+        else console.log(message)
+      }
+
+      const renderStatus = (data) => {
+        const connected = Boolean(data?.canPublish)
+        const label = data?.handle ? `@${data.handle}` : 'Not connected'
+        if (identifier && data?.handle) identifier.value = data.handle.replace(/^@/, '')
+        if (handle) handle.textContent = label
+        if (detail) {
+          detail.textContent = connected
+            ? 'Ready to publish and sync timeline from Postline.'
+            : data?.handle
+              ? 'Saved handle found — add a valid app password to publish.'
+              : 'Add an app password to publish and sync your timeline.'
+        }
+        if (status) {
+          status.textContent = connected ? 'Connected' : data?.handle ? 'Needs password' : 'Setup'
+          status.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+            connected
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : data?.handle
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-zinc-200 text-zinc-500'
+          }`
+        }
+        if (pill) pill.textContent = connected ? 'Bluesky ready' : 'Action required'
+        if (submit) submit.textContent = connected ? 'Reconnect Bluesky' : 'Connect Bluesky'
       }
 
       const refreshStatus = async () => {
         try {
-          const response = await fetch('/api/postline/bluesky/status')
-          const payload = await response.json()
-          if (payload.ok && payload.data?.handle) {
-            if (identifier) identifier.value = payload.data.handle
-            setStatus(
-              payload.data.connected
-                ? `${payload.data.handle} is connected.`
-                : `${payload.data.handle} needs an app password to publish.`,
-              payload.data.connected ? 'success' : 'neutral',
-            )
-          }
+          const data = await blueskyApi?.fetchStatus()
+          renderStatus(data)
         }
-        catch {}
+        catch (error) {
+          renderStatus(null)
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Bluesky' })
+        }
       }
 
       form?.addEventListener('submit', async (event) => {
         event.preventDefault()
-        const body = new FormData(form)
-        setStatus('Connecting...')
+        submit?.setAttribute('disabled', 'disabled')
+        notify('Connecting to Bluesky…', 'info', { title: 'Accounts' })
 
         try {
           const response = await fetch('/api/postline/bluesky/connect', {
             method: 'POST',
-            body,
+            body: new FormData(form),
           })
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky connect failed.')
           if (password) password.value = ''
-          setStatus(`${payload.data.handle} connected.`, 'success')
+          await refreshStatus()
+          notify(`${payload.data.handle} is connected. You can publish from the composer.`, 'success', { title: 'Connected' })
         }
         catch (error) {
-          setStatus(error instanceof Error ? error.message : String(error), 'error')
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Connect failed' })
+        }
+        finally {
+          submit?.removeAttribute('disabled')
         }
       })
 
-      refreshStatus()
+      void refreshStatus()
     })()
   </script>
 @endsection

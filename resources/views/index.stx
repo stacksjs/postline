@@ -5,12 +5,16 @@
 
 @section('content')
   <section class="grid gap-3.5" data-postline-page="composer" data-testid="composer-page">
-    <div class="hidden bottom-6 fixed right-6 z-50 px-3.5 py-2.5 max-w-md text-sm bg-white border border-zinc-200 rounded-2xl shadow-[0_18px_54px_rgba(24,31,42,0.16)]" role="status" data-bluesky-status></div>
-
     <div class="grid">
       <section class="grid content-start grid-rows-[auto_auto_auto] self-start bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Post composer">
-        <header class="flex gap-3 items-center justify-between p-3 border-b border-zinc-200">
-          <strong class="text-[13px]">New post</strong>
+        <header class="flex flex-wrap gap-3 items-center justify-between p-3 border-b border-zinc-200">
+          <div class="flex gap-2 items-center">
+            <strong class="text-[13px]">New post</strong>
+            <a class="inline-flex gap-1.5 items-center px-2.5 min-h-7 text-xs font-bold border rounded-lg transition-colors border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-white" href="/accounts" data-stx-link data-bluesky-connection data-no-window-drag>
+              <span class="h-2 w-2 rounded-full bg-zinc-300" data-bluesky-connection-dot aria-hidden="true"></span>
+              <span data-bluesky-connection-label>Checking Bluesky…</span>
+            </a>
+          </div>
           <div class="grid grid-cols-3 p-0.5 bg-zinc-100 border border-zinc-200 rounded-xl" role="group" aria-label="Post mode">
             <button class="px-2.5 py-1.5 min-w-19 text-neutral-950 text-xs bg-white rounded-lg shadow-sm" type="button" data-composer-mode="single">Single</button>
             <button class="px-2.5 py-1.5 min-w-19 text-xs text-zinc-500 rounded-lg" type="button" data-composer-mode="thread">Thread</button>
@@ -20,8 +24,8 @@
 
         <div class="grid p-3">
           <div class="flex flex-wrap gap-2 mb-2.5">
-            <div class="flex items-center px-2.5 min-h-8 text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-xl">Bluesky</div>
-            <div class="flex items-center px-2.5 min-h-8 text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-xl">Today 3:30 PM</div>
+            <div class="flex items-center px-2.5 min-h-8 text-xs font-bold text-zinc-700 bg-zinc-50 border border-zinc-200 rounded-xl">Bluesky</div>
+            <div class="flex items-center px-2.5 min-h-8 text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-xl">Publish now</div>
             <div class="flex items-center px-2.5 min-h-8 text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-xl">Public</div>
           </div>
           <div class="grid overflow-y-auto content-start gap-4 pr-1 max-h-72" data-composer-posts>
@@ -35,7 +39,7 @@
                   <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
                 </button>
               </header>
-              <textarea class="min-h-24 w-full leading-relaxed text-[18px] text-neutral-950 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" maxlength="300" data-bluesky-text>Working on a calmer way to plan posts: drafts, timelines, scheduling, and publishing in one native-feeling place.</textarea>
+              <textarea class="min-h-24 w-full leading-relaxed text-[18px] text-neutral-950 bg-transparent border-0 outline-none resize-none placeholder:text-zinc-400" spellcheck="true" aria-label="Post body 1" maxlength="300" placeholder="What do you want to share on Bluesky?" data-bluesky-text></textarea>
               <div class="hidden overflow-hidden bg-zinc-50 border border-zinc-200 rounded-2xl" data-link-preview></div>
             </article>
           </div>
@@ -50,9 +54,9 @@
             <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Preview post" title="Preview post" data-preview-post>
               <span class="h-4 w-4 i-hugeicons-view" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-white bg-neutral-950 rounded-xl" type="button" data-bluesky-publish>
+            <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-white bg-neutral-950 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed" type="button" data-bluesky-publish>
               <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
-              <span>Publish</span>
+              <span data-bluesky-publish-label>Publish</span>
             </button>
           </div>
         </footer>
@@ -69,8 +73,13 @@
       root.dataset.composerReady = 'true'
 
       const count = root.querySelector('[data-bluesky-count]')
-      const status = root.querySelector('[data-bluesky-status]')
+      const connection = root.querySelector('[data-bluesky-connection]')
+      const connectionDot = root.querySelector('[data-bluesky-connection-dot]')
+      const connectionLabel = root.querySelector('[data-bluesky-connection-label]')
+      const publishLabel = root.querySelector('[data-bluesky-publish-label]')
       const buttons = Array.from(root.querySelectorAll('[data-bluesky-publish], [data-bluesky-publish-top]'))
+      const toast = window.postlineToast?.show
+      const blueskyApi = window.postlineBluesky
       const postsRoot = root.querySelector('[data-composer-posts]')
       const addPostButton = root.querySelector('[data-add-post]')
       const previewButton = root.querySelector('[data-preview-post]')
@@ -87,13 +96,50 @@
       let previewTimer
       let draftSaveTimer
 
-      const setStatus = (message, tone = 'neutral') => {
+      let canPublish = false
+
+      const setStatus = (message, tone = 'neutral', options = {}) => {
+        if (toast) {
+          toast({
+            title: options.title,
+            message,
+            tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info',
+            url: options.url,
+          })
+          return
+        }
+        console.log(`[postline] ${message}`)
+      }
+
+      const applyConnection = (status) => {
         if (!status) return
-        status.textContent = message
-        status.classList.remove('hidden', 'border-emerald-200', 'bg-emerald-50', 'text-emerald-700', 'border-red-200', 'bg-red-50', 'text-red-700', 'border-zinc-200', 'bg-white', 'text-zinc-700')
-        if (tone === 'success') status.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-700')
-        else if (tone === 'error') status.classList.add('border-red-200', 'bg-red-50', 'text-red-700')
-        else status.classList.add('border-zinc-200', 'bg-white', 'text-zinc-700')
+        canPublish = Boolean(status.canPublish)
+        const label = blueskyApi?.formatConnectionLabel(status) || 'Bluesky'
+        if (connectionLabel) connectionLabel.textContent = label
+        connection?.classList.toggle('border-emerald-200', canPublish)
+        connection?.classList.toggle('bg-emerald-50', canPublish)
+        connection?.classList.toggle('text-emerald-800', canPublish)
+        connection?.classList.toggle('border-amber-200', !canPublish && Boolean(status.handle))
+        connection?.classList.toggle('bg-amber-50', !canPublish && Boolean(status.handle))
+        connection?.classList.toggle('text-amber-900', !canPublish && Boolean(status.handle))
+        connectionDot?.classList.toggle('bg-emerald-500', canPublish)
+        connectionDot?.classList.toggle('bg-amber-500', !canPublish && Boolean(status.handle))
+        connectionDot?.classList.toggle('bg-zinc-300', !canPublish && !status.handle)
+        buttons.forEach(button => {
+          if (canPublish) button.removeAttribute('disabled')
+          else button.setAttribute('disabled', 'disabled')
+        })
+      }
+
+      const refreshConnection = async () => {
+        try {
+          const status = await blueskyApi?.fetchStatus()
+          applyConnection(status)
+        }
+        catch (error) {
+          applyConnection({ canPublish: false, handle: null, configuredFromEnv: false })
+          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Bluesky' })
+        }
       }
 
       const textareaFor = post => post?.querySelector('[data-bluesky-text]')
@@ -184,7 +230,12 @@
       const updateCount = () => {
         const textarea = activeTextarea()
         if (!textarea || !count) return
-        count.textContent = `${textarea.value.length} / 300 characters - ${allPosts().length} post${allPosts().length === 1 ? '' : 's'}`
+        const length = textarea.value.length
+        const limit = 300
+        count.textContent = `${length} / ${limit} characters - ${allPosts().length} post${allPosts().length === 1 ? '' : 's'}`
+        count.classList.toggle('text-amber-700', length > 260 && length <= limit)
+        count.classList.toggle('text-red-700', length >= limit)
+        count.classList.toggle('text-zinc-500', length <= 260)
       }
 
       const renderLinkPreview = (post, preview) => {
@@ -328,44 +379,93 @@
         if (!options.skipSave) saveDraft()
       }
 
-      const publish = async () => {
-        const textarea = activeTextarea()
-        if (!textarea) return
+      const publishOne = async (post) => {
+        const textarea = textareaFor(post)
+        if (!textarea) throw new Error('Missing post body.')
         const text = textarea.value.trim()
-        if (!text) {
-          setStatus('Write something before publishing.', 'error')
-          textarea.focus()
-          return
-        }
+        if (!text) throw new Error('Write something before publishing.')
         const body = new FormData()
         body.set('text', text)
-        if (activePost?.dataset.externalUri && activePost.dataset.externalTitle) {
-          body.set('external_uri', activePost.dataset.externalUri)
-          body.set('external_title', activePost.dataset.externalTitle)
-          body.set('external_description', activePost.dataset.externalDescription || '')
+        if (post?.dataset.externalUri && post.dataset.externalTitle) {
+          body.set('external_uri', post.dataset.externalUri)
+          body.set('external_title', post.dataset.externalTitle)
+          body.set('external_description', post.dataset.externalDescription || '')
         }
+        const response = await fetch('/api/postline/bluesky/publish', {
+          method: 'POST',
+          body,
+        })
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky publish failed.')
+        return payload.data?.post?.url
+      }
+
+      const publish = async () => {
+        if (!canPublish) {
+          setStatus('Connect Bluesky on the Accounts page before publishing.', 'error', { title: 'Not connected' })
+          return
+        }
+
+        const targets = activeMode === 'thread'
+          ? allPosts().filter(post => textareaFor(post)?.value.trim())
+          : [activePost].filter(Boolean)
+
+        if (targets.length === 0) {
+          setStatus('Write something before publishing.', 'error')
+          activeTextarea()?.focus()
+          return
+        }
+
         buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
-        setStatus('Publishing to Bluesky...')
+        if (publishLabel) publishLabel.textContent = 'Publishing…'
+        setStatus(
+          targets.length > 1 ? `Publishing ${targets.length} posts to Bluesky…` : 'Publishing to Bluesky…',
+          'info',
+          { title: 'Publishing' },
+        )
 
         try {
-          const response = await fetch('/api/postline/bluesky/publish', {
-            method: 'POST',
-            body,
-          })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky publish failed.')
-          const url = payload.data?.post?.url
-          setStatus(url ? `Published: ${url}` : 'Published to Bluesky.', 'success')
-          textarea.value = ''
+          let lastUrl
+          for (const [index, post] of targets.entries()) {
+            lastUrl = await publishOne(post)
+            if (targets.length > 1) {
+              textareaFor(post).value = ''
+              renderLinkPreview(post, null)
+            }
+            if (index < targets.length - 1) await new Promise(resolve => setTimeout(resolve, 400))
+          }
+
+          if (activeMode === 'thread') {
+            allPosts().forEach((post) => {
+              const textarea = textareaFor(post)
+              if (textarea) textarea.value = ''
+              renderLinkPreview(post, null)
+            })
+          }
+          else {
+            const textarea = textareaFor(targets[0])
+            if (textarea) textarea.value = ''
+            renderLinkPreview(targets[0], null)
+          }
+
           updateCount()
-          renderLinkPreview(activePost, null)
           saveDraft()
+          setStatus(
+            targets.length > 1
+              ? `Published ${targets.length} posts to Bluesky.`
+              : 'Your post is live on Bluesky.',
+            'success',
+            { title: 'Published', url: lastUrl },
+          )
         }
         catch (error) {
-          setStatus(error instanceof Error ? error.message : String(error), 'error')
+          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Publish failed' })
         }
         finally {
-          buttons.forEach(button => button.removeAttribute('disabled'))
+          if (publishLabel) publishLabel.textContent = 'Publish'
+          buttons.forEach(button => {
+            if (canPublish) button.removeAttribute('disabled')
+          })
         }
       }
 
@@ -399,15 +499,13 @@
       })
       refreshButton?.addEventListener('click', async () => {
         refreshButton.setAttribute('disabled', 'disabled')
-        setStatus('Checking Bluesky connection...')
         try {
-          const response = await fetch('/api/postline/bluesky/status')
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not check Bluesky.')
-          setStatus(payload.data?.canPublish ? 'Bluesky is ready to publish.' : 'Bluesky needs an app password before publishing.', payload.data?.canPublish ? 'success' : 'error')
-        }
-        catch (error) {
-          setStatus(error instanceof Error ? error.message : String(error), 'error')
+          await refreshConnection()
+          setStatus(
+            canPublish ? 'Bluesky is ready to publish.' : 'Add your Bluesky app password on Accounts.',
+            canPublish ? 'success' : 'error',
+            { title: 'Bluesky' },
+          )
         }
         finally {
           refreshButton.removeAttribute('disabled')
@@ -426,6 +524,7 @@
       selectPost(allPosts()[savedActiveIndex] || activePost, { skipSave: true })
       updateCount()
       void updateLinkPreview(activePost)
+      void refreshConnection()
     })()
   </script>
 @endsection
