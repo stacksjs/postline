@@ -105,6 +105,7 @@
             message,
             tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info',
             url: options.url,
+            id: options.id,
           })
           return
         }
@@ -421,7 +422,7 @@
         setStatus(
           targets.length > 1 ? `Publishing ${targets.length} posts to Bluesky…` : 'Publishing to Bluesky…',
           'info',
-          { title: 'Publishing' },
+          { title: 'Publishing', id: 'publish' },
         )
 
         try {
@@ -450,6 +451,7 @@
 
           updateCount()
           saveDraft()
+          window.postlineToast?.dismiss?.('publish')
           setStatus(
             targets.length > 1
               ? `Published ${targets.length} posts to Bluesky.`
@@ -459,6 +461,7 @@
           )
         }
         catch (error) {
+          window.postlineToast?.dismiss?.('publish')
           setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Publish failed' })
         }
         finally {

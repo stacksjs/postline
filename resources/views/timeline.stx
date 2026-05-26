@@ -4,24 +4,34 @@
 @section('description', 'Read connected social timelines from Postline.')
 
 @section('content')
-  <section class="grid gap-3.5" data-postline-page="timeline" data-testid="timeline-page">
-    <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Bluesky timeline">
-      <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
-        <strong class="text-[13px]">Timeline</strong>
-        <div class="flex gap-2 items-center">
-          <button class="inline-flex items-center justify-center h-8 w-8 text-neutral-950 bg-white border border-zinc-200 rounded-lg shadow-sm" type="button" aria-label="Refresh timeline" title="Refresh timeline" data-bluesky-timeline-refresh>
-            <span class="h-3.5 w-3.5 i-hugeicons-refresh" aria-hidden="true"></span>
-          </button>
-          <button class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-bold text-xs text-white bg-neutral-950 rounded-lg" type="button">
-            <span class="h-3.5 w-3.5 i-hugeicons-message-add-01" aria-hidden="true"></span>
-            <span>Reply</span>
-          </button>
-        </div>
-      </header>
-      <div class="grid gap-2.5 p-3" data-bluesky-timeline-list>
-        <p class="m-0 p-6 text-center text-sm text-zinc-500" data-bluesky-timeline-empty>Connect Bluesky on Accounts, then refresh to load your timeline.</p>
+  <section class="grid gap-4" data-postline-page="timeline" data-testid="timeline-page">
+    <header class="flex gap-4 items-center justify-between min-h-11">
+      <div>
+        <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Timeline</p>
+        <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Home feed</h1>
+        <p class="mt-1.5 mb-0 text-[13px] text-zinc-600">Posts from your connected Bluesky account.</p>
       </div>
-    </section>
+      <div class="flex gap-2 items-center">
+        <a class="inline-flex items-center justify-center px-4 h-9 font-bold text-sm text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm hover:bg-zinc-50" href="/" data-stx-link>Compose</a>
+        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-sm text-white bg-neutral-950 rounded-xl disabled:opacity-50" type="button" data-bluesky-timeline-refresh>
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.312 4.818A.75.75 0 0 0 14 4H6.5a.75.75 0 0 0 0 1.5h5.992l-4.43 4.431a.75.75 0 1 0 1.06 1.06l5.784-5.784a.75.75 0 0 0 0-1.06l-5.784-5.784a.75.75 0 0 0-1.06 1.06l4.43 4.43H6a2.75 2.75 0 0 0 0 5.5h8.312a.75.75 0 0 0 .53-.22l2.25-2.25a.75.75 0 0 0-1.06-1.06l-1.72 1.72H6a1.25 1.25 0 0 1 0-2.5h7.312a.75.75 0 0 0 .53-.22l2.25-2.25a.75.75 0 0 0 0-1.06l-2.25-2.25a.75.75 0 0 0-.53-.22Z" clip-rule="evenodd"/></svg>
+          <span data-bluesky-timeline-refresh-label>Refresh</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="overflow-hidden bg-white border border-zinc-200 rounded-2xl shadow-sm postline-feed" aria-label="Bluesky timeline">
+      <div class="postline-feed__header">
+        <div>
+          <strong class="text-sm font-bold text-zinc-900">Following</strong>
+          <p class="m-0 mt-0.5 text-xs text-zinc-500" data-bluesky-timeline-meta>Loading feed…</p>
+        </div>
+        <span class="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">Bluesky</span>
+      </div>
+      <div class="postline-feed__list" data-bluesky-timeline-list>
+        <p class="postline-feed__loading" data-bluesky-timeline-empty>Loading your timeline…</p>
+      </div>
+    </div>
   </section>
 
   <script>
@@ -30,13 +40,15 @@
       if (!root) return
 
       const button = root.querySelector('[data-bluesky-timeline-refresh]')
+      const refreshLabel = root.querySelector('[data-bluesky-timeline-refresh-label]')
       const list = root.querySelector('[data-bluesky-timeline-list]')
-      const empty = root.querySelector('[data-bluesky-timeline-empty]')
+      const meta = root.querySelector('[data-bluesky-timeline-meta]')
       const toast = window.postlineToast?.show
 
-      const setStatus = (message, tone = 'neutral', options = {}) => {
-        if (toast) toast({ message, tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info', title: options.title })
-      }
+      const ICON_REPLY = '<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.22 3.22A.75.75 0 0 1 8 3h7.25a.75.75 0 0 1 .53.22l3.25 3.25a.75.75 0 0 1 0 1.06l-3.25 3.25a.75.75 0 0 1-1.06-1.06L15.19 5.5H8.81l1.72 1.72a.75.75 0 1 1-1.06 1.06l-3.25-3.25a.75.75 0 0 1 0-1.06l3.25-3.25a.75.75 0 0 1 1.06 0ZM2.75 6A.75.75 0 0 1 3.5 5.25h7a.75.75 0 0 1 0 1.5h-7A.75.75 0 0 1 2.75 6Zm0 4.5a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H3.5a.75.75 0 0 1-.75-.75Zm0 4.5a.75.75 0 0 1 .75-.75h7a.75.75 0 0 1 0 1.5h-7a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd"/></svg>'
+      const ICON_REPOST = '<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.312 4.818A.75.75 0 0 0 14 4H6.5a.75.75 0 0 0 0 1.5h5.44l-3.97 3.97a.75.75 0 1 0 1.06 1.06l5.22-5.22a.75.75 0 0 0 0-1.06l-5.22-5.22a.75.75 0 0 0-1.06 1.06l3.97 3.97H6a2.75 2.75 0 0 0 0 5.5h8.312a.75.75 0 0 0 .53-.22l2.25-2.25a.75.75 0 0 0-1.06-1.06l-1.72 1.72H6a1.25 1.25 0 0 1 0-2.5h7.312a.75.75 0 0 0 .53-.22l2.25-2.25a.75.75 0 0 0 0-1.06l-2.25-2.25a.75.75 0 0 0-.53-.22Z" clip-rule="evenodd"/></svg>'
+      const ICON_LIKE = '<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M1.66 10.68a4.5 4.5 0 0 1 6.36-4.04l.54.22V4.5a.75.75 0 0 1 1.5 0v3.88l.54-.22a4.5 4.5 0 1 1 6.02 5.9 5.48 5.48 0 0 1-1.06 1.23l-4.2 4.2a.75.75 0 0 1-1.06 0l-4.2-4.2a5.48 5.48 0 0 1-1.06-1.23 4.5 4.5 0 0 1-.44-4.68Z"/></svg>'
+      const ICON_EXTERNAL = '<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h4a.75.75 0 0 1 0 1.5h-4Zm6.25-.75v4a.75.75 0 0 0 1.28.53l5.88-5.88a.75.75 0 0 0-1.06-1.06L11 7.94V3.5a.75.75 0 0 0-1.5 0Z" clip-rule="evenodd"/></svg>'
 
       const escapeHtml = (value) => String(value || '')
         .replaceAll('&', '&amp;')
@@ -45,44 +57,145 @@
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#039;')
 
+      const formatCount = (value) => {
+        const n = Number(value) || 0
+        if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+        if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`
+        return String(n)
+      }
+
+      const formatRelativeTime = (iso) => {
+        const date = new Date(iso)
+        if (Number.isNaN(date.getTime())) return ''
+        const diff = Date.now() - date.getTime()
+        const minutes = Math.floor(diff / 60000)
+        if (minutes < 1) return 'now'
+        if (minutes < 60) return `${minutes}m`
+        const hours = Math.floor(minutes / 60)
+        if (hours < 24) return `${hours}h`
+        const days = Math.floor(hours / 24)
+        if (days < 7) return `${days}d`
+        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      }
+
+      const avatarGradient = (handle) => {
+        let hash = 0
+        for (let i = 0; i < handle.length; i++) hash = handle.charCodeAt(i) + ((hash << 5) - hash)
+        const hues = [215, 168, 280, 32, 340, 128, 48, 12]
+        const hue = hues[Math.abs(hash) % hues.length]
+        return `--postline-avatar-a:hsl(${hue} 72% 58%);--postline-avatar-b:hsl(${hue} 68% 42%)`
+      }
+
+      const initials = (handle, name) => {
+        if (name) {
+          const parts = name.trim().split(/\s+/).slice(0, 2)
+          if (parts.length) return parts.map(part => part[0]?.toUpperCase() || '').join('')
+        }
+        return handle.replace(/[^a-z0-9]/gi, '').slice(0, 2).toUpperCase() || 'PL'
+      }
+
+      const profileUrl = (handle) => `https://bsky.app/profile/${encodeURIComponent(handle)}`
+
+      const postUrl = (item) => {
+        if (item.postUrl) return item.postUrl
+        const id = String(item.uri || '').split('/').pop()
+        return id ? `https://bsky.app/profile/${encodeURIComponent(item.authorHandle)}/post/${id}` : profileUrl(item.authorHandle)
+      }
+
+      const linkifyBody = (text) => {
+        const escaped = escapeHtml(text)
+        return escaped.replace(
+          /(https?:\/\/[^\s<]+)/g,
+          '<a class="postline-feed-post__link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
+        )
+      }
+
+      const renderSkeleton = () => {
+        if (!list) return
+        list.innerHTML = Array.from({ length: 4 }, () => `
+          <div class="postline-feed__skeleton">
+            <div class="postline-feed__skeleton-row">
+              <div class="postline-feed__skeleton-avatar"></div>
+              <div class="postline-feed__skeleton-lines">
+                <div class="postline-feed__skeleton-line postline-feed__skeleton-line--short"></div>
+                <div class="postline-feed__skeleton-line postline-feed__skeleton-line--medium"></div>
+                <div class="postline-feed__skeleton-line postline-feed__skeleton-line--long"></div>
+              </div>
+            </div>
+          </div>
+        `).join('')
+      }
+
       const renderItems = (items) => {
         if (!list || !Array.isArray(items)) return
         if (items.length === 0) {
-          list.innerHTML = '<p class="m-0 p-6 text-center text-sm text-zinc-500">No timeline posts yet. Publish or refresh again.</p>'
+          list.innerHTML = '<p class="postline-feed__empty">No posts in your feed yet. Publish from the composer or refresh again.</p>'
+          if (meta) meta.textContent = '0 posts'
           return
         }
-        empty?.remove()
-        list.innerHTML = items.map(item => `
-          <article class="p-3.5 bg-white border border-zinc-200 rounded-2xl shadow-sm">
-            <header class="flex gap-3 items-center justify-between mb-3">
-              <div>
-                <span class="block font-bold text-xs">${escapeHtml(item.authorHandle)}</span>
-                <span class="text-xs text-zinc-500">${escapeHtml(item.authorName || 'Bluesky')}</span>
+
+        if (meta) meta.textContent = `${items.length} post${items.length === 1 ? '' : 's'}`
+        list.innerHTML = items.map((item) => {
+          const handle = item.authorHandle || 'unknown.bsky.social'
+          const name = item.authorName || handle
+          const url = postUrl(item)
+          const avatarMarkup = item.authorAvatar
+            ? `<img src="${escapeHtml(item.authorAvatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+            : escapeHtml(initials(handle, name))
+
+          return `
+            <article class="postline-feed-post">
+              <div class="postline-feed-post__layout">
+                <a class="postline-feed-post__avatar" href="${escapeHtml(profileUrl(handle))}" target="_blank" rel="noopener noreferrer" style="${avatarGradient(handle)}" aria-label="${escapeHtml(name)}">${avatarMarkup}</a>
+                <div class="postline-feed-post__main">
+                  <div class="postline-feed-post__meta">
+                    <div class="postline-feed-post__identity">
+                      <div class="postline-feed-post__name-row">
+                        <a class="postline-feed-post__name" href="${escapeHtml(profileUrl(handle))}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>
+                        <a class="postline-feed-post__handle" href="${escapeHtml(profileUrl(handle))}" target="_blank" rel="noopener noreferrer">@${escapeHtml(handle)}</a>
+                        <span class="postline-feed-post__dot">·</span>
+                        <time class="postline-feed-post__time" datetime="${escapeHtml(item.postedAt)}">${escapeHtml(formatRelativeTime(item.postedAt))}</time>
+                      </div>
+                      <span class="postline-feed-post__provider">Bluesky</span>
+                    </div>
+                    <a class="postline-feed-post__open" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" aria-label="Open post on Bluesky" title="Open on Bluesky">${ICON_EXTERNAL}</a>
+                  </div>
+                  <p class="postline-feed-post__body">${linkifyBody(item.body || '')}</p>
+                  <div class="postline-feed-post__actions">
+                    <a class="postline-feed-post__stat" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${ICON_REPLY}<span>${formatCount(item.replyCount)}</span></a>
+                    <span class="postline-feed-post__stat">${ICON_REPOST}<span>${formatCount(item.repostCount)}</span></span>
+                    <span class="postline-feed-post__stat">${ICON_LIKE}<span>${formatCount(item.likeCount)}</span></span>
+                  </div>
+                </div>
               </div>
-              <a class="inline-flex items-center justify-center px-3 h-8 font-bold text-neutral-950 text-xs bg-white border border-zinc-200 rounded-lg shadow-sm" href="https://bsky.app/profile/${encodeURIComponent(item.authorHandle)}" target="_blank" rel="noreferrer">Open</a>
-            </header>
-            <p class="m-0 leading-normal text-[13px] text-slate-700 whitespace-pre-wrap">${escapeHtml(item.body)}</p>
-            <footer class="mt-3 text-xs text-zinc-500">${item.likeCount} likes / ${item.repostCount} reposts / ${item.replyCount} replies</footer>
-          </article>
-        `).join('')
+            </article>
+          `
+        }).join('')
       }
 
       const refresh = async () => {
         button?.setAttribute('disabled', 'disabled')
-        setStatus('Syncing Bluesky timeline...')
+        if (refreshLabel) refreshLabel.textContent = 'Refreshing…'
+        renderSkeleton()
+        if (meta) meta.textContent = 'Syncing…'
 
         try {
           const response = await fetch('/api/postline/bluesky/timeline?limit=30')
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky timeline sync failed.')
           renderItems(payload.data.items)
-          setStatus(`Synced ${payload.data.saved} timeline posts.`, 'success')
+          if (toast) toast({ title: 'Timeline', message: `Loaded ${payload.data.items?.length || 0} posts.`, tone: 'success', durationMs: 3200 })
         }
         catch (error) {
-          setStatus(error instanceof Error ? error.message : String(error), 'error')
+          if (list) {
+            list.innerHTML = `<p class="postline-feed__empty">${escapeHtml(error instanceof Error ? error.message : String(error))}</p>`
+          }
+          if (meta) meta.textContent = 'Could not load feed'
+          if (toast) toast({ title: 'Timeline', message: error instanceof Error ? error.message : String(error), tone: 'error' })
         }
         finally {
           button?.removeAttribute('disabled')
+          if (refreshLabel) refreshLabel.textContent = 'Refresh'
         }
       }
 

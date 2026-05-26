@@ -6,20 +6,29 @@ export interface PostlineToastOptions {
   tone?: PostlineToastTone
   url?: string
   durationMs?: number
+  /** Replaces an existing toast with this id (e.g. dismiss "Publishing" on success). */
+  id?: string
 }
 
 const ICONS: Record<PostlineToastTone, string> = {
-  success: 'i-hugeicons-checkmark-circle-02',
-  error: 'i-hugeicons-alert-circle',
-  info: 'i-hugeicons-information-circle',
-  neutral: 'i-hugeicons-notification-03',
+  success: `<svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>`,
+  error: `<svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-3a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 7Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>`,
+  info: `<svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 9 9Z" clip-rule="evenodd"/></svg>`,
+  neutral: `<svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path d="M10 2a6 6 0 0 0-6 6v3.586l-.707.707A1 1 0 0 0 4 14h12a1 1 0 0 0 .707-1.707L16 11.586V8a6 6 0 0 0-6-6Zm0 16a2 2 0 0 0 1.995-1.85L12 16h-4l.005.15A2 2 0 0 0 10 18Z"/></svg>`,
 }
 
-const TONE_STYLES: Record<PostlineToastTone, string> = {
-  success: 'border-emerald-200/90 bg-emerald-50 text-emerald-950',
-  error: 'border-red-200/90 bg-red-50 text-red-950',
-  info: 'border-blue-200/90 bg-blue-50 text-blue-950',
-  neutral: 'border-zinc-200/90 bg-white text-neutral-950',
+const SPINNER = `<svg class="postline-toast__spinner" viewBox="0 0 20 20" fill="none" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="2" stroke-opacity="0.25"/><path d="M17 10a7 7 0 0 0-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`
+
+const toastRegistry = new Map<string, HTMLElement>()
+let stylesheetLinked = false
+
+function ensureStyles(): void {
+  if (stylesheetLinked) return
+  stylesheetLinked = true
+  const link = document.createElement('link')
+  link.rel = 'stylesheet'
+  link.href = '/assets/styles/postline-toast.css'
+  document.head.append(link)
 }
 
 function host(): HTMLElement {
@@ -27,7 +36,7 @@ function host(): HTMLElement {
   if (!element) {
     element = document.createElement('div')
     element.id = 'postline-toast-host'
-    element.className = 'fixed bottom-6 right-6 z-[100] flex flex-col gap-2 pointer-events-none max-w-md w-[calc(100%-3rem)] sm:w-[22rem]'
+    element.className = 'pointer-events-none fixed bottom-6 right-6 z-[100] flex w-[calc(100%-2rem)] max-w-[22rem] flex-col-reverse gap-2.5 sm:right-6'
     element.setAttribute('aria-live', 'polite')
     element.setAttribute('aria-relevant', 'additions')
     document.body.append(element)
@@ -43,72 +52,104 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;')
 }
 
-function dismissToast(toast: HTMLElement): void {
-  toast.classList.add('opacity-0', 'translate-y-1')
-  window.setTimeout(() => toast.remove(), 180)
+function formatUrlLabel(url: string): string {
+  try {
+    const parsed = new URL(url)
+    const path = parsed.pathname.length > 36
+      ? `${parsed.pathname.slice(0, 36)}…`
+      : parsed.pathname
+    return `${parsed.hostname}${path}`
+  }
+  catch {
+    return url.length > 48 ? `${url.slice(0, 48)}…` : url
+  }
+}
+
+function dismissToast(toast: HTMLElement, id?: string): void {
+  if (id) toastRegistry.delete(id)
+  toast.classList.remove('is-visible')
+  toast.classList.add('is-leaving')
+  window.setTimeout(() => toast.remove(), 220)
+}
+
+function dismissToastById(id: string): void {
+  const existing = toastRegistry.get(id)
+  if (existing) dismissToast(existing, id)
 }
 
 export function showPostlineToast(options: PostlineToastOptions): void {
+  ensureStyles()
+
+  if (options.id) dismissToastById(options.id)
+
   const tone = options.tone ?? 'neutral'
-  const title = options.title ?? (tone === 'success' ? 'Done' : tone === 'error' ? 'Something went wrong' : 'Postline')
-  const durationMs = options.durationMs ?? (tone === 'error' ? 12000 : 9000)
+  const title = options.title ?? (tone === 'success' ? 'Published' : tone === 'error' ? 'Error' : tone === 'info' ? 'Working' : 'Postline')
+  const durationMs = options.durationMs ?? (tone === 'error' ? 12000 : tone === 'info' ? 0 : 8000)
+  const isLoading = tone === 'info' && /publish/i.test(title)
 
   const toast = document.createElement('div')
-  toast.className = `pointer-events-auto grid gap-3 p-3.5 border rounded-2xl shadow-[0_18px_54px_rgba(24,31,42,0.16)] transition-all duration-200 ${TONE_STYLES[tone]}`
+  toast.className = `postline-toast postline-toast--${tone}`
   toast.setAttribute('role', 'status')
 
-  const linkBlock = options.url
-    ? `<div class="grid gap-1.5">
-        <p class="m-0 text-sm leading-snug text-inherit/90">${escapeHtml(options.message)}</p>
-        <a class="block font-medium text-sm text-blue-700 underline underline-offset-2 break-all hover:text-blue-900" href="${escapeHtml(options.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(options.url)}</a>
-      </div>`
-    : `<p class="m-0 text-sm leading-snug text-inherit/90">${escapeHtml(options.message)}</p>`
+  const iconMarkup = isLoading ? SPINNER : ICONS[tone]
+
+  const bodyMarkup = options.url
+    ? `<p class="postline-toast__message">${escapeHtml(options.message)}</p>
+       <a class="postline-toast__url" href="${escapeHtml(options.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(options.url)}">${escapeHtml(formatUrlLabel(options.url))}</a>`
+    : `<p class="postline-toast__message">${escapeHtml(options.message)}</p>`
 
   toast.innerHTML = `
-    <div class="flex gap-3 items-start">
-      <span class="grid place-items-center shrink-0 h-9 w-9 rounded-xl bg-white/70 border border-black/5">
-        <span class="h-5 w-5 ${ICONS[tone]}" aria-hidden="true"></span>
-      </span>
-      <div class="grid flex-1 gap-1 min-w-0">
-        <div class="flex gap-2 items-start justify-between">
-          <strong class="text-sm font-bold">${escapeHtml(title)}</strong>
-          <button type="button" class="shrink-0 grid place-items-center h-7 w-7 text-inherit/60 hover:text-inherit rounded-lg hover:bg-black/5" aria-label="Dismiss notification" data-toast-dismiss>
-            <span class="h-4 w-4 i-hugeicons-cancel-01" aria-hidden="true"></span>
+    <div class="postline-toast__row">
+      <div class="postline-toast__icon">${iconMarkup}</div>
+      <div class="postline-toast__body">
+        <div class="postline-toast__header">
+          <strong class="postline-toast__title">${escapeHtml(title)}</strong>
+          <button type="button" class="postline-toast__close" aria-label="Dismiss" data-toast-dismiss>
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
           </button>
         </div>
-        ${linkBlock}
+        ${bodyMarkup}
       </div>
     </div>
     ${options.url
-      ? `<div class="flex flex-wrap gap-2">
-          <a class="inline-flex items-center justify-center px-3 h-8 text-xs font-bold text-white bg-neutral-950 rounded-lg" href="${escapeHtml(options.url)}" target="_blank" rel="noopener noreferrer">Open on Bluesky</a>
-          <button type="button" class="inline-flex items-center justify-center px-3 h-8 text-xs font-bold text-neutral-950 bg-white border border-zinc-200 rounded-lg" data-toast-copy>Copy link</button>
+      ? `<div class="postline-toast__actions">
+          <a class="postline-toast__btn postline-toast__btn--primary" href="${escapeHtml(options.url)}" target="_blank" rel="noopener noreferrer">Open on Bluesky</a>
+          <button type="button" class="postline-toast__btn postline-toast__btn--secondary" data-toast-copy>Copy link</button>
         </div>`
       : ''}
   `
 
-  toast.querySelector('[data-toast-dismiss]')?.addEventListener('click', () => dismissToast(toast))
+  toast.querySelector('[data-toast-dismiss]')?.addEventListener('click', () => dismissToast(toast, options.id))
   toast.querySelector('[data-toast-copy]')?.addEventListener('click', async () => {
     if (!options.url) return
     try {
       await navigator.clipboard.writeText(options.url)
-      showPostlineToast({ title: 'Copied', message: 'Post link copied to clipboard.', tone: 'success', durationMs: 3500 })
+      showPostlineToast({ title: 'Copied', message: 'Link copied to clipboard.', tone: 'success', durationMs: 2800 })
     }
     catch {
       showPostlineToast({ title: 'Copy failed', message: 'Could not copy the link.', tone: 'error', durationMs: 5000 })
     }
   })
 
+  if (options.id) toastRegistry.set(options.id, toast)
+
   host().prepend(toast)
-  window.setTimeout(() => dismissToast(toast), durationMs)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => toast.classList.add('is-visible'))
+  })
+
+  if (durationMs > 0) {
+    window.setTimeout(() => dismissToast(toast, options.id), durationMs)
+  }
 }
 
 declare global {
   interface Window {
     postlineToast?: {
       show: typeof showPostlineToast
+      dismiss: typeof dismissToastById
     }
   }
 }
 
-window.postlineToast = { show: showPostlineToast }
+window.postlineToast = { show: showPostlineToast, dismiss: dismissToastById }

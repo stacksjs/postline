@@ -60,13 +60,49 @@
         border-left-color: transparent !important;
         box-shadow: none !important;
       }
+
+      html.postline-sidebar-collapsed [data-postline-sidebar] {
+        overflow: visible;
+        pointer-events: none;
+      }
+
+      html.postline-sidebar-collapsed [data-shell-controls-row] {
+        display: none !important;
+      }
+
+      [data-sidebar-expand-fab] {
+        opacity: 0;
+        transform: translate3d(-6px, 0, 0) scale(0.94);
+        pointer-events: none;
+        transition:
+          opacity 220ms cubic-bezier(0.22, 1, 0.36, 1),
+          transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      html.postline-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fab] {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+        pointer-events: auto;
+      }
     </style>
+    <link rel="stylesheet" href="/assets/styles/postline-toast.css">
+    <link rel="stylesheet" href="/assets/styles/postline-timeline.css">
   </head>
   <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-[#f3f3f1]">
     <div class="grid grid-cols-1 lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] min-h-screen duration-200 ease-out transition-[grid-template-columns]" data-postline-app data-postline-shell>
       <PostlineSidebar />
 
-      <div class="min-w-0 bg-[#f3f3f1]" data-postline-content-shell>
+      <div class="relative min-w-0 bg-[#f3f3f1]" data-postline-content-shell>
+        <button
+          class="fixed top-3.5 left-3.5 z-[90] inline-flex items-center justify-center h-9 w-9 text-zinc-700 bg-white/95 border border-zinc-200/90 rounded-xl shadow-[0_8px_28px_rgba(24,31,42,0.12)] backdrop-blur-sm hover:bg-white hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60"
+          type="button"
+          aria-label="Expand sidebar"
+          title="Expand sidebar"
+          data-sidebar-expand-fab
+          data-no-window-drag
+        >
+          <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true"><path fill-rule="evenodd" d="M4.75 4a.75.75 0 0 0-.75.75v10.5c0 .414.336.75.75.75h2.5a.75.75 0 0 0 0-1.5H5.5V5.5h7.69l-1.22-1.22a.75.75 0 1 1 1.06-1.06l2.5 2.5a.75.75 0 0 1 0 1.06l-2.5 2.5a.75.75 0 1 1-1.06-1.06L13.19 11H5.5v5.25h1.75a.75.75 0 0 0 0 1.5h-2.5A.75.75 0 0 0 4.75 15V4.75Z" clip-rule="evenodd"/></svg>
+        </button>
         <section class="overflow-hidden min-h-screen min-w-0 bg-[#f3f3f1] border-l border-t border-zinc-200/80 rounded-tl-[28px] shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace data-window-drag-region>
           <main class="p-3.5 sm:p-4 min-w-0" data-postline-router>
             @yield('content')
@@ -74,7 +110,7 @@
         </section>
       </div>
     </div>
-    <div id="postline-toast-host" class="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 pointer-events-none max-w-md w-[calc(100%-3rem)] sm:w-[22rem]" aria-live="polite" aria-relevant="additions"></div>
+    <div id="postline-toast-host" class="pointer-events-none fixed bottom-6 right-6 z-[100] flex w-[calc(100%-2rem)] max-w-[22rem] flex-col-reverse gap-2.5 sm:right-6" aria-live="polite" aria-relevant="additions"></div>
     <script type="module" src="/assets/scripts/postline-toast.ts"></script>
     <script type="module" src="/assets/scripts/postline-bluesky.ts"></script>
     <script type="module" src="/assets/scripts/postline-analytics.ts"></script>
@@ -85,19 +121,23 @@
           const sidebar = document.querySelector('[data-postline-sidebar]')
           const button = document.querySelector('[data-sidebar-collapse]')
           const collapseIcon = document.querySelector('[data-sidebar-collapse-icon]')
+          const expandFab = document.querySelector('[data-sidebar-expand-fab]')
 
           shell?.style.setProperty('--postline-sidebar-width', collapsed ? '0px' : '286px')
           document.documentElement.style.setProperty('--postline-sidebar-width', collapsed ? '0px' : '286px')
           document.documentElement.classList.toggle('postline-sidebar-collapsed', collapsed)
           document.documentElement.dataset.stxSidebarCollapsed = collapsed ? 'true' : 'false'
           if (shell?.dataset) shell.dataset.sidebarCollapsed = collapsed ? 'true' : 'false'
-          sidebar?.classList.remove('opacity-0', 'pointer-events-none')
+          sidebar?.classList.remove('opacity-0')
           sidebar?.classList.toggle('px-5', !collapsed)
           sidebar?.classList.toggle('pt-[68px]', !collapsed)
           sidebar?.classList.toggle('pb-5', !collapsed)
           sidebar?.setAttribute('aria-hidden', String(collapsed))
-          if (sidebar) sidebar.style.width = collapsed ? '0px' : ''
-          if (sidebar) sidebar.style.overflow = collapsed ? 'visible' : ''
+          if (sidebar) {
+            sidebar.style.width = collapsed ? '0px' : ''
+            sidebar.style.minWidth = collapsed ? '0px' : ''
+            sidebar.style.overflow = collapsed ? 'visible' : ''
+          }
 
           document.querySelectorAll('[data-sidebar-expanded]').forEach(element => {
             element.classList.toggle('hidden', collapsed)
@@ -108,22 +148,33 @@
 
           button?.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar')
           button?.setAttribute('aria-expanded', String(!collapsed))
-          collapseIcon?.classList.toggle('rotate-180', collapsed)
+          if (collapseIcon instanceof SVGElement)
+            collapseIcon.style.transform = collapsed ? 'rotate(180deg)' : ''
+          else
+            collapseIcon?.classList.toggle('rotate-180', collapsed)
+          expandFab?.setAttribute('aria-hidden', String(!collapsed))
           window.localStorage?.setItem('postline.sidebar.collapsed', collapsed ? 'true' : 'false')
           window.craft?.window?.setWebSidebarCollapsed?.(collapsed).catch?.(() => {})
           syncNativeShell()
         }
 
         const bindSidebarCollapse = () => {
+          const initial = window.localStorage?.getItem('postline.sidebar.collapsed') === 'true'
+          syncSidebarCollapse(initial)
+
           document.querySelectorAll('[data-sidebar-collapse]').forEach(button => {
             if (button.dataset.bound === 'true') return
             button.dataset.bound = 'true'
-            const initial = window.localStorage?.getItem('postline.sidebar.collapsed') === 'true'
-            syncSidebarCollapse(initial)
             button.addEventListener('click', () => {
               const collapsed = button.getAttribute('aria-expanded') === 'true'
               syncSidebarCollapse(collapsed)
             })
+          })
+
+          document.querySelectorAll('[data-sidebar-expand-fab]').forEach(button => {
+            if (button.dataset.bound === 'true') return
+            button.dataset.bound = 'true'
+            button.addEventListener('click', () => syncSidebarCollapse(false))
           })
         }
 
@@ -173,11 +224,7 @@
           }
 
           if (collapsed) {
-            row.style.position = 'fixed'
-            row.style.top = '14px'
-            row.style.left = '14px'
-            row.style.right = 'auto'
-            row.style.zIndex = '80'
+            row.style.display = 'none'
             sidebar.style.paddingTop = '0px'
             return
           }
@@ -186,9 +233,11 @@
             element.classList.add('hidden')
             element.style.display = 'none'
           })
+          row.style.display = ''
           row.removeAttribute('style')
-          row.style.removeProperty('display')
           row.style.removeProperty('position')
+          row.style.removeProperty('top')
+          row.style.removeProperty('left')
           row.style.removeProperty('z-index')
           sidebar.style.removeProperty('padding-top')
         }

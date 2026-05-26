@@ -122,6 +122,8 @@ export interface TimelineResult {
     uri: string
     authorHandle: string
     authorName?: string
+    authorAvatar?: string
+    postUrl?: string
     body: string
     postedAt: string
     likeCount: number

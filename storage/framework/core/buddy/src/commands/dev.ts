@@ -387,6 +387,7 @@ export async function startDevelopmentServer(_options: DevOptions, _startTime?: 
     closeNativeApp?.()
     void unregisterRpxProxies(activeRpxRegistryIds)
     activeRpxRegistryIds.length = 0
+    void reconcileRpxDnsAfterDevExit()
     try { process.kill(-process.pid, 'SIGTERM') }
     catch {
       // Process group may not exist (e.g., not session leader) — try the
@@ -865,160 +866,6 @@ async function waitForPort(port: number, timeoutMs: number): Promise<boolean> {
  * or our bootstrap script.
  */
 const RPX_SSL_DIR = join(homedir(), '.stacks', 'ssl')
-const RPX_ROOT_CA_PATH = join(RPX_SSL_DIR, 'rpx-root-ca.crt')
-const RPX_HOST_CERT_PATH = join(RPX_SSL_DIR, 'rpx.localhost.crt')
-const LOGIN_KEYCHAIN = join(homedir(), 'Library/Keychains/login.keychain-db')
-
-function normalizeSha256Fingerprint(raw: string): string {
-  const value = raw.includes('=') ? raw.split('=').pop()! : raw
-  return value.replace(/SHA-256\s+hash:\s*/gi, '').replace(/:/g, '').trim().toUpperCase()
-}
-
-function readCertFingerprint(certPath: string): string | null {
-  try {
-    const out = execSync(`openssl x509 -noout -fingerprint -sha256 -in "${certPath}"`, { encoding: 'utf8' })
-    return normalizeSha256Fingerprint(out)
-  }
-  catch {
-    return null
-  }
-}
-
-/**
- * True when the on-disk rpx Root CA fingerprint appears in a keychain Chrome/Safari use.
- */
-function isRpxRootCaInKeychain(caPath: string): boolean {
-  const fp = readCertFingerprint(caPath)
-  if (!fp)
-    return false
-
-  const keychains = [
-    '/Library/Keychains/System.keychain',
-    LOGIN_KEYCHAIN,
-  ]
-
-  for (const keychain of keychains) {
-    try {
-      const listing = execSync(`security find-certificate -a -Z "${keychain}" 2>/dev/null || true`, { encoding: 'utf8' })
-      for (const line of listing.split('\n')) {
-        if (line.toUpperCase().includes('SHA-256') && normalizeSha256Fingerprint(line) === fp)
-          return true
-      }
-    }
-    catch { /* try next keychain */ }
-  }
-
-  return false
-}
-
-function execSudoSh(command: string): void {
-  const sudoPassword = process.env.SUDO_PASSWORD
-  const escaped = command.replace(/'/g, `'\\''`)
-  if (sudoPassword)
-    execSync(`echo '${sudoPassword}' | sudo -S sh -c '${escaped}' 2>/dev/null`, { stdio: ['pipe', 'pipe', 'pipe'] })
-  else
-    execSync(`sudo sh -c '${escaped}'`, { stdio: 'inherit' })
-}
-
-/** Chrome/Edge need SSL + basic trust policies — plain trustRoot often leaves "trust settings: 0". */
-const MACOS_CA_TRUST_FLAGS = '-d -r trustRoot -p ssl -p basic'
-
-function listRpxRootCaHashesInKeychain(keychain: string): string[] {
-  const listing = execSync(
-    `security find-certificate -a -c "rpx.localhost" -Z "${keychain}" 2>/dev/null || true`,
-    { encoding: 'utf8' },
-  )
-  const hashes: string[] = []
-  for (const line of listing.split('\n')) {
-    const match = line.match(/SHA-256 hash:\s*([A-F0-9]+)/i)
-    if (match)
-      hashes.push(match[1]!.toUpperCase())
-  }
-  return hashes
-}
-
-function pruneStaleRpxRootCas(caPath: string): void {
-  if (process.platform !== 'darwin')
-    return
-
-  const keep = readCertFingerprint(caPath)
-  if (!keep)
-    return
-
-  for (const keychain of ['/Library/Keychains/System.keychain', LOGIN_KEYCHAIN]) {
-    for (const hash of listRpxRootCaHashesInKeychain(keychain)) {
-      if (hash === keep)
-        continue
-      try {
-        if (keychain.startsWith('/Library'))
-          execSudoSh(`security delete-certificate -Z ${hash} "${keychain}"`)
-        else
-          execSync(`security delete-certificate -Z ${hash} "${keychain}"`, { stdio: 'ignore' })
-      }
-      catch { /* already removed */ }
-    }
-  }
-}
-
-function isRpxRootCaTrustedForSsl(caPath: string, serverName: string): boolean {
-  if (process.platform !== 'darwin')
-    return isRpxRootCaInKeychain(caPath)
-
-  try {
-    const out = execSync(
-      `security verify-cert -c "${caPath}" -s "${serverName}" -l -L -R ssl 2>&1`,
-      { encoding: 'utf8' },
-    )
-    return out.includes('successful')
-  }
-  catch {
-    return false
-  }
-}
-
-function trustRpxRootCaForBrowsers(caPath: string, serverName: string): boolean {
-  if (process.platform !== 'darwin')
-    return false
-
-  pruneStaleRpxRootCas(caPath)
-
-  try {
-    execSync(
-      `security add-trusted-cert ${MACOS_CA_TRUST_FLAGS} -k "${LOGIN_KEYCHAIN}" "${caPath}"`,
-      { stdio: 'ignore' },
-    )
-  }
-  catch { /* may already exist — re-apply trust below */ }
-
-  try {
-    execSudoSh(`security add-trusted-cert ${MACOS_CA_TRUST_FLAGS} -k /Library/Keychains/System.keychain "${caPath}"`)
-  }
-  catch {
-    return false
-  }
-
-  return isRpxRootCaTrustedForSsl(caPath, serverName)
-    || isRpxRootCaInKeychain(caPath)
-}
-
-/**
- * True when :443 presents a chain signed by the current ~/.stacks/ssl/rpx-root-ca.crt.
- */
-function isLiveHttpsChainValid(domain: string): boolean {
-  if (!existsSync(RPX_ROOT_CA_PATH))
-    return false
-
-  try {
-    const out = execSync(
-      `echo | openssl s_client -connect ${domain}:443 -servername ${domain} -CAfile "${RPX_ROOT_CA_PATH}" 2>/dev/null | grep "Verify return code"`,
-      { encoding: 'utf8', timeout: 4000 },
-    )
-    return out.includes(': 0 (ok)')
-  }
-  catch {
-    return false
-  }
-}
 
 function buildDevelopmentTlsHostnames(domain: string, includeDashboard: boolean): string[] {
   // App domain must be first — it becomes the cert CN. Safari/Chrome surface CN in
@@ -1032,22 +879,12 @@ function buildDevelopmentTlsHostnames(domain: string, includeDashboard: boolean)
   ]
 }
 
-function readCertCommonName(certPath: string): string | null {
-  try {
-    const subject = execSync(`openssl x509 -in "${certPath}" -noout -subject -nameopt RFC2253`, { encoding: 'utf8' })
-    const match = subject.match(/CN=([^,/]+)/)
-    return match?.[1]?.trim() ?? null
-  }
-  catch {
-    return null
-  }
-}
-
 function buildDevelopmentTlsOptions(domain: string, includeDashboard: boolean, verbose: boolean) {
   const hostnames = buildDevelopmentTlsHostnames(domain, includeDashboard)
+  const sharedCert = join(RPX_SSL_DIR, 'rpx.localhost.crt')
   return {
     https: {
-      certPath: RPX_HOST_CERT_PATH,
+      certPath: sharedCert,
       keyPath: join(RPX_SSL_DIR, 'rpx.localhost.key'),
       caCertPath: join(RPX_SSL_DIR, 'rpx.localhost.ca.crt'),
       commonName: domain,
@@ -1070,27 +907,28 @@ async function ensureRpxDevelopmentHttps(
 ): Promise<void> {
   const verbose = options.verbose ?? false
   const {
+    certIncludesSanHostnames,
     checkExistingCertificates,
     clearSslConfigCache,
     forceTrustCertificate,
     generateCertificate,
+    getRootCAPaths,
     isDaemonRunning,
+    isRootCaTrustedForSsl,
+    readCertCommonName,
     stopDaemon,
+    trustRootCaForBrowsers,
+    verifyHttpsChain,
   } = await import('@stacksjs/rpx')
+
+  const { caCertPath: rootCaPath } = getRootCAPaths(RPX_SSL_DIR)
+  const sharedCert = join(RPX_SSL_DIR, 'rpx.localhost.crt')
 
   const hostnames = buildDevelopmentTlsHostnames(domain, includeDashboard)
   const tlsOptions = buildDevelopmentTlsOptions(domain, includeDashboard, verbose)
 
-  const hostnameInCert = hostnames.every((host) => {
-    try {
-      const text = execSync(`openssl x509 -in "${RPX_HOST_CERT_PATH}" -noout -text`, { encoding: 'utf8' })
-      return text.includes(`DNS:${host}`)
-    }
-    catch {
-      return false
-    }
-  })
-  const cnMatchesApp = readCertCommonName(RPX_HOST_CERT_PATH) === domain
+  const hostnameInCert = certIncludesSanHostnames(sharedCert, hostnames)
+  const cnMatchesApp = readCertCommonName(sharedCert) === domain
 
   let certRegenerated = false
   const existing = await checkExistingCertificates(tlsOptions)
@@ -1100,12 +938,12 @@ async function ensureRpxDevelopmentHttps(
     certRegenerated = true
   }
 
-  const trusted = isRpxRootCaTrustedForSsl(RPX_ROOT_CA_PATH, domain)
+  const trusted = isRootCaTrustedForSsl(rootCaPath, domain, { verbose })
   if (!trusted) {
     void (async () => {
-      const nowTrusted = trustRpxRootCaForBrowsers(RPX_ROOT_CA_PATH, domain)
-        || await forceTrustCertificate(RPX_ROOT_CA_PATH)
-        || isRpxRootCaTrustedForSsl(RPX_ROOT_CA_PATH, domain)
+      const nowTrusted = trustRootCaForBrowsers(rootCaPath, { serverName: domain, verbose })
+        || await forceTrustCertificate(rootCaPath, { serverName: domain, verbose })
+        || isRootCaTrustedForSsl(rootCaPath, domain, { verbose })
       if (verbose) {
         if (nowTrusted)
           console.log(`  ${green('✓')}  ${dim('HTTPS')}:         ${dim('Local certificate trusted for SSL')}`)
@@ -1118,7 +956,7 @@ async function ensureRpxDevelopmentHttps(
     console.log(`  ${green('✓')}  ${dim('HTTPS')}:         ${dim('Local certificate trusted for SSL')}`)
   }
 
-  const chainOk = isLiveHttpsChainValid(domain)
+  const chainOk = verifyHttpsChain(domain, rootCaPath)
 
   // Stop a running daemon only when TLS material changed — registerRpxProxiesForDomain
   // starts the daemon afterward. Do not stop merely because chainOk is false while
@@ -1195,6 +1033,15 @@ function buildRpxProxySpecs(input: {
       ? [{ id: `${domain}-dashboard`, from: `localhost:${dashboardPort}`, to: dashboardDomain }]
       : []),
   ]
+}
+
+/** Drop stale macOS DNS overrides when dev exits and the shared daemon is idle. */
+async function reconcileRpxDnsAfterDevExit(): Promise<void> {
+  try {
+    const { reconcileDevelopmentDnsOnIdle } = await import('@stacksjs/rpx')
+    await reconcileDevelopmentDnsOnIdle()
+  }
+  catch { /* rpx not installed or API not yet published */ }
 }
 
 async function unregisterRpxProxies(ids: string[]): Promise<void> {
