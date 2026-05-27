@@ -369,6 +369,14 @@ export async function startDevelopmentServer(_options: DevOptions, _startTime?: 
   const rpxTlsPreflight = hasCustomDomain && domain
     ? prepareRpxTlsForDev({ domain, includeDashboard, options })
     : Promise.resolve()
+  // The HTTPS proxy is optional. This preflight is only awaited later (inside the
+  // readiness handler, behind the frontend port probe), so without a handler
+  // attached now an early failure — e.g. an @stacksjs/rpx build that predates the
+  // TLS helpers `ensureRpxDevelopmentHttps` calls — would surface as an unhandled
+  // rejection and kill the dev server before the frontend even binds. Attaching a
+  // no-op catch keeps the rejection "handled"; the real await below still reports
+  // it as a warning and the dev server degrades to http://localhost.
+  void rpxTlsPreflight.catch(() => {})
 
   // Clean up child processes on exit to prevent orphaned processes.
   //
@@ -482,6 +490,7 @@ export async function startDevelopmentServer(_options: DevOptions, _startTime?: 
         catch (error) {
           const message = error instanceof Error ? error.message : String(error)
           console.log(`  ${yellow('⚠')}  ${yellow('HTTPS proxy unavailable')}: ${message}`)
+          console.log(`  ${dim('    ')}${dim(`Use http://localhost:${frontendPort} (API http://localhost:${apiPort})`)}`)
           if (options.verbose) {
             console.log(`  ${dim('    ')}${dim('Set SUDO_PASSWORD in .env and restart `./buddy dev`')}`)
             console.log(`  ${dim('    ')}${dim(`Trust CA: sh ${join(RPX_SSL_DIR, 'trust-rpx-cert.sh')}`)}`)
