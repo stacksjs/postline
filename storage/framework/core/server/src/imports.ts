@@ -409,7 +409,12 @@ export async function injectGlobalAutoImports(): Promise<void> {
     ])
   }
 
-  for (const [pkg, names] of primitiveModules) {
+  // Import every primitive concurrently. They're independent packages that
+  // export distinct global names, so the order they resolve in doesn't matter —
+  // only that all of them land on globalThis before the user barrel loads (the
+  // await below). Parallelizing overlaps their module I/O instead of paying for
+  // each import end-to-end in sequence.
+  await Promise.all(primitiveModules.map(async ([pkg, names]) => {
     try {
       const mod = await importWithTimeout(pkg)
       for (const name of names) {
@@ -420,7 +425,7 @@ export async function injectGlobalAutoImports(): Promise<void> {
     catch (err) {
       errors.push(err as Error)
     }
-  }
+  }))
 
   // Now that every framework primitive is fully evaluated and globalThis-ed,
   // it's safe to load the user's auto-import barrel: models can read
