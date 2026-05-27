@@ -988,7 +988,7 @@ async function resolveRpxDaemonSpawnCommand(): Promise<string[]> {
   // Prefer the in-repo bootstrap over a global `rpx` binary. The compiled CLI
   // is often launched from a Stacks app directory and can load that app's Bun
   // plugins (e.g. preloader.ts), which prevents the daemon from binding :443.
-  const bootstrap = join(dirname(fileURLToPath(import.meta.url)), '../scripts/rpx-daemon-bootstrap.ts')
+  const bootstrap = join(dirname(fileURLToPath(import.meta.url)), '../../scripts/rpx-daemon-bootstrap.ts')
   if (existsSync(bootstrap))
     return [process.execPath, bootstrap]
 
