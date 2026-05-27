@@ -23,3 +23,22 @@ route.group({ prefix: '/postline/bluesky' }, () => {
   route.get('/link-preview', 'Actions/Postline/BlueskyLinkPreviewAction').skipCsrf()
   route.get('/timeline', 'Actions/Postline/BlueskyTimelineAction').skipCsrf()
 })
+
+route.group({ prefix: '/postline/linkedin' }, () => {
+  route.get('/status', 'Actions/Postline/LinkedInStatusAction').skipCsrf()
+  route.post('/connect', 'Actions/Postline/LinkedInConnectAction').skipCsrf()
+  route.get('/auth', 'Actions/Postline/LinkedInAuthAction').skipCsrf()
+  route.get('/callback', 'Actions/Postline/LinkedInCallbackAction').skipCsrf()
+})
+
+route.group({ prefix: '/postline/instagram' }, () => {
+  route.get('/status', 'Actions/Postline/InstagramStatusAction').skipCsrf()
+  route.post('/connect', 'Actions/Postline/InstagramConnectAction').skipCsrf()
+  route.get('/auth', 'Actions/Postline/InstagramAuthAction').skipCsrf()
+  route.get('/callback', 'Actions/Postline/InstagramCallbackAction').skipCsrf()
+})
+
+route.group({ prefix: '/postline' }, () => {
+  route.get('/providers', 'Actions/Postline/ProvidersStatusAction').skipCsrf()
+  route.post('/publish', 'Actions/Postline/CrosspostPublishAction').skipCsrf()
+})
