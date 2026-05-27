@@ -113,6 +113,9 @@
     <div id="postline-toast-host" class="pointer-events-none fixed bottom-6 right-6 z-[100] flex w-[calc(100%-2rem)] max-w-[22rem] flex-col-reverse gap-2.5 sm:right-6" aria-live="polite" aria-relevant="additions"></div>
     <script type="module" src="/assets/scripts/postline-toast.ts"></script>
     <script type="module" src="/assets/scripts/postline-bluesky.ts"></script>
+    <script type="module" src="/assets/scripts/postline-linkedin.ts"></script>
+    <script type="module" src="/assets/scripts/postline-instagram.ts"></script>
+    <script type="module" src="/assets/scripts/postline-social.ts"></script>
     <script type="module" src="/assets/scripts/postline-analytics.ts"></script>
     <script>
       ;(() => {
