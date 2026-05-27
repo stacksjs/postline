@@ -5,11 +5,14 @@
 
 @section('content')
   <section class="grid gap-5" data-postline-page="accounts" data-testid="accounts-page">
+    <!-- Crosswind safelist: connection status-pill colors are set dynamically
+        via JS, so list them in static markup for the CSS scanner. -->
+    <div class="hidden text-amber-800 text-emerald-700 text-zinc-500 bg-amber-50 bg-emerald-50 border-amber-200 border-emerald-200 border-zinc-200" aria-hidden="true"></div>
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Accounts</p>
         <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Publishing drivers</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">Connect Bluesky and LinkedIn to publish and crosspost from Postline.</p>
+        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">Connect Bluesky, LinkedIn, and Instagram to publish and crosspost from Postline.</p>
       </div>
     </header>
 
