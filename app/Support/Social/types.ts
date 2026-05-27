@@ -48,6 +48,29 @@ export interface PublishedPost {
   url?: string
 }
 
+/** Optional content attached to a post: a link card and/or media. */
+export interface PublishContent {
+  external?: {
+    uri: string
+    title: string
+    description?: string
+  }
+  media?: Array<{
+    url: string
+    altText?: string
+  }>
+}
+
+/** Outcome of publishing one post to a single provider during a crosspost. */
+export interface CrosspostTargetResult {
+  provider: SocialProvider
+  ok: boolean
+  url?: string
+  uri?: string
+  targetId?: number
+  error?: string
+}
+
 export interface TimelineQuery {
   cursor?: string
   limit?: number
