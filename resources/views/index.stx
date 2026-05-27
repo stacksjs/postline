@@ -5,6 +5,10 @@
 
 @section('content')
   <section class="grid gap-3.5" data-postline-page="composer" data-testid="composer-page">
+    <!-- Crosswind safelist: utilities applied dynamically from the script below
+        (provider toggles, active-post highlight, connection summary, char
+        counter) must appear in static markup so the CSS scanner emits them. -->
+    <div class="hidden text-amber-700 text-emerald-800 text-neutral-950 text-red-700 text-white text-zinc-400 text-zinc-500 text-zinc-600 bg-emerald-400 bg-emerald-50 bg-emerald-500 bg-neutral-950 bg-white bg-zinc-100 bg-zinc-300 bg-zinc-50 hover:bg-white border-blue-300 border-emerald-200 border-neutral-950 border-zinc-200 shadow-sm cursor-not-allowed" aria-hidden="true"></div>
     <div class="grid">
       <section class="grid content-start grid-rows-[auto_auto_auto] self-start bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Post composer">
         <header class="flex flex-wrap gap-3 items-center justify-between p-3 border-b border-zinc-200">
@@ -162,7 +166,7 @@
       const renderProviderToggles = () => {
         if (!providerToggles) return
         if (providers.length === 0) {
-          providerToggles.innerHTML = '<span class="flex items-center px-2.5 min-h-8 text-xs text-zinc-400 bg-zinc-50 border border-zinc-200 rounded-xl">No accounts yet — connect one on Accounts.</span>'
+          providerToggles.innerHTML = '<a class="inline-flex items-center px-2.5 min-h-8 text-xs text-zinc-500 bg-zinc-50 hover:bg-white border border-zinc-200 rounded-xl transition-colors" href="/accounts" data-stx-link>No accounts yet — connect one →</a>'
           return
         }
         providerToggles.replaceChildren(...providers.map(createProviderToggle))
@@ -428,6 +432,7 @@
         const post = createPost(postCounter, options.text || '')
         postsRoot?.append(post)
         renamePosts()
+        applyMaxLength()
         selectPost(post, { skipSave: true })
         if (options.focus !== false) textareaFor(post)?.focus()
         if (options.announce !== false) setStatus(`Added post ${allPosts().length}.`, 'success')
