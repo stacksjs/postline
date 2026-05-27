@@ -10,9 +10,9 @@
         <header class="flex flex-wrap gap-3 items-center justify-between p-3 border-b border-zinc-200">
           <div class="flex gap-2 items-center">
             <strong class="text-[13px]">New post</strong>
-            <a class="inline-flex gap-1.5 items-center px-2.5 min-h-7 text-xs font-bold border rounded-lg transition-colors border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-white" href="/accounts" data-stx-link data-bluesky-connection data-no-window-drag>
-              <span class="h-2 w-2 rounded-full bg-zinc-300" data-bluesky-connection-dot aria-hidden="true"></span>
-              <span data-bluesky-connection-label>Checking Bluesky…</span>
+            <a class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-bold text-xs text-zinc-600 bg-zinc-50 hover:bg-white border border-zinc-200 rounded-lg transition-colors" href="/accounts" data-stx-link data-bluesky-connection data-no-window-drag>
+              <span class="h-2 w-2 bg-zinc-300 rounded-full" data-bluesky-connection-dot aria-hidden="true"></span>
+              <span data-bluesky-connection-label>Checking accounts…</span>
             </a>
           </div>
           <div class="grid grid-cols-3 p-0.5 bg-zinc-100 border border-zinc-200 rounded-xl" role="group" aria-label="Post mode">
@@ -23,11 +23,13 @@
         </header>
 
         <div class="grid p-3">
-          <div class="flex flex-wrap gap-2 mb-2.5">
-            <div class="flex items-center px-2.5 min-h-8 text-xs font-bold text-zinc-700 bg-zinc-50 border border-zinc-200 rounded-xl">Bluesky</div>
-            <div class="flex items-center px-2.5 min-h-8 text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-xl">Publish now</div>
-            <div class="flex items-center px-2.5 min-h-8 text-xs text-zinc-500 bg-zinc-50 border border-zinc-200 rounded-xl">Public</div>
+          <div class="flex flex-wrap gap-2 mb-2.5" data-provider-toggles role="group" aria-label="Crosspost targets">
+            <span class="flex items-center px-2.5 min-h-8 text-xs text-zinc-400 bg-zinc-50 border border-zinc-200 rounded-xl" data-provider-empty>Loading accounts…</span>
           </div>
+          <label class="hidden gap-2 items-center mb-2.5" data-compose-image-row>
+            <span class="h-4 w-4 text-zinc-500 i-hugeicons-image-01" aria-hidden="true"></span>
+            <input class="px-3 h-9 w-full text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" type="url" inputmode="url" placeholder="Image URL (required for Instagram)" aria-label="Image URL for Instagram" data-compose-image>
+          </label>
           <div class="grid overflow-y-auto content-start gap-4 pr-1 max-h-72" data-composer-posts>
             <article class="grid gap-2 pb-3 last:pb-0 border-b border-zinc-100 last:border-b-0" data-composer-post data-active="true">
               <header class="flex gap-3 items-center justify-between">
@@ -39,7 +41,7 @@
                   <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
                 </button>
               </header>
-              <textarea class="min-h-24 w-full leading-relaxed text-[18px] text-neutral-950 bg-transparent border-0 outline-none resize-none placeholder:text-zinc-400" spellcheck="true" aria-label="Post body 1" maxlength="300" placeholder="What do you want to share on Bluesky?" data-bluesky-text></textarea>
+              <textarea class="min-h-24 w-full leading-relaxed text-[18px] text-neutral-950 placeholder:text-zinc-400 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" maxlength="300" placeholder="What do you want to share?" data-bluesky-text></textarea>
               <div class="hidden overflow-hidden bg-zinc-50 border border-zinc-200 rounded-2xl" data-link-preview></div>
             </article>
           </div>
@@ -79,7 +81,9 @@
       const publishLabel = root.querySelector('[data-bluesky-publish-label]')
       const buttons = Array.from(root.querySelectorAll('[data-bluesky-publish], [data-bluesky-publish-top]'))
       const toast = window.postlineToast?.show
-      const blueskyApi = window.postlineBluesky
+      const providerToggles = root.querySelector('[data-provider-toggles]')
+      const composeImageRow = root.querySelector('[data-compose-image-row]')
+      const composeImage = root.querySelector('[data-compose-image]')
       const postsRoot = root.querySelector('[data-composer-posts]')
       const addPostButton = root.querySelector('[data-add-post]')
       const previewButton = root.querySelector('[data-preview-post]')
@@ -97,6 +101,8 @@
       let draftSaveTimer
 
       let canPublish = false
+      let providers = []
+      const selected = new Set()
 
       const setStatus = (message, tone = 'neutral', options = {}) => {
         if (toast) {
@@ -112,34 +118,112 @@
         console.log(`[postline] ${message}`)
       }
 
-      const applyConnection = (status) => {
-        if (!status) return
-        canPublish = Boolean(status.canPublish)
-        const label = blueskyApi?.formatConnectionLabel(status) || 'Bluesky'
-        if (connectionLabel) connectionLabel.textContent = label
-        connection?.classList.toggle('border-emerald-200', canPublish)
-        connection?.classList.toggle('bg-emerald-50', canPublish)
-        connection?.classList.toggle('text-emerald-800', canPublish)
-        connection?.classList.toggle('border-amber-200', !canPublish && Boolean(status.handle))
-        connection?.classList.toggle('bg-amber-50', !canPublish && Boolean(status.handle))
-        connection?.classList.toggle('text-amber-900', !canPublish && Boolean(status.handle))
-        connectionDot?.classList.toggle('bg-emerald-500', canPublish)
-        connectionDot?.classList.toggle('bg-amber-500', !canPublish && Boolean(status.handle))
-        connectionDot?.classList.toggle('bg-zinc-300', !canPublish && !status.handle)
-        buttons.forEach(button => {
+      const providerLabel = provider => window.postlineSocial?.providerLabel(provider) || provider
+      const connectedProviders = () => providers.filter(provider => provider.canPublish)
+      const selectedConnected = () => connectedProviders().filter(provider => selected.has(provider.provider))
+
+      const effectiveLimit = () => {
+        const limits = selectedConnected().map(provider => provider.characterLimit).filter(Boolean)
+        return limits.length ? Math.min(...limits) : 300
+      }
+
+      const applyMaxLength = () => {
+        const limit = effectiveLimit()
+        allPosts().forEach((post) => {
+          textareaFor(post)?.setAttribute('maxlength', String(limit))
+        })
+      }
+
+      const toggleClass = (isSelected, connected) => {
+        const base = 'inline-flex gap-1.5 items-center px-2.5 min-h-8 text-xs font-bold border rounded-xl transition-colors'
+        if (!connected) return `${base} border-zinc-200 bg-zinc-50 text-zinc-400 cursor-not-allowed`
+        return isSelected
+          ? `${base} border-neutral-950 bg-neutral-950 text-white`
+          : `${base} border-zinc-200 bg-zinc-50 text-zinc-600 hover:bg-white`
+      }
+
+      const createProviderToggle = (status) => {
+        const label = providerLabel(status.provider)
+        const isSelected = selected.has(status.provider) && status.canPublish
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.dataset.providerToggle = status.provider
+        button.setAttribute('aria-pressed', isSelected ? 'true' : 'false')
+        button.className = toggleClass(isSelected, status.canPublish)
+        if (!status.canPublish) {
+          button.setAttribute('disabled', 'disabled')
+          button.title = `Connect ${label} on the Accounts page to crosspost here.`
+        }
+        const dot = isSelected ? 'bg-emerald-400' : 'bg-zinc-300'
+        button.innerHTML = `<span class="h-2 w-2 rounded-full ${dot}" aria-hidden="true"></span><span>${label}</span>`
+        return button
+      }
+
+      const renderProviderToggles = () => {
+        if (!providerToggles) return
+        if (providers.length === 0) {
+          providerToggles.innerHTML = '<span class="flex items-center px-2.5 min-h-8 text-xs text-zinc-400 bg-zinc-50 border border-zinc-200 rounded-xl">No accounts yet — connect one on Accounts.</span>'
+          return
+        }
+        providerToggles.replaceChildren(...providers.map(createProviderToggle))
+      }
+
+      const renderConnectionSummary = () => {
+        const connected = connectedProviders()
+        const ready = connected.length > 0
+        if (connectionLabel) {
+          connectionLabel.textContent = ready
+            ? `${connected.map(provider => providerLabel(provider.provider)).join(', ')} ready`
+            : 'Connect an account'
+        }
+        connection?.classList.toggle('border-emerald-200', ready)
+        connection?.classList.toggle('bg-emerald-50', ready)
+        connection?.classList.toggle('text-emerald-800', ready)
+        connectionDot?.classList.toggle('bg-emerald-500', ready)
+        connectionDot?.classList.toggle('bg-zinc-300', !ready)
+      }
+
+      const updatePublishability = () => {
+        canPublish = selectedConnected().length > 0
+        buttons.forEach((button) => {
           if (canPublish) button.removeAttribute('disabled')
           else button.setAttribute('disabled', 'disabled')
         })
+        // The image field is only meaningful for Instagram, which rejects
+        // text-only posts.
+        const needsImage = selected.has('instagram') && connectedProviders().some(provider => provider.provider === 'instagram')
+        composeImageRow?.classList.toggle('hidden', !needsImage)
+        composeImageRow?.classList.toggle('flex', needsImage)
+        applyMaxLength()
+        updateCount()
+      }
+
+      const applyConnection = (list) => {
+        providers = Array.isArray(list) ? list : []
+        const connectedKeys = connectedProviders().map(provider => provider.provider)
+        // Default to every connected provider; otherwise drop any selected
+        // provider that is no longer connected.
+        if (selected.size === 0) {
+          connectedKeys.forEach(key => selected.add(key))
+        }
+        else {
+          ;[...selected].forEach((key) => {
+            if (!connectedKeys.includes(key)) selected.delete(key)
+          })
+        }
+        renderProviderToggles()
+        renderConnectionSummary()
+        updatePublishability()
       }
 
       const refreshConnection = async () => {
         try {
-          const status = await blueskyApi?.fetchStatus()
-          applyConnection(status)
+          const list = await window.postlineSocial?.fetchProviders()
+          applyConnection(list || [])
         }
         catch (error) {
-          applyConnection({ canPublish: false, handle: null, configuredFromEnv: false })
-          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Bluesky' })
+          applyConnection([])
+          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Accounts' })
         }
       }
 
@@ -232,11 +316,11 @@
         const textarea = activeTextarea()
         if (!textarea || !count) return
         const length = textarea.value.length
-        const limit = 300
+        const limit = effectiveLimit()
         count.textContent = `${length} / ${limit} characters - ${allPosts().length} post${allPosts().length === 1 ? '' : 's'}`
-        count.classList.toggle('text-amber-700', length > 260 && length <= limit)
+        count.classList.toggle('text-amber-700', length > limit - 40 && length <= limit)
         count.classList.toggle('text-red-700', length >= limit)
-        count.classList.toggle('text-zinc-500', length <= 260)
+        count.classList.toggle('text-zinc-500', length <= limit - 40)
       }
 
       const renderLinkPreview = (post, preview) => {
@@ -380,30 +464,29 @@
         if (!options.skipSave) saveDraft()
       }
 
-      const publishOne = async (post) => {
+      const publishOne = async (post, targetProviders) => {
+        const social = window.postlineSocial
+        if (!social) throw new Error('Publishing is still loading. Try again in a moment.')
         const textarea = textareaFor(post)
         if (!textarea) throw new Error('Missing post body.')
         const text = textarea.value.trim()
         if (!text) throw new Error('Write something before publishing.')
-        const body = new FormData()
-        body.set('text', text)
-        if (post?.dataset.externalUri && post.dataset.externalTitle) {
-          body.set('external_uri', post.dataset.externalUri)
-          body.set('external_title', post.dataset.externalTitle)
-          body.set('external_description', post.dataset.externalDescription || '')
-        }
-        const response = await fetch('/api/postline/bluesky/publish', {
-          method: 'POST',
-          body,
-        })
-        const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky publish failed.')
-        return payload.data?.post?.url
+        const external = (post?.dataset.externalUri && post.dataset.externalTitle)
+          ? {
+              uri: post.dataset.externalUri,
+              title: post.dataset.externalTitle,
+              description: post.dataset.externalDescription || '',
+            }
+          : undefined
+        const imageUrl = composeImage?.value.trim()
+        const image = imageUrl ? { url: imageUrl } : undefined
+        return await social.publishCrosspost({ text, providers: targetProviders, external, image })
       }
 
       const publish = async () => {
-        if (!canPublish) {
-          setStatus('Connect Bluesky on the Accounts page before publishing.', 'error', { title: 'Not connected' })
+        const targetProviders = selectedConnected().map(provider => provider.provider)
+        if (targetProviders.length === 0) {
+          setStatus('Select a connected account on the Accounts page before publishing.', 'error', { title: 'Not connected' })
           return
         }
 
@@ -417,18 +500,30 @@
           return
         }
 
+        const providerNames = targetProviders.map(providerLabel).join(', ')
         buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
         if (publishLabel) publishLabel.textContent = 'Publishing…'
         setStatus(
-          targets.length > 1 ? `Publishing ${targets.length} posts to Bluesky…` : 'Publishing to Bluesky…',
+          targets.length > 1 ? `Publishing ${targets.length} posts to ${providerNames}…` : `Publishing to ${providerNames}…`,
           'info',
           { title: 'Publishing', id: 'publish' },
         )
 
         try {
           let lastUrl
+          const failures = []
+          let successCount = 0
           for (const [index, post] of targets.entries()) {
-            lastUrl = await publishOne(post)
+            const data = await publishOne(post, targetProviders)
+            for (const result of data.results || []) {
+              if (result.ok) {
+                successCount += 1
+                if (result.url) lastUrl = result.url
+              }
+              else {
+                failures.push(`${providerLabel(result.provider)}: ${result.error || 'failed'}`)
+              }
+            }
             if (targets.length > 1) {
               textareaFor(post).value = ''
               renderLinkPreview(post, null)
@@ -452,13 +547,21 @@
           updateCount()
           saveDraft()
           window.postlineToast?.dismiss?.('publish')
-          setStatus(
-            targets.length > 1
-              ? `Published ${targets.length} posts to Bluesky.`
-              : 'Your post is live on Bluesky.',
-            'success',
-            { title: 'Published', url: lastUrl },
-          )
+          if (failures.length && successCount === 0) {
+            setStatus(`Publish failed — ${failures.join('; ')}`, 'error', { title: 'Publish failed' })
+          }
+          else if (failures.length) {
+            setStatus(`Published, but some targets failed — ${failures.join('; ')}`, 'info', { title: 'Partially published', url: lastUrl })
+          }
+          else {
+            setStatus(
+              targets.length > 1
+                ? `Published ${targets.length} posts to ${providerNames}.`
+                : `Your post is live on ${providerNames}.`,
+              'success',
+              { title: 'Published', url: lastUrl },
+            )
+          }
         }
         catch (error) {
           window.postlineToast?.dismiss?.('publish')
@@ -505,14 +608,25 @@
         try {
           await refreshConnection()
           setStatus(
-            canPublish ? 'Bluesky is ready to publish.' : 'Add your Bluesky app password on Accounts.',
+            canPublish ? 'Accounts are ready to publish.' : 'Connect an account on the Accounts page.',
             canPublish ? 'success' : 'error',
-            { title: 'Bluesky' },
+            { title: 'Accounts' },
           )
         }
         finally {
           refreshButton.removeAttribute('disabled')
         }
+      })
+      providerToggles?.addEventListener('click', (event) => {
+        const target = event.target
+        if (!(target instanceof HTMLElement)) return
+        const button = target.closest('[data-provider-toggle]')
+        if (!button || button.hasAttribute('disabled')) return
+        const provider = button.dataset.providerToggle
+        if (selected.has(provider)) selected.delete(provider)
+        else selected.add(provider)
+        renderProviderToggles()
+        updatePublishability()
       })
       searchButton?.addEventListener('click', () => {
         const text = activeTextarea()?.value.trim()
@@ -527,7 +641,14 @@
       selectPost(allPosts()[savedActiveIndex] || activePost, { skipSave: true })
       updateCount()
       void updateLinkPreview(activePost)
-      void refreshConnection()
+      // Wait for the social module (a deferred `type=module` script) before the
+      // first provider fetch so window.postlineSocial is guaranteed to exist.
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => void refreshConnection(), { once: true })
+      }
+      else {
+        void refreshConnection()
+      }
     })()
   </script>
 @endsection

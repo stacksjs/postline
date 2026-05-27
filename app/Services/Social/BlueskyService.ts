@@ -1,4 +1,4 @@
-import type { BlueskySession, PublishedPost, TimelineResult } from '../../Support/Social/types'
+import type { BlueskySession, CrosspostTargetResult, PublishContent, PublishedPost, TimelineResult } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { BlueskyApiError, BlueskyDriver } from './Drivers/BlueskyDriver'
@@ -108,11 +108,8 @@ export class BlueskyService {
       throw new Error(`Bluesky posts must be ${this.driver.characterLimit} characters or fewer.`)
     }
 
-    const identity = await this.requireIdentity()
-    const driver = await this.ensureDriver()
     const accountId = await this.ensureAccount()
     const postUuid = uuid()
-    const targetUuid = uuid()
     const createdAt = now()
 
     await database.insertInto('posts').values({
@@ -132,10 +129,65 @@ export class BlueskyService {
       .selectAll()
       .where('uuid', '=', postUuid)
       .executeTakeFirstOrThrow()
-    const publishInput = { text: body } as Parameters<BlueskyDriver['publish']>[1] & {
+
+    const result = await this.publishToPost({ id: Number(post.id), body }, external ? { external } : undefined)
+    const finishedAt = now()
+
+    if (!result.ok) {
+      await database.updateTable('posts').set({
+        status: 'failed',
+        updated_at: finishedAt,
+      }).where('id', '=', post.id).execute()
+
+      throw new Error(result.error || 'Bluesky publish failed.')
+    }
+
+    await database.updateTable('posts').set({
+      status: 'published',
+      published_at: finishedAt,
+      updated_at: finishedAt,
+    }).where('id', '=', post.id).execute()
+
+    return {
+      post: { provider: 'bluesky', uri: result.uri || '', url: result.url },
+      postId: Number(post.id),
+      targetId: Number(result.targetId),
+    }
+  }
+
+  /**
+   * Publish an already-created post row to Bluesky as a new target. Never
+   * throws — failures are recorded on the target and returned so a crosspost
+   * to other providers can still proceed.
+   */
+  async publishToPost(
+    post: { id: number, body: string },
+    content?: PublishContent,
+  ): Promise<CrosspostTargetResult> {
+    const driver = await this.ensureDriver()
+
+    let identity: SocialIdentityRow
+    try {
+      identity = await this.requireIdentity()
+    }
+    catch (error) {
+      return { provider: 'bluesky', ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
+
+    if (post.body.length > this.driver.characterLimit) {
+      return {
+        provider: 'bluesky',
+        ok: false,
+        error: `Bluesky posts must be ${this.driver.characterLimit} characters or fewer.`,
+      }
+    }
+
+    const targetUuid = uuid()
+    const createdAt = now()
+    const publishInput = { text: post.body } as Parameters<BlueskyDriver['publish']>[1] & {
       external?: { uri: string, title: string, description?: string }
     }
-    if (external) publishInput.external = external
+    if (content?.external) publishInput.external = content.external
 
     await database.insertInto('post_targets').values({
       uuid: targetUuid,
@@ -158,19 +210,13 @@ export class BlueskyService {
       const published = await this.withFreshSession(identity, freshIdentity =>
         this.driver.publish({
           handle: freshIdentity.handle,
-        did: freshIdentity.external_id || undefined,
-        accessToken: freshIdentity.access_token || undefined,
-        refreshToken: freshIdentity.refresh_token || undefined,
+          did: freshIdentity.external_id || undefined,
+          accessToken: freshIdentity.access_token || undefined,
+          refreshToken: freshIdentity.refresh_token || undefined,
         }, publishInput),
       )
 
       const publishedAt = now()
-      await database.updateTable('posts').set({
-        status: 'published',
-        published_at: publishedAt,
-        updated_at: publishedAt,
-      }).where('id', '=', post.id).execute()
-
       await database.updateTable('post_targets').set({
         status: 'published',
         remote_uri: published.uri,
@@ -180,26 +226,23 @@ export class BlueskyService {
       }).where('id', '=', target.id).execute()
 
       return {
-        post: published,
-        postId: Number(post.id),
+        provider: 'bluesky',
+        ok: true,
+        url: published.url,
+        uri: published.uri,
         targetId: Number(target.id),
       }
     }
     catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const failedAt = now()
-      await database.updateTable('posts').set({
-        status: 'failed',
-        updated_at: failedAt,
-      }).where('id', '=', post.id).execute()
-
       await database.updateTable('post_targets').set({
         status: 'failed',
         failure_reason: message,
         updated_at: failedAt,
       }).where('id', '=', target.id).execute()
 
-      throw error
+      return { provider: 'bluesky', ok: false, error: message, targetId: Number(target.id) }
     }
   }
 
