@@ -9,7 +9,7 @@
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Accounts</p>
         <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Publishing drivers</h1>
-        <p class="mt-1.5 mb-0 text-[13px] text-zinc-600">Connect Bluesky with an app password to publish from Postline.</p>
+        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">Connect Bluesky and LinkedIn to publish and crosspost from Postline.</p>
       </div>
     </header>
 
@@ -40,15 +40,39 @@
             <p class="my-1.5 text-[13px] text-slate-700" data-bluesky-channel-handle>Not connected</p>
             <span class="text-xs text-zinc-500" data-bluesky-channel-detail>Add an app password to publish and sync your timeline.</span>
           </div>
-          <span class="whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold border-zinc-200 text-zinc-500" data-bluesky-channel-status>Setup</span>
+          <span class="px-2.5 py-1 font-bold text-[11px] text-zinc-500 whitespace-nowrap border border-zinc-200 rounded-full" data-bluesky-channel-status>Setup</span>
+        </article>
+        <article class="flex gap-5 items-center justify-between p-3.5 bg-white border border-zinc-200 rounded-xl" data-channel="linkedin">
+          <div>
+            <h2 class="my-0 font-bold text-[15px]">LinkedIn</h2>
+            <p class="my-1.5 text-[13px] text-slate-700" data-linkedin-channel-handle>Not connected</p>
+            <span class="text-xs text-zinc-500" data-linkedin-channel-detail>Connect with LinkedIn to crosspost member shares.</span>
+          </div>
+          <div class="flex flex-col gap-2 items-end">
+            <span class="px-2.5 py-1 font-bold text-[11px] text-zinc-500 whitespace-nowrap border border-zinc-200 rounded-full" data-linkedin-channel-status>Setup</span>
+            <button class="inline-flex items-center justify-center px-3 h-9 font-bold text-sm text-white bg-[#0a66c2] rounded-xl disabled:opacity-50" type="button" data-linkedin-connect>Connect with LinkedIn</button>
+            <button class="hidden text-xs text-zinc-500 underline" type="button" data-linkedin-connect-env>Use token from .env</button>
+          </div>
+        </article>
+        <article class="flex gap-5 items-center justify-between p-3.5 bg-white border border-zinc-200 rounded-xl" data-channel="instagram">
+          <div>
+            <h2 class="my-0 font-bold text-[15px]">Instagram</h2>
+            <p class="my-1.5 text-[13px] text-slate-700" data-instagram-channel-handle>Not connected</p>
+            <span class="text-xs text-zinc-500" data-instagram-channel-detail>Connect an Instagram Business account to crosspost. Posts require an image.</span>
+          </div>
+          <div class="flex flex-col gap-2 items-end">
+            <span class="px-2.5 py-1 font-bold text-[11px] text-zinc-500 whitespace-nowrap border border-zinc-200 rounded-full" data-instagram-channel-status>Setup</span>
+            <button class="inline-flex items-center justify-center px-3 h-9 font-bold text-sm text-white bg-gradient-to-tr from-amber-500 to-purple-600 via-pink-600 rounded-xl disabled:opacity-50" type="button" data-instagram-connect>Connect with Instagram</button>
+            <button class="hidden text-xs text-zinc-500 underline" type="button" data-instagram-connect-env>Use token from .env</button>
+          </div>
         </article>
         <article class="flex gap-5 items-center justify-between p-3.5 bg-zinc-50/80 border border-zinc-200 rounded-xl opacity-80">
           <div>
             <h2 class="my-0 font-bold text-[15px] text-zinc-700">Twitter/X</h2>
             <p class="my-1.5 text-[13px] text-zinc-600">Planned</p>
-            <span class="text-xs text-zinc-500">Driver adapter coming after Bluesky is stable.</span>
+            <span class="text-xs text-zinc-500">Driver adapter coming after Bluesky, LinkedIn, and Instagram are stable.</span>
           </div>
-          <span class="whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold border-zinc-200 text-zinc-500">Planned</span>
+          <span class="px-2.5 py-1 font-bold text-[11px] text-zinc-500 whitespace-nowrap border border-zinc-200 rounded-full">Planned</span>
         </article>
       </div>
     </section>
@@ -135,6 +159,200 @@
           submit?.removeAttribute('disabled')
         }
       })
+
+      // --- LinkedIn ---
+      const linkedinHandle = root.querySelector('[data-linkedin-channel-handle]')
+      const linkedinDetail = root.querySelector('[data-linkedin-channel-detail]')
+      const linkedinStatusPill = root.querySelector('[data-linkedin-channel-status]')
+      const linkedinConnect = root.querySelector('[data-linkedin-connect]')
+      const linkedinConnectEnv = root.querySelector('[data-linkedin-connect-env]')
+
+      const renderLinkedIn = (data) => {
+        const connected = Boolean(data?.canPublish)
+        const label = data?.displayName || data?.handle || 'Not connected'
+        if (linkedinHandle) {
+          linkedinHandle.textContent = connected ? label : (data?.handle ? `${label} — reconnect` : 'Not connected')
+        }
+        if (linkedinDetail) {
+          linkedinDetail.textContent = connected
+            ? 'Ready to crosspost member shares from Postline.'
+            : data?.oauthConfigured
+              ? 'Connect with LinkedIn to crosspost member shares.'
+              : data?.configuredFromEnv
+                ? 'Token found in .env — connect to start crossposting.'
+                : 'Add LinkedIn API keys to .env, then connect.'
+        }
+        if (linkedinStatusPill) {
+          linkedinStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
+          linkedinStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+            connected
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : data?.handle
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-zinc-200 text-zinc-500'
+          }`
+        }
+        if (linkedinConnect) {
+          linkedinConnect.textContent = connected ? 'Reconnect LinkedIn' : 'Connect with LinkedIn'
+          if (data && !data.oauthConfigured) linkedinConnect.setAttribute('disabled', 'disabled')
+          else linkedinConnect.removeAttribute('disabled')
+        }
+        if (linkedinConnectEnv) linkedinConnectEnv.classList.toggle('hidden', !data?.configuredFromEnv)
+      }
+
+      const refreshLinkedIn = async () => {
+        try {
+          const data = await window.postlineLinkedin?.fetchStatus()
+          renderLinkedIn(data)
+        }
+        catch (error) {
+          renderLinkedIn(null)
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'LinkedIn' })
+        }
+      }
+
+      linkedinConnect?.addEventListener('click', () => {
+        notify('Redirecting to LinkedIn…', 'info', { title: 'LinkedIn' })
+        window.location.href = '/api/postline/linkedin/auth'
+      })
+
+      linkedinConnectEnv?.addEventListener('click', async () => {
+        linkedinConnectEnv.setAttribute('disabled', 'disabled')
+        notify('Connecting LinkedIn from .env…', 'info', { title: 'LinkedIn' })
+        try {
+          const response = await fetch('/api/postline/linkedin/connect', { method: 'POST' })
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'LinkedIn connect failed.')
+          await refreshLinkedIn()
+          notify('LinkedIn connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
+        }
+        catch (error) {
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Connect failed' })
+        }
+        finally {
+          linkedinConnectEnv.removeAttribute('disabled')
+        }
+      })
+
+      // Surface the OAuth callback result, then strip it from the URL.
+      const params = new URLSearchParams(window.location.search)
+      const linkedinResult = params.get('linkedin')
+      if (linkedinResult === 'connected') {
+        notify('LinkedIn connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
+      }
+      else if (linkedinResult === 'error') {
+        notify(params.get('message') || 'LinkedIn connection failed.', 'error', { title: 'LinkedIn' })
+      }
+      if (linkedinResult) {
+        params.delete('linkedin')
+        params.delete('message')
+        const query = params.toString()
+        window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+      }
+
+      const startLinkedIn = () => void refreshLinkedIn()
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startLinkedIn, { once: true })
+      }
+      else {
+        startLinkedIn()
+      }
+
+      // --- Instagram ---
+      const instagramHandle = root.querySelector('[data-instagram-channel-handle]')
+      const instagramDetail = root.querySelector('[data-instagram-channel-detail]')
+      const instagramStatusPill = root.querySelector('[data-instagram-channel-status]')
+      const instagramConnect = root.querySelector('[data-instagram-connect]')
+      const instagramConnectEnv = root.querySelector('[data-instagram-connect-env]')
+
+      const renderInstagram = (data) => {
+        const connected = Boolean(data?.canPublish)
+        const label = data?.handle ? `@${data.handle}` : 'Not connected'
+        if (instagramHandle) {
+          instagramHandle.textContent = connected ? label : (data?.handle ? `${label} — reconnect` : 'Not connected')
+        }
+        if (instagramDetail) {
+          instagramDetail.textContent = connected
+            ? 'Ready to crosspost. Remember Instagram posts need an image.'
+            : data?.oauthConfigured
+              ? 'Connect an Instagram Business account to crosspost. Posts require an image.'
+              : data?.configuredFromEnv
+                ? 'Token found in .env — connect to start crossposting.'
+                : 'Add Instagram Graph API keys to .env, then connect.'
+        }
+        if (instagramStatusPill) {
+          instagramStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
+          instagramStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+            connected
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : data?.handle
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-zinc-200 text-zinc-500'
+          }`
+        }
+        if (instagramConnect) {
+          instagramConnect.textContent = connected ? 'Reconnect Instagram' : 'Connect with Instagram'
+          if (data && !data.oauthConfigured) instagramConnect.setAttribute('disabled', 'disabled')
+          else instagramConnect.removeAttribute('disabled')
+        }
+        if (instagramConnectEnv) instagramConnectEnv.classList.toggle('hidden', !data?.configuredFromEnv)
+      }
+
+      const refreshInstagram = async () => {
+        try {
+          const data = await window.postlineInstagram?.fetchStatus()
+          renderInstagram(data)
+        }
+        catch (error) {
+          renderInstagram(null)
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Instagram' })
+        }
+      }
+
+      instagramConnect?.addEventListener('click', () => {
+        notify('Redirecting to Instagram…', 'info', { title: 'Instagram' })
+        window.location.href = '/api/postline/instagram/auth'
+      })
+
+      instagramConnectEnv?.addEventListener('click', async () => {
+        instagramConnectEnv.setAttribute('disabled', 'disabled')
+        notify('Connecting Instagram from .env…', 'info', { title: 'Instagram' })
+        try {
+          const response = await fetch('/api/postline/instagram/connect', { method: 'POST' })
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Instagram connect failed.')
+          await refreshInstagram()
+          notify('Instagram connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
+        }
+        catch (error) {
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Connect failed' })
+        }
+        finally {
+          instagramConnectEnv.removeAttribute('disabled')
+        }
+      })
+
+      const instagramResult = params.get('instagram')
+      if (instagramResult === 'connected') {
+        notify('Instagram connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
+      }
+      else if (instagramResult === 'error') {
+        notify(params.get('message') || 'Instagram connection failed.', 'error', { title: 'Instagram' })
+      }
+      if (instagramResult) {
+        params.delete('instagram')
+        params.delete('message')
+        const query = params.toString()
+        window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+      }
+
+      const startInstagram = () => void refreshInstagram()
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startInstagram, { once: true })
+      }
+      else {
+        startInstagram()
+      }
 
       void refreshStatus()
     })()
