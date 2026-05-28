@@ -3,11 +3,13 @@ import { env } from '@stacksjs/env'
 import { BlueskyDriver } from './Drivers/BlueskyDriver'
 import { InstagramDriver } from './Drivers/InstagramDriver'
 import { LinkedInDriver } from './Drivers/LinkedInDriver'
+import { ThreadsDriver } from './Drivers/ThreadsDriver'
 
 const drivers: Partial<Record<SocialProvider, SocialDriver>> = {
   bluesky: new BlueskyDriver(),
   linkedin: new LinkedInDriver({ apiVersion: String(env.LINKEDIN_API_VERSION || '202405') }),
   instagram: new InstagramDriver({ graphVersion: String(env.INSTAGRAM_GRAPH_VERSION || 'v21.0') }),
+  threads: new ThreadsDriver({ graphVersion: String(env.THREADS_GRAPH_VERSION || 'v1.0') }),
 }
 
 export function getSocialDriver(provider: SocialProvider): SocialDriver {

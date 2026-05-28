@@ -3,6 +3,7 @@ import { response } from '@stacksjs/router'
 import { bluesky } from '../../Services/Social/BlueskyService'
 import { instagram } from '../../Services/Social/InstagramService'
 import { linkedin } from '../../Services/Social/LinkedInService'
+import { threads } from '../../Services/Social/ThreadsService'
 
 export default new Action({
   name: 'Postline Providers Status',
@@ -15,6 +16,7 @@ export default new Action({
         bluesky.status(),
         linkedin.status(),
         instagram.status(),
+        threads.status(),
       ])
 
       return response.json({ ok: true, data: { providers } })

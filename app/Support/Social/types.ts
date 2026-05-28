@@ -6,6 +6,7 @@ export type SocialProvider =
   | 'instagram'
   | 'tiktok'
   | 'linkedin'
+  | 'threads'
 
 export interface SocialIdentityCredentials {
   handle: string

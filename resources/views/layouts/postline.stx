@@ -115,6 +115,7 @@
     <script type="module" src="/assets/scripts/postline-bluesky.ts"></script>
     <script type="module" src="/assets/scripts/postline-linkedin.ts"></script>
     <script type="module" src="/assets/scripts/postline-instagram.ts"></script>
+    <script type="module" src="/assets/scripts/postline-threads.ts"></script>
     <script type="module" src="/assets/scripts/postline-social.ts"></script>
     <script type="module" src="/assets/scripts/postline-analytics.ts"></script>
     <script>
