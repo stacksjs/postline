@@ -38,6 +38,13 @@ route.group({ prefix: '/postline/instagram' }, () => {
   route.get('/callback', 'Actions/Postline/InstagramCallbackAction').skipCsrf()
 })
 
+route.group({ prefix: '/postline/threads' }, () => {
+  route.get('/status', 'Actions/Postline/ThreadsStatusAction').skipCsrf()
+  route.post('/connect', 'Actions/Postline/ThreadsConnectAction').skipCsrf()
+  route.get('/auth', 'Actions/Postline/ThreadsAuthAction').skipCsrf()
+  route.get('/callback', 'Actions/Postline/ThreadsCallbackAction').skipCsrf()
+})
+
 route.group({ prefix: '/postline' }, () => {
   route.get('/providers', 'Actions/Postline/ProvidersStatusAction').skipCsrf()
   route.post('/publish', 'Actions/Postline/CrosspostPublishAction').skipCsrf()

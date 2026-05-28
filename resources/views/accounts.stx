@@ -12,7 +12,7 @@
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Accounts</p>
         <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Publishing drivers</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">Connect Bluesky, LinkedIn, and Instagram to publish and crosspost from Postline.</p>
+        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">Connect Bluesky, LinkedIn, Instagram, and Threads to publish and crosspost from Postline.</p>
       </div>
     </header>
 
@@ -69,11 +69,23 @@
             <button class="hidden text-xs text-zinc-500 underline" type="button" data-instagram-connect-env>Use token from .env</button>
           </div>
         </article>
+        <article class="flex gap-5 items-center justify-between p-3.5 bg-white border border-zinc-200 rounded-xl" data-channel="threads">
+          <div>
+            <h2 class="my-0 font-bold text-[15px]">Threads</h2>
+            <p class="my-1.5 text-[13px] text-slate-700" data-threads-channel-handle>Not connected</p>
+            <span class="text-xs text-zinc-500" data-threads-channel-detail>Connect a Threads account to crosspost.</span>
+          </div>
+          <div class="flex flex-col gap-2 items-end">
+            <span class="px-2.5 py-1 font-bold text-[11px] text-zinc-500 whitespace-nowrap border border-zinc-200 rounded-full" data-threads-channel-status>Setup</span>
+            <button class="inline-flex items-center justify-center px-3 h-9 font-bold text-sm text-white bg-neutral-950 rounded-xl disabled:opacity-50" type="button" data-threads-connect>Connect with Threads</button>
+            <button class="hidden text-xs text-zinc-500 underline" type="button" data-threads-connect-env>Use token from .env</button>
+          </div>
+        </article>
         <article class="flex gap-5 items-center justify-between p-3.5 bg-zinc-50/80 border border-zinc-200 rounded-xl opacity-80">
           <div>
             <h2 class="my-0 font-bold text-[15px] text-zinc-700">Twitter/X</h2>
             <p class="my-1.5 text-[13px] text-zinc-600">Planned</p>
-            <span class="text-xs text-zinc-500">Driver adapter coming after Bluesky, LinkedIn, and Instagram are stable.</span>
+            <span class="text-xs text-zinc-500">Driver adapter coming after Bluesky, LinkedIn, Instagram, and Threads are stable.</span>
           </div>
           <span class="px-2.5 py-1 font-bold text-[11px] text-zinc-500 whitespace-nowrap border border-zinc-200 rounded-full">Planned</span>
         </article>
@@ -355,6 +367,102 @@
       }
       else {
         startInstagram()
+      }
+
+      // --- Threads ---
+      const threadsHandle = root.querySelector('[data-threads-channel-handle]')
+      const threadsDetail = root.querySelector('[data-threads-channel-detail]')
+      const threadsStatusPill = root.querySelector('[data-threads-channel-status]')
+      const threadsConnect = root.querySelector('[data-threads-connect]')
+      const threadsConnectEnv = root.querySelector('[data-threads-connect-env]')
+
+      const renderThreads = (data) => {
+        const connected = Boolean(data?.canPublish)
+        const label = data?.handle ? `@${data.handle}` : 'Not connected'
+        if (threadsHandle) {
+          threadsHandle.textContent = connected ? label : (data?.handle ? `${label} — reconnect` : 'Not connected')
+        }
+        if (threadsDetail) {
+          threadsDetail.textContent = connected
+            ? 'Ready to crosspost from Postline.'
+            : data?.oauthConfigured
+              ? 'Connect a Threads account to crosspost.'
+              : data?.configuredFromEnv
+                ? 'Token found in .env — connect to start crossposting.'
+                : 'Add Threads API keys to .env, then connect.'
+        }
+        if (threadsStatusPill) {
+          threadsStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
+          threadsStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+            connected
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : data?.handle
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-zinc-200 text-zinc-500'
+          }`
+        }
+        if (threadsConnect) {
+          threadsConnect.textContent = connected ? 'Reconnect Threads' : 'Connect with Threads'
+          if (data && !data.oauthConfigured) threadsConnect.setAttribute('disabled', 'disabled')
+          else threadsConnect.removeAttribute('disabled')
+        }
+        if (threadsConnectEnv) threadsConnectEnv.classList.toggle('hidden', !data?.configuredFromEnv)
+      }
+
+      const refreshThreads = async () => {
+        try {
+          const data = await window.postlineThreads?.fetchStatus()
+          renderThreads(data)
+        }
+        catch (error) {
+          renderThreads(null)
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Threads' })
+        }
+      }
+
+      threadsConnect?.addEventListener('click', () => {
+        notify('Redirecting to Threads…', 'info', { title: 'Threads' })
+        window.location.href = '/api/postline/threads/auth'
+      })
+
+      threadsConnectEnv?.addEventListener('click', async () => {
+        threadsConnectEnv.setAttribute('disabled', 'disabled')
+        notify('Connecting Threads from .env…', 'info', { title: 'Threads' })
+        try {
+          const response = await fetch('/api/postline/threads/connect', { method: 'POST' })
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Threads connect failed.')
+          await refreshThreads()
+          notify('Threads connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
+        }
+        catch (error) {
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Connect failed' })
+        }
+        finally {
+          threadsConnectEnv.removeAttribute('disabled')
+        }
+      })
+
+      const threadsResult = params.get('threads')
+      if (threadsResult === 'connected') {
+        notify('Threads connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
+      }
+      else if (threadsResult === 'error') {
+        notify(params.get('message') || 'Threads connection failed.', 'error', { title: 'Threads' })
+      }
+      if (threadsResult) {
+        params.delete('threads')
+        params.delete('message')
+        const query = params.toString()
+        window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+      }
+
+      const startThreads = () => void refreshThreads()
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startThreads, { once: true })
+      }
+      else {
+        startThreads()
       }
 
       void refreshStatus()

@@ -33,6 +33,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   mastodon: 'Mastodon',
   facebook: 'Facebook',
   instagram: 'Instagram',
+  threads: 'Threads',
   tiktok: 'TikTok',
 }
 

@@ -4,6 +4,7 @@ import { env } from '@stacksjs/env'
 import { bluesky } from './BlueskyService'
 import { instagram } from './InstagramService'
 import { linkedin } from './LinkedInService'
+import { threads } from './ThreadsService'
 import { ensureAccount, now, uuid } from './support'
 
 const database = db as any
@@ -17,6 +18,7 @@ const publishers: Partial<Record<SocialProvider, ProviderPublisher>> = {
   bluesky,
   linkedin,
   instagram,
+  threads,
 }
 
 export function crosspostProviders(): SocialProvider[] {
