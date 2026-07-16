@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { existsSync } from 'node:fs'
-import { config } from '@stacksjs/config'
+import { config, overridesReady } from '@stacksjs/config'
 import { projectPath } from '@stacksjs/path'
 
 /**
@@ -15,11 +15,9 @@ import { projectPath } from '@stacksjs/path'
  *
  * Two extras the default server bakes in for new scaffolds:
  *
- *   1. /api/** is reverse-proxied to the API dev server (port 3008 by
- *      default). Without this, `<form action="/api/foo">` posts on the
- *      frontend port land on stx-serve, which doesn't know about
- *      bun-router actions, and shoppers see a 404 page instead of
- *      their cart.
+ *   1. /api/** and /docs/** are reverse-proxied to the API and docs dev
+ *      servers. Without this, form posts and doc assets on the frontend
+ *      port land on stx-serve and 404.
  *
  *   2. The raw Request's cookies are exposed to stx server-script
  *      blocks via a per-request AsyncLocalStorage on a stable global
@@ -29,24 +27,10 @@ import { projectPath } from '@stacksjs/path'
  *      own cookie during SSR.
  */
 
-const projectServe = projectPath('serve.ts')
-
-try {
-  const file = Bun.file(projectServe)
-  if (await file.exists()) {
-    await import(projectServe)
-  }
-  else {
-    await startDefaultServer()
-  }
-}
-catch {
-  await startDefaultServer()
-}
-
 interface StacksRequestContext {
   cookies: Record<string, string>
   url: string
+  locale: string
 }
 
 const requestStore = new AsyncLocalStorage<StacksRequestContext>()
@@ -61,6 +45,24 @@ const requestStore = new AsyncLocalStorage<StacksRequestContext>()
   url(): string {
     return requestStore.getStore()?.url ?? ''
   },
+  locale(): string {
+    return requestStore.getStore()?.locale ?? 'de'
+  },
+}
+
+const projectServe = projectPath('serve.ts')
+
+try {
+  const file = Bun.file(projectServe)
+  if (await file.exists()) {
+    await import(projectServe)
+  }
+  else {
+    await startDefaultServer()
+  }
+}
+catch {
+  await startDefaultServer()
 }
 
 function parseCookies(req: Request): Record<string, string> {
@@ -83,63 +85,19 @@ function parseCookies(req: Request): Record<string, string> {
   return out
 }
 
-async function proxyToApi(req: Request, apiBase: string): Promise<Response> {
-  const incoming = new URL(req.url)
-  const target = `${apiBase}${incoming.pathname}${incoming.search}`
-
-  const fwd = new Headers(req.headers)
-  fwd.delete('host')
-  fwd.delete('content-length')
-  fwd.set('x-forwarded-host', incoming.host)
-  fwd.set('x-forwarded-proto', incoming.protocol.replace(':', ''))
-
-  const body = req.method === 'GET' || req.method === 'HEAD'
-    ? undefined
-    : await req.arrayBuffer()
-
-  const upstream = await fetch(target, {
-    method: req.method,
-    headers: fwd,
-    body,
-    redirect: 'manual',
-  })
-
-  // Re-emit the body without the upstream's content-length /
-  // content-encoding — the body we forward may be re-chunked, and
-  // letting the original headers through breaks the response.
-  const out = new Headers(upstream.headers)
-  out.delete('content-length')
-  out.delete('content-encoding')
-
-  return new Response(upstream.body, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers: out,
-  })
-}
-
 async function startDefaultServer() {
-  let serve: any
-  // Prefer the project-vendored pantry copy so framework patches and
-  // bug fixes shipped via `cp` (or `pantry/install`) take effect even
-  // when the global Bun install cache has an older `bun-plugin-stx`.
-  try {
-    ;({ serve } = await import(projectPath('pantry/bun-plugin-stx/dist/serve.js')))
-  }
-  catch {
-    ;({ serve } = await import('bun-plugin-stx/serve'))
-  }
+  await overridesReady
 
-  // Pre-resolve the stx module from pantry (if vendored). Bun resolves a
-  // bare-specifier `import('@stacksjs/stx')` from the file doing the
-  // import — for the pantry-vendored serve.js that's pantry/bun-plugin-stx,
-  // and Bun walks up node_modules from there, finding the cwd's
-  // `node_modules/@stacksjs/stx` first. If that copy is older than the
-  // pantry-vendored stx (common when bun-plugin-stx in node_modules pinned
-  // an older peer), the @extends/layoutsDir resolver behaves incorrectly
-  // and pages render blank. Pass the pantry copy explicitly so serve()
-  // uses it instead of letting bare-specifier resolution win.
-  const stxModule = await resolveVendoredStxModule()
+  const { injectGlobalAutoImports, isApiBoundRequest, proxyToBackend } = await import('@stacksjs/server')
+  const { applyRequestLocale } = await import('@stacksjs/i18n')
+  await injectGlobalAutoImports()
+
+  // The stx dev server resolves like any other dependency. To develop against
+  // a local STX build, `bun link` it into the project — bare resolution then
+  // picks the link up the same as any other node module.
+  const { serve } = await import('bun-plugin-stx/serve')
+
+  const { site: siteConfig, i18n: i18nConfig } = await loadStxSiteConfig()
 
   const userViewsPath = 'resources/views'
   const defaultViewsPath = 'storage/framework/defaults/resources/views'
@@ -159,7 +117,9 @@ async function startDefaultServer() {
   ]) ?? 'resources/views/components'
   const preferredPort = Number(process.env.PORT) || 3000
   const apiPort = Number(process.env.PORT_API) || 3008
+  const docsPort = Number(process.env.PORT_DOCS) || config.ports?.docs || 3006
   const apiBase = `http://127.0.0.1:${apiPort}`
+  const docsBase = `http://127.0.0.1:${docsPort}`
 
   // Cookie name the SPA writes when a user logs in. Defaults to whatever
   // `config.auth.defaultTokenName` is set to, falling back to `auth-token`.
@@ -178,7 +138,8 @@ async function startDefaultServer() {
     fallbackLayoutsDir: defaultLayoutsPath,
     fallbackPartialsDir: defaultViewsPath,
     quiet: true,
-    ...(stxModule && { stxModule }),
+    ...(i18nConfig && { i18n: i18nConfig }),
+    ...(siteConfig?.url && { site: siteConfig }),
     auth: {
       cookieName: authCookie,
       redirectTo: '/login',
@@ -196,6 +157,14 @@ async function startDefaultServer() {
       if (gated)
         return gated
 
+      // The blog is rendered by BunPress with a custom Stacks theme (see
+      // ./blog.ts). Intercept /blog and /blog/<slug> here so BunPress wins
+      // over the stx page layer; anything else (feeds, assets) falls through.
+      const { renderBlog } = await import('../blog')
+      const blogResponse = await renderBlog(req)
+      if (blogResponse)
+        return blogResponse
+
       // Forward to the API dev server when this request can't possibly
       // be a stx page render. Two cases:
       //   1. `/api/**` — the canonical API prefix.
@@ -203,17 +172,36 @@ async function startDefaultServer() {
       //      a static stx page, so they always belong to bun-router.
       // Without (2), `route.post('/subscribe', ...)` declared at the
       // root (no /api prefix) hits stx-serve and 404s.
-      const apiMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
-      if (url.pathname.startsWith('/api/') || apiMethods.has(req.method))
-        return proxyToApi(req, apiBase)
+      if (url.pathname === '/docs' || url.pathname.startsWith('/docs/'))
+        return proxyToBackend(req, docsBase, '/docs')
+
+      if (isApiBoundRequest(req, url.pathname))
+        return proxyToBackend(req, apiBase)
+
+      // Optional `/locale/{code}` redirect (same as default SetLocaleAction).
+      // STX i18n normally switches via `/<code>/…` paths from the injected
+      // lang-picker script; this handles bookmarked `/locale/…` URLs on the
+      // frontend dev server without an app-level `routes/web.ts` entry.
+      if (i18nConfig && req.method === 'GET') {
+        const localeSwitch = url.pathname.match(/^\/locale\/([a-z]{2}(?:-[a-z]{2})?)\/?$/i)
+        if (localeSwitch) {
+          const { createLocaleSwitchResponse } = await import('@stacksjs/i18n')
+          return createLocaleSwitchResponse(req, localeSwitch[1], i18nConfig)
+        }
+      }
 
       // Stash cookies + url so server-script blocks rendering this
       // request can pull them via globalThis.requestContext. We use
       // enterWith() rather than run() because returning here would
       // exit the async context before stx-serve resumes.
+      const locale = await applyRequestLocale(req)
+
+      ;(globalThis as { __stxServeSearch?: string }).__stxServeSearch = url.search
+
       requestStore.enterWith({
         cookies: parseCookies(req),
         url: req.url,
+        locale,
       })
       return null
     },
@@ -234,12 +222,50 @@ async function firstExistingPath(candidates: string[]): Promise<string | null> {
   return null
 }
 
-async function resolveVendoredStxModule(): Promise<any | undefined> {
-  try {
-    const vendored = projectPath('pantry/@stacksjs/stx/dist/index.js')
-    if (await Bun.file(vendored).exists())
-      return await import(vendored)
+function fallbackI18nFromSite(site: { i18n: { locales: string[], defaultLocale?: string, pickerSelector?: string, labels?: Record<string, string> } }) {
+  const locales = site.i18n.locales
+  const defaultLocale = site.i18n.defaultLocale ?? locales[0]
+  return {
+    locales,
+    defaultLocale,
+    labels: site.i18n.labels ?? Object.fromEntries(locales.map(c => [c, c.toUpperCase()])),
+    translations: {} as Record<string, Record<string, string>>,
+    pickerSelector: site.i18n.pickerSelector ?? '#lang-picker',
   }
-  catch { /* fall through — let serve() use its own bare-specifier import */ }
-  return undefined
+}
+
+async function resolveSiteI18n(site: { i18n: { locales: string[], defaultLocale?: string, translationsDir?: string | false, format?: string, labels?: Record<string, string>, pickerSelector?: string, translations?: Record<string, Record<string, string>> } }) {
+  // `resolveI18n` is exported by @stacksjs/stx — resolve it as a normal dep.
+  try {
+    const { resolveI18n } = await import('@stacksjs/stx') as { resolveI18n?: (site: unknown, root: string) => unknown }
+    if (typeof resolveI18n === 'function') {
+      const i18n = resolveI18n(site, projectPath())
+      if (i18n)
+        return i18n
+    }
+  }
+  catch { /* fall back to the site config's own i18n block */ }
+  return fallbackI18nFromSite(site)
+}
+
+async function loadStxSiteConfig(): Promise<{ site?: any, i18n?: any }> {
+  const sitePath = projectPath('site.config.ts')
+  if (!existsSync(sitePath))
+    return {}
+
+  try {
+    const mod = await import(sitePath)
+    const site = mod.default
+    if (!site)
+      return {}
+
+    if (!site.i18n)
+      return { site }
+
+    const i18n = await resolveSiteI18n(site)
+    return { site, i18n }
+  }
+  catch { /* no site config */ }
+
+  return {}
 }

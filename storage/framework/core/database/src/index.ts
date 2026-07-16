@@ -83,6 +83,20 @@ export { addColumnSafely, backfillInBatches, renameColumnSafely } from './safe-m
 // Seeding
 export * from './seeder'
 
+// stacksjs/stacks#1919 — public factory API. The canonical replacement
+// for the legacy `useSeeder` trait + auto-walker. Class seeders call
+// `factory.generate(Model, opts)` explicitly so there's one
+// orchestration layer per table, no double-fire on tables that have
+// both a `useSeeder` trait and a class seeder file.
+export { factory, generate as factoryGenerate } from './factory'
+export type { GenerateOptions } from './factory'
+
+// `buddy seed:scaffold` codemod — generates class-seeder files for
+// every model with a `useSeeder` trait, easing the migration off the
+// auto-walker.
+export { scaffoldClassSeedersFromModels, renderSeederFile } from './seed-scaffold'
+export type { ScaffoldOptions, ScaffoldResult } from './seed-scaffold'
+
 // Driver utilities
 export * from './drivers'
 
@@ -92,9 +106,37 @@ export * from './custom'
 // Auth tables migration
 export * from './auth-tables'
 
+// Notification tables migration (stacksjs/stacks#1937)
+export { migrateNotificationTables } from './notification-tables'
+
+// RBAC tables migration (stacksjs/stacks#1941 Phase A)
+export { migrateRbacTables } from './rbac-tables'
+
 // SQL dialect helpers & connection defaults
 export * from './sql-helpers'
 export * from './defaults'
+
+// Foreign-key audit (stacksjs/stacks#1916) — compare declared
+// `belongsTo` relationships against live FKs.
+export { auditForeignKeys, findFkOrphans, getDeclaredFKs, getLiveFKs } from './fk-audit'
+export type { DeclaredFK, FkAuditResult, FkOrphan, FkOrphanReport, LiveFK } from './fk-audit'
+
+// Unique-index drift audit (stacksjs/stacks#1952) — compare declared
+// `unique: true` attributes / indexes against live UNIQUE indexes.
+export { auditUniqueIndexes, getDeclaredUniques, getLiveUniqueIndexes } from './unique-audit'
+export type { DeclaredUnique, LiveUniqueIndex, UniqueAuditResult } from './unique-audit'
+
+// Transaction context: AsyncLocalStorage-based scope so side-effect
+// emitters (queue dispatch, mailer send) can buffer themselves
+// until the surrounding `db.transaction(...)` commits
+// (stacksjs/stacks#1882).
+export {
+  __flushAfterCommitNow,
+  __pendingAfterCommitCount,
+  enqueueAfterCommit,
+  isInTransaction,
+  runInTransactionScope,
+} from './transaction-context'
 
 // Re-export bun-query-builder functions and types
 export {

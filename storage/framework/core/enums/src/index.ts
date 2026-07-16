@@ -56,6 +56,7 @@ export enum Action {
   BuildCore = 'build/core',
   BuildDesktop = 'build/desktop',
   BuildDocs = 'build/docs',
+  BuildFrontendStatic = 'build/frontend-static',
   BuildServer = 'build/server',
   Changelog = 'changelog',
   CheckPorts = 'check/ports',
@@ -97,6 +98,15 @@ export enum Action {
   QueueFlush = 'queue/flush',
   QueueMonitor = 'queue/monitor',
   QueueInspect = 'queue/inspect',
+  QueueList = 'queue/list',
+  // stacksjs/stacks#1885 — DLQ + poison + circuit-breaker CLI
+  QueueDlq = 'queue/dlq',
+  QueueDlqRetry = 'queue/dlq-retry',
+  QueueDlqPurge = 'queue/dlq-purge',
+  QueueQuarantine = 'queue/quarantine',
+  QueueUnquarantine = 'queue/unquarantine',
+  QueuePause = 'queue/pause',
+  QueueResume = 'queue/resume',
   QueueSchedule = 'queue/schedule',
   QueueScheduleList = 'queue/schedule-list',
   Release = 'release', // ✅

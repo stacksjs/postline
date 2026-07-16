@@ -1,17 +1,21 @@
 import { Buffer } from 'node:buffer'
 import { createHmac } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
-import { access, constants, copyFile, lstat, mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises'
+import { access, chmod, constants, copyFile, lstat, mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
+import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type {
   ChecksumOptions,
   DirectoryEntry,
   DirectoryListing,
   FileContents,
+  GetStreamOptions,
   ListOptions,
   MimeTypeOptions,
   PublicUrlOptions,
+  PutResult,
+  PutStreamOptions,
   SignedUrlOptions,
   StatEntry,
   StorageAdapter,
@@ -49,7 +53,7 @@ export class LocalStorageAdapter implements StorageAdapter {
     return resolved
   }
 
-  async write(path: string, contents: FileContents): Promise<void> {
+  async write(path: string, contents: FileContents): Promise<PutResult> {
     const fullPath = this.resolvePath(path)
     const dir = dirname(fullPath)
 
@@ -70,11 +74,78 @@ export class LocalStorageAdapter implements StorageAdapter {
       const writeStream = createWriteStream(fullPath)
       await pipeline(contents as any, writeStream)
     }
+
+    // Read back size + mtime in one syscall — cheaper than the
+    // caller doing a separate `Storage.stat()` round-trip and lets
+    // streaming writes (where size isn't known up front) still
+    // report the on-disk total. See stacksjs/stacks#1888 S-8.
+    const st = await stat(fullPath)
+    return {
+      path,
+      size: st.size,
+      lastModified: st.mtimeMs,
+    }
   }
 
   async read(path: string): Promise<FileContents> {
     const fullPath = this.resolvePath(path)
     return await readFile(fullPath)
+  }
+
+  /**
+   * Stream a file from disk (stacksjs/stacks#1886). Wraps Node's
+   * fs.createReadStream into a web-standard `ReadableStream<Uint8Array>`
+   * via `Readable.toWeb`, so callers get a portable type that
+   * pipes cleanly into other adapters' `putStream`.
+   *
+   * Memory footprint is per-chunk (Node defaults to 64 KiB) — the
+   * full file never sits in memory.
+   */
+  async getStream(path: string, options?: GetStreamOptions): Promise<ReadableStream<Uint8Array>> {
+    const fullPath = this.resolvePath(path)
+    // Existence check: createReadStream() is lazy, so a missing
+    // file only surfaces when the consumer reads. Throwing here
+    // matches the eager behavior of read() / readToBuffer().
+    await access(fullPath, constants.R_OK)
+    const nodeStream = createReadStream(fullPath, { signal: options?.signal })
+    return Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>
+  }
+
+  /**
+   * Pipe a web stream into a file on disk
+   * (stacksjs/stacks#1886). Uses `Readable.fromWeb` to bridge
+   * back into Node's stream pipeline so backpressure flows
+   * correctly — the file write paces with the source.
+   *
+   * Cancels via `options.signal` propagate to both the read and
+   * write sides; the partial file gets removed on abort to avoid
+   * leaving truncated artifacts.
+   */
+  async putStream(path: string, stream: ReadableStream<Uint8Array>, options?: PutStreamOptions): Promise<PutResult> {
+    const fullPath = this.resolvePath(path)
+    const dir = dirname(fullPath)
+    await mkdir(dir, { recursive: true })
+
+    const nodeReadable = Readable.fromWeb(stream as unknown as Parameters<typeof Readable.fromWeb>[0])
+    const writeStream = createWriteStream(fullPath)
+    try {
+      await pipeline(nodeReadable, writeStream, { signal: options?.signal })
+    }
+    catch (err) {
+      // Clean up the partial file so subsequent reads don't see
+      // truncated content from a cancelled upload.
+      try { await unlink(fullPath) }
+      catch { /* best-effort cleanup */ }
+      throw err
+    }
+
+    const st = await stat(fullPath)
+    return {
+      path,
+      size: st.size,
+      contentType: options?.contentType,
+      lastModified: st.mtimeMs,
+    }
   }
 
   async readToString(path: string): Promise<string> {
@@ -194,16 +265,43 @@ export class LocalStorageAdapter implements StorageAdapter {
     return entries
   }
 
-  async changeVisibility(_path: string, _visibility: Visibility): Promise<void> {
-    // Node.js doesn't have a simple visibility concept
-    // Would need to use chmod and translate visibility to permissions
-    // For now, this is a no-op
+  /**
+   * Translate the abstract "public / private" visibility into POSIX
+   * mode bits and apply via chmod (stacksjs/stacks#1873 S-4).
+   *
+   *  - public  → 0o644 (rw-r--r--)  / 0o755 for directories
+   *  - private → 0o600 (rw-------)  / 0o700 for directories
+   *
+   * Directories get the executable bit because POSIX requires it on
+   * the lookup path; without it a `readdir` on a "public" directory
+   * would still fail for other users.
+   *
+   * Previously a silent no-op — callers got "success" without any
+   * mode change, which made bug reports a guessing game ("I called
+   * `changeVisibility('public')` and the file is still 0600 — why?").
+   */
+  async changeVisibility(path: string, vis: Visibility): Promise<void> {
+    const fullPath = this.resolvePath(path)
+    const stats = await lstat(fullPath)
+    const isDir = stats.isDirectory()
+    const mode = (vis === ('public' as Visibility))
+      ? (isDir ? 0o755 : 0o644)
+      : (isDir ? 0o700 : 0o600)
+    await chmod(fullPath, mode)
   }
 
-  async visibility(_path: string): Promise<Visibility> {
-    // Would need to check file permissions and translate to visibility
-    // For now, default to private
-    return 'private' as Visibility
+  /**
+   * Read POSIX mode bits and translate back to abstract visibility.
+   * Any "world-readable" bit (0o004) flips the file to public; the
+   * stricter "group-readable but world-blocked" cases collapse to
+   * private since the storage facade has no group concept.
+   */
+  async visibility(path: string): Promise<Visibility> {
+    const fullPath = this.resolvePath(path)
+    const stats = await lstat(fullPath)
+    // mode is the full st_mode field; mask to the permission bits.
+    const perms = stats.mode & 0o777
+    return ((perms & 0o004) ? 'public' : 'private') as Visibility
   }
 
   async fileExists(path: string): Promise<boolean> {
@@ -231,8 +329,16 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 
   async publicUrl(path: string, options: PublicUrlOptions = {}): Promise<string> {
-    const domain = options.domain || 'http://localhost'
-    return `${domain}/${path}`
+    // Resolution order (stacksjs/stacks#1873 S-9):
+    //   1. explicit `options.domain`  — caller-controlled
+    //   2. `APP_URL` env var          — matches signedUrl() behavior
+    //   3. localhost fallback          — dev-mode safety net
+    // Pre-fix step 2 was missing — production apps that set APP_URL
+    // for every other framework URL got localhost-prefixed public
+    // links pointing at files on disk, which broke whenever the
+    // generated URL was emailed or stored.
+    const base = (options.domain || process.env.APP_URL || 'http://localhost').replace(/\/$/, '')
+    return `${base}/${path}`
   }
 
   async temporaryUrl(path: string, options: TemporaryUrlOptions): Promise<string> {

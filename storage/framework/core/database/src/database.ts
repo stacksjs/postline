@@ -146,7 +146,9 @@ export class Database {
       hooks: this._options.hooks,
     })
 
-    // Create the query builder instance
+    // Create the query builder instance. stacksjs/stacks#1951 — the wrapped
+    // createQueryBuilder bootstraps fresh sqlite connections with the FK
+    // pragmas, so no explicit applySqlitePragmas call is needed here.
     this._queryBuilder = createQueryBuilder()
     this._initialized = true
   }
@@ -236,8 +238,27 @@ export class Database {
         break
       }
 
+      case 'dynamodb' as SupportedDialect:
+        // DynamoDB has no SQL connection — it's accessed via the
+        // dedicated entity-style `dynamo.entity(...)` API instead. Set
+        // DB_CONNECTION to sqlite/mysql/postgres if you want the SQL
+        // path (migrations, ORM models, query builder)
+        // (stacksjs/stacks#1876 D-4). Throwing here means a
+        // mis-configured env surfaces immediately instead of silently
+        // falling back to an in-memory SQLite that loses data on restart.
+        throw new Error(
+          '[database] DB_CONNECTION=dynamodb is not a SQL driver. '
+          + 'Use the entity-style `dynamo.entity(...)` API for DynamoDB access, '
+          + 'or set DB_CONNECTION to sqlite/mysql/postgres for SQL workloads.',
+        )
+
       default:
-        connection = { database: ':memory:' }
+        // An unrecognized DB_CONNECTION used to silently land here and
+        // get an in-memory SQLite — a worst-case "it works on my machine"
+        // surprise. Loud-fail instead.
+        throw new Error(
+          `[database] Unknown DB_CONNECTION "${String(driver)}". Allowed values: sqlite, mysql, postgres.`,
+        )
     }
 
     return new Database({

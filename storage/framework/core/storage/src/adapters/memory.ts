@@ -5,9 +5,12 @@ import type {
   DirectoryEntry,
   DirectoryListing,
   FileContents,
+  GetStreamOptions,
   ListOptions,
   MimeTypeOptions,
   PublicUrlOptions,
+  PutResult,
+  PutStreamOptions,
   SignedUrlOptions,
   StatEntry,
   StorageAdapter,
@@ -57,8 +60,18 @@ export class InMemoryStorageAdapter implements StorageAdapter {
       return contents
     }
     else {
-      // ReadableStream
-      const reader = contents.getReader()
+      // Web-standard ReadableStream only — see s3.ts:contentsToBuffer
+      // (stacksjs/stacks#1873 S-15) for the same guard.
+      const stream = contents as unknown as { getReader?: ReadableStream['getReader'] }
+      if (typeof stream.getReader !== 'function') {
+        throw new TypeError(
+          '[storage/memory] contents must be a web-standard ReadableStream '
+          + '(with .getReader()), not a Node stream.Readable. '
+          + 'Convert via Readable.toWeb(nodeStream) before passing.',
+        )
+      }
+
+      const reader = stream.getReader.call(contents as ReadableStream)
       const chunks: Uint8Array[] = []
 
       while (true) {
@@ -82,7 +95,7 @@ export class InMemoryStorageAdapter implements StorageAdapter {
     }
   }
 
-  async write(path: string, contents: FileContents): Promise<void> {
+  async write(path: string, contents: FileContents): Promise<PutResult> {
     const normalized = this.normalizePath(path)
     const dirPath = this.getDirectoryPath(normalized)
 
@@ -92,13 +105,25 @@ export class InMemoryStorageAdapter implements StorageAdapter {
     }
 
     const data = await this.contentsToUint8Array(contents)
+    const lastModified = Date.now()
+    const mimeType = this.detectMimeType(normalized)
 
     this.files.set(normalized, {
       contents: data,
       visibility: 'private' as Visibility,
-      mimeType: this.detectMimeType(normalized),
-      lastModified: Date.now(),
+      mimeType,
+      lastModified,
     })
+
+    // Return the same metadata we stored — caller can use the
+    // returned size + lastModified without a separate stat() round-
+    // trip (stacksjs/stacks#1888 S-8).
+    return {
+      path: normalized,
+      size: data.length,
+      contentType: mimeType,
+      lastModified,
+    }
   }
 
   async read(path: string): Promise<FileContents> {
@@ -110,6 +135,70 @@ export class InMemoryStorageAdapter implements StorageAdapter {
     }
 
     return file.contents
+  }
+
+  /**
+   * Single-chunk stream wrapping the stored bytes
+   * (stacksjs/stacks#1886). The memory driver isn't a real
+   * streaming source — the whole file is already in memory by
+   * definition — so callers that expect partial reads will see
+   * one chunk, then `done: true`. Useful for cross-driver
+   * stream-piping where one side genuinely streams.
+   */
+  async getStream(path: string, _options?: GetStreamOptions): Promise<ReadableStream<Uint8Array>> {
+    const normalized = this.normalizePath(path)
+    const file = this.files.get(normalized)
+    if (!file) throw new Error(`File not found: ${path}`)
+    const bytes = file.contents
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes)
+        controller.close()
+      },
+    })
+  }
+
+  /**
+   * Consume a stream into the in-memory store
+   * (stacksjs/stacks#1886). Aborts via `options.signal` close the
+   * stream and discard any buffered chunks. The whole file ends
+   * up in memory — this driver is for tests + dev; production
+   * uploads should target a real disk.
+   */
+  async putStream(path: string, stream: ReadableStream<Uint8Array>, options?: PutStreamOptions): Promise<PutResult> {
+    const normalized = this.normalizePath(path)
+    const dirPath = this.getDirectoryPath(normalized)
+    if (dirPath) await this.createDirectory(dirPath)
+
+    const chunks: Uint8Array[] = []
+    const reader = stream.getReader()
+    const abort = options?.signal
+    try {
+      while (true) {
+        if (abort?.aborted) throw new Error('aborted')
+        const { done, value } = await reader.read()
+        if (done) break
+        if (value) chunks.push(value)
+      }
+    }
+    finally {
+      try { reader.releaseLock() }
+      catch { /* release best-effort */ }
+    }
+    const totalLength = chunks.reduce((sum, c) => sum + c.length, 0)
+    const data = new Uint8Array(totalLength)
+    let offset = 0
+    for (const c of chunks) { data.set(c, offset); offset += c.length }
+
+    const lastModified = Date.now()
+    const mimeType = options?.contentType ?? this.detectMimeType(normalized)
+    this.files.set(normalized, {
+      contents: data,
+      visibility: 'private' as Visibility,
+      mimeType,
+      lastModified,
+    })
+    return { path: normalized, size: data.length, contentType: mimeType, lastModified }
   }
 
   async readToString(path: string): Promise<string> {
@@ -346,8 +435,12 @@ export class InMemoryStorageAdapter implements StorageAdapter {
   }
 
   async publicUrl(path: string, options: PublicUrlOptions = {}): Promise<string> {
-    const domain = options.domain || 'http://localhost'
-    return `${domain}/${this.normalizePath(path)}`
+    // Mirrors local.ts (stacksjs/stacks#1873 S-9): explicit domain
+    // wins, otherwise fall back to APP_URL, otherwise localhost.
+    // Pre-fix the memory driver silently localhost-prefixed every
+    // URL even in production — same bug shape as the local driver.
+    const base = (options.domain || process.env.APP_URL || 'http://localhost').replace(/\/$/, '')
+    return `${base}/${this.normalizePath(path)}`
   }
 
   async temporaryUrl(path: string, options: TemporaryUrlOptions): Promise<string> {

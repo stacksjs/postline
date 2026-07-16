@@ -136,10 +136,11 @@ export interface SeedSummary {
 /**
  * Parsed model with seeding information
  */
-interface SeederModel {
+export interface SeederModel {
   name: string
   table: string
   count: number
+  fixtures: Array<Record<string, unknown>>
   attributes: Record<string, Attribute>
   model: Model
   filePath: string
@@ -186,10 +187,13 @@ async function loadModelsFromDir(modelsDir: string, recursive: boolean = false):
         continue
       }
 
-      // Get seed count
+      // Get seed count + optional fixture rows (merged over factories)
       let count = 10 // default
+      let fixtures: Array<Record<string, unknown>> = []
       if (typeof useSeeder === 'object' && 'count' in useSeeder) {
-        count = (useSeeder as SeedOptions).count
+        const opts = useSeeder as SeedOptions
+        count = opts.count
+        fixtures = opts.fixtures ?? []
       }
 
       // Get model name and table name
@@ -199,7 +203,8 @@ async function loadModelsFromDir(modelsDir: string, recursive: boolean = false):
       models.push({
         name: modelName,
         table: tableName,
-        count,
+        count: Math.max(count, fixtures.length),
+        fixtures,
         attributes: modelDef.attributes || {},
         model: modelDef,
         filePath: fullPath,
@@ -384,16 +389,34 @@ function inferDefaultValue(fieldName: string): unknown {
 /**
  * Generate multiple records for a model
  */
+function fixtureToColumns(fixture: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(fixture))
+    out[snakeCase(key)] = value
+  return out
+}
+
 async function generateRecords(model: SeederModel, verbose: boolean = false): Promise<Record<string, unknown>[]> {
   const records: Record<string, unknown>[] = []
 
   for (let i = 0; i < model.count; i++) {
     // Only log factory failures for the first record to avoid spam
     const record = await generateRecord(model.attributes, model.name, verbose && i === 0)
-    records.push(record)
+    const fixture = model.fixtures[i]
+    records.push(fixture ? { ...record, ...fixtureToColumns(fixture) } : record)
   }
 
   return records
+}
+
+/**
+ * Direct entry point for `factory.generate(Model, opts)` — exported
+ * under a distinct name so the new public API in `factory.ts` can call
+ * into the same insert path the legacy walker uses without leaking the
+ * `SeederModel` type. See stacksjs/stacks#1919.
+ */
+export function seedModelDirect(model: SeederModel, options: SeederConfig): Promise<SeedResult> {
+  return seedModel(model, options)
 }
 
 /**
@@ -405,7 +428,7 @@ async function seedModel(model: SeederModel, options: SeederConfig): Promise<See
   try {
     // Check if the table exists before attempting to seed
     try {
-      await db.selectFrom(model.table as any).limit(0).execute()
+      await db.selectFrom(model.table).limit(0).execute()
     }
     catch (tableErr: any) {
       const msg = tableErr?.message || ''
@@ -424,6 +447,25 @@ async function seedModel(model: SeederModel, options: SeederConfig): Promise<See
       throw tableErr
     }
 
+    if (!options.fresh) {
+      const existing = await db.selectFrom(model.table)
+        .selectAll()
+        .limit(1)
+        .executeTakeFirst()
+      if (existing) {
+        if (options.verbose) {
+          log.info(`  ${model.name}: table already has rows — skipping (use --fresh to replace)`)
+        }
+        return {
+          model: model.name,
+          table: model.table,
+          count: 0,
+          success: true,
+          duration: Date.now() - startTime,
+        }
+      }
+    }
+
     // Generate records
     const records = await generateRecords(model, options.verbose)
 
@@ -440,7 +482,7 @@ async function seedModel(model: SeederModel, options: SeederConfig): Promise<See
     // Truncate table if fresh option is enabled
     if (options.fresh) {
       try {
-        await db.deleteFrom(model.table as any).execute()
+        await db.deleteFrom(model.table).execute()
         if (options.verbose) {
           log.info(`  Truncated table: ${model.table}`)
         }
@@ -457,7 +499,7 @@ async function seedModel(model: SeederModel, options: SeederConfig): Promise<See
     for (let i = 0; i < records.length; i += batchSize) {
       const batch = records.slice(i, i + batchSize)
 
-      await db.insertInto(model.table as any)
+      await db.insertInto(model.table)
         .values(batch as any)
         .execute()
 
@@ -522,6 +564,13 @@ function sortModelsByDependencies(models: SeederModel[]): SeederModel[] {
  * Seeds the database using model factory functions
  * Loads models from both framework defaults and user-defined models,
  * with user models taking precedence.
+ *
+ * @deprecated stacksjs/stacks#1919 — the model auto-walker is no
+ * longer invoked by `./buddy seed`. Migrate each `useSeeder` trait to
+ * a class seeder via `./buddy seed:scaffold`, then call
+ * `factory.generate(Model, opts)` from inside each seeder. This
+ * function remains exported for programmatic back-compat but is
+ * scheduled for removal.
  */
 export async function seed(config: SeederConfig = {}): Promise<SeedSummary> {
   const startTime = Date.now()
@@ -549,6 +598,19 @@ export async function seed(config: SeederConfig = {}): Promise<SeedSummary> {
       duration: Date.now() - startTime,
     }
   }
+
+  // stacksjs/stacks#1919 — the `useSeeder` auto-walker is being
+  // collapsed into `factory.generate(Model, opts)`, which class
+  // seeders invoke explicitly. Emit a one-shot deprecation warning so
+  // users know the dual-pipeline footgun (walker rows + class seeder
+  // rows on the same table) is going away. The walker keeps firing
+  // for now to preserve back-compat; removal lands in a future major.
+  log.warn(
+    `[seed] The \`useSeeder\` trait + auto-walker is deprecated (stacksjs/stacks#1919, #1929). `
+    + `Run \`./buddy seed:scaffold\` to generate a class seeder per \`useSeeder\` model AND strip the trait `
+    + `from the model in one pass. The walker + trait are scheduled for removal in the next major. `
+    + `Affected: ${models.map(m => m.name).join(', ')}`,
+  )
 
   // Filter models if only/except is specified
   if (config.only && config.only.length > 0) {

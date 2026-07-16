@@ -25,6 +25,7 @@ import {
   deleteMigrationFiles,
   findDifferingKeys,
   getLastMigrationFields,
+  getLikeableForeignKey,
   getUpvoteTableName,
   hasTableBeenMigrated,
   isArrayEqual,
@@ -98,20 +99,23 @@ export async function resetPostgresDatabase(): Promise<Ok<string, never>> {
 
 export async function generatePostgresMigration(modelPath: string): Promise<void> {
   // check if any files are in the database folder
-  const files = await (fs.readdir as any)(path.userMigrationsPath(''))
+  // `fs` is plain node:fs — its callback readdir/unlink return undefined
+  // when awaited, so the promises API is required (the old `as any` casts
+  // hid an unconditional ERR_INVALID_ARG_TYPE crash here).
+  const files = await fs.promises.readdir(path.userMigrationsPath(''))
 
-  if ((files as any).length === 0) {
+  if (files.length === 0) {
     log.debug('No migrations found in the database folder, clearing the model snapshot cache...')
 
     const cacheDir = path.frameworkPath('cache/models')
 
     if (fs.existsSync(cacheDir)) {
-      const modelFiles = await (fs.readdir as any)(cacheDir)
+      const modelFiles = await fs.promises.readdir(cacheDir)
 
-      if ((modelFiles as any).length) {
-        for (const file of modelFiles as any) {
+      if (modelFiles.length) {
+        for (const file of modelFiles) {
           if (file.endsWith('.ts'))
-            await (fs.unlink as any)(path.frameworkPath(`cache/models/${file}`))
+            await fs.promises.unlink(path.frameworkPath(`cache/models/${file}`))
         }
       }
     }
@@ -181,7 +185,11 @@ async function createTableMigration(modelPath: string) {
 
   const useTimestamps = model.traits?.useTimestamps ?? model.traits?.timestampable ?? true
   const useSocials = model?.traits?.useSocials && Array.isArray(model.traits.useSocials) && model.traits.useSocials.length > 0
-  const useLikeable = model?.traits?.likeable && Array.isArray(model.traits.likeable) && model.traits.likeable.length > 0
+  // The typed forms are `boolean | LikeableOptions` — neither is an array,
+  // so requiring a non-empty array meant no typed model could ever get a
+  // pivot while the runtime trait activates for any truthy value
+  // (stacksjs/stacks#1954). Legacy empty arrays stay a no-op.
+  const useLikeable = Array.isArray(model?.traits?.likeable) ? model.traits.likeable.length > 0 : Boolean(model?.traits?.likeable)
   const useSoftDeletes = model.traits?.useSoftDeletes ?? model.traits?.softDeletable ?? false
 
   const usePasskey = (typeof model.traits?.useAuth === 'object' && model.traits.useAuth.usePasskey) ?? false
@@ -193,8 +201,12 @@ async function createTableMigration(modelPath: string) {
 
   let migrationContent = `import type { Database } from '@stacksjs/database'\n`
   migrationContent += `import { sql } from '@stacksjs/database'\n\n`
-  migrationContent += `export async function up(_db: Database<any>) {\n`
-  migrationContent += `  await (_db as any).schema\n`
+  // `up(db)` like every other generator — this was the last emitted
+  // signature naming its parameter `_db`, and the shared index helpers
+  // below emit `db`.
+  // eslint-disable-next-line pickier/no-unused-vars
+  migrationContent += `export async function up(db: Database<any>) {\n`
+  migrationContent += `  await (db as any).schema\n`
   migrationContent += `    .createTable('${tableName}')\n`
 
   migrationContent += `    .addColumn('id', 'serial', (col) => col.primaryKey())\n`
@@ -288,19 +300,30 @@ async function createTableMigration(modelPath: string) {
   if (useLikeable) {
     const upvoteTable = getUpvoteTableName(model, tableName)
     if (upvoteTable) {
+      // Singular FK — must match the runtime trait default or like()
+      // can't write to the generated table (see getLikeableForeignKey).
+      const foreignKey = getLikeableForeignKey(model, tableName)
       migrationContent += `\n  // Create upvote table\n`
-      migrationContent += `  await (_db as any).schema\n`
+      migrationContent += `  await (db as any).schema\n`
       migrationContent += `    .createTable('${upvoteTable}')\n`
       migrationContent += `    .addColumn('id', 'serial', (col) => col.primaryKey())\n`
-      migrationContent += `    .addColumn('${tableName}_id', 'integer', (col) => col.notNull())\n`
+      migrationContent += `    .addColumn('${foreignKey}', 'integer', (col) => col.notNull())\n`
       migrationContent += `    .addColumn('user_id', 'integer', (col) => col.notNull())\n`
-      migrationContent += `    .addColumn('created_at', 'timestamp', col => col.notNull().defaultTo(sql.raw('CURRENT_TIMESTAMP')))\n`
-      migrationContent += `    .addColumn('updated_at', 'timestamp')\n`
+      // Use timestamptz on PostgreSQL — same convention as the main
+      // model table above (stacksjs/stacks#1876 D-5). Without this,
+      // the upvote table drifted to plain `timestamp` (no TZ) while
+      // its parent table used `timestamptz`, so cross-table joins
+      // returned mismatched values for the same instant.
+      migrationContent += `    .addColumn('created_at', 'timestamptz', col => col.notNull().defaultTo(sql.raw('CURRENT_TIMESTAMP')))\n`
+      migrationContent += `    .addColumn('updated_at', 'timestamptz')\n`
       migrationContent += `    .execute()\n\n`
       migrationContent += `  // Add indexes for upvote table\n`
-      migrationContent += `  await (_db as any).schema.createIndex('${upvoteTable}_${tableName}_id_index').on('${upvoteTable}').column('${tableName}_id').execute()\n`
-      migrationContent += `  await (_db as any).schema.createIndex('${upvoteTable}_user_id_index').on('${upvoteTable}').column('user_id').execute()\n`
-      migrationContent += `  await (_db as any).schema.createIndex('${upvoteTable}_id_index').on('${upvoteTable}').column('id').execute()\n`
+      migrationContent += `  await (db as any).schema.createIndex('${upvoteTable}_${foreignKey}_index').on('${upvoteTable}').column('${foreignKey}').execute()\n`
+      // Composite UNIQUE (user_id, fk) — backs the trait's idempotent
+      // like(): duplicate inserts throw 23505 and the catch returns the
+      // existing row instead of double-counting.
+      migrationContent += `  await (db as any).schema.createIndex('${upvoteTable}_user_${foreignKey}_unique').on('${upvoteTable}').columns(['user_id', '${foreignKey}']).unique().execute()\n`
+      migrationContent += `  await (db as any).schema.createIndex('${upvoteTable}_id_index').on('${upvoteTable}').column('id').execute()\n`
     }
   }
 
@@ -315,69 +338,12 @@ async function createTableMigration(modelPath: string) {
   log.success(`Created migration: ${italic(migrationFileName)}`)
 }
 
-export async function createPostgresForeignKeyMigrations(modelPath: string): Promise<void> {
-  const model = (await import(modelPath)).default as Model
-  const modelName = getModelName(model, modelPath)
-  const tableName = getTableName(model, modelPath)
-  const otherModelRelations = await fetchOtherModelRelations(modelName)
-
-  const foreignKeyRelations = otherModelRelations.filter(relation => relation.foreignKey)
-
-  if (!foreignKeyRelations.length) {
-    return
-  }
-
-  let migrationContent = `import type { Database } from '@stacksjs/database'\n`
-  migrationContent += `import { sql } from '@stacksjs/database'\n\n`
-  migrationContent += `export async function up(_db: Database<any>) {\n`
-  migrationContent += `  await (_db as any).schema\n`
-  migrationContent += `    .alterTable('${tableName}')\n`
-
-  for (const modelRelation of foreignKeyRelations) {
-    migrationContent += `    .addColumn('${modelRelation.foreignKey}', 'integer', (col) =>
-      col.references('${modelRelation.relationTable}.id').onDelete('cascade')
-    ) \n`
-  }
-
-  migrationContent += `    .execute()\n`
-  migrationContent += await createCompositeIndexMigration(model, modelPath)
-  migrationContent += `}\n`
-
-  const timestamp = new Date().getTime().toString()
-  const migrationFileName = `${timestamp}-add-foreign-keys-to-${tableName}-table.ts`
-  const migrationFilePath = path.userMigrationsPath(migrationFileName)
-
-  await Bun.write(migrationFilePath, migrationContent)
-
-  log.success(`Created foreign key migration: ${italic(migrationFileName)}`)
-}
-
-async function createCompositeIndexMigration(model: Model, modelPath: string): Promise<string> {
-  const tableName = getTableName(model, modelPath)
-  const modelName = getModelName(model, modelPath)
-  const otherModelRelations = await fetchOtherModelRelations(modelName)
-
-  let migrationContent = ''
-
-  // Add composite indexes if defined
-  if (model.indexes?.length) {
-    migrationContent += '\n'
-    for (const index of model.indexes) {
-      migrationContent += generateIndexCreationSQL(tableName, index.name, index.columns)
-    }
-  }
-
-  if (otherModelRelations?.length) {
-    for (const modelRelation of otherModelRelations) {
-      if (!modelRelation.foreignKey)
-        continue
-
-      migrationContent += generateForeignKeyIndexSQL(tableName, modelRelation.foreignKey)
-    }
-  }
-
-  return migrationContent
-}
+// `createPostgresForeignKeyMigrations` + `createCompositeIndexMigration`
+// used to live here — both were never called from anywhere in the
+// codebase. The FK migrations they generated have been redundant
+// since stacksjs/bun-query-builder#1019 (and #1916) — bqb emits the
+// equivalent `ALTER TABLE … ADD CONSTRAINT FOREIGN KEY` statements
+// inside its own migration plan. Removed in #1916 Phase 2.
 
 async function createPivotTableMigration(model: Model, modelPath: string) {
   const pivotTables = await getPivotTables(model, modelPath)
@@ -408,29 +374,35 @@ async function createPivotTableMigration(model: Model, modelPath: string) {
     migrationContent += `    .addColumn('id', 'serial', (col) => col.primaryKey())\n`
     migrationContent += `    .addColumn('${pivotTable.firstForeignKey}', 'integer', (col) => col.notNull())\n`
     migrationContent += `    .addColumn('${pivotTable.secondForeignKey}', 'integer', (col) => col.notNull())\n`
-    migrationContent += `    .addColumn('created_at', 'timestamp', col => col.notNull().defaultTo(sql.raw('CURRENT_TIMESTAMP')))\n`
+    // Use timestamptz on PostgreSQL to match the parent table
+    // convention (see :275). Cross-table joins on created_at
+    // returned mismatched values when the pivot drifted to plain
+    // `timestamp` (no TZ) while the parent used `timestamptz`.
+    // Same D-5 fix that the upvote table got in #1876; this was the
+    // missed m2m sibling. See stacksjs/stacks#1915.
+    migrationContent += `    .addColumn('created_at', 'timestamptz', col => col.notNull().defaultTo(sql.raw('CURRENT_TIMESTAMP')))\n`
     migrationContent += `    .execute()\n\n`
 
     // Add foreign key constraints
-    migrationContent += `  await (_db as any).schema\n`
+    migrationContent += `  await (db as any).schema\n`
     migrationContent += `    .alterTable('${pivotTable.table}')\n`
     migrationContent += `    .addForeignKeyConstraint('${pivotTable.table}_${pivotTable.firstForeignKey}_fkey', ['${pivotTable.firstForeignKey}'], '${plural(pivotTable.firstForeignKey?.replace(/_id$/, '') || '')}', ['id'], (cb) => cb.onDelete('cascade'))\n`
     migrationContent += `    .execute()\n\n`
 
     // Add unique constraint to prevent duplicate relationships
-    migrationContent += `  await (_db as any).schema\n`
+    migrationContent += `  await (db as any).schema\n`
     migrationContent += `    .alterTable('${pivotTable.table}')\n`
     migrationContent += `    .addUniqueConstraint('${pivotTable.table}_unique', ['${pivotTable.firstForeignKey}', '${pivotTable.secondForeignKey}'])\n`
     migrationContent += `    .execute()\n\n`
 
     // Add indexes for better query performance
-    migrationContent += `  await (_db as any).schema\n`
+    migrationContent += `  await (db as any).schema\n`
     migrationContent += `    .createIndex('${pivotTable.table}_${pivotTable.firstForeignKey}_idx')\n`
     migrationContent += `    .on('${pivotTable.table}')\n`
     migrationContent += `    .column('${pivotTable.firstForeignKey}')\n`
     migrationContent += `    .execute()\n\n`
 
-    migrationContent += `  await (_db as any).schema\n`
+    migrationContent += `  await (db as any).schema\n`
     migrationContent += `    .createIndex('${pivotTable.table}_${pivotTable.secondForeignKey}_idx')\n`
     migrationContent += `    .on('${pivotTable.table}')\n`
     migrationContent += `    .column('${pivotTable.secondForeignKey}')\n`
@@ -475,7 +447,7 @@ async function createAlterTableMigration(modelPath: string) {
 
   if (fieldsToAdd.length || fieldsToRemove.length) {
     hasChanged = true
-    migrationContent += `  await (_db as any).schema.alterTable('${tableName}')\n`
+    migrationContent += `  await (db as any).schema.alterTable('${tableName}')\n`
   }
 
   // Add new fields
@@ -542,17 +514,32 @@ async function createAlterTableMigration(modelPath: string) {
   }
 }
 
-function generateIndexCreationSQL(tableName: string, indexName: string, columns: string[]): string {
-  const columnsStr = columns.map(col => `'${snakeCase(col)}'`).join(', ')
-  return `  await (_db as any).schema.createIndex('${indexName}').on('${tableName}').columns([${columnsStr}]).execute()\n`
+export function generateIndexCreationSQL(
+  tableName: string,
+  index: { name: string, columns: string[], unique?: boolean, where?: string },
+): string {
+  // Partial / multi-column unique indexes (stacksjs/stacks#1943) — emit
+  // raw SQL via `db.unsafe(...)` for the UNIQUE / WHERE forms so we
+  // don't have to thread kysely's `sql` template tag into generated
+  // migration imports.
+  if (index.unique || index.where) {
+    const unique = index.unique ? 'UNIQUE ' : ''
+    const cols = index.columns.map(col => snakeCase(col)).join(', ')
+    const whereClause = index.where ? ` WHERE ${index.where}` : ''
+    return `  await db.unsafe(\`CREATE ${unique}INDEX IF NOT EXISTS "${index.name}" ON "${tableName}" (${cols})${whereClause}\`).execute()\n`
+  }
+  const columnsStr = index.columns.map(col => `'${snakeCase(col)}'`).join(', ')
+  return `  await (db as any).schema.createIndex('${index.name}').on('${tableName}').columns([${columnsStr}]).execute()\n`
 }
 
+// These helpers are spliced into generated up(db) bodies, so the emitted
+// references must use `db` — `_db` was a ReferenceError at migration time.
 function generatePrimaryKeyIndexSQL(tableName: string): string {
-  return `  await (_db as any).schema.createIndex('${tableName}_id_index').on('${tableName}').column('id').execute()\n`
+  return `  await (db as any).schema.createIndex('${tableName}_id_index').on('${tableName}').column('id').execute()\n`
 }
 
 function generateForeignKeyIndexSQL(tableName: string, foreignKey: string): string {
-  return `  await (_db as any).schema.createIndex('${tableName}_${foreignKey}_index').on('${tableName}').column('${foreignKey}').execute()\n\n`
+  return `  await (db as any).schema.createIndex('${tableName}_${foreignKey}_index').on('${tableName}').column('${foreignKey}').execute()\n\n`
 }
 
 export async function fetchPostgresTables(): Promise<string[]> {

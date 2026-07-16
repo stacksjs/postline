@@ -35,6 +35,22 @@ if (!existsSync(modelsIndex))
 // the "no imports needed" ergonomics of framework default actions.
 await injectGlobalAutoImports()
 
+// Optional app hook: start Typesense (or other search infra) before the API
+// serves traffic. Projects using SEARCH_ENGINE_DRIVER=typesense can ship
+// `app/Lib/typesense-dev.ts` with `ensureTypesenseRunning()`.
+try {
+  const typesenseDev = path.appPath('Lib/typesense-dev.ts')
+  if (existsSync(typesenseDev)) {
+    const mod = await import(typesenseDev)
+    if (typeof mod.ensureTypesenseRunning === 'function')
+      await mod.ensureTypesenseRunning()
+  }
+}
+catch (err) {
+  const { log } = await import('@stacksjs/cli')
+  log.warn(`[api:dev] search engine bootstrap skipped: ${(err as Error).message}`)
+}
+
 // Boot the user's event listener registry. Without this, every dispatch()
 // inside an action (booking:created, payment:succeeded, car:updated, etc.)
 // is fire-and-silently-forgotten — emitter.on('*') is never registered.
@@ -55,6 +71,19 @@ try {
 catch (err) {
   const { log } = await import('@stacksjs/cli')
   log.warn(`[api:dev] failed to bootstrap event listeners — dispatched events will be ignored: ${(err as Error).message}`)
+}
+
+// Auto-migrate on model edits: keep the dev database in sync with the models
+// without a manual `buddy migrate`. Non-destructive changes apply silently;
+// destructive ones are logged and left for `buddy migrate`. Opt out with
+// STACKS_DEV_AUTO_MIGRATE=0. Wrapped so a watch failure can't crash the API.
+try {
+  const { startModelMigrationWatcher } = await import('./migrate-watcher')
+  startModelMigrationWatcher()
+}
+catch (err) {
+  const { log } = await import('@stacksjs/cli')
+  log.debug(`[api:dev] auto-migrate watcher not started: ${(err as Error).message}`)
 }
 
 // Enable CORS middleware.

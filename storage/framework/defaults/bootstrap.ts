@@ -57,6 +57,10 @@ setRbacStore(createBqbRbacStore())
 // to an empty 200, and every route returns `200 OK Content-Length: 0`.
 route.use(MaintenanceMiddleware.toRouterHandler() as any)
 
+// Locale cookie + STX-style path redirect (`/locale/en` → `/en/…`).
+// Overridable by registering the same path in app routes first.
+await route.register(frameworkPath('defaults/routes/core.ts'))
+
 // Feature-gated route registration. The dashboard.ts file currently bundles
 // ~687 lines covering auth, password reset, email subscribe, storefront
 // cart/checkout, reviews, sitemap, AI, voice, and the admin dashboard's
@@ -81,4 +85,15 @@ if (feature('dashboard')) {
   // JSON endpoints for the dev dashboard UI. Kept separate from the view
   // routes above so the data layer is one obvious file to grep.
   await route.register(frameworkPath('defaults/routes/dashboard-api.ts'))
+}
+
+// Email webhook + unsubscribe routes (stacksjs/stacks#1881, #1880).
+// Always mounted when the `email` feature is on — the underlying
+// handlers self-disable when their provider credentials aren't
+// configured (they 401 rather than processing). Apps that need a
+// non-default mount path register their own routes in `routes/api.ts`
+// and the framework's mount silently no-ops since user routes
+// register first.
+if (feature('email')) {
+  await route.register(frameworkPath('defaults/routes/email.ts'))
 }

@@ -1,5 +1,6 @@
 import { log, runCommand } from '@stacksjs/cli'
 import { ExitCode } from '@stacksjs/types'
+import { getErrorMessage } from '@stacksjs/utils'
 import { CLI } from '@stacksjs/clapp'
 import { createHash, createHmac, randomBytes } from 'crypto'
 import { readFileSync, existsSync } from 'node:fs'
@@ -54,8 +55,8 @@ export function mailCommands(buddy: CLI): void {
         }
 
         process.exit(ExitCode.Success)
-      } catch (error: any) {
-        log.error(`Failed to add user: ${error.message}`)
+      } catch (error: unknown) {
+        log.error(`Failed to add user: ${getErrorMessage(error)}`)
         process.exit(ExitCode.FatalError)
       }
     })
@@ -89,8 +90,8 @@ export function mailCommands(buddy: CLI): void {
 
         console.log('')
         process.exit(ExitCode.Success)
-      } catch (error: any) {
-        log.error(`Failed to list users: ${error.message}`)
+      } catch (error: unknown) {
+        log.error(`Failed to list users: ${getErrorMessage(error)}`)
         process.exit(ExitCode.FatalError)
       }
     })
@@ -112,8 +113,8 @@ export function mailCommands(buddy: CLI): void {
 
         log.success(`User ${email} deleted`)
         process.exit(ExitCode.Success)
-      } catch (error: any) {
-        log.error(`Failed to delete user: ${error.message}`)
+      } catch (error: unknown) {
+        log.error(`Failed to delete user: ${getErrorMessage(error)}`)
         process.exit(ExitCode.FatalError)
       }
     })
@@ -194,8 +195,8 @@ export function mailCommands(buddy: CLI): void {
           proxy.stop()
           process.exit(0)
         })
-      } catch (error: any) {
-        log.error(`Failed to start proxy: ${error.message}`)
+      } catch (error: unknown) {
+        log.error(`Failed to start proxy: ${getErrorMessage(error)}`)
         process.exit(ExitCode.FatalError)
       }
     })
@@ -239,8 +240,8 @@ export function mailCommands(buddy: CLI): void {
         }
 
         process.exit(ExitCode.Success)
-      } catch (error: any) {
-        log.error(`Failed to test API: ${error.message}`)
+      } catch (error: unknown) {
+        log.error(`Failed to test API: ${getErrorMessage(error)}`)
         process.exit(ExitCode.FatalError)
       }
     })
@@ -388,8 +389,8 @@ export function mailCommands(buddy: CLI): void {
 
         console.log('')
         process.exit(ExitCode.Success)
-      } catch (error: any) {
-        log.error(`Failed to fetch logs: ${error.message}`)
+      } catch (error: unknown) {
+        log.error(`Failed to fetch logs: ${getErrorMessage(error)}`)
         process.exit(ExitCode.FatalError)
       }
     })
@@ -450,8 +451,8 @@ export function mailCommands(buddy: CLI): void {
 
         console.log('')
         process.exit(ExitCode.Success)
-      } catch (error: any) {
-        log.error(`Failed to get status: ${error.message}`)
+      } catch (error: unknown) {
+        log.error(`Failed to get status: ${getErrorMessage(error)}`)
         process.exit(ExitCode.FatalError)
       }
     })
@@ -532,8 +533,8 @@ export function mailCommands(buddy: CLI): void {
             const result = execSync(`ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 root@${ip} "timeout 5 bash -c 'echo QUIT > /dev/tcp/gmail-smtp-in.l.google.com/25' 2>&1 && echo PORT_25_OPEN || echo PORT_25_BLOCKED"`, { encoding: 'utf-8' })
             printPort25Status(result.trim(), 'Hetzner', ip)
           }
-        } catch (error: any) {
-          log.error(`Failed: ${error.message}`)
+        } catch (error: unknown) {
+          log.error(`Failed: ${getErrorMessage(error)}`)
         }
         process.exit(ExitCode.Success)
       }
@@ -567,8 +568,8 @@ export function mailCommands(buddy: CLI): void {
 
         printPort25Status(result.output?.trim() || 'PORT_25_BLOCKED', 'AWS', publicIp)
         process.exit(ExitCode.Success)
-      } catch (error: any) {
-        log.error(`Failed: ${error.message}`)
+      } catch (error: unknown) {
+        log.error(`Failed: ${getErrorMessage(error)}`)
         process.exit(ExitCode.FatalError)
       }
     })
@@ -648,10 +649,45 @@ export function mailCommands(buddy: CLI): void {
         })
 
         process.exit(0)
-      } catch (error: any) {
-        log.error(`Failed to start SMTP server: ${error.message}`)
+      } catch (error: unknown) {
+        log.error(`Failed to start SMTP server: ${getErrorMessage(error)}`)
         process.exit(ExitCode.FatalError)
       }
+    })
+
+  // Preview-server companion (stacksjs/stacks#1900 A3). The preview
+  // routes themselves live in `defaults/routes/core.ts` so they mount
+  // automatically on any dev server (`./buddy dev:api`); this command
+  // is a convenience that prints the URL + opens it. Reads the API
+  // port from `config.ports.api` with the same env-var override the
+  // dev server uses.
+  buddy
+    .command('mail:preview', 'Open the dev-only Mailable preview UI in your browser')
+    .option('--no-open', 'Print the URL but skip the browser-open step', { default: false })
+    .option('--port <port>', 'Override the API port (default: from config.ports.api / PORT_API)')
+    .example('buddy mail:preview')
+    .example('buddy mail:preview --no-open')
+    .example('buddy mail:preview --port 4000')
+    .action(async (options: { open?: boolean, port?: string }) => {
+      const { config } = await import('@stacksjs/config')
+      const portFromOption = options.port ? Number(options.port) : undefined
+      const portFromEnv = process.env.PORT_API ? Number(process.env.PORT_API) : undefined
+      const port = portFromOption || portFromEnv || config.ports?.api || 3008
+      const url = `http://localhost:${port}/_stacks/mail/preview`
+
+      log.info(`Mailable preview: ${url}`)
+      log.info('(Make sure `./buddy dev:api` is running.)')
+
+      if (options.open !== false) {
+        try {
+          execSync(`open "${url}" 2>/dev/null || xdg-open "${url}" 2>/dev/null || true`, { encoding: 'utf-8' })
+        }
+        catch {
+          /* Silent — printing the URL above is sufficient for headless envs. */
+        }
+      }
+
+      process.exit(ExitCode.Success)
     })
 }
 
@@ -836,8 +872,8 @@ async function requestAwsPort25(
         log.success(`Reverse DNS requested: ${elasticIp} -> ${rdns}`)
         console.log('  (rDNS propagation may take a few minutes)')
       }
-    } catch (error: any) {
-      log.warn(`rDNS setup failed: ${error.message}`)
+    } catch (error: unknown) {
+      log.warn(`rDNS setup failed: ${getErrorMessage(error)}`)
       console.log('  You may need to set this up manually in the AWS console.')
     }
   }
@@ -950,8 +986,8 @@ async function requestHetznerPort25(
       } else {
         log.warn(`rDNS response: ${JSON.stringify(rdnsData.error || rdnsData)}`)
       }
-    } catch (error: any) {
-      log.warn(`rDNS failed: ${error.message}`)
+    } catch (error: unknown) {
+      log.warn(`rDNS failed: ${getErrorMessage(error)}`)
     }
   }
 

@@ -6,6 +6,7 @@
  */
 
 import type { DatabaseSchema } from '@stacksjs/query-builder'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { createQueryBuilder, setConfig } from '@stacksjs/query-builder'
 
 // Permissive schema type that accepts any table name with any columns
@@ -63,6 +64,14 @@ export function initializeDbConfig(config: any): void {
 
   // Update bun-query-builder config
   updateQueryBuilderConfig()
+
+  // Drop the cached query-builder instance so the next `db` access renders
+  // SQL for the overridden dialect. The connection itself is rebuilt by
+  // bun-query-builder's signature check, but the cached instance keeps
+  // rendering with the dialect captured at creation — a config override
+  // from mysql back to sqlite otherwise executes `NOW()`-style SQL against
+  // the sqlite connection (cross-file test interference).
+  _dbInstance = null
 }
 
 // Simple functions with defensive defaults
@@ -147,7 +156,11 @@ function updateQueryBuilderConfig(): void {
       defaultOrderColumn: 'created_at',
     },
     softDeletes: {
-      enabled: false,
+      // Boot-time default; mirrors config/query-builder.ts. Enabled so the
+      // ORM read path filters out `deleted_at` rows by default (per-model
+      // behavior still gated by the `useSoftDeletes` trait). See the config
+      // file for the full rationale.
+      enabled: true,
       column: 'deleted_at',
       defaultFilter: true,
     },
@@ -191,10 +204,73 @@ export async function ensureDatabaseConfigLoaded(): Promise<void> {
   await ensureConfigLoaded()
 }
 
+// SQLite bootstrap pragmas (stacksjs/stacks#1951) now live in
+// @stacksjs/query-builder — the one chokepoint every framework
+// query-builder instance is created through — so EVERY fresh sqlite
+// connection gets `foreign_keys = ON`, including builders created outside
+// this module (e.g. the ORM auto-CRUD routes). Re-exported here for
+// backwards compatibility with existing imports.
+export { applySqlitePragmas, SQLITE_BOOTSTRAP_PRAGMAS } from '@stacksjs/query-builder'
+
+/**
+ * SQLite transaction serialization (stacksjs/stacks#1953).
+ *
+ * Bun.SQL's sqlite adapter is a single shared connection and
+ * bun-query-builder tracks transaction depth per-connection, so two
+ * CONCURRENT `db.transaction()` calls interleave: the second BEGIN is
+ * issued as a savepoint inside the first caller's transaction (or fails
+ * outright with "cannot start a transaction within a transaction"), and
+ * the first COMMIT destroys the second caller's savepoint ("no such
+ * savepoint: qb_sp_N"). Either way the loser 500s on perfectly legal
+ * work — e.g. two near-simultaneous registrations for different emails.
+ * Queue transactions through a promise-chain mutex so they run one at a
+ * time instead of colliding. MySQL/Postgres pool connections, so they
+ * are unaffected; the patch is only applied for the sqlite dialect.
+ *
+ * Same-async-context NESTING is exempt from the queue: a nested
+ * `db.transaction()` inside an open transaction's callback is the
+ * sequential savepoint case bun-query-builder handles correctly, and
+ * queueing it would deadlock — the inner call would wait for the outer
+ * transaction (its own caller) to finish.
+ */
+const sqliteTxOwner = new AsyncLocalStorage<true>()
+let sqliteTxTail: Promise<void> = Promise.resolve()
+
+function serializeSqliteTransaction<T>(run: () => Promise<T>): Promise<T> {
+  if (sqliteTxOwner.getStore())
+    return run()
+
+  const result = sqliteTxTail.then(() => sqliteTxOwner.run(true, run))
+  // Keep the chain alive after a rollback — the rejection still surfaces
+  // to this transaction's caller via `result`.
+  sqliteTxTail = result.then(() => undefined, () => undefined)
+  return result
+}
+
+function applySqliteTransactionSerialization(instance: RawQueryBuilder): void {
+  // Patch the instance's own property (not the proxy) so internal callers
+  // like `transactional()` — which invokes `this.transaction(...)` — are
+  // serialized too.
+  const original = (instance.transaction as (...args: any[]) => Promise<any>).bind(instance)
+  ;(instance as any).transaction = (...args: any[]) =>
+    serializeSqliteTransaction(() => original(...args))
+}
+
 function getDb(): ReturnType<typeof createQueryBuilder> {
   if (!_dbInstance) {
     updateQueryBuilderConfig()
+    // stacksjs/stacks#1951 — the wrapped createQueryBuilder applies the
+    // sqlite bootstrap pragmas to the freshly captured connection, so every
+    // instance recreation (config reload nulls `_dbInstance`, and a config
+    // change can swap bun-query-builder's signature-keyed singleton) is
+    // re-bootstrapped without an explicit call here.
     _dbInstance = createQueryBuilder()
+    // stacksjs/stacks#1953 — re-applied on every instance recreation
+    // (config reload nulls `_dbInstance`). Pragmas themselves are applied
+    // inside the wrapped createQueryBuilder (#1951), so only the
+    // transaction serialization patch is needed here.
+    if (getDialect() === 'sqlite')
+      applySqliteTransactionSerialization(_dbInstance)
   }
   return _dbInstance
 }
@@ -332,14 +408,51 @@ type GenericPassthroughKeys =
   | 'simple'
   | 'file'
 
+/**
+ * Userland-augmentable table registry (stacksjs/stacks#1923).
+ *
+ * Empty by default — the framework can't know an app's tables at its
+ * own build time. `buddy generate:types` walks `app/Models/*.ts` and
+ * emits `database/types.d.ts` containing:
+ *
+ * ```ts
+ * declare module '@stacksjs/database' {
+ *   interface DatabaseSchema {
+ *     court_houses: { columns: { id: number; name: string; ... } }
+ *     judges:       { columns: { id: number; name: string; court_id: number; ... } }
+ *   }
+ * }
+ * ```
+ *
+ * Once that file is loaded into the TS project, `db.selectFrom('co|')`
+ * autocompletes to known table names. Apps without a generated file
+ * still compile — the `(string & {})` branch on `TableName` keeps the
+ * type as a literal-union+escape-hatch, so any string is accepted
+ * but known keys are surfaced first by the language server.
+ */
+// eslint-disable-next-line ts/no-empty-object-type
+export interface DatabaseSchema {}
+
+/**
+ * Accept either a registered table name (from augmented
+ * `DatabaseSchema`) for autocomplete, or any other string for apps
+ * that haven't generated types yet / tables not in a model file.
+ *
+ * The `(string & {})` branch prevents TS from collapsing the union
+ * back to `string` and losing the autocomplete narrowing — a
+ * well-documented LiteralUnion trick.
+ */
+// eslint-disable-next-line ts/no-empty-object-type
+export type TableName = (keyof DatabaseSchema & string) | (string & {})
+
 interface Db extends Pick<Required<RawQueryBuilder>, GenericPassthroughKeys> {
-  selectFrom: (table: string) => FluentChain
-  insertInto: (table: string) => FluentChain
-  updateTable: (table: string) => FluentChain
-  deleteFrom: (table: string) => FluentChain
-  table: (table: string) => FluentChain
+  selectFrom: (table: TableName) => FluentChain
+  insertInto: (table: TableName) => FluentChain
+  updateTable: (table: TableName) => FluentChain
+  deleteFrom: (table: TableName) => FluentChain
+  table: (table: TableName) => FluentChain
   selectFromSub: (sub: any, alias: string) => FluentChain
-  select: (table: string, ...columns: string[]) => FluentChain
+  select: (table: TableName, ...columns: string[]) => FluentChain
   unsafe: (query: string, params?: any[]) => UnsafeReturn
 }
 

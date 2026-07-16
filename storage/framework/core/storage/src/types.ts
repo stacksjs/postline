@@ -35,6 +35,89 @@ export interface StatEntry {
 }
 
 /**
+ * Options for `Storage.getStream(path, options?)`
+ * (stacksjs/stacks#1886).
+ */
+export interface GetStreamOptions {
+  /** Abort signal — cancels the read mid-stream. */
+  signal?: AbortSignal
+}
+
+/**
+ * Options for `Storage.putStream(path, stream, options?)`
+ * (stacksjs/stacks#1886). All fields are optional; the S3 driver
+ * reads them to tune its multipart pipeline, other drivers
+ * generally only honor `contentType` and `signal`.
+ */
+export interface PutStreamOptions {
+  /**
+   * MIME type to record on the upload. Drivers that auto-detect
+   * from the path extension still use that as the default; this
+   * field overrides.
+   */
+  contentType?: string
+  /**
+   * Abort the upload mid-flight. On S3 this triggers
+   * AbortMultipartUpload so partial uploads don't accrue storage
+   * charges.
+   */
+  signal?: AbortSignal
+  /**
+   * S3 multipart part size in bytes. Default 5 MiB (S3's minimum
+   * part size except for the final part). Larger values reduce
+   * the per-part overhead at the cost of more buffered memory
+   * per concurrent upload. Capped at 5 GiB per S3's max part
+   * size.
+   */
+  partSize?: number
+  /**
+   * S3 multipart upload concurrency — how many parts to upload
+   * in parallel. Default 4. Higher values increase throughput on
+   * fast networks but use more memory (`concurrency * partSize`
+   * peak).
+   */
+  concurrency?: number
+  /**
+   * S3 multipart per-part retry attempts before aborting the
+   * whole upload. Default 3.
+   */
+  maxRetries?: number
+}
+
+/**
+ * Result returned from `Storage.put()` (stacksjs/stacks#1888 S-8).
+ *
+ * Pre-fix `put()` returned `Promise<void>` — callers that wanted to
+ * record an etag for cache-invalidation or a size for storage-quota
+ * accounting had to issue a second `.stat()` round-trip. This shape
+ * carries the metadata back from the write itself.
+ *
+ * Fields beyond `path` are best-effort: drivers that don't expose
+ * (or can't cheaply compute) a value omit it rather than synthesizing
+ * a fake one. Callers should treat them as nullable.
+ */
+export interface PutResult {
+  /** Storage-relative path the file was written to. */
+  path: string
+  /** Bytes written. */
+  size: number
+  /** MIME type recorded for the write (driver-detected or caller-supplied). */
+  contentType?: string
+  /**
+   * Last-modified timestamp the driver reports for the written object,
+   * in milliseconds since epoch. Useful for cache-control headers and
+   * change detection without a follow-up `stat()`.
+   */
+  lastModified?: number
+  /**
+   * Driver-reported strong-validator (S3 ETag, content hash, etc.).
+   * Use for HTTP `If-None-Match` / `If-Match` conditional requests.
+   * Omitted by drivers that don't compute one.
+   */
+  etag?: string
+}
+
+/**
  * Directory listing entry
  */
 export interface DirectoryEntry {
@@ -97,6 +180,55 @@ export interface SignedUrlOptions {
 }
 
 /**
+ * Options for `presignedUploadPolicy()` — the POST-form upload
+ * primitive that S3 can enforce server-side (stacksjs/stacks#1888
+ * Phase B). Distinct from {@link PresignedUploadUrlOptions} (PUT-
+ * form): the POST policy carries a `Content-Length-Range` condition
+ * that S3 enforces server-side, so this is the right primitive when
+ * you genuinely need a size cap against an untrusted client.
+ */
+export interface PresignedUploadPolicyOptions {
+  /**
+   * Either an exact key the upload must land at, or a `{ startsWith
+   * }` prefix when the client picks the final suffix.
+   */
+  key: string | { startsWith: string }
+  /**
+   * Required Content-Type the upload must submit. Pass an exact
+   * string OR `{ startsWith: 'image/' }` for prefix-matching.
+   */
+  contentType: string | { startsWith: string }
+  /**
+   * S3-enforced size range in bytes. The whole reason to use POST-
+   * form over PUT-form is that S3 actually rejects uploads outside
+   * this range — no post-upload cleanup required.
+   */
+  contentLengthRange?: { min: number, max: number }
+  /** ACL on the resulting object. Default `'private'`. */
+  acl?: 'private' | 'public-read' | 'public-read-write' | 'authenticated-read' | 'bucket-owner-read' | 'bucket-owner-full-control'
+  /** Policy expiry in seconds. Clamped to [60, 7 * 24 * 60 * 60]. */
+  expiresIn: number
+  /**
+   * Extra strict-equality conditions to embed in the policy AND
+   * include in the returned `fields` map.
+   */
+  fields?: Record<string, string>
+}
+
+/**
+ * What the caller hands to the browser. Submit as
+ * `multipart/form-data` to `url` with every entry of `fields` as a
+ * form field, then the actual file LAST under the field name
+ * `'file'`. `key` is what the upload will land at — store on the
+ * domain record.
+ */
+export interface PresignedUploadPolicy {
+  url: string
+  fields: Record<string, string>
+  key: string
+}
+
+/**
  * Options for `presignedUploadUrl()` (stacksjs/stacks#1856 Stage 6).
  */
 export interface PresignedUploadUrlOptions {
@@ -128,14 +260,36 @@ export interface PresignedUploadUrlOptions {
   filename?: string
 
   /**
-   * Maximum size in bytes the eventual upload should be. **Not
-   * enforceable on a simple presigned PUT URL** — S3 enforces
-   * Content-Length-Range only via presigned POST policies. Callers
-   * pass this so client-side composables (`useDirectUpload`) can
-   * reject the file before kicking off the PUT, but the server cannot
-   * rely on this being respected by an attacker. For real
-   * size-enforcement against untrusted clients, use a server-side
-   * scan after upload or switch to presigned POST policies.
+   * Maximum size in bytes the eventual upload should be.
+   *
+   * **⚠ ADVISORY ONLY — NOT SERVER-SIDE ENFORCED.** S3's presigned
+   * PUT (the API this method generates) cannot carry a
+   * `Content-Length-Range` constraint. Only S3's presigned POST
+   * policy form can enforce server-side size limits.
+   *
+   * What this field actually does:
+   *   1. Client-side composables (`useDirectUpload`) read it and
+   *      reject the file before kicking off the PUT.
+   *   2. The framework echoes it back on the returned
+   *      {@link PresignedUploadUrl} so callers can record it for
+   *      later post-upload verification.
+   *
+   * What this field does NOT do:
+   *   - Stop an attacker who crafts their own PUT with a larger
+   *     body. They will succeed and your bucket will accept the
+   *     oversized file.
+   *
+   * For real size enforcement against untrusted clients, do one
+   * of:
+   *   - Run a server-side `HEAD` after upload and delete oversized
+   *     objects (most common pattern; cheap because S3 charges by
+   *     storage, not by short-lived blobs)
+   *   - Switch to presigned POST policies (tracked separately —
+   *     see stacksjs/stacks#1873 S-12 follow-up)
+   *   - Front the bucket with a server endpoint that proxies the
+   *     upload and counts bytes
+   *
+   * Audit context: stacksjs/stacks#1873 S-12.
    */
   maxBytes?: number
 }
@@ -181,10 +335,15 @@ export interface StorageAdapterConfig {
   region?: string
   /** S3 key prefix */
   prefix?: string
-  /** AWS credentials */
+  /**
+   * AWS credentials. When omitted the adapter falls back to the
+   * standard env vars (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+   * `AWS_SESSION_TOKEN`) — same source as the S3Client itself.
+   */
   credentials?: {
     accessKeyId: string
     secretAccessKey: string
+    sessionToken?: string
   }
 }
 
@@ -192,8 +351,17 @@ export interface StorageAdapterConfig {
  * Base storage adapter interface
  */
 export interface StorageAdapter {
-  /** Write file contents */
-  write(path: string, contents: FileContents): Promise<void>
+  /**
+   * Write file contents. Returns a {@link PutResult} carrying the
+   * size + driver-reported metadata so callers don't need a follow-up
+   * `stat()` to record an etag / size against their domain models
+   * (stacksjs/stacks#1888 S-8).
+   *
+   * Drivers that can't cheaply produce a value omit it rather than
+   * synthesizing one — callers should treat the optional fields as
+   * nullable.
+   */
+  write(path: string, contents: FileContents): Promise<PutResult>
 
   /** Read file contents */
   read(path: string): Promise<FileContents>
@@ -269,6 +437,53 @@ export interface StorageAdapter {
    * what the caller should persist; `url` is for the browser.
    */
   presignedUploadUrl?(options: PresignedUploadUrlOptions): Promise<PresignedUploadUrl>
+
+  /**
+   * Generate a presigned POST policy for direct browser-to-cloud
+   * upload with server-side size enforcement (stacksjs/stacks#1888
+   * Phase B). Distinct from {@link presignedUploadUrl}: the POST
+   * policy embeds a `Content-Length-Range` condition that S3
+   * actually enforces — uploads outside the range are rejected
+   * before any bytes hit storage.
+   *
+   * S3-only today; local / memory / bun adapters don't need this
+   * primitive (they don't expose a public POST endpoint). Callers
+   * fall back to `presignedUploadUrl` when the disk doesn't support
+   * POST policies.
+   */
+  presignedUploadPolicy?(options: PresignedUploadPolicyOptions): Promise<PresignedUploadPolicy>
+
+  /**
+   * Read a file as a web-standard `ReadableStream<Uint8Array>`
+   * (stacksjs/stacks#1886). Use this for files that don't fit in
+   * memory — the alternative `read()` / `readToBuffer()` methods
+   * load the full contents up front.
+   *
+   * Drivers that genuinely can't stream (memory-only mocks) emit
+   * a single chunk via `new Response(buf).body` rather than
+   * advertising real streaming they can't deliver — the
+   * abstraction still works, but callers shouldn't expect
+   * partial-read behavior from those drivers.
+   */
+  getStream?(path: string, options?: GetStreamOptions): Promise<ReadableStream<Uint8Array>>
+
+  /**
+   * Write a web-standard `ReadableStream<Uint8Array>` to the
+   * adapter (stacksjs/stacks#1886). Returns the same
+   * {@link PutResult} shape as `write()` — size is reported as
+   * the byte count consumed from the stream.
+   *
+   * On S3, streams larger than the configured part size
+   * automatically use multipart upload (CreateMultipartUpload →
+   * UploadPart × N → CompleteMultipartUpload) so files up to 5TB
+   * are supported. Smaller streams use a single putObject for
+   * lower overhead.
+   *
+   * `options.signal` aborts the upload — on S3 that means
+   * issuing AbortMultipartUpload so partial uploads don't accrue
+   * billable storage.
+   */
+  putStream?(path: string, stream: ReadableStream<Uint8Array>, options?: PutStreamOptions): Promise<PutResult>
 
   /** Calculate file checksum */
   checksum(path: string, options?: ChecksumOptions): Promise<string>

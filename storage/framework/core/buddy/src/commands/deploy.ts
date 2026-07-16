@@ -11,6 +11,7 @@ import { encryptEnv, env } from '@stacksjs/env'
 import { Action } from '@stacksjs/enums'
 import { path as p } from '@stacksjs/path'
 import { ExitCode } from '@stacksjs/types'
+import { getErrorCode, getErrorMessage } from '@stacksjs/utils'
 import { ensureAppKey, ensureEnvIsSet, ensurePantryDependencies, ensurePantryInstalled } from './setup'
 
 // Use console.log for clean output without timestamps
@@ -277,8 +278,8 @@ async function setupEmailDnsRecords(emailDomain: string, region: string, logger:
           },
         })
         logger.success(`Added DKIM record: ${token}._domainkey`)
-      } catch (e: any) {
-        logger.warn(`Failed to add DKIM record: ${e.message}`)
+      } catch (e: unknown) {
+        logger.warn(`Failed to add DKIM record: ${getErrorMessage(e)}`)
       }
     }
 
@@ -306,8 +307,8 @@ async function setupEmailDnsRecords(emailDomain: string, region: string, logger:
         },
       })
       logger.success(`Added MX record: ${mxTarget}`)
-    } catch (e: any) {
-      logger.warn(`Failed to add MX record: ${e.message}`)
+    } catch (e: unknown) {
+      logger.warn(`Failed to add MX record: ${getErrorMessage(e)}`)
     }
 
     // Add SPF record
@@ -327,8 +328,8 @@ async function setupEmailDnsRecords(emailDomain: string, region: string, logger:
         },
       })
       logger.success('Added SPF record')
-    } catch (e: any) {
-      logger.warn(`Failed to add SPF record: ${e.message}`)
+    } catch (e: unknown) {
+      logger.warn(`Failed to add SPF record: ${getErrorMessage(e)}`)
     }
 
     // Add DMARC record
@@ -348,8 +349,8 @@ async function setupEmailDnsRecords(emailDomain: string, region: string, logger:
         },
       })
       logger.success('Added DMARC record')
-    } catch (e: any) {
-      logger.warn(`Failed to add DMARC record: ${e.message}`)
+    } catch (e: unknown) {
+      logger.warn(`Failed to add DMARC record: ${getErrorMessage(e)}`)
     }
 
     // Activate the SES receipt rule set
@@ -358,14 +359,14 @@ async function setupEmailDnsRecords(emailDomain: string, region: string, logger:
       const ruleSetName = `${appName}-email-rules`
       await ses.setActiveReceiptRuleSet(ruleSetName)
       logger.success(`Activated email receipt rule set: ${ruleSetName}`)
-    } catch (e: any) {
-      logger.warn(`Failed to activate receipt rule set: ${e.message}`)
+    } catch (e: unknown) {
+      logger.warn(`Failed to activate receipt rule set: ${getErrorMessage(e)}`)
     }
 
     logger.success('Email DNS records configured!')
     logger.info('Note: DKIM verification may take 5-15 minutes to complete')
-  } catch (error: any) {
-    logger.warn(`Failed to set up email DNS records: ${error.message}`)
+  } catch (error: unknown) {
+    logger.warn(`Failed to set up email DNS records: ${getErrorMessage(error)}`)
     logger.info('You can manually set up DNS records using: buddy email:verify')
   }
 }
@@ -404,8 +405,9 @@ async function createDefaultMailUser(appName: string, emailDomain: string, regio
         logger.success(`Created default mail user: ${defaultEmail}`)
         logger.info(`Password: ${defaultPassword}`)
         logger.info('Save this password - it will not be shown again!')
-      } catch (e: any) {
-        if (e.message?.includes('ConditionalCheckFailedException') || e.message?.includes('already exists')) {
+      } catch (e: unknown) {
+        const msg = getErrorMessage(e)
+        if (msg.includes('ConditionalCheckFailedException') || msg.includes('already exists')) {
           logger.debug('Default mail user already exists')
         } else {
           throw e
@@ -436,17 +438,18 @@ async function createDefaultMailUser(appName: string, emailDomain: string, regio
           if (typeof mailbox !== 'object' || !mb.password) {
             logger.info(`  Password: ${password}`)
           }
-        } catch (e: any) {
-          if (e.message?.includes('ConditionalCheckFailedException')) {
+        } catch (e: unknown) {
+          const msg = getErrorMessage(e)
+          if (msg.includes('ConditionalCheckFailedException')) {
             logger.debug(`Mail user ${email} already exists`)
           } else {
-            logger.warn(`Failed to create mail user ${email}: ${e.message}`)
+            logger.warn(`Failed to create mail user ${email}: ${msg}`)
           }
         }
       }
     }
-  } catch (error: any) {
-    logger.warn(`Failed to create mail users: ${error.message}`)
+  } catch (error: unknown) {
+    logger.warn(`Failed to create mail users: ${getErrorMessage(error)}`)
   }
 }
 
@@ -507,8 +510,8 @@ async function uploadMailServerToS3(bucketName: string, region: string, mode: st
         binaryUploaded = true
       }
     }
-    catch (error: any) {
-      log.debug(`Pantry mail install failed: ${error.message}`)
+    catch (error: unknown) {
+      log.debug(`Pantry mail install failed: ${getErrorMessage(error)}`)
     }
 
     if (!binaryUploaded) {
@@ -517,6 +520,439 @@ async function uploadMailServerToS3(bucketName: string, region: string, mode: st
   }
   catch (uploadErr: any) {
     log.debug(`Could not upload mail server to S3 (bucket may not exist yet): ${uploadErr.message}`)
+  }
+}
+
+/**
+ * Load the `tsCloud` configuration object exported from `config/cloud.ts`.
+ * Returns undefined if the project has no ts-cloud config (older projects /
+ * pure AWS setups that only export the legacy `CloudConfig`).
+ */
+async function loadTsCloudConfig(): Promise<any | undefined> {
+  try {
+    const mod = await import(p.projectPath('config/cloud.ts'))
+    return mod.tsCloud
+  }
+  catch (err) {
+    log.debug('Could not load config/cloud.ts tsCloud export:', err)
+    return undefined
+  }
+}
+
+/**
+ * Resolve the cloud provider from a ts-cloud config (defaults to aws).
+ */
+function resolveProvider(tsCloudConfig: any): string {
+  return tsCloudConfig?.cloud?.provider
+    || (process.env.CLOUD_PROVIDER as string | undefined)
+    || 'aws'
+}
+
+/**
+ * Wait until cloud-init finishes on the freshly provisioned host and the bun
+ * runtime is on PATH. Cloud-init runs asynchronously after the server reports
+ * "running", so deploying immediately would race the bun install and the
+ * systemd unit's ExecStart (`/usr/local/bin/bun …`) would not exist yet.
+ */
+async function waitForRemoteReady(ip: string, verbose: boolean): Promise<void> {
+  const { execSync } = await import('node:child_process')
+  const sshArgs = [
+    '-o', 'StrictHostKeyChecking=accept-new',
+    '-o', 'BatchMode=yes',
+    '-o', 'ConnectTimeout=10',
+    `root@${ip}`,
+  ]
+
+  const run = (remote: string): string =>
+    execSync(`ssh ${sshArgs.map(a => `'${a}'`).join(' ')} '${remote.replace(/'/g, `'\\''`)}'`, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', verbose ? 'inherit' : 'pipe'],
+    })
+
+  // 1) Wait for SSH to accept connections (server may still be booting).
+  log.info('Waiting for SSH to come up...')
+  const sshDeadline = Date.now() + 3 * 60_000
+  for (;;) {
+    try {
+      run('true')
+      break
+    }
+    catch {
+      if (Date.now() > sshDeadline)
+        throw new Error(`SSH did not become reachable on ${ip} within 3 minutes`)
+      await new Promise(r => setTimeout(r, 5000))
+    }
+  }
+  log.success('SSH is up')
+
+  // 2) Block on cloud-init, then confirm bun landed on PATH.
+  log.info('Waiting for cloud-init (installing bun + caddy)...')
+  try {
+    run('cloud-init status --wait || true')
+  }
+  catch (err) {
+    log.debug('cloud-init status --wait returned non-zero (continuing):', err)
+  }
+
+  const bunDeadline = Date.now() + 5 * 60_000
+  for (;;) {
+    try {
+      run('test -x /usr/local/bin/bun')
+      break
+    }
+    catch {
+      if (Date.now() > bunDeadline)
+        throw new Error('bun runtime did not appear at /usr/local/bin/bun within 5 minutes (cloud-init may have failed — check /var/log/cloud-init-output.log)')
+      await new Promise(r => setTimeout(r, 5000))
+    }
+  }
+  log.success('Server is ready (bun installed)')
+}
+
+/**
+ * Forge-style deploy to a Hetzner Cloud server via ts-cloud:
+ *   1. provision (or reuse) the compute server + firewall + SSH key,
+ *   2. wait for cloud-init to finish installing bun,
+ *   3. package each configured site and ship it over SSH as a systemd service.
+ *
+ * The app is served directly on the server's public IP (no domain required).
+ */
+async function deployToHetzner(tsCloudConfig: any, deployEnv: string, options: DeployOptions): Promise<void> {
+  const verbose = options.verbose === true
+  const environment = (deployEnv === 'prod' ? 'production' : deployEnv) as 'production' | 'staging' | 'development'
+
+  const apiToken = tsCloudConfig.hetzner?.apiToken || process.env.HCLOUD_TOKEN || process.env.HETZNER_API_TOKEN
+  if (!apiToken) {
+    log.error('No Hetzner API token found. Set HCLOUD_TOKEN in your .env (or hetzner.apiToken in config/cloud.ts).')
+    process.exit(ExitCode.FatalError)
+  }
+
+  // Confirm the local SSH public key the driver will register on the server.
+  const sshPubKey = join(homedir(), '.ssh', 'id_ed25519.pub')
+  if (!existsSync(sshPubKey)) {
+    log.error(`SSH public key not found at ${sshPubKey}.`)
+    log.info('ts-cloud deploys to Hetzner over SSH and registers this key on the server.')
+    log.info('Generate one with:  ssh-keygen -t ed25519')
+    process.exit(ExitCode.FatalError)
+  }
+
+  const { createCloudDriver, deployAllComputeSites, resolveSiteKind } = await import('@stacksjs/ts-cloud')
+
+  try {
+    await runHetznerDeploy({ tsCloudConfig, environment, verbose, docker: (options as any).docker === true, createCloudDriver, deployAllComputeSites, resolveSiteKind })
+  }
+  catch (err) {
+    log.error('Hetzner deploy failed:')
+    console.error(err instanceof Error ? (err.stack || err.message) : err)
+    process.exit(ExitCode.FatalError)
+  }
+}
+
+/**
+ * Loopback-bound server-app sites (e.g. the `api` site: env.HOST=127.0.0.1,
+ * reached only through `buddy serve`'s same-origin /api proxy on :3000 —
+ * stacksjs/stacks#1950) must NOT have their port opened to the internet.
+ * ts-cloud's Hetzner provisioning opens EVERY numeric `site.port` to
+ * 0.0.0.0/0 + ::/0 (collectUpstreamPorts → buildHetznerFirewallRules), which
+ * would leave only the process bind between the public internet and the full
+ * bun-router API. Hand the provision step a copy of the config with those
+ * ports stripped — the unmodified config still drives deployAllComputeSites,
+ * so the systemd unit (ExecStart, Environment=PORT) is unaffected.
+ *
+ * Domain-less sites only: a loopback site WITH a domain feeds the rpx
+ * gateway's route table (which proxies to 127.0.0.1:port on-box), so its
+ * port declaration is left alone.
+ */
+export function scrubLoopbackSitePortsForFirewall(tsCloudConfig: any): any {
+  const sites = tsCloudConfig?.sites
+  if (!sites)
+    return tsCloudConfig
+
+  const loopbackHosts = new Set(['127.0.0.1', '::1', 'localhost'])
+  const scrubbed: Record<string, any> = {}
+  for (const [siteName, site] of Object.entries<any>(sites)) {
+    const host = String(site?.env?.HOST ?? '').toLowerCase()
+    if (site && typeof site.port === 'number' && !site.domain && loopbackHosts.has(host)) {
+      const rest = { ...site }
+      delete rest.port
+      scrubbed[siteName] = rest
+    }
+    else {
+      scrubbed[siteName] = site
+    }
+  }
+  return { ...tsCloudConfig, sites: scrubbed }
+}
+
+async function runHetznerDeploy(args: {
+  tsCloudConfig: any
+  environment: 'production' | 'staging' | 'development'
+  verbose: boolean
+  docker: boolean
+  createCloudDriver: any
+  deployAllComputeSites: any
+  resolveSiteKind: (site: any) => 'bucket' | 'server-app' | 'server-static'
+}): Promise<void> {
+  const { tsCloudConfig, environment, verbose, docker, createCloudDriver, deployAllComputeSites, resolveSiteKind } = args
+
+  const startTime = performance.now()
+  console.log('')
+  console.log('🚀 Deploy → Hetzner Cloud')
+  console.log('')
+  log.info(`Project: ${tsCloudConfig.project?.slug}`)
+  log.info(`Environment: ${environment}`)
+  log.info(`Location: ${tsCloudConfig.hetzner?.location || process.env.HCLOUD_LOCATION || 'fsn1'}`)
+  log.info(`Size: ${tsCloudConfig.infrastructure?.compute?.size || 'small'}`)
+
+  const driver = createCloudDriver({ config: tsCloudConfig, provider: 'hetzner' })
+  if (!driver.provisionComputeInfrastructure) {
+    log.error('Hetzner driver does not support compute provisioning (update @stacksjs/ts-cloud).')
+    process.exit(ExitCode.FatalError)
+  }
+
+  log.info('Provisioning Hetzner compute infrastructure...')
+  // Provision with loopback-only site ports stripped so the firewall never
+  // exposes them (#1950); the full config still drives deployAllComputeSites.
+  const outputs = await driver.provisionComputeInfrastructure({ config: scrubLoopbackSitePortsForFirewall(tsCloudConfig), environment })
+  const ip = outputs.appPublicIp
+  log.success('Hetzner compute infrastructure ready')
+  if (ip)
+    log.info(`Server IP: ${ip}`)
+  if (outputs.appInstanceId)
+    log.info(`Server ID: ${outputs.appInstanceId}`)
+
+  if (!ip) {
+    log.error('Provisioned server has no public IP — cannot deploy over SSH.')
+    process.exit(ExitCode.FatalError)
+  }
+
+  await waitForRemoteReady(ip, verbose)
+
+  // Package each site as source-only: dependencies are NOT shipped. They are
+  // installed on the server from the committed lockfile via the site's
+  // `preStart` hook (`bun install --frozen-lockfile`), which keeps the upload
+  // tiny (tens of MB instead of ~800MB of node_modules + pantry).
+  const { execSync } = await import('node:child_process')
+  const { tmpdir } = await import('node:os')
+  const sites = tsCloudConfig.sites || {}
+  const slug = tsCloudConfig.project?.slug || 'app'
+  let sha: string
+  try {
+    sha = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+  }
+  catch {
+    sha = Date.now().toString(36)
+  }
+
+  // Excluded from the release tarball. `node_modules`/`pantry` are reinstalled
+  // on the server; the rest is dev-only noise that production never needs.
+  // Patterns cover both top-level (`./x`) and nested (`*/x`) occurrences.
+  const tarExcludes = [
+    'node_modules',
+    'pantry',
+    '.git',
+    '.github',
+    '.cache',
+    'tmp',
+    'temp',
+    '.DS_Store',
+    '*.log',
+    '.env.local',
+    '.env.production.bak',
+  ].flatMap(p => [`--exclude='${p}'`, `--exclude='*/${p}'`])
+
+  const tarballs = new Map<string, string>()
+  for (const [siteName, site] of Object.entries<any>(sites)) {
+    if (!site)
+      continue
+    // ts-cloud's deployAllComputeSites deploys BOTH server-app sites (`start`)
+    // and server-static sites (no `start`, has `root`) — and it calls
+    // tarballForSite() for each. Bucket sites are handled elsewhere. So we must
+    // produce a tarball for every non-bucket site, not just `start` ones.
+    const kind = resolveSiteKind(site)
+    if (kind === 'bucket')
+      continue
+
+    // server-static: build the site locally first so the tarball contains the
+    // FINAL static files (served verbatim by the reverse proxy's file_server at
+    // /var/www/<site>). server-app sites ship source and build via preStart on
+    // the box, so they are NOT built here.
+    if (kind === 'server-static' && site.build) {
+      log.info(`Building static site '${siteName}': ${site.build}`)
+      execSync(site.build, { stdio: verbose ? 'inherit' : 'pipe' })
+    }
+
+    const root = site.root || '.'
+    const tarballPath = join(tmpdir(), `${slug}-${siteName}-${sha}.tar.gz`)
+    log.info(`Packaging ${root} → ${tarballPath}...`)
+    execSync(
+      `tar czf "${tarballPath}" ${tarExcludes.join(' ')} -C "${root}" .`,
+      { stdio: verbose ? 'inherit' : 'pipe' },
+    )
+    const sizeMb = Math.max(1, Math.round((statSync(tarballPath).size) / 1048576))
+    log.info(`Release tarball: ~${sizeMb} MB`)
+    tarballs.set(siteName, tarballPath)
+  }
+
+  // `--docker` builds an OCI container image with pantry's native builder
+  // (no Docker daemon, no deps) from `storage/framework/Dockerfile`, and pushes
+  // it to the pantry registry when a token is present. The site itself still
+  // runs dep-free via bun + systemd below, so the box stays daemon-less.
+  if (docker)
+    await buildContainerImageWithPantry({ slug, sites, verbose })
+
+  log.info('Shipping release to the server...')
+  const ok = await deployAllComputeSites({
+    config: tsCloudConfig,
+    environment,
+    driver,
+    sha,
+    runtime: tsCloudConfig.infrastructure?.compute?.runtime || 'bun',
+    tarballForSite: (siteName: string) => {
+      const path = tarballs.get(siteName)
+      if (!path)
+        throw new Error(`Missing tarball for site '${siteName}'`)
+      return path
+    },
+    logger: {
+      info: (m: string) => log.info(m),
+      warn: (m: string) => log.warn(m),
+      error: (m: string) => log.error(m),
+      step: (m: string) => log.info(m),
+      success: (m: string) => log.success(m),
+    },
+  })
+
+  // Reconcile DNS for every site that declares a public domain. Hetzner deploys
+  // historically had NO DNS step (Route53 reconciliation only ran on the AWS
+  // path), so domains had to be pointed by hand. We now resolve a DNS provider
+  // per-domain via ts-cloud's factory (Porkbun/Route53/Cloudflare/GoDaddy from
+  // env) and upsert A records → the box IP. Non-fatal: a DNS hiccup shouldn't
+  // fail an otherwise-successful release.
+  if (ok)
+    await reconcileHetznerDns(sites, ip, log)
+
+  console.log('')
+  if (ok) {
+    await outro(`Deployed to Hetzner. Your site is live at http://${ip}:3000`, { startTime, useSeconds: true })
+    log.info(`Coming-soon page: http://${ip}:3000  (bypass with ?secret=…)`)
+  }
+  else {
+    await outro('Hetzner deploy reported a failure — see the per-instance output above.', { startTime, useSeconds: true })
+    process.exit(ExitCode.FatalError)
+  }
+}
+
+/**
+ * Point every site's public domain (apex + `www`) at the Hetzner box via the
+ * appropriate DNS provider. Providers are resolved per-domain from the
+ * environment (Porkbun, Route53, Cloudflare, GoDaddy) using ts-cloud's
+ * `detectDnsProvider`, so whichever registrar actually hosts the zone is used.
+ * Idempotent (upsert) and best-effort — failures are logged, not thrown.
+ */
+async function reconcileHetznerDns(sites: Record<string, any>, ip: string, logger: typeof log): Promise<void> {
+  // Collect the apex domains declared by sites (skip loopback/domain-less sites).
+  const domains = new Set<string>()
+  for (const site of Object.values(sites)) {
+    if (site?.domain && typeof site.domain === 'string')
+      domains.add(site.domain.replace(/^www\./, ''))
+  }
+  if (domains.size === 0)
+    return
+
+  // Candidate provider configs, built from whatever credentials are present.
+  const providerConfigs: any[] = []
+  if (process.env.PORKBUN_API_KEY && process.env.PORKBUN_SECRET_KEY)
+    providerConfigs.push({ provider: 'porkbun', apiKey: process.env.PORKBUN_API_KEY, secretKey: process.env.PORKBUN_SECRET_KEY })
+  if (process.env.CLOUDFLARE_API_TOKEN)
+    providerConfigs.push({ provider: 'cloudflare', apiToken: process.env.CLOUDFLARE_API_TOKEN })
+  if (process.env.AWS_ACCESS_KEY_ID || process.env.AWS_PROFILE)
+    providerConfigs.push({ provider: 'route53' })
+
+  if (providerConfigs.length === 0) {
+    logger.warn('DNS: no DNS provider credentials found (PORKBUN_API_KEY/…); skipping DNS reconciliation.')
+    for (const d of domains)
+      logger.info(`  Point manually:  A ${d} → ${ip}   and   A www.${d} → ${ip}`)
+    return
+  }
+
+  const { detectDnsProvider } = await import('@stacksjs/ts-cloud') as any
+  logger.info('Reconciling DNS records...')
+
+  for (const domain of domains) {
+    try {
+      const provider = await detectDnsProvider(domain, providerConfigs)
+      if (!provider) {
+        logger.warn(`  DNS: no configured provider can manage ${domain} — point it manually: A ${domain} → ${ip}`)
+        continue
+      }
+      for (const sub of ['', 'www']) {
+        const fqdn = sub ? `${sub}.${domain}` : domain
+        const res = await provider.upsertRecord(domain, { name: sub, type: 'A', content: ip, ttl: 600 })
+        if (res?.success === false)
+          logger.warn(`  DNS: ${fqdn} → ${ip} failed: ${res.error || 'unknown error'}`)
+        else
+          logger.success(`  DNS: ${fqdn} → ${ip} (${provider.name})`)
+      }
+    }
+    catch (err: any) {
+      logger.warn(`  DNS: ${domain} reconciliation failed: ${err?.message || err}`)
+    }
+  }
+}
+
+/**
+ * Build an OCI container image for each site using pantry's native, daemon-less
+ * builder — no Docker dependency. The image is built from the framework's
+ * generated `storage/framework/Dockerfile` and pushed to the pantry registry
+ * when `PANTRY_REGISTRY_TOKEN`/`PANTRY_TOKEN` is set, so the container can be
+ * consumed by registries, CDK, or ts-cloud. The site continues to run on the
+ * server via bun + systemd, keeping the box dependency-free.
+ */
+async function buildContainerImageWithPantry(args: {
+  slug: string
+  sites: Record<string, any>
+  verbose: boolean
+}): Promise<void> {
+  const { slug, sites, verbose } = args
+  const { execSync } = await import('node:child_process')
+
+  // Resolve the pantry CLI (system install preferred; falls back to ts-pantry).
+  let cli: string | undefined
+  for (const candidate of ['pantry', 'ts-pantry']) {
+    try {
+      execSync(`command -v ${candidate}`, { stdio: 'pipe' })
+      cli = candidate
+      break
+    }
+    catch { /* not on PATH */ }
+  }
+  if (!cli) {
+    log.warn('pantry CLI not found on PATH — skipping container image build. Install pantry to enable `--docker`.')
+    return
+  }
+
+  const dockerfile = 'storage/framework/Dockerfile'
+  const canPush = Boolean(process.env.PANTRY_REGISTRY_TOKEN || process.env.PANTRY_TOKEN)
+
+  for (const [siteName, site] of Object.entries(sites)) {
+    if (!site?.start)
+      continue
+    const tag = `${slug}-${siteName}:latest`
+    log.info(`[${siteName}] building image ${tag} with pantry (native, no Docker daemon)...`)
+    const flags = [
+      'build', '.',
+      '-t', tag,
+      '-f', dockerfile,
+      '--run-mode', 'skip', // build runs locally; deps install on the server
+    ]
+    if (canPush)
+      flags.push('--push')
+    execSync(`${cli} ${flags.map(f => (f.includes(' ') ? `'${f}'` : f)).join(' ')}`, {
+      stdio: verbose ? 'inherit' : 'pipe',
+      maxBuffer: 1024 * 1024 * 512,
+    })
+    log.success(`[${siteName}] image built${canPush ? ' + pushed to the pantry registry' : ''}`)
   }
 }
 
@@ -540,13 +976,23 @@ export function deploy(buddy: CLI): void {
     .option('--dev', descriptions.development, { default: false })
     .option('--yes', descriptions.yes, { default: false })
     .option('--staging', descriptions.staging, { default: false })
+    .option('--docker', 'Also build an OCI image with pantry (native, no Docker daemon) and push it to the pantry registry', { default: false })
     .option('--verbose', descriptions.verbose, { default: false })
-    .action(async (envArg: string | undefined, options: DeployOptions) => {
+    .action(async (envArg: string | undefined, options: DeployOptions & { docker?: boolean }) => {
       log.debug('Running `buddy deploy` ...', options)
 
       await ensureDeployPrerequisites(options.verbose === true)
 
       const deployEnv = envArg || 'production'
+
+      // Non-AWS providers (currently Hetzner) provision + deploy over SSH via
+      // ts-cloud and have nothing to do with the AWS CloudFormation path below.
+      // Route them off early, before any AWS credential / domain checks run.
+      const tsCloudConfig = await loadTsCloudConfig()
+      if (tsCloudConfig && resolveProvider(tsCloudConfig) === 'hetzner') {
+        await deployToHetzner(tsCloudConfig, deployEnv, options)
+        return
+      }
 
       // Clear AWS_PROFILE to prevent credential conflicts when static credentials are provided
       // AWS SDK's defaultProvider prefers profile over static credentials, causing InvalidClientTokenId errors
@@ -984,8 +1430,8 @@ async function checkIfAwsIsBootstrapped(options?: DeployOptions) {
         }
       }
     }
-    catch (error: any) {
-      log.debug(`Stack not found: ${error.message}`)
+    catch (error: unknown) {
+      log.debug(`Stack not found: ${getErrorMessage(error)}`)
       // Stack doesn't exist, we'll create it below
     }
 
@@ -2521,9 +2967,9 @@ echo "Mail server setup complete at $(date)"
         return true
       }
     }
-    catch (error: any) {
+    catch (error: unknown) {
       // Handle case where stack already exists (shouldn't happen now with our check)
-      if (error.code === 'AlreadyExistsException') {
+      if (getErrorCode(error) === 'AlreadyExistsException') {
         handlingAlreadyExists = true
         console.log('')
         log.error(`A cloud stack named "${stackName}" already exists`)
@@ -2561,11 +3007,11 @@ echo "Mail server setup complete at $(date)"
       process.exit(ExitCode.FatalError)
     }
   }
-  catch (err: any) {
+  catch (err: unknown) {
     // Don't log error details if we're already handling AlreadyExistsException
     if (!handlingAlreadyExists) {
       log.error('Error checking cloud infrastructure')
-      log.error(`Error: ${err.message || err}`)
+      log.error(`Error: ${getErrorMessage(err)}`)
       if (options?.verbose) {
         console.error(err)
       }

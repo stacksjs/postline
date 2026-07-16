@@ -1,26 +1,18 @@
 import type { EmailAddress, EmailMessage, EmailResult } from '@stacksjs/types'
 import { Buffer } from 'node:buffer'
+import process from 'node:process'
 import * as tls from 'node:tls'
 import * as net from 'node:net'
 import { config } from '@stacksjs/config'
 import { log } from '@stacksjs/logging'
 import type { TemplateOptions } from '../template'
 import { template } from '../template'
+import { buildMimeMessage } from '../mime'
+import { ENVELOPE_ADDRESS, filterStringHeaders } from '../validation'
 import { BaseEmailDriver } from './base'
 
-/**
- * Encode an SMTP header value with RFC 2047 base64 encoding when it
- * contains non-ASCII characters. Without this, subjects like
- * "Encore d'idées" or "你好" produce headers that violate RFC 5322 (which
- * mandates 7-bit ASCII for headers) and get mangled or rejected by
- * downstream relays.
- */
-function encodeRfc2047IfNeeded(value: string): string {
-  // eslint-disable-next-line no-control-regex
-  if (/^[\x00-\x7F]*$/.test(value)) return value
-  const encoded = Buffer.from(value, 'utf-8').toString('base64')
-  return `=?UTF-8?B?${encoded}?=`
-}
+// `encodeRfc2047IfNeeded` moved to `../mime` and is shared with the SES
+// `SendRawEmail` path (stacksjs/stacks#1871 M-2 / M-3).
 
 /**
  * SMTP envelope-address validator.
@@ -36,8 +28,9 @@ function encodeRfc2047IfNeeded(value: string): string {
  * because the broader form (display names, comments, source routes)
  * has no business reaching this transport.
  */
-const ENVELOPE_ADDRESS = /^[^\s<>"\\\r\n\t]+@[^\s<>"\\\r\n\t]+$/
-
+// `ENVELOPE_ADDRESS` regex now lives in `../validation` (single source
+// of truth across the base driver, SMTP, and any future driver that
+// needs an envelope-shape check). See stacksjs/stacks#1871 M-6.
 function assertEnvelopeAddress(addr: string, role: string): void {
   if (typeof addr !== 'string' || !ENVELOPE_ADDRESS.test(addr)) {
     throw new Error(`[smtp] Refusing to send: ${role} envelope address contains forbidden characters or is malformed: ${JSON.stringify(addr)}`)
@@ -53,27 +46,45 @@ export class SMTPDriver extends BaseEmailDriver {
   private static readonly SMTP_TIMEOUT = 30_000 // 30 seconds
 
   public name = 'smtp'
-  private smtpConfig: {
-    host: string
-    port: number
-    username: string
-    password: string
-    encryption: 'tls' | 'ssl' | 'starttls' | null
-  } | null = null
 
+  /**
+   * Resolve SMTP settings fresh on every call (stacksjs/stacks#1925).
+   *
+   * The previous implementation cached the resolved config on the
+   * instance after the first read. If that first `mail.send()` landed
+   * inside the boot window — before `@stacksjs/config`'s async
+   * `overridesReady` finished importing `~/config/services` — then
+   * `config.services.smtp` read as `undefined`, the fallback snapped
+   * `127.0.0.1:587` into the cache, and *every* subsequent send hit
+   * port 587 forever (ECONNREFUSED against a Mailpit on 2525, with no
+   * way to recover short of a restart).
+   *
+   * A property read is cheap next to a multi-RTT SMTP round-trip, so
+   * there was never a reason to cache. Reading every call also makes
+   * the driver correct under hot-reload / per-test config swaps.
+   *
+   * As belt-and-suspenders, fall back to `process.env.MAIL_*` so a
+   * correctly-populated `.env` works even if the config layer hasn't
+   * surfaced the override yet.
+   */
   private getConfig() {
-    if (!this.smtpConfig) {
-      const encryption = config.services.smtp?.encryption
-      this.smtpConfig = {
-        host: config.services.smtp?.host || '127.0.0.1',
-        port: config.services.smtp?.port || 587,
-        username: config.services.smtp?.username || '',
-        password: config.services.smtp?.password || '',
-        // Map 'tls' to 'starttls' for port 587 (STARTTLS), 'ssl' for port 465 (implicit TLS)
-        encryption: encryption === 'tls' ? 'starttls' : encryption || null,
-      }
+    const smtp = config.services?.smtp
+    const env = process.env
+
+    const host = smtp?.host || env.MAIL_HOST || '127.0.0.1'
+    const port = smtp?.port || (env.MAIL_PORT ? Number(env.MAIL_PORT) : undefined) || 587
+    const username = smtp?.username || env.MAIL_USERNAME || ''
+    const password = smtp?.password || env.MAIL_PASSWORD || ''
+    const rawEncryption = smtp?.encryption ?? env.MAIL_ENCRYPTION ?? null
+
+    return {
+      host,
+      port,
+      username,
+      password,
+      // Map 'tls' to 'starttls' for port 587 (STARTTLS), 'ssl' for port 465 (implicit TLS)
+      encryption: (rawEncryption === 'tls' ? 'starttls' : rawEncryption || null) as 'tls' | 'ssl' | 'starttls' | null,
     }
-    return this.smtpConfig
   }
 
   public async send(message: EmailMessage, options?: TemplateOptions): Promise<EmailResult> {
@@ -113,16 +124,22 @@ export class SMTPDriver extends BaseEmailDriver {
       const fromName = message.from?.name || config.email.from?.name || ''
       const toAddresses = this.formatAddresses(message.to)
 
-      // Build email content
-      const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).substring(2)}`
-      const emailContent = this.buildEmailContent({
+      // Build email content via the shared MIME helper. Reply-To,
+      // custom headers, and attachments all flow through the same code
+      // path used by the SES `SendRawEmail` branch — see
+      // stacksjs/stacks#1871 M-2 / M-3 / M-4 / M-5.
+      const replyToAddresses = this.formatAddressList(message.replyTo)
+      const emailContent = buildMimeMessage({
         from: fromName ? `${fromName} <${fromAddress}>` : fromAddress,
         to: toAddresses.join(', '),
         cc: message.cc ? this.formatAddresses(message.cc).join(', ') : undefined,
+        replyTo: replyToAddresses.length > 0 ? replyToAddresses.join(', ') : undefined,
+        customHeaders: filterStringHeaders(message.headers),
         subject: message.subject,
         text: message.text,
         html: finalHtml,
-        boundary,
+        attachments: message.attachments,
+        messageIdDomain: config.email.domain,
       })
 
       // Send via SMTP
@@ -135,61 +152,8 @@ export class SMTPDriver extends BaseEmailDriver {
     }
   }
 
-  private buildEmailContent(options: {
-    from: string
-    to: string
-    cc?: string
-    subject: string
-    text?: string
-    html?: string
-    boundary: string
-  }): string {
-    const { from, to, cc, subject, text, html, boundary } = options
-    const lines: string[] = []
-
-    // Headers
-    lines.push(`From: ${from}`)
-    lines.push(`To: ${to}`)
-    if (cc)
-      lines.push(`Cc: ${cc}`)
-    lines.push(`Subject: ${encodeRfc2047IfNeeded(subject)}`)
-    lines.push(`MIME-Version: 1.0`)
-    lines.push(`Date: ${new Date().toUTCString()}`)
-    lines.push(`Message-ID: <${Date.now()}.${Math.random().toString(36).substring(2)}@${config.email.domain || 'localhost'}>`)
-
-    if (html && text) {
-      // Multipart message with both HTML and text
-      lines.push(`Content-Type: multipart/alternative; boundary="${boundary}"`)
-      lines.push('')
-      lines.push(`--${boundary}`)
-      lines.push('Content-Type: text/plain; charset=UTF-8')
-      lines.push('Content-Transfer-Encoding: 7bit')
-      lines.push('')
-      lines.push(text)
-      lines.push('')
-      lines.push(`--${boundary}`)
-      lines.push('Content-Type: text/html; charset=UTF-8')
-      lines.push('Content-Transfer-Encoding: 7bit')
-      lines.push('')
-      lines.push(html)
-      lines.push('')
-      lines.push(`--${boundary}--`)
-    }
-    else if (html) {
-      lines.push('Content-Type: text/html; charset=UTF-8')
-      lines.push('Content-Transfer-Encoding: 7bit')
-      lines.push('')
-      lines.push(html)
-    }
-    else if (text) {
-      lines.push('Content-Type: text/plain; charset=UTF-8')
-      lines.push('Content-Transfer-Encoding: 7bit')
-      lines.push('')
-      lines.push(text)
-    }
-
-    return lines.join('\r\n')
-  }
+  // MIME envelope building lives in `../mime` (shared with the SES
+  // SendRawEmail path) since stacksjs/stacks#1871 M-2 / M-3.
 
   private async sendViaSMTP(
     smtpConfig: { host: string, port: number, username: string, password: string, encryption: 'tls' | 'ssl' | 'starttls' | null },
@@ -212,6 +176,10 @@ export class SMTPDriver extends BaseEmailDriver {
       const _currentCommand = ''
       const commandQueue: Array<{ cmd: string, resolve: (response: string) => void, reject: (error: Error) => void }> = []
       const _isProcessing = false
+      // Set once the message has been accepted by the server (250 after the
+      // final "."). After this point a socket close/error is expected (the
+      // server hangs up after QUIT) and must NOT reject the delivered message.
+      let completed = false
 
       const processResponse = (response: string) => {
         log.debug(`[SMTP] Server: ${response.trim()}`)
@@ -331,13 +299,25 @@ export class SMTPDriver extends BaseEmailDriver {
             commandQueue.push({ cmd: 'DATA_END', resolve: res, reject: rej })
           })
 
-          await sendCommand('QUIT')
-          socket.end()
-
+          // The message is accepted once the server replies 250 to the final
+          // ".". Mark complete and resolve now; QUIT is best-effort courtesy.
+          // Many servers (incl. the self-hosted Stacks mail server) drop the
+          // socket right after the message is queued, which would otherwise
+          // race the 'close' handler and reject an already-delivered message.
+          completed = true
           const messageId = `${Date.now()}.${Math.random().toString(36).substring(2)}@${smtpConfig.host}`
+          try {
+            socket.write('QUIT\r\n')
+          }
+          catch {}
+          socket.end()
           resolve(messageId)
         }
         catch (error) {
+          if (completed) {
+            socket.end()
+            return
+          }
           socket.end()
           reject(error)
         }
@@ -372,11 +352,16 @@ export class SMTPDriver extends BaseEmailDriver {
         socket.destroy(new Error(`SMTP socket timed out after ${SMTPDriver.SMTP_TIMEOUT}ms`))
       })
       socket.on('error', (error) => {
+        // A reset/close after the message was accepted is expected — ignore it.
+        if (completed)
+          return
         log.error(`[SMTP] Connection error to ${smtpConfig.host}:${smtpConfig.port}:`, error)
         reject(error)
       })
       socket.on('close', (hadError) => {
         log.debug(`[SMTP] Connection closed (hadError: ${hadError})`)
+        if (completed)
+          return
         // Reject any pending commands
         while (commandQueue.length > 0) {
           const pending = commandQueue.shift()

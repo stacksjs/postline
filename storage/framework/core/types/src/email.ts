@@ -286,6 +286,30 @@ export interface EmailOptions {
   notifications?: EmailNotificationsConfig
 
   default: 'log' | 'ses' | 'sendgrid' | 'mailgun' | 'mailtrap' | 'smtp'
+
+  /**
+   * Suppression-list enforcement policy (stacksjs/stacks#1880).
+   *
+   * - `'strict'`                — block all sends to suppressed
+   *   recipients (default)
+   * - `'transactional-allowed'` — block broadcasts; allow messages
+   *   with `tag: 'transactional'`
+   * - `'off'`                   — never block; the suppression
+   *   table is just a tracking record
+   *
+   * The check is opt-in at the table level — apps that haven't
+   * created the `email_suppressions` table see "always allowed"
+   * with a one-shot warn.
+   */
+  suppressionPolicy?: 'strict' | 'transactional-allowed' | 'off'
+
+  /**
+   * URL prefix the framework's default unsubscribe route mounts
+   * under (stacksjs/stacks#1880). Defaults to
+   * `/_stacks/email/unsubscribe`. The full link is built as
+   * `${app.url}${unsubscribeRoute}/${signed-token}`.
+   */
+  unsubscribeRoute?: string
 }
 
 export type EmailConfig = Partial<EmailOptions>
@@ -340,6 +364,17 @@ export interface EmailMessage {
   cc?: string | string[] | EmailAddress[]
   /** Blind carbon copy recipient(s) */
   bcc?: string | string[] | EmailAddress[]
+  /**
+   * Reply-To address(es) for the outgoing message.
+   *
+   * Drivers must propagate this to the provider's equivalent field
+   * (`ReplyToAddresses` on SES, `h:Reply-To` on Mailgun, `reply_to` on
+   * SendGrid, a `Reply-To:` header for SMTP). Previously the field
+   * lived as an `as any` stash on the message (stacksjs/stacks#1871 M-4)
+   * — promoting it to a first-class slot means drivers can be
+   * checked at compile time for coverage.
+   */
+  replyTo?: EmailAddress | EmailAddress[] | string | string[]
   /** Email subject line */
   subject: string
   /** Path to email template (Vue component) */
@@ -364,6 +399,48 @@ export interface EmailMessage {
   onError?: (error: Error) => Promise<{ message: string }> | { message: string }
   /** Optional custom handler */
   handle?: () => Promise<{ message: string }> | { message: string }
+  /**
+   * Caller-supplied idempotency key (stacksjs/stacks#1871 M-8).
+   *
+   * When set, `mail.send()` consults an `email_idempotency` dedup
+   * table before dispatching to the driver:
+   *   - hit: returns the cached EmailResult from the first send
+   *   - miss: dispatches, then records the result under the key
+   *
+   * Why it matters: queued send retries (the framework retries 3×
+   * with backoff) and external retry loops (webhook handlers that
+   * re-fire on transient failures, request POSTs that the user
+   * double-clicks) can otherwise deliver the same email multiple
+   * times. The key turns those retries into safe no-ops.
+   *
+   * Construction guidance: derive the key from the business event
+   * the email represents — e.g. `welcome:${userId}`,
+   * `order-confirmation:${orderId}:${attempt}`, not from message
+   * content (which would collide across unrelated sends).
+   *
+   * The dedup table is opt-in. When the migration hasn't been run
+   * yet, the framework warns once and falls back to "send every
+   * time" so unrelated apps aren't broken by the new behavior.
+   */
+  idempotencyKey?: string
+  /**
+   * Classification used by the suppression-policy check
+   * (stacksjs/stacks#1880). Set to `'transactional'` for messages
+   * that should bypass suppression when
+   * `email.suppressionPolicy: 'transactional-allowed'` is
+   * configured — password resets, billing receipts, magic-link
+   * sign-ins.
+   *
+   * Set to `'broadcast'` (or omit) for marketing / newsletter
+   * sends; those get blocked when the recipient is suppressed.
+   *
+   * Under the default `'strict'` policy this field has no effect
+   * — both transactional and broadcast sends get blocked. Apps
+   * that need to send password-reset emails to bounced addresses
+   * (rare, but legitimate) opt into `'transactional-allowed'` AND
+   * tag the message.
+   */
+  tag?: 'transactional' | 'broadcast'
 }
 
 // Email interfaces

@@ -27,18 +27,23 @@ export function queue(buddy: CLI): void {
     .action(async (options: CliQueueOptions & { concurrency?: string }) => {
       log.debug('Running `buddy queue:work` ...', options)
 
-      // Two-phase shutdown for queue workers. SIGTERM lets in-flight jobs
-      // finish (or hand off to retry) before we tear the process down;
-      // a follow-up SIGKILL after a 10-second grace window prevents a
-      // misbehaving job from holding the process forever. Without this,
-      // `Ctrl+C` during dev would orphan the bun-queue Redis connection
-      // and leave reserved jobs locked until their reservation expired.
+      // Two-phase shutdown for queue workers. SIGTERM signals
+      // `stopProcessor()` to drain in-flight jobs within the grace
+      // window (stacksjs/stacks#1872 Q-10 — previously the worker
+      // exited immediately and left jobs mid-handle); a follow-up
+      // SIGKILL after the timeout prevents a misbehaving job from
+      // holding the process forever. Jobs that don't finish in time
+      // are released by the next worker's reservation sweep (Q-2).
       const SHUTDOWN_GRACE_MS = 10_000
       let shuttingDown = false
       const cleanup = (signal: NodeJS.Signals) => {
         if (shuttingDown) return
         shuttingDown = true
         log.info(`[queue] Received ${signal}, draining workers (max ${SHUTDOWN_GRACE_MS / 1000}s)…`)
+        // Fire the in-process drain in parallel with the kill timer
+        // so an unresponsive handler can't out-wait the timeout.
+        import('@stacksjs/queue').then(({ stopProcessor }) => stopProcessor({ graceMs: SHUTDOWN_GRACE_MS }))
+          .catch(error => log.error('[queue] stopProcessor failed', error))
         setTimeout(() => {
           log.warn('[queue] Drain timeout exceeded — forcing shutdown.')
           process.exit(ExitCode.FatalError)
@@ -66,6 +71,7 @@ export function queue(buddy: CLI): void {
     .command('queue:failed', 'List all failed jobs')
     .option('-p, --project [project]', descriptions.project, { default: false })
     .option('-q, --queue [queue]', descriptions.queue, { default: false })
+    .option('--since [duration]', 'Only show jobs failed since (e.g. 1h, 30m, 2d)', { default: false })
     .option('--verbose', descriptions.verbose, { default: false })
     .action(async (options: CliQueueOptions) => {
       log.debug('Running `buddy queue:failed` ...', options)
@@ -148,6 +154,35 @@ export function queue(buddy: CLI): void {
     })
 
   buddy
+    .command('queue:list', 'List queued jobs (flat row view, filterable by queue/status)')
+    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('-q, --queue [queue]', descriptions.queue, { default: false })
+    .option('--status [status]', 'Filter by pending | reserved | delayed', { default: false })
+    .option('--limit [limit]', 'Maximum rows to display (default 50)', { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:list` ...', options)
+
+      const perf = await intro('buddy queue:list')
+      const result = await runAction(Action.QueueList, options)
+
+      if (result.isErr) {
+        await outro(
+          'While running the queue:list command, there was an issue',
+          { startTime: perf, useSeconds: true },
+          result.error,
+        )
+        process.exit(ExitCode.FatalError)
+      }
+
+      await outro('Listed queued jobs', {
+        startTime: perf,
+        useSeconds: true,
+      })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
     .command('queue:status', 'Display the status of queue workers')
     .option('-p, --project [project]', descriptions.project, { default: false })
     .option('-q, --queue [queue]', descriptions.queue, { default: false })
@@ -199,6 +234,126 @@ export function queue(buddy: CLI): void {
         startTime: perf,
         useSeconds: true,
       })
+      process.exit(ExitCode.Success)
+    })
+
+  // ===========================================================================
+  // DLQ + poison + circuit-breaker CLI (stacksjs/stacks#1885)
+  // ===========================================================================
+  buddy
+    .command('queue:dlq', 'List dead-letter jobs (jobs that re-failed after retry)')
+    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('-q, --queue [queue]', descriptions.queue, { default: false })
+    .option('--reason [reason]', 'Filter by reason (repeat-failure | poison-detected | circuit-broken | manual)', { default: false })
+    .option('--since [duration]', 'Only show rows dead-lettered since (e.g. 1h, 30m, 2d)', { default: false })
+    .option('--limit [limit]', 'Maximum rows to display (default 100)', { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:dlq` ...', options)
+      const perf = await intro('buddy queue:dlq')
+      const result = await runAction(Action.QueueDlq, options)
+      if (result.isErr) {
+        await outro('While running queue:dlq there was an issue', { startTime: perf, useSeconds: true }, result.error)
+        process.exit(ExitCode.FatalError)
+      }
+      await outro('Listed dead-letter jobs', { startTime: perf, useSeconds: true })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:dlq:retry', 'Re-enqueue a dead-letter job back into its queue')
+    .option('--id [id]', 'Dead-letter row id to retry', { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:dlq:retry` ...', options)
+      const perf = await intro('buddy queue:dlq:retry')
+      const result = await runAction(Action.QueueDlqRetry, options)
+      if (result.isErr) {
+        await outro('While running queue:dlq:retry there was an issue', { startTime: perf, useSeconds: true }, result.error)
+        process.exit(ExitCode.FatalError)
+      }
+      await outro('Re-enqueued dead-letter job', { startTime: perf, useSeconds: true })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:dlq:purge', 'Delete dead-letter rows older than a retention window')
+    .option('--older-than-days [days]', 'Retention window in days (default 30)', { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:dlq:purge` ...', options)
+      const perf = await intro('buddy queue:dlq:purge')
+      const result = await runAction(Action.QueueDlqPurge, options)
+      if (result.isErr) {
+        await outro('While running queue:dlq:purge there was an issue', { startTime: perf, useSeconds: true }, result.error)
+        process.exit(ExitCode.FatalError)
+      }
+      await outro('Purged dead-letter rows', { startTime: perf, useSeconds: true })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:quarantine', 'List quarantined jobs (or --add a manual quarantine)')
+    .option('--add [jobName]', 'Manually quarantine a job class', { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:quarantine` ...', options)
+      const perf = await intro('buddy queue:quarantine')
+      const result = await runAction(Action.QueueQuarantine, options)
+      if (result.isErr) {
+        await outro('While running queue:quarantine there was an issue', { startTime: perf, useSeconds: true }, result.error)
+        process.exit(ExitCode.FatalError)
+      }
+      await outro('queue:quarantine done', { startTime: perf, useSeconds: true })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:unquarantine', 'Lift the quarantine on a job class')
+    .option('--name [name]', 'Job class name to unquarantine', { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:unquarantine` ...', options)
+      const perf = await intro('buddy queue:unquarantine')
+      const result = await runAction(Action.QueueUnquarantine, options)
+      if (result.isErr) {
+        await outro('While running queue:unquarantine there was an issue', { startTime: perf, useSeconds: true }, result.error)
+        process.exit(ExitCode.FatalError)
+      }
+      await outro('Unquarantined', { startTime: perf, useSeconds: true })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:pause', 'Manually pause a queue (circuit-breaker)')
+    .option('--queue [name]', 'Queue name to pause', { default: false })
+    .option('--for [seconds]', 'Pause duration in seconds (default 300)', { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:pause` ...', options)
+      const perf = await intro('buddy queue:pause')
+      const result = await runAction(Action.QueuePause, options)
+      if (result.isErr) {
+        await outro('While running queue:pause there was an issue', { startTime: perf, useSeconds: true }, result.error)
+        process.exit(ExitCode.FatalError)
+      }
+      await outro('Paused queue', { startTime: perf, useSeconds: true })
+      process.exit(ExitCode.Success)
+    })
+
+  buddy
+    .command('queue:resume', 'Resume a paused queue (circuit-breaker)')
+    .option('--queue [name]', 'Queue name to resume', { default: false })
+    .option('--verbose', descriptions.verbose, { default: false })
+    .action(async (options: CliQueueOptions) => {
+      log.debug('Running `buddy queue:resume` ...', options)
+      const perf = await intro('buddy queue:resume')
+      const result = await runAction(Action.QueueResume, options)
+      if (result.isErr) {
+        await outro('While running queue:resume there was an issue', { startTime: perf, useSeconds: true }, result.error)
+        process.exit(ExitCode.FatalError)
+      }
+      await outro('Resumed queue', { startTime: perf, useSeconds: true })
       process.exit(ExitCode.Success)
     })
 

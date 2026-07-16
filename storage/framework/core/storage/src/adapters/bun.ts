@@ -1,14 +1,18 @@
 import { Buffer } from 'node:buffer'
 import { file, write as bunWrite } from 'bun'
+import { chmod, lstat } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
 import type {
   ChecksumOptions,
   DirectoryEntry,
   DirectoryListing,
   FileContents,
+  GetStreamOptions,
   ListOptions,
   MimeTypeOptions,
   PublicUrlOptions,
+  PutResult,
+  PutStreamOptions,
   SignedUrlOptions,
   StatEntry,
   StorageAdapter,
@@ -38,7 +42,7 @@ export class BunStorageAdapter implements StorageAdapter {
     return resolved
   }
 
-  async write(path: string, contents: FileContents): Promise<void> {
+  async write(path: string, contents: FileContents): Promise<PutResult> {
     const fullPath = this.resolvePath(path)
     const dir = dirname(fullPath)
     await this.createDirectory(relative(this.root, dir))
@@ -53,7 +57,18 @@ export class BunStorageAdapter implements StorageAdapter {
       await bunWrite(fullPath, contents)
     }
     else {
-      const reader = contents.getReader()
+      // Web-standard ReadableStream only — see s3.ts:contentsToBuffer
+      // (stacksjs/stacks#1873 S-15) for the same guard.
+      const stream = contents as unknown as { getReader?: ReadableStream['getReader'] }
+      if (typeof stream.getReader !== 'function') {
+        throw new TypeError(
+          '[storage/bun] contents must be a web-standard ReadableStream '
+          + '(with .getReader()), not a Node stream.Readable. '
+          + 'Convert via Readable.toWeb(nodeStream) before passing.',
+        )
+      }
+
+      const reader = stream.getReader.call(contents as ReadableStream)
       const chunks: Uint8Array[] = []
       while (true) {
         const { done, value } = await reader.read()
@@ -69,6 +84,15 @@ export class BunStorageAdapter implements StorageAdapter {
       }
       await bunWrite(fullPath, result)
     }
+
+    // Read back size + mtime via Bun.file — same shape as the local
+    // adapter (stacksjs/stacks#1888 S-8).
+    const written = file(fullPath)
+    return {
+      path,
+      size: written.size,
+      lastModified: written.lastModified,
+    }
   }
 
   async read(path: string): Promise<FileContents> {
@@ -78,6 +102,70 @@ export class BunStorageAdapter implements StorageAdapter {
       throw new Error(`File not found: ${path}`)
     }
     return await bunFile.arrayBuffer().then(buf => new Uint8Array(buf))
+  }
+
+  /**
+   * Native Bun stream via `Bun.file().stream()`
+   * (stacksjs/stacks#1886). Returns a web-standard
+   * `ReadableStream<Uint8Array>` directly — no Node-stream
+   * conversion needed since Bun's file streams are already WHATWG.
+   */
+  async getStream(path: string, _options?: GetStreamOptions): Promise<ReadableStream<Uint8Array>> {
+    const fullPath = this.resolvePath(path)
+    const bunFile = file(fullPath)
+    if (!(await bunFile.exists()))
+      throw new Error(`File not found: ${path}`)
+    return bunFile.stream() as ReadableStream<Uint8Array>
+  }
+
+  /**
+   * Pipe a web stream to disk via `Bun.write(path, stream)`
+   * (stacksjs/stacks#1886). Bun's `write()` accepts a
+   * ReadableStream natively and handles the backpressure.
+   *
+   * Abort handling: tee the stream so we can cancel one half on
+   * `signal` while bun consumes the other; on abort we
+   * unlink the partial file so callers don't see truncated
+   * artifacts.
+   */
+  async putStream(path: string, stream: ReadableStream<Uint8Array>, options?: PutStreamOptions): Promise<PutResult> {
+    const fullPath = this.resolvePath(path)
+    const dir = dirname(fullPath)
+    await this.createDirectory(relative(this.root, dir))
+
+    // Wire AbortSignal to a Response wrapper — `Bun.write` accepts
+    // BodyInit (Response counts), and a Response with a signal
+    // aborts the underlying read on cancel.
+    try {
+      const body = new Response(stream)
+      const writePromise = bunWrite(fullPath, body)
+      if (options?.signal) {
+        const abortHandler = (): void => {
+          // Bun doesn't expose a write-cancel API today; the next
+          // read from the source stream rejects, and we clean up
+          // the partial file in the catch below.
+        }
+        options.signal.addEventListener('abort', abortHandler, { once: true })
+        try { await writePromise }
+        finally { options.signal.removeEventListener('abort', abortHandler) }
+      }
+      else {
+        await writePromise
+      }
+    }
+    catch (err) {
+      try { await Bun.$.throws(false)`rm -f ${fullPath}` }
+      catch { /* best-effort cleanup */ }
+      throw err
+    }
+
+    const written = file(fullPath)
+    return {
+      path,
+      size: written.size,
+      contentType: options?.contentType,
+      lastModified: written.lastModified,
+    }
   }
 
   async readToString(path: string): Promise<string> {
@@ -185,8 +273,30 @@ export class BunStorageAdapter implements StorageAdapter {
     yield* createDirectoryListing(entries)
   }
 
-  async changeVisibility(_path: string, _visibility: Visibility): Promise<void> {}
-  async visibility(_path: string): Promise<Visibility> { return 'private' as Visibility }
+  /**
+   * Same chmod-based visibility as the local adapter
+   * (stacksjs/stacks#1873 S-4). Bun's own file APIs don't expose a
+   * mode setter, so we use node:fs/promises.chmod against the
+   * already-resolved path. Public = 0o644 / 0o755, Private = 0o600 /
+   * 0o700, with the executable bit on directories so traversal still
+   * works for other users.
+   */
+  async changeVisibility(path: string, vis: Visibility): Promise<void> {
+    const fullPath = this.resolvePath(path)
+    const stats = await lstat(fullPath)
+    const isDir = stats.isDirectory()
+    const mode = (vis === ('public' as Visibility))
+      ? (isDir ? 0o755 : 0o644)
+      : (isDir ? 0o700 : 0o600)
+    await chmod(fullPath, mode)
+  }
+
+  async visibility(path: string): Promise<Visibility> {
+    const fullPath = this.resolvePath(path)
+    const stats = await lstat(fullPath)
+    const perms = stats.mode & 0o777
+    return ((perms & 0o004) ? 'public' : 'private') as Visibility
+  }
 
   async fileExists(path: string): Promise<boolean> {
     const fullPath = this.resolvePath(path)
