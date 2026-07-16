@@ -60,7 +60,7 @@ function authStateOrNull(): RequestAuthState | null {
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
-import { createToken as createRawToken, parseScopes } from './tokens'
+import { createToken as createRawToken, getPasswordChangedAt, isIssuedBeforePasswordChange, parseScopes } from './tokens'
 
 export class Auth {
   // Per-request state lives on the request object via `authStateOrNull()`
@@ -281,7 +281,7 @@ export class Auth {
     // The per-IP throttle middleware on /api/auth/login is the first
     // line; this is the second (in case the attacker rotates IPs but
     // keeps targeting one inbox).
-    const isRateLimited = RateLimiter.isRateLimited(email)
+    const isRateLimited = await RateLimiter.isRateLimited(email)
 
     const user = await User.where('email', '=', email).first()
     const authPass = credentials[password] || ''
@@ -302,13 +302,13 @@ export class Auth {
       return false
 
     if (hashCheck && user) {
-      RateLimiter.resetAttempts(email)
+      await RateLimiter.resetAttempts(email)
       const state = authStateOrNull()
       if (state) state.authUser = user
       return true
     }
 
-    RateLimiter.recordFailedAttempt(email)
+    await RateLimiter.recordFailedAttempt(email)
     return false
   }
 
@@ -384,17 +384,20 @@ export class Auth {
     const bearerToken = this.getBearerToken()
 
     if (bearerToken) {
-      const parsed = this.parseToken(bearerToken)
-      if (parsed) {
-        const decryptedId = await this.decryptTokenId(parsed.encryptedId)
-        if (decryptedId) {
-          // Revoke any refresh tokens linked to this access token before
-          // we revoke the access row itself.
-          await db.updateTable('oauth_refresh_tokens')
-            .set({ revoked: true })
-            .where('access_token_id', '=', Number(decryptedId))
-            .execute()
-        }
+      // Find the access-token row by hashed bearer so we can cascade-
+      // revoke any refresh tokens before the access row itself.
+      // Same raw-hex lookup as `validateToken` / `getUserFromToken` —
+      // see their doc comments for the createTokenForUser refactor
+      // context (stacksjs/stacks#1867).
+      const accessToken = await db.selectFrom('oauth_access_tokens')
+        .where('token', '=', hashToken(bearerToken))
+        .select(['id'])
+        .executeTakeFirst()
+      if (accessToken) {
+        await db.updateTable('oauth_refresh_tokens')
+          .set({ revoked: true })
+          .where('access_token_id', '=', Number(accessToken.id))
+          .execute()
       }
       await this.revokeToken(bearerToken)
     }
@@ -577,37 +580,25 @@ export class Auth {
   // ============================================================================
 
   /**
-   * Validate a token
+   * Validate a token.
+   *
+   * Looks up the access-token row by the hashed plaintext bearer. The
+   * `createTokenForUser` path (and `tokens.ts:createToken` it delegates
+   * to) emits raw 40-byte hex bearers — no `${jwt}:${encryptedId}`
+   * envelope. The previous parseToken + decryptTokenId chain was left
+   * behind here after `createTokenForUser` switched
+   * (see stacksjs/stacks#1867), so every issued bearer was unparseable
+   * on the read side and validation always returned false. Going
+   * straight to a hashed-token lookup mirrors `tokens.ts:findToken`.
    */
   public static async validateToken(token: string): Promise<boolean> {
-    const parsed = this.parseToken(token)
-    if (!parsed)
-      return false
-
-    const { plainToken, encryptedId } = parsed
-    const decryptedId = await this.decryptTokenId(encryptedId)
-    if (!decryptedId)
-      return false
-
+    const hashedPlainToken = hashToken(token)
     const accessToken = await db.selectFrom('oauth_access_tokens')
-      .where('id', '=', Number(decryptedId))
+      .where('token', '=', hashedPlainToken)
       .selectAll()
       .executeTakeFirst()
 
-    // Compare hashed token using timing-safe comparison
     if (!accessToken)
-      return false
-
-    const hashedPlainToken = hashToken(plainToken)
-    const storedHash = String(accessToken.token)
-    if (hashedPlainToken.length !== storedHash.length)
-      return false
-
-    const isMatch = timingSafeEqual(
-      Buffer.from(hashedPlainToken, 'utf-8'),
-      Buffer.from(storedHash, 'utf-8'),
-    )
-    if (!isMatch)
       return false
 
     log.debug(`[auth] Token validated for token#${accessToken.id}`)
@@ -622,6 +613,12 @@ export class Auth {
 
     // Check if token is revoked
     if (accessToken.revoked)
+      return false
+
+    // Reject tokens issued before the user last changed their password
+    // (stacksjs/stacks#1957). Binds validity to the durable users row,
+    // so a stolen token survives neither a reset nor the sweep gap.
+    if (isIssuedBeforePasswordChange(accessToken.created_at, await getPasswordChangedAt(accessToken.user_id)))
       return false
 
     // Mark the token as freshly-used. Used to be a rotation path here
@@ -643,24 +640,18 @@ export class Auth {
   }
 
   /**
-   * Get user from a token
+   * Get user from a token. Uses the same raw-hex hashed lookup as
+   * `validateToken` — see its doc for context on why parseToken +
+   * decryptTokenId was removed (stacksjs/stacks#1867 follow-up).
    */
   public static async getUserFromToken(token: string): Promise<UserModel | undefined> {
-    const parsed = this.parseToken(token)
-    if (!parsed)
-      return undefined
-
-    const { plainToken, encryptedId } = parsed
-    const decryptedId = await this.decryptTokenId(encryptedId)
-    if (!decryptedId)
-      return undefined
-
+    const hashedPlainToken = hashToken(token)
     const accessToken = await db.selectFrom('oauth_access_tokens')
-      .where('id', '=', Number(decryptedId))
+      .where('token', '=', hashedPlainToken)
       .selectAll()
       .executeTakeFirst()
 
-    if (!accessToken || accessToken.token !== hashToken(plainToken))
+    if (!accessToken)
       return undefined
 
     if (accessToken.expires_at && new Date(String(accessToken.expires_at)) < new Date()) {
@@ -686,7 +677,17 @@ export class Auth {
     if (!accessToken?.user_id)
       return undefined
 
-    return await User.find(accessToken.user_id as number)
+    const user = await User.find(accessToken.user_id as number)
+
+    // Reject tokens issued before the user last changed their password
+    // (stacksjs/stacks#1957). Reuses the already-loaded User model — no
+    // extra query. A missing column reads as undefined => legacy-allow.
+    const changedAtRaw = (user as any)?.password_changed_at
+    const changedAt = changedAtRaw ? new Date(String(changedAtRaw)) : null
+    if (isIssuedBeforePasswordChange(accessToken.created_at, changedAt))
+      return undefined
+
+    return user
   }
 
   /**
@@ -702,15 +703,17 @@ export class Auth {
     if (!bearerToken)
       return undefined
 
-    const parsed = this.parseToken(bearerToken)
-    if (!parsed)
+    // Raw-hex lookup matches the createTokenForUser bearer shape — no
+    // parseToken / decryptTokenId envelope. See `validateToken`'s
+    // doc for context (stacksjs/stacks#1867 follow-up).
+    const accessToken = await db.selectFrom('oauth_access_tokens')
+      .where('token', '=', hashToken(bearerToken))
+      .select(['id'])
+      .executeTakeFirst()
+    if (!accessToken)
       return undefined
 
-    const decryptedId = await this.decryptTokenId(parsed.encryptedId)
-    if (!decryptedId)
-      return undefined
-
-    const token = await this.getTokenFromId(Number(decryptedId))
+    const token = await this.getTokenFromId(Number(accessToken.id))
     if (token && state)
       state.currentToken = token
 
@@ -813,20 +816,15 @@ export class Auth {
   }
 
   /**
-   * Revoke a specific token
+   * Revoke a specific token. Raw-hex hashed lookup matches the bearer
+   * shape `createTokenForUser` actually emits — see `validateToken`
+   * for context on why parseToken / decryptTokenId aren't used here
+   * anymore (stacksjs/stacks#1867 follow-up).
    */
   public static async revokeToken(token: string): Promise<void> {
-    const parsed = this.parseToken(token)
-    if (!parsed)
-      return
-
-    const decryptedId = await this.decryptTokenId(parsed.encryptedId)
-    if (!decryptedId)
-      return
-
     await db.updateTable('oauth_access_tokens')
       .set({ revoked: true, updated_at: formatDate(new Date()) })
-      .where('id', '=', Number(decryptedId))
+      .where('token', '=', hashToken(token))
       .execute()
   }
 

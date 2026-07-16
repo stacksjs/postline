@@ -15,23 +15,31 @@
  * ```
  */
 
+import process from 'node:process'
 import { response, route } from '@stacksjs/router'
 
 // ============================================================================
 // Auth Routes
 // ============================================================================
 
-route.post('/login', 'Actions/Auth/LoginAction')
-route.post('/register', 'Actions/Auth/RegisterAction')
-route.get('/generate-registration-options', 'Actions/Auth/GenerateRegistrationAction')
-route.post('/verify-registration', 'Actions/Auth/VerifyRegistrationAction')
-route.get('/generate-authentication-options', 'Actions/Auth/GenerateAuthenticationAction')
-route.get('/verify-authentication', 'Actions/Auth/VerifyAuthenticationAction')
+// Rate limits on token-issuance + password-reset endpoints
+// (stacksjs/stacks#1921). `Auth.attempt()` already has a per-email
+// lockout but it doesn't stop credential-stuffing across many emails
+// from one IP, and the token endpoints have no upstream brake at all
+// — a leaked refresh token could be hammered for unlimited access
+// tokens until the row TTL. Userland that overrides any of these in
+// `routes/api.ts` (user routes win) gets to pick its own limits.
+route.post('/login', 'Actions/Auth/LoginAction').rateLimit(5, 'minute')
+route.post('/register', 'Actions/Auth/RegisterAction').rateLimit(3, 'minute')
+route.get('/generate-registration-options', 'Actions/Auth/GenerateRegistrationAction').rateLimit(10, 'minute')
+route.post('/verify-registration', 'Actions/Auth/VerifyRegistrationAction').rateLimit(5, 'minute')
+route.get('/generate-authentication-options', 'Actions/Auth/GenerateAuthenticationAction').rateLimit(10, 'minute')
+route.get('/verify-authentication', 'Actions/Auth/VerifyAuthenticationAction').rateLimit(10, 'minute')
 
 route.group({ prefix: '/auth' }, () => {
-  route.post('/refresh', 'Actions/Auth/RefreshTokenAction')
+  route.post('/refresh', 'Actions/Auth/RefreshTokenAction').rateLimit(10, 'minute')
   route.get('/tokens', 'Actions/Auth/ListTokensAction').middleware('auth')
-  route.post('/token', 'Actions/Auth/CreateTokenAction').middleware('auth')
+  route.post('/token', 'Actions/Auth/CreateTokenAction').middleware('auth').rateLimit(10, 'minute')
   route.delete('/tokens/{id}', 'Actions/Auth/RevokeTokenAction').middleware('auth')
   route.get('/abilities', 'Actions/Auth/TestAbilitiesAction').middleware('auth')
 })
@@ -39,13 +47,17 @@ route.group({ prefix: '/auth' }, () => {
 route.group({ middleware: 'auth' }, () => {
   route.get('/me', 'Actions/Auth/AuthUserAction')
   route.post('/logout', 'Actions/Auth/LogoutAction')
+  // Sign out everywhere: revoke every access/refresh token AND destroy
+  // every session for the authenticated user (stacksjs/stacks#1957).
+  route.post('/logout-all', 'Actions/Auth/LogoutAllAction')
 })
 
-// Password Reset
+// Password Reset. `/forgot` triggers a mailer hop so it's the most
+// abuse-prone — keep that tighter than the verification endpoints.
 route.group({ prefix: '/password' }, () => {
-  route.post('/forgot', 'Actions/Password/SendPasswordResetEmailAction')
-  route.post('/reset', 'Actions/Password/PasswordResetAction')
-  route.post('/verify-token', 'Actions/Password/VerifyResetTokenAction')
+  route.post('/forgot', 'Actions/Password/SendPasswordResetEmailAction').rateLimit(3, 'minute')
+  route.post('/reset', 'Actions/Password/PasswordResetAction').rateLimit(5, 'minute')
+  route.post('/verify-token', 'Actions/Password/VerifyResetTokenAction').rateLimit(10, 'minute')
 })
 
 // ============================================================================
@@ -99,8 +111,24 @@ route.post('/api/reviews/submit', 'Actions/Storefront/SubmitReviewAction').skipC
 // ============================================================================
 
 route.health()
-route.get('/install', 'Actions/InstallAction')
-route.get('/test-error', 'Actions/TestErrorAction')
+
+// Dev-only diagnostics (stacksjs/stacks#1955). `/install` returns the
+// framework's shell bootstrap script (free stack fingerprinting) and
+// `/test-error` is an on-demand exception generator — `?type=` picks a
+// 401/404/422/500 scenario — so neither belongs on a production app's
+// public API. Same env detection as defaults/routes/dashboard-api.ts:
+// APP_ENV wins over NODE_ENV, and an unset env counts as local so
+// `buddy dev` and test suites keep both endpoints out of the box.
+// Apps that intentionally want either route in production can
+// re-register the path in `routes/api.ts` — user routes load first,
+// so their copy wins.
+const APP_ENV = (process.env.APP_ENV ?? process.env.NODE_ENV ?? '').toLowerCase()
+const IS_LOCAL_ENV = APP_ENV === '' || APP_ENV === 'local' || APP_ENV === 'development' || APP_ENV === 'dev' || APP_ENV === 'test' || APP_ENV === 'testing'
+
+if (IS_LOCAL_ENV) {
+  route.get('/install', 'Actions/InstallAction')
+  route.get('/test-error', 'Actions/TestErrorAction')
+}
 
 // ============================================================================
 // SEO — sitemap.xml + robots.txt
@@ -191,7 +219,14 @@ route.group({ prefix: '/dashboard', middleware: 'auth' }, () => {
 // Payments
 // ============================================================================
 
-route.group({ prefix: '/payments' }, () => {
+// Auth-gated: every handler reads a `{id}` path param and resolves that user's
+// Stripe customer/payment data. Without `auth` the whole group was an
+// unauthenticated IDOR — anyone could enumerate billing/PII or mutate payment
+// methods by incrementing the id. `auth` closes the unauthenticated hole; each
+// action must STILL scope to the authenticated user (derive the customer from
+// `await request.user()`, never trust the `{id}` path param) to prevent an
+// authenticated user from reaching another user's billing.
+route.group({ prefix: '/payments', middleware: 'auth' }, () => {
   route.get('/fetch-customer/{id}', 'Actions/Payment/FetchPaymentCustomerAction')
   route.get('/fetch-transaction-history/{id}', 'Actions/Payment/FetchTransactionHistoryAction')
   route.get('/fetch-user-subscriptions/{id}', 'Actions/Payment/FetchUserSubscriptionsAction')
@@ -219,11 +254,14 @@ route.group({ prefix: '/payments' }, () => {
 // Queues & Realtime (legacy endpoints)
 // ============================================================================
 
-route.group({ prefix: '/queues' }, () => {
+// Auth-gated to match every other operational dashboard group — these expose
+// internal job/queue and websocket state and were the only siblings missing
+// `auth`, leaking infra telemetry to anonymous callers.
+route.group({ prefix: '/queues', middleware: 'auth' }, () => {
   route.get('/', 'Actions/Queue/FetchQueuesAction')
 })
 
-route.group({ prefix: '/realtime' }, () => {
+route.group({ prefix: '/realtime', middleware: 'auth' }, () => {
   route.get('/websockets', 'Actions/Realtime/FetchWebsocketsAction')
   route.get('/stats', 'Actions/Dashboard/Realtime/RealtimeStatsAction')
 })
@@ -260,10 +298,11 @@ route.group({ prefix: '/api/monitoring', middleware: 'auth' }, () => {
 })
 
 // ============================================================================
-// CMS / Blog
+// CMS (admin surface, auth-gated)
 //
-// /cms is the admin surface (auth-gated). /blog below mirrors a subset of
-// the same handlers without auth so userland can render a public blog.
+// The PUBLIC blog at /blog is served separately by BunPress from markdown in
+// content/blog/ (dev: actions onRequest; prod: a static BunPress build) — it
+// is no longer a DB/CMS mirror. /cms below remains the authoring API.
 // ============================================================================
 
 route.group({ prefix: '/cms', middleware: 'auth' }, () => {
@@ -308,15 +347,9 @@ route.group({ prefix: '/cms', middleware: 'auth' }, () => {
   route.get('/files', 'Actions/Dashboard/Content/FileIndexAction')
 })
 
-// Public Blog routes
-route.group({ prefix: '/blog' }, () => {
-  route.get('/posts', 'Actions/Cms/PostIndexAction')
-  route.get('/posts/{id}', 'Actions/Cms/PostShowAction')
-  route.get('/categories', 'Actions/Cms/CategorizableIndexAction')
-  route.get('/tags', 'Actions/Cms/TaggableIndexAction')
-  route.get('/feed.xml', 'Actions/Cms/RssFeedAction')
-  route.get('/sitemap.xml', 'Actions/Cms/SitemapAction')
-})
+// (The public /blog mirror — posts/categories/tags/feed/sitemap from the DB —
+// was retired. The blog is now BunPress + markdown; its feed.xml and
+// sitemap.xml are generated by BunPress from content/blog/.)
 
 // ============================================================================
 // Commerce

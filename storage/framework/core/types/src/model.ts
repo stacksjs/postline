@@ -107,6 +107,11 @@ export type SocialProviders = 'google' | 'github' | 'twitter' | 'facebook'
 
 export interface SeedOptions {
   count: number
+  /**
+   * Fixed rows merged over factory output for the first N entries (N = fixtures.length).
+   * Keys use model attribute names (camelCase); stored as snake_case columns.
+   */
+  fixtures?: Array<Record<string, unknown>>
 }
 
 type LogAttribute = string
@@ -185,7 +190,17 @@ export interface ModelOptions extends Base {
     commentables?: boolean // defaults to false
     useAuth?: boolean | UserAuthOptions // defaults to false
     authenticatable?: boolean | UserAuthOptions // useAuth alias
+    /**
+     * @deprecated stacksjs/stacks#1929 — the `useSeeder` trait only
+     * existed to drive the auto-walker, which is removed from
+     * `./buddy seed` (stacksjs/stacks#1919). Seeding is now owned by
+     * class seeders: a `database/seeders/<Model>Seeder.ts` file calling
+     * `factory.generate(Model, { count })`. Run `./buddy seed:scaffold`
+     * to codemod existing traits into seeder files (and strip the
+     * trait). This field is scheduled for removal in the next major.
+     */
     useSeeder?: boolean | SeedOptions // defaults to a count of 10
+    /** @deprecated alias of {@link useSeeder} — see stacksjs/stacks#1929. */
     seedable?: boolean | SeedOptions // useSeeder alias
     useSearch?: boolean | SearchOptions // defaults to false
     useSocials?: SocialOptions // defaults to false
@@ -253,6 +268,23 @@ export interface Attribute {
 export interface CompositeIndex {
   name: string
   columns: string[]
+  /**
+   * Emit `UNIQUE` on the index — turns a multi-column index into a
+   * multi-column unique constraint. Combine with `where:` for a
+   * partial unique index (stacksjs/stacks#1943).
+   *
+   * @default false
+   */
+  unique?: boolean
+  /**
+   * Partial-index `WHERE` clause as a raw SQL expression — e.g.
+   * `'user_id IS NOT NULL'`. Lets the constraint apply to a subset of
+   * rows; the canonical case is "prevent a logged-in user from flagging
+   * the same review twice, but allow anonymous flags (user_id NULL) to
+   * repeat" (stacksjs/stacks#1943). Emitted verbatim, so don't
+   * interpolate untrusted input.
+   */
+  where?: string
 }
 
 export interface AttributesElements {

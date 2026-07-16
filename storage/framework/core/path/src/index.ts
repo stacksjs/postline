@@ -1,4 +1,5 @@
 import type { ParsedPath } from 'node:path'
+import { existsSync } from 'node:fs'
 import os from 'node:os'
 import {
   basename,
@@ -77,7 +78,25 @@ export function userViewsPath(path?: string): string {
 }
 
 export function userFunctionsPath(path?: string): string {
-  return resourcesPath(`functions/${path || ''}`)
+  return `${resolveUserLibBase(projectPath('functions'), resourcesPath('functions'))}/${path || ''}`
+}
+
+/**
+ * Pick where a user lib folder (`components` / `functions`) lives
+ * (stacksjs/stacks#929). A root-level `<project>/components` (or
+ * `/functions`) folder wins when it exists; otherwise the conventional
+ * `resources/<name>`. Lets apps keep these at the project root without
+ * losing the `resources/`-nested default.
+ *
+ * Pure + injectable `exists` so the selection is unit-testable without
+ * touching the real filesystem.
+ */
+export function resolveUserLibBase(
+  rootDir: string,
+  resourcesDir: string,
+  exists: (p: string) => boolean = existsSync,
+): string {
+  return exists(rootDir) ? rootDir : resourcesDir
 }
 
 /**
@@ -168,6 +187,35 @@ export function userModelsPath(path?: string): string {
  */
 export function userNotificationsPath(path?: string): string {
   return appPath(`Notifications/${path || ''}`)
+}
+
+/**
+ * Returns the path to the user-defined `Mail` directory.
+ *
+ * Mailable classes live here, one file per email type. The companion
+ * stx template lives in `resources/emails/<kebab-name>.stx` and is
+ * resolved by `@stacksjs/email`'s template loader at send time.
+ *
+ * @param path - The relative path to the file or directory within the `Mail` directory.
+ * @returns The absolute path to the specified file or directory within the user-defined `Mail` directory.
+ * @example
+ * ```ts
+ * import { userMailPath } from '@stacksjs/path'
+ *
+ * console.log(userMailPath('Welcome.ts')) // Outputs the absolute path to 'Welcome.ts' within the user-defined `Mail` directory.
+ * ```
+ */
+export function userMailPath(path?: string): string {
+  return appPath(`Mail/${path || ''}`)
+}
+
+/**
+ * Returns the path to the user-defined `resources/emails` directory
+ * where stx email templates live. The make:mail scaffolder writes a
+ * companion stx file alongside each Mailable class.
+ */
+export function userEmailsPath(path?: string): string {
+  return resourcesPath(`emails/${path || ''}`)
 }
 
 export function userDatabasePath(path?: string): string {
@@ -533,7 +581,9 @@ export function commandsPath(path?: string): string {
  * @returns The absolute path to the specified file or directory within the `components` directory.
  */
 export function componentsPath(path?: string): string {
-  return userLibsPath(`components/${path || ''}`)
+  // Root-level `components/` wins when present, else `resources/components`
+  // (stacksjs/stacks#929).
+  return `${resolveUserLibBase(projectPath('components'), resourcesPath('components'))}/${path || ''}`
 }
 
 /**
@@ -750,7 +800,9 @@ export function healthPath(path?: string): string {
  * @returns The absolute path to the specified file or directory within the `functions` directory.
  */
 export function functionsPath(path?: string): string {
-  return userLibsPath(`functions/${path || ''}`)
+  // Root-level `functions/` wins when present, else `resources/functions`
+  // (stacksjs/stacks#929).
+  return `${resolveUserLibBase(projectPath('functions'), resourcesPath('functions'))}/${path || ''}`
 }
 
 /**
@@ -1522,6 +1574,8 @@ export interface Path {
   userMiddlewarePath: (path?: string) => string
   userModelsPath: (path?: string) => string
   userNotificationsPath: (path?: string) => string
+  userMailPath: (path?: string) => string
+  userEmailsPath: (path?: string) => string
   utilsPath: (path?: string) => string
   validationPath: (path?: string) => string
   xRayPath: (path?: string) => string
@@ -1659,6 +1713,8 @@ export const path: Path = {
   userMiddlewarePath,
   userModelsPath,
   userNotificationsPath,
+  userMailPath,
+  userEmailsPath,
   utilsPath,
   validationPath,
   xRayPath,

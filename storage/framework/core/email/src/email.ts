@@ -1,12 +1,16 @@
 import type { EmailDriver, EmailMessage, EmailResult } from '@stacksjs/types'
 import { config } from '@stacksjs/config'
+import { log } from '@stacksjs/logging'
 import type { Message } from './types'
+import { CaptureEmailDriver } from './drivers/capture'
 import { LogEmailDriver } from './drivers/log'
 import { MailgunDriver } from './drivers/mailgun'
 import { MailtrapDriver } from './drivers/mailtrap'
 import { SendGridDriver } from './drivers/sendgrid'
 import { SESDriver } from './drivers/ses'
 import { SMTPDriver } from './drivers/smtp'
+import { findEmailByIdempotencyKey, recordEmailIdempotency } from './idempotency'
+import { checkSuppressionFor } from './suppression'
 
 /** Result returned by email handler callbacks */
 interface EmailHandlerResult {
@@ -115,7 +119,7 @@ export class Email {
   }
 }
 
-class Mail {
+export class Mail {
   private drivers: Map<string, EmailDriver> = new Map()
   private defaultDriver: string
 
@@ -131,6 +135,10 @@ class Mail {
     this.drivers.set('mailgun', new MailgunDriver())
     this.drivers.set('mailtrap', new MailtrapDriver())
     this.drivers.set('smtp', new SMTPDriver())
+    // Tests-only in-memory capture (stacksjs/stacks#1871 M-12). Cheap
+    // to register even when unused — the driver only holds an empty
+    // array until something calls `send()`.
+    this.drivers.set('capture', new CaptureEmailDriver())
   }
 
   public async send(message: EmailMessage): Promise<EmailResult> {
@@ -149,15 +157,50 @@ class Mail {
       )
     }
 
+    // Idempotency-key short-circuit (stacksjs/stacks#1871 M-8). A
+    // retry with the same key returns the cached EmailResult from
+    // the first successful send instead of re-dispatching to the
+    // driver. Both the lookup and the recording silently degrade
+    // when the email_idempotency table isn't migrated yet — same
+    // opt-in pattern as #1879 Co-3's order dedup.
+    if (message.idempotencyKey) {
+      const cached = await findEmailByIdempotencyKey(message.idempotencyKey)
+      if (cached) return cached
+    }
+
+    // Suppression check (stacksjs/stacks#1880). Runs AFTER
+    // idempotency: a suppressed retry of a previously-successful
+    // send should still return the cached "yes I sent it" result —
+    // the suppression only affects NEW dispatches. Suppression
+    // check itself is opt-in (warns and degrades when the
+    // email_suppressions table isn't migrated).
+    const suppressionType = await checkSuppressionForFirstRecipient(message)
+    if (suppressionType) {
+      return {
+        success: false,
+        message: `suppressed:${suppressionType}`,
+        provider: 'suppression',
+      }
+    }
+
     const defaultFrom: EmailFromAddress = {
       name: config.email.from?.name || 'Stacks',
       address: config.email.from?.address || 'no-reply@stacksjs.com',
     }
 
-    return driver.send({
+    const result = await driver.send({
       ...message,
       from: message.from || defaultFrom,
     })
+
+    // Record AFTER the successful dispatch so a driver failure
+    // doesn't lock the key — the caller can retry. Failed results
+    // are filtered inside recordEmailIdempotency.
+    if (message.idempotencyKey) {
+      await recordEmailIdempotency(message.idempotencyKey, message, result)
+    }
+
+    return result
   }
 
   // Create a new Mail instance with a different driver (doesn't mutate the singleton)
@@ -171,61 +214,119 @@ class Mail {
 
   /**
    * Queue an email for background sending via the job system.
-   * Falls back to synchronous send if queue driver is 'sync'.
+   * Falls back to synchronous send if the queue system isn't loaded
+   * or the dispatch fails; the failure is logged so a dropped queue
+   * doesn't silently degrade to inline sends without anyone noticing
+   * (stacksjs/stacks#1871 M-11).
    */
   public async queue(message: EmailMessage): Promise<void> {
-    try {
+    await this.dispatchOrFallback(message, async () => {
       const { job } = await import('@stacksjs/queue')
-      await job('SendEmail', {
-        message,
-        driver: this.defaultDriver,
-      })
+      await job('SendEmail', { message, driver: this.defaultDriver })
         .onQueue('emails')
         .dispatch()
-    }
-    catch {
-      // Queue system not available, fall back to sync send
-      await this.send(message)
-    }
+    }, { context: 'queue' })
   }
 
   /**
    * Queue an email for sending after a delay (in seconds).
    */
   public async later(delaySeconds: number, message: EmailMessage): Promise<void> {
-    try {
+    await this.dispatchOrFallback(message, async () => {
       const { job } = await import('@stacksjs/queue')
-      await job('SendEmail', {
-        message,
-        driver: this.defaultDriver,
-      })
+      await job('SendEmail', { message, driver: this.defaultDriver })
         .onQueue('emails')
         .delay(delaySeconds)
         .dispatch()
-    }
-    catch {
-      // Queue system not available, fall back to sync send
-      await this.send(message)
-    }
+    }, { context: 'later', delaySeconds })
   }
 
   /**
    * Queue an email on a specific named queue.
    */
   public async queueOn(queueName: string, message: EmailMessage): Promise<void> {
-    try {
+    await this.dispatchOrFallback(message, async () => {
       const { job } = await import('@stacksjs/queue')
-      await job('SendEmail', {
-        message,
-        driver: this.defaultDriver,
-      })
+      await job('SendEmail', { message, driver: this.defaultDriver })
         .onQueue(queueName)
         .dispatch()
+    }, { context: 'queueOn', queueName })
+  }
+
+  /**
+   * Run the queue-dispatch closure; if it throws (queue package not
+   * loaded, broker connection lost, serializer crash, …) log the
+   * failure and fall back to a synchronous send. Previously the
+   * dispatch error was swallowed and apps had no signal that their
+   * background-send pipeline had silently degraded to inline sends —
+   * worth knowing before a worker's worth of sends starts blocking
+   * the request thread. See stacksjs/stacks#1871 M-11.
+   */
+  private async dispatchOrFallback(
+    message: EmailMessage,
+    dispatch: () => Promise<void>,
+    logExtra: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await dispatch()
+      return
     }
-    catch {
-      await this.send(message)
+    catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      log.warn(
+        '[email] Queue dispatch failed; falling back to synchronous send. '
+        + 'Background email pipeline is degraded — check the queue worker / broker.',
+        { ...logExtra, reason },
+      )
+    }
+    await this.send(message)
+  }
+}
+
+/**
+ * Walk every recipient on a message (to / cc / bcc) and consult
+ * the suppression list. Returns the matched suppression type for
+ * the FIRST suppressed recipient so the caller can surface a
+ * structured "rejected" result. Returns `null` when all recipients
+ * pass the policy check.
+ *
+ * Short-circuits on first match — a 100-recipient broadcast with
+ * one suppressed address is still a fast no-op rather than 100
+ * round-trips. See stacksjs/stacks#1880.
+ */
+async function checkSuppressionForFirstRecipient(message: EmailMessage): Promise<string | null> {
+  const recipients = collectRecipientAddresses(message)
+  if (recipients.length === 0) return null
+  for (const addr of recipients) {
+    const matched = await checkSuppressionFor(addr, message.tag)
+    if (matched) return matched
+  }
+  return null
+}
+
+/**
+ * Flatten the message's recipient fields (to / cc / bcc) into a
+ * single string-list. Tolerates the four shapes the framework
+ * accepts: string, string[], EmailAddress, EmailAddress[].
+ */
+function collectRecipientAddresses(message: EmailMessage): string[] {
+  const out: string[] = []
+  const pushOne = (v: unknown) => {
+    if (typeof v === 'string') { out.push(v); return }
+    if (v && typeof v === 'object' && 'address' in v && typeof (v as { address: unknown }).address === 'string')
+      out.push((v as { address: string }).address)
+  }
+  for (const field of ['to', 'cc', 'bcc'] as const) {
+    const v = (message as unknown as Record<string, unknown>)[field]
+    if (!v) continue
+    if (Array.isArray(v)) {
+      for (const item of v) pushOne(item)
+    }
+    else {
+      pushOne(v)
     }
   }
+  return out
 }
 
 // Export a singleton instance — reads default driver from config lazily so

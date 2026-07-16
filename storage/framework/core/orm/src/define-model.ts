@@ -1,8 +1,11 @@
 import { createModel, type ModelDefinition as BQBModelDefinition, registerModel } from '@stacksjs/query-builder'
 import type { InferRelationNames } from '@stacksjs/query-builder'
+import type { SearchOptions } from '@stacksjs/types'
 import { log } from '@stacksjs/logging'
 import { snakeCase } from '@stacksjs/strings'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { toCursorPaginator, toPaginator, toSimplePaginator } from './paginator'
+import { enrichPaginatorUrls, resolveCursorArgs, resolvePageArgs } from './paginator-request'
 
 /**
  * Event-suppression scope. When the current async context's store reports
@@ -43,6 +46,27 @@ export function withoutEvents<T>(fn: () => T | Promise<T>): Promise<T> {
 // prevents TypeScript from providing contextual types for callback parameters.
 /**
  * Built-in cast types for model attributes.
+ *
+ * ### Timezone contract (stacksjs/stacks#1876 O-5, D-5)
+ *
+ * `datetime` and `date` casts persist values in **UTC** regardless of
+ * which driver is connected. The `set` direction uses
+ * `Date.toISOString()`, which always emits `Z`-suffixed UTC. The
+ * `get` direction parses the stored string back into a JavaScript
+ * `Date`, which represents an instant on the universal timeline —
+ * timezone presentation is the caller's responsibility (typically via
+ * `Intl.DateTimeFormat` at the render layer, or a Temporal-API
+ * adapter).
+ *
+ * **Why UTC-only:** Per-driver behavior diverges sharply on
+ * timezone-aware columns. PostgreSQL has `timestamptz` (timezone-
+ * aware); MySQL stores `TIMESTAMP` as UTC but presents in the
+ * session timezone; SQLite has no timezone concept at all and stores
+ * ISO strings verbatim. The ORM normalizes them to a single
+ * convention (UTC on the wire) so multi-driver apps behave the same
+ * across environments. Apps that need original-timezone preservation
+ * should store the user's TZ as a separate column and convert at
+ * the render layer.
  */
 export type CastType = 'string' | 'number' | 'boolean' | 'json' | 'datetime' | 'date' | 'array' | 'integer' | 'float'
 
@@ -52,6 +76,22 @@ export type CastType = 'string' | 'number' | 'boolean' | 'json' | 'datetime' | '
 export interface CasterInterface {
   get(value: unknown): unknown
   set(value: unknown): unknown
+}
+
+// Track which JSON-cast columns have already logged a parse failure so
+// a corrupted row doesn't spam the log on every read
+// (stacksjs/stacks#1876 O-4). Set is keyed by `${typeof v}:${preview}`
+// so genuinely different corruptions each get logged once.
+const jsonParseFailureSeen = new Set<string>()
+
+function logJsonParseFailure(raw: unknown, err: unknown): void {
+  const preview = typeof raw === 'string' ? raw.slice(0, 80) : String(raw)
+  const key = `${typeof raw}:${preview}`
+  if (jsonParseFailureSeen.has(key)) return
+  jsonParseFailureSeen.add(key)
+  const message = err instanceof Error ? err.message : String(err)
+  // eslint-disable-next-line no-console
+  console.error(`[orm] JSON cast failed to parse value (returning null): ${message} — value preview: ${JSON.stringify(preview)}`)
 }
 
 const builtInCasters: Record<CastType, CasterInterface> = {
@@ -78,7 +118,22 @@ const builtInCasters: Record<CastType, CasterInterface> = {
   json: {
     get: (v) => {
       if (v == null) return null
-      if (typeof v === 'string') { try { return JSON.parse(v) } catch { return v } }
+      if (typeof v === 'string') {
+        try {
+          return JSON.parse(v)
+        }
+        catch (err) {
+          // Previously the catch returned the unparsed string, so callers
+          // expecting `typeof row.config === 'object'` silently
+          // type-cast wrong and crashed downstream
+          // (stacksjs/stacks#1876 O-4). Now: log the corruption once
+          // per distinct shape so it's visible, and return null (the
+          // typed default) so consumers don't accidentally string-`.length`
+          // a malformed JSON column.
+          logJsonParseFailure(v, err)
+          return null
+        }
+      }
       return v
     },
     set: (v) => {
@@ -87,10 +142,19 @@ const builtInCasters: Record<CastType, CasterInterface> = {
     },
   },
   datetime: {
+    // UTC-only by contract (see CastType docstring). The returned
+    // `Date` is timezone-agnostic; convert via `toLocaleString(tz)`
+    // or Intl at render time when local-time display is needed.
     get: (v) => v ? new Date(v as string) : null,
     set: (v) => v instanceof Date ? v.toISOString() : v,
   },
   date: {
+    // Date-only field, persisted as YYYY-MM-DD derived from the UTC
+    // calendar day. A noon-local Date in UTC-5 stored as a `date`
+    // becomes the next day's UTC date — that's the trade-off of the
+    // UTC-only contract. Callers that need local-calendar-day
+    // semantics should convert to UTC at the boundary themselves
+    // (e.g. `new Date(Date.UTC(y, m, d))` from local Y/M/D parts).
     get: (v) => v ? new Date(v as string) : null,
     set: (v) => v instanceof Date ? v.toISOString().split('T')[0] : v,
   },
@@ -134,6 +198,42 @@ const MODEL_INSTANCE_INTERNAL_KEYS = new Set([
 ])
 
 const STACKS_PROXY_TAG = Symbol.for('stacks.modelInstanceProxy')
+
+/**
+ * Walk a dot-separated path against a relations map and return the
+ * resolved value, or `null` if any segment misses. Used by
+ * `toSearchableObject` to pull denormalised cross-table fields out of
+ * `_relations` without an extra database round-trip (the caller is
+ * expected to have eager-loaded the relevant relations via
+ * `.with(...)`). See stacksjs/stacks#1918.
+ */
+function resolveRelationPath(
+  relations: Record<string, unknown> | undefined,
+  path: string,
+): unknown {
+  if (!relations || !path) return null
+  const segments = path.split('.')
+  let current: unknown = relations
+  for (const segment of segments) {
+    if (current == null || typeof current !== 'object') return null
+    const obj = current as Record<string, unknown>
+    // Relations are wrapped instances — read from `_attributes` first
+    // so the path-walk doesn't need to know about the proxy tag.
+    if ('_attributes' in obj && obj._attributes && typeof obj._attributes === 'object') {
+      const attrs = obj._attributes as Record<string, unknown>
+      if (segment in attrs) {
+        current = attrs[segment]
+        continue
+      }
+    }
+    if (segment in obj) {
+      current = obj[segment]
+      continue
+    }
+    return null
+  }
+  return current ?? null
+}
 
 /**
  * Wrap a bun-query-builder ModelInstance in a Proxy that:
@@ -216,6 +316,43 @@ function wrapModelInstance<T extends object>(
         }
       }
 
+      // Sync `save()` guard. If a model has `set: { x: async (...) }` and
+      // the user does `inst.x = 'plain'; inst.save()` (no await), the
+      // underlying bqb save() would call the setter and persist its raw
+      // Promise — which surfaces deep in the SQLite driver as a cryptic
+      // "Binding expected string, TypedArray, boolean…" error. We pre-run
+      // each dirty setter, throw a helpful message if any is a Promise,
+      // and otherwise stash the resolved values + suppress the underlying
+      // setter pass so we don't double-apply.
+      if (prop === 'save') {
+        return function () {
+          const def = (target as any)._definition
+          const setters = def?.set as Record<string, (attrs: Record<string, unknown>) => unknown> | undefined
+          if (setters && Object.keys(setters).length > 0 && typeof (target as any).isDirty === 'function') {
+            for (const [key, fn] of Object.entries(setters)) {
+              if (typeof fn !== 'function') continue
+              if (!(target as any).isDirty(key)) continue
+              const result = fn((target as any)._attributes as Record<string, unknown>)
+              if (result && typeof (result as { then?: unknown }).then === 'function') {
+                throw new Error(
+                  `Setter for "${key}" returned a Promise — use \`saveAsync()\` instead of \`save()\` when a model has async setters.`,
+                )
+              }
+              ;(target as any)._attributes[key] = result
+            }
+            const original = def.set
+            def.set = {}
+            try {
+              return (target as any).save()
+            }
+            finally {
+              def.set = original
+            }
+          }
+          return (target as any).save()
+        }
+      }
+
       if (prop === 'updateAsync') {
         return async function (data: Record<string, unknown>) {
           // fill() then saveAsync() — same flow as instance.update() but
@@ -261,6 +398,72 @@ function wrapModelInstance<T extends object>(
       if (prop === 'deleteQuietly') {
         return function () {
           return withoutEvents(() => (target as any).delete())
+        }
+      }
+
+      if (prop === 'toSearchableObject') {
+        return function toSearchableObject() {
+          const def = (target as any)._definition as { traits?: { useSearch?: boolean | SearchOptions } } | undefined
+          const search = def?.traits?.useSearch
+          if (!search) return null
+
+          const attrs = (target as any)._attributes as Record<string, unknown> | undefined
+          if (!attrs) return null
+
+          // Boolean form: `useSearch: true` indexes every attribute on
+          // the row. Pre-fix this branch short-circuited to `null`
+          // because `typeof true === 'boolean'`, which silently no-op'd
+          // both the live observer hook AND `./buddy search-engine:
+          // update` (the latter logged `imported 0, skipped N` and
+          // exited 0). See stacksjs/stacks#1917.
+          if (search === true) {
+            const doc: Record<string, unknown> = { ...attrs }
+            if (attrs.id != null) doc.id = String(attrs.id)
+            return doc
+          }
+
+          // Object form: explicit `searchable` / `displayable` /
+          // `filterable` / `sortable` arrays.
+          const doc: Record<string, unknown> = {}
+          const keys = search.displayable?.length
+            ? search.displayable
+            : [...search.searchable ?? [], ...search.filterable ?? [], ...search.sortable ?? [], 'id']
+
+          // Pre-resolve any cross-table fields declared in `denormalize`
+          // by walking the dot-path against `_relations`. Eager-loading
+          // is the caller's job (`Model.query().with('court_house').
+          // get()`); this loop just reads the already-loaded relation.
+          // See stacksjs/stacks#1918 for the broader picture.
+          const denormalize = search.denormalize ?? {}
+          const relations = (target as any)._relations as Record<string, unknown> | undefined
+
+          for (const key of keys) {
+            const snake = snakeCase(key)
+
+            // 1) Own attribute on the row — fast path, identical to
+            //    pre-#1918 behaviour.
+            const own = attrs[snake] ?? attrs[key]
+            if (own !== undefined) {
+              doc[snake] = own
+              continue
+            }
+
+            // 2) Denormalised dot-path against `_relations`. Missing
+            //    relation/segment resolves to `null` rather than
+            //    `undefined` so the indexed document keeps the field
+            //    (Meilisearch settings that declare a key as searchable
+            //    expect every doc to carry it).
+            const path = denormalize[key] ?? denormalize[snake]
+            if (path) {
+              doc[snake] = resolveRelationPath(relations, path)
+              continue
+            }
+
+            doc[snake] = undefined
+          }
+
+          if (attrs.id != null) doc.id = String(attrs.id)
+          return doc
         }
       }
 
@@ -357,7 +560,19 @@ function wrapModelInstance<T extends object>(
  * — `Car.where(...).first()` should return a proxied instance, not a raw
  * one.
  */
-const QB_TERMINATORS = new Set(['get', 'first', 'last', 'firstOrFail', 'find', 'findOrFail', 'all', 'paginate'])
+const QB_TERMINATORS = new Set([
+  'get', 'first', 'last', 'firstOrFail', 'find', 'findOrFail', 'all',
+  // Pagination terminators (stacksjs/stacks#1905 P1) — each one routes
+  // its bqb-shaped return through the matching canonical adapter below
+  // so userland sees `{ data, current_page, per_page, total, ... }`
+  // instead of bqb's internal `{ data, meta: { perPage, page, ... } }`.
+  'paginate', 'simplePaginate', 'cursorPaginate',
+])
+const PAGINATE_ADAPTERS: Record<string, (r: any) => any> = {
+  paginate: toPaginator,
+  simplePaginate: toSimplePaginator,
+  cursorPaginate: toCursorPaginator,
+}
 const STACKS_QB_PROXY_TAG = Symbol.for('stacks.queryBuilderProxy')
 
 function wrapQueryBuilder(qb: any, casts?: Record<string, CastType | CasterInterface>): any {
@@ -376,11 +591,41 @@ function wrapQueryBuilder(qb: any, casts?: Record<string, CastType | CasterInter
       if (typeof v !== 'function') return v
       // eslint-disable-next-line pickier/no-unused-vars
       return function (this: any, ...args: any[]) {
-        const result = v.apply(target, args)
+        // P2 — when the caller invokes a pagination terminator without
+        // explicit args, fill them from the active request's query
+        // string (`?page=N&per_page=M`). This is the no-op path outside
+        // any request scope, so CLI / queue / cron callers still see
+        // the same defaults as before.
+        let callArgs = args
+        const propName = String(prop)
+        if (propName === 'paginate' || propName === 'simplePaginate') {
+          const { perPage, page } = resolvePageArgs(args[0], args[1])
+          callArgs = [perPage, page]
+        }
+        else if (propName === 'cursorPaginate') {
+          const { perPage, cursor } = resolveCursorArgs(args[0], args[1])
+          callArgs = [perPage, cursor, args[2], args[3]] // pass thru column + direction
+        }
+
+        const result = v.apply(target, callArgs)
         const finalize = (r: any) => {
-          if (QB_TERMINATORS.has(String(prop))) {
+          if (QB_TERMINATORS.has(propName)) {
             if (Array.isArray(r)) return r.map(x => wrapModelInstance(x, casts))
-            // paginate returns an object like { data: [...], meta: {...} }
+            // Paginators — wrap data items first, then convert the raw
+            // bqb `{ data, meta }` shape to the canonical Stacks
+            // paginator. Each adapter preserves the data array, so
+            // wrapping the model instances before the conversion is
+            // safe (and saves a re-walk). Finally, enrich with URL
+            // fields from the active request (P2 — no-op when none).
+            const adapter = PAGINATE_ADAPTERS[propName]
+            if (adapter && r && Array.isArray((r as any).data)) {
+              const wrappedData = (r as any).data.map((x: any) => wrapModelInstance(x, casts))
+              const canonical = adapter({ ...r, data: wrappedData })
+              return enrichPaginatorUrls(canonical as any)
+            }
+            // Backward-compat: a non-paginator object whose `.data` is
+            // an array (custom subquery / search result) — re-wrap items
+            // without touching the surrounding shape.
             if (r && Array.isArray((r as any).data)) {
               return { ...r, data: (r as any).data.map((x: any) => wrapModelInstance(x, casts)) }
             }
@@ -508,19 +753,22 @@ const MASS_ASSIGNMENT_SYSTEM_COLUMNS = new Set([
  * payload (unchanged) or throws `MassAssignmentException` on the first
  * forbidden field it sees.
  *
- * Mode resolution mirrors Laravel:
+ * Deny-by-default. Once a model declares `attributes`, only those declared
+ * columns may be mass-assigned, so a request body can't smuggle in an
+ * undeclared column like `role` / `is_admin`:
  *
- *   • If any attribute carries `fillable: true` → allowlist mode. Fields
- *     not on the allowlist (or in the system-column / FK exemption set)
- *     throw `not-fillable`.
- *   • Else, `guarded: true` attrs throw `guarded`; everything else passes.
- *   • Else, the model has no opinion on mass assignment → permissive
- *     (matches the framework's pre-fix behavior so existing apps that
- *     declare neither don't suddenly start throwing).
- *
- * `_id`-suffixed columns are always allowed through (FK columns); the
- * model usually doesn't list them in `attributes`, so blocking them
- * would break every belongsTo write.
+ *   • If any attribute carries `fillable: true` → the allowlist is exactly
+ *     that explicit `fillable` subset (Laravel `$fillable`).
+ *   • Else → the allowlist is every declared attribute (minus `guarded`).
+ *   • `guarded: true` always wins — including on foreign-key (`*_id`)
+ *     columns. The old code blanket-exempted every `*_id` key, so a
+ *     `guarded` `owner_id` / `account_id` was still mass-assignable and an
+ *     attacker could re-parent a record or cross tenants. Now guarded FKs
+ *     throw like any other guarded column.
+ *   • Non-guarded `*_id` columns stay assignable even when not separately
+ *     declared in `attributes`, so `belongsTo` writes keep working.
+ *   • A model that declares no `attributes` at all has no column vocabulary
+ *     to validate against → permissive (the only escape hatch left).
  *
  * Callers can opt out per-call via `{ force: true }` — used by the
  * `forceCreate` / `forceUpdate` static helpers.
@@ -536,24 +784,33 @@ function applyMassAssignmentRules(
   const attrs = (definition as any).attributes as Record<string, { fillable?: boolean, guarded?: boolean }> | undefined
   if (!attrs) return data
 
+  const declared = new Set<string>()
   const fillable = new Set<string>()
   const guarded = new Set<string>()
   for (const [k, a] of Object.entries(attrs)) {
     const col = snakeCase(k)
+    declared.add(col)
     if (a?.fillable === true) fillable.add(col)
     if (a?.guarded === true) guarded.add(col)
   }
 
-  const allowlistMode = fillable.size > 0
+  // Explicit `fillable` narrows the allowlist; otherwise every declared,
+  // non-guarded attribute is assignable. Deny-by-default either way.
+  const allowed = fillable.size > 0 ? fillable : declared
 
   for (const key of Object.keys(data)) {
     if (MASS_ASSIGNMENT_SYSTEM_COLUMNS.has(key)) continue
-    if (key.endsWith('_id')) continue // foreign keys
 
+    // Guarded wins for every column, FK included.
     if (guarded.has(key))
       throw new MassAssignmentException(definition.name, key, 'guarded')
 
-    if (allowlistMode && !fillable.has(key))
+    // Non-guarded foreign keys remain assignable so belongsTo writes work
+    // even when the FK column isn't separately declared as an attribute.
+    if (key.endsWith('_id'))
+      continue
+
+    if (!allowed.has(key))
       throw new MassAssignmentException(definition.name, key, 'not-fillable')
   }
 
@@ -857,6 +1114,175 @@ function addStaticHelpers(baseModel: Record<string, unknown>, definition: BQBMod
       }
     }
   }
+
+  // Scout-style search statics (stacksjs/stacks#1891). Installed
+  // only when `traits.useSearch` is set — otherwise these names
+  // stay free for caller-defined statics. Each one is a thin
+  // wrapper around the search-engine driver scoped to the model's
+  // resolved index name.
+  const searchConfig = resolveSearchConfig(definition.traits?.useSearch)
+  if (searchConfig) {
+    const indexName = searchConfig.index ?? definition.table ?? snakeCase(`${definition.name}s`)
+
+    // Model.search(query, params?) — full-text search returning a
+    // builder so callers can chain `.get()`, `.paginate(n)`,
+    // `.hydrate()` (returns model instances) or pass through to the
+    // raw driver response via `.raw()`.
+    if (typeof baseModel.search !== 'function') {
+      baseModel.search = function (query: string, params?: Record<string, unknown>) {
+        return createSearchQueryBuilder(baseModel, indexName, query, params)
+      }
+    }
+
+    // Model.makeAllSearchable() — bulk reindex every row. Uses
+    // `chunk(500)` when available; falls back to `.all()` for
+    // models that don't expose chunking. Returns the total count
+    // indexed.
+    if (typeof baseModel.makeAllSearchable !== 'function') {
+      baseModel.makeAllSearchable = async function (chunkSize: number = 500): Promise<number> {
+        const all = baseModel.all as Function | undefined
+        if (typeof all !== 'function')
+          throw new Error(`[ORM] ${definition.name}.makeAllSearchable cannot run: the underlying query builder did not expose all()`)
+
+        const { useSearchEngine } = await import('@stacksjs/search-engine')
+        const engine = useSearchEngine()
+        let total = 0
+
+        // Try the chunking path first — far cheaper for large
+        // tables. Falls through to .all() if the builder doesn't
+        // expose .query().chunk() (some test mocks).
+        const query = baseModel.query as Function | undefined
+        if (typeof query === 'function') {
+          try {
+            const q = query.call(baseModel) as { chunk?: (size: number, cb: (rows: any[]) => Promise<void>) => Promise<void> }
+            if (q && typeof q.chunk === 'function') {
+              await q.chunk(chunkSize, async (rows: any[]) => {
+                const docs = rows.map(r => projectDocumentFromTrait(r, searchConfig)).filter(Boolean) as Record<string, unknown>[]
+                if (docs.length > 0) await engine.addDocuments(indexName, docs)
+                total += docs.length
+              })
+              return total
+            }
+          }
+          catch {
+            // Fall through to .all() — chunking is an optimization, not a requirement.
+          }
+        }
+
+        const rows = (await all.call(baseModel)) || []
+        const docs = (rows as any[]).map(r => projectDocumentFromTrait(r, searchConfig)).filter(Boolean) as Record<string, unknown>[]
+        if (docs.length > 0) await engine.addDocuments(indexName, docs)
+        return docs.length
+      }
+    }
+
+    // Model.removeAllFromSearch() — drop every document from the
+    // model's index. Useful before a driver swap or schema-shape
+    // change. Idempotent: calling against an empty index is a no-op.
+    if (typeof baseModel.removeAllFromSearch !== 'function') {
+      baseModel.removeAllFromSearch = async function (): Promise<void> {
+        const { useSearchEngine } = await import('@stacksjs/search-engine')
+        const engine = useSearchEngine() as { deleteAllDocuments?: (index: string) => Promise<unknown> }
+        if (typeof engine.deleteAllDocuments === 'function') {
+          await engine.deleteAllDocuments(indexName)
+          return
+        }
+        // Fallback: iterate + delete-by-id when the driver doesn't
+        // expose a bulk-flush primitive. Rare — most engines do.
+        const all = baseModel.all as Function | undefined
+        const rows = typeof all === 'function' ? ((await all.call(baseModel)) || []) : []
+        const e2 = useSearchEngine()
+        for (const r of rows as any[]) {
+          const id = r?.id ?? r?._attributes?.id
+          if (id != null) await e2.deleteDocument(indexName, Number(id))
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Standalone projection helper (#1891) — used by both the lifecycle
+ * sync and the bulk-reindex path so the document shape stays
+ * consistent. Mirrors the closure inside `buildSearchHooks` but
+ * lives at module scope so the static-helpers code can reach it.
+ */
+function projectDocumentFromTrait(
+  model: any,
+  config: SearchableTraitConfig,
+): Record<string, unknown> | null | undefined {
+  if (typeof config.shape === 'function') {
+    try { return config.shape(model) }
+    catch { return undefined }
+  }
+  const fromHook = (model as { toSearchableObject?: () => Record<string, unknown> | null })?.toSearchableObject?.()
+  if (fromHook !== undefined) return fromHook
+  return model?._attributes ?? (typeof model?.toJSON === 'function' ? model.toJSON() : null)
+}
+
+/**
+ * Lightweight search-query builder returned by `Model.search()`
+ * (#1891). Thin wrapper around the search-engine driver — defers
+ * `.get()` / `.paginate()` / `.raw()` to the driver and lets
+ * callers attach filter / facet params via the standard search
+ * payload shape.
+ */
+function createSearchQueryBuilder(
+  _baseModel: Record<string, unknown>,
+  indexName: string,
+  query: string,
+  initialParams?: Record<string, unknown>,
+): {
+  get: () => Promise<unknown[]>
+  paginate: (perPage: number, page?: number) => Promise<{ hits: unknown[], total: number, page: number, perPage: number }>
+  raw: () => Promise<unknown>
+  with: (params: Record<string, unknown>) => ReturnType<typeof createSearchQueryBuilder>
+  where: (filter: string | string[]) => ReturnType<typeof createSearchQueryBuilder>
+} {
+  let params: Record<string, unknown> = { q: query, ...(initialParams ?? {}) }
+
+  const builder = {
+    /** Merge extra search params (filters, facets, attributesToRetrieve, etc.). */
+    with(extra: Record<string, unknown>) {
+      params = { ...params, ...extra }
+      return builder
+    },
+    /** Set a Meilisearch-style `filter` clause; driver-specific syntax. */
+    where(filter: string | string[]) {
+      params = { ...params, filter }
+      return builder
+    },
+    /** Execute and return the hit array. */
+    async get(): Promise<unknown[]> {
+      const { useSearchEngine } = await import('@stacksjs/search-engine')
+      const engine = useSearchEngine()
+      const result = await engine.search(indexName, params)
+      return (result as { hits?: unknown[] })?.hits ?? []
+    },
+    /** Execute with pagination. */
+    async paginate(perPage: number, page: number = 1) {
+      const { useSearchEngine } = await import('@stacksjs/search-engine')
+      const engine = useSearchEngine()
+      const result = await engine.search(indexName, {
+        ...params,
+        limit: perPage,
+        offset: (page - 1) * perPage,
+      }) as { hits?: unknown[], estimatedTotalHits?: number, nbHits?: number, total?: number }
+      return {
+        hits: result.hits ?? [],
+        total: Number(result.estimatedTotalHits ?? result.nbHits ?? result.total ?? 0),
+        page,
+        perPage,
+      }
+    },
+    /** Return the raw driver response (escape hatch for driver-specific fields). */
+    async raw(): Promise<unknown> {
+      const { useSearchEngine } = await import('@stacksjs/search-engine')
+      return await useSearchEngine().search(indexName, params)
+    },
+  }
+
+  return builder
 }
 
 /**
@@ -1062,8 +1488,30 @@ interface StacksModelDefinition {
   table: string
   primaryKey?: string
   autoIncrement?: boolean
+  /**
+   * Per-model declarative behaviors. Common entries:
+   *   - `observe: true | ['create','update','delete']` — emit
+   *     framework events (`<model>:created` etc.) on lifecycle hooks
+   *   - `useAudit`, `useSoftDeletes`, `useTimestamps`, etc.
+   *   - `broadcastOn(model): string | string[]` — channels to push
+   *     model lifecycle events to via `@stacksjs/realtime`. Requires
+   *     `broadcastWith` to be set too; only fires when `observe` is
+   *     enabled (stacksjs/stacks#1874 F-10).
+   *   - `broadcastWith(model): Record<string, unknown>` — payload
+   *     shape the realtime subscribers receive. Lets you broadcast
+   *     a curated public projection instead of the full row.
+   *
+   * @example
+   * ```ts
+   * traits: {
+   *   observe: true,
+   *   broadcastOn: post => [`user.${post.user_id}`, 'feed'],
+   *   broadcastWith: post => ({ id: post.id, title: post.title, author: post.author?.name }),
+   * }
+   * ```
+   */
   traits?: Record<string, unknown>
-  indexes?: Array<{ name: string, columns: string[] }>
+  indexes?: Array<{ name: string, columns: string[], unique?: boolean, where?: string }>
   casts?: Record<string, CastType | CasterInterface>
   attributes: {
     [key: string]: {
@@ -1082,7 +1530,7 @@ import { createBillableMethods } from './traits/billable'
 import { createLikeableMethods } from './traits/likeable'
 import { createTwoFactorMethods } from './traits/two-factor'
 import { createSoftDeleteMethods, resolveSoftDeleteOptions, cascadeSoftDelete } from './traits/soft-deletes'
-import { applyAudit } from './traits/audit'
+import { applyAudit, resolveAuditOptions } from './traits/audit'
 import { collectEncryptedAttributes, decryptValue, encryptValue, isEncrypted } from './utils/encrypted'
 
 /**
@@ -1133,8 +1581,10 @@ import { collectEncryptedAttributes, decryptValue, encryptValue, isEncrypted } f
 export function defineModel<const TDef extends ModelDefinition>(definition: TDef) {
   log.debug(`[orm] Defining model: ${definition.name} (table: ${definition.table})`)
 
-  // Build event hooks from observer configuration
-  const hooks = buildEventHooks(definition as unknown as BQBModelDefinition)
+  // Build event hooks from observer configuration and search indexing
+  const observeHooks = buildEventHooks(definition as unknown as BQBModelDefinition)
+  const searchHooks = buildSearchHooks(definition as unknown as BQBModelDefinition)
+  const hooks = mergeModelHooks(observeHooks, searchHooks)
 
   // Merge hooks into definition
   const defWithHooks = hooks
@@ -1195,8 +1645,16 @@ export function defineModel<const TDef extends ModelDefinition>(definition: TDef
   // Audit trait must run AFTER soft-delete wiring so it wraps the final
   // `delete` (which the soft-delete trait may have aliased to softDelete).
   // Wrapping earlier would leave the softDelete shim's writes unaudited.
-  if ((definition as { traits?: { useAudit?: unknown } }).traits?.useAudit) {
-    applyAudit(baseModel, definition.name, definition.primaryKey || 'id')
+  //
+  // `useAudit: true` keeps the legacy best-effort behavior. To opt
+  // into transactional auditing (audit failure rolls back the user
+  // write — required for compliance scenarios), declare
+  // `traits.useAudit: { transactional: true }` instead
+  // (stacksjs/stacks#1876 X-2).
+  const useAuditDecl = (definition as { traits?: { useAudit?: unknown } }).traits?.useAudit
+  if (useAuditDecl) {
+    const auditOpts = resolveAuditOptions(useAuditDecl)
+    applyAudit(baseModel, definition.name, definition.primaryKey || 'id', auditOpts)
   }
 
   // Build trait methods based on model config
@@ -1258,21 +1716,78 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
   // INSIDE the dispatcher (rather than at the hook caller) so even
   // explicit `dispatchEvent` calls from elsewhere honour the
   // `withoutEvents` ALS scope without each call site having to remember.
-  const dispatchEvent = (event: string, data: any) => {
-    if (eventsAreSuppressed()) return Promise.resolve()
-    return import('@stacksjs/events')
-      .then(({ dispatch }) => dispatch(event, data))
-      .catch((err) => {
-        // Only silence module resolution errors (events package may not exist in browser/tests)
-        if (err && typeof err === 'object' && 'code' in err && err.code === 'MODULE_NOT_FOUND') {
-          return
-        }
-        // Log actual event handler errors instead of swallowing them
-        console.error(`[ORM] Event '${event}' handler error:`, err)
-      })
+  //
+  // Re-throw listener errors by default (stacksjs/stacks#1876 O-2).
+  // Previously this swallowed every exception and only logged to
+  // console.error, which meant a queue dispatch failing inside an
+  // `updated` listener looked like a successful save with a missing
+  // background job — silent data drift. Now: the model save fails
+  // when a listener fails, matching Laravel's semantics. Listeners
+  // that are genuinely best-effort (analytics, observability) should
+  // catch their own errors. Opt out globally via
+  // `STACKS_ORM_EVENT_ERRORS=swallow` for legacy code that hasn't
+  // audited its listeners yet.
+  const dispatchEvent = async (event: string, data: any) => {
+    if (eventsAreSuppressed()) return
+    try {
+      const { dispatch } = await import('@stacksjs/events')
+      await dispatch(event, data)
+    }
+    catch (err) {
+      // MODULE_NOT_FOUND is the expected shape when the events package
+      // isn't installed (browser bundles, some test envs) — silence it.
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'MODULE_NOT_FOUND')
+        return
+      console.error(`[ORM] Event '${event}' handler error:`, err)
+      if (process.env.STACKS_ORM_EVENT_ERRORS !== 'swallow') throw err
+    }
   }
 
-  // Dispatches a before-event and returns false if the handler cancels the operation
+  // Model-level broadcasting (stacksjs/stacks#1874 F-10).
+  //
+  // Opt-in via `traits.broadcastOn` (channels) + `traits.broadcastWith`
+  // (payload shape). When both are declared, the post-write hooks
+  // dispatch to `@stacksjs/realtime` with the same event name shape
+  // (`<model>:<verb>`) as the events bus uses, so subscribers see
+  // consistent naming across both channels.
+  //
+  // Errors are LOGGED-AND-SWALLOWED by default — broadcasting is a
+  // notification side-channel, not the source of truth, and a flaky
+  // websocket layer must not break model saves. Opt in to throw via
+  // `STACKS_ORM_BROADCAST_ERRORS=throw` for tests that want to
+  // surface mis-wired broadcasts loudly.
+  const broadcastOnFn = (definition as { traits?: { broadcastOn?: (model: any) => string | string[] } }).traits?.broadcastOn
+  const broadcastWithFn = (definition as { traits?: { broadcastWith?: (model: any) => Record<string, unknown> } }).traits?.broadcastWith
+  const broadcastingEnabled = typeof broadcastOnFn === 'function' && typeof broadcastWithFn === 'function'
+
+  const dispatchBroadcast = async (event: string, model: any): Promise<void> => {
+    if (!broadcastingEnabled) return
+    if (eventsAreSuppressed()) return
+    try {
+      const channelsRaw = broadcastOnFn!(model)
+      const channels = Array.isArray(channelsRaw) ? channelsRaw : [channelsRaw]
+      const payload = broadcastWithFn!(model)
+      const realtime = await import('@stacksjs/realtime').catch(() => null) as { broadcast?: (channel: string, event: string, data: unknown) => Promise<void> | void } | null
+      const broadcast = realtime?.broadcast
+      if (typeof broadcast !== 'function') return
+      for (const channel of channels) {
+        if (typeof channel !== 'string' || channel.length === 0) continue
+        await broadcast(channel, event, payload)
+      }
+    }
+    catch (err) {
+      if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'MODULE_NOT_FOUND')
+        return
+      console.error(`[ORM] Broadcast '${event}' handler error:`, err)
+      if (process.env.STACKS_ORM_BROADCAST_ERRORS === 'throw') throw err
+    }
+  }
+
+  // Dispatches a before-event and returns false if the handler cancels
+  // the operation. Same re-throw policy as `dispatchEvent` — a broken
+  // `before*` listener used to silently allow the operation through
+  // because the catch returned `true` (default-allow). Now: the save
+  // fails on listener error unless STACKS_ORM_EVENT_ERRORS=swallow.
   const dispatchBeforeEvent = async (event: string, data: any): Promise<boolean> => {
     if (eventsAreSuppressed()) return true
     try {
@@ -1283,10 +1798,10 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
       if (Array.isArray(results) && results.some(r => r === false)) return false
     }
     catch (err) {
-      if (err && typeof err === 'object' && 'code' in err && err.code === 'MODULE_NOT_FOUND') {
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'MODULE_NOT_FOUND')
         return true
-      }
       console.error(`[ORM] Before-event '${event}' handler error:`, err)
+      if (process.env.STACKS_ORM_EVENT_ERRORS !== 'swallow') throw err
     }
     return true
   }
@@ -1314,6 +1829,9 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
       // already fired for the insert path.
       await dispatchEvent(`${modelName}:created`, model)
       await dispatchEvent(`${modelName}:saved`, model)
+      // Broadcast AFTER the event dispatch so any event-listener-side
+      // mutation of the model is reflected in the broadcast payload.
+      await dispatchBroadcast(`${modelName}:created`, model)
     }
   }
   if (events.includes('update')) {
@@ -1327,6 +1845,7 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
     hooks.afterUpdate = async (model: any) => {
       await dispatchEvent(`${modelName}:updated`, model)
       await dispatchEvent(`${modelName}:saved`, model)
+      await dispatchBroadcast(`${modelName}:updated`, model)
     }
   }
   if (events.includes('delete')) {
@@ -1335,10 +1854,178 @@ function buildEventHooks(definition: BQBModelDefinition): BQBModelDefinition['ho
       const shouldProceed = await dispatchBeforeEvent(`${modelName}:deleting`, model)
       if (!shouldProceed) throw new Error(`[ORM] ${modelName}:deleting event cancelled the operation`)
     }
-    hooks.afterDelete = (model: any) => dispatchEvent(`${modelName}:deleted`, model)
+    hooks.afterDelete = async (model: any) => {
+      await dispatchEvent(`${modelName}:deleted`, model)
+      await dispatchBroadcast(`${modelName}:deleted`, model)
+    }
   }
 
   return hooks
+}
+
+function mergeModelHooks(
+  ...sets: Array<BQBModelDefinition['hooks'] | undefined>
+): BQBModelDefinition['hooks'] | undefined {
+  const merged: NonNullable<BQBModelDefinition['hooks']> = {}
+  const names = new Set<string>()
+
+  for (const set of sets) {
+    if (!set) continue
+    for (const name of Object.keys(set)) names.add(name)
+  }
+
+  for (const name of names) {
+    const fns = sets.map(s => s?.[name as keyof NonNullable<BQBModelDefinition['hooks']>]).filter((fn): fn is (...args: any[]) => any => typeof fn === 'function')
+    if (!fns.length) continue
+    ;(merged as Record<string, (...args: any[]) => any>)[name] = async (...args: any[]) => {
+      for (const fn of fns) await fn(...args)
+    }
+  }
+
+  return Object.keys(merged).length ? merged : undefined
+}
+
+/**
+ * Scout-style search index sync when `traits.useSearch` is set.
+ * Indexes on create/update and removes on delete without requiring `observe: true`.
+ */
+/**
+ * Per-model search-trait config (stacksjs/stacks#1891). Accepts
+ * either `true` (legacy boolean — uses the model's
+ * `toSearchableObject()` if defined) OR a declarative object that
+ * spells out index name, document projection, and whether to
+ * dispatch the sync via a queued job.
+ */
+interface SearchableTraitConfig {
+  /** Index name. Defaults to the model's table name. */
+  index?: string
+  /**
+   * Projection function — what gets indexed. Lets you index a
+   * curated subset of fields (or denormalize relations) instead of
+   * the full row. Falls back to the model's `toSearchableObject()`
+   * if both are absent; if neither exists, the whole row is
+   * indexed.
+   */
+  shape?: (model: any) => Record<string, unknown> | null | undefined
+  /**
+   * When `true`, the search-sync runs through a queued job
+   * (`SyncSearchIndexJob`) instead of inline. Recommended for
+   * production where the search backend is on a separate network
+   * and a slow upsert shouldn't block the request.
+   *
+   * Default `false` so tests see the index update immediately and
+   * dev environments don't need a worker running.
+   */
+  queueable?: boolean
+}
+
+function resolveSearchConfig(useSearch: unknown): SearchableTraitConfig | null {
+  if (!useSearch) return null
+  if (useSearch === true) return {}
+  if (typeof useSearch === 'object') return useSearch as SearchableTraitConfig
+  return null
+}
+
+function buildSearchHooks(definition: BQBModelDefinition): BQBModelDefinition['hooks'] | undefined {
+  const config = resolveSearchConfig(definition.traits?.useSearch)
+  if (!config) return undefined
+
+  const indexName = config.index ?? definition.table ?? snakeCase(`${definition.name}s`)
+
+  /**
+   * Project a model into a searchable document. Resolution order
+   * (stacksjs/stacks#1891):
+   *   1. trait config's `shape(model)` — explicit per-model
+   *      projection, most callers
+   *   2. model's `toSearchableObject()` — legacy hook still
+   *      supported for back-compat
+   *   3. fall back to the raw model attributes
+   */
+  function projectDocument(model: any): Record<string, unknown> | null | undefined {
+    if (typeof config.shape === 'function') {
+      try { return config.shape(model) }
+      catch (err) {
+        log.warn(`[orm/search] shape() threw for ${definition.name}: ${(err as Error).message}`)
+        return undefined
+      }
+    }
+    const wrapped = wrapModelInstance(model)
+    const fromHook = (wrapped as { toSearchableObject?: () => Record<string, unknown> | null }).toSearchableObject?.()
+    if (fromHook !== undefined) return fromHook
+    // Fall back to the model attributes (mirrors `Model.toJSON()`).
+    return model?._attributes ?? (typeof model?.toJSON === 'function' ? model.toJSON() : null)
+  }
+
+  /**
+   * Dispatch through the queue when `queueable` is enabled; runs
+   * inline otherwise. The queue path is fire-and-forget — failures
+   * don't abort the model save (an unreachable Meilisearch shouldn't
+   * roll the user write back). When inline runs throw, log a warn
+   * for diagnostic visibility.
+   */
+  const syncDocument = async (model: any) => {
+    if (eventsAreSuppressed()) return
+    const doc = projectDocument(model)
+    if (!doc) return
+
+    if (config.queueable) {
+      try {
+        const { Jobs } = await import('@stacksjs/queue')
+        await Jobs.dispatch('SyncSearchIndex', { index: indexName, op: 'upsert', doc })
+      }
+      catch (err) {
+        log.warn(`[orm/search] queue dispatch failed for ${definition.name}; falling back to inline: ${(err as Error).message}`)
+        await indexInline(indexName, doc, definition.name)
+      }
+      return
+    }
+    await indexInline(indexName, doc, definition.name)
+  }
+
+  const removeDocument = async (model: any) => {
+    if (eventsAreSuppressed()) return
+    const id = model?.id ?? model?._attributes?.id
+    if (id == null) return
+
+    if (config.queueable) {
+      try {
+        const { Jobs } = await import('@stacksjs/queue')
+        await Jobs.dispatch('SyncSearchIndex', { index: indexName, op: 'delete', id: Number(id) })
+      }
+      catch (err) {
+        log.warn(`[orm/search] queue dispatch failed for ${definition.name}#${id}; falling back to inline: ${(err as Error).message}`)
+        await removeInline(indexName, Number(id), definition.name)
+      }
+      return
+    }
+    await removeInline(indexName, Number(id), definition.name)
+  }
+
+  return {
+    afterCreate: syncDocument,
+    afterUpdate: syncDocument,
+    afterDelete: removeDocument,
+  }
+}
+
+async function indexInline(indexName: string, doc: Record<string, unknown>, modelName: string): Promise<void> {
+  try {
+    const { useSearchEngine } = await import('@stacksjs/search-engine')
+    await useSearchEngine().addDocument(indexName, doc)
+  }
+  catch (err) {
+    log.warn(`[orm/search] Failed to index ${modelName}: ${(err as Error).message}`)
+  }
+}
+
+async function removeInline(indexName: string, id: number, modelName: string): Promise<void> {
+  try {
+    const { useSearchEngine } = await import('@stacksjs/search-engine')
+    await useSearchEngine().deleteDocument(indexName, id)
+  }
+  catch (err) {
+    log.warn(`[orm/search] Failed to remove ${modelName}#${id}: ${(err as Error).message}`)
+  }
 }
 
 export interface TraitMethods {
@@ -1442,22 +2129,55 @@ function applySoftDeletes(
   // ever fired — the audit's #11 specifically called this out, since a
   // listener watching for "user came back" via `restored` was never going
   // to receive the event.
+  //
+  // Cascade is wrapped in a transaction (stacksjs/stacks#1876 O-3) so
+  // a child-cascade failure rolls back the parent's soft-delete /
+  // restore. Without this, the parent committed first and a failing
+  // child left the schema in an inconsistent state with no signal to
+  // the caller. The transaction is opt-out via
+  // `STACKS_ORM_CASCADE_SWALLOW=true` (the cascadeChildren callsite
+  // honors the same env var — same boundary, same opt-out).
+  const transactional = process.env.STACKS_ORM_CASCADE_SWALLOW !== 'true'
+
   const softDeleteFn = async (id: number | string): Promise<boolean> => {
-    const ok = await helpers.softDelete(id)
-    if (ok && options.cascade?.length)
-      await cascadeSoftDelete(parentDef, options, id, 'softDelete')
-    return ok
+    if (!options.cascade?.length || !transactional) {
+      const ok = await helpers.softDelete(id)
+      if (ok && options.cascade?.length)
+        await cascadeSoftDelete(parentDef, options, id, 'softDelete')
+      return ok
+    }
+    const { db } = await import('@stacksjs/database')
+    return await db.transaction(async () => {
+      const ok = await helpers.softDelete(id)
+      if (ok)
+        await cascadeSoftDelete(parentDef, options, id, 'softDelete')
+      return ok
+    })
   }
 
   const restoreFn = async (id: number | string): Promise<boolean> => {
     const proceed = await fireRestoring(id)
     if (!proceed) return false
-    const ok = await helpers.restore(id)
-    if (ok) {
-      if (options.cascade?.length)
-        await cascadeSoftDelete(parentDef, options, id, 'restore')
-      await fireRestored(id)
+    if (!options.cascade?.length || !transactional) {
+      const ok = await helpers.restore(id)
+      if (ok) {
+        if (options.cascade?.length)
+          await cascadeSoftDelete(parentDef, options, id, 'restore')
+        await fireRestored(id)
+      }
+      return ok
     }
+    const { db } = await import('@stacksjs/database')
+    const ok = await db.transaction(async () => {
+      const inner = await helpers.restore(id)
+      if (inner)
+        await cascadeSoftDelete(parentDef, options, id, 'restore')
+      return inner
+    })
+    // Fire `restored` AFTER the transaction commits — listeners that
+    // run side effects (queue jobs, audit log) should observe the
+    // restored state, not the in-flight transaction snapshot.
+    if (ok) await fireRestored(id)
     return ok
   }
 

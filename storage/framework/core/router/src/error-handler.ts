@@ -381,11 +381,22 @@ export async function createErrorResponse(
     // missed `Accept: */*` (curl + fetch default) and silently leaked an
     // HTML page to JSON-consuming clients.
     if (isApiRequest(request)) {
+      // 4xx messages are meant for the caller (validation copy, dedupe vs.
+      // invalid, field-level errors), so surface `error.name` / `error.message`
+      // / `details` for client errors and keep masking 5xx to avoid leaking
+      // internals. Mirrors `createMiddlewareErrorResponse` so an
+      // `HttpError(4xx, …)` reads the same whether it's thrown from middleware
+      // or an action handler. See stacksjs/stacks#1946.
+      const isClientError = status >= 400 && status < 500
+      const errDetails = (error as { details?: unknown }).details
       return new Response(
         buildErrorJson({
-          error: 'Internal Server Error',
-          message: 'An unexpected error occurred.',
+          error: isClientError ? (error.name || 'Client Error') : 'Internal Server Error',
+          message: isClientError ? error.message : 'An unexpected error occurred.',
           status,
+          details: isClientError && errDetails && typeof errDetails === 'object'
+            ? errDetails as Record<string, unknown>
+            : undefined,
         }),
         { status, headers: getJsonHeaders() },
       )
@@ -476,7 +487,7 @@ export async function createErrorResponse(
     const corsOrigin = process.env.APP_URL
       ? (process.env.APP_URL.startsWith('http') ? process.env.APP_URL : `https://${process.env.APP_URL}`)
       : (isDebugAllowed() ? '*' : request.headers.get('origin') ?? 'null')
-    const html = handler.render(error, status)
+    const html = await handler.render(error, status)
     return new Response(html, {
       status,
       headers: {
@@ -517,7 +528,7 @@ export async function createErrorResponse(
  * which is what we used to ship for `GET /api/me` without a token.
  */
 export async function createMiddlewareErrorResponse(
-  error: Error & { statusCode?: number, status?: number },
+  error: Error & { statusCode?: number, status?: number, headers?: Record<string, string> },
   request: Request | EnhancedRequest,
 ): Promise<Response> {
   const status = error.statusCode ?? error.status ?? 500
@@ -525,13 +536,19 @@ export async function createMiddlewareErrorResponse(
 
   // For 4xx errors, return JSON in both dev and prod
   if (status >= 400 && status < 500) {
+    // Merge in any per-error headers (e.g. `Retry-After` from
+    // rate-limit 429s — stacksjs/stacks#1870 R-8). JSON headers
+    // win on collision so content-type stays correct.
+    const headers = error.headers
+      ? { ...error.headers, ...getJsonHeaders() }
+      : getJsonHeaders()
     return new Response(
       buildErrorJson({
         error: error.name || 'ClientError',
         message: error.message,
         status,
       }),
-      { status, headers: getJsonHeaders() },
+      { status, headers },
     )
   }
 

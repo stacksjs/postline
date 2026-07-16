@@ -21,6 +21,12 @@ export { setAuditUser, createAuditMethods } from './traits/audit'
 export type { AuditHelpers } from './traits/audit'
 // Re-export soft-delete option types so user code can `satisfies SoftDeleteOptions`.
 export type { SoftDeleteOptions, SoftDeleteHelpers } from './traits/soft-deletes'
+// Shared write-error classifiers (stacksjs/stacks#1957). Named exports only —
+// `export *` would collide with the snakeCase helpers also exported from
+// './auto-crud' via other barrels. `isUniqueViolation` is re-exported by
+// `@stacksjs/auth`'s './rbac-store-bqb' for back-compat; `mapWriteError`
+// powers the auto-CRUD store/update 409 mapping.
+export { isUniqueViolation, mapWriteError } from './auto-crud'
 export * from './batch-loader'
 export * from './db'
 export * from './subquery'
@@ -29,6 +35,29 @@ export * from './model-types'
 export * from './types'
 export * from './utils'
 export * from './define-model'
+// Codegen for `database/types.d.ts` — augments
+// `@stacksjs/database`'s `DatabaseSchema` so `db.selectFrom(...)` gets
+// table-name autocomplete (stacksjs/stacks#1923).
+export { buildDatabaseSchema, renderDatabaseTypeFile } from './generate-database-schema'
+export type { GenerateSchemaOptions, GenerateSchemaResult } from './generate-database-schema'
+// Canonical paginator shapes + adapters (stacksjs/stacks#1905 P1).
+export {
+  isCursorPaginator,
+  isPaginator,
+  isSimplePaginator,
+  toCursorPaginator,
+  toPaginator,
+  toSimplePaginator,
+} from './paginator'
+export type { CursorPaginator, Paginator, SimplePaginator } from './paginator'
+// Request-aware pagination helpers (stacksjs/stacks#1906 P2 + #1907 P3).
+export {
+  enrichPaginatorUrls,
+  parseCursor,
+  resolveCursorArgs,
+  resolvePageArgs,
+} from './paginator-request'
+export type { ResolvedPageArgs } from './paginator-request'
 
 // Auto-configure the ORM database connection from project config.
 // This ensures model queries work without manual configureOrm() calls.

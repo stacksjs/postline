@@ -82,6 +82,22 @@ function getExpiryMinutes(): number {
 }
 
 /**
+ * Build the verification URL. Configurable via
+ * `config.auth.emailVerification.url` — a template with `{id}` / `{token}`
+ * placeholders — so apps whose verify page lives on a custom route can
+ * reuse this whole flow instead of hand-rolling the send. Falls back to
+ * the framework convention. Absolute templates are used as-is; path
+ * templates are prefixed with the app URL. (Mirrors the password-reset
+ * URL treatment — stacksjs/stacks#1944.)
+ */
+function getVerificationUrl(userId: number, token: string): string {
+  const base = config.app.url ? `https://${config.app.url}` : `http://localhost:${process.env.PORT || '3000'}`
+  const tpl = config.auth.emailVerification?.url ?? '/verify-email/{id}/{token}'
+  const filled = tpl.replace('{id}', String(userId)).replace('{token}', token)
+  return /^https?:\/\//.test(filled) ? filled : `${base}${filled.startsWith('/') ? '' : '/'}${filled}`
+}
+
+/**
  * Check if a user's email is verified
  */
 export function isEmailVerified(user: { email_verified_at?: string | Date | null }): boolean {
@@ -113,9 +129,8 @@ export async function sendVerificationEmail(user: { id: number, email: string, n
     })
     .executeTakeFirst()
 
-  // Build verification URL
-  const appUrl = config.app.url ? `https://${config.app.url}` : `http://localhost:${process.env.PORT || '3000'}`
-  const verificationUrl = `${appUrl}/verify-email/${user.id}/${token}`
+  // Build verification URL (configurable — see getVerificationUrl)
+  const verificationUrl = getVerificationUrl(user.id, token)
   const appName = config.app.name || 'Stacks'
 
   try {
@@ -127,6 +142,14 @@ export async function sendVerificationEmail(user: { id: number, email: string, n
         userName: user.name || user.email,
       },
     })
+
+    // template() swallows missing-template and STX-render failures into
+    // empty strings instead of throwing (template.ts returns
+    // { html: '', text: '' }), which would mail a blank email with no
+    // verification link. Treat an empty render as failure so the
+    // plain-text fallback below actually fires (stacksjs/stacks#1944).
+    if (!html && !text)
+      throw new Error('email-verification template missing or rendered empty')
 
     await mail.send({
       to: user.email,

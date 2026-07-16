@@ -2,13 +2,14 @@ import { log } from '@stacksjs/cli'
 import { notification as _notification } from '@stacksjs/config'
 import type { EmailMessage, EmailResult, NotificationOptions } from '@stacksjs/types'
 import { mail } from '@stacksjs/email'
-import { chat, email, sms } from './drivers'
+import { chat, email, push, sms } from './drivers'
+import { BroadcastNotificationDriver } from './drivers/broadcast'
 import { DatabaseNotificationDriver } from './drivers/database'
 import { filterChannelsByPreferences } from './preferences'
 
 const config = _notification as NotificationOptions | undefined
 
-export type NotificationChannel = 'email' | 'sms' | 'chat' | 'database' | 'push'
+export type NotificationChannel = 'email' | 'sms' | 'chat' | 'database' | 'push' | 'broadcast'
 
 /** Optional flags accepted by {@link notify}. */
 export interface NotifyOptions {
@@ -43,6 +44,22 @@ export interface NotificationRecipient {
   email?: string
   phone?: string
   userId?: number
+  /**
+   * Device token(s) for the push channel — Expo tokens
+   * (`ExponentPushToken[...]`) or raw FCM registration IDs. A single
+   * recipient can have multiple tokens registered (one per device); pass
+   * an array and the push driver fans out (multicast on FCM, batch
+   * receipts on Expo). Required when `'push'` is in the channel list,
+   * same way `email` / `phone` are required for their channels.
+   */
+  pushTokens?: string | string[]
+  /**
+   * WebSocket channel name for the `broadcast` notification channel
+   * (stacksjs/stacks#669). When omitted, the driver derives a default:
+   * `private-user-{userId}` if `userId` is set, otherwise the public
+   * `notifications` channel.
+   */
+  broadcastChannel?: string
 }
 
 export interface NotifyResult {
@@ -86,8 +103,33 @@ export function useSMS(driver?: string): typeof sms[keyof typeof sms] {
   return sms[resolvedDriver as keyof typeof sms]
 }
 
+/**
+ * Push transport — returns the `@stacksjs/push` namespace whose
+ * `send(to, notification, options)` dispatches to Expo or FCM based on
+ * `options.driver`. `notify()` calls it with the driver omitted so the
+ * push package's own default kicks in (`expo`). Apps that need to
+ * force FCM can call `push.send(...)` directly with `{ driver: 'fcm' }`.
+ *
+ * Previously the `'push'` switch arm in `notify()` threw a hardcoded
+ * "not yet wired into a default driver" error even though both drivers
+ * exist (stacksjs/stacks#1874 F-1) — this helper is the missing link.
+ */
+export function usePush(): typeof push {
+  return push
+}
+
 export function useDatabase(): typeof DatabaseNotificationDriver {
   return DatabaseNotificationDriver
+}
+
+/**
+ * Broadcast transport — returns the `BroadcastNotificationDriver` which
+ * fans out a notification payload over the realtime WebSocket layer
+ * (`@stacksjs/realtime` `emit()`). See {@link BroadcastNotificationDriver}
+ * for channel-naming rules. stacksjs/stacks#669.
+ */
+export function useBroadcast(): typeof BroadcastNotificationDriver {
+  return BroadcastNotificationDriver
 }
 
 export function useNotification(typeParam?: string, driverParam?: string): typeof chat[keyof typeof chat] | typeof email[keyof typeof email] | typeof sms[keyof typeof sms] | typeof DatabaseNotificationDriver {
@@ -135,6 +177,24 @@ export function useNotification(typeParam?: string, driverParam?: string): typeo
  * await notify({ userId: 7, email: 'a@x' }, { body: 'Sale!' }, ['email'], { category: 'marketing' })
  * ```
  */
+/** A driver that can deliver a message (sms/chat transports). */
+interface SendableDriver {
+  send: (message: Record<string, unknown>) => Promise<unknown>
+}
+
+/**
+ * Whether a resolved driver can actually deliver (stacksjs/stacks#1936).
+ * The sms/chat channels previously guarded on this but then silently
+ * `break`'d when it was false — recording a success for an
+ * undeliverable channel. Now the channel throws on a falsy result.
+ */
+function isSendableDriver(driver: unknown): driver is SendableDriver {
+  return !!driver
+    && typeof driver === 'object'
+    && 'send' in driver
+    && typeof (driver as { send?: unknown }).send === 'function'
+}
+
 export async function notify(
   recipient: NotificationRecipient,
   payload: NotificationPayload,
@@ -183,25 +243,26 @@ export async function notify(
           break
         }
         case 'sms': {
-          const driver = useSMS()
-          if (driver && typeof driver === 'object' && 'send' in driver) {
-            if (!recipient.phone) {
-              throw new Error('[notify] sms channel requires recipient.phone')
-            }
-            await (driver as any).send({
-              to: recipient.phone,
-              body: payload.body,
-            })
+          // Fail loudly, not silently (stacksjs/stacks#1936). Previously
+          // a misconfigured SMS driver (one without a `send()`) let the
+          // case fall through and `Promise.allSettled` recorded success —
+          // so a broken SMS config looked like a delivered notification.
+          if (!recipient.phone) {
+            throw new Error('[notify] sms channel requires recipient.phone')
           }
+          const driver = useSMS()
+          if (!isSendableDriver(driver)) {
+            throw new Error('[notify] sms channel is not configured: no usable SMS driver with a send() method')
+          }
+          await driver.send({ to: recipient.phone, body: payload.body })
           break
         }
         case 'chat': {
           const driver = useChat()
-          if (driver && typeof driver === 'object' && 'send' in driver) {
-            await (driver as any).send({
-              body: payload.body,
-            })
+          if (!isSendableDriver(driver)) {
+            throw new Error('[notify] chat channel is not configured: no usable chat driver with a send() method')
           }
+          await driver.send({ body: payload.body })
           break
         }
         case 'database': {
@@ -216,11 +277,33 @@ export async function notify(
           break
         }
         case 'push': {
-          // Push is opt-in via @stacksjs/push and is currently only filtered
-          // through preferences — the actual dispatch is left to the app
-          // until a unified push driver lands. Throwing keeps the channel
-          // honest rather than silently no-op'ing.
-          throw new Error('[notify] push channel is filtered by preferences but not yet wired into a default driver')
+          // Wired up in stacksjs/stacks#1874 F-1. Push tokens are the
+          // channel-specific contact (analogous to `recipient.email` for
+          // email and `recipient.phone` for SMS) — fail loudly when
+          // they're missing rather than silently dropping the dispatch.
+          if (!recipient.pushTokens || (Array.isArray(recipient.pushTokens) && recipient.pushTokens.length === 0)) {
+            throw new Error('[notify] push channel requires recipient.pushTokens')
+          }
+          const driver = usePush()
+          await driver.send(recipient.pushTokens, {
+            title: payload.subject,
+            body: payload.body,
+            data: payload.data,
+          })
+          break
+        }
+        case 'broadcast': {
+          // Realtime WS fanout (stacksjs/stacks#669). Best-effort:
+          // missing realtime server returns `delivered: false` rather
+          // than throwing, so a broadcast misconfig doesn't break the
+          // rest of the multi-channel dispatch.
+          await BroadcastNotificationDriver.send({
+            channel: recipient.broadcastChannel,
+            userId: recipient.userId,
+            event: payload.subject ?? 'notification',
+            data: { body: payload.body, ...payload.data },
+          })
+          break
         }
         default:
           throw new Error(`Unsupported notification channel: ${channel}`)
@@ -249,6 +332,8 @@ export function notification(): ReturnType<typeof useNotification> {
   return useNotification()
 }
 
+export { BroadcastNotificationDriver } from './drivers/broadcast'
+export type { BroadcastNotificationOptions, BroadcastNotificationResult } from './drivers/broadcast'
 export { DatabaseNotificationDriver } from './drivers/database'
 export type { CreateNotificationOptions, DatabaseNotification } from './drivers/database'
 export {

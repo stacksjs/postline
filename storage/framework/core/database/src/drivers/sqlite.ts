@@ -7,7 +7,7 @@ function italic(str: string): string {
 }
 import { app } from '@stacksjs/config'
 // Local relative import — see drivers/mysql.ts for the cycle-deadlock rationale.
-import { db } from '../utils'
+import { db, SQLITE_BOOTSTRAP_PRAGMAS } from '../utils'
 import { ok } from '@stacksjs/error-handling'
 // Deep import to the leaf orm/utils file — see drivers/helpers.ts for why
 // we go around the orm barrel.
@@ -25,6 +25,7 @@ import {
   fetchTables,
   findDifferingKeys,
   getLastMigrationFields,
+  getLikeableForeignKey,
   getUpvoteTableName,
   isArrayEqual,
   mapFieldTypeToColumnType,
@@ -45,20 +46,16 @@ export async function resetSqliteDatabase(): Promise<Ok<string, never>> {
  * cheap to re-apply, but each one is a no-op once set so repeated calls
  * during dev hot-reload don't accumulate state.
  *
- * - WAL journaling: lets readers and a single writer proceed in parallel
- *   instead of serializing every transaction. Critical for dev where the
- *   API server, queue worker, and dashboard all hit the same file.
- * - foreign_keys=ON: SQLite ships with FK enforcement OFF by default.
- *   Without this, FK constraint violations are silently ignored — broken
- *   relations land in the DB and fail later, far from the original write.
- * - busy_timeout: backs off when the file is locked by another writer
- *   instead of failing the whole query immediately.
+ * Connection bootstrap now applies SQLITE_BOOTSTRAP_PRAGMAS automatically
+ * inside @stacksjs/query-builder's wrapped `createQueryBuilder`
+ * (stacksjs/stacks#1951); this export remains for explicit re-application.
+ * See the shared list in @stacksjs/query-builder for what each pragma does
+ * and why it must be set per connection.
  */
 export async function configureSqlitePragmas(): Promise<void> {
   try {
-    await db.unsafe('PRAGMA journal_mode = WAL').execute()
-    await db.unsafe('PRAGMA foreign_keys = ON').execute()
-    await db.unsafe('PRAGMA busy_timeout = 5000').execute()
+    for (const pragma of SQLITE_BOOTSTRAP_PRAGMAS)
+      await db.unsafe(pragma).execute()
   }
   catch (err) {
     log.debug(`[sqlite] Failed to apply pragmas: ${(err as Error).message}`)
@@ -157,13 +154,6 @@ export async function generateSqliteMigration(modelPath: string): Promise<void> 
   else await createTableMigration(modelPath)
 }
 
-export async function createSqliteForeignKeyMigrations(_modelPath: string): Promise<void> {
-  // SQLite doesn't support adding foreign key constraints via ALTER TABLE
-  // Foreign keys are already added during table creation in createTableMigration()
-  // So we skip creating separate foreign key migrations for SQLite
-  return
-}
-
 export async function copyModelFiles(modelPath: string): Promise<void> {
   const model = (await import(modelPath)).default as Model
   const fileName = path.basename(modelPath)
@@ -204,7 +194,11 @@ async function createTableMigration(modelPath: string) {
 
   const useTimestamps = model?.traits?.useTimestamps ?? model?.traits?.timestampable ?? true
   const useSocials = model?.traits?.useSocials && Array.isArray(model.traits.useSocials) && model.traits.useSocials.length > 0
-  const useLikeable = model?.traits?.likeable && Array.isArray(model.traits.likeable) && model.traits.likeable.length > 0
+  // The typed forms are `boolean | LikeableOptions` — neither is an array,
+  // so requiring a non-empty array meant no typed model could ever get a
+  // pivot while the runtime trait activates for any truthy value
+  // (stacksjs/stacks#1954). Legacy empty arrays stay a no-op.
+  const useLikeable = Array.isArray(model?.traits?.likeable) ? model.traits.likeable.length > 0 : Boolean(model?.traits?.likeable)
   const useSoftDeletes = model?.traits?.useSoftDeletes ?? model?.traits?.softDeletable ?? false
 
   const usePasskey = (typeof model.traits?.useAuth === 'object' && model.traits.useAuth.usePasskey) ?? false
@@ -310,7 +304,7 @@ async function createTableMigration(modelPath: string) {
   if (model.indexes?.length) {
     migrationContent += '\n'
     for (const index of model.indexes) {
-      migrationContent += generateIndexCreationSQL(tableName, index.name, index.columns)
+      migrationContent += generateIndexCreationSQL(tableName, index)
     }
   }
 
@@ -320,18 +314,24 @@ async function createTableMigration(modelPath: string) {
   if (useLikeable) {
     const upvoteTable = getUpvoteTableName(model, tableName)
     if (upvoteTable) {
+      // Singular FK — must match the runtime trait default or like()
+      // can't write to the generated table (see getLikeableForeignKey).
+      const foreignKey = getLikeableForeignKey(model, tableName)
       migrationContent += `\n  // Create upvote table\n`
       migrationContent += `  await (db as any).schema\n`
       migrationContent += `    .createTable('${upvoteTable}')\n`
       migrationContent += `    .addColumn('id', 'integer', col => col.primaryKey().autoIncrement())\n`
-      migrationContent += `    .addColumn('${tableName}_id', 'integer', col => col.notNull())\n`
+      migrationContent += `    .addColumn('${foreignKey}', 'integer', col => col.notNull())\n`
       migrationContent += `    .addColumn('user_id', 'integer', col => col.notNull())\n`
       migrationContent += `    .addColumn('created_at', 'timestamp', col => col.notNull().defaultTo(sql\`CURRENT_TIMESTAMP\`))\n`
       migrationContent += `    .addColumn('updated_at', 'timestamp')\n`
       migrationContent += `    .execute()\n\n`
       migrationContent += `  // Add indexes for upvote table\n`
-      migrationContent += `  await (db as any).schema.createIndex('${upvoteTable}_${tableName}_id_index').on('${upvoteTable}').column('${tableName}_id').execute()\n`
-      migrationContent += `  await (db as any).schema.createIndex('${upvoteTable}_user_id_index').on('${upvoteTable}').column('user_id').execute()\n`
+      migrationContent += `  await (db as any).schema.createIndex('${upvoteTable}_${foreignKey}_index').on('${upvoteTable}').column('${foreignKey}').execute()\n`
+      // Composite UNIQUE (user_id, fk) — backs the trait's idempotent
+      // like(): duplicate inserts throw SQLITE_CONSTRAINT_UNIQUE and the
+      // catch returns the existing row instead of double-counting.
+      migrationContent += `  await (db as any).schema.createIndex('${upvoteTable}_user_${foreignKey}_unique').on('${upvoteTable}').columns(['user_id', '${foreignKey}']).unique().execute()\n`
       migrationContent += `  await (db as any).schema.createIndex('${upvoteTable}_id_index').on('${upvoteTable}').column('id').execute()\n`
     }
   }
@@ -484,7 +484,7 @@ async function createAlterTableMigration(modelPath: string) {
   for (const newIndex of newIndexes) {
     if (!oldIndexes.find(oldIndex => oldIndex.name === newIndex.name)) {
       hasChanged = true
-      migrationContent += generateIndexCreationSQL(tableName, newIndex.name, newIndex.columns)
+      migrationContent += generateIndexCreationSQL(tableName, newIndex)
     }
   }
 
@@ -521,9 +521,22 @@ function reArrangeColumns(attributes: AttributesElements | undefined, tableName:
   return migrationContent
 }
 
-function generateIndexCreationSQL(tableName: string, indexName: string, columns: string[]): string {
-  const columnsStr = columns.map(col => `\`${snakeCase(col)}\``).join(', ')
-  return `  await (db as any).schema.createIndex('${indexName}').on('${tableName}').columns([${columnsStr}]).execute()\n`
+export function generateIndexCreationSQL(
+  tableName: string,
+  index: { name: string, columns: string[], unique?: boolean, where?: string },
+): string {
+  // Partial / multi-column unique indexes (stacksjs/stacks#1943) — emit
+  // raw SQL via `db.unsafe(...)` so we don't have to thread kysely's
+  // `sql` template tag into every generated migration's imports just
+  // to express a WHERE clause.
+  if (index.unique || index.where) {
+    const unique = index.unique ? 'UNIQUE ' : ''
+    const cols = index.columns.map(col => snakeCase(col)).join(', ')
+    const whereClause = index.where ? ` WHERE ${index.where}` : ''
+    return `  await db.unsafe(\`CREATE ${unique}INDEX IF NOT EXISTS "${index.name}" ON "${tableName}" (${cols})${whereClause}\`).execute()\n`
+  }
+  const columnsStr = index.columns.map(col => `\`${snakeCase(col)}\``).join(', ')
+  return `  await (db as any).schema.createIndex('${index.name}').on('${tableName}').columns([${columnsStr}]).execute()\n`
 }
 
 function generatePrimaryKeyIndexSQL(tableName: string): string {

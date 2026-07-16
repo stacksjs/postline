@@ -22,7 +22,7 @@ export * from '@stacksjs/bun-router'
 export type { StacksRequestExtensions, StacksRequestMacros, StacksRequestMarkers } from './request-augmentation'
 
 // Export Stacks-specific action resolver and URL helper
-export { clearMiddlewareCache, createStacksRouter, installMiddlewareHotReload, route, serve, serverResponse, url } from './stacks-router'
+export { assertRouteMiddlewareResolvable, clearMiddlewareCache, createStacksRouter, findUnresolvableRouteMiddleware, installMiddlewareHotReload, route, serve, serverResponse, url } from './stacks-router'
 
 // Export request context helpers
 export { cacheRequestQuery, getCurrentRequest, getTraceId, request, runWithRequest, setCurrentRequest, withTraceId } from './request-context'
@@ -59,6 +59,56 @@ export { isApiRequest, JSON_CONTENT_TYPE } from './api-shape'
 
 // Export action-level rate limiting helpers
 export { rateLimit, rateLimitStatus, clearRateLimit } from './rate-limit'
+
+// Export path-param sanitization helper (stacksjs/stacks#1870 R-12).
+// Defense-in-depth for actions that interpolate route params into
+// filesystem paths; the helper enforces no-traversal / no-absolute /
+// no-null-byte / length ceiling at a single chokepoint.
+export { PathParamError, safePathParam, sanitizePathParam } from './path-sanitize'
+export type { PathParamRejection, SanitizePathParamOptions } from './path-sanitize'
+
+// Export the streaming-response helper for SSE / NDJSON / chunked
+// binary returns (stacksjs/stacks#1870 R-4). Actions can return
+// `stream(asyncGen, { type: 'sse' })` and the router pipes it back
+// with the right Content-Type + no-cache headers.
+export { stream } from './stacks-router'
+export type { StreamOptions } from './stacks-router'
+
+// Signed-URL helpers — HMAC over the URL + optional expiry so single-
+// use links (email verify, password reset, unsubscribe) can be handed
+// out without long-lived bearer tokens. Pair `signedUrl(...)` with the
+// `signed` middleware (or call `verifySignedUrl(req.url)` directly).
+// See stacksjs/stacks#1870 R-7.
+export { signedUrl, signUrl, verifySignedUrl, verifySignedUrlMiddleware } from './signed-url'
+export type { SignedUrlOptions, SignedUrlVerifyResult } from './signed-url'
+
+// Encryption-at-rest wrapper for any bun-router SessionStore
+// (stacksjs/stacks#1878 Se-4). Opt-in: wrap your existing store
+// instance so session payloads are AES-GCM encrypted via APP_KEY
+// before being persisted.
+export { EncryptedSessionStore } from './encrypted-session-store'
+export type { EncryptedSessionStoreOptions } from './encrypted-session-store'
+
+// Session driver factory (stacksjs/stacks#1889, F-2 from #1874).
+// Builds a SessionStore from the Stacks config — picks the right
+// driver from `config.session.driver`, optionally wraps with
+// EncryptedSessionStore. Re-exports all four bun-router store
+// classes so callers can assemble custom stacks manually too.
+export {
+  createSessionStore,
+  createStacksSessionStore,
+  DatabaseSessionStore,
+  FileSessionStore,
+  MemorySessionStore,
+  RedisSessionStore,
+} from './session-factory'
+export type {
+  RedisClient,
+  SessionConfig,
+  SessionData,
+  SessionStore,
+  StacksSessionConfig,
+} from './session-factory'
 
 // DI: register the router's query tracker with the database package on
 // import so the cycle `database → router → database` doesn't manifest
