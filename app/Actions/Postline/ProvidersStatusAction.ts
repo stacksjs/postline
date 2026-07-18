@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { blog } from '../../Services/Social/BlogService'
 import { bluesky } from '../../Services/Social/BlueskyService'
 import { instagram } from '../../Services/Social/InstagramService'
 import { linkedin } from '../../Services/Social/LinkedInService'
@@ -17,6 +18,7 @@ export default new Action({
         linkedin.status(),
         instagram.status(),
         threads.status(),
+        blog.status(),
       ])
 
       return response.json({ ok: true, data: { providers } })

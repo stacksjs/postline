@@ -1,6 +1,7 @@
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import { blog } from './BlogService'
 import { bluesky } from './BlueskyService'
 import { instagram } from './InstagramService'
 import { linkedin } from './LinkedInService'
@@ -19,6 +20,7 @@ const publishers: Partial<Record<SocialProvider, ProviderPublisher>> = {
   linkedin,
   instagram,
   threads,
+  blog,
 }
 
 export function crosspostProviders(): SocialProvider[] {

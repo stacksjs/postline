@@ -37,6 +37,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   instagram: 'Instagram',
   threads: 'Threads',
   tiktok: 'TikTok',
+  blog: 'Blog',
 }
 
 export function providerLabel(provider: string): string {

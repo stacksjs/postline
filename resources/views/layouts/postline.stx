@@ -316,7 +316,7 @@
 
         // Number keys 1-6 jump between pages (the sidebar shows the badges).
         const bindKeyboardShortcuts = () => {
-          const routes = { 1: '/', 2: '/queue', 3: '/timeline', 4: '/analytics', 5: '/accounts', 6: '/settings' }
+          const routes = { 1: '/', 2: '/queue', 3: '/timeline', 4: '/analytics', 5: '/accounts', 6: '/blog', 7: '/settings' }
           document.addEventListener('keydown', (event) => {
             if (event.metaKey || event.ctrlKey || event.altKey) return
             const target = event.target
