@@ -22,6 +22,8 @@ export interface CrosspostResultItem {
 export interface CrosspostInput {
   text: string
   providers: string[]
+  /** Explicit title for long-form targets (blog). */
+  title?: string
   external?: { uri: string, title: string, description?: string }
   image?: { url: string, altText?: string }
   /** Attached image file — uploaded to providers that accept bytes (Bluesky). */
@@ -59,6 +61,7 @@ export async function publishCrosspost(input: CrosspostInput): Promise<{ postId:
   const body = new FormData()
   body.set('text', input.text)
   body.set('providers', input.providers.join(','))
+  if (input.title) body.set('title', input.title)
   if (input.thread && input.thread.length > 1)
     body.set('thread', JSON.stringify(input.thread))
   if (input.external?.uri && input.external?.title) {
