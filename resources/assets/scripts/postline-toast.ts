@@ -36,7 +36,7 @@ function host(): HTMLElement {
   if (!element) {
     element = document.createElement('div')
     element.id = 'postline-toast-host'
-    element.className = 'pointer-events-none fixed bottom-6 right-6 z-[100] flex w-[calc(100%-2rem)] max-w-[22rem] flex-col-reverse gap-2.5 sm:right-6'
+    element.className = 'flex bottom-6 fixed right-6 z-[100] sm:right-6 flex-col-reverse gap-2.5 max-w-[22rem] w-[calc(100%-2rem)] pointer-events-none'
     element.setAttribute('aria-live', 'polite')
     element.setAttribute('aria-relevant', 'additions')
     document.body.append(element)
@@ -95,7 +95,7 @@ export function showPostlineToast(options: PostlineToastOptions): void {
 
   const bodyMarkup = options.url
     ? `<p class="postline-toast__message">${escapeHtml(options.message)}</p>
-       <a class="postline-toast__url" href="${escapeHtml(options.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(options.url)}">${escapeHtml(formatUrlLabel(options.url))}</a>`
+      <a class="postline-toast__url" href="${escapeHtml(options.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(options.url)}">${escapeHtml(formatUrlLabel(options.url))}</a>`
     : `<p class="postline-toast__message">${escapeHtml(options.message)}</p>`
 
   toast.innerHTML = `
