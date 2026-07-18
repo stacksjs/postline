@@ -112,13 +112,20 @@ export interface PublishPostInput {
     parent: { uri: string, cid: string }
   }
   /**
-   * Attached media. Required by media-only providers such as Instagram, and
-   * ignored by text-first providers (Bluesky, LinkedIn) for now.
+   * Attached media. Instagram requires a public `url`; Bluesky uploads
+   * `bytes` (or fetches `url`) as a blob and embeds the images.
    */
   media?: Array<{
-    url: string
+    url?: string
+    bytes?: Uint8Array
+    mimeType?: string
     altText?: string
   }>
+  /**
+   * Precomputed rich-text facets (ATProto shape). When omitted, drivers
+   * that support facets detect links/mentions/hashtags automatically.
+   */
+  facets?: unknown[]
 }
 
 export interface PublishedPost {

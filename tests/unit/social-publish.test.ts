@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { BlueskyPublishingDriver } from '../../storage/framework/core/socials/src/drivers/bluesky'
+import { BlueskyPublishingDriver, detectFacetCandidates } from '../../storage/framework/core/socials/src/drivers/bluesky'
 
 const realFetch = globalThis.fetch
 
@@ -15,6 +15,22 @@ interface CapturedRequest {
 function mockBlueskyApi(captured: CapturedRequest[]): void {
   globalThis.fetch = (async (input: any, init?: any) => {
     const url = String(input)
+
+    if (url.includes('resolveHandle')) {
+      captured.push({ url, body: undefined })
+      const handle = new URL(url).searchParams.get('handle')
+      if (handle === 'ghost.example.com')
+        return new Response(JSON.stringify({ error: 'not found' }), { status: 400 })
+      return new Response(JSON.stringify({ did: `did:plc:${handle}` }), { status: 200 })
+    }
+
+    if (url.includes('uploadBlob')) {
+      captured.push({ url, body: { mimeType: init?.headers?.['content-type'], size: init?.body?.length } })
+      return new Response(JSON.stringify({
+        blob: { $type: 'blob', ref: { $link: `blob${captured.length}` }, mimeType: init?.headers?.['content-type'], size: init?.body?.length },
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }
+
     const body = init?.body ? JSON.parse(String(init.body)) : undefined
     captured.push({ url, body })
     return new Response(JSON.stringify({
@@ -22,6 +38,10 @@ function mockBlueskyApi(captured: CapturedRequest[]): void {
       cid: `cid${captured.length}`,
     }), { status: 200, headers: { 'content-type': 'application/json' } })
   }) as typeof fetch
+}
+
+function lastRecord(captured: CapturedRequest[]): any {
+  return captured.find(request => request.url.includes('createRecord'))?.body?.record
 }
 
 const identity = {
@@ -93,5 +113,88 @@ describe('BlueskyPublishingDriver.publish', () => {
     const driver = new BlueskyPublishingDriver()
     await expect(driver.publish({ handle: 'tester.bsky.social' }, { text: 'hi' })).rejects.toThrow(/access token/)
     expect(captured).toHaveLength(0)
+  })
+
+  test('auto-builds link, tag, and mention facets with resolved DIDs', async () => {
+    const captured: CapturedRequest[] = []
+    mockBlueskyApi(captured)
+
+    const driver = new BlueskyPublishingDriver()
+    await driver.publish(identity, { text: 'Read https://example.com/x. Thanks @alice.bsky.social #stacks' })
+
+    const record = lastRecord(captured)
+    expect(record.facets).toHaveLength(3)
+    const features = record.facets.map((facet: any) => facet.features[0])
+    expect(features[0]).toEqual({ $type: 'app.bsky.richtext.facet#link', uri: 'https://example.com/x' })
+    expect(features[1]).toEqual({ $type: 'app.bsky.richtext.facet#mention', did: 'did:plc:alice.bsky.social' })
+    expect(features[2]).toEqual({ $type: 'app.bsky.richtext.facet#tag', tag: 'stacks' })
+  })
+
+  test('drops mention facets whose handle does not resolve', async () => {
+    const captured: CapturedRequest[] = []
+    mockBlueskyApi(captured)
+
+    const driver = new BlueskyPublishingDriver()
+    await driver.publish(identity, { text: 'cc @ghost.example.com' })
+
+    expect(lastRecord(captured).facets).toBeUndefined()
+  })
+
+  test('uploads image bytes and embeds them, overriding the link card', async () => {
+    const captured: CapturedRequest[] = []
+    mockBlueskyApi(captured)
+
+    const driver = new BlueskyPublishingDriver()
+    await driver.publish(identity, {
+      text: 'photo time',
+      external: { uri: 'https://example.com', title: 'Example' },
+      media: [{ bytes: new Uint8Array([1, 2, 3]), mimeType: 'image/png', altText: 'a chart' }],
+    })
+
+    const upload = captured.find(request => request.url.includes('uploadBlob'))
+    expect(upload?.body.mimeType).toBe('image/png')
+    const record = lastRecord(captured)
+    expect(record.embed.$type).toBe('app.bsky.embed.images')
+    expect(record.embed.images[0].alt).toBe('a chart')
+    expect(record.embed.images[0].image.ref.$link).toBeDefined()
+  })
+
+  test('uploadBlob rejects images over 1MB', async () => {
+    const captured: CapturedRequest[] = []
+    mockBlueskyApi(captured)
+
+    const driver = new BlueskyPublishingDriver()
+    await expect(driver.uploadBlob(identity, new Uint8Array(1_000_001), 'image/png')).rejects.toThrow(/1MB/)
+    expect(captured).toHaveLength(0)
+  })
+})
+
+describe('detectFacetCandidates', () => {
+  test('computes UTF-8 byte offsets, not character offsets', () => {
+    const text = '🦋 fly to https://bsky.app now'
+    const [link] = detectFacetCandidates(text)
+    // '🦋 fly to ' is 4 (emoji) + 8 = 12 bytes
+    expect(link.byteStart).toBe(12)
+    expect(link.byteEnd).toBe(12 + 'https://bsky.app'.length)
+    expect(link.value).toBe('https://bsky.app')
+  })
+
+  test('trims trailing punctuation from links', () => {
+    const [link] = detectFacetCandidates('see https://example.com/docs.')
+    expect(link.value).toBe('https://example.com/docs')
+  })
+
+  test('skips numeric-only hashtags and tags inside links', () => {
+    const candidates = detectFacetCandidates('#2024 https://example.com/#anchor #real')
+    expect(candidates.map(candidate => `${candidate.type}:${candidate.value}`)).toEqual([
+      'link:https://example.com/#anchor',
+      'tag:real',
+    ])
+  })
+
+  test('mentions require a domain-shaped handle', () => {
+    const candidates = detectFacetCandidates('hey @nodot and @real.handle.social')
+    expect(candidates).toHaveLength(1)
+    expect(candidates[0]).toMatchObject({ type: 'mention', value: 'real.handle.social' })
   })
 })
