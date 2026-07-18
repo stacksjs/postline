@@ -79,8 +79,10 @@
         return date.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
       }
 
-      const bskyUrl = (uri) => {
-        const match = String(uri || '').match(/^at:\/\/([^/]+)\/app\.bsky\.feed\.post\/(.+)$/)
+      const liveUrlFor = (uri) => {
+        const value = String(uri || '')
+        if (value.startsWith('/')) return value
+        const match = value.match(/^at:\/\/([^/]+)\/app\.bsky\.feed\.post\/(.+)$/)
         return match ? `https://bsky.app/profile/${encodeURIComponent(match[1])}/post/${encodeURIComponent(match[2])}` : null
       }
 
@@ -93,7 +95,7 @@
         const channels = item.providers.map(target => providerLabel(target.provider)).join(', ') || '—'
         const failure = item.providers.find(target => target.failureReason)?.failureReason
         const liveUri = item.providers.find(target => target.remoteUri)?.remoteUri
-        const liveUrl = bskyUrl(liveUri)
+        const liveUrl = liveUrlFor(liveUri)
         const actionable = ['draft', 'scheduled', 'failed'].includes(item.status)
 
         return `

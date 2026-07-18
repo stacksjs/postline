@@ -27,7 +27,7 @@ export default defineModel({
     provider: {
       required: true,
       fillable: true,
-      validation: { rule: schema.enum(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin']).required() },
+      validation: { rule: schema.enum(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin', 'threads', 'blog']).required() },
       factory: faker => faker.helpers.arrayElement(['bluesky', 'twitter', 'mastodon']),
     },
     status: {

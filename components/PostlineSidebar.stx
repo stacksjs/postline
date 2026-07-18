@@ -45,6 +45,13 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
       </a>
     @endforeach
     <a
+      href="/blog"
+      class="inline-flex gap-1.5 items-center shrink-0 px-3 py-1.5 font-medium text-xs text-zinc-600 whitespace-nowrap hover:bg-white/60 rounded-full transition-colors"
+    >
+      <span class="h-4 w-4 i-hugeicons-quill-write-02" aria-hidden="true"></span>
+      <span>Blog</span>
+    </a>
+    <a
       href="/settings"
       data-stx-link
       data-stx-active-class="text-zinc-950 bg-white shadow-sm"
@@ -100,6 +107,14 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>{{ link.shortcut }}</span>
         </a>
       @endforeach
+      <a
+        href="/blog"
+        class="flex gap-3 items-center px-3 py-1.5 w-full text-[13.5px] text-left text-zinc-700 focus-visible:bg-white/38 hover:bg-white/38 rounded-[14px] focus-visible:outline-none transition-colors"
+      >
+        <span class="h-[18px] w-[18px] text-zinc-600 i-hugeicons-quill-write-02" aria-hidden="true"></span>
+        <span class="flex-1 font-medium truncate" data-sidebar-expanded>Blog</span>
+        <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>6</span>
+      </a>
     </nav>
 
     <a
@@ -113,7 +128,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
     >
       <span class="h-[18px] w-[18px] i-hugeicons-settings-02 {{ settingsActive ? 'text-zinc-900' : 'text-zinc-600' }}" aria-hidden="true"></span>
       <span class="flex-1 font-medium" data-sidebar-expanded>Settings</span>
-      <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>6</span>
+      <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-zinc-500 bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>7</span>
     </a>
   </aside>
   </div>
