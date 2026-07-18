@@ -61,4 +61,5 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/queue', 'Actions/Postline/QueueSaveAction').middleware('auth').skipCsrf()
   route.post('/queue/delete', 'Actions/Postline/QueueDeleteAction').middleware('auth').skipCsrf()
   route.post('/queue/publish-now', 'Actions/Postline/QueuePublishNowAction').middleware('auth').skipCsrf()
+  route.post('/metrics/sync', 'Actions/Postline/MetricsSyncAction').middleware('auth').skipCsrf()
 })

@@ -21,6 +21,11 @@ export default function () {
     .job('PublishScheduledPosts')
     .everyMinute()
 
+  // Refresh Bluesky engagement counts for the analytics page
+  schedule
+    .job('SyncEngagementMetrics')
+    .everyThirtyMinutes()
+
   // Run a custom action every five minutes
   // schedule.action('CleanupTempFiles').everyFiveMinutes()
 

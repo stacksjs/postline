@@ -34,7 +34,7 @@ export default new Action({
 
       const targets = await database
         .selectFrom('post_targets')
-        .select(['provider', 'status', 'updated_at'])
+        .select(['provider', 'status', 'created_at', 'metrics'])
         .where('status', '=', 'published')
         .execute()
 
@@ -77,16 +77,31 @@ export default new Action({
           share: totalTargets ? Math.round((count / totalTargets) * 100) : 0,
         }))
 
-      // Publish-hour histogram (UTC) → best posting windows.
+      // Publish-hour histogram (UTC) → best posting windows. Uses
+      // created_at: metric syncs bump updated_at, which would skew it.
       const byHour = new Map<number, number>()
       for (const target of targets) {
-        const date = parseUtc(target.updated_at)
+        const date = parseUtc(target.created_at)
         if (date) byHour.set(date.getUTCHours(), (byHour.get(date.getUTCHours()) || 0) + 1)
       }
       const windows = [...byHour.entries()]
         .sort((a, b) => b[1] - a[1])
         .slice(0, 3)
         .map(([hour, count]) => ({ hour, count }))
+
+      // Engagement totals from synced post_targets.metrics.
+      const engagement = { likes: 0, reposts: 0, replies: 0, syncedTargets: 0 }
+      for (const target of targets) {
+        if (!target.metrics) continue
+        try {
+          const metrics = JSON.parse(String(target.metrics))
+          engagement.likes += Number(metrics.likes) || 0
+          engagement.reposts += Number(metrics.reposts) || 0
+          engagement.replies += Number(metrics.replies) || 0
+          engagement.syncedTargets += 1
+        }
+        catch {}
+      }
 
       return response.json({
         ok: true,
@@ -96,6 +111,7 @@ export default new Action({
             postsLastWeek,
             bestChannel: channelMix[0] || null,
             bestHour: windows[0] || null,
+            engagement,
           },
           series,
           channelMix,

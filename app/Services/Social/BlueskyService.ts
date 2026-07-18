@@ -273,6 +273,58 @@ export class BlueskyService {
     }
   }
 
+  /**
+   * Refresh engagement counts (likes/reposts/replies) for recently
+   * published Bluesky targets into `post_targets.metrics`. Batched 25
+   * URIs per API call; missing posts (deleted upstream) are skipped.
+   */
+  async syncMetrics(limit = 100): Promise<{ synced: number }> {
+    const identity = await this.requireIdentity()
+    await this.ensureDriver()
+
+    const targets = await database
+      .selectFrom('post_targets')
+      .select(['id', 'remote_uri'])
+      .where('provider', '=', 'bluesky')
+      .where('status', '=', 'published')
+      .where('remote_uri', 'like', 'at://%')
+      .orderBy('id', 'desc')
+      .limit(limit)
+      .execute()
+
+    if (targets.length === 0) return { synced: 0 }
+
+    let synced = 0
+    for (let offset = 0; offset < targets.length; offset += 25) {
+      const chunk = targets.slice(offset, offset + 25)
+      const metrics = await this.withFreshSession(identity, freshIdentity =>
+        this.driver.postMetrics({
+          handle: freshIdentity.handle,
+          did: freshIdentity.external_id || undefined,
+          accessToken: freshIdentity.access_token || undefined,
+          refreshToken: freshIdentity.refresh_token || undefined,
+        }, chunk.map((target: any) => String(target.remote_uri))),
+      )
+
+      const byUri = new Map(metrics.map(item => [item.uri, item]))
+      for (const target of chunk) {
+        const counts = byUri.get(String(target.remote_uri))
+        if (!counts) continue
+        await database.updateTable('post_targets').set({
+          metrics: JSON.stringify({
+            likes: counts.likeCount,
+            reposts: counts.repostCount,
+            replies: counts.replyCount,
+            syncedAt: now(),
+          }),
+        }).where('id', '=', target.id).execute()
+        synced += 1
+      }
+    }
+
+    return { synced }
+  }
+
   async syncTimeline(limit = 30): Promise<TimelineResult & { saved: number }> {
     const identity = await this.requireIdentity()
     const driver = await this.ensureDriver()
