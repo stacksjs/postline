@@ -159,6 +159,39 @@ describe('BlueskyPublishingDriver.publish', () => {
     expect(record.embed.images[0].image.ref.$link).toBeDefined()
   })
 
+  test('postMetrics fetches engagement counts for up to 25 URIs', async () => {
+    const captured: CapturedRequest[] = []
+    globalThis.fetch = (async (input: any) => {
+      const url = new URL(String(input))
+      captured.push({ url: String(input), body: undefined })
+      const uris = url.searchParams.getAll('uris')
+      return new Response(JSON.stringify({
+        // Second post "deleted" upstream — absent from the response.
+        posts: uris.slice(0, 1).map(uri => ({ uri, likeCount: 7, repostCount: 2, replyCount: 3 })),
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }) as typeof fetch
+
+    const driver = new BlueskyPublishingDriver()
+    const metrics = await driver.postMetrics(identity, [
+      'at://did:plc:test/app.bsky.feed.post/aaa',
+      'at://did:plc:test/app.bsky.feed.post/bbb',
+    ])
+
+    expect(captured[0].url).toContain('app.bsky.feed.getPosts')
+    expect(metrics).toEqual([
+      { uri: 'at://did:plc:test/app.bsky.feed.post/aaa', likeCount: 7, repostCount: 2, replyCount: 3 },
+    ])
+  })
+
+  test('postMetrics returns empty without hitting the API for no URIs', async () => {
+    const captured: CapturedRequest[] = []
+    mockBlueskyApi(captured)
+
+    const driver = new BlueskyPublishingDriver()
+    expect(await driver.postMetrics(identity, [])).toEqual([])
+    expect(captured).toHaveLength(0)
+  })
+
   test('uploadBlob rejects images over 1MB', async () => {
     const captured: CapturedRequest[] = []
     mockBlueskyApi(captured)

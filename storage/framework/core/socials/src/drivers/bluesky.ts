@@ -218,6 +218,33 @@ export class BlueskyPublishingDriver implements SocialPublishingDriver {
     }
   }
 
+  /**
+   * Engagement counts for up to 25 of the account's posts per call
+   * (app.bsky.feed.getPosts). Deleted posts are simply absent from the
+   * response.
+   */
+  async postMetrics(
+    identity: SocialIdentityCredentials,
+    uris: string[],
+  ): Promise<Array<{ uri: string, likeCount: number, repostCount: number, replyCount: number }>> {
+    if (!identity.accessToken) throw new Error('Bluesky access token is missing for this identity.')
+    if (uris.length === 0) return []
+
+    const url = new URL(`${this.service}/xrpc/app.bsky.feed.getPosts`)
+    for (const uri of uris.slice(0, 25)) url.searchParams.append('uris', uri)
+
+    const payload = await this.request<{ posts?: Array<{ uri: string, likeCount?: number, repostCount?: number, replyCount?: number }> }>(url, {
+      headers: { authorization: `Bearer ${identity.accessToken}` },
+    })
+
+    return (payload.posts || []).map(post => ({
+      uri: post.uri,
+      likeCount: post.likeCount || 0,
+      repostCount: post.repostCount || 0,
+      replyCount: post.replyCount || 0,
+    }))
+  }
+
   async timeline(identity: SocialIdentityCredentials, query: TimelineQuery = {}): Promise<TimelineResult> {
     if (!identity.accessToken) throw new Error('Bluesky access token is missing for this identity.')
 
