@@ -70,9 +70,6 @@
   },
   "dependencies": {
     "@stacksjs/bun-router": "^0.0.16",
-    "@ts-charts/array": "^0.2.2",
-    "@ts-charts/scale": "^0.2.2",
-    "@ts-charts/shape": "^0.2.2",
     "craft-native": "^0.0.37",
     "stacks": "workspace:*"
   },
