@@ -3,6 +3,7 @@ import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { crosspost, crosspostProviders } from '../../Services/Social/CrosspostService'
+import { readUploadedImage } from '../../Support/Social/uploads'
 
 export default new Action({
   name: 'Postline Crosspost Publish',
@@ -34,14 +35,9 @@ export default new Action({
     const imageAlt = String(request.get('image_alt') || '').trim()
 
     const media: NonNullable<Parameters<typeof crosspost.publish>[2]>['media'] = []
-    const uploaded = request.file?.('image')
-    if (uploaded?.buffer && uploaded.buffer.byteLength > 0) {
-      media.push({
-        bytes: new Uint8Array(uploaded.buffer),
-        mimeType: uploaded.mimetype || 'image/jpeg',
-        altText: imageAlt || undefined,
-      })
-    }
+    const uploadedImage = await readUploadedImage(request.file?.('image'))
+    if (uploadedImage)
+      media.push({ ...uploadedImage, altText: imageAlt || undefined })
     if (imageUrl)
       media.push({ url: imageUrl, altText: imageAlt || undefined })
 

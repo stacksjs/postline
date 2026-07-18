@@ -4,6 +4,7 @@ import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { crosspostProviders } from '../../Services/Social/CrosspostService'
 import { postQueue } from '../../Services/Social/QueueService'
+import { readUploadedImage } from '../../Support/Social/uploads'
 
 export default new Action({
   name: 'Postline Queue Save',
@@ -22,8 +23,27 @@ export default new Action({
     const scheduledAt = String(request.get('scheduled_at') || '').trim() || null
     const title = String(request.get('title') || '').trim() || null
 
+    const externalUri = String(request.get('external_uri') || '').trim()
+    const externalTitle = String(request.get('external_title') || '').trim()
+    const external = externalUri && externalTitle
+      ? {
+          uri: externalUri,
+          title: externalTitle,
+          description: String(request.get('external_description') || '').trim() || undefined,
+        }
+      : null
+
+    const imageAlt = String(request.get('image_alt') || '').trim() || undefined
+    const uploadedImage = await readUploadedImage(request.file?.('image'))
+    const imageUrl = String(request.get('image_url') || '').trim()
+    const image = uploadedImage
+      ? { ...uploadedImage, altText: imageAlt }
+      : imageUrl
+        ? { url: imageUrl, altText: imageAlt }
+        : null
+
     try {
-      const data = await postQueue.save({ text, providers, title, scheduledAt })
+      const data = await postQueue.save({ text, providers, title, scheduledAt, external, image })
       return response.json({ ok: true, data })
     }
     catch (error) {
