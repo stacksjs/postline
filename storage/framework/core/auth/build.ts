@@ -15,7 +15,10 @@ const result = await Bun.build({
   external: frameworkExternal(),
   plugins: [
     dts({
-      root: '.',
+      // `root: '.'` nests declarations under dist/src/, leaving no
+      // dist/index.d.ts beside dist/index.js — consumers then fail with
+      // TS7016. Match the other framework packages (e.g. router).
+      root: './src',
       outdir: './dist',
     }),
   ],

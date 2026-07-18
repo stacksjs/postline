@@ -1,0 +1,114 @@
+@extends('layouts/default')
+
+@section('title', 'Postline - Sign in')
+@section('description', 'Sign in to your Postline workspace.')
+
+@section('content')
+  <main class="grid place-items-center px-4 min-h-screen bg-[#f3f3f1]" data-testid="login-page">
+    <section class="grid gap-5 p-6 max-w-sm w-full bg-white border border-zinc-200 rounded-2xl shadow-sm">
+      <header class="grid gap-2 justify-items-center text-center">
+        <span class="grid place-items-center h-11 w-11 font-bold text-lg text-white bg-neutral-950 rounded-xl">P</span>
+        <h1 class="m-0 font-bold text-[20px] text-neutral-950" data-login-heading>Sign in to Postline</h1>
+        <p class="m-0 text-[13px] text-zinc-600" data-login-subtitle>Your personal publishing workspace.</p>
+      </header>
+
+      <form class="grid gap-3" data-login-form>
+        <label class="hidden gap-1.5" data-login-name-row>
+          <span class="font-bold text-xs text-zinc-500">Name</span>
+          <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="name" autocomplete="name" placeholder="Your name" data-login-name>
+        </label>
+        <label class="grid gap-1.5">
+          <span class="font-bold text-xs text-zinc-500">Email</span>
+          <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="email" type="email" autocomplete="username" placeholder="you@example.com" required data-login-email>
+        </label>
+        <label class="grid gap-1.5">
+          <span class="font-bold text-xs text-zinc-500">Password</span>
+          <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required minlength="6" data-login-password>
+        </label>
+        <p class="hidden m-0 text-red-700 text-xs" data-login-error></p>
+        <button class="inline-flex items-center justify-center px-4 h-10 font-bold text-sm text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" data-login-submit>Sign in</button>
+      </form>
+
+      <button class="text-xs text-zinc-500 underline hover:text-zinc-700 transition-colors" type="button" data-login-toggle>First run? Create the workspace account</button>
+    </section>
+  </main>
+
+  <script>
+    ;(() => {
+      const root = document.querySelector('[data-testid="login-page"]')
+      if (!root) return
+
+      const form = root.querySelector('[data-login-form]')
+      const heading = root.querySelector('[data-login-heading]')
+      const subtitle = root.querySelector('[data-login-subtitle]')
+      const nameRow = root.querySelector('[data-login-name-row]')
+      const nameInput = root.querySelector('[data-login-name]')
+      const emailInput = root.querySelector('[data-login-email]')
+      const passwordInput = root.querySelector('[data-login-password]')
+      const errorText = root.querySelector('[data-login-error]')
+      const submit = root.querySelector('[data-login-submit]')
+      const toggle = root.querySelector('[data-login-toggle]')
+
+      let registering = false
+
+      const setError = (message) => {
+        if (!errorText) return
+        errorText.textContent = message || ''
+        errorText.classList.toggle('hidden', !message)
+      }
+
+      const setMode = (register) => {
+        registering = register
+        nameRow?.classList.toggle('hidden', !register)
+        nameRow?.classList.toggle('grid', register)
+        if (heading) heading.textContent = register ? 'Create your workspace' : 'Sign in to Postline'
+        if (subtitle) subtitle.textContent = register ? 'One account owns this Postline instance.' : 'Your personal publishing workspace.'
+        if (submit) submit.textContent = register ? 'Create account' : 'Sign in'
+        if (toggle) toggle.textContent = register ? 'Already set up? Sign in instead' : 'First run? Create the workspace account'
+        setError('')
+      }
+
+      const storeTokenAndEnter = (token, expiresIn) => {
+        const maxAge = Number(expiresIn) > 0 ? Number(expiresIn) : 60 * 60 * 24 * 30
+        document.cookie = `auth-token=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax`
+        window.location.assign('/')
+      }
+
+      toggle?.addEventListener('click', () => setMode(!registering))
+
+      form?.addEventListener('submit', async (event) => {
+        event.preventDefault()
+        setError('')
+        submit?.setAttribute('disabled', 'disabled')
+
+        const body = new FormData()
+        body.set('email', emailInput?.value.trim() || '')
+        body.set('password', passwordInput?.value || '')
+        if (registering) body.set('name', nameInput?.value.trim() || '')
+
+        try {
+          const response = await fetch(registering ? '/api/register' : '/api/login', { method: 'POST', body })
+          const payload = await response.json().catch(() => ({}))
+
+          if (registering) {
+            if (!response.ok || payload.ok === false) throw new Error(payload.error || 'Could not create the account.')
+            const token = payload.data?.access_token
+            if (token) storeTokenAndEnter(token)
+            else setMode(false)
+            return
+          }
+
+          const token = payload.access_token || payload.token
+          if (!response.ok || !token) throw new Error(payload.error || payload.message || 'Incorrect email or password.')
+          storeTokenAndEnter(token, payload.expires_in)
+        }
+        catch (error) {
+          setError(error instanceof Error ? error.message : String(error))
+        }
+        finally {
+          submit?.removeAttribute('disabled')
+        }
+      })
+    })()
+  </script>
+@endsection
