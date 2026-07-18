@@ -1,4 +1,6 @@
-import { line, scaleLinear, ticks } from '@ts-charts/charts'
+import { ticks } from '@ts-charts/array'
+import { scaleLinear } from '@ts-charts/scale'
+import { line } from '@ts-charts/shape'
 
 type Point = {
   label: string
