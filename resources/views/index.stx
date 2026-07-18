@@ -59,8 +59,21 @@
         </div>
 
         <footer class="flex gap-3 items-center justify-between p-3 border-t border-zinc-200">
-          <span class="text-xs text-zinc-500" data-bluesky-count>0 / 300 characters</span>
+          <div class="flex gap-2 items-center min-w-0">
+            <span class="text-xs text-zinc-500 whitespace-nowrap" data-bluesky-count>0 / 300 characters</span>
+            <span class="hidden gap-1.5 items-center px-2.5 max-w-48 min-h-7 font-bold text-xs text-zinc-600 bg-zinc-50 border border-zinc-200 rounded-lg" data-attach-chip>
+              <span class="shrink-0 h-3.5 w-3.5 i-hugeicons-image-01" aria-hidden="true"></span>
+              <span class="truncate" data-attach-name></span>
+              <button class="inline-flex items-center justify-center shrink-0 h-4 w-4 text-zinc-500 hover:text-zinc-800 transition-colors" type="button" aria-label="Remove attached image" data-attach-clear>
+                <span class="h-3 w-3 i-hugeicons-cancel-01" aria-hidden="true"></span>
+              </button>
+            </span>
+          </div>
           <div class="flex flex-wrap gap-2 items-center justify-end">
+            <input class="hidden" type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="Attach image" data-attach-input>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach image" title="Attach image" data-attach-button>
+              <span class="h-4 w-4 i-hugeicons-image-01" aria-hidden="true"></span>
+            </button>
             <input class="hidden px-2 h-9 text-neutral-950 text-xs bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" type="datetime-local" aria-label="Schedule time" data-compose-schedule>
             <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm transition-colors" type="button" aria-label="Schedule post" title="Schedule post" data-schedule-toggle>
               <span class="h-4 w-4 i-hugeicons-calendar-03" aria-hidden="true"></span>
@@ -101,6 +114,19 @@
       const composeImage = root.querySelector('[data-compose-image]')
       const scheduleToggle = root.querySelector('[data-schedule-toggle]')
       const scheduleInput = root.querySelector('[data-compose-schedule]')
+      const attachButton = root.querySelector('[data-attach-button]')
+      const attachInput = root.querySelector('[data-attach-input]')
+      const attachChip = root.querySelector('[data-attach-chip]')
+      const attachName = root.querySelector('[data-attach-name]')
+      const attachClear = root.querySelector('[data-attach-clear]')
+
+      const attachedFile = () => attachInput?.files?.[0] || undefined
+
+      const clearAttachment = () => {
+        if (attachInput) attachInput.value = ''
+        attachChip?.classList.add('hidden')
+        attachChip?.classList.remove('inline-flex')
+      }
       const postsRoot = root.querySelector('[data-composer-posts]')
       const addPostButton = root.querySelector('[data-add-post]')
       const previewButton = root.querySelector('[data-preview-post]')
@@ -568,7 +594,7 @@
           : undefined
         const imageUrl = composeImage?.value.trim()
         const image = imageUrl ? { url: imageUrl } : undefined
-        return await social.publishCrosspost({ text, providers: targetProviders, external, image })
+        return await social.publishCrosspost({ text, providers: targetProviders, external, image, imageFile: attachedFile() })
       }
 
       const publish = async () => {
@@ -635,6 +661,7 @@
               providers: targetProviders,
               external,
               image: imageUrl ? { url: imageUrl } : undefined,
+              imageFile: attachedFile(),
             }))
           }
           else {
@@ -656,6 +683,7 @@
 
           updateCount()
           saveDraft()
+          clearAttachment()
           window.postlineToast?.dismiss?.('publish')
           if (failures.length && successCount === 0) {
             setStatus(`Publish failed — ${failures.join('; ')}`, 'error', { title: 'Publish failed' })
@@ -723,6 +751,23 @@
         updatePublishLabel()
       })
       scheduleInput?.addEventListener('input', updatePublishLabel)
+      attachButton?.addEventListener('click', () => attachInput?.click())
+      attachInput?.addEventListener('change', () => {
+        const file = attachedFile()
+        if (!file) {
+          clearAttachment()
+          return
+        }
+        if (file.size > 1_000_000) {
+          clearAttachment()
+          setStatus('Images must be 1MB or smaller for Bluesky.', 'error', { title: 'Attachment' })
+          return
+        }
+        if (attachName) attachName.textContent = file.name
+        attachChip?.classList.remove('hidden')
+        attachChip?.classList.add('inline-flex')
+      })
+      attachClear?.addEventListener('click', clearAttachment)
       addPostButton?.addEventListener('click', addPost)
       previewButton?.addEventListener('click', () => {
         const text = activeTextarea()?.value.trim()

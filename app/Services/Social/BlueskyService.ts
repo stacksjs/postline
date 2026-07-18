@@ -187,9 +187,33 @@ export class BlueskyService {
     const publishInput = { text: post.body } as Parameters<BlueskyDriver['publish']>[1] & {
       external?: { uri: string, title: string, description?: string }
       reply?: { root: { uri: string, cid: string }, parent: { uri: string, cid: string } }
+      media?: Array<{ bytes?: Uint8Array, mimeType?: string, altText?: string }>
     }
     if (content?.external) publishInput.external = content.external
     if (content?.reply) publishInput.reply = content.reply
+    if (content?.media?.length) {
+      // The driver embeds raw bytes; fetch URL-only media server-side.
+      const media: Array<{ bytes: Uint8Array, mimeType?: string, altText?: string }> = []
+      for (const item of content.media.slice(0, 4)) {
+        if (item.bytes?.length) {
+          media.push({ bytes: item.bytes, mimeType: item.mimeType, altText: item.altText })
+        }
+        else if (item.url) {
+          try {
+            const response = await fetch(item.url)
+            if (!response.ok) continue
+            const bytes = new Uint8Array(await response.arrayBuffer())
+            media.push({
+              bytes,
+              mimeType: item.mimeType || response.headers.get('content-type') || 'image/jpeg',
+              altText: item.altText,
+            })
+          }
+          catch {}
+        }
+      }
+      if (media.length) publishInput.media = media
+    }
 
     await database.insertInto('post_targets').values({
       uuid: targetUuid,

@@ -57,8 +57,14 @@ export interface PublishContent {
     title: string
     description?: string
   }
+  /**
+   * Attached media. Instagram needs a public `url`; Bluesky uploads
+   * `bytes` (or fetches `url`) as a blob.
+   */
   media?: Array<{
-    url: string
+    url?: string
+    bytes?: Uint8Array
+    mimeType?: string
     altText?: string
   }>
   /** Thread chaining refs — only honored by providers that support replies. */
