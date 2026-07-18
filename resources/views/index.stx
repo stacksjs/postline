@@ -606,8 +606,7 @@
           let lastUrl
           const failures = []
           let successCount = 0
-          for (const [index, post] of targets.entries()) {
-            const data = await publishOne(post, targetProviders)
+          const collect = (data) => {
             for (const result of data.results || []) {
               if (result.ok) {
                 successCount += 1
@@ -617,11 +616,29 @@
                 failures.push(`${providerLabel(result.provider)}: ${result.error || 'failed'}`)
               }
             }
-            if (targets.length > 1) {
-              textareaFor(post).value = ''
-              renderLinkPreview(post, null)
-            }
-            if (index < targets.length - 1) await new Promise(resolve => setTimeout(resolve, 400))
+          }
+
+          if (targets.length > 1) {
+            // Threads go up in one request so the server can reply-chain the
+            // segments on providers that support it (Bluesky).
+            const social = window.postlineSocial
+            if (!social) throw new Error('Publishing is still loading. Try again in a moment.')
+            const first = targets[0]
+            const external = (first?.dataset.externalUri && first.dataset.externalTitle)
+              ? { uri: first.dataset.externalUri, title: first.dataset.externalTitle, description: first.dataset.externalDescription || '' }
+              : undefined
+            const imageUrl = composeImage?.value.trim()
+            const thread = targets.map(post => textareaFor(post)?.value.trim() || '')
+            collect(await social.publishCrosspost({
+              text: thread[0],
+              thread,
+              providers: targetProviders,
+              external,
+              image: imageUrl ? { url: imageUrl } : undefined,
+            }))
+          }
+          else {
+            collect(await publishOne(targets[0], targetProviders))
           }
 
           if (activeMode === 'thread') {
