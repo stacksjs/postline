@@ -58,7 +58,7 @@ export class BlogService {
 
   async publishToPost(
     post: { id: number, body: string },
-    _content?: PublishContent,
+    content?: PublishContent,
   ): Promise<CrosspostTargetResult> {
     const targetUuid = uuid()
     const createdAt = now()
@@ -79,16 +79,20 @@ export class BlogService {
       .executeTakeFirstOrThrow()
 
     try {
+      // Explicit title (long-form composer) keeps the whole text as body;
+      // otherwise the first line doubles as the title and is stripped.
+      const explicitTitle = content?.title?.trim()
       const lines = post.body.split('\n').map(line => line.trim())
-      const title = (lines.find(Boolean) || 'Untitled post').slice(0, 200)
+      const title = (explicitTitle || lines.find(Boolean) || 'Untitled post').slice(0, 200)
       const body = post.body.trim()
       const slug = await uniqueSlug(slugify(title))
       const accountId = await ensureAccount()
       const publishedAt = now()
 
-      // Body minus the title line — the blog theme already renders the title.
       const firstContentIndex = post.body.split('\n').findIndex(line => line.trim())
-      const markdownBody = post.body.split('\n').slice(firstContentIndex + 1).join('\n').trim() || body
+      const markdownBody = explicitTitle
+        ? body
+        : post.body.split('\n').slice(firstContentIndex + 1).join('\n').trim() || body
 
       await mkdir(CONTENT_DIR, { recursive: true })
       await Bun.write(join(CONTENT_DIR, `${slug}.md`), [

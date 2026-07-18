@@ -30,6 +30,8 @@ export interface QueueItemView {
 export interface SaveQueueInput {
   text: string
   providers: SocialProvider[]
+  /** Explicit title for long-form targets (blog). */
+  title?: string | null
   /** UTC `YYYY-MM-DD HH:MM:SS`; omitted → saved as a draft. */
   scheduledAt?: string | null
 }
@@ -67,7 +69,7 @@ export class QueueService {
 
     await database.insertInto('posts').values({
       uuid: postUuid,
-      title: body.slice(0, 80),
+      title: input.title?.trim() || body.slice(0, 80),
       body,
       status,
       scheduled_at: scheduledAt,
