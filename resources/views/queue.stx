@@ -3,66 +3,200 @@
 @section('title', 'Postline - Queue')
 @section('description', 'Review scheduled and drafted social posts in Postline.')
 
-<script server>
-const scheduledPosts = [
-  {
-    time: 'Today 3:30 PM',
-    channel: 'Bluesky',
-    status: 'Ready',
-    text: 'Working on a calmer way to plan posts: drafts, timelines, scheduling, and publishing in one native-feeling place.',
-    note: 'Auto-publish when the Bluesky driver token is present.',
-  },
-  {
-    time: 'Tomorrow 9:00 AM',
-    channel: 'Bluesky',
-    status: 'Draft',
-    text: 'Tiny systems compound. A clean publishing queue might be the difference between ideas fading and ideas shipping.',
-    note: 'Needs final copy pass.',
-  },
-  {
-    time: 'Friday 11:15 AM',
-    channel: 'Mastodon',
-    status: 'Planned',
-    text: 'Cross-posting should feel intentional, not like copy/paste chores across six tabs.',
-    note: 'Driver support planned after Bluesky settles.',
-  },
-]
-</script>
-
 @section('content')
-  <section class="grid gap-3.5" data-postline-page="queue" data-testid="queue-page">
+  <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
+    <!-- Crosswind safelist: status pill + action classes are set from JS. -->
+    <div class="hidden text-amber-800 text-blue-700 text-emerald-700 text-red-700 text-zinc-600 bg-amber-50 bg-blue-50 bg-emerald-50 bg-red-50 bg-zinc-100 hover:bg-neutral-800 hover:bg-zinc-50 border-amber-200 border-blue-200 border-emerald-200 border-red-200 border-zinc-200 transition-colors" aria-hidden="true"></div>
+    <header class="flex gap-4 items-center justify-between min-h-11">
+      <div>
+        <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Queue</p>
+        <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Scheduled posts</h1>
+        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">What's drafted, scheduled, and recently published.</p>
+      </div>
+      <a href="/" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-sm text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition-colors">
+        <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
+        <span>New post</span>
+      </a>
+    </header>
+
     <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
       <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
-        <strong class="text-[13px]">Queue</strong>
-        <div class="flex gap-2 items-center">
-          <a href="/" data-stx-link class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-bold text-xs text-neutral-950 bg-white border border-zinc-200 rounded-lg shadow-sm">
-            <span class="h-3.5 w-3.5 i-hugeicons-plus-sign" aria-hidden="true"></span>
-            <span>New</span>
-          </a>
-          <button class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-bold text-xs text-white bg-neutral-950 rounded-lg" type="button">
-            <span class="h-3.5 w-3.5 i-hugeicons-magic-wand-01" aria-hidden="true"></span>
-            <span>Optimize</span>
-          </button>
-        </div>
+        <strong class="text-[13px]">Upcoming &amp; drafts</strong>
+        <span class="text-xs text-zinc-500" data-queue-meta>Loading…</span>
       </header>
-      <div class="grid gap-2.5 p-3">
-        @foreach (scheduledPosts as post)
-          <article class="grid gap-2.5 p-3.5 bg-white border border-zinc-200 rounded-2xl">
-            <header class="flex gap-3 items-center justify-between">
-              <div class="grid gap-1">
-                <span class="font-bold text-xs">{{ post.time }}</span>
-                <span class="text-xs text-zinc-500">{{ post.channel }}</span>
-              </div>
-              <span class="px-2 py-1 font-bold text-[11px] text-blue-700 bg-blue-50 rounded-full">{{ post.status }}</span>
-            </header>
-            <p class="m-0 leading-normal text-[13px] text-slate-700">{{ post.text }}</p>
-            <footer class="flex items-center justify-between text-xs text-zinc-500">
-              <span>{{ post.note }}</span>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-neutral-950 bg-white border border-zinc-200 rounded-lg shadow-sm" type="button">Edit</button>
-            </footer>
-          </article>
-        @endforeach
+      <div class="grid gap-2.5 p-3" data-queue-pending>
+        <p class="m-0 p-3 text-[13px] text-zinc-500" data-queue-pending-empty>Loading queue…</p>
+      </div>
+    </section>
+
+    <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
+      <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
+        <strong class="text-[13px]">Recent</strong>
+        <span class="text-xs text-zinc-500" data-queue-recent-meta></span>
+      </header>
+      <div class="grid gap-2.5 p-3" data-queue-recent>
+        <p class="m-0 p-3 text-[13px] text-zinc-500" data-queue-recent-empty>Loading…</p>
       </div>
     </section>
   </section>
+
+  <script>
+    ;(() => {
+      const root = document.querySelector('[data-testid="queue-page"]')
+      if (!root) return
+
+      const pendingList = root.querySelector('[data-queue-pending]')
+      const recentList = root.querySelector('[data-queue-recent]')
+      const meta = root.querySelector('[data-queue-meta]')
+      const recentMeta = root.querySelector('[data-queue-recent-meta]')
+      const toast = window.postlineToast?.show
+
+      const PENDING = new Set(['draft', 'scheduled', 'publishing', 'failed'])
+
+      const pillClass = (status) => {
+        const base = 'px-2 py-1 font-bold text-[11px] rounded-full border whitespace-nowrap'
+        if (status === 'published') return `${base} text-emerald-700 bg-emerald-50 border-emerald-200`
+        if (status === 'scheduled') return `${base} text-blue-700 bg-blue-50 border-blue-200`
+        if (status === 'publishing') return `${base} text-amber-800 bg-amber-50 border-amber-200`
+        if (status === 'failed') return `${base} text-red-700 bg-red-50 border-red-200`
+        return `${base} text-zinc-600 bg-zinc-100 border-zinc-200`
+      }
+
+      const escapeHtml = (value) => String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;')
+
+      const providerLabel = (provider) => window.postlineSocial?.providerLabel(provider) || provider
+
+      // Server timestamps are UTC "YYYY-MM-DD HH:MM:SS" — render in local time.
+      const formatTime = (value) => {
+        if (!value) return ''
+        const date = new Date(`${value.replace(' ', 'T')}Z`)
+        if (Number.isNaN(date.getTime())) return value
+        return date.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+      }
+
+      const liveUrlFor = (uri) => {
+        const value = String(uri || '')
+        if (value.startsWith('/')) return value
+        const match = value.match(/^at:\/\/([^/]+)\/app\.bsky\.feed\.post\/(.+)$/)
+        return match ? `https://bsky.app/profile/${encodeURIComponent(match[1])}/post/${encodeURIComponent(match[2])}` : null
+      }
+
+      const itemHtml = (item) => {
+        const when = item.status === 'scheduled'
+          ? `Scheduled · ${formatTime(item.scheduledAt)}`
+          : item.status === 'published'
+            ? `Published · ${formatTime(item.publishedAt || item.createdAt)}`
+            : `${item.status[0].toUpperCase()}${item.status.slice(1)} · ${formatTime(item.createdAt)}`
+        const channels = item.providers.map(target => providerLabel(target.provider)).join(', ') || '—'
+        const failure = item.providers.find(target => target.failureReason)?.failureReason
+        const liveUri = item.providers.find(target => target.remoteUri)?.remoteUri
+        const liveUrl = liveUrlFor(liveUri)
+        const actionable = ['draft', 'scheduled', 'failed'].includes(item.status)
+
+        return `
+          <article class="grid gap-2.5 p-3.5 bg-white border border-zinc-200 rounded-2xl" data-queue-item="${item.id}">
+            <header class="flex gap-3 items-center justify-between">
+              <div class="grid gap-1">
+                <span class="font-bold text-xs">${escapeHtml(when)}</span>
+                <span class="text-xs text-zinc-500">${escapeHtml(channels)}</span>
+              </div>
+              <span class="${pillClass(item.status)}">${escapeHtml(item.status)}</span>
+            </header>
+            <p class="m-0 leading-normal text-[13px] text-slate-700">${escapeHtml(item.body)}</p>
+            ${failure ? `<p class="m-0 text-red-700 text-xs">${escapeHtml(failure)}</p>` : ''}
+            <footer class="flex gap-2 items-center justify-end">
+              ${liveUrl ? `<a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-neutral-950 text-xs bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" href="${escapeHtml(liveUrl)}" target="_blank" rel="noopener noreferrer">View</a>` : ''}
+              ${actionable ? `<button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-white text-xs bg-neutral-950 hover:bg-neutral-800 rounded-lg transition-colors" type="button" data-queue-publish="${item.id}">Publish now</button>` : ''}
+              ${actionable ? `<button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-red-700 text-xs bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" type="button" data-queue-delete="${item.id}">Delete</button>` : ''}
+            </footer>
+          </article>
+        `
+      }
+
+      const render = (items) => {
+        const pending = items.filter(item => PENDING.has(item.status))
+        const recent = items.filter(item => !PENDING.has(item.status))
+
+        if (pendingList) {
+          pendingList.innerHTML = pending.length
+            ? pending.map(itemHtml).join('')
+            : '<p class="m-0 p-3 text-[13px] text-zinc-500">Nothing queued yet. Schedule a post from the composer and it will show up here.</p>'
+        }
+        if (recentList) {
+          recentList.innerHTML = recent.length
+            ? recent.slice(0, 10).map(itemHtml).join('')
+            : '<p class="m-0 p-3 text-[13px] text-zinc-500">No published posts yet.</p>'
+        }
+        if (meta) {
+          const scheduled = pending.filter(item => item.status === 'scheduled').length
+          const drafts = pending.filter(item => item.status === 'draft').length
+          meta.textContent = `${scheduled} scheduled · ${drafts} draft${drafts === 1 ? '' : 's'}`
+        }
+        if (recentMeta) recentMeta.textContent = `${recent.length} post${recent.length === 1 ? '' : 's'}`
+      }
+
+      const refresh = async () => {
+        try {
+          const response = await fetch('/api/postline/queue')
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the queue.')
+          render(payload.data.items || [])
+        }
+        catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          if (pendingList) pendingList.innerHTML = `<p class="m-0 p-3 text-[13px] text-zinc-500">${escapeHtml(message)}</p>`
+          if (meta) meta.textContent = 'Could not load'
+          if (toast) toast({ title: 'Queue', message, tone: 'error' })
+        }
+      }
+
+      const post = async (path, id) => {
+        const form = new FormData()
+        form.set('id', String(id))
+        const response = await fetch(path, { method: 'POST', body: form })
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Request failed.')
+        return payload.data
+      }
+
+      root.addEventListener('click', async (event) => {
+        const target = event.target
+        if (!(target instanceof HTMLElement)) return
+
+        const publishButton = target.closest('[data-queue-publish]')
+        if (publishButton) {
+          publishButton.setAttribute('disabled', 'disabled')
+          try {
+            await post('/api/postline/queue/publish-now', publishButton.dataset.queuePublish)
+            if (toast) toast({ title: 'Published', message: 'Post published.', tone: 'success' })
+          }
+          catch (error) {
+            if (toast) toast({ title: 'Publish failed', message: error instanceof Error ? error.message : String(error), tone: 'error' })
+          }
+          await refresh()
+          return
+        }
+
+        const deleteButton = target.closest('[data-queue-delete]')
+        if (deleteButton) {
+          deleteButton.setAttribute('disabled', 'disabled')
+          try {
+            await post('/api/postline/queue/delete', deleteButton.dataset.queueDelete)
+            if (toast) toast({ title: 'Removed', message: 'Post removed from the queue.', tone: 'success' })
+          }
+          catch (error) {
+            if (toast) toast({ title: 'Delete failed', message: error instanceof Error ? error.message : String(error), tone: 'error' })
+          }
+          await refresh()
+        }
+      })
+
+      void refresh()
+    })()
+  </script>
 @endsection

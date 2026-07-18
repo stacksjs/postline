@@ -9,11 +9,11 @@
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Timeline</p>
         <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Home feed</h1>
-        <p class="mt-1.5 mb-0 text-[13px] text-zinc-600">Posts from your connected Bluesky account.</p>
+        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">Posts from your connected Bluesky account.</p>
       </div>
       <div class="flex gap-2 items-center">
-        <a class="inline-flex items-center justify-center px-4 h-9 font-bold text-sm text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm hover:bg-zinc-50" href="/" data-stx-link>Compose</a>
-        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-sm text-white bg-neutral-950 rounded-xl disabled:opacity-50" type="button" data-bluesky-timeline-refresh>
+        <a class="inline-flex items-center justify-center px-4 h-9 font-bold text-neutral-950 text-sm bg-white hover:bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm transition-colors" href="/" data-stx-link>Compose</a>
+        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-sm text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" data-bluesky-timeline-refresh>
           <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.312 4.818A.75.75 0 0 0 14 4H6.5a.75.75 0 0 0 0 1.5h5.992l-4.43 4.431a.75.75 0 1 0 1.06 1.06l5.784-5.784a.75.75 0 0 0 0-1.06l-5.784-5.784a.75.75 0 0 0-1.06 1.06l4.43 4.43H6a2.75 2.75 0 0 0 0 5.5h8.312a.75.75 0 0 0 .53-.22l2.25-2.25a.75.75 0 0 0-1.06-1.06l-1.72 1.72H6a1.25 1.25 0 0 1 0-2.5h7.312a.75.75 0 0 0 .53-.22l2.25-2.25a.75.75 0 0 0 0-1.06l-2.25-2.25a.75.75 0 0 0-.53-.22Z" clip-rule="evenodd"/></svg>
           <span data-bluesky-timeline-refresh-label>Refresh</span>
         </button>
@@ -23,10 +23,10 @@
     <div class="overflow-hidden bg-white border border-zinc-200 rounded-2xl shadow-sm postline-feed" aria-label="Bluesky timeline">
       <div class="postline-feed__header">
         <div>
-          <strong class="text-sm font-bold text-zinc-900">Following</strong>
+          <strong class="font-bold text-sm text-zinc-900">Following</strong>
           <p class="m-0 mt-0.5 text-xs text-zinc-500" data-bluesky-timeline-meta>Loading feed…</p>
         </div>
-        <span class="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">Bluesky</span>
+        <span class="px-2.5 py-1 font-bold text-[11px] text-blue-700 bg-blue-50 border border-blue-200 rounded-full">Bluesky</span>
       </div>
       <div class="postline-feed__list" data-bluesky-timeline-list>
         <p class="postline-feed__loading" data-bluesky-timeline-empty>Loading your timeline…</p>

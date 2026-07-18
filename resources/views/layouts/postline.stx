@@ -6,6 +6,7 @@
     <meta name="color-scheme" content="light">
     <meta name="description" content="@yield('description', 'Postline is a clean personal workspace for social publishing.')">
     <title>@yield('title', 'Postline')</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <script>
       ;(() => {
         document.documentElement.setAttribute('data-theme', 'light')
@@ -84,17 +85,28 @@
         transform: translate3d(0, 0, 0) scale(1);
         pointer-events: auto;
       }
+
+      @media (max-width: 1023px) {
+        [data-sidebar-expand-fab] {
+          display: none;
+        }
+      }
+
+      [data-postline-app] :is(a, button, [role='button']):focus-visible {
+        outline: 2px solid rgb(82 82 91 / 0.6);
+        outline-offset: 2px;
+      }
     </style>
     <link rel="stylesheet" href="/assets/styles/postline-toast.css">
     <link rel="stylesheet" href="/assets/styles/postline-timeline.css">
   </head>
   <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-[#f3f3f1]">
-    <div class="grid grid-cols-1 lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] min-h-screen duration-200 ease-out transition-[grid-template-columns]" data-postline-app data-postline-shell>
+    <div class="grid grid-cols-1 grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] lg:grid-rows-1 min-h-screen duration-200 ease-out transition-[grid-template-columns]" data-postline-app data-postline-shell>
       <PostlineSidebar />
 
       <div class="relative min-w-0 bg-[#f3f3f1]" data-postline-content-shell>
         <button
-          class="fixed top-3.5 left-3.5 z-[90] inline-flex items-center justify-center h-9 w-9 text-zinc-700 bg-white/95 border border-zinc-200/90 rounded-xl shadow-[0_8px_28px_rgba(24,31,42,0.12)] backdrop-blur-sm hover:bg-white hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60"
+          class="inline-flex fixed left-3.5 top-3.5 z-[90] items-center justify-center h-9 w-9 text-zinc-700 hover:text-zinc-900 bg-white/95 hover:bg-white border border-zinc-200/90 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60 shadow-[0_8px_28px_rgba(24,31,42,0.12)] backdrop-blur-sm"
           type="button"
           aria-label="Expand sidebar"
           title="Expand sidebar"
@@ -103,14 +115,14 @@
         >
           <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true"><path fill-rule="evenodd" d="M4.75 4a.75.75 0 0 0-.75.75v10.5c0 .414.336.75.75.75h2.5a.75.75 0 0 0 0-1.5H5.5V5.5h7.69l-1.22-1.22a.75.75 0 1 1 1.06-1.06l2.5 2.5a.75.75 0 0 1 0 1.06l-2.5 2.5a.75.75 0 1 1-1.06-1.06L13.19 11H5.5v5.25h1.75a.75.75 0 0 0 0 1.5h-2.5A.75.75 0 0 0 4.75 15V4.75Z" clip-rule="evenodd"/></svg>
         </button>
-        <section class="overflow-hidden min-h-screen min-w-0 bg-[#f3f3f1] border-l border-t border-zinc-200/80 rounded-tl-[28px] shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace data-window-drag-region>
+        <section class="overflow-hidden min-h-screen min-w-0 bg-[#f3f3f1] border-t border-zinc-200/80 lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace data-window-drag-region>
           <main class="p-3.5 sm:p-4 min-w-0" data-postline-router>
             @yield('content')
           </main>
         </section>
       </div>
     </div>
-    <div id="postline-toast-host" class="pointer-events-none fixed bottom-6 right-6 z-[100] flex w-[calc(100%-2rem)] max-w-[22rem] flex-col-reverse gap-2.5 sm:right-6" aria-live="polite" aria-relevant="additions"></div>
+    <div id="postline-toast-host" class="flex bottom-6 fixed right-6 z-[100] sm:right-6 flex-col-reverse gap-2.5 max-w-[22rem] w-[calc(100%-2rem)] pointer-events-none" aria-live="polite" aria-relevant="additions"></div>
     <script type="module" src="/assets/scripts/postline-toast.ts"></script>
     <script type="module" src="/assets/scripts/postline-bluesky.ts"></script>
     <script type="module" src="/assets/scripts/postline-linkedin.ts"></script>
@@ -302,9 +314,26 @@
           })
         }
 
+        // Number keys 1-6 jump between pages (the sidebar shows the badges).
+        const bindKeyboardShortcuts = () => {
+          const routes = { 1: '/', 2: '/queue', 3: '/timeline', 4: '/analytics', 5: '/accounts', 6: '/blog', 7: '/settings' }
+          document.addEventListener('keydown', (event) => {
+            if (event.metaKey || event.ctrlKey || event.altKey) return
+            const target = event.target
+            if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable]')) return
+            const href = routes[event.key]
+            if (!href || window.location.pathname === href) return
+            event.preventDefault()
+            const link = document.querySelector(`[data-stx-link][href="${href}"]`)
+            if (link instanceof HTMLElement) link.click()
+            else window.location.assign(href)
+          })
+        }
+
         bindSidebarCollapse()
         bindShellHistory()
         bindWindowDragRegions()
+        bindKeyboardShortcuts()
         syncNativeShell()
         window.addEventListener('stx:load', bindShellHistory)
         window.addEventListener('stx:load', bindSidebarCollapse)

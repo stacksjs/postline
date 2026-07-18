@@ -104,6 +104,14 @@ export interface PublishPostInput {
     description?: string
   }
   /**
+   * Reply references for thread chaining (ATProto shape). `root` is the
+   * first post of the thread, `parent` the one directly above.
+   */
+  reply?: {
+    root: { uri: string, cid: string }
+    parent: { uri: string, cid: string }
+  }
+  /**
    * Attached media. Required by media-only providers such as Instagram, and
    * ignored by text-first providers (Bluesky, LinkedIn) for now.
    */

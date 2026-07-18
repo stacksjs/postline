@@ -35,8 +35,19 @@ export default new Action({
       ? [{ url: imageUrl, altText: imageAlt || undefined }]
       : undefined
 
+    // Optional multi-segment thread: JSON array of post texts. Segments are
+    // reply-chained on providers that support it (Bluesky).
+    let thread: string[] = []
     try {
-      const data = await crosspost.publish(text, providers, { external, media })
+      const parsed = JSON.parse(String(request.get('thread') || '[]'))
+      if (Array.isArray(parsed)) thread = parsed.map(value => String(value).trim()).filter(Boolean)
+    }
+    catch {}
+
+    try {
+      const data = thread.length > 1
+        ? await crosspost.publishThread(thread, providers, { external, media })
+        : await crosspost.publish(thread[0] || text, providers, { external, media })
       // Surface a partial-failure (some targets failed) as a 207-style payload
       // while still returning 200 so the client can report per-provider state.
       const allFailed = data.results.length > 0 && data.results.every(result => !result.ok)
