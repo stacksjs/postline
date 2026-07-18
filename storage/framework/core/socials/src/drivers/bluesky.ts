@@ -110,6 +110,7 @@ export class BlueskyPublishingDriver implements SocialPublishingDriver {
     }
 
     if (post.langs?.length) record.langs = post.langs
+    if (post.reply) record.reply = post.reply
     if (post.external) {
       record.embed = {
         $type: 'app.bsky.embed.external',

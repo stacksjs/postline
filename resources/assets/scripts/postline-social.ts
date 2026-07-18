@@ -24,6 +24,8 @@ export interface CrosspostInput {
   providers: string[]
   external?: { uri: string, title: string, description?: string }
   image?: { url: string, altText?: string }
+  /** Multi-segment thread; reply-chained on providers that support it. */
+  thread?: string[]
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -54,6 +56,8 @@ export async function publishCrosspost(input: CrosspostInput): Promise<{ postId:
   const body = new FormData()
   body.set('text', input.text)
   body.set('providers', input.providers.join(','))
+  if (input.thread && input.thread.length > 1)
+    body.set('thread', JSON.stringify(input.thread))
   if (input.external?.uri && input.external?.title) {
     body.set('external_uri', input.external.uri)
     body.set('external_title', input.external.title)

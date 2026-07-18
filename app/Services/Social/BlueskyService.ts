@@ -186,8 +186,10 @@ export class BlueskyService {
     const createdAt = now()
     const publishInput = { text: post.body } as Parameters<BlueskyDriver['publish']>[1] & {
       external?: { uri: string, title: string, description?: string }
+      reply?: { root: { uri: string, cid: string }, parent: { uri: string, cid: string } }
     }
     if (content?.external) publishInput.external = content.external
+    if (content?.reply) publishInput.reply = content.reply
 
     await database.insertInto('post_targets').values({
       uuid: targetUuid,
@@ -230,6 +232,7 @@ export class BlueskyService {
         ok: true,
         url: published.url,
         uri: published.uri,
+        cid: published.cid,
         targetId: Number(target.id),
       }
     }

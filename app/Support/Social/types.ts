@@ -60,6 +60,11 @@ export interface PublishContent {
     url: string
     altText?: string
   }>
+  /** Thread chaining refs — only honored by providers that support replies. */
+  reply?: {
+    root: { uri: string, cid: string }
+    parent: { uri: string, cid: string }
+  }
 }
 
 /** Outcome of publishing one post to a single provider during a crosspost. */
@@ -68,6 +73,7 @@ export interface CrosspostTargetResult {
   ok: boolean
   url?: string
   uri?: string
+  cid?: string
   targetId?: number
   error?: string
 }
