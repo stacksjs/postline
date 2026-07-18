@@ -48,4 +48,8 @@ route.group({ prefix: '/postline/threads' }, () => {
 route.group({ prefix: '/postline' }, () => {
   route.get('/providers', 'Actions/Postline/ProvidersStatusAction').skipCsrf()
   route.post('/publish', 'Actions/Postline/CrosspostPublishAction').skipCsrf()
+  route.get('/queue', 'Actions/Postline/QueueListAction').skipCsrf()
+  route.post('/queue', 'Actions/Postline/QueueSaveAction').skipCsrf()
+  route.post('/queue/delete', 'Actions/Postline/QueueDeleteAction').skipCsrf()
+  route.post('/queue/publish-now', 'Actions/Postline/QueuePublishNowAction').skipCsrf()
 })

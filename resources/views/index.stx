@@ -60,7 +60,11 @@
 
         <footer class="flex gap-3 items-center justify-between p-3 border-t border-zinc-200">
           <span class="text-xs text-zinc-500" data-bluesky-count>0 / 300 characters</span>
-          <div class="flex gap-2 items-center">
+          <div class="flex flex-wrap gap-2 items-center justify-end">
+            <input class="hidden px-2 h-9 text-neutral-950 text-xs bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" type="datetime-local" aria-label="Schedule time" data-compose-schedule>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm transition-colors" type="button" aria-label="Schedule post" title="Schedule post" data-schedule-toggle>
+              <span class="h-4 w-4 i-hugeicons-calendar-03" aria-hidden="true"></span>
+            </button>
             <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm transition-colors" type="button" aria-label="Add post" title="Add post" data-add-post>
               <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
             </button>
@@ -95,6 +99,8 @@
       const providerToggles = root.querySelector('[data-provider-toggles]')
       const composeImageRow = root.querySelector('[data-compose-image-row]')
       const composeImage = root.querySelector('[data-compose-image]')
+      const scheduleToggle = root.querySelector('[data-schedule-toggle]')
+      const scheduleInput = root.querySelector('[data-compose-schedule]')
       const postsRoot = root.querySelector('[data-composer-posts]')
       const addPostButton = root.querySelector('[data-add-post]')
       const previewButton = root.querySelector('[data-preview-post]')
@@ -459,6 +465,75 @@
         saveDraft()
       }
 
+      const updatePublishLabel = () => {
+        if (!publishLabel) return
+        if (activeMode === 'draft') publishLabel.textContent = 'Save draft'
+        else if (scheduleInput?.value) publishLabel.textContent = 'Schedule'
+        else publishLabel.textContent = 'Publish'
+      }
+
+      const toUtcTimestamp = (localValue) => {
+        const date = new Date(localValue)
+        if (Number.isNaN(date.getTime())) throw new Error('Pick a valid schedule time.')
+        return date.toISOString().slice(0, 19).replace('T', ' ')
+      }
+
+      // Draft mode and schedule-time both save to the server-side queue
+      // instead of publishing immediately.
+      const saveToQueue = async (scheduleValue) => {
+        const text = activeTextarea()?.value.trim()
+        if (!text) {
+          setStatus('Write something before saving.', 'error')
+          activeTextarea()?.focus()
+          return
+        }
+        const targetProviders = selectedConnected().map(provider => provider.provider)
+        if (targetProviders.length === 0) {
+          setStatus('Select a connected account before saving to the queue.', 'error', { title: 'Not connected' })
+          return
+        }
+        if (activeMode === 'thread' && allPosts().filter(post => textareaFor(post)?.value.trim()).length > 1) {
+          setStatus('Scheduling threads is not supported yet — schedule posts one at a time.', 'error', { title: 'Queue' })
+          return
+        }
+
+        const form = new FormData()
+        form.set('text', text)
+        form.set('providers', targetProviders.join(','))
+        if (scheduleValue) form.set('scheduled_at', toUtcTimestamp(scheduleValue))
+
+        buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
+        try {
+          const response = await fetch('/api/postline/queue', { method: 'POST', body: form })
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save to the queue.')
+
+          const textarea = activeTextarea()
+          if (textarea) textarea.value = ''
+          if (scheduleInput) scheduleInput.value = ''
+          scheduleInput?.classList.add('hidden')
+          renderLinkPreview(activePost, null)
+          updateCount()
+          updatePublishLabel()
+          saveDraft()
+          setStatus(
+            payload.data.status === 'scheduled'
+              ? `Scheduled — check the Queue page to manage it.`
+              : 'Draft saved to the queue.',
+            'success',
+            { title: payload.data.status === 'scheduled' ? 'Scheduled' : 'Draft saved' },
+          )
+        }
+        catch (error) {
+          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Queue' })
+        }
+        finally {
+          buttons.forEach((button) => {
+            if (canPublish) button.removeAttribute('disabled')
+          })
+        }
+      }
+
       const setMode = (mode, options = {}) => {
         const nextMode = ['single', 'thread', 'draft'].includes(mode) ? mode : 'single'
         activeMode = nextMode
@@ -472,6 +547,7 @@
         if (nextMode === 'thread' && allPosts().length === 1 && !options.skipThreadPost) {
           addPost({ announce: false, focus: false, save: false })
         }
+        updatePublishLabel()
         if (!options.silent) setStatus(`${nextMode[0].toUpperCase()}${nextMode.slice(1)} mode selected.`, 'success')
         if (!options.skipSave) saveDraft()
       }
@@ -496,6 +572,11 @@
       }
 
       const publish = async () => {
+        if (activeMode === 'draft' || scheduleInput?.value) {
+          await saveToQueue(scheduleInput?.value || null)
+          return
+        }
+
         const targetProviders = selectedConnected().map(provider => provider.provider)
         if (targetProviders.length === 0) {
           setStatus('Select a connected account on the Accounts page before publishing.', 'error', { title: 'Not connected' })
@@ -580,7 +661,7 @@
           setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Publish failed' })
         }
         finally {
-          if (publishLabel) publishLabel.textContent = 'Publish'
+          updatePublishLabel()
           buttons.forEach(button => {
             if (canPublish) button.removeAttribute('disabled')
           })
@@ -609,6 +690,22 @@
         selectPost(post)
         updateCount()
       })
+      scheduleToggle?.addEventListener('click', () => {
+        if (!scheduleInput) return
+        const showing = scheduleInput.classList.toggle('hidden') === false
+        if (showing) {
+          // Local-time floor so the picker can't select the past.
+          const soon = new Date(Date.now() + 5 * 60 * 1000)
+          soon.setSeconds(0, 0)
+          scheduleInput.min = new Date(soon.getTime() - soon.getTimezoneOffset() * 60 * 1000).toISOString().slice(0, 16)
+          scheduleInput.focus()
+        }
+        else {
+          scheduleInput.value = ''
+        }
+        updatePublishLabel()
+      })
+      scheduleInput?.addEventListener('input', updatePublishLabel)
       addPostButton?.addEventListener('click', addPost)
       previewButton?.addEventListener('click', () => {
         const text = activeTextarea()?.value.trim()
