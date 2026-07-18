@@ -31,9 +31,18 @@ export default new Action({
 
     const imageUrl = String(request.get('image_url') || '').trim()
     const imageAlt = String(request.get('image_alt') || '').trim()
-    const media = imageUrl
-      ? [{ url: imageUrl, altText: imageAlt || undefined }]
-      : undefined
+
+    const media: NonNullable<Parameters<typeof crosspost.publish>[2]>['media'] = []
+    const uploaded = request.file?.('image')
+    if (uploaded?.buffer && uploaded.buffer.byteLength > 0) {
+      media.push({
+        bytes: new Uint8Array(uploaded.buffer),
+        mimeType: uploaded.mimetype || 'image/jpeg',
+        altText: imageAlt || undefined,
+      })
+    }
+    if (imageUrl)
+      media.push({ url: imageUrl, altText: imageAlt || undefined })
 
     // Optional multi-segment thread: JSON array of post texts. Segments are
     // reply-chained on providers that support it (Bluesky).
@@ -45,9 +54,10 @@ export default new Action({
     catch {}
 
     try {
+      const content = { external, media: media.length ? media : undefined }
       const data = thread.length > 1
-        ? await crosspost.publishThread(thread, providers, { external, media })
-        : await crosspost.publish(thread[0] || text, providers, { external, media })
+        ? await crosspost.publishThread(thread, providers, content)
+        : await crosspost.publish(thread[0] || text, providers, content)
       // Surface a partial-failure (some targets failed) as a 207-style payload
       // while still returning 200 so the client can report per-provider state.
       const allFailed = data.results.length > 0 && data.results.every(result => !result.ok)

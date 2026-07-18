@@ -24,6 +24,8 @@ export interface CrosspostInput {
   providers: string[]
   external?: { uri: string, title: string, description?: string }
   image?: { url: string, altText?: string }
+  /** Attached image file — uploaded to providers that accept bytes (Bluesky). */
+  imageFile?: File
   /** Multi-segment thread; reply-chained on providers that support it. */
   thread?: string[]
 }
@@ -68,6 +70,8 @@ export async function publishCrosspost(input: CrosspostInput): Promise<{ postId:
     body.set('image_url', input.image.url)
     if (input.image.altText) body.set('image_alt', input.image.altText)
   }
+  if (input.imageFile)
+    body.set('image', input.imageFile, input.imageFile.name)
 
   const response = await fetch('/api/postline/publish', { method: 'POST', body })
   const payload = await response.json()
