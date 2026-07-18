@@ -3,44 +3,43 @@
 @section('title', 'Postline - Analytics')
 @section('description', 'Review lightweight publishing analytics in Postline.')
 
-<script server>
-const stats = [
-  { label: 'Posts this week', value: '12', trend: '+4 from last week' },
-  { label: 'Best channel', value: 'Bluesky', trend: '2.8x engagement' },
-  { label: 'Best window', value: '9 AM', trend: 'Weekdays' },
-]
-
-const channelSplits = [
-  { label: 'Bluesky', value: '68%', width: '68%' },
-  { label: 'Mastodon', value: '21%', width: '21%' },
-  { label: 'Twitter/X', value: '11%', width: '11%' },
-]
-</script>
-
 @section('content')
-  <section class="grid gap-3.5" data-postline-page="analytics" data-testid="analytics-page">
+  <section class="grid gap-5" data-postline-page="analytics" data-testid="analytics-page">
+    <header class="flex gap-4 items-center justify-between min-h-11">
+      <div>
+        <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Analytics</p>
+        <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Publishing insights</h1>
+        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">How your posting has performed over the last 30 days.</p>
+      </div>
+    </header>
+
     <div class="grid gap-3.5 lg:grid-cols-3">
-      @foreach (stats as stat)
-        <article class="grid gap-2 p-3.5 bg-white border border-zinc-200 rounded-2xl shadow-sm">
-          <span class="text-xs text-zinc-500">{{ stat.label }}</span>
-          <strong class="text-2xl">{{ stat.value }}</strong>
-          <span class="text-xs text-zinc-500">{{ stat.trend }}</span>
-        </article>
-      @endforeach
+      <article class="grid gap-2 p-3.5 bg-white border border-zinc-200 rounded-2xl shadow-sm">
+        <span class="text-xs text-zinc-500">Posts this week</span>
+        <strong class="text-2xl" data-analytics-posts-week>—</strong>
+        <span class="text-xs text-zinc-500" data-analytics-posts-trend>Loading…</span>
+      </article>
+      <article class="grid gap-2 p-3.5 bg-white border border-zinc-200 rounded-2xl shadow-sm">
+        <span class="text-xs text-zinc-500">Best channel</span>
+        <strong class="text-2xl" data-analytics-best-channel>—</strong>
+        <span class="text-xs text-zinc-500" data-analytics-best-channel-trend>Loading…</span>
+      </article>
+      <article class="grid gap-2 p-3.5 bg-white border border-zinc-200 rounded-2xl shadow-sm">
+        <span class="text-xs text-zinc-500">Best window</span>
+        <strong class="text-2xl" data-analytics-best-window>—</strong>
+        <span class="text-xs text-zinc-500" data-analytics-best-window-trend>Loading…</span>
+      </article>
     </div>
 
     <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_320px]">
       <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
         <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
-          <strong class="text-[13px]">Response trend</strong>
-          <button class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-bold text-xs text-white bg-neutral-950 rounded-lg" type="button">
-            <span class="h-3.5 w-3.5 i-hugeicons-download-04" aria-hidden="true"></span>
-            <span>Export</span>
-          </button>
+          <strong class="text-[13px]">Publishing activity</strong>
+          <span class="text-xs text-zinc-500">Last 30 days</span>
         </header>
         <div class="p-3.5">
-          <svg class="block w-full h-auto" viewBox="0 0 640 280" role="img" aria-label="Postline response trend chart" data-analytics-chart>
-            <desc>Responses over the last 30 days with publishing dates on the x axis and response counts on the y axis.</desc>
+          <svg class="block h-auto w-full" viewBox="0 0 640 280" role="img" aria-label="Posts published over the last 30 days" data-analytics-chart>
+            <desc>Posts published over the last 30 days with dates on the x axis and post counts on the y axis.</desc>
             <rect x="0" y="0" width="640" height="280" rx="16" fill="#fafafa"></rect>
             <g data-chart-legend></g>
             <g data-chart-grid></g>
@@ -51,7 +50,7 @@ const channelSplits = [
             <path data-chart-line fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
             <g data-chart-points></g>
             <g data-chart-hover aria-hidden="true"></g>
-            <rect data-chart-hit-area x="0" y="0" width="640" height="280" fill="transparent" tabindex="0" role="application" aria-label="Hover or focus the response trend chart for point details."></rect>
+            <rect data-chart-hit-area x="0" y="0" width="640" height="280" fill="transparent" tabindex="0" role="application" aria-label="Hover or focus the publishing activity chart for point details."></rect>
           </svg>
         </div>
       </section>
@@ -61,18 +60,8 @@ const channelSplits = [
           <header class="p-3.5 border-b border-zinc-200">
             <strong class="text-[13px]">Channel mix</strong>
           </header>
-          <div class="grid gap-3 p-3.5">
-            @foreach (channelSplits as channel)
-              <div class="grid gap-1.5">
-                <div class="flex items-center justify-between text-xs">
-                  <span class="font-bold">{{ channel.label }}</span>
-                  <span class="text-zinc-500">{{ channel.value }}</span>
-                </div>
-                <div class="h-2 overflow-hidden bg-zinc-100 rounded-full">
-                  <div class="h-full bg-blue-600 rounded-full" style="width: {{ channel.width }}"></div>
-                </div>
-              </div>
-            @endforeach
+          <div class="grid gap-3 p-3.5" data-analytics-channel-mix>
+            <p class="m-0 text-xs text-zinc-500">Loading…</p>
           </div>
         </section>
 
@@ -80,21 +69,11 @@ const channelSplits = [
           <header class="p-3.5 border-b border-zinc-200">
             <strong class="text-[13px]">Best windows</strong>
           </header>
-          <div class="grid gap-2 p-3 text-xs text-zinc-500">
-            <div class="flex items-center justify-between"><span>Weekdays</span><span class="font-bold text-neutral-950">9:00 AM</span></div>
-            <div class="flex items-center justify-between"><span>Launch notes</span><span class="font-bold text-neutral-950">3:30 PM</span></div>
-            <div class="flex items-center justify-between"><span>Replies</span><span class="font-bold text-neutral-950">11:15 AM</span></div>
+          <div class="grid gap-2 p-3 text-xs text-zinc-500" data-analytics-windows>
+            <p class="m-0 text-xs">Loading…</p>
           </div>
         </section>
       </aside>
     </div>
-
-    <section class="pb-3.5 bg-white border border-zinc-200 rounded-2xl shadow-sm">
-      <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
-        <strong class="text-[13px]">What is working</strong>
-        <span class="text-xs text-zinc-500">Bluesky</span>
-      </header>
-      <p class="m-0 p-3.5 leading-normal text-[13px] text-slate-700">Short, concrete posts are outperforming general updates. Bluesky is carrying the current response rate, so the next scheduling pass should keep that channel as the primary publishing target.</p>
-    </section>
   </section>
 @endsection
