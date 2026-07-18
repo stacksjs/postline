@@ -41,6 +41,7 @@
             <span class="h-4 w-4 text-zinc-500 i-hugeicons-image-01" aria-hidden="true"></span>
             <input class="px-3 h-9 w-full text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" type="url" inputmode="url" placeholder="Image URL (required for Instagram)" aria-label="Image URL for Instagram" data-compose-image>
           </label>
+          <input class="hidden mb-2 w-full font-bold leading-snug text-[22px] text-neutral-950 placeholder:text-zinc-400 bg-transparent border-0 outline-none" type="text" maxlength="200" placeholder="Post title" aria-label="Blog post title" data-compose-title>
           <div class="grid overflow-y-auto content-start gap-4 pr-1 max-h-72" data-composer-posts>
             <article class="grid gap-2 pb-3 last:pb-0 border-b border-zinc-100 last:border-b-0" data-composer-post data-active="true">
               <header class="flex gap-3 items-center justify-between">
@@ -121,6 +122,8 @@
       const attachClear = root.querySelector('[data-attach-clear]')
 
       const attachedFile = () => attachInput?.files?.[0] || undefined
+      const composeTitle = root.querySelector('[data-compose-title]')
+      const composedTitle = () => composeTitle?.value.trim() || undefined
 
       const clearAttachment = () => {
         if (attachInput) attachInput.value = ''
@@ -237,6 +240,10 @@
         const needsImage = selected.has('instagram') && connectedProviders().some(provider => provider.provider === 'instagram')
         composeImageRow?.classList.toggle('hidden', !needsImage)
         composeImageRow?.classList.toggle('flex', needsImage)
+        // Long-form title field appears whenever the blog is a target.
+        const wantsTitle = selected.has('blog') && connectedProviders().some(provider => provider.provider === 'blog')
+        composeTitle?.classList.toggle('hidden', !wantsTitle)
+        composeTitle?.classList.toggle('block', wantsTitle)
         applyMaxLength()
         updateCount()
       }
@@ -526,6 +533,8 @@
         const form = new FormData()
         form.set('text', text)
         form.set('providers', targetProviders.join(','))
+        const queueTitle = composedTitle()
+        if (queueTitle) form.set('title', queueTitle)
         if (scheduleValue) form.set('scheduled_at', toUtcTimestamp(scheduleValue))
 
         buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
@@ -537,6 +546,7 @@
           const textarea = activeTextarea()
           if (textarea) textarea.value = ''
           if (scheduleInput) scheduleInput.value = ''
+          if (composeTitle) composeTitle.value = ''
           scheduleInput?.classList.add('hidden')
           renderLinkPreview(activePost, null)
           updateCount()
@@ -594,7 +604,7 @@
           : undefined
         const imageUrl = composeImage?.value.trim()
         const image = imageUrl ? { url: imageUrl } : undefined
-        return await social.publishCrosspost({ text, providers: targetProviders, external, image, imageFile: attachedFile() })
+        return await social.publishCrosspost({ text, title: composedTitle(), providers: targetProviders, external, image, imageFile: attachedFile() })
       }
 
       const publish = async () => {
@@ -657,6 +667,7 @@
             const thread = targets.map(post => textareaFor(post)?.value.trim() || '')
             collect(await social.publishCrosspost({
               text: thread[0],
+              title: composedTitle(),
               thread,
               providers: targetProviders,
               external,
@@ -684,6 +695,7 @@
           updateCount()
           saveDraft()
           clearAttachment()
+          if (composeTitle) composeTitle.value = ''
           window.postlineToast?.dismiss?.('publish')
           if (failures.length && successCount === 0) {
             setStatus(`Publish failed — ${failures.join('; ')}`, 'error', { title: 'Publish failed' })

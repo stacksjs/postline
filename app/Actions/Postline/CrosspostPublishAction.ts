@@ -11,6 +11,7 @@ export default new Action({
 
   async handle(request: RequestInstance) {
     const text = String(request.get('text') || request.get('body') || '').trim()
+    const title = String(request.get('title') || '').trim() || undefined
 
     const available = new Set<string>(crosspostProviders())
     const providers = String(request.get('providers') || request.get('provider') || '')
@@ -54,7 +55,7 @@ export default new Action({
     catch {}
 
     try {
-      const content = { external, media: media.length ? media : undefined }
+      const content = { title, external, media: media.length ? media : undefined }
       const data = thread.length > 1
         ? await crosspost.publishThread(thread, providers, content)
         : await crosspost.publish(thread[0] || text, providers, content)

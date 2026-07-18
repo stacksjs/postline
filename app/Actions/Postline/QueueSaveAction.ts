@@ -20,9 +20,10 @@ export default new Action({
       .filter(value => available.has(value)) as SocialProvider[]
 
     const scheduledAt = String(request.get('scheduled_at') || '').trim() || null
+    const title = String(request.get('title') || '').trim() || null
 
     try {
-      const data = await postQueue.save({ text, providers, scheduledAt })
+      const data = await postQueue.save({ text, providers, title, scheduledAt })
       return response.json({ ok: true, data })
     }
     catch (error) {

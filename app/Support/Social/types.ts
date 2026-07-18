@@ -52,6 +52,8 @@ export interface PublishedPost {
 
 /** Optional content attached to a post: a link card and/or media. */
 export interface PublishContent {
+  /** Explicit post title — used by long-form targets (blog); ignored by social providers. */
+  title?: string
   external?: {
     uri: string
     title: string
