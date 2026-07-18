@@ -92,7 +92,8 @@
           : item.status === 'published'
             ? `Published · ${formatTime(item.publishedAt || item.createdAt)}`
             : `${item.status[0].toUpperCase()}${item.status.slice(1)} · ${formatTime(item.createdAt)}`
-        const channels = item.providers.map(target => providerLabel(target.provider)).join(', ') || '—'
+        const extras = [item.hasImage ? 'image' : '', item.hasLink ? 'link card' : ''].filter(Boolean).join(' · ')
+        const channels = (item.providers.map(target => providerLabel(target.provider)).join(', ') || '—') + (extras ? ` · ${extras}` : '')
         const failure = item.providers.find(target => target.failureReason)?.failureReason
         const liveUri = item.providers.find(target => target.remoteUri)?.remoteUri
         const liveUrl = liveUrlFor(liveUri)

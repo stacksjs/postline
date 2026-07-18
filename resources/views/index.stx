@@ -536,6 +536,15 @@
         const queueTitle = composedTitle()
         if (queueTitle) form.set('title', queueTitle)
         if (scheduleValue) form.set('scheduled_at', toUtcTimestamp(scheduleValue))
+        if (activePost?.dataset.externalUri && activePost.dataset.externalTitle) {
+          form.set('external_uri', activePost.dataset.externalUri)
+          form.set('external_title', activePost.dataset.externalTitle)
+          form.set('external_description', activePost.dataset.externalDescription || '')
+        }
+        const queueImageUrl = composeImage?.value.trim()
+        if (queueImageUrl) form.set('image_url', queueImageUrl)
+        const queueFile = attachedFile()
+        if (queueFile) form.set('image', queueFile, queueFile.name)
 
         buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
         try {
@@ -548,6 +557,7 @@
           if (scheduleInput) scheduleInput.value = ''
           if (composeTitle) composeTitle.value = ''
           scheduleInput?.classList.add('hidden')
+          clearAttachment()
           renderLinkPreview(activePost, null)
           updateCount()
           updatePublishLabel()

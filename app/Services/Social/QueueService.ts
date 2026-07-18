@@ -1,10 +1,35 @@
-import type { CrosspostTargetResult, SocialProvider } from '../../Support/Social/types'
+import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
+import { mkdir, unlink } from 'node:fs/promises'
+import { join } from 'node:path'
+import process from 'node:process'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { crosspost, crosspostProviders } from './CrosspostService'
 import { ensureAccount, now, uuid } from './support'
 
 const database = db as any
+
+/** Uploaded images for queued posts live here until publish. */
+const MEDIA_DIR = join(process.cwd(), 'storage/app/postline-media')
+
+/** Serialized into posts.content — everything beyond the text itself. */
+interface StoredContent {
+  /** Only set when the composer provided an explicit title. */
+  title?: string
+  external?: { uri: string, title: string, description?: string }
+  media?: Array<{ url?: string, path?: string, mimeType?: string, altText?: string }>
+}
+
+function parseStoredContent(raw: unknown): StoredContent | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(String(raw))
+    return parsed && typeof parsed === 'object' ? parsed as StoredContent : null
+  }
+  catch {
+    return null
+  }
+}
 
 /** Post statuses a user may still act on (publish now, delete). */
 const ACTIONABLE = new Set(['draft', 'scheduled', 'failed'])
@@ -25,6 +50,8 @@ export interface QueueItemView {
   publishedAt: string | null
   createdAt: string
   providers: QueueTargetView[]
+  hasImage: boolean
+  hasLink: boolean
 }
 
 export interface SaveQueueInput {
@@ -34,6 +61,9 @@ export interface SaveQueueInput {
   title?: string | null
   /** UTC `YYYY-MM-DD HH:MM:SS`; omitted → saved as a draft. */
   scheduledAt?: string | null
+  external?: { uri: string, title: string, description?: string } | null
+  /** Attached image: raw bytes (stored to disk until publish) or a URL. */
+  image?: { bytes?: Uint8Array, url?: string, mimeType?: string, altText?: string } | null
 }
 
 export class QueueService {
@@ -67,11 +97,26 @@ export class QueueService {
     const postUuid = uuid()
     const createdAt = now()
 
+    const stored: StoredContent = {}
+    if (input.title?.trim()) stored.title = input.title.trim()
+    if (input.external?.uri && input.external.title) stored.external = input.external
+    if (input.image?.bytes?.length) {
+      const extension = (input.image.mimeType || 'image/jpeg').split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'jpg'
+      const filename = `${postUuid}.${extension}`
+      await mkdir(MEDIA_DIR, { recursive: true })
+      await Bun.write(join(MEDIA_DIR, filename), input.image.bytes)
+      stored.media = [{ path: filename, mimeType: input.image.mimeType, altText: input.image.altText }]
+    }
+    else if (input.image?.url) {
+      stored.media = [{ url: input.image.url, altText: input.image.altText }]
+    }
+
     await database.insertInto('posts').values({
       uuid: postUuid,
       title: input.title?.trim() || body.slice(0, 80),
       body,
       status,
+      content: Object.keys(stored).length ? JSON.stringify(stored) : null,
       scheduled_at: scheduledAt,
       timezone: env.TZ || 'America/Los_Angeles',
       source: 'composer',
@@ -128,6 +173,8 @@ export class QueueService {
       scheduledAt: post.scheduled_at || null,
       publishedAt: post.published_at || null,
       createdAt: String(post.created_at),
+      hasImage: Boolean(parseStoredContent(post.content)?.media?.length),
+      hasLink: Boolean(parseStoredContent(post.content)?.external),
       providers: targets
         .filter((target: any) => Number(target.post_id) === Number(post.id))
         .map((target: any): QueueTargetView => ({
@@ -142,6 +189,7 @@ export class QueueService {
   /** Delete a draft, scheduled, or failed post along with its targets. */
   async remove(id: number): Promise<void> {
     const post = await this.findActionable(id)
+    await this.removeStoredMedia(post)
     await database.deleteFrom('post_targets').where('post_id', '=', post.id).execute()
     await database.deleteFrom('posts').where('id', '=', post.id).execute()
   }
@@ -176,6 +224,7 @@ export class QueueService {
     const results = await crosspost.publishExisting(
       { id: Number(post.id), body: String(post.body) },
       providers,
+      await this.hydrateContent(post),
     )
 
     const anyOk = results.some(result => result.ok)
@@ -186,7 +235,52 @@ export class QueueService {
       updated_at: finishedAt,
     }).where('id', '=', post.id).execute()
 
+    if (anyOk) await this.removeStoredMedia(post)
+
     return { postId: Number(post.id), results }
+  }
+
+  /** Rebuild PublishContent from a queued post's stored content JSON. */
+  private async hydrateContent(post: any): Promise<PublishContent | undefined> {
+    const stored = parseStoredContent(post.content)
+    if (!stored) return undefined
+
+    const content: PublishContent = {}
+    if (stored.title) content.title = stored.title
+    if (stored.external) content.external = stored.external
+
+    if (stored.media?.length) {
+      const media: NonNullable<PublishContent['media']> = []
+      for (const item of stored.media) {
+        if (item.path) {
+          try {
+            const file = Bun.file(join(MEDIA_DIR, item.path))
+            if (await file.exists()) {
+              media.push({
+                bytes: new Uint8Array(await file.arrayBuffer()),
+                mimeType: item.mimeType,
+                altText: item.altText,
+              })
+            }
+          }
+          catch {}
+        }
+        else if (item.url) {
+          media.push({ url: item.url, altText: item.altText })
+        }
+      }
+      if (media.length) content.media = media
+    }
+
+    return Object.keys(content).length ? content : undefined
+  }
+
+  private async removeStoredMedia(post: any): Promise<void> {
+    const stored = parseStoredContent(post.content)
+    for (const item of stored?.media || []) {
+      if (!item.path) continue
+      await unlink(join(MEDIA_DIR, item.path)).catch(() => {})
+    }
   }
 
   /**
