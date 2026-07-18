@@ -16,6 +16,11 @@ export default function () {
     .hourly()
     .setTimeZone('America/Los_Angeles')
 
+  // Publish scheduled Postline posts as they come due
+  schedule
+    .job('PublishScheduledPosts')
+    .everyMinute()
+
   // Run a custom action every five minutes
   // schedule.action('CleanupTempFiles').everyFiveMinutes()
 

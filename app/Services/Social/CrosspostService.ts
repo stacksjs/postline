@@ -67,11 +67,7 @@ export class CrosspostService {
       .where('uuid', '=', postUuid)
       .executeTakeFirstOrThrow()
 
-    const results: CrosspostTargetResult[] = []
-    for (const provider of selected) {
-      const publisher = publishers[provider]!
-      results.push(await publisher.publishToPost({ id: Number(post.id), body }, content))
-    }
+    const results = await this.publishExisting({ id: Number(post.id), body }, selected, content)
 
     const anyOk = results.some(result => result.ok)
     const finishedAt = now()
@@ -82,6 +78,25 @@ export class CrosspostService {
     }).where('id', '=', post.id).execute()
 
     return { postId: Number(post.id), results }
+  }
+
+  /**
+   * Publish an existing `posts` row to the given providers. Used by the
+   * fresh-publish path above and by the queue when a scheduled or drafted
+   * post is (re)published.
+   */
+  async publishExisting(
+    post: { id: number, body: string },
+    providers: SocialProvider[],
+    content?: PublishContent,
+  ): Promise<CrosspostTargetResult[]> {
+    const results: CrosspostTargetResult[] = []
+    for (const provider of providers) {
+      const publisher = publishers[provider]
+      if (!publisher) continue
+      results.push(await publisher.publishToPost({ id: post.id, body: post.body }, content))
+    }
+    return results
   }
 }
 
