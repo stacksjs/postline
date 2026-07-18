@@ -11,6 +11,7 @@
         <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Publishing</h1>
         <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">Defaults for Postline. Bluesky credentials live on Accounts.</p>
       </div>
+      <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-neutral-950 text-sm bg-white hover:bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm transition-colors" type="button" data-sign-out>Sign out</button>
     </header>
 
     <section class="grid gap-3.5 lg:grid-cols-2">
@@ -51,6 +52,11 @@
     ;(() => {
       const root = document.querySelector('[data-testid="settings-page"]')
       if (!root) return
+
+      root.querySelector('[data-sign-out]')?.addEventListener('click', () => {
+        document.cookie = 'auth-token=; path=/; max-age=0; SameSite=Lax'
+        window.location.assign('/login')
+      })
 
       const summary = root.querySelector('[data-settings-bluesky-summary]')
       const pill = root.querySelector('[data-settings-bluesky-pill]')

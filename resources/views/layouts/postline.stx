@@ -8,6 +8,16 @@
     <title>@yield('title', 'Postline')</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <script>
+      // Client-side auth guard: the server gate covers the listed pages,
+      // and this covers `/` (which can't be a protected prefix without
+      // also matching /login). The API rejects unauthenticated calls
+      // regardless — this is UX, not the security boundary.
+      ;(() => {
+        if (!/(?:^|;\s*)auth-token=/.test(document.cookie))
+          window.location.replace('/login')
+      })()
+    </script>
+    <script>
       ;(() => {
         document.documentElement.setAttribute('data-theme', 'light')
         document.documentElement.classList.remove('dark')

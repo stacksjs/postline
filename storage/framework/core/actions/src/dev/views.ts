@@ -143,6 +143,10 @@ async function startDefaultServer() {
     auth: {
       cookieName: authCookie,
       redirectTo: '/login',
+      // Postline pages require a signed-in user; `/` is guarded
+      // client-side in the layout (a '/' prefix here would also match
+      // /login and loop). The public blog stays open.
+      protectedPaths: ['/queue', '/timeline', '/analytics', '/accounts', '/settings'],
     },
     onRequest: async (req: Request) => {
       const url = new URL(req.url)
@@ -175,8 +179,21 @@ async function startDefaultServer() {
       if (url.pathname === '/docs' || url.pathname.startsWith('/docs/'))
         return proxyToBackend(req, docsBase, '/docs')
 
-      if (isApiBoundRequest(req, url.pathname))
+      if (isApiBoundRequest(req, url.pathname)) {
+        // Bridge cookie auth → bearer auth: the page gate stores the token
+        // in the auth cookie, while bun-router's Auth middleware reads the
+        // Authorization header. Inject it so browser fetches stay plain.
+        if (!req.headers.get('authorization')) {
+          const cookieHeader = req.headers.get('cookie') || ''
+          const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${authCookie}=([^;]+)`))
+          if (match) {
+            const headers = new Headers(req.headers)
+            headers.set('authorization', `Bearer ${decodeURIComponent(match[1])}`)
+            return proxyToBackend(new Request(req, { headers }), apiBase)
+          }
+        }
         return proxyToBackend(req, apiBase)
+      }
 
       // Optional `/locale/{code}` redirect (same as default SetLocaleAction).
       // STX i18n normally switches via `/<code>/…` paths from the injected
