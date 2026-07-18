@@ -9,7 +9,7 @@
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Settings</p>
         <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Publishing</h1>
-        <p class="mt-1.5 mb-0 text-[13px] text-zinc-600">Defaults for Postline. Bluesky credentials live on Accounts.</p>
+        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">Defaults for Postline. Bluesky credentials live on Accounts.</p>
       </div>
     </header>
 
@@ -18,12 +18,12 @@
         <header class="flex gap-3 items-center justify-between pb-3 border-b border-zinc-200">
           <div>
             <strong class="text-[13px]">Bluesky connection</strong>
-            <p class="mt-1 mb-0 text-xs text-zinc-500" data-settings-bluesky-summary>Checking…</p>
+            <p class="mb-0 mt-1 text-xs text-zinc-500" data-settings-bluesky-summary>Checking…</p>
           </div>
-          <span class="rounded-full border px-2.5 py-1 text-[11px] font-bold border-zinc-200 text-zinc-500" data-settings-bluesky-pill>—</span>
+          <span class="px-2.5 py-1 font-bold text-[11px] text-zinc-500 border border-zinc-200 rounded-full" data-settings-bluesky-pill>—</span>
         </header>
-        <p class="m-0 text-[13px] leading-relaxed text-slate-700">Postline uses a Bluesky app password (not your main login). You can also set <code class="px-1 py-0.5 text-xs bg-zinc-100 rounded">BLUESKY_IDENTIFIER</code> and <code class="px-1 py-0.5 text-xs bg-zinc-100 rounded">BLUESKY_APP_PASSWORD</code> in <code class="px-1 py-0.5 text-xs bg-zinc-100 rounded">.env</code> for local dev.</p>
-        <a class="inline-flex items-center justify-center px-4 h-9 w-fit font-bold text-sm text-white bg-neutral-950 rounded-xl" href="/accounts" data-stx-link>Manage on Accounts</a>
+        <p class="m-0 leading-relaxed text-[13px] text-slate-700">Postline uses a Bluesky app password (not your main login). You can also set <code class="px-1 py-0.5 text-xs bg-zinc-100 rounded">BLUESKY_IDENTIFIER</code> and <code class="px-1 py-0.5 text-xs bg-zinc-100 rounded">BLUESKY_APP_PASSWORD</code> in <code class="px-1 py-0.5 text-xs bg-zinc-100 rounded">.env</code> for local dev.</p>
+        <a class="inline-flex items-center justify-center px-4 h-9 w-fit font-bold text-sm text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition-colors" href="/accounts" data-stx-link>Manage on Accounts</a>
       </article>
 
       <article class="grid gap-3 p-4 bg-white border border-zinc-200 rounded-2xl shadow-sm">
@@ -41,7 +41,7 @@
         </label>
         <label class="flex gap-4 items-center justify-between text-[13px] text-slate-700">
           <span>Auto-save drafts</span>
-          <span class="text-emerald-700 font-bold">On</span>
+          <span class="font-bold text-emerald-700">On</span>
         </label>
       </article>
     </section>

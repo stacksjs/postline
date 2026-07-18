@@ -4,11 +4,18 @@
 @section('description', 'Write, schedule, publish, and review social posts from a clean personal workspace.')
 
 @section('content')
-  <section class="grid gap-3.5" data-postline-page="composer" data-testid="composer-page">
+  <section class="grid gap-5" data-postline-page="composer" data-testid="composer-page">
     <!-- Crosswind safelist: utilities applied dynamically from the script below
         (provider toggles, active-post highlight, connection summary, char
         counter) must appear in static markup so the CSS scanner emits them. -->
     <div class="hidden text-amber-700 text-emerald-800 text-neutral-950 text-red-700 text-white text-zinc-400 text-zinc-500 text-zinc-600 bg-emerald-400 bg-emerald-50 bg-emerald-500 bg-neutral-950 bg-white bg-zinc-100 bg-zinc-300 bg-zinc-50 hover:bg-white border-blue-300 border-emerald-200 border-neutral-950 border-zinc-200 shadow-sm cursor-not-allowed" aria-hidden="true"></div>
+    <header class="flex gap-4 items-center justify-between min-h-11">
+      <div>
+        <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Composer</p>
+        <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Write a post</h1>
+        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">Draft once, then publish to every connected account.</p>
+      </div>
+    </header>
     <div class="grid">
       <section class="grid content-start grid-rows-[auto_auto_auto] self-start bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Post composer">
         <header class="flex flex-wrap gap-3 items-center justify-between p-3 border-b border-zinc-200">
@@ -20,9 +27,9 @@
             </a>
           </div>
           <div class="grid grid-cols-3 p-0.5 bg-zinc-100 border border-zinc-200 rounded-xl" role="group" aria-label="Post mode">
-            <button class="px-2.5 py-1.5 min-w-19 text-neutral-950 text-xs bg-white rounded-lg shadow-sm" type="button" data-composer-mode="single">Single</button>
-            <button class="px-2.5 py-1.5 min-w-19 text-xs text-zinc-500 rounded-lg" type="button" data-composer-mode="thread">Thread</button>
-            <button class="px-2.5 py-1.5 min-w-19 text-xs text-zinc-500 rounded-lg" type="button" data-composer-mode="draft">Draft</button>
+            <button class="px-2.5 py-1.5 min-w-19 text-neutral-950 text-xs bg-white rounded-lg shadow-sm transition-colors" type="button" data-composer-mode="single">Single</button>
+            <button class="px-2.5 py-1.5 min-w-19 text-xs text-zinc-500 rounded-lg transition-colors" type="button" data-composer-mode="thread">Thread</button>
+            <button class="px-2.5 py-1.5 min-w-19 text-xs text-zinc-500 rounded-lg transition-colors" type="button" data-composer-mode="draft">Draft</button>
           </div>
         </header>
 
@@ -41,7 +48,7 @@
                   <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
                   <span data-post-label>Post 1</span>
                 </button>
-                <button class="hidden items-center justify-center h-7 w-7 text-zinc-500 bg-white border border-zinc-200 rounded-lg shadow-sm" type="button" aria-label="Remove post" title="Remove post" data-remove-post>
+                <button class="hidden items-center justify-center h-7 w-7 text-zinc-500 hover:text-zinc-700 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" type="button" aria-label="Remove post" title="Remove post" data-remove-post>
                   <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
                 </button>
               </header>
@@ -52,15 +59,15 @@
         </div>
 
         <footer class="flex gap-3 items-center justify-between p-3 border-t border-zinc-200">
-          <span class="text-xs text-zinc-500" data-bluesky-count>118 / 300 characters</span>
+          <span class="text-xs text-zinc-500" data-bluesky-count>0 / 300 characters</span>
           <div class="flex gap-2 items-center">
-            <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Add post" title="Add post" data-add-post>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm transition-colors" type="button" aria-label="Add post" title="Add post" data-add-post>
               <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white border border-zinc-200 rounded-xl shadow-sm" type="button" aria-label="Preview post" title="Preview post" data-preview-post>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-neutral-950 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm transition-colors" type="button" aria-label="Preview post" title="Preview post" data-preview-post>
               <span class="h-4 w-4 i-hugeicons-view" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-white bg-neutral-950 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed" type="button" data-bluesky-publish>
+            <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" data-bluesky-publish>
               <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
               <span data-bluesky-publish-label>Publish</span>
             </button>
@@ -251,7 +258,7 @@
             <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
             <span data-post-label>Post ${number}</span>
           </button>
-          <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500 bg-white border border-zinc-200 rounded-lg shadow-sm" type="button" aria-label="Remove post" title="Remove post" data-remove-post>
+          <button class="inline-flex items-center justify-center h-7 w-7 text-zinc-500 hover:text-zinc-700 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" type="button" aria-label="Remove post" title="Remove post" data-remove-post>
             <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
           </button>
         </header>

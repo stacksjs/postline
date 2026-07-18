@@ -18,7 +18,15 @@ const channelSplits = [
 </script>
 
 @section('content')
-  <section class="grid gap-3.5" data-postline-page="analytics" data-testid="analytics-page">
+  <section class="grid gap-5" data-postline-page="analytics" data-testid="analytics-page">
+    <header class="flex gap-4 items-center justify-between min-h-11">
+      <div>
+        <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Analytics</p>
+        <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Publishing insights</h1>
+        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">How your posts performed across channels over the last 30 days.</p>
+      </div>
+    </header>
+
     <div class="grid gap-3.5 lg:grid-cols-3">
       @foreach (stats as stat)
         <article class="grid gap-2 p-3.5 bg-white border border-zinc-200 rounded-2xl shadow-sm">
@@ -33,13 +41,10 @@ const channelSplits = [
       <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
         <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
           <strong class="text-[13px]">Response trend</strong>
-          <button class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-bold text-xs text-white bg-neutral-950 rounded-lg" type="button">
-            <span class="h-3.5 w-3.5 i-hugeicons-download-04" aria-hidden="true"></span>
-            <span>Export</span>
-          </button>
+          <span class="text-xs text-zinc-500">Last 30 days</span>
         </header>
         <div class="p-3.5">
-          <svg class="block w-full h-auto" viewBox="0 0 640 280" role="img" aria-label="Postline response trend chart" data-analytics-chart>
+          <svg class="block h-auto w-full" viewBox="0 0 640 280" role="img" aria-label="Postline response trend chart" data-analytics-chart>
             <desc>Responses over the last 30 days with publishing dates on the x axis and response counts on the y axis.</desc>
             <rect x="0" y="0" width="640" height="280" rx="16" fill="#fafafa"></rect>
             <g data-chart-legend></g>
@@ -68,7 +73,7 @@ const channelSplits = [
                   <span class="font-bold">{{ channel.label }}</span>
                   <span class="text-zinc-500">{{ channel.value }}</span>
                 </div>
-                <div class="h-2 overflow-hidden bg-zinc-100 rounded-full">
+                <div class="overflow-hidden h-2 bg-zinc-100 rounded-full">
                   <div class="h-full bg-blue-600 rounded-full" style="width: {{ channel.width }}"></div>
                 </div>
               </div>

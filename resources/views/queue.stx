@@ -4,6 +4,12 @@
 @section('description', 'Review scheduled and drafted social posts in Postline.')
 
 <script server>
+const statusStyles = {
+  Ready: 'text-emerald-700 bg-emerald-50 border border-emerald-200',
+  Draft: 'text-amber-800 bg-amber-50 border border-amber-200',
+  Planned: 'text-zinc-600 bg-zinc-100 border border-zinc-200',
+}
+
 const scheduledPosts = [
   {
     time: 'Today 3:30 PM',
@@ -26,24 +32,29 @@ const scheduledPosts = [
     text: 'Cross-posting should feel intentional, not like copy/paste chores across six tabs.',
     note: 'Driver support planned after Bluesky settles.',
   },
-]
+].map(post => ({ ...post, statusClass: statusStyles[post.status] || statusStyles.Planned }))
 </script>
 
 @section('content')
-  <section class="grid gap-3.5" data-postline-page="queue" data-testid="queue-page">
+  <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
+    <!-- Crosswind safelist: status pill classes come from server data. -->
+    <div class="hidden text-amber-800 text-emerald-700 text-zinc-600 bg-amber-50 bg-emerald-50 bg-zinc-100 border-amber-200 border-emerald-200 border-zinc-200" aria-hidden="true"></div>
+    <header class="flex gap-4 items-center justify-between min-h-11">
+      <div>
+        <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Queue</p>
+        <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Scheduled posts</h1>
+        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">What's drafted, planned, and ready to publish next.</p>
+      </div>
+      <a href="/" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-sm text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition-colors">
+        <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
+        <span>New post</span>
+      </a>
+    </header>
+
     <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
       <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
-        <strong class="text-[13px]">Queue</strong>
-        <div class="flex gap-2 items-center">
-          <a href="/" data-stx-link class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-bold text-xs text-neutral-950 bg-white border border-zinc-200 rounded-lg shadow-sm">
-            <span class="h-3.5 w-3.5 i-hugeicons-plus-sign" aria-hidden="true"></span>
-            <span>New</span>
-          </a>
-          <button class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-bold text-xs text-white bg-neutral-950 rounded-lg" type="button">
-            <span class="h-3.5 w-3.5 i-hugeicons-magic-wand-01" aria-hidden="true"></span>
-            <span>Optimize</span>
-          </button>
-        </div>
+        <strong class="text-[13px]">Upcoming</strong>
+        <span class="text-xs text-zinc-500">{{ scheduledPosts.length }} posts</span>
       </header>
       <div class="grid gap-2.5 p-3">
         @foreach (scheduledPosts as post)
@@ -53,12 +64,11 @@ const scheduledPosts = [
                 <span class="font-bold text-xs">{{ post.time }}</span>
                 <span class="text-xs text-zinc-500">{{ post.channel }}</span>
               </div>
-              <span class="px-2 py-1 font-bold text-[11px] text-blue-700 bg-blue-50 rounded-full">{{ post.status }}</span>
+              <span class="px-2 py-1 font-bold text-[11px] rounded-full {{ post.statusClass }}">{{ post.status }}</span>
             </header>
             <p class="m-0 leading-normal text-[13px] text-slate-700">{{ post.text }}</p>
             <footer class="flex items-center justify-between text-xs text-zinc-500">
               <span>{{ post.note }}</span>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-neutral-950 bg-white border border-zinc-200 rounded-lg shadow-sm" type="button">Edit</button>
             </footer>
           </article>
         @endforeach
