@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { BlueskyPublishingDriver, detectFacetCandidates } from '../../storage/framework/core/socials/src/drivers/bluesky'
+import { BlueskyPublishingDriver, detectFacetCandidates } from '../../app/Services/Social/Drivers/BlueskyDriver'
 
 const realFetch = globalThis.fetch
 
