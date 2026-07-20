@@ -1,5 +1,6 @@
-# preload these modules before running bun
-preload = [ "./storage/framework/defaults/resources/plugins/preloader.ts" ]
+# preload these modules before running bun.
+# Local preloader (framework is a node_modules dependency now).
+preload = [ "./resources/plugins/preloader.ts" ]
 
 [test]
 preload = [ "./tests/setup.ts" ]

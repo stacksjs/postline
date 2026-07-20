@@ -22,6 +22,14 @@ export default defineModel({
     useAuth: {
       usePasskey: true,
     },
+    // Not every app bills through the User model — leave `billable`
+    // off by default here. An app that wants checkout()/
+    // createStripeUser()/activeSubscription() etc. (createBillableMethods
+    // in orm/define-model.ts) should `buddy publish:model User` and
+    // enable the trait on its own app/Models/User.ts override, alongside
+    // the matching users.stripe_id guarantee-ALTER already provided by
+    // ensureUsersAuthColumns() regardless of this flag.
+    billable: false,
     useUuid: true,
     useTimestamps: true, // defaults to true, `timestampable` used as an alias
     useSocials: ['github'],
