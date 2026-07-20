@@ -18,6 +18,31 @@
       })()
     </script>
     <script>
+      // Cookie → bearer bridge. bun-router's Auth middleware reads the
+      // Authorization header, but the page gate stores the token in the
+      // auth-token cookie. Attach it to same-origin /api/ fetches so every
+      // page script's plain fetch() authenticates without per-call plumbing.
+      // (Previously done in the framework dev proxy; re-homed to app code
+      // now that the framework is a node_modules dependency.)
+      ;(() => {
+        const nativeFetch = window.fetch.bind(window)
+        const readToken = () => document.cookie.match(/(?:^|;\s*)auth-token=([^;]+)/)?.[1]
+        window.fetch = (input, init = {}) => {
+          try {
+            const url = typeof input === 'string' ? input : input?.url || ''
+            const sameOriginApi = url.startsWith('/api/') || url.startsWith(`${window.location.origin}/api/`)
+            const token = readToken()
+            if (sameOriginApi && token) {
+              const headers = new Headers(init.headers || (typeof input !== 'string' ? input.headers : undefined))
+              if (!headers.has('authorization')) headers.set('authorization', `Bearer ${decodeURIComponent(token)}`)
+              return nativeFetch(input, { ...init, headers })
+            }
+          } catch {}
+          return nativeFetch(input, init)
+        }
+      })()
+    </script>
+    <script>
       ;(() => {
         document.documentElement.setAttribute('data-theme', 'light')
         document.documentElement.classList.remove('dark')

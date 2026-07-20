@@ -1,9 +1,0 @@
-@extends('layouts/default')
-
-@section('content')
-@title('Dashboard - Deployments')
-<DeploymentList />
-
-<!-- <ActivityFeed /> -->
-
-@endsection
