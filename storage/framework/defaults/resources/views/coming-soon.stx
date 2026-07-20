@@ -1,9 +1,0 @@
-<script>
-defineOptions({
-  name: 'ComingSoonPage',
-})
-</script>
-
-<main>
-  <ComingSoon />
-</main>
