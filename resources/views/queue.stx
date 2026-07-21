@@ -112,6 +112,7 @@
             ${failure ? `<p class="m-0 text-red-700 text-xs">${escapeHtml(failure)}</p>` : ''}
             <footer class="flex gap-2 items-center justify-end">
               ${liveUrl ? `<a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-neutral-950 text-xs bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" href="${escapeHtml(liveUrl)}" target="_blank" rel="noopener noreferrer">View</a>` : ''}
+              ${actionable ? `<a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-neutral-950 text-xs bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" href="/?edit=${item.id}" data-stx-link>Edit</a>` : ''}
               ${actionable ? `<button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-white text-xs bg-neutral-950 hover:bg-neutral-800 rounded-lg transition-colors" type="button" data-queue-publish="${item.id}">Publish now</button>` : ''}
               ${actionable ? `<button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-red-700 text-xs bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" type="button" data-queue-delete="${item.id}">Delete</button>` : ''}
             </footer>

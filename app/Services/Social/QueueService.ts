@@ -66,6 +66,23 @@ export interface SaveQueueInput {
   image?: { bytes?: Uint8Array, url?: string, mimeType?: string, altText?: string } | null
 }
 
+/** Edit input. `image`: undefined = keep, null = remove, object = replace. */
+export interface UpdateQueueInput extends Omit<SaveQueueInput, 'image'> {
+  image?: { bytes?: Uint8Array, url?: string, mimeType?: string, altText?: string } | null
+}
+
+/** Editable snapshot of a queued post for prefilling the composer. */
+export interface QueueEditView {
+  id: number
+  text: string
+  title: string | null
+  status: string
+  scheduledAt: string | null
+  providers: SocialProvider[]
+  external: { uri: string, title: string, description?: string } | null
+  image: { kind: 'file' | 'url', url: string | null } | null
+}
+
 export class QueueService {
   /**
    * Persist a post without publishing it. With `scheduledAt` the post is
@@ -192,6 +209,110 @@ export class QueueService {
     await this.removeStoredMedia(post)
     await database.deleteFrom('post_targets').where('post_id', '=', post.id).execute()
     await database.deleteFrom('posts').where('id', '=', post.id).execute()
+  }
+
+  /**
+   * Full editable state for one draft/scheduled/failed post, for prefilling
+   * the composer. Media is described (present/kind), not returned as bytes —
+   * the composer keeps the existing image unless the user replaces/removes it.
+   */
+  async get(id: number): Promise<QueueEditView> {
+    const post = await this.findActionable(id)
+    const stored = parseStoredContent(post.content)
+    const targets = await database
+      .selectFrom('post_targets')
+      .select(['provider'])
+      .where('post_id', '=', post.id)
+      .execute()
+
+    const media = stored?.media?.[0]
+    return {
+      id: Number(post.id),
+      text: String(post.body || ''),
+      title: stored?.title || null,
+      status: String(post.status),
+      scheduledAt: post.scheduled_at || null,
+      providers: [...new Set(targets.map((t: any) => t.provider))] as SocialProvider[],
+      external: stored?.external || null,
+      image: media ? { kind: media.path ? 'file' : 'url', url: media.url || null } : null,
+    }
+  }
+
+  /**
+   * Update a draft/scheduled/failed post in place: text, title, providers,
+   * schedule, link card, and image. `image` semantics — undefined keeps the
+   * existing media, null removes it, an object replaces it. Placeholder
+   * targets are rebuilt to match the new provider set.
+   */
+  async update(id: number, input: UpdateQueueInput): Promise<{ postId: number, status: 'draft' | 'scheduled' }> {
+    const post = await this.findActionable(id)
+
+    const body = input.text.trim()
+    if (!body)
+      throw new Error('Post text is required.')
+
+    const available = new Set<string>(crosspostProviders())
+    const providers = input.providers.filter(provider => available.has(provider))
+    if (providers.length === 0)
+      throw new Error('Select at least one connected provider.')
+
+    const scheduledAt = input.scheduledAt?.trim() || null
+    if (scheduledAt) {
+      if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(scheduledAt))
+        throw new Error('Scheduled time must be a UTC YYYY-MM-DD HH:MM:SS timestamp.')
+      if (scheduledAt <= now())
+        throw new Error('Scheduled time must be in the future.')
+    }
+
+    const status = scheduledAt ? 'scheduled' as const : 'draft' as const
+    const existing = parseStoredContent(post.content)
+    const stored: StoredContent = {}
+    if (input.title?.trim()) stored.title = input.title.trim()
+    if (input.external?.uri && input.external.title) stored.external = input.external
+
+    // Media: replace / remove / keep. Replacing or removing drops the old file.
+    if (input.image === null || input.image?.bytes?.length || input.image?.url) {
+      await this.removeStoredMedia(post)
+    }
+    if (input.image?.bytes?.length) {
+      const extension = (input.image.mimeType || 'image/jpeg').split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'jpg'
+      const filename = `${post.uuid}-${uuid().slice(0, 8)}.${extension}`
+      await mkdir(MEDIA_DIR, { recursive: true })
+      await Bun.write(join(MEDIA_DIR, filename), input.image.bytes)
+      stored.media = [{ path: filename, mimeType: input.image.mimeType, altText: input.image.altText }]
+    }
+    else if (input.image?.url) {
+      stored.media = [{ url: input.image.url, altText: input.image.altText }]
+    }
+    else if (input.image === undefined && existing?.media?.length) {
+      stored.media = existing.media
+    }
+
+    const updatedAt = now()
+    await database.updateTable('posts').set({
+      title: input.title?.trim() || body.slice(0, 80),
+      body,
+      status,
+      content: Object.keys(stored).length ? JSON.stringify(stored) : null,
+      scheduled_at: scheduledAt,
+      updated_at: updatedAt,
+    }).where('id', '=', post.id).execute()
+
+    // Rebuild placeholder targets to match the new provider set.
+    await database.deleteFrom('post_targets').where('post_id', '=', post.id).execute()
+    for (const provider of providers) {
+      await database.insertInto('post_targets').values({
+        uuid: uuid(),
+        provider,
+        status,
+        scheduled_at: scheduledAt,
+        post_id: post.id,
+        created_at: updatedAt,
+        updated_at: updatedAt,
+      }).execute()
+    }
+
+    return { postId: Number(post.id), status }
   }
 
   /** Publish a draft/scheduled/failed post immediately. */
