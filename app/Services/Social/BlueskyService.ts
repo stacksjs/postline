@@ -1,6 +1,7 @@
 import type { BlueskySession, CrosspostTargetResult, PublishContent, PublishedPost, TimelineResult } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import { describeBlueskyError } from '../../Support/Social/bluesky-errors'
 import { BlueskyApiError, BlueskyDriver } from './Drivers/BlueskyDriver'
 
 const database = db as any
@@ -261,7 +262,7 @@ export class BlueskyService {
       }
     }
     catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = describeBlueskyError(error)
       const failedAt = now()
       await database.updateTable('post_targets').set({
         status: 'failed',
@@ -388,9 +389,21 @@ export class BlueskyService {
         throw error
       }
 
-      const session = await this.driver.refreshSession(identity.refresh_token)
-      const driver = await this.ensureDriver()
-      const refreshed = await this.saveSession(session, driver)
+      // Access JWT expired — refresh once and retry. If the refresh token is
+      // also dead, mark the identity expired so /accounts prompts a reconnect.
+      let refreshed: SocialIdentityRow
+      try {
+        const session = await this.driver.refreshSession(identity.refresh_token)
+        const driver = await this.ensureDriver()
+        refreshed = await this.saveSession(session, driver)
+      }
+      catch {
+        await database.updateTable('social_identities')
+          .set({ auth_status: 'expired', updated_at: now() })
+          .where('id', '=', identity.id)
+          .execute()
+        throw new Error('Bluesky session expired — reconnect your account on the Accounts page.')
+      }
       return await callback(refreshed)
     }
   }
