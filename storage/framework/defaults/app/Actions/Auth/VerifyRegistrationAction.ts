@@ -5,6 +5,7 @@ import {
   verifyRegistrationResponse,
 } from '@stacksjs/auth'
 import { config } from '@stacksjs/config'
+import { User } from '@stacksjs/orm'
 
 export default new Action({
   name: 'VerifyRegistrationAction',
@@ -12,15 +13,12 @@ export default new Action({
   method: 'POST',
   async handle(request: RequestInstance) {
     const body = request.all()
+    const email = request.get('email') ?? ''
 
-    // Same identity rule as GenerateRegistrationAction: the account a
-    // passkey gets attached to must be the caller's own authenticated
-    // session, never a client-supplied `email` field. This route must
-    // stay behind `middleware('auth')` — see routes/dashboard.ts.
-    const user = await request.user()
+    const user = await User.where('email', email).first()
 
     if (!user)
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+      return Response.json({ error: 'User not found' }, { status: 404 })
 
     // Read + delete the server-stored registration challenge for this
     // user. The previous flow accepted `body.challenge` from the

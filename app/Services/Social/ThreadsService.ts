@@ -200,11 +200,7 @@ export class ThreadsService {
         accessToken: identity.access_token || undefined,
       }, {
         text: post.body,
-        // Threads only accepts URL media; drop any bytes-only entries from
-        // the shared PublishContent.
-        media: content?.media
-          ?.filter((item): item is { url: string, altText?: string } => Boolean(item.url))
-          .map(item => ({ url: item.url, altText: item.altText })),
+        media: content?.media,
       })
 
       await database.updateTable('post_targets').set({
