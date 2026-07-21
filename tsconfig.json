@@ -1,22 +1,7 @@
 {
-  // Self-contained: the framework is a node_modules dependency now, not a
-  // vendored storage/framework/core to extend. @stacksjs/* resolve from
-  // node_modules (they ship .d.ts); skipLibCheck keeps typecheck on this app's
-  // own code rather than the framework's shipped declarations.
+  "extends": "./storage/framework/core/tsconfig.json",
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "types": ["bun"],
-    "jsx": "preserve",
-    "strict": true,
-    "noEmit": true,
-    "allowJs": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
-    "allowImportingTsExtensions": true,
+    "lib": ["esnext", "dom"],
     "paths": {
       "Actions/*": ["./app/Actions/*"],
       "Commands/*": ["./app/Commands/*"],

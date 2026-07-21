@@ -19,8 +19,8 @@
     "url": "https://github.com/stacksjs/stacks/issues"
   },
   "scripts": {
-    "build:reset": "rm -rf node_modules pantry.lock && pantry install && ./buddy generate:model-files && ./buddy lint:fix",
-    "buddy": "./buddy",
+    "build:reset": "rm -rf node_modules pantry.lock && pantry install && ./buddy generate:model-files && ./buddy lint:fix && cd storage/framework && bun run build && cd ../../",
+    "buddy": "bun ./storage/framework/core/buddy/src/cli.ts",
     "stacks": "./buddy",
     "setup": "./bootstrap",
     "fresh": "./buddy fresh",
@@ -69,19 +69,24 @@
     "sqlite": "^3.47.2"
   },
   "dependencies": {
-    "@stacksjs/bun-queue": "^0.1.2",
     "@stacksjs/bun-router": "^0.0.16",
     "craft-native": "^0.0.37",
-    "stacks": "^0.70.145"
+    "stacks": "workspace:*"
   },
   "devDependencies": {
     "@iconify-json/hugeicons": "^1.2.27",
     "@stacksjs/dtsx": "^0.9.23",
-    "@stacksjs/stx": "^0.2.82",
     "better-dx": "^0.2.12",
-    "bun-plugin-dtsx": "^0.9.23",
-    "bun-plugin-stx": "^0.2.82"
+    "bun-plugin-dtsx": "^0.9.23"
   },
+  "workspaces": [
+    "storage/framework",
+    "storage/framework/libs/*",
+    "storage/framework/views/*",
+    "storage/framework/core",
+    "storage/framework/core/*",
+    "storage/framework/core/bun-create/*"
+  ],
   "git-hooks": {
     "pre-commit": {
       "staged-lint": {
