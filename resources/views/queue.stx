@@ -5,38 +5,69 @@
 
 @section('content')
   <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
-    <!-- Crosswind safelist: status pill + action classes are set from JS. -->
-    <div class="hidden text-amber-800 text-blue-700 text-emerald-700 text-red-700 text-zinc-600 bg-amber-50 bg-blue-50 bg-emerald-50 bg-red-50 bg-zinc-100 hover:bg-neutral-800 hover:bg-zinc-50 border-amber-200 border-blue-200 border-emerald-200 border-red-200 border-zinc-200 transition-colors" aria-hidden="true"></div>
-    <header class="flex gap-4 items-center justify-between min-h-11">
+    <!-- Crosswind safelist: status pill + action + calendar classes are set from JS. -->
+    <div class="hidden text-amber-800 text-blue-700 text-emerald-700 text-red-700 text-zinc-500 text-zinc-600 bg-amber-50 bg-blue-50 bg-blue-500 bg-emerald-50 bg-emerald-500 bg-red-50 bg-red-500 bg-zinc-100 bg-zinc-400 bg-zinc-50 hover:bg-neutral-800 hover:bg-zinc-100 hover:bg-zinc-50 border-amber-200 border-blue-200 border-emerald-200 border-red-200 border-zinc-100 border-zinc-200 shadow-sm transition-colors" aria-hidden="true"></div>
+    <header class="flex flex-wrap gap-4 items-center justify-between min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Queue</p>
         <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Scheduled posts</h1>
         <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">What's drafted, scheduled, and recently published.</p>
       </div>
-      <a href="/" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-sm text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition-colors">
-        <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
-        <span>New post</span>
-      </a>
+      <div class="flex flex-wrap gap-2 items-center">
+        <div class="grid grid-cols-2 p-0.5 bg-zinc-100 border border-zinc-200 rounded-xl" role="group" aria-label="Queue view">
+          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-bold text-xs rounded-lg transition-colors" type="button" data-view-toggle="list">
+            <span class="h-3.5 w-3.5 i-hugeicons-menu-01" aria-hidden="true"></span><span>List</span>
+          </button>
+          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-bold text-xs rounded-lg transition-colors" type="button" data-view-toggle="calendar">
+            <span class="h-3.5 w-3.5 i-hugeicons-calendar-03" aria-hidden="true"></span><span>Calendar</span>
+          </button>
+        </div>
+        <a href="/" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-sm text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition-colors">
+          <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
+          <span>New post</span>
+        </a>
+      </div>
     </header>
 
-    <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
-      <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
-        <strong class="text-[13px]">Upcoming &amp; drafts</strong>
-        <span class="text-xs text-zinc-500" data-queue-meta>Loading…</span>
-      </header>
-      <div class="grid gap-2.5 p-3" data-queue-pending>
-        <p class="m-0 p-3 text-[13px] text-zinc-500" data-queue-pending-empty>Loading queue…</p>
-      </div>
-    </section>
+    <div class="grid gap-5" data-view-panel="list">
+      <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
+        <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
+          <strong class="text-[13px]">Upcoming &amp; drafts</strong>
+          <span class="text-xs text-zinc-500" data-queue-meta>Loading…</span>
+        </header>
+        <div class="grid gap-2.5 p-3" data-queue-pending>
+          <p class="m-0 p-3 text-[13px] text-zinc-500" data-queue-pending-empty>Loading queue…</p>
+        </div>
+      </section>
 
-    <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
+      <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
+        <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
+          <strong class="text-[13px]">Recent</strong>
+          <span class="text-xs text-zinc-500" data-queue-recent-meta></span>
+        </header>
+        <div class="grid gap-2.5 p-3" data-queue-recent>
+          <p class="m-0 p-3 text-[13px] text-zinc-500" data-queue-recent-empty>Loading…</p>
+        </div>
+      </section>
+    </div>
+
+    <section class="hidden bg-white border border-zinc-200 rounded-2xl shadow-sm" data-view-panel="calendar">
       <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
-        <strong class="text-[13px]">Recent</strong>
-        <span class="text-xs text-zinc-500" data-queue-recent-meta></span>
+        <div class="flex gap-2 items-center">
+          <button class="inline-flex items-center justify-center h-8 w-8 text-zinc-600 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" type="button" aria-label="Previous month" data-cal-prev>
+            <span class="h-4 w-4 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
+          </button>
+          <button class="inline-flex items-center justify-center px-3 h-8 font-bold text-neutral-950 text-xs bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" type="button" data-cal-today>Today</button>
+          <button class="inline-flex items-center justify-center h-8 w-8 text-zinc-600 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" type="button" aria-label="Next month" data-cal-next>
+            <span class="h-4 w-4 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
+          </button>
+        </div>
+        <strong class="text-[13px]" data-cal-title>—</strong>
       </header>
-      <div class="grid gap-2.5 p-3" data-queue-recent>
-        <p class="m-0 p-3 text-[13px] text-zinc-500" data-queue-recent-empty>Loading…</p>
+      <div class="grid grid-cols-7 font-bold text-[11px] text-zinc-500 border-b border-zinc-200">
+        <div class="p-2 text-center">Sun</div><div class="p-2 text-center">Mon</div><div class="p-2 text-center">Tue</div><div class="p-2 text-center">Wed</div><div class="p-2 text-center">Thu</div><div class="p-2 text-center">Fri</div><div class="p-2 text-center">Sat</div>
       </div>
+      <div class="grid grid-cols-7" data-cal-grid></div>
     </section>
   </section>
 
@@ -140,7 +171,108 @@
           meta.textContent = `${scheduled} scheduled · ${drafts} draft${drafts === 1 ? '' : 's'}`
         }
         if (recentMeta) recentMeta.textContent = `${recent.length} post${recent.length === 1 ? '' : 's'}`
+
+        cachedItems = items
+        renderCalendar()
       }
+
+      // ---- Calendar view ----
+      const calGrid = root.querySelector('[data-cal-grid]')
+      const calTitle = root.querySelector('[data-cal-title]')
+      let cachedItems = []
+      let calMonth = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })()
+
+      const dotClass = (status) => {
+        if (status === 'published') return 'bg-emerald-500'
+        if (status === 'failed') return 'bg-red-500'
+        if (status === 'scheduled') return 'bg-blue-500'
+        return 'bg-zinc-400'
+      }
+
+      // Local Y-M-D key for a post's effective calendar date.
+      const dayKey = (item) => {
+        const raw = item.scheduledAt || item.publishedAt
+        if (!raw) return null
+        const d = new Date(`${raw.replace(' ', 'T')}Z`)
+        if (Number.isNaN(d.getTime())) return null
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      }
+      const timeOf = (item) => {
+        const raw = item.scheduledAt || item.publishedAt
+        const d = new Date(`${raw.replace(' ', 'T')}Z`)
+        return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+      }
+
+      const renderCalendar = () => {
+        if (!calGrid) return
+        const year = calMonth.getFullYear()
+        const month = calMonth.getMonth()
+        if (calTitle) calTitle.textContent = calMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+
+        // Only dated posts (scheduled or published) land on the calendar.
+        const byDay = new Map()
+        for (const item of cachedItems) {
+          const key = dayKey(item)
+          if (!key) continue
+          if (!byDay.has(key)) byDay.set(key, [])
+          byDay.get(key).push(item)
+        }
+
+        const first = new Date(year, month, 1)
+        const startOffset = first.getDay()
+        const daysInMonth = new Date(year, month + 1, 0).getDate()
+        const todayKey = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })()
+        const cells = []
+
+        // Leading blanks from the previous month.
+        for (let i = 0; i < startOffset; i++) cells.push('<div class="p-1.5 min-h-24 bg-zinc-50/40 border-b border-r border-zinc-100"></div>')
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+          const dayItems = (byDay.get(key) || []).sort((a, b) => (a.scheduledAt || a.publishedAt).localeCompare(b.scheduledAt || b.publishedAt))
+          const isToday = key === todayKey
+          const chips = dayItems.slice(0, 3).map((item) => {
+            const label = escapeHtml((item.title || item.body || '').slice(0, 22) || 'post')
+            const href = ['draft', 'scheduled', 'failed'].includes(item.status) ? `/?edit=${item.id}` : null
+            const inner = `<span class="h-1.5 w-1.5 shrink-0 rounded-full ${dotClass(item.status)}"></span><span class="truncate">${escapeHtml(timeOf(item))} ${label}</span>`
+            return href
+              ? `<a class="flex gap-1 items-center px-1 py-0.5 text-[10px] text-zinc-700 bg-zinc-50 hover:bg-zinc-100 rounded transition-colors" href="${href}" data-stx-link>${inner}</a>`
+              : `<span class="flex gap-1 items-center px-1 py-0.5 text-[10px] text-zinc-500 bg-zinc-50 rounded">${inner}</span>`
+          }).join('')
+          const more = dayItems.length > 3 ? `<span class="px-1 text-[10px] text-zinc-400">+${dayItems.length - 3} more</span>` : ''
+          cells.push(`
+            <div class="min-h-24 p-1.5 grid content-start gap-1 border-b border-r border-zinc-100 ${isToday ? 'bg-blue-50/50' : 'bg-white'}">
+              <a class="text-[11px] font-bold ${isToday ? 'text-blue-700' : 'text-zinc-500'} hover:text-neutral-950 transition-colors" href="/?schedule=${key}" data-stx-link title="Schedule a post on this day">${day}</a>
+              ${chips}${more}
+            </div>
+          `)
+        }
+        // Trailing blanks to complete the last week row.
+        while (cells.length % 7 !== 0) cells.push('<div class="p-1.5 min-h-24 bg-zinc-50/40 border-b border-r border-zinc-100"></div>')
+        calGrid.innerHTML = cells.join('')
+      }
+
+      // ---- View toggle (persisted) ----
+      const viewToggles = Array.from(root.querySelectorAll('[data-view-toggle]'))
+      const panels = { list: root.querySelector('[data-view-panel="list"]'), calendar: root.querySelector('[data-view-panel="calendar"]') }
+      const setView = (view) => {
+        const next = view === 'calendar' ? 'calendar' : 'list'
+        panels.list?.classList.toggle('hidden', next !== 'list')
+        panels.calendar?.classList.toggle('hidden', next !== 'calendar')
+        viewToggles.forEach((button) => {
+          const active = button.dataset.viewToggle === next
+          button.classList.toggle('bg-white', active)
+          button.classList.toggle('text-neutral-950', active)
+          button.classList.toggle('shadow-sm', active)
+          button.classList.toggle('text-zinc-500', !active)
+        })
+        try { localStorage.setItem('postline.queue.view', next) } catch {}
+        if (next === 'calendar') renderCalendar()
+      }
+      viewToggles.forEach(button => button.addEventListener('click', () => setView(button.dataset.viewToggle)))
+      root.querySelector('[data-cal-prev]')?.addEventListener('click', () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1); renderCalendar() })
+      root.querySelector('[data-cal-next]')?.addEventListener('click', () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1); renderCalendar() })
+      root.querySelector('[data-cal-today]')?.addEventListener('click', () => { const d = new Date(); calMonth = new Date(d.getFullYear(), d.getMonth(), 1); renderCalendar() })
 
       const refresh = async () => {
         try {
@@ -198,6 +330,7 @@
         }
       })
 
+      try { setView(localStorage.getItem('postline.queue.view') || 'list') } catch { setView('list') }
       void refresh()
     })()
   </script>
