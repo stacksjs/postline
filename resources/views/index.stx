@@ -18,9 +18,13 @@
     </header>
     <div class="grid">
       <section class="grid content-start grid-rows-[auto_auto_auto] self-start bg-white border border-zinc-200 rounded-2xl shadow-sm" aria-label="Post composer">
+        <div class="hidden flex-wrap gap-3 items-center justify-between px-3 py-2 text-xs bg-blue-50 border-b border-blue-200" data-edit-banner>
+          <span class="font-bold text-blue-800">Editing a queued post</span>
+          <a class="inline-flex items-center px-2.5 min-h-6 font-bold text-blue-800 bg-white hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors" href="/" data-stx-link>Cancel</a>
+        </div>
         <header class="flex flex-wrap gap-3 items-center justify-between p-3 border-b border-zinc-200">
           <div class="flex gap-2 items-center">
-            <strong class="text-[13px]">New post</strong>
+            <strong class="text-[13px]" data-composer-heading>New post</strong>
             <a class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-bold text-xs text-zinc-600 bg-zinc-50 hover:bg-white border border-zinc-200 rounded-lg transition-colors" href="/accounts" data-stx-link data-bluesky-connection data-no-window-drag>
               <span class="h-2 w-2 bg-zinc-300 rounded-full" data-bluesky-connection-dot aria-hidden="true"></span>
               <span data-bluesky-connection-label>Checking accounts…</span>
@@ -149,6 +153,13 @@
       let canPublish = false
       let providers = []
       const selected = new Set()
+
+      // Edit mode: /?edit=<id> loads a queued post into the composer.
+      const editBanner = root.querySelector('[data-edit-banner]')
+      const composerHeading = root.querySelector('[data-composer-heading]')
+      let editingId = null
+      let editHadImage = false
+      let editRemoveImage = false
 
       const setStatus = (message, tone = 'neutral', options = {}) => {
         if (toast) {
@@ -500,9 +511,120 @@
 
       const updatePublishLabel = () => {
         if (!publishLabel) return
-        if (activeMode === 'draft') publishLabel.textContent = 'Save draft'
+        if (editingId) publishLabel.textContent = scheduleInput?.value ? 'Update schedule' : 'Update post'
+        else if (activeMode === 'draft') publishLabel.textContent = 'Save draft'
         else if (scheduleInput?.value) publishLabel.textContent = 'Schedule'
         else publishLabel.textContent = 'Publish'
+      }
+
+      // Convert a UTC "YYYY-MM-DD HH:MM:SS" to the datetime-local input value.
+      const utcToLocalInput = (utc) => {
+        const date = new Date(`${utc.replace(' ', 'T')}Z`)
+        if (Number.isNaN(date.getTime())) return ''
+        return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+      }
+
+      const enterEditMode = (item) => {
+        editingId = item.id
+        editBanner?.classList.remove('hidden')
+        editBanner?.classList.add('flex')
+        if (composerHeading) composerHeading.textContent = `Editing post #${item.id}`
+
+        // Text (single-post edit — threads edit one segment).
+        const textarea = activeTextarea()
+        if (textarea) textarea.value = item.text || ''
+        if (composeTitle) composeTitle.value = item.title || ''
+
+        // Providers: select exactly the post's set (intersected with connected).
+        selected.clear()
+        for (const provider of item.providers || []) selected.add(provider)
+        renderProviderToggles()
+        updatePublishability()
+
+        // Schedule.
+        if (item.scheduledAt && scheduleInput) {
+          scheduleInput.value = utcToLocalInput(item.scheduledAt)
+          scheduleInput.classList.remove('hidden')
+        }
+
+        // Link card.
+        if (item.external?.uri) {
+          activePost.dataset.externalUri = item.external.uri
+          activePost.dataset.externalTitle = item.external.title || ''
+          activePost.dataset.externalDescription = item.external.description || ''
+        }
+
+        // Existing image → show a "kept" chip; attaching a new file replaces,
+        // clearing it marks removal.
+        editHadImage = Boolean(item.image)
+        editRemoveImage = false
+        if (item.image) {
+          if (attachName) attachName.textContent = item.image.url ? 'Current image (URL)' : 'Current image'
+          attachChip?.classList.remove('hidden')
+          attachChip?.classList.add('inline-flex')
+        }
+
+        updateCount()
+        void updateLinkPreview(activePost)
+        updatePublishLabel()
+      }
+
+      const loadEditPost = async (id) => {
+        try {
+          const response = await fetch(`/api/postline/queue/item?id=${encodeURIComponent(id)}`)
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the post.')
+          enterEditMode(payload.data)
+        }
+        catch (error) {
+          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Edit' })
+        }
+      }
+
+      const updateQueued = async () => {
+        const text = activeTextarea()?.value.trim()
+        if (!text) {
+          setStatus('Write something before updating.', 'error')
+          activeTextarea()?.focus()
+          return
+        }
+        const targetProviders = selectedConnected().map(provider => provider.provider)
+        if (targetProviders.length === 0) {
+          setStatus('Select a connected account.', 'error', { title: 'Not connected' })
+          return
+        }
+
+        const form = new FormData()
+        form.set('id', String(editingId))
+        form.set('text', text)
+        form.set('providers', targetProviders.join(','))
+        const editTitle = composedTitle()
+        if (editTitle) form.set('title', editTitle)
+        if (scheduleInput?.value) form.set('scheduled_at', toUtcTimestamp(scheduleInput.value))
+        if (activePost?.dataset.externalUri && activePost.dataset.externalTitle) {
+          form.set('external_uri', activePost.dataset.externalUri)
+          form.set('external_title', activePost.dataset.externalTitle)
+          form.set('external_description', activePost.dataset.externalDescription || '')
+        }
+        const editImageUrl = composeImage?.value.trim()
+        if (editImageUrl) form.set('image_url', editImageUrl)
+        const editFile = attachedFile()
+        if (editFile) form.set('image', editFile, editFile.name)
+        else if (editRemoveImage) form.set('remove_image', '1')
+
+        buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
+        try {
+          const response = await fetch('/api/postline/queue/update', { method: 'POST', body: form })
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not update the post.')
+          setStatus('Post updated.', 'success', { title: 'Updated' })
+          // Back to the queue to see the change.
+          window.location.assign('/queue')
+        }
+        catch (error) {
+          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Update failed' })
+          buttons.forEach((button) => { if (canPublish) button.removeAttribute('disabled') })
+        }
       }
 
       const toUtcTimestamp = (localValue) => {
@@ -618,6 +740,11 @@
       }
 
       const publish = async () => {
+        // Editing a queued post always updates it in place (never publishes).
+        if (editingId) {
+          await updateQueued()
+          return
+        }
         if (activeMode === 'draft' || scheduleInput?.value) {
           await saveToQueue(scheduleInput?.value || null)
           return
@@ -789,7 +916,11 @@
         attachChip?.classList.remove('hidden')
         attachChip?.classList.add('inline-flex')
       })
-      attachClear?.addEventListener('click', clearAttachment)
+      attachClear?.addEventListener('click', () => {
+        // In edit mode, clearing an existing image marks it for removal.
+        if (editingId && editHadImage && !attachedFile()) editRemoveImage = true
+        clearAttachment()
+      })
       addPostButton?.addEventListener('click', addPost)
       previewButton?.addEventListener('click', () => {
         const text = activeTextarea()?.value.trim()
@@ -827,8 +958,13 @@
       })
       modeButtons.forEach(button => button.addEventListener('click', () => setMode(button.dataset.composerMode || 'single')))
       buttons.forEach(button => button.addEventListener('click', publish))
-      window.addEventListener('beforeunload', saveDraft)
-      restoreDraft()
+      // Editing a queued post — don't restore a local draft over it, and don't
+      // save the edited content back into the draft.
+      const editParam = new URLSearchParams(window.location.search).get('edit')
+      if (!editParam) {
+        window.addEventListener('beforeunload', saveDraft)
+        restoreDraft()
+      }
       setMode(activeMode, { silent: true, skipSave: true, skipThreadPost: true })
       renamePosts()
       selectPost(allPosts()[savedActiveIndex] || activePost, { skipSave: true })
@@ -836,11 +972,16 @@
       void updateLinkPreview(activePost)
       // Wait for the social module (a deferred `type=module` script) before the
       // first provider fetch so window.postlineSocial is guaranteed to exist.
+      // Load the edit post only after connection so provider toggles resolve.
+      const start = async () => {
+        await refreshConnection()
+        if (editParam) await loadEditPost(editParam)
+      }
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => void refreshConnection(), { once: true })
+        document.addEventListener('DOMContentLoaded', () => void start(), { once: true })
       }
       else {
-        void refreshConnection()
+        void start()
       }
     })()
   </script>
