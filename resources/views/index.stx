@@ -973,9 +973,21 @@
       // Wait for the social module (a deferred `type=module` script) before the
       // first provider fetch so window.postlineSocial is guaranteed to exist.
       // Load the edit post only after connection so provider toggles resolve.
+      // /?schedule=YYYY-MM-DD (from the queue calendar) opens the schedule
+      // input pre-set to 09:00 local on that day.
+      const scheduleParam = new URLSearchParams(window.location.search).get('schedule')
+      const applyScheduleParam = () => {
+        if (!scheduleParam || !scheduleInput || !/^\d{4}-\d{2}-\d{2}$/.test(scheduleParam)) return
+        scheduleInput.value = `${scheduleParam}T09:00`
+        scheduleInput.classList.remove('hidden')
+        updatePublishLabel()
+        activeTextarea()?.focus()
+      }
+
       const start = async () => {
         await refreshConnection()
         if (editParam) await loadEditPost(editParam)
+        else applyScheduleParam()
       }
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => void start(), { once: true })
