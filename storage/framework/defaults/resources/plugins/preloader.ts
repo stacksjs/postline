@@ -36,13 +36,7 @@ const fastCommands = [
   'scaffold:crud',
 ]
 const isRepl = !process.argv[1]
-// Dependency installation runs package lifecycle scripts before Bun has finished
-// linking every workspace package. Loading @stacksjs/env (or the wider auto-import
-// graph) from a postinstall script can therefore fail even though the install is
-// otherwise valid. Postinstall scripts are bootstrap work and must stay independent
-// of the application runtime preloader.
-const isPostinstall = process.env.npm_lifecycle_event === 'postinstall'
-const skipPreloader = isRepl || isPostinstall || (args.length > 0 && fastCommands.some(cmd => args[0] === cmd || args[0].startsWith(`${cmd}:`)))
+const skipPreloader = isRepl || (args.length > 0 && fastCommands.some(cmd => args[0] === cmd || args[0].startsWith(`${cmd}:`)))
 
 if (!skipPreloader) {
   // Detect production/deployment commands and set environment accordingly BEFORE loading env files
@@ -50,20 +44,11 @@ if (!skipPreloader) {
   const productionCommands = ['cloud:remove', 'cloud:rm', 'cloud:destroy', 'cloud:cleanup', 'cloud:clean-up', 'undeploy']
   const isProductionCommand = productionCommands.includes(args[0])
 
-  // Handle deploy command: the env may be positional (`deploy staging`) or a
-  // flag (`deploy --staging`). CI deploys use the flag form, so detecting only
-  // the positional arg left APP_ENV wrong and loaded the wrong .env file.
+  // Handle deploy command which can have an optional env argument: `deploy [env]`
   const isDeployCommand = args[0] === 'deploy'
   if (isDeployCommand) {
-    const flagEnv = args.includes('--production') || args.includes('--prod')
-      ? 'production'
-      : args.includes('--staging')
-        ? 'staging'
-        : args.includes('--development') || args.includes('--dev')
-          ? 'development'
-          : undefined
-    const positionalEnv = args[1] && !args[1].startsWith('-') ? args[1] : undefined
-    const deployEnv = flagEnv ?? positionalEnv ?? 'production'
+    // Check if second arg is an environment (not a flag starting with -)
+    const deployEnv = args[1] && !args[1].startsWith('-') ? args[1] : 'production'
     process.env.APP_ENV = deployEnv
     process.env.NODE_ENV = deployEnv
   }
@@ -72,24 +57,12 @@ if (!skipPreloader) {
     process.env.NODE_ENV = 'production'
   }
 
-  // Load .env files with encryption support using the vendored source first.
-  // The preloader runs before Bun has necessarily linked workspace packages
-  // (fresh installs and minimal Linux/Docker checkouts are the important
-  // cases), so resolving @stacksjs/env here creates a bootstrap cycle. The
-  // source plugin is self-contained; retain the package fallback for contexts
-  // where defaults is consumed outside the standard framework layout.
-  const envPackage = '@stacksjs/' + 'env'
-  const { autoLoadEnv } = await import('../../../core/env/src/plugin.ts')
-    .catch(() => import(envPackage))
+  // Load .env files with encryption support using our native Bun plugin
+  const { autoLoadEnv } = await import('@stacksjs/env')
 
   // Auto-load .env files based on environment
   // Set quiet: true to prevent duplicate logging across multiple processes
-  //
-  // Pass the resolved env so deploy commands deterministically select their
-  // matching `.env.<env>` file. autoLoadEnv discovers `.env.keys` by default,
-  // replaces ciphertext that Bun preloaded, and preserves genuine shell/CI
-  // overrides while applying environment-specific file precedence.
-  autoLoadEnv({ quiet: true, env: process.env.APP_ENV })
+  autoLoadEnv({ quiet: true })
 }
 
 // stx template engine plugin
@@ -105,9 +78,7 @@ if (!skipPreloader) {
 // explicitly when needed — see #1835 root cause 3.
 export async function loadAutoImports() {
   const { Glob } = await import('bun')
-  const pathPackage = '@stacksjs/' + 'path'
-  const path = await import('../../../core/path/src/index.ts')
-    .catch(() => import(pathPackage))
+  const path = await import('@stacksjs/path')
 
   // CRITICAL: Never overwrite these built-in globals
   const protectedGlobals = new Set([
@@ -319,8 +290,7 @@ if (!skipAutoImports) {
 
   // Run package auto-discovery after all imports are loaded
   try {
-    const actionsPackage = '@stacksjs/' + 'actions'
-    const { discoverPackages } = await import(actionsPackage)
+    const { discoverPackages } = await import('@stacksjs/actions')
     await discoverPackages()
   }
   catch {

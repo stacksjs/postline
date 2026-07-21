@@ -1,0 +1,147 @@
+@extends('layouts/default')
+
+@section('content')
+<div class="p-6 min-h-screen text-neutral-950 dark:text-neutral-100 bg-neutral-50 dark:bg-neutral-950">
+  <div class="flex flex-col gap-6 mx-auto max-w-6xl">
+    <header class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between pb-5 border-b border-neutral-200 dark:border-neutral-800">
+      <div>
+        <p class="font-semibold text-blue-600 text-xs tracking-wide uppercase dark:text-blue-400">CMS</p>
+        <h1 class="mt-1 font-semibold text-2xl tracking-tight">Tags</h1>
+        <p class="mt-1 text-neutral-500 text-sm dark:text-neutral-400">Manage the tags used by blog posts and markdown content.</p>
+      </div>
+      <button id="new-tag-button" type="button" class="inline-flex gap-2 items-center px-3 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-500 rounded-md shadow-sm">
+        <span class="h-4 w-4 i-hugeicons-plus-sign"></span>
+        New Tag
+      </button>
+    </header>
+
+    <section class="grid gap-4 md:grid-cols-3">
+      <div class="p-4 bg-white dark:bg-neutral-900 border border-neutral-200 rounded-lg dark:border-neutral-800 shadow-sm">
+        <p class="text-neutral-500 text-sm dark:text-neutral-400">Total Tags</p>
+        <p id="tag-total" class="mt-2 font-semibold text-3xl">0</p>
+      </div>
+      <div class="p-4 bg-white dark:bg-neutral-900 border border-neutral-200 rounded-lg dark:border-neutral-800 shadow-sm">
+        <p class="text-neutral-500 text-sm dark:text-neutral-400">Newest</p>
+        <p id="tag-newest" class="mt-2 font-semibold text-2xl truncate">-</p>
+      </div>
+      <div class="p-4 bg-white dark:bg-neutral-900 border border-neutral-200 rounded-lg dark:border-neutral-800 shadow-sm">
+        <p class="text-neutral-500 text-sm dark:text-neutral-400">Active</p>
+        <p id="tag-active" class="mt-2 font-semibold text-3xl text-green-600 dark:text-green-400">0</p>
+      </div>
+    </section>
+
+    <section class="bg-white dark:bg-neutral-900 border border-neutral-200 rounded-lg dark:border-neutral-800 shadow-sm">
+      <div class="p-4 border-b border-neutral-200 dark:border-neutral-800">
+        <input id="tag-search" type="search" placeholder="Search tags..." class="px-3 py-2 max-w-md w-full text-sm bg-white dark:bg-neutral-950 border border-neutral-300 outline-none rounded-md dark:border-neutral-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm divide-neutral-200 divide-y dark:divide-neutral-800">
+          <thead class="font-semibold text-left text-neutral-500 text-xs uppercase dark:text-neutral-400 bg-neutral-50 dark:bg-neutral-900">
+            <tr>
+              <th class="px-4 py-3">Name</th>
+              <th class="px-4 py-3">Slug</th>
+              <th class="px-4 py-3">Description</th>
+              <th class="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tags-table" class="divide-neutral-200 divide-y dark:divide-neutral-800"></tbody>
+        </table>
+      </div>
+      <div id="tags-empty" class="hidden p-10 text-center text-neutral-500 text-sm dark:text-neutral-400">No tags found.</div>
+    </section>
+  </div>
+</div>
+
+<dialog id="tag-dialog" class="p-0 max-w-lg w-full text-neutral-950 dark:text-neutral-100 bg-white backdrop:bg-black/40 dark:bg-neutral-900 border border-neutral-200 rounded-lg dark:border-neutral-800 shadow-xl">
+  <form id="tag-form" method="dialog">
+    <div class="px-5 py-4 border-b border-neutral-200 dark:border-neutral-800">
+      <h2 class="font-semibold text-lg">New Tag</h2>
+    </div>
+    <div class="grid gap-4 p-5">
+      <label class="grid gap-1 font-medium text-sm">Name <input id="tag-name" required class="px-3 py-2 text-sm bg-white dark:bg-neutral-950 border border-neutral-300 rounded-md dark:border-neutral-700" /></label>
+      <label class="grid gap-1 font-medium text-sm">Slug <input id="tag-slug" class="px-3 py-2 text-sm bg-white dark:bg-neutral-950 border border-neutral-300 rounded-md dark:border-neutral-700" /></label>
+      <label class="grid gap-1 font-medium text-sm">Description <textarea id="tag-description" rows="3" class="px-3 py-2 text-sm bg-white dark:bg-neutral-950 border border-neutral-300 rounded-md dark:border-neutral-700"></textarea></label>
+    </div>
+    <div class="flex gap-2 justify-end px-5 py-4 border-neutral-200 border-t dark:border-neutral-800">
+      <button id="tag-cancel" type="button" class="px-3 py-2 font-medium text-sm border border-neutral-300 rounded-md dark:border-neutral-700">Cancel</button>
+      <button type="submit" class="px-3 py-2 font-semibold text-sm text-white bg-blue-600 hover:bg-blue-500 rounded-md">Create Tag</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+;(function () {
+  var api = '/api/dashboard/cms'
+  var tags = []
+  var table = document.getElementById('tags-table')
+  var empty = document.getElementById('tags-empty')
+  var dialog = document.getElementById('tag-dialog')
+  var search = document.getElementById('tag-search')
+  function $(id) { return document.getElementById(id) }
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, function (ch) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]
+    })
+  }
+  function slug(value) {
+    return String(value || '').trim().toLowerCase().replace(/['"]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  }
+  function render() {
+    var q = search.value.toLowerCase()
+    var rows = tags.filter(function (tag) {
+      return !q || [tag.name, tag.slug, tag.description].join(' ').toLowerCase().indexOf(q) !== -1
+    })
+    $('tag-total').textContent = String(tags.length)
+    $('tag-active').textContent = String(tags.filter(function (t) { return t.is_active !== false && t.is_active !== 0 }).length)
+    $('tag-newest').textContent = tags[0] ? tags[0].name : '-'
+    empty.classList.toggle('hidden', rows.length > 0)
+    table.innerHTML = rows.map(function (tag) {
+      return '<tr class="hover:bg-neutral-50 dark:hover:bg-neutral-950/70">' +
+        '<td class="px-4 py-3 font-medium">' + escapeHtml(tag.name) + '</td>' +
+        '<td class="px-4 py-3 text-neutral-600 dark:text-neutral-300">' + escapeHtml(tag.slug) + '</td>' +
+        '<td class="px-4 py-3 text-neutral-600 dark:text-neutral-300">' + escapeHtml(tag.description) + '</td>' +
+        '<td class="px-4 py-3 text-right"><button type="button" data-id="' + tag.id + '" class="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded"><span class="block h-4 w-4 i-hugeicons-waste"></span></button></td>' +
+      '</tr>'
+    }).join('')
+  }
+  async function load() {
+    var res = await fetch(api)
+    var json = await res.json()
+    tags = Array.isArray(json.tags) ? json.tags : []
+    render()
+  }
+  document.getElementById('new-tag-button').addEventListener('click', function () {
+    $('tag-name').value = ''
+    $('tag-slug').value = ''
+    $('tag-description').value = ''
+    dialog.showModal()
+  })
+  $('tag-cancel').addEventListener('click', function () { dialog.close() })
+  $('tag-name').addEventListener('input', function () {
+    if (!$('tag-slug').dataset.touched) $('tag-slug').value = slug($('tag-name').value)
+  })
+  $('tag-slug').addEventListener('input', function () { $('tag-slug').dataset.touched = '1' })
+  document.getElementById('tag-form').addEventListener('submit', async function (event) {
+    event.preventDefault()
+    var res = await fetch(api + '/tags', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: $('tag-name').value, slug: $('tag-slug').value, description: $('tag-description').value }),
+    })
+    if (!res.ok) return alert('Could not create tag')
+    dialog.close()
+    await load()
+  })
+  table.addEventListener('click', async function (event) {
+    var button = event.target.closest('button[data-id]')
+    if (!button || !confirm('Delete this tag?')) return
+    var res = await fetch(api + '/tags/' + button.getAttribute('data-id'), { method: 'DELETE' })
+    if (!res.ok) return alert('Could not delete tag')
+    await load()
+  })
+  search.addEventListener('input', render)
+  load()
+})()
+</script>
+
+@endsection
