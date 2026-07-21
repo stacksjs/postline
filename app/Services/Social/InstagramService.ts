@@ -205,11 +205,7 @@ export class InstagramService {
         accessToken: identity.access_token || undefined,
       }, {
         text: post.body,
-        // Instagram only accepts URL media (it has no blob upload); drop
-        // any bytes-only entries from the shared PublishContent.
-        media: content?.media
-          ?.filter((item): item is { url: string, altText?: string } => Boolean(item.url))
-          .map(item => ({ url: item.url, altText: item.altText })),
+        media: content?.media,
       })
 
       await database.updateTable('post_targets').set({

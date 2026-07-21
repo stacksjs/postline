@@ -13,26 +13,21 @@ export default new Action({
   async handle(request) {
     await request.validate()
 
-    const user = await request.user()
-
-    if (!user)
-      return response.unauthorized('Authentication required')
-
     const author = await authors.findOrCreate({
-      name: user.name,
-      email: user.email,
+      name: 'Current User',
+      email: 'current@user.com',
     })
-
-    const status = request.get('status') || 'draft'
 
     const data = {
       author_id: author.id,
       title: request.get('title'),
       excerpt: request.get('excerpt'),
+      slug: request.get('slug'),
       content: request.get('content'),
-      status,
+      status: request.get('status'),
       poster: request.get('poster'),
       views: 0,
+      published_at: Date.now(),
     }
 
     const model = await posts.store(data)
