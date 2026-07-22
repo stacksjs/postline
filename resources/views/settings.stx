@@ -15,6 +15,20 @@
     </header>
 
     <section class="grid gap-3.5 lg:grid-cols-2">
+      <article class="grid gap-3 lg:col-span-2 p-4 bg-white border border-zinc-200 rounded-2xl shadow-sm">
+        <header class="flex gap-3 items-center justify-between pb-3 border-b border-zinc-200">
+          <div>
+            <strong class="text-[13px]">Appearance</strong>
+            <p class="mb-0 mt-1 text-xs text-zinc-500">Light, dark, or match your system.</p>
+          </div>
+          <div class="grid grid-cols-3 p-0.5 bg-zinc-100 border border-zinc-200 rounded-xl" role="group" aria-label="Theme">
+            <button class="px-3 py-1.5 min-w-16 font-bold text-xs text-zinc-500 rounded-lg transition-colors" type="button" data-theme-option="light">Light</button>
+            <button class="px-3 py-1.5 min-w-16 font-bold text-xs text-zinc-500 rounded-lg transition-colors" type="button" data-theme-option="dark">Dark</button>
+            <button class="px-3 py-1.5 min-w-16 font-bold text-xs text-zinc-500 rounded-lg transition-colors" type="button" data-theme-option="system">System</button>
+          </div>
+        </header>
+      </article>
+
       <article class="grid gap-3 p-4 bg-white border border-zinc-200 rounded-2xl shadow-sm">
         <header class="flex gap-3 items-center justify-between pb-3 border-b border-zinc-200">
           <div>
@@ -56,6 +70,35 @@
       root.querySelector('[data-sign-out]')?.addEventListener('click', () => {
         document.cookie = 'auth-token=; path=/; max-age=0; SameSite=Lax'
         window.location.assign('/login')
+      })
+
+      // --- Theme (light / dark / system) ---
+      const themeOptions = Array.from(root.querySelectorAll('[data-theme-option]'))
+      const applyTheme = (pref) => {
+        const dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.classList.toggle('dark', dark)
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+      }
+      const renderTheme = (pref) => {
+        themeOptions.forEach((button) => {
+          const active = button.dataset.themeOption === pref
+          button.classList.toggle('bg-white', active)
+          button.classList.toggle('text-neutral-950', active)
+          button.classList.toggle('shadow-sm', active)
+          button.classList.toggle('text-zinc-500', !active)
+        })
+      }
+      const currentPref = (() => { try { return localStorage.getItem('theme') || 'system' } catch { return 'system' } })()
+      renderTheme(currentPref)
+      themeOptions.forEach(button => button.addEventListener('click', () => {
+        const pref = button.dataset.themeOption
+        try { localStorage.setItem('theme', pref) } catch {}
+        applyTheme(pref)
+        renderTheme(pref)
+      }))
+      // Keep 'system' live if the OS theme flips while the page is open.
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        try { if ((localStorage.getItem('theme') || 'system') === 'system') applyTheme('system') } catch {}
       })
 
       const summary = root.querySelector('[data-settings-bluesky-summary]')

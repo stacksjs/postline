@@ -4,6 +4,32 @@
 @section('description', 'Sign in to your Postline workspace.')
 
 @section('content')
+  <script>
+    // Login uses a different layout, so it carries its own theme bootstrap.
+    ;(() => {
+      try {
+        const s = localStorage.getItem('theme') || 'system'
+        const d = s === 'dark' || (s === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.classList.toggle('dark', d)
+        document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light')
+      } catch {}
+    })()
+  </script>
+  <style>
+    html.dark { color-scheme: dark; background: #0a0a0c; }
+    html.dark body { background-color: #0a0a0c; }
+    .dark .bg-\[\#f3f3f1\] { background-color: #0a0a0c; }
+    .dark .bg-white { background-color: #18181b; }
+    .dark .border-zinc-200 { border-color: #2a2a2e; }
+    .dark .text-neutral-950 { color: #f4f4f5; }
+    .dark .text-zinc-600, .dark .text-zinc-500 { color: #a1a1aa; }
+    .dark .text-red-700 { color: #fca5a5; }
+    .dark .bg-neutral-950 { background-color: #f4f4f5; color: #0a0a0c; }
+    .dark .hover\:bg-neutral-800:hover { background-color: #d4d4d8; }
+    .dark .hover\:text-zinc-700:hover { color: #d4d4d8; }
+    .dark input { color: #f4f4f5; background-color: #18181b; }
+    .dark input::placeholder { color: #71717a; }
+  </style>
   <main class="grid place-items-center px-4 min-h-screen bg-[#f3f3f1]" data-testid="login-page">
     <section class="grid gap-5 p-6 max-w-sm w-full bg-white border border-zinc-200 rounded-2xl shadow-sm">
       <header class="grid gap-2 justify-items-center text-center">
