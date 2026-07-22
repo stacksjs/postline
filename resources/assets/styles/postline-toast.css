@@ -202,3 +202,10 @@
   gap: 0.75rem;
   align-items: flex-start;
 }
+
+/* Dark theme */
+.dark .postline-toast {
+  background: rgb(24 24 27 / 0.97);
+  border-color: rgb(63 63 70 / 0.9);
+  color: #e4e4e7;
+}

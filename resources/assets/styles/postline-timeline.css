@@ -265,3 +265,22 @@
     background-position: -100% 0;
   }
 }
+
+/* Dark theme — the feed uses its own classes (not utilities), so it needs
+   its own overrides to match the app's .dark remap. */
+.dark .postline-feed__header,
+.dark .postline-feed__list { background: #18181b; }
+.dark .postline-feed__header { border-bottom-color: #2a2a2e; }
+.dark .postline-feed-post { border-bottom-color: #232327; }
+.dark .postline-feed-post:hover { background: #202024; }
+.dark .postline-feed-post__name { color: #f4f4f5; }
+.dark .postline-feed-post__body { color: #d4d4d8; }
+.dark .postline-feed__empty,
+.dark .postline-feed__loading { color: #a1a1aa; }
+.dark .postline-feed-post__avatar { border-color: rgb(255 255 255 / 0.12); }
+.dark .postline-feed__skeleton { border-bottom-color: #232327; }
+.dark .postline-feed__skeleton-avatar,
+.dark .postline-feed__skeleton-line {
+  background: linear-gradient(90deg, #232327 25%, #2c2c31 50%, #232327 75%);
+  background-size: 200% 100%;
+}
