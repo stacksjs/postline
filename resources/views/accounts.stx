@@ -12,7 +12,7 @@
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Accounts</p>
         <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Publishing drivers</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">Connect Bluesky, LinkedIn, Instagram, and Threads to publish and crosspost from Postline.</p>
+        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">Connect Bluesky, LinkedIn, Instagram, Threads, and Mastodon to publish and crosspost from Postline.</p>
       </div>
     </header>
 
@@ -81,11 +81,27 @@
             <button class="hidden text-xs text-zinc-500 underline hover:text-zinc-700 transition-colors" type="button" data-threads-connect-env>Use token from .env</button>
           </div>
         </article>
+        <article class="grid gap-3 p-3.5 bg-white border border-zinc-200 rounded-xl" data-channel="mastodon">
+          <div class="flex gap-5 items-center justify-between">
+            <div>
+              <h2 class="my-0 font-bold text-[15px]">Mastodon</h2>
+              <p class="my-1.5 text-[13px] text-slate-700" data-mastodon-channel-handle>Not connected</p>
+              <span class="text-xs text-zinc-500" data-mastodon-channel-detail>Connect any Mastodon instance with an access token to crosspost.</span>
+            </div>
+            <span class="px-2.5 py-1 font-bold text-[11px] text-zinc-500 whitespace-nowrap border border-zinc-200 rounded-full" data-mastodon-channel-status>Setup</span>
+          </div>
+          <form class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]" data-mastodon-connect-form>
+            <input class="px-3 h-9 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="instance" placeholder="mastodon.social" autocomplete="url" data-mastodon-instance required>
+            <input class="px-3 h-9 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="access_token" type="password" placeholder="Access token" autocomplete="off" data-mastodon-token required>
+            <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-sm text-white bg-neutral-950 hover:bg-neutral-800 rounded-lg disabled:opacity-50 transition-colors" type="submit" data-mastodon-connect-submit>Connect</button>
+            <p class="sm:col-span-3 m-0 text-xs text-zinc-500">Create a token in your instance's Preferences → Development → New application (needs the <code class="px-1 py-0.5 text-xs bg-zinc-100 rounded">write:statuses</code> + <code class="px-1 py-0.5 text-xs bg-zinc-100 rounded">write:media</code> scopes).</p>
+          </form>
+        </article>
         <article class="flex gap-5 items-center justify-between p-3.5 bg-zinc-50/80 border border-zinc-200 rounded-xl opacity-80">
           <div>
             <h2 class="my-0 font-bold text-[15px] text-zinc-700">Twitter/X</h2>
             <p class="my-1.5 text-[13px] text-zinc-600">Planned</p>
-            <span class="text-xs text-zinc-500">Driver adapter coming after Bluesky, LinkedIn, Instagram, and Threads are stable.</span>
+            <span class="text-xs text-zinc-500">Driver adapter coming after the current set is stable.</span>
           </div>
           <span class="px-2.5 py-1 font-bold text-[11px] text-zinc-500 whitespace-nowrap border border-zinc-200 rounded-full">Planned</span>
         </article>
@@ -463,6 +479,80 @@
       }
       else {
         startThreads()
+      }
+
+      // --- Mastodon ---
+      const mastodonForm = root.querySelector('[data-mastodon-connect-form]')
+      const mastodonInstance = root.querySelector('[data-mastodon-instance]')
+      const mastodonToken = root.querySelector('[data-mastodon-token]')
+      const mastodonSubmit = root.querySelector('[data-mastodon-connect-submit]')
+      const mastodonHandle = root.querySelector('[data-mastodon-channel-handle]')
+      const mastodonDetail = root.querySelector('[data-mastodon-channel-detail]')
+      const mastodonStatusPill = root.querySelector('[data-mastodon-channel-status]')
+
+      const renderMastodon = (data) => {
+        const connected = Boolean(data?.canPublish)
+        if (mastodonHandle) mastodonHandle.textContent = connected ? data.handle : (data?.handle ? `${data.handle} — reconnect` : 'Not connected')
+        if (mastodonInstance && data?.instance) mastodonInstance.value = data.instance
+        if (mastodonDetail) {
+          mastodonDetail.textContent = connected
+            ? 'Ready to crosspost from Postline.'
+            : data?.configuredFromEnv
+              ? 'Token found in .env — connect to start crossposting.'
+              : 'Connect any Mastodon instance with an access token to crosspost.'
+        }
+        if (mastodonStatusPill) {
+          mastodonStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
+          mastodonStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+            connected
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : data?.handle
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-zinc-200 text-zinc-500'
+          }`
+        }
+        if (mastodonSubmit) mastodonSubmit.textContent = connected ? 'Reconnect' : 'Connect'
+      }
+
+      const refreshMastodon = async () => {
+        try {
+          const response = await fetch('/api/postline/mastodon/status')
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load Mastodon status.')
+          renderMastodon(payload.data)
+        }
+        catch (error) {
+          renderMastodon(null)
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Mastodon' })
+        }
+      }
+
+      mastodonForm?.addEventListener('submit', async (event) => {
+        event.preventDefault()
+        mastodonSubmit?.setAttribute('disabled', 'disabled')
+        notify('Connecting to Mastodon…', 'info', { title: 'Mastodon' })
+        try {
+          const response = await fetch('/api/postline/mastodon/connect', { method: 'POST', body: new FormData(mastodonForm) })
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Mastodon connect failed.')
+          if (mastodonToken) mastodonToken.value = ''
+          await refreshMastodon()
+          notify(`${payload.data.handle} is connected. You can crosspost from the composer.`, 'success', { title: 'Connected' })
+        }
+        catch (error) {
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Connect failed' })
+        }
+        finally {
+          mastodonSubmit?.removeAttribute('disabled')
+        }
+      })
+
+      const startMastodon = () => void refreshMastodon()
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startMastodon, { once: true })
+      }
+      else {
+        startMastodon()
       }
 
       void refreshStatus()
