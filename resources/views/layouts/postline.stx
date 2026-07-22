@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light">
+    <meta name="color-scheme" content="light dark">
     <meta name="description" content="@yield('description', 'Postline is a clean personal workspace for social publishing.')">
     <title>@yield('title', 'Postline')</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -18,15 +18,20 @@
       })()
     </script>
     <script>
+      // Theme bootstrap — runs before paint to avoid a flash. Stored
+      // preference is 'light' | 'dark' | 'system' (default system).
       ;(() => {
-        document.documentElement.setAttribute('data-theme', 'light')
-        document.documentElement.classList.remove('dark')
+        const root = document.documentElement
         try {
-          window.localStorage?.setItem('theme', 'light')
+          const stored = window.localStorage?.getItem('theme') || 'system'
+          const dark = stored === 'dark' || (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          root.classList.toggle('dark', dark)
+          root.setAttribute('data-theme', dark ? 'dark' : 'light')
+
           const sidebarCollapsed = window.localStorage?.getItem('postline.sidebar.collapsed') === 'true'
-          document.documentElement.classList.toggle('postline-sidebar-collapsed', sidebarCollapsed)
-          document.documentElement.dataset.stxSidebarCollapsed = sidebarCollapsed ? 'true' : 'false'
-          document.documentElement.style.setProperty('--postline-sidebar-width', sidebarCollapsed ? '0px' : '286px')
+          root.classList.toggle('postline-sidebar-collapsed', sidebarCollapsed)
+          root.dataset.stxSidebarCollapsed = sidebarCollapsed ? 'true' : 'false'
+          root.style.setProperty('--postline-sidebar-width', sidebarCollapsed ? '0px' : '286px')
         } catch {}
       })()
     </script>
@@ -36,6 +41,97 @@
         color-scheme: light;
         background: #f3f3f1;
       }
+
+      html.dark {
+        color-scheme: dark;
+        background: #0a0a0c;
+      }
+
+      /*
+       * Dark theme — a scoped remap of the app's consistent utility palette.
+       * The views use a small, fixed set of hardcoded utilities (bg-white
+       * cards, zinc borders, neutral text), so one place remaps them instead
+       * of adding dark: variants to ~380 call sites. Unlayered head styles
+       * beat crosswind's layered utilities regardless of specificity.
+       */
+      html.dark body { background-color: #0a0a0c; color: #e4e4e7; }
+
+      /* Surfaces */
+      .dark .bg-white { background-color: #18181b; }
+      .dark .bg-\[\#f3f3f1\] { background-color: #0a0a0c; }
+      .dark .bg-zinc-50, .dark .bg-zinc-50\/80, .dark .bg-zinc-50\/48 { background-color: #1c1c1f; }
+      .dark .bg-zinc-50\/40 { background-color: rgba(255, 255, 255, 0.02); }
+      .dark .bg-zinc-100 { background-color: #26262a; }
+      .dark .bg-blue-50 { background-color: #172554; }
+      .dark .bg-emerald-50 { background-color: #052e2b; }
+      .dark .bg-amber-50 { background-color: #3a2a08; }
+      .dark .bg-red-50 { background-color: #3a1414; }
+
+      /* Borders */
+      .dark .border-zinc-200, .dark .border-zinc-200\/80, .dark .border-zinc-100 { border-color: #2a2a2e; }
+      .dark .border-blue-200 { border-color: #1e3a8a; }
+      .dark .border-emerald-200 { border-color: #0f766e; }
+      .dark .border-amber-200 { border-color: #78500a; }
+      .dark .border-red-200 { border-color: #7f1d1d; }
+
+      /* Text */
+      .dark .text-neutral-950 { color: #f4f4f5; }
+      .dark .text-slate-700 { color: #d4d4d8; }
+      .dark .text-zinc-600, .dark .text-zinc-500 { color: #a1a1aa; }
+      .dark .text-zinc-700, .dark .text-zinc-800 { color: #d4d4d8; }
+      .dark .text-blue-700, .dark .text-blue-800 { color: #93c5fd; }
+      .dark .text-emerald-700 { color: #6ee7b7; }
+      .dark .text-amber-800 { color: #fcd34d; }
+      .dark .text-red-700 { color: #fca5a5; }
+
+      /* Hover states (higher specificity than the base utilities above) */
+      .dark .hover\:bg-white:hover { background-color: #26262a; }
+      .dark .hover\:bg-zinc-50:hover { background-color: #26262a; }
+      .dark .hover\:bg-zinc-100:hover { background-color: #2f2f34; }
+
+      /* Primary buttons invert to light-on-dark-text so they pop on dark surfaces */
+      .dark .bg-neutral-950 { background-color: #f4f4f5; }
+      .dark .bg-neutral-950.text-white,
+      .dark .bg-neutral-950 .text-white,
+      .dark .text-white.bg-neutral-950 { color: #0a0a0c; }
+      .dark .hover\:bg-neutral-800:hover { background-color: #d4d4d8; }
+      /* Keep the small "P" brand mark dark-on-light */
+      .dark .bg-neutral-950.rounded-xl > span,
+      .dark [aria-label="Postline composer"] .bg-neutral-950 { color: #0a0a0c; }
+
+      /* Inputs + code */
+      .dark input, .dark textarea, .dark select { color: #f4f4f5; }
+      .dark input::placeholder, .dark textarea::placeholder { color: #71717a; }
+      .dark code { background-color: #26262a; color: #e4e4e7; }
+
+      /* Shell surfaces (targeted by data-attribute; opacity/gradient variants) */
+      .dark [data-postline-content-shell],
+      .dark [data-postline-workspace],
+      .dark [data-postline-sidebar] { background-color: #0a0a0c; }
+      .dark [data-postline-workspace] {
+        border-color: #2a2a2e;
+        box-shadow: -10px 0 36px rgba(0, 0, 0, 0.4);
+      }
+      .dark [data-postline-sidebar] { background-color: rgba(24, 24, 27, 0.5); }
+      .dark [data-postline-sidebar] > .absolute { opacity: 0.35; }
+      /* Sidebar nav: active item + white/xx controls and badges */
+      .dark .bg-\[\#e8e8e6\]\/90 { background-color: rgba(63, 63, 70, 0.6); }
+      .dark .bg-white\/95 { background-color: rgba(39, 39, 42, 0.95); }
+      .dark .bg-white\/72 { background-color: rgba(63, 63, 70, 0.72); }
+      .dark .bg-white\/60 { background-color: rgba(63, 63, 70, 0.6); }
+      .dark .hover\:bg-white\/38:hover,
+      .dark .hover\:bg-white\/60:hover,
+      .dark .hover\:bg-white\/35:hover { background-color: rgba(63, 63, 70, 0.55); }
+      .dark .bg-white\/48 { background-color: rgba(39, 39, 42, 0.48); }
+
+      /* Analytics chart — CSS overrides the hardcoded SVG palette (CSS
+         fill/stroke beat presentation attributes) so the chart isn't a
+         light island on a dark page. */
+      .dark [data-analytics-chart] rect[rx="16"] { fill: #101014; }
+      .dark [data-analytics-chart] line[stroke="#e4e4e7"] { stroke: #2a2a2e; }
+      .dark [data-analytics-chart] text[fill="#18181b"] { fill: #e4e4e7; }
+      .dark [data-analytics-chart] rect[fill="#fff"] { fill: #26262a; stroke: #3f3f46; }
+      .dark [data-analytics-chart] .bg-zinc-100 { background-color: #26262a; }
 
       @property --postline-sidebar-width {
         syntax: '<length>';
