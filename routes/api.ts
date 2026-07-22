@@ -52,6 +52,11 @@ route.group({ prefix: '/postline/threads' }, () => {
   route.get('/callback', 'Actions/Postline/ThreadsCallbackAction').skipCsrf()
 })
 
+route.group({ prefix: '/postline/mastodon' }, () => {
+  route.get('/status', 'Actions/Postline/MastodonStatusAction').middleware('auth').skipCsrf()
+  route.post('/connect', 'Actions/Postline/MastodonConnectAction').middleware('auth').skipCsrf()
+})
+
 route.group({ prefix: '/postline' }, () => {
   route.get('/providers', 'Actions/Postline/ProvidersStatusAction').middleware('auth').skipCsrf()
   route.post('/publish', 'Actions/Postline/CrosspostPublishAction').middleware('auth').skipCsrf()
