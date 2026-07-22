@@ -5,6 +5,7 @@ import { blog } from './BlogService'
 import { bluesky } from './BlueskyService'
 import { instagram } from './InstagramService'
 import { linkedin } from './LinkedInService'
+import { mastodon } from './MastodonService'
 import { threads } from './ThreadsService'
 import { ensureAccount, now, uuid } from './support'
 
@@ -20,6 +21,7 @@ const publishers: Partial<Record<SocialProvider, ProviderPublisher>> = {
   linkedin,
   instagram,
   threads,
+  mastodon,
   blog,
 }
 

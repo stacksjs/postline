@@ -4,6 +4,7 @@ import { blog } from '../../Services/Social/BlogService'
 import { bluesky } from '../../Services/Social/BlueskyService'
 import { instagram } from '../../Services/Social/InstagramService'
 import { linkedin } from '../../Services/Social/LinkedInService'
+import { mastodon } from '../../Services/Social/MastodonService'
 import { threads } from '../../Services/Social/ThreadsService'
 
 export default new Action({
@@ -18,6 +19,7 @@ export default new Action({
         linkedin.status(),
         instagram.status(),
         threads.status(),
+        mastodon.status(),
         blog.status(),
       ])
 
