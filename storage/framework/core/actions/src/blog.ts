@@ -5,9 +5,18 @@
  * Stacks theme — not by the stx view layer. Posts are markdown files in
  * `content/blog/*.md`; BunPress handles markdown → HTML (syntax highlighting,
  * containers, heading anchors, GFM) and wraps it in its themed document shell.
- * We re-skin its VitePress theme to the Stacks brand via `content/blog/.theme.css`
- * and add blog chrome (post header, author card, share, listing cards). RSS +
- * sitemap come from BunPress's own `buildRssFeed` / `buildSitemap`.
+ * We style its BunPress theme via `content/blog/.theme.css` and add blog
+ * chrome (post header, author card, share, listing cards). RSS + sitemap are
+ * generated here from `listPosts()`, not by BunPress's `buildRssFeed` /
+ * `buildSitemap` — see the note on `feedXml` for why.
+ *
+ * A post with `draft: true` in its frontmatter is written by the dashboard
+ * (see ./blog-admin.ts) and is excluded from the listing, the feed, the sitemap,
+ * and its own URL, so unpublished work has no public surface.
+ *
+ * Branding (titles, nav, author fallback, colophon, theme modes) is read from
+ * the app's `config/blog.ts`; the defaults below match the Stacks blog so an
+ * unconfigured app renders exactly as before.
  *
  * Two consumers share the same renderers:
  *   - `renderBlog(req)` — dynamic, used by the dev server's onRequest hook.
@@ -29,22 +38,96 @@ interface BunPress {
   defaultConfig: any
 }
 
+type BlogThemeMode = 'colored' | 'light' | 'dark'
+
+/** Branding knobs read from `config/blog.ts` (all optional there). */
+interface BlogSiteConfig {
+  title: string
+  description: string
+  /** Short title used in the layout nav; defaults to `title`. */
+  siteTitle: string
+  /** Fallback post author when frontmatter has none. */
+  author: string
+  /** Canonical site origin for feed/sitemap URLs when no request origin exists. */
+  url: string
+  nav: { text: string, link: string }[]
+  /** Which modes the theme toggle offers. */
+  themes: BlogThemeMode[]
+  defaultTheme: BlogThemeMode
+  /** Raw HTML for the footer colophon line. */
+  colophon: string
+  /** Empty-state heading shown when no posts exist yet. */
+  emptyTitle: string
+  /** Empty-state copy shown under the heading (plain text). */
+  emptyText: string
+}
+
+const STACKS_DEFAULTS: BlogSiteConfig = {
+  title: 'The Stacks Blog',
+  description: 'Notes from building a full-stack TypeScript framework whose only dependencies are TypeScript and Bun.',
+  siteTitle: 'Stacks Blog',
+  author: 'The Stacks Team',
+  url: 'https://stacksjs.com',
+  nav: [
+    { text: 'Blog', link: '/blog' },
+    { text: 'Docs', link: '/docs' },
+    { text: 'GitHub', link: 'https://github.com/stacksjs/stacks' },
+  ],
+  themes: ['colored', 'light', 'dark'],
+  defaultTheme: 'colored',
+  colophon: 'Built with Stacks · TypeScript &amp; Bun · <a href="/blog/feed.xml">RSS</a>',
+  emptyTitle: 'No posts yet',
+  emptyText: 'The first one is in the works. Leave your email and it will land in your inbox the moment it ships.',
+}
+
+let sitePromise: Promise<BlogSiteConfig> | null = null
+
+/** Load `config/blog.ts` and merge over the Stacks defaults (cached). */
+function site(): Promise<BlogSiteConfig> {
+  if (!sitePromise) {
+    sitePromise = (async () => {
+      try {
+        const mod = await import(join(process.cwd(), 'config/blog.ts'))
+        const cfg = (mod.default ?? {}) as Partial<BlogSiteConfig>
+        const merged: BlogSiteConfig = { ...STACKS_DEFAULTS, ...cfg }
+        if (!cfg.siteTitle && cfg.title)
+          merged.siteTitle = cfg.title
+        return merged
+      }
+      catch {
+        return STACKS_DEFAULTS
+      }
+    })()
+  }
+  return sitePromise
+}
+
 let bunpressPromise: Promise<BunPress | null> | null = null
 
 async function loadBunPress(): Promise<BunPress | null> {
   if (!bunpressPromise) {
     bunpressPromise = (async () => {
-      const candidates = [
+      const sourceCandidates = [
         join(homedir(), 'Code/Tools/bunpress/packages/bunpress/dist/src/index.js'),
         join(process.cwd(), 'pantry/@stacksjs/bunpress/dist/src/index.js'),
-        '@stacksjs/bunpress',
       ]
-      for (const entry of candidates) {
+
+      const candidates = sourceCandidates.filter(entry => existsSync(entry))
+      try {
+        candidates.push(Bun.resolveSync('@stacksjs/bunpress', import.meta.dir))
+      }
+      catch {
+        // BunPress is optional for apps that use their own blog renderer.
+      }
+
+      for (const entry of new Set(candidates)) {
         try {
-          if (entry.startsWith('@') || existsSync(entry))
-            return (await import(entry)) as unknown as BunPress
+          return (await import(entry)) as unknown as BunPress
         }
-        catch { /* try next */ }
+        catch (cause) {
+          const detail = cause instanceof Error ? cause.message : String(cause)
+          throw new Error(`[blog] Failed to import BunPress from ${entry}: ${detail}`, { cause })
+        }
       }
       return null
     })()
@@ -60,43 +143,79 @@ function escapeXml(s: string): string {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&apos;' }[c]!))
 }
 
+/**
+ * An origin safe to bake into absolute links, or '' when it is not usable.
+ *
+ * The deploy-time build takes its baseUrl from `APP_URL`, which is not always
+ * plaintext: a release that loads an env file it cannot decrypt leaves the
+ * literal ciphertext there, and prefixing it with `https://` produced feed and
+ * sitemap URLs like `https://encrypted:tLq7…==/blog/introducing-stacks` on the
+ * live site. Anything that is not a parseable http(s) origin with a dotted
+ * hostname is rejected here so callers fall back to the configured site url.
+ */
+export function usableOrigin(value?: string): string {
+  if (!value)
+    return ''
+
+  try {
+    const url = new URL(/^https?:\/\//.test(value) ? value : `https://${value}`)
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:')
+      return ''
+    if (!url.hostname.includes('.') || !/^[a-z0-9.-]+$/i.test(url.hostname))
+      return ''
+
+    return url.origin
+  }
+  catch {
+    return ''
+  }
+}
+
 function postUrl(baseUrl: string, slug: string): string {
   return `${baseUrl.replace(/\/$/, '')}/blog/${slug}`
 }
 
-function rssDate(date: string): string {
+function rssDate(date?: string): string {
+  if (!date)
+    return ''
   const parsed = new Date(date)
   return Number.isNaN(parsed.getTime()) ? date : parsed.toUTCString()
 }
 
-function fallbackFeedXml(baseUrl: string): string {
-  const origin = baseUrl || 'https://stacksjs.com'
+async function fallbackFeedXml(baseUrl: string): Promise<string> {
+  const cfg = await site()
+  const origin = usableOrigin(baseUrl) || usableOrigin(cfg.url) || cfg.url
   const posts = listPosts().slice(0, 50)
   const items = posts.map((p) => {
     const url = postUrl(origin, p.slug)
 
+    // `dc:creator` is carried over from the BunPress-built feed this replaced,
+    // so readers that show a byline keep showing one.
     return `    <item>
       <title>${escapeXml(p.fm.title || p.slug)}</title>
       <link>${escapeXml(url)}</link>
       <guid>${escapeXml(url)}</guid>
       <pubDate>${escapeXml(rssDate(p.fm.date))}</pubDate>
       <description>${escapeXml(p.fm.description || '')}</description>
+      <dc:creator>${escapeXml(p.fm.author || cfg.author)}</dc:creator>
     </item>`
   }).join('\n')
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
-    <title>The Stacks Blog</title>
+    <title>${escapeXml(cfg.title)}</title>
     <link>${escapeXml(`${origin}/blog`)}</link>
-    <description>Field notes from building a full-stack TypeScript framework whose only dependencies are TypeScript and Bun.</description>
+    <description>${escapeXml(cfg.description)}</description>
 ${items}
   </channel>
 </rss>`
 }
 
-function fallbackSitemapXml(baseUrl: string): string {
-  const origin = baseUrl || 'https://stacksjs.com'
+async function fallbackSitemapXml(baseUrl: string): Promise<string> {
+  const cfg = await site()
+  const origin = usableOrigin(baseUrl) || usableOrigin(cfg.url) || cfg.url
   const urls = [`${origin}/blog`, ...listPosts().map(p => postUrl(origin, p.slug))]
     .map(url => `  <url><loc>${escapeXml(url)}</loc></url>`)
     .join('\n')
@@ -113,7 +232,8 @@ function parseFrontmatter(md: string): { data: Record<string, string>, body: str
   if (!m)
     return { data: {}, body: md }
   const data: Record<string, string> = {}
-  for (const line of m[1].split('\n')) {
+  const frontmatter = m[1] ?? ''
+  for (const line of frontmatter.split('\n')) {
     const i = line.indexOf(':')
     if (i === -1)
       continue
@@ -123,10 +243,10 @@ function parseFrontmatter(md: string): { data: Record<string, string>, body: str
       val = val.slice(1, -1)
     data[key] = val
   }
-  return { data, body: m[2] }
+  return { data, body: m[2] ?? '' }
 }
 
-function formatDate(d: string): string {
+function formatDate(d?: string): string {
   if (!d)
     return ''
   const date = new Date(d)
@@ -136,20 +256,37 @@ function formatDate(d: string): string {
   return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`
 }
 
+const THEME_BUTTONS: Record<BlogThemeMode, { label: string, glyph: string }> = {
+  colored: { label: 'Glacier theme', glyph: '🌲' },
+  light: { label: 'Light theme', glyph: '☀' },
+  dark: { label: 'Dark theme', glyph: '🌙' },
+}
+
 /**
- * Outdoors chrome injected into every blog page:
+ * Chrome injected into every blog page:
  *   - an early (head-ish) script that applies the saved theme before paint and
  *     defines the toggle handler, then
- *   - a fixed 3-way theme switcher (colored / light / dark).
- * Default theme is `colored` (the warm NPS-brochure look — the signature Stacks
- * blog palette); the script only diverges from it when the visitor has
- * previously chosen another, or when a `?theme=` override is present.
+ *   - a fixed theme switcher offering the configured modes.
+ * The default mode comes from config (`defaultTheme`); the script only diverges
+ * from it when the visitor has previously chosen another mode, or when a
+ * `?theme=` override is present.
  */
-function blogChrome(): string {
+async function blogChrome(): Promise<string> {
+  const cfg = await site()
+  const modes = cfg.themes.length ? cfg.themes : STACKS_DEFAULTS.themes
+  const fallback = modes.includes(cfg.defaultTheme) ? cfg.defaultTheme : modes[0]
+  const buttons = modes.map(m => `<button type="button" data-t="${m}" title="${THEME_BUTTONS[m].label}" aria-label="${THEME_BUTTONS[m].label}" onclick="stxBlogTheme('${m}')">${THEME_BUTTONS[m].glyph}</button>`).join('\n      ')
+  const toggle = modes.length > 1
+    ? `<div class="blog-theme-toggle" role="group" aria-label="Theme">
+      ${buttons}
+    </div>`
+    : ''
+
   return `<script>
     (function () {
+      var modes = ${JSON.stringify(modes)}
       function ok(theme) {
-        return theme === 'light' || theme === 'colored' || theme === 'dark'
+        return modes.indexOf(theme) !== -1
       }
 
       var queryTheme = ''
@@ -158,56 +295,61 @@ function blogChrome(): string {
       }
       catch {}
 
+      // 'stacks-theme' is the shared key; the marketing page writes it too, so a
+      // choice made on / carries to /blog. 'stacks-blog-theme' is the old
+      // blog-only key, read once so an existing choice is not thrown away.
       var savedTheme = ''
       try {
-        savedTheme = localStorage.getItem('stacks-blog-theme') || ''
+        savedTheme = localStorage.getItem('stacks-theme') || localStorage.getItem('stacks-blog-theme') || ''
       }
       catch {}
 
-      var theme = ok(queryTheme) ? queryTheme : (ok(savedTheme) ? savedTheme : 'colored')
+      // A visitor who has never chosen gets their OS preference rather than a
+      // hard-coded default, which is what prefers-color-scheme is for. The
+      // configured default still answers for everyone who prefers light.
+      var prefersDark = false
+      try {
+        prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      }
+      catch {}
+
+      var systemTheme = (prefersDark && ok('dark')) ? 'dark' : ${JSON.stringify(fallback)}
+      var theme = ok(queryTheme) ? queryTheme : (ok(savedTheme) ? savedTheme : systemTheme)
       document.documentElement.setAttribute('data-theme', theme)
       window.stxBlogTheme = function (nextTheme) {
         try {
-          localStorage.setItem('stacks-blog-theme', nextTheme)
+          localStorage.setItem('stacks-theme', nextTheme)
         }
         catch {}
         document.documentElement.setAttribute('data-theme', nextTheme)
       }
     })()
   </script>
-    <div class="blog-theme-toggle" role="group" aria-label="Theme">
-      <button type="button" data-t="colored" title="Park (default)" aria-label="Park theme" onclick="stxBlogTheme('colored')">🌲</button>
-      <button type="button" data-t="light" title="Light" aria-label="Light theme" onclick="stxBlogTheme('light')">☀</button>
-      <button type="button" data-t="dark" title="Dark" aria-label="Dark theme" onclick="stxBlogTheme('dark')">🌙</button>
-    </div>`
+    ${toggle}`
 }
 
-/** Ridge + river landscape footer that closes out every blog page. */
-function blogFooter(): string {
-  return `<div class="blog-landscape" aria-hidden="true">
-      <span class="ridge"></span>
-      <span class="river"></span>
-      <p class="colophon">Built with Stacks · TypeScript &amp; Bun · <a href="/blog/feed.xml">RSS</a></p>
-    </div>`
+/** Minimal hairline footer that closes out every blog page. */
+async function blogFooter(): Promise<string> {
+  const cfg = await site()
+  return `<footer class="blog-foot">
+      <p class="colophon">${cfg.colophon}</p>
+    </footer>`
 }
 
-function blogConfig(bp: BunPress, fm: Record<string, any>) {
+async function blogConfig(bp: BunPress, fm: Record<string, any>) {
+  const cfg = await site()
   const themeCss = existsSync(THEME_FILE) ? readFileSync(THEME_FILE, 'utf-8') : ''
   const baseCss = (bp.defaultConfig.markdown?.css as string) || ''
   return {
     ...bp.defaultConfig,
-    title: fm.title || 'Stacks Blog',
-    description: fm.description || 'The official Stacks blog.',
+    title: fm.title || cfg.title,
+    description: fm.description || cfg.description,
     docsDir: CONTENT_DIR,
-    theme: 'vitepress',
+    theme: 'bun',
     markdown: { ...bp.defaultConfig.markdown, css: `${baseCss}\n${themeCss}` },
     themeConfig: {
-      siteTitle: 'Stacks Blog',
-      nav: [
-        { text: 'Blog', link: '/blog' },
-        { text: 'Docs', link: '/docs' },
-        { text: 'GitHub', link: 'https://github.com/stacksjs/stacks' },
-      ],
+      siteTitle: cfg.siteTitle,
+      nav: cfg.nav,
     },
   }
 }
@@ -221,9 +363,11 @@ function listPosts(): { slug: string, fm: Record<string, string> }[] {
       const { data } = parseFrontmatter(readFileSync(join(CONTENT_DIR, f), 'utf-8'))
       return { slug: f.replace(/\.md$/, ''), fm: data }
     })
-    // A real post needs a title + date; this skips docs/drafts like STRATEGY.md
-    // (and matches what BunPress's RSS collector requires).
-    .filter(p => !!p.fm.title && !!p.fm.date)
+    // A real post needs a title + date; this skips docs like STRATEGY.md
+    // (and matches what BunPress's RSS collector requires). `draft: true` is
+    // set by the dashboard to hold a post back from the listing, feed, and
+    // sitemap; a post with no `draft` key is published.
+    .filter(p => !!p.fm.title && !!p.fm.date && p.fm.draft !== 'true')
     .sort((a, b) => {
       // Featured first, then newest date first.
       const fa = a.fm.featured === 'true' ? 1 : 0
@@ -240,15 +384,16 @@ async function notFoundHtml(bp: BunPress): Promise<string> {
   const body = `
     <a class="blog-back" href="/blog">← All posts</a>
     <div class="blog-404">
-      <span class="blog-404-art" aria-hidden="true"></span>
-      <h1>You've wandered off the trail</h1>
-      <p>This post isn't on the map (or it moved camp). Head back to <a href="/blog">the trailhead</a>.</p>
+      <p class="blog-kicker">404</p>
+      <h1>Nothing here</h1>
+      <p>This post doesn't exist (or it moved). Head back to <a href="/blog">all posts</a>.</p>
     </div>`
-  return bp.wrapInLayout(blogChrome() + body + blogFooter(), blogConfig(bp, { title: 'Not found' }), '/blog', 'page')
+  return bp.wrapInLayout(await blogChrome() + body + await blogFooter(), await blogConfig(bp, { title: 'Not found' }), '/blog', 'page')
 }
 
 /** Full HTML for a single post, or null if the markdown file doesn't exist. */
 async function postHtml(bp: BunPress, slug: string, origin: string): Promise<string | null> {
+  const cfg = await site()
   const file = join(CONTENT_DIR, `${slug}.md`)
   if (!existsSync(file))
     return null
@@ -256,37 +401,40 @@ async function postHtml(bp: BunPress, slug: string, origin: string): Promise<str
   const raw = readFileSync(file, 'utf-8')
   const { html, frontmatter: fm } = await bp.markdownToHtml(raw, CONTENT_DIR)
 
-  // Only real posts (title + date) are served; docs/drafts in content/blog/
-  // (e.g. STRATEGY.md) are not addressable as posts.
-  if (!fm.title || !fm.date)
+  // Only real posts (title + date) are served; prose docs in content/blog/
+  // (e.g. STRATEGY.md) are not addressable as posts. `draft: true` 404s here as
+  // well as hiding from the listing, so an unpublished post has no public URL.
+  // BunPress parses YAML, so `draft` arrives as a boolean, not the string the
+  // single-line parser in `listPosts` sees.
+  if (!fm.title || !fm.date || fm.draft === true || fm.draft === 'true')
     return null
 
-  const initial = escapeHtml((fm.author || 'S').charAt(0).toUpperCase())
+  const author = fm.author || cfg.author
+  const initial = escapeHtml(author.charAt(0).toUpperCase())
   const header = `
     <a class="blog-back" href="/blog">← All posts</a>
     <div class="blog-post-head">
-      <h1>${escapeHtml(fm.title || slug)}</h1>
       <p class="blog-post-meta">
-        <span class="author">${escapeHtml(fm.author || 'The Stacks Team')}</span>
-        <span class="dot">·</span>
         <time>${escapeHtml(formatDate(fm.date))}</time>
+        <span class="dot">·</span>
+        <span class="author">${escapeHtml(author)}</span>
       </p>
-      ${fm.poster ? `<figure class="blog-post-poster"><img src="${escapeHtml(fm.poster)}" alt="${escapeHtml(fm.title || '')}"></figure>` : ''}
+      <h1>${escapeHtml(fm.title || slug)}</h1>
     </div>`
 
   const authorCard = fm.authorBio
     ? `<aside class="blog-author-card">
         <div class="avatar">${initial}</div>
-        <div><span class="name">${escapeHtml(fm.author || 'The Stacks Team')}</span><p class="bio">${escapeHtml(fm.authorBio)}</p></div>
+        <div><span class="name">${escapeHtml(author)}</span><p class="bio">${escapeHtml(fm.authorBio)}</p></div>
       </aside>`
     : ''
 
-  const postUrl = `${origin}/blog/${slug}`
+  const shareUrl = `${origin}/blog/${slug}`
   const share = `
     <div class="blog-share">
       <span class="blog-share-label">Share</span>
-      <a href="https://twitter.com/intent/tweet?url=${encodeURIComponent(postUrl)}&text=${encodeURIComponent(fm.title || '')}" target="_blank" rel="noreferrer">X / Twitter</a>
-      <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(postUrl)}" target="_blank" rel="noreferrer">LinkedIn</a>
+      <a href="https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(fm.title || '')}" target="_blank" rel="noreferrer">X / Twitter</a>
+      <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}" target="_blank" rel="noreferrer">LinkedIn</a>
     </div>`
 
   const others = listPosts().filter(p => p.slug !== slug).slice(0, 3)
@@ -297,58 +445,112 @@ async function postHtml(bp: BunPress, slug: string, origin: string): Promise<str
       </nav>`
     : ''
 
-  return bp.wrapInLayout(blogChrome() + header + html + authorCard + share + more + blogFooter(), blogConfig(bp, fm), `/blog/${slug}`, 'page')
+  return bp.wrapInLayout(await blogChrome() + header + html + authorCard + share + more + await blogFooter(), await blogConfig(bp, fm), `/blog/${slug}`, 'page')
 }
 
 /** Full HTML for the blog listing. */
 async function indexHtml(bp: BunPress): Promise<string> {
+  const cfg = await site()
   const posts = listPosts()
-  const cards = posts.map((p) => {
-    const featured = p.fm.featured === 'true'
-    const media = p.fm.poster
-      ? `<div class="blog-card-media"><img src="${escapeHtml(p.fm.poster)}" alt="" loading="lazy"></div>`
-      : ''
-    return `<a class="blog-card${featured ? ' is-featured' : ''}" href="/blog/${escapeHtml(p.slug)}">
-      ${media}
-      <div>
-        ${featured ? '<span class="blog-card-flag">Featured</span>' : ''}
-        <h2 class="blog-card-title">${escapeHtml(p.fm.title || p.slug)}</h2>
-        <p class="blog-card-excerpt">${escapeHtml((p.fm.description || '').slice(0, 180))}</p>
-        <div class="blog-card-meta">${escapeHtml(p.fm.author || 'The Stacks Team')} · ${escapeHtml(formatDate(p.fm.date))}</div>
+
+  // Editorial index: the lead post (featured first, otherwise newest) gets a
+  // hero treatment, everything after it is a hairline row. No thumbnails;
+  // type, rules, and whitespace carry the page.
+  const [lead, ...rest] = posts
+  const leadHtml = lead
+    ? `<a class="blog-feature" href="/blog/${escapeHtml(lead.slug)}">
+        <p class="blog-feature-meta">${lead.fm.featured === 'true' ? '<span class="chip">Featured</span>' : ''}<time>${escapeHtml(formatDate(lead.fm.date))}</time></p>
+        <h2>${escapeHtml(lead.fm.title || lead.slug)}</h2>
+        <p class="blog-feature-excerpt">${escapeHtml((lead.fm.description || '').slice(0, 200))}</p>
+        <span class="blog-read">Read the post <span class="arrow" aria-hidden="true">→</span></span>
+      </a>`
+    : ''
+  const rows = rest.map(p => `<a class="blog-row" href="/blog/${escapeHtml(p.slug)}">
+      <time>${escapeHtml(formatDate(p.fm.date))}</time>
+      <div class="blog-row-main">
+        <h2>${escapeHtml(p.fm.title || p.slug)}</h2>
+        <p>${escapeHtml((p.fm.description || '').slice(0, 160))}</p>
       </div>
-    </a>`
-  }).join('\n')
+      <span class="blog-row-arrow" aria-hidden="true">→</span>
+    </a>`).join('\n')
+  const cards = leadHtml + (rest.length ? `<div class="blog-index">${rows}</div>` : '')
+
+  // Empty state doubles as an email-capture moment: every Stacks app ships the
+  // public `/api/email/subscribe` endpoint, so the form works out of the box.
+  const emptyState = `
+    <div class="blog-empty">
+      <h2>${escapeHtml(cfg.emptyTitle)}</h2>
+      <p>${escapeHtml(cfg.emptyText)}</p>
+      <form class="blog-subscribe" method="POST" action="/api/email/subscribe">
+        <input type="email" name="email" placeholder="you@example.com" autocomplete="email" aria-label="Email address" required>
+        <input type="hidden" name="source" value="blog-empty">
+        <button type="submit">Subscribe</button>
+        <p class="blog-form-note" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+    <script>
+      (function () {
+        var form = document.querySelector('.blog-subscribe')
+        if (!form) return
+        var note = form.querySelector('.blog-form-note')
+        var button = form.querySelector('button[type="submit"]')
+        var say = function (text) { if (note) note.textContent = text }
+        form.addEventListener('submit', function (event) {
+          event.preventDefault()
+          var input = form.querySelector('input[name="email"]')
+          if (!input || !input.value) { say('Enter an email address first.'); return }
+          if (button) button.disabled = true
+          say('Subscribing...')
+          var body = new URLSearchParams()
+          body.set('email', input.value)
+          body.set('source', 'blog-empty')
+          fetch('/api/email/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString(),
+          })
+            .then(function (res) { return res.json().catch(function () { return {} }) })
+            .then(function (data) {
+              if (data && data.success) {
+                say(data.message === 'Already subscribed' ? 'You are already on the list.' : 'Subscribed. Check your inbox to confirm.')
+                form.reset()
+              }
+              else {
+                say((data && data.message) || 'Something went wrong. Try again.')
+              }
+            })
+            .catch(function () { say('Network error. Try again in a moment.') })
+            .finally(function () { if (button) button.disabled = false })
+        })
+      })()
+    </script>`
 
   const body = `
-    <div class="blog-listing-head">
-      <span class="sign" aria-hidden="true"></span>
-      <h1>The Stacks Blog</h1>
-      <p>Field notes from building a full-stack TypeScript framework whose only dependencies are TypeScript and Bun.</p>
+    <div class="blog-head">
+      <h1>${escapeHtml(cfg.title)}</h1>
+      <p class="blog-head-sub">${escapeHtml(cfg.description)}</p>
+      ${posts.length ? `<p class="blog-count">${posts.length} ${posts.length === 1 ? 'post' : 'posts'}</p>` : ''}
     </div>
-    <div class="blog-cards">${cards || '<p>No posts yet.</p>'}</div>`
+    <div class="blog-list">${cards || emptyState}</div>`
 
-  return bp.wrapInLayout(blogChrome() + body + blogFooter(), blogConfig(bp, { title: 'Blog', description: 'The official Stacks blog.' }), '/blog', 'page')
+  return bp.wrapInLayout(await blogChrome() + body + await blogFooter(), await blogConfig(bp, { title: cfg.title, description: cfg.description }), '/blog', 'page')
 }
 
-/** RSS feed (BunPress's own builder). `baseUrl` is the site origin (no /blog). */
-function feedXml(bp: BunPress, baseUrl: string): Promise<string> {
-  const cfg = { ...blogConfig(bp, { title: 'The Stacks Blog' }), sitemap: { enabled: true, baseUrl: `${baseUrl}/blog` } }
-  return typeof bp.buildRssFeed === 'function'
-    ? bp.buildRssFeed(CONTENT_DIR, cfg, {
-        enabled: true,
-        title: 'The Stacks Blog',
-        description: 'Field notes from building a full-stack TypeScript framework whose only dependencies are TypeScript and Bun.',
-        maxItems: 50,
-      })
-    : Promise.resolve(fallbackFeedXml(baseUrl))
+/**
+ * RSS feed and XML sitemap. `baseUrl` is the site origin (no /blog).
+ *
+ * Both are generated from `listPosts()` rather than BunPress's `buildRssFeed` /
+ * `buildSitemap`. Those scan `content/blog/*.md` themselves and have no concept
+ * of our `draft` flag, so they published an unfinished post's title, description,
+ * and link even though the listing hid it and its own URL 404'd. Driving every
+ * public surface off `listPosts()` keeps one answer to "what is published".
+ */
+async function feedXml(baseUrl: string): Promise<string> {
+  return fallbackFeedXml(baseUrl)
 }
 
-/** XML sitemap (BunPress's own builder). `baseUrl` is the site origin (no /blog). */
-function sitemapXml(bp: BunPress, baseUrl: string): Promise<string> {
-  const cfg = { ...blogConfig(bp, { title: 'Blog' }), sitemap: { enabled: true, baseUrl: `${baseUrl}/blog` } }
-  return typeof bp.buildSitemap === 'function'
-    ? bp.buildSitemap(CONTENT_DIR, cfg)
-    : Promise.resolve(fallbackSitemapXml(baseUrl))
+async function sitemapXml(baseUrl: string): Promise<string> {
+  return fallbackSitemapXml(baseUrl)
 }
 
 // ── Dynamic path (dev server onRequest) ──────────────────────────────────────
@@ -376,15 +578,35 @@ export async function renderBlog(req: Request): Promise<Response | null> {
   const html = (s: string, status = 200) => new Response(s, { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
 
   if (isFeed)
-    return new Response(await feedXml(bp, url.origin), { headers: { 'Content-Type': 'application/rss+xml; charset=utf-8' } })
+    return new Response(await feedXml(url.origin), { headers: { 'Content-Type': 'application/rss+xml; charset=utf-8' } })
   if (isSitemap)
-    return new Response(await sitemapXml(bp, url.origin), { headers: { 'Content-Type': 'application/xml; charset=utf-8' } })
+    return new Response(await sitemapXml(url.origin), { headers: { 'Content-Type': 'application/xml; charset=utf-8' } })
   if (pathname === '/blog' || pathname === '/blog/')
     return html(await indexHtml(bp))
 
   const slug = pathname.replace(/^\/blog\//, '').replace(/\/$/, '')
   const post = await postHtml(bp, slug, url.origin)
   return post ? html(post) : html(await notFoundHtml(bp), 404)
+}
+
+/**
+ * RSS + sitemap for an stx-native blog. When an app renders /blog with its own
+ * stx views (so BunPress is skipped for the HTML pages), it still wants
+ * /blog/feed.xml and /blog/sitemap.xml — these are generated straight from the
+ * `content/blog/*.md` frontmatter with NO BunPress dependency, so they work in
+ * dev and production alike. Returns null for any non-feed path (the stx page
+ * layer then handles /blog and /blog/<slug>). Absolute URLs use the configured
+ * site url (blog config), never the loopback request origin.
+ */
+export async function renderBlogFeed(req: Request): Promise<Response | null> {
+  if (req.method !== 'GET' && req.method !== 'HEAD')
+    return null
+  const { pathname } = new URL(req.url)
+  if (pathname === '/blog/feed.xml')
+    return new Response(await fallbackFeedXml(''), { headers: { 'Content-Type': 'application/rss+xml; charset=utf-8' } })
+  if (pathname === '/blog/sitemap.xml')
+    return new Response(await fallbackSitemapXml(''), { headers: { 'Content-Type': 'application/xml; charset=utf-8' } })
+  return null
 }
 
 // ── Static path (deploy-time build → dist/blog) ──────────────────────────────
@@ -397,11 +619,20 @@ export async function renderBlog(req: Request): Promise<Response | null> {
  */
 export async function buildBlog(options: { outDir: string, baseUrl?: string } = { outDir: 'dist/blog' }): Promise<void> {
   const outDir = options.outDir || 'dist/blog'
-  const baseUrl = (options.baseUrl || '').replace(/\/$/, '')
+  // `options.baseUrl` comes from APP_URL at deploy time and is not trusted: see
+  // `usableOrigin`. An unusable value falls back to the configured site url
+  // rather than being baked into every absolute link.
+  const siteUrl = (await site()).url
+  const baseUrl = usableOrigin(options.baseUrl) || usableOrigin(siteUrl) || siteUrl.replace(/\/$/, '')
+
+  if (options.baseUrl && !usableOrigin(options.baseUrl)) {
+    // eslint-disable-next-line no-console
+    console.warn(`[blog] ignoring unusable baseUrl ${JSON.stringify(options.baseUrl)}; falling back to ${baseUrl}`)
+  }
 
   const bp = await loadBunPress()
   if (!bp)
-    throw new Error('[blog] BunPress not found — cannot build the blog.')
+    throw new Error('[blog] BunPress not found; cannot build the blog.')
 
   mkdirSync(outDir, { recursive: true })
   const write = (rel: string, content: string) => {
@@ -422,8 +653,8 @@ export async function buildBlog(options: { outDir: string, baseUrl?: string } = 
   }
 
   // SEO
-  write('feed.xml', await feedXml(bp, baseUrl))
-  write('sitemap.xml', await sitemapXml(bp, baseUrl))
+  write('feed.xml', await feedXml(baseUrl))
+  write('sitemap.xml', await sitemapXml(baseUrl))
 
   // eslint-disable-next-line no-console
   console.log(`[blog] built ${posts.length} post(s) + listing, feed.xml, sitemap.xml → ${outDir}`)

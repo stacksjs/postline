@@ -1,42 +1,21 @@
-import { dts } from 'bun-plugin-dtsx'
-import { frameworkExternal, intro, outro } from '../build/src'
+import { frameworkExternal, intro, outro, transpilePackage } from '../build/src'
 
 const { startTime } = await intro({
   dir: import.meta.dir,
 })
 
-const result = await Bun.build({
-  entrypoints: ['./src/index.ts'],
-  outdir: './dist',
-  format: 'esm',
-  target: 'bun',
-  // sourcemap: 'linked',
-  minify: true,
-
+// Transpile file-by-file (Bun.Transpiler) instead of bundling with Bun.build:
+// the bundler mangles this package's barrel re-exports into invalid
+// `export { x as y }` where `x` is never declared — the "Exported binding 'X'
+// needs to refer to a top-level declared variable" crash that broke every
+// consumer on import (stacks 0.70.85–0.70.88). See core/build/src/index.ts.
+await transpilePackage({
+  dir: import.meta.dir,
   external: frameworkExternal(),
-  plugins: [
-    dts({
-      root: './src',
-      outdir: './dist',
-    }),
-  ],
 })
-
-// dtsx (<= 0.10.8) drops the space between an interface name and its
-// `extends` clause inside `declare module` blocks, emitting a d.ts that
-// fails to parse (TS1005). Repair the known augmentation until the
-// upstream emitter is fixed.
-const augmentationDts = `${import.meta.dir}/dist/request-augmentation.d.ts`
-const dtsFile = Bun.file(augmentationDts)
-if (await dtsFile.exists()) {
-  const contents = await dtsFile.text()
-  const repaired = contents.replace(/\binterface (\w+)extends /g, 'interface $1 extends ')
-  if (repaired !== contents)
-    await Bun.write(augmentationDts, repaired)
-}
 
 await outro({
   dir: import.meta.dir,
   startTime,
-  result,
+  result: { errors: [], warnings: [] },
 })

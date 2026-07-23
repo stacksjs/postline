@@ -1,7 +1,8 @@
 {
   "name": "@stacksjs/api",
   "type": "module",
-  "version": "0.70.45",
+  "sideEffects": false,
+  "version": "0.70.162",
   "description": "The Stacks array utilities.",
   "author": "Chris Breuer",
   "contributors": [
@@ -29,12 +30,16 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "bun": "./src/index.ts",
-      "import": "./dist/index.js"
+      "development": "./src/index.ts",
+      "bun": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./*": {
-      "bun": "./src/*",
-      "import": "./dist/*"
+      "development": "./src/*",
+      "bun": "./dist/*",
+      "import": "./dist/*",
+      "default": "./dist/*"
     }
   },
   "module": "dist/index.js",
@@ -45,12 +50,12 @@
   ],
   "scripts": {
     "build": "bun build.ts",
-    "generate-types": "open-api ./../../api/openapi.json --output ./../../api/api-types.ts",
+    "generate-types": "bun src/generate-types.ts",
     "typecheck": "bun tsc --noEmit",
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {
-    "better-dx": "^0.2.12",
+    "better-dx": "catalog:",
     "@stacksjs/utils": "workspace:*"
   }
 }

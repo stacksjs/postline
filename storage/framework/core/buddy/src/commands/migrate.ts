@@ -1,7 +1,7 @@
 import type { CLI, MigrateOptions } from '@stacksjs/types'
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import process from 'node:process'
-import { confirm, intro, log, onUnknownSubcommand, outro } from "@stacksjs/cli"
+import { confirm, intro, log, onUnknownSubcommand, outro, text } from "@stacksjs/cli"
 import { Action } from '@stacksjs/enums'
 import { hasTTY, isCI } from '@stacksjs/env'
 import { appPath, frameworkPath, projectPath } from '@stacksjs/path'
@@ -147,11 +147,46 @@ async function reportMissingForeignKeys(): Promise<void> {
     const more = result.missing.length > 5 ? `\n  + ${result.missing.length - 5} more — run \`./buddy doctor\` for the full list.` : ''
     log.warn(
       `${result.missing.length} of ${result.declared.length} declared foreign keys are missing from the live schema:\n${sample}${more}\n`
-      + `If you just flipped DB_CONNECTION, the FK ALTER migrations may be sitting on disk but unapplied — run \`./buddy migrate:fresh\` against the new database (will reset data) or replay the alter-*.sql files manually.`,
+      + `The model-backed create migrations may be stale for this database — run \`./buddy migrate:fresh\` to regenerate and replay them from the model attributes (this resets data).`,
     )
   }
   catch (err) {
     log.debug(`[migrate] FK integrity check skipped: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
+/**
+ * Post-migrate orphan-row scan (stacksjs/stacks#1951, follow-up from #1957).
+ *
+ * SQLite now boots with `foreign_keys = ON`, so a database written under the
+ * old `foreign_keys = OFF` default can carry child rows pointing at parents
+ * that no longer exist. Those orphans turn previously-working deletes/inserts
+ * into runtime FK failures. `buddy doctor` already surfaces them, but migrate
+ * is the highest-context moment — it's the step that first flips enforcement on
+ * against the legacy data — so warn here too. Read-only (`PRAGMA
+ * foreign_key_check`) and non-fatal: a failed scan must never break migrate,
+ * and we never delete data (the operator cleans up manually).
+ */
+async function reportFkOrphans(): Promise<void> {
+  try {
+    const { findFkOrphans } = await import('@stacksjs/database')
+    const result = await findFkOrphans()
+    if (!result.supported || result.total === 0) return
+
+    const sample = result.orphans
+      .slice(0, 5)
+      .map(o => `  • ${o.table}.${o.column} → ${o.parent} (${o.count} row${o.count === 1 ? '' : 's'})`)
+      .join('\n')
+    const more = result.orphans.length > 5 ? `\n  + ${result.orphans.length - 5} more — run \`./buddy doctor\` for the full list.` : ''
+    const first = result.orphans[0]!
+    log.warn(
+      `${result.total} row${result.total === 1 ? '' : 's'} violate foreign keys (orphaned parents), now that SQLite enforces \`foreign_keys = ON\`:\n${sample}${more}\n`
+      + `These were written under the old \`foreign_keys = OFF\` default (#1951). Review and clean up manually — e.g. `
+      + `DELETE FROM ${first.table} WHERE ${first.column} IS NOT NULL AND ${first.column} NOT IN (SELECT id FROM ${first.parent}). migrate never deletes data.`,
+    )
+  }
+  catch (err) {
+    log.debug(`[migrate] FK orphan scan skipped: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
 
@@ -227,9 +262,74 @@ async function confirmDestructiveMigrations(opts: { force?: boolean, fromDb?: bo
   return confirm({ message: 'Apply these destructive changes?', initial: false })
 }
 
+type FreshGuard = 'allow' | 'confirm' | 'disabled'
+
+interface MigrationGuards {
+  confirmMigrate: boolean
+  migrateFresh: FreshGuard
+}
+
+/** Coerce an env string like "0"/"false"/"no" to a boolean, else undefined. */
+function parseGuardBool(raw: string | undefined): boolean | undefined {
+  if (raw == null || raw === '') return undefined
+  const v = raw.toLowerCase().trim()
+  if (v === '1' || v === 'true' || v === 'yes' || v === 'on') return true
+  if (v === '0' || v === 'false' || v === 'no' || v === 'off') return false
+  return undefined
+}
+
+function parseFreshGuard(raw: string | undefined): FreshGuard | undefined {
+  const v = raw?.toLowerCase().trim()
+  return v === 'allow' || v === 'confirm' || v === 'disabled' ? v : undefined
+}
+
+/**
+ * Resolve the effective migration safety guards. Precedence (highest first):
+ *   1. env var override (DB_MIGRATE_CONFIRM / DB_MIGRATE_FRESH) — the CI escape hatch
+ *   2. config/database.ts `safety` block
+ *   3. built-in default (confirm on; migrate:fresh disabled in prod, allow elsewhere)
+ *
+ * Config is read via `awaitConfig()` so the user's `config/database.ts` has
+ * definitely merged over the framework defaults before we look. A failure to
+ * load config falls back to the safe built-in defaults rather than throwing —
+ * a broken config must not turn the guards off.
+ */
+async function resolveMigrationGuards(): Promise<MigrationGuards> {
+  const isProd = /^prod/i.test(process.env.APP_ENV || 'local')
+
+  let cfg: { confirmMigrate?: boolean, migrateFresh?: FreshGuard } = {}
+  try {
+    const { awaitConfig } = await import('@stacksjs/config')
+    const resolved = await awaitConfig()
+    cfg = (resolved.database as { safety?: typeof cfg })?.safety ?? {}
+  }
+  catch (error) {
+    log.debug(`[migrate] safety config unavailable, using defaults: ${error instanceof Error ? error.message : String(error)}`)
+  }
+
+  const confirmMigrate = parseGuardBool(process.env.DB_MIGRATE_CONFIRM)
+    ?? cfg.confirmMigrate
+    ?? true
+
+  const migrateFresh = parseFreshGuard(process.env.DB_MIGRATE_FRESH)
+    ?? cfg.migrateFresh
+    ?? (isProd ? 'disabled' : 'allow')
+
+  return { confirmMigrate, migrateFresh }
+}
+
+/** Human-friendly label for the database `migrate:fresh` is about to drop. */
+function currentDatabaseLabel(): string {
+  const driver = (process.env.DB_CONNECTION || 'sqlite').toLowerCase()
+  if (driver === 'sqlite')
+    return process.env.DB_DATABASE_PATH || 'database/stacks.sqlite'
+  return process.env.DB_DATABASE || 'stacks'
+}
+
 export function migrate(buddy: CLI): void {
   const descriptions = {
     migrate: 'Migrates your database',
+    fresh: 'Drop all tables and re-run every migration (destroys all data)',
     project: 'Target a specific project',
     verbose: 'Enable verbose output',
     auth: 'Also migrate auth tables (oauth_clients, oauth_access_tokens, oauth_refresh_tokens, password_resets)',
@@ -292,6 +392,29 @@ export function migrate(buddy: CLI): void {
         process.exit(ExitCode.Success)
       }
 
+      // Safety guard: confirm before touching the database at all. This is
+      // separate from (and runs before) the destructive-change gate below —
+      // it catches "wrong database / wrong env" mistakes even for additive
+      // migrations. `--force` bypasses it, and non-interactive runs (CI /
+      // no TTY) proceed automatically so deploy pipelines aren't blocked.
+      const guards = await resolveMigrationGuards()
+      if (guards.confirmMigrate && !options.force) {
+        if (isCI || !hasTTY) {
+          log.debug('[migrate] confirmMigrate guard skipped — non-interactive environment.')
+        }
+        else {
+          const APP_ENV = process.env.APP_ENV || 'local'
+          const proceed = await confirm({
+            message: `Run migrations against the ${APP_ENV} database "${currentDatabaseLabel()}"?`,
+            initial: true,
+          })
+          if (!proceed) {
+            await outro('Migration cancelled — no changes applied.', { startTime: perf, useSeconds: true })
+            process.exit(ExitCode.Success)
+          }
+        }
+      }
+
       // Acquire a project-local migration lock to prevent two concurrent
       // runs from interleaving DDL on the same database. Two parallel
       // `buddy migrate` invocations on the same project used to corrupt
@@ -312,23 +435,18 @@ export function migrate(buddy: CLI): void {
         process.exit(ExitCode.Success)
       }
 
-      const result = await runAction(Action.Migrate, options).finally(() => lock.release())
-
-      if (result.isErr) {
-        // Don't exit yet — the auth/notification/RBAC guarantees below
-        // are independent of the model migrations (#1952): the sqlite
-        // self-heal replays poisoned unique-index migrations, and real
-        // duplicate rows make that replay hard-fail, aborting every
-        // remaining model migration. The legacy apps hitting that are
-        // exactly the ones that still need the guarantee tables (and
-        // #1948's users.email_verified_at ALTER), and all of that SQL
-        // is idempotent CREATE TABLE IF NOT EXISTS / defensive ALTERs —
-        // safe against a partially migrated schema. The command still
-        // exits FatalError below, after the guarantees have run.
-        log.error('Model migrations failed — applying auth/notification/RBAC table guarantees before exiting.')
-      }
-
-      // Auth/oauth tables migrate by default. Pass --no-auth to opt out.
+      // Auth/oauth tables migrate by default, and run BEFORE the numbered
+      // model migrations (not after — see stacksjs/stacks#1952 for why this
+      // used to run last). Migration
+      // 0000000098-revoke-legacy-long-lived-tokens.sql (and any future
+      // migration touching oauth_access_tokens/oauth_refresh_tokens)
+      // assumes these framework tables already exist; on a brand new
+      // `buddy new` project there is no prior `buddy migrate --auth` run
+      // to have created them, so that migration hard-failed with
+      // "no such table: oauth_access_tokens" on every fresh install. The
+      // SQL here is all idempotent `CREATE TABLE IF NOT EXISTS` /
+      // defensive `ALTER`, so running it first is a no-op on databases
+      // that already have these tables. Pass --no-auth to opt out.
       if (options.auth !== false) {
         // Step-progress at debug — the auth-tables SQL is all
         // `CREATE TABLE IF NOT EXISTS`, so re-runs are no-ops and the
@@ -336,31 +454,45 @@ export function migrate(buddy: CLI): void {
         // every time. Errors still surface via log.error below.
         log.debug('Migrating auth tables...')
         try {
-          const { migrateAuthTables, migrateNotificationTables, migrateRbacTables } = await import('@stacksjs/database')
+          const { migrateAuthTables } = await import('@stacksjs/database')
           const authResult = await migrateAuthTables({ verbose: options.verbose })
 
           if (!authResult.success) {
             log.error(`Failed to migrate auth tables: ${authResult.error}`)
           }
 
-          // Notification tables (stacksjs/stacks#1937) — the `database`
-          // channel + preference layer need these; previously unshipped.
+        }
+        catch (error) {
+          log.error('Failed to migrate auth tables:', error)
+        }
+      }
+
+      const result = await runAction(Action.Migrate, options).finally(() => lock.release())
+
+      if (result.isErr) {
+        log.error('Model migrations failed — applying notification/RBAC table guarantees before exiting.')
+      }
+
+      // Notification and RBAC guarantees run AFTER model migrations so an app
+      // model with the same table name remains authoritative. In particular,
+      // pre-creating `notification_preferences` used to suppress the generated
+      // model migration and silently discard its user_id foreign key. These
+      // guarantees are still attempted before the failure exit below (#1952).
+      if (options.auth !== false) {
+        try {
+          const { migrateNotificationTables, migrateRbacTables } = await import('@stacksjs/database')
           const notifResult = await migrateNotificationTables({ verbose: options.verbose })
           if (!notifResult.success) {
             log.error(`Failed to migrate notification tables: ${notifResult.error}`)
           }
 
-          // RBAC tables (stacksjs/stacks#1941 Phase A) — roles,
-          // permissions, and the three pivot tables the RBAC store
-          // reads. Schema was documented in rbac-store-bqb.ts but the
-          // migration never shipped.
           const rbacResult = await migrateRbacTables({ verbose: options.verbose })
           if (!rbacResult.success) {
             log.error(`Failed to migrate RBAC tables: ${rbacResult.error}`)
           }
         }
         catch (error) {
-          log.error('Failed to migrate auth/notification/RBAC tables:', error)
+          log.error('Failed to migrate notification/RBAC tables:', error)
         }
       }
 
@@ -375,11 +507,54 @@ export function migrate(buddy: CLI): void {
         process.exit(ExitCode.FatalError)
       }
 
+      // `users` doesn't exist yet when migrateAuthTables() runs above
+      // (that step intentionally runs BEFORE model migrations — other
+      // numbered migrations reference oauth_access_tokens, see #1952)
+      // — so its users.* guarantee-column ALTERs (email_verified_at,
+      // password_changed_at, two_factor_secret, two_factor_enabled) all
+      // fail harmlessly against a table that isn't there yet. Run them
+      // again now that the numbered migration creating `users` has had
+      // its chance. Only when a project's model migrations actually run
+      // `users` through (still gated behind --auth, same flag as above).
+      if (options.auth !== false) {
+        try {
+          const { ensureUsersAuthColumns, sqlHelpers } = await import('@stacksjs/database')
+          const driver = process.env.DB_CONNECTION || 'sqlite'
+          await ensureUsersAuthColumns(sqlHelpers(driver), { verbose: options.verbose })
+        }
+        catch (error) {
+          log.error('Failed to ensure users auth columns post-migration:', error)
+        }
+      }
+
+      // uuid guarantee — every model with `useUuid: true` needs a `uuid`
+      // column, but most committed create-table migrations were generated
+      // before the trait was added to their model (or predate the model
+      // entirely) and nothing ever regenerates them (stacksjs/status#1
+      // Phase 9, see uuid-columns.ts). Unlike the block above this isn't
+      // gated behind --auth: the affected models span the whole app, not
+      // just `users`.
+      try {
+        const { ensureUuidColumns, sqlHelpers } = await import('@stacksjs/database')
+        const driver = process.env.DB_CONNECTION || 'sqlite'
+        await ensureUuidColumns(sqlHelpers(driver), { verbose: options.verbose })
+      }
+      catch (error) {
+        log.error('Failed to ensure uuid columns post-migration:', error)
+      }
+
       // Post-migrate FK integrity check (stacksjs/stacks#1915 D-5).
       // Surfaces the "you flipped DB_CONNECTION and the FKs didn't
       // follow" failure mode while the user is still at the migrate
       // command — the highest-context moment to warn.
       await reportMissingForeignKeys()
+
+      // Post-migrate orphan-row scan (stacksjs/stacks#1951). migrate is the
+      // step that flips `foreign_keys = ON` against legacy data, so it's the
+      // right place to surface pre-existing orphans (read-only, non-fatal).
+      // migrate:fresh rebuilds from scratch, so it can't have orphans — this
+      // scan is intentionally only on the plain `migrate` path.
+      await reportFkOrphans()
 
       const APP_ENV = process.env.APP_ENV || 'local'
 
@@ -405,15 +580,16 @@ export function migrate(buddy: CLI): void {
     })
 
   buddy
-    .command('migrate:fresh', descriptions.migrate)
+    .command('migrate:fresh', descriptions.fresh)
     .alias('db:fresh')
     .option('-d, --diff', 'Show the SQL that would be run', { default: false })
     .option('-p, --project [project]', descriptions.project, { default: false })
     .option('-s, --seed', 'Run database seeders after migration', { default: false })
     .option('-a, --auth', descriptions.auth, { default: true })
     .option('--no-auth', 'Skip auth/oauth table migrations')
+    .option('-f, --force', 'Skip the drop-database confirmation (only honored when the migrateFresh guard is "allow")', { default: false })
     .option('--verbose', descriptions.verbose, { default: false })
-    .action(async (options: MigrateOptions & { seed?: boolean, auth?: boolean }) => {
+    .action(async (options: MigrateOptions & { seed?: boolean, auth?: boolean, force?: boolean }) => {
       log.debug('Running `buddy migrate:fresh` ...', options)
 
       const perf = await intro('buddy migrate:fresh')
@@ -423,6 +599,46 @@ export function migrate(buddy: CLI): void {
       if (!validation.valid) {
         console.error(`\n❌ Error: ${validation.error!}\n`)
         process.exit(ExitCode.FatalError)
+      }
+
+      // Safety guard. migrate:fresh DROPS every table, so it is gated far
+      // more strictly than `migrate`: a hard kill-switch plus a typed
+      // confirmation that no accidental keystroke can satisfy.
+      const guards = await resolveMigrationGuards()
+      const dbLabel = currentDatabaseLabel()
+      const APP_ENV = process.env.APP_ENV || 'local'
+
+      // Hard kill-switch — the command refuses to run at all.
+      if (guards.migrateFresh === 'disabled') {
+        log.error(
+          `\`buddy migrate:fresh\` is disabled by your migration safety guards (it DROPS every table).\n`
+          + `  Target: ${APP_ENV} database "${dbLabel}"\n`
+          + `  To allow it, set database.safety.migrateFresh to 'allow' in config/database.ts,\n`
+          + `  or run once with: DB_MIGRATE_FRESH=allow ./buddy migrate:fresh`,
+        )
+        await outro('migrate:fresh refused — the migrateFresh guard is set to "disabled".', { startTime: perf, useSeconds: true })
+        process.exit(ExitCode.FatalError)
+      }
+
+      // Typed confirmation. `--force` bypasses it ONLY when the guard is
+      // 'allow'; under 'confirm' a human must always type the name.
+      const canBypass = guards.migrateFresh === 'allow' && options.force === true
+      if (!canBypass) {
+        if (isCI || !hasTTY) {
+          const hint = guards.migrateFresh === 'confirm'
+            ? 'Guard is "confirm": migrate:fresh must be run interactively.'
+            : 'Re-run with --force to drop the database non-interactively.'
+          log.error(`Refusing to drop the ${APP_ENV} database "${dbLabel}" in a non-interactive environment. ${hint}`)
+          await outro('migrate:fresh cancelled.', { startTime: perf, useSeconds: true })
+          process.exit(ExitCode.FatalError)
+        }
+
+        log.warn(`This will DROP ALL TABLES in the ${APP_ENV} database "${dbLabel}" and rebuild them from scratch. All data will be lost.`)
+        const typed = await text({ message: `Type the database name "${dbLabel}" to confirm (blank to cancel):` })
+        if (typed.trim() !== dbLabel) {
+          await outro('migrate:fresh cancelled — confirmation did not match.', { startTime: perf, useSeconds: true })
+          process.exit(ExitCode.Success)
+        }
       }
 
       const result = await runAction(Action.MigrateFresh, options)
@@ -468,6 +684,18 @@ export function migrate(buddy: CLI): void {
         catch (error) {
           log.error('Failed to migrate auth/notification/RBAC tables:', error)
         }
+      }
+
+      // uuid guarantee (stacksjs/status#1 Phase 9, see uuid-columns.ts) —
+      // not gated behind --auth, same reasoning as the `buddy migrate` call
+      // site above.
+      try {
+        const { ensureUuidColumns, sqlHelpers } = await import('@stacksjs/database')
+        const driver = process.env.DB_CONNECTION || 'sqlite'
+        await ensureUuidColumns(sqlHelpers(driver), { verbose: options.verbose })
+      }
+      catch (error) {
+        log.error('Failed to ensure uuid columns post-migration:', error)
       }
 
       // Surface the model-migration failure only after the guarantee

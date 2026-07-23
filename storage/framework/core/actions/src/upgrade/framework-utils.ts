@@ -58,7 +58,7 @@ export function resolveUpgradeContext(options: {
  * `subPath` is relative to the repo root (e.g. `storage/framework/core`).
  */
 export function buildTemplateString(ref: string, subPath = 'storage/framework/core'): string {
-  return `github:stacksjs/stacks#${ref}/${subPath}`
+  return `github:stacksjs/stacks/${subPath}#${ref}`
 }
 
 /**
@@ -153,6 +153,17 @@ export function writeSyncedVersion(versionFilePath: string, ch: 'stable' | 'cana
   catch {
     // best-effort
   }
+}
+
+/**
+ * Decide whether the upgrade must protect framework-managed paths from local
+ * edits. The initial process always owns this preflight unless the user passed
+ * `--force`. An internal restart runs only after that validated parent has
+ * intentionally replaced those paths, so checking again would reject the
+ * upgrade's own writes as if they belonged to the user.
+ */
+export function shouldCheckDirtyManagedPaths(args: { force: boolean, alreadyRestarted: boolean }): boolean {
+  return !args.force && !args.alreadyRestarted
 }
 
 /**
@@ -258,6 +269,8 @@ export interface ManagedPath {
   subPath: string
   /** True for single-file targets (e.g. the root `buddy` script). */
   isFile?: boolean
+  /** Restore executable mode after archive extraction/copy. */
+  executable?: boolean
   /** Directory entries to skip when copying — generated/cache files we don't want to overwrite. */
   skip?: string[]
   /** Human label shown in the upgrade summary. */
@@ -280,8 +293,8 @@ export const MANAGED_PATHS: ManagedPath[] = [
     // Don't clobber it during update.
     skip: ['node_modules', 'dist', '.DS_Store', '.discovered-models.json'],
   },
-  { localPath: 'buddy', subPath: 'buddy', label: 'buddy', isFile: true },
-  { localPath: 'bootstrap', subPath: 'bootstrap', label: 'bootstrap', isFile: true },
+  { localPath: 'buddy', subPath: 'buddy', label: 'buddy', isFile: true, executable: true },
+  { localPath: 'bootstrap', subPath: 'bootstrap', label: 'bootstrap', isFile: true, executable: true },
 ]
 
 /**
@@ -319,6 +332,17 @@ export function detectLocalStacks(projectRoot: string): string | null {
   }
 
   return null
+}
+
+/**
+ * Local checkout auto-detection is a development convenience for channel
+ * upgrades. A pinned version must resolve the published git tag instead: the
+ * local checkout may be ahead of that tag while still reporting the same
+ * package version, which would install unreleased code under a released label.
+ * An explicit --from remains authoritative because the caller selected it.
+ */
+export function shouldAutoDetectLocalStacks(options: { from?: string, version?: string }): boolean {
+  return !options.from && !options.version
 }
 
 /**
@@ -429,6 +453,57 @@ export function diffSnapshots(
   }
 
   return { added, changed, removed, unchanged }
+}
+
+export interface DetailedChangeSummary extends ChangeSummary {
+  /** Relative paths present upstream but not locally (a sync would add them). */
+  addedFiles: string[]
+  /** Relative paths whose upstream content differs from local (a sync would change them). */
+  changedFiles: string[]
+  /** Relative paths no longer shipped upstream. The sync never deletes, so these stay in place. */
+  removedFiles: string[]
+}
+
+/**
+ * Like `diffSnapshots`, but also returns the sorted relative file lists behind
+ * the counts. Used by the `--dry-run` preview, which diffs the local target
+ * against the upgrade SOURCE (local checkout or temp-dir download) instead of
+ * against a post-sync tree, so it can show exactly which files a real sync
+ * would add or change without writing anything.
+ */
+export function diffSnapshotsDetailed(
+  before: Map<string, SnapshotEntry>,
+  after: Map<string, SnapshotEntry>,
+): DetailedChangeSummary {
+  const addedFiles: string[] = []
+  const changedFiles: string[] = []
+  const removedFiles: string[] = []
+  let unchanged = 0
+
+  for (const [rel, info] of after) {
+    const prev = before.get(rel)
+    if (!prev) addedFiles.push(rel)
+    else if (prev.size !== info.size || prev.hash !== info.hash) changedFiles.push(rel)
+    else unchanged++
+  }
+
+  for (const rel of before.keys()) {
+    if (!after.has(rel)) removedFiles.push(rel)
+  }
+
+  addedFiles.sort()
+  changedFiles.sort()
+  removedFiles.sort()
+
+  return {
+    added: addedFiles.length,
+    changed: changedFiles.length,
+    removed: removedFiles.length,
+    unchanged,
+    addedFiles,
+    changedFiles,
+    removedFiles,
+  }
 }
 
 async function hashFile(absPath: string): Promise<bigint> {

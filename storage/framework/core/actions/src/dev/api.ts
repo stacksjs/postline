@@ -11,9 +11,15 @@ import { config, overridesReady } from '@stacksjs/config'
 import { path } from '@stacksjs/path'
 import type { Middleware } from '@stacksjs/router'
 import { route } from '@stacksjs/router'
-import { generateAutoImportFiles, injectGlobalAutoImports } from '@stacksjs/server'
+import { generateAutoImportFiles, generateServerAutoImportTypes, injectGlobalAutoImports } from '@stacksjs/server'
+import { resolveApiHost } from '../helpers/api-host'
 
 const _options = parseOptions()
+
+// Keep TypeScript's global declarations aligned with the runtime primitives
+// and current models without registering a catch-all bundler plugin in this
+// watched process.
+await generateServerAutoImportTypes()
 
 // Wait for the user's config/*.ts files to land before reading the port.
 // Without this, `config.ports?.api` returns the framework default (3008)
@@ -21,6 +27,7 @@ const _options = parseOptions()
 // resolved yet. Env var wins so users can override via .env / shell.
 await overridesReady
 const port = Number(process.env.PORT_API) || config.ports?.api || 3008
+const hostname = resolveApiHost()
 
 // Regenerate the model + function auto-import manifest ONLY when missing —
 // regenerating on every boot (and thus every hot-reload cycle) triggers an
@@ -98,7 +105,21 @@ catch (err) {
 // reads `config.cors` (when defined) or falls back to safe defaults:
 // no credentials, no wildcard-with-credentials. See
 // stacksjs/stacks#1859 R-1.
-const corsMod = await import(path.frameworkPath('defaults/app/Middleware/Cors.ts'))
+// Vendored checkout wins; a node_modules app falls back to @stacksjs/defaults
+// (which ships the `app/` scaffold) — see resolveDefaultsCorsPath below.
+function resolveDefaultsCorsPath(): string {
+  const vendored = path.frameworkPath('defaults/app/Middleware/Cors.ts')
+  if (existsSync(vendored))
+    return vendored
+  try {
+    const pkgJson = Bun.resolveSync('@stacksjs/defaults/package.json', process.cwd())
+    return `${pkgJson.replace(/package\.json$/, '')}app/Middleware/Cors.ts`
+  }
+  catch {
+    return vendored
+  }
+}
+const corsMod = await import(resolveDefaultsCorsPath())
 const corsMiddleware: Middleware = corsMod.default
 route.use(corsMiddleware.toRouterHandler())
 
@@ -166,11 +187,11 @@ await route.importRoutes()
 try {
   await route.serve({
     port,
-    hostname: '127.0.0.1',
+    hostname,
   })
   // Most terminals turn `http://localhost:3008` into a click-through
   // link; the leading newline gives the previous output room to breathe.
-  console.log(`\n  ➜  API server ready: http://localhost:${port}\n`)
+  console.log(`\n  ➜  API server ready: http://${hostname}:${port}\n`)
 }
 catch (err: any) {
   const code = err?.code || err?.errno

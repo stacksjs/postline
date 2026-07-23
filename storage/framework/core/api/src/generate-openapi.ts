@@ -1,12 +1,13 @@
 import { path } from '@stacksjs/path'
+import type { SchemaObject } from './generate-types'
 
 interface OpenApiPathItem {
   [method: string]: {
     summary?: string
     operationId?: string
     parameters?: Array<{ name: string, in: string, required: boolean, schema: { type: string } }>
-    responses: Record<string, { description: string, content?: Record<string, unknown> }>
-    requestBody?: { content: Record<string, unknown>, required?: boolean }
+    responses: Record<string, { description: string, content?: Record<string, { schema?: SchemaObject }> }>
+    requestBody?: { content: Record<string, { schema?: SchemaObject }>, required?: boolean }
   }
 }
 
@@ -14,7 +15,7 @@ interface OpenApiSpec {
   openapi: string
   info: { title: string, version: string }
   paths: Record<string, OpenApiPathItem>
-  components: { schemas: Record<string, unknown> }
+  components: { schemas: Record<string, SchemaObject> }
 }
 
 /**
@@ -93,17 +94,56 @@ async function loadActionValidations(handlerPath: string): Promise<Record<string
  * but omits a request body schema — that's still useful for clients
  * that just want to know what endpoints exist.
  */
-export async function generateOpenApi(): Promise<OpenApiSpec> {
+export async function generateOpenApi(options: { write?: boolean } = {}): Promise<OpenApiSpec> {
   const { listRegisteredRoutes } = await import('@stacksjs/router')
+
+  // `buddy generate:openapi` runs as its own one-shot CLI process — unlike
+  // the real dev/prod server (see storage/framework/core/server/src/start.ts),
+  // nothing has imported routes/api.ts (or the framework defaults, or the
+  // useApi-generated ORM routes) yet, so routeMiddlewareRegistry is empty
+  // and listRegisteredRoutes() below returns nothing. Load routes the same
+  // way the server does, just without actually calling serve(). Best-effort
+  // and idempotent-safe: if this ever runs inside an already-booted process
+  // (routes already loaded), re-importing is a silent no-op per each
+  // module's own import-cache semantics, not a duplicate-registration error.
+  try {
+    const { loadRoutes } = await import('@stacksjs/router')
+    const { default: routeRegistry } = await import('../../../../../app/Routes')
+    await loadRoutes(routeRegistry)
+  }
+  catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.warn(`[generateOpenApi] Failed to load routes/api.ts + framework routes: ${message}`)
+  }
+  try {
+    await import('../../orm/routes')
+  }
+  catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.warn(`[generateOpenApi] Failed to load useApi-generated ORM routes: ${message}`)
+  }
+
   const routes = listRegisteredRoutes()
+
+  // Was a hardcoded 'Stacks API' — every app generating an OpenAPI spec
+  // (via `buddy generate:openapi` or the live GET /__openapi.json route)
+  // got the framework's own name instead of its own, regardless of
+  // config/app.ts's `name`.
+  let appName = 'Stacks API'
+  try {
+    const { config } = await import('@stacksjs/config')
+    if (config.app?.name) appName = `${config.app.name} API`
+  }
+  catch { /* best-effort — keep the generic fallback */ }
 
   const spec: OpenApiSpec = {
     openapi: '3.0.0',
-    info: { title: 'Stacks API', version: '1.0.0' },
+    info: { title: appName, version: '1.0.0' },
     paths: {},
     components: { schemas: {} },
   }
 
+  const operationIds = new Set<string>()
   for (const r of routes) {
     // Convert `:id` style to OpenAPI `{id}` style so the spec validates.
     const oasPath = r.path.replace(/(^|\/):(\w+)(?=$|\/)/g, '$1{$2}')
@@ -122,9 +162,17 @@ export async function generateOpenApi(): Promise<OpenApiSpec> {
     // and the action lives at `app/Actions/<Name>.ts`. We only attempt
     // this for non-GET requests, since GET typically has no body.
     const method = r.method.toLowerCase()
+    const preferredOperationId = r.name ?? `${method}_${oasPath.replace(/[^a-z0-9]/gi, '_')}`
+    let operationId = preferredOperationId
+    if (operationIds.has(operationId)) {
+      operationId = `${preferredOperationId}_${method}`
+      let suffix = 2
+      while (operationIds.has(operationId)) operationId = `${preferredOperationId}_${method}_${suffix++}`
+    }
+    operationIds.add(operationId)
     const op: OpenApiPathItem[string] = {
       summary: r.name ?? r.path,
-      operationId: r.name ?? `${method}_${oasPath.replace(/[^a-z0-9]/gi, '_')}`,
+      operationId,
       parameters: paramNames.map(name => ({
         name,
         in: 'path',
@@ -171,13 +219,15 @@ export async function generateOpenApi(): Promise<OpenApiSpec> {
     spec.paths[oasPath][method] = op
   }
 
-  // Persist for build pipelines that want the file on disk; in dev,
-  // the live route at GET /__openapi.json regenerates on every hit so
-  // schema changes don't require a rebuild step.
-  const file = Bun.file(path.frameworkPath(`api/openapi.json`))
-  const writer = file.writer()
-  writer.write(JSON.stringify(spec, null, 2))
-  await writer.end()
+  if (options.write !== false) {
+    // Persist for build pipelines that want the file on disk; in dev,
+    // the live route at GET /__openapi.json regenerates on every hit so
+    // schema changes don't require a rebuild step.
+    const file = Bun.file(path.frameworkPath(`api/openapi.json`))
+    const writer = file.writer()
+    writer.write(JSON.stringify(spec, null, 2))
+    await writer.end()
+  }
 
   return spec
 }

@@ -19,6 +19,8 @@ import { config as bunQbConfig, createQueryBuilder as createBunQueryBuilder } fr
 
 // Re-export everything from bun-query-builder
 export * from 'bun-query-builder'
+export { saveMigrationSnapshot } from 'bun-query-builder'
+export type StacksDialect = import('bun-query-builder').SupportedDialect | 'singlestore'
 
 /**
  * Per-connection SQLite bootstrap pragmas (stacksjs/stacks#1951).
@@ -26,10 +28,20 @@ export * from 'bun-query-builder'
  * enforcement OFF on every new connection — so the inline
  * `REFERENCES … ON DELETE CASCADE` emitted by migrations (#1916) is inert
  * unless the connection bootstrap turns it on. bun-query-builder delegates
- * this to the consumer; this wrapper is the one chokepoint every framework
- * query-builder instance is created through, so applying here covers every
- * connection — including the ORM auto-CRUD route builders that previously
- * bypassed the pragma'd `db` proxy in @stacksjs/database.
+ * this to the consumer, and it opens sqlite connections in TWO independent
+ * layers — both are bootstrapped here:
+ *
+ *  1. The query-builder connection (`getOrCreateBunSql` → `SQLiteWrapper`,
+ *     which only sets `journal_mode = WAL`): covered by the wrapped
+ *     `createQueryBuilder` below.
+ *  2. The MODEL-EXECUTOR connection (`configureOrm`/`getExecutor` → a raw
+ *     `bun:sqlite` `Database` with NO pragmas at all) — the connection every
+ *     `Model.create()/save()/delete()` actually writes through: covered by
+ *     the wrapped `configureOrm` + `bootstrapModelExecutorPragmas` below.
+ *     Pre-fix, production model writes ran with `foreign_keys = OFF` while
+ *     the (idle) query-builder connection was correctly bootstrapped —
+ *     confirmed on a live deploy via lsof (two connections) and WAL frames
+ *     from ORM inserts never auto-checkpointing.
  */
 export const SQLITE_BOOTSTRAP_PRAGMAS = [
   // WAL is also set by bun-query-builder's SQLiteWrapper at connect time;
@@ -37,6 +49,14 @@ export const SQLITE_BOOTSTRAP_PRAGMAS = [
   'PRAGMA journal_mode = WAL',
   'PRAGMA foreign_keys = ON',
   'PRAGMA busy_timeout = 5000',
+  // Checkpoint the WAL into the main db file after every commit (passive —
+  // never blocks readers). bun:sqlite's default threshold is 1000 pages
+  // (~4MB), which on low-write apps leaves recent rows sitting in the -wal
+  // sidecar indefinitely — invisible to anything that reads only the main
+  // file: remote SQLite browsing (e.g. TablePlus over SSH downloads just the
+  // db file), file-level backups, and snapshot scripts. Low-write apps pay
+  // effectively nothing; a high-write deployment can raise this back up.
+  'PRAGMA wal_autocheckpoint = 1',
 ] as const
 
 // bun-query-builder types `unsafe()` as returning `Promise<any>`, but at
@@ -70,6 +90,62 @@ export function applySqlitePragmas(instance: { unsafe: (query: string, params?: 
 }
 
 /**
+ * Raw `bun:sqlite` `Database` handles that have already been bootstrapped.
+ * The model executor caches its Database per configure/config-signature, so
+ * a WeakSet keeps re-assertion calls (every wrapped `createQueryBuilder`)
+ * from re-running the pragmas on an already-bootstrapped connection.
+ */
+const bootstrappedRawDbs = new WeakSet<object>()
+
+/**
+ * Bootstrap the MODEL-EXECUTOR connection — the raw `bun:sqlite` `Database`
+ * that `Model.create()/save()/delete()` (createModel → getExecutor) write
+ * through. Upstream creates it with `new Database(path)` and applies no
+ * pragmas whatsoever, so without this the ORM write path runs with
+ * `foreign_keys = OFF` (silent orphan rows) and default WAL checkpointing
+ * regardless of what the query-builder connection was bootstrapped with.
+ *
+ * `getDatabase()` returns the executor's live handle for the sqlite dialect
+ * (creating the executor if needed) and throws for mysql/postgres — where
+ * there is nothing to bootstrap, hence the silent catch. Safe to call
+ * repeatedly: the WeakSet makes it a no-op after the first hit per
+ * connection, and a config change that swaps the executor's Database
+ * produces a fresh (unseen) handle that gets bootstrapped on the next call.
+ */
+export function bootstrapModelExecutorPragmas(): void {
+  try {
+    const raw = (bunQueryBuilder as { getDatabase?: () => { run: (sql: string) => unknown } }).getDatabase?.()
+    if (!raw || typeof raw.run !== 'function' || bootstrappedRawDbs.has(raw))
+      return
+    for (const pragma of SQLITE_BOOTSTRAP_PRAGMAS) {
+      try {
+        raw.run(pragma)
+      }
+      catch {
+        // Fail open per-pragma — same rationale as `applySqlitePragmas`.
+      }
+    }
+    bootstrappedRawDbs.add(raw)
+  }
+  catch {
+    // Non-sqlite dialect (`getDatabase()` throws) — nothing to bootstrap.
+  }
+}
+
+/**
+ * Drop-in replacement for bun-query-builder's `configureOrm` that
+ * bootstraps the model-executor connection it (re)creates.
+ *
+ * This is the exact entry point `@stacksjs/orm` calls at import time
+ * (`autoConfigureOrm()`), which in production builds the raw `Database`
+ * every model write goes through — pre-fix, with no pragmas at all.
+ */
+export function configureOrm(options: Parameters<typeof bunQueryBuilder.configureOrm>[0]): void {
+  bunQueryBuilder.configureOrm(options)
+  bootstrapModelExecutorPragmas()
+}
+
+/**
  * Drop-in replacement for bun-query-builder's `createQueryBuilder` that
  * bootstraps every fresh SQLite connection with the pragmas above.
  *
@@ -81,13 +157,20 @@ export function applySqlitePragmas(instance: { unsafe: (query: string, params?: 
  * instance captured (see `applySqlitePragmas`). Skipped when the caller
  * supplies its own `state.sql` (reserved/transaction connections derive
  * from an already-bootstrapped parent).
+ *
+ * Also re-asserts the model-executor bootstrap: framework entry points run
+ * through here on boot and on config reloads, so an executor Database that
+ * was lazily (re)created from a config change gets its pragmas without any
+ * caller having to know the two-connection topology.
  */
 export function createQueryBuilder<DB extends DatabaseSchema<any> = DatabaseSchema<any>>(
   state?: Parameters<typeof createBunQueryBuilder>[0],
 ): ReturnType<typeof createBunQueryBuilder<DB>> {
   const qb = createBunQueryBuilder<DB>(state)
-  if (!state?.sql && bunQbConfig.dialect === 'sqlite')
+  if (!state?.sql && bunQbConfig.dialect === 'sqlite') {
     applySqlitePragmas(qb)
+    bootstrapModelExecutorPragmas()
+  }
   return qb
 }
 
