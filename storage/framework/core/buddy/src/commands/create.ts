@@ -7,7 +7,6 @@ import { Action } from '@stacksjs/enums'
 import { resolve } from '@stacksjs/path'
 import { isFolder } from '@stacksjs/storage'
 import { ExitCode } from '@stacksjs/types'
-import { useOnline } from '@stacksjs/utils'
 import { uninstallAllFeatures } from './features'
 import { ensurePantryDependencies, ensurePantryInstalled } from './setup'
 
@@ -18,7 +17,6 @@ export function create(buddy: CLI): void {
     ui: 'Are you building a UI?',
     components: 'Are you building UI components?',
     webComponents: 'Automagically built optimized custom elements/web components?',
-    vue: 'Automagically built a Vue component library?',
     views: 'How about views?',
     functions: 'Are you developing functions/composables?',
     api: 'Are you building an API?',
@@ -36,16 +34,15 @@ export function create(buddy: CLI): void {
     .alias('create [name]')
     .option('-n, --name [name]', descriptions.name, { default: false })
     .option('-u, --ui', descriptions.ui, { default: true }) // if no, disregard remainder of questions wrt UI
-    .option('-c, --components', descriptions.components, { default: true }) // if no, -v and -w would be false
+    .option('-c, --components', descriptions.components, { default: true })
     .option('-w, --web-components', descriptions.webComponents, { default: true })
-    .option('-v, --vue', descriptions.vue, { default: true })
     .option('-p, --views', descriptions.views, { default: true }) // i.e. `buddy dev`
     .option('-f, --functions', descriptions.functions, { default: true }) // if no, API would be false
     .option('-a, --api', descriptions.api, { default: true }) // APIs need an HTTP server & assumes functions is true
     .option('-d, --database', descriptions.database, { default: true })
     .option('-ca, --cache', descriptions.cache, { default: false })
     .option('-e, --email', descriptions.email, { default: false })
-    .option('-p, --project [project]', descriptions.project, { default: false })
+    .option('-P, --project [project]', descriptions.project, { default: false })
     .option('-m, --minimal', descriptions.minimal, { default: false })
     .option('--verbose', descriptions.verbose, { default: false })
     // .option('--auth', 'Scaffold an authentication?', { default: true })
@@ -58,7 +55,7 @@ export function create(buddy: CLI): void {
       const path = resolve(process.cwd(), name)
 
       isFolderCheck(path)
-      onlineCheck()
+      await onlineCheck()
 
       const result = await download(name, path, options)
 
@@ -80,6 +77,8 @@ export function create(buddy: CLI): void {
       }
 
       log.info(bold('Welcome to the Stacks Framework! ⚛️'))
+      log.info(`Get started: ${cyan(`cd ${name}`)} and then ${cyan('./buddy dev')}`)
+      log.info(`Run ${cyan('./buddy doctor')} anytime to check your setup`)
       log.info('To learn more, visit https://stacksjs.com')
 
       process.exit(ExitCode.Success)
@@ -95,22 +94,53 @@ function isFolderCheck(path: string) {
   }
 }
 
-function onlineCheck() {
-  const online = useOnline()
-  if (!online) {
-    log.info('It appears you are disconnected from the internet.')
-    log.info('The Stacks setup requires a brief internet connection for setup.')
-    log.info('For instance, it installs your dependencies from.')
-    process.exit(ExitCode.FatalError)
+async function onlineCheck() {
+  if (await isOnline())
+    return
+
+  log.info('It appears you are disconnected from the internet.')
+  log.info('Creating a new project requires a brief internet connection to download the template and install dependencies.')
+  process.exit(ExitCode.FatalError)
+}
+
+async function isOnline(): Promise<boolean> {
+  try {
+    const response = await fetch('https://github.com', {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(3000),
+    })
+    return response.ok
+  }
+  catch {
+    return false
   }
 }
 
-async function download(name: string, path: string, options: CreateOptions) {
+/**
+ * Uses `@stacksjs/gitit`'s library API directly rather than shelling out to
+ * `bunx --bun @stacksjs/gitit`. `bunx` always resolves the published npm
+ * package into an ephemeral install, bypassing whatever gitit version is
+ * actually installed in this project, and adds a registry round-trip that
+ * has no benefit here since gitit is already a direct dependency.
+ *
+ * The source is pinned to `gh:stacksjs/stacks` on purpose: gitit's default
+ * template registry still points the bare `stacks` name at the old org and
+ * only reaches us via GitHub's repo-transfer redirect. Resolving the GitHub
+ * provider directly removes that third-party lookup (and its supply-chain
+ * risk) entirely.
+ */
+async function download(name: string, path: string, _options: CreateOptions) {
   log.info('Setting up your stack.')
-  const result = await runCommand(`bunx --bun @stacksjs/gitit stacks ${name}`, options)
-  log.success(`Successfully scaffolded your project at ${cyan(path)}`)
 
-  return result
+  try {
+    const { downloadTemplate } = await import('@stacksjs/gitit')
+    await downloadTemplate('gh:stacksjs/stacks', { dir: name })
+    log.success(`Successfully scaffolded your project at ${cyan(path)}`)
+    return { isErr: false as const }
+  }
+  catch (error) {
+    return { isErr: true as const, error: error instanceof Error ? error.message : String(error) }
+  }
 }
 
 function ensureExecutableScripts(path: string) {
@@ -128,9 +158,7 @@ function ensureExecutableScripts(path: string) {
 async function ensureEnv(path: string, _options: CreateOptions) {
   log.info('Ensuring your environment is ready...')
   // Bootstrap the Pantry CLI (idempotent) and install the new project's
-  // system-level dependencies declared in `config/deps.ts` — bun, sqlite,
-  // craft, etc. — so the subsequent `bun install` runs against the right
-  // toolchain.
+  // complete machine and project dependency graph declared by the template.
   await ensurePantryInstalled()
   await ensurePantryDependencies(path)
   log.success('Environment is ready')
@@ -139,21 +167,23 @@ async function ensureEnv(path: string, _options: CreateOptions) {
 async function install(path: string, options: CreateOptions) {
   log.info('Installing & setting up Stacks')
 
-  log.info('Running bun install...')
-  let result = await runCommand('bun install', { ...options, cwd: path })
-
-  if (result?.isErr) {
-    log.error(result.error)
-    process.exit(ExitCode.FatalError)
-  }
-
   log.info('Copying .env.example → .env')
-  result = await runCommand('cp .env.example .env', { ...options, cwd: path })
+  let result = await runCommand('cp .env.example .env', { ...options, cwd: path })
 
   if (result?.isErr) {
     log.error(result.error)
     process.exit(ExitCode.FatalError)
   }
+
+  // The template ships .env.development/.staging/.production encrypted with
+  // the UPSTREAM repo's dotenvx keys (and no .env.keys), so a fresh app can
+  // never decrypt them — they only leak "encrypted:..." garbage into config
+  // (e.g. `email.default: expected one of [...], got "encrypted:..."`).
+  // Drop them; `buddy env:encrypt` regenerates per-project files when needed.
+  log.info('Removing template-encrypted env files...')
+  const { rm } = await import('node:fs/promises')
+  for (const stale of ['.env.development', '.env.staging', '.env.production', '.env.keys'])
+    await rm(`${path}/${stale}`, { force: true })
 
   log.info('Generating application key...')
   const keyResult = await runAction(Action.KeyGenerate, { ...options, cwd: path })

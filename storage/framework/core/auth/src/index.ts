@@ -20,6 +20,7 @@ export * from './tokens'
 export * from './gate'
 export * from './policy'
 export * from './authorizable'
+export * from './permissions'
 
 // Role-Based Access Control (RBAC)
 export * from './rbac'
@@ -40,3 +41,9 @@ export {
   generateTOTPSecret,
   totpKeyUri,
 } from '@stacksjs/ts-auth'
+
+// TOTP setup/enable/disable + login-challenge persistence
+export * from './two-factor'
+
+// Team resolution from auth credentials (dashboard-form scoping)
+export * from './team'

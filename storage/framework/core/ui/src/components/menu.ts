@@ -1,1 +1,2 @@
-export { Menu, MenuButton, MenuItem, MenuItems } from '@stacksjs/stx'
+// Menu primitives were part of the former compatibility layer.
+export {}

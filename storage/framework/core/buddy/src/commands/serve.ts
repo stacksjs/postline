@@ -1,9 +1,81 @@
 import type { CLI } from '@stacksjs/types'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { log } from '@stacksjs/cli'
+
+/**
+ * Request-scoped context (query string + parsed cookies) for `<script
+ * server>` blocks in `.stx` pages — mirrors `dev/views.ts`'s dev-only
+ * setup of the same globals. Without this, `globalThis.requestContext`
+ * and `__stxServeSearch` are simply undefined in production: every
+ * cookie-aware or query-param-aware page (auth+team resolution on the
+ * dashboard, filter params on monitors/incidents, etc.) silently reads
+ * nothing and falls back to its unauthenticated/no-filter state, even
+ * for a legitimately signed-in request. `dev/views.ts` sets these up
+ * for `buddy dev`, but `buddy serve` (this file, the actual Hetzner
+ * entrypoint) never did — this was found by an end-to-end login +
+ * dashboard smoke test, not by inspection.
+ *
+ * Plain globals, not `AsyncLocalStorage` — tried that first (mirroring
+ * dev/views.ts's own approach) and confirmed via the same e2e test that
+ * the store is empty by the time a `<script server>` block reads it:
+ * bun-plugin-stx's internal request handling doesn't preserve the async
+ * context across whatever it does between `onRequest` returning and the
+ * page actually rendering. `__stxServeSearch` already uses a plain
+ * global for the exact same reason (and already accepts the same
+ * concurrent-request race this shares) — `__stxServeCookies` follows
+ * that precedent instead of a mechanism that demonstrably doesn't work
+ * in this server.
+ */
+;(globalThis as any).requestContext = {
+  cookie(name: string): string | null {
+    const cookies = (globalThis as { __stxServeCookies?: Record<string, string> }).__stxServeCookies
+    return cookies?.[name] ?? null
+  },
+  url(): string {
+    return (globalThis as { __stxServeSearch?: string }).__stxServeSearch ?? ''
+  },
+}
+
+function parseCookies(req: Request): Record<string, string> {
+  const out: Record<string, string> = {}
+  const header = req.headers.get('cookie') || ''
+  if (!header)
+    return out
+  for (const part of header.split(';')) {
+    const trimmed = part.trim()
+    const eq = trimmed.indexOf('=')
+    if (eq === -1)
+      continue
+    const k = trimmed.slice(0, eq).trim()
+    const v = trimmed.slice(eq + 1).trim()
+    if (!k)
+      continue
+    try { out[k] = decodeURIComponent(v) }
+    catch { out[k] = v }
+  }
+  return out
+}
+
+/**
+ * Resolve the project's includes directory using Stacks conventions. Modern
+ * Stacks apps keep reusable `.stx` fragments in `resources/components` and
+ * commonly point `config/stx.ts#partialsDir` there; older apps may still use
+ * one of the dedicated partials directories below.
+ */
+export function resolveUserPartialsPath(cwd = process.cwd()): string | undefined {
+  const candidates = [
+    'resources/partials',
+    'resources/views/partials',
+    'partials',
+    'resources/components',
+  ]
+
+  const relative = candidates.find(candidate => existsSync(join(cwd, candidate)))
+  return relative ? join(cwd, relative) : undefined
+}
 
 /**
  * `buddy serve` — boot the production HTTP server.
@@ -60,8 +132,9 @@ export function serve(buddy: CLI): void {
         }
         catch { /* try next */ }
       }
-      if (!stxServe)
+      if (!stxServe) {
         ;({ serve: stxServe } = await import('bun-plugin-stx/serve'))
+      }
 
       // Pre-resolve the vendored stx module + site/i18n config so `{t:…}`
       // translation tokens and the lang picker render in production exactly
@@ -70,9 +143,14 @@ export function serve(buddy: CLI): void {
       const { site: siteConfig, i18n: i18nConfig } = await loadStxSiteConfig()
 
       const userViewsPath = 'resources/views'
-      const defaultViewsPath = 'storage/framework/defaults/resources/views'
+      // Framework fallback resources (default views/layouts/components). A
+      // vendored checkout has them at storage/framework/defaults; an app that
+      // consumes the framework from node_modules gets them from the published
+      // @stacksjs/defaults package. Vendored wins so behaviour is unchanged.
+      const defaultsResources = resolveDefaultsResources()
+      const defaultViewsPath = join(defaultsResources, 'views')
       const userLayoutsPath = existsSync('resources/views/layouts') ? 'resources/views/layouts' : 'resources/layouts'
-      const userComponentsPath = existsSync('resources/views/components') ? 'resources/views/components' : 'resources/components'
+      const userPartialsPath = resolveUserPartialsPath()
 
       // Same-origin API target. Scaffolded client code fetches relative
       // `/api/...` URLs (dashboard stores, CartDrawer, the coming-soon
@@ -87,10 +165,27 @@ export function serve(buddy: CLI): void {
       await stxServe({
         patterns: [userViewsPath, defaultViewsPath],
         port,
-        componentsDir: 'storage/framework/defaults/resources/components',
+        // Never silently drift off the configured port: the reverse
+        // proxy/gateway routes to exactly this port, so stx's fallback bind
+        // on port+1 would serve nothing. Fail loudly instead (systemd
+        // restarts / the deploy health gate catches it).
+        autoIncrementPort: false,
+        // SO_REUSEPORT (stx >= 0.2.81): lets the next release's instance
+        // bind the same port while this one still serves — the overlap
+        // ts-cloud's zero-downtime cutover needs. Enabled for every *deployed*
+        // environment (production, staging, development), since each runs via
+        // the same templated systemd unit + health-gate handoff where the new
+        // release must bind the port before the old one is stopped. Off for
+        // local `serve` runs, where two servers fighting over one port should
+        // fail loudly. Ignored harmlessly by older stx versions.
+        reusePort: ['production', 'staging', 'development']
+          .includes((process.env.APP_ENV || '').toLowerCase()),
+        componentsDir: join(defaultsResources, 'components'),
         layoutsDir: userLayoutsPath,
-        partialsDir: userComponentsPath,
-        fallbackLayoutsDir: 'storage/framework/defaults/resources/layouts',
+        // Omit the override only when the app has no Stacks include directory,
+        // allowing bun-plugin-stx to fall back to its own project config.
+        ...(userPartialsPath && { partialsDir: userPartialsPath }),
+        fallbackLayoutsDir: join(defaultsResources, 'layouts'),
         fallbackPartialsDir: defaultViewsPath,
         quiet: options?.verbose !== true,
         ...(stxModule && { stxModule }),
@@ -121,12 +216,76 @@ export function serve(buddy: CLI): void {
             }
           }
 
+          // stx-native blog: /blog and /blog/<slug> render as stx pages, but
+          // the feed + sitemap are served from content/blog markdown here (no
+          // BunPress). HTML paths return null and fall through to stx.
+          if (existsSync(join(process.cwd(), 'resources/views/blog.stx'))) {
+            const { renderBlogFeed } = await import('@stacksjs/actions/blog')
+            const feed = await renderBlogFeed(req)
+            if (feed)
+              return feed
+          }
+
+          // Stash cookies + query string so server-script blocks rendering
+          // this request can pull them via globalThis.requestContext /
+          // __stxServeSearch — see the doc comment above this function.
+          ;(globalThis as { __stxServeSearch?: string }).__stxServeSearch = url.search
+          ;(globalThis as { __stxServeCookies?: Record<string, string> }).__stxServeCookies = parseCookies(req)
+
           return undefined
         },
       })
 
       log.success(`Production server listening on http://0.0.0.0:${port}`)
     })
+}
+
+/**
+ * `buddy serve:api` — boot the production API server (bun-router routes).
+ *
+ * The twin of `buddy serve`: where that serves the STX frontend, this runs the
+ * loopback API the frontend proxies `/api` + non-GET requests to. The entry
+ * (`@stacksjs/actions/serve/api`) is resolved through the module graph, so it
+ * works whether the framework is vendored at `storage/framework/core` OR only
+ * installed under `node_modules/@stacksjs/actions`. This keeps deployments from
+ * having to hardcode a `storage/framework/core/...` path in their `start`
+ * command — `./buddy serve:api` resolves the framework wherever it lives.
+ */
+export function serveApi(buddy: CLI): void {
+  buddy
+    .command('serve:api', 'Start the production API server (bun-router routes the frontend proxies /api to)')
+    .option('-p, --port <port>', 'Port to listen on (defaults to PORT env or 3008)')
+    .action(async (options?: { port?: string | number }) => {
+      if (options?.port)
+        process.env.PORT = String(options.port)
+      process.env.APP_ENV = process.env.APP_ENV || 'production'
+
+      // The api entry is a self-booting server script; importing it starts it.
+      // Resolved from node_modules (or the vendored core) via the package name.
+      await import('@stacksjs/actions/serve/api')
+    })
+}
+
+/**
+ * Resolve the framework's default resources root (fallback views/layouts/
+ * components + preloader). A vendored checkout has them at
+ * `storage/framework/defaults/resources` (the source of truth), which wins so
+ * a full checkout behaves exactly as before. An app that consumes the framework
+ * from node_modules has no vendored copy, so fall back to the published
+ * `@stacksjs/defaults` package. Returns the vendored path if neither resolves,
+ * letting stx surface a clear missing-directory error.
+ */
+function resolveDefaultsResources(): string {
+  const vendored = 'storage/framework/defaults/resources'
+  if (existsSync(vendored))
+    return vendored
+  try {
+    const pkgJson = Bun.resolveSync('@stacksjs/defaults/package.json', process.cwd())
+    return join(dirname(pkgJson), 'resources')
+  }
+  catch {
+    return vendored
+  }
 }
 
 async function resolveVendoredStxModule(): Promise<any | undefined> {

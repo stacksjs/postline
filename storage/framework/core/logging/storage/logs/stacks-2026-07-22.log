@@ -1,0 +1,35 @@
+[2026-07-22T11:31:17.855Z] local.ERROR: action failed Error: kaboom
+    at <anonymous> (/Users/glennmichaeltorregosa/Documents/Projects/stacks/storage/framework/core/logging/tests/error-reporting.test.ts:85:38) {"requestId":"req-1"}
+[2026-07-22T11:31:17.862Z] local.ERROR: Error: bare
+    at <anonymous> (/Users/glennmichaeltorregosa/Documents/Projects/stacks/storage/framework/core/logging/tests/error-reporting.test.ts:90:32)
+[2026-07-22T11:31:17.882Z] local.INFO: test info message
+[2026-07-22T11:31:17.883Z] local.INFO: msg extra 123
+[2026-07-22T11:31:17.883Z] local.ERROR: test error message
+[2026-07-22T11:31:17.883Z] local.ERROR: Error: test
+    at <anonymous> (/Users/glennmichaeltorregosa/Documents/Projects/stacks/storage/framework/core/logging/tests/logging.test.ts:47:34)
+[2026-07-22T11:31:17.883Z] local.ERROR: Error: {"code":"ERR_01"}
+[2026-07-22T11:31:17.884Z] local.WARNING: test warning undefined
+[2026-07-22T11:31:17.884Z] local.SUCCESS: operation complete
+[2026-07-22T11:31:17.890Z] local.INFO: db-query: 5.72ms
+[2026-07-22T11:31:17.890Z] local.INFO: api-call: 0.00ms {"endpoint":"/users"}
+[2026-07-22T11:31:17.891Z] local.INFO: ECHO: echo output
+[2026-07-22T11:31:17.893Z] local.INFO: integration test info
+[2026-07-22T11:31:17.893Z] local.WARNING: integration test warn undefined
+[2026-07-22T11:31:17.893Z] local.ERROR: integration test error
+[2026-07-22T11:31:17.893Z] local.ERROR: Error: test error object
+    at <anonymous> (/Users/glennmichaeltorregosa/Documents/Projects/stacks/storage/framework/core/logging/tests/integration.test.ts:21:32)
+[2026-07-22T11:31:17.894Z] local.SUCCESS: integration test success
+[2026-07-22T11:31:17.894Z] local.INFO: test-timer: 0.00ms
+[2026-07-22T11:31:17.895Z] local.INFO: duration-test: 0.44ms {"iterations":4999950000}
+[2026-07-22T11:31:17.895Z] local.INFO: ECHO: echo test
+[2026-07-22T11:31:17.898Z] local.WARNING: [router] CSRF cookie seeding failed {
+  "error": {
+    "name": "Error",
+    "message": "seed failed",
+    "stack": "Error: seed failed\n    at <anonymous> (/Users/glennmichaeltorregosa/Documents/Projects/stacks/storage/framework/core/logging/tests/context-normalization.test.ts:53:68)"
+  }
+}
+[2026-07-22T11:31:17.898Z] local.INFO: request failed Error: bare
+    at <anonymous> (/Users/glennmichaeltorregosa/Documents/Projects/stacks/storage/framework/core/logging/tests/context-normalization.test.ts:58:49)
+[2026-07-22T11:31:17.898Z] local.ERROR: action failed Error: primary
+    at <anonymous> (/Users/glennmichaeltorregosa/Documents/Projects/stacks/storage/framework/core/logging/tests/context-normalization.test.ts:67:38) {"error":{"name":"Error","message":"ctx-err","stack":"Error: ctx-err\n    at <anonymous> (/Users/glennmichaeltorregosa/Documents/Projects/stacks/storage/framework/core/logging/tests/context-normalization.test.ts:67:69)"}}

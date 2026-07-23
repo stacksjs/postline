@@ -37,16 +37,24 @@ const requestStore = new AsyncLocalStorage<StacksRequestContext>()
 
 // Stable global so server-script blocks (which run inside stx serve's
 // fetch handler but without the raw Request) can read cookies.
+//
+// The AsyncLocalStorage context set via enterWith() in the fetch pre-handler
+// does NOT survive into stx-serve's later render of the server script (a
+// different async continuation), so we ALSO stash the context on a plain global
+// (`__stxServeContext`) — the same mechanism `__stxServeSearch` already relies
+// on — and fall back to it when the ALS store is empty.
+function currentRequestContext(): StacksRequestContext | undefined {
+  return requestStore.getStore() ?? (globalThis as { __stxServeContext?: StacksRequestContext }).__stxServeContext
+}
 ;(globalThis as any).requestContext = {
   cookie(name: string): string | null {
-    const ctx = requestStore.getStore()
-    return ctx?.cookies?.[name] ?? null
+    return currentRequestContext()?.cookies?.[name] ?? null
   },
   url(): string {
-    return requestStore.getStore()?.url ?? ''
+    return currentRequestContext()?.url ?? ''
   },
   locale(): string {
-    return requestStore.getStore()?.locale ?? 'de'
+    return currentRequestContext()?.locale ?? 'de'
   },
 }
 
@@ -101,20 +109,20 @@ async function startDefaultServer() {
 
   const userViewsPath = 'resources/views'
   const defaultViewsPath = 'storage/framework/defaults/resources/views'
-  // Layouts and partials live alongside views by default
-  // (resources/views/layouts, resources/views/components). The legacy
-  // resources/layouts and resources/components paths still exist on
-  // older scaffolds, so we let stx-serve fall back to those via the
-  // `fallbackLayoutsDir` / `fallbackPartialsDir` options.
+  // Layouts and partials are distinct resources. Prefer the
+  // framework-standard resources/* paths while retaining the older
+  // resources/views/* and root partials locations for existing apps.
   const userLayoutsPath = await firstExistingPath([
     'resources/views/layouts',
     'resources/layouts',
   ]) ?? 'resources/views/layouts'
   const defaultLayoutsPath = 'storage/framework/defaults/resources/layouts'
-  const userComponentsPath = await firstExistingPath([
-    'resources/views/components',
+  const userPartialsPath = await firstExistingPath([
+    'resources/partials',
+    'resources/views/partials',
+    'partials',
     'resources/components',
-  ]) ?? 'resources/views/components'
+  ])
   const preferredPort = Number(process.env.PORT) || 3000
   const apiPort = Number(process.env.PORT_API) || 3008
   const docsPort = Number(process.env.PORT_DOCS) || config.ports?.docs || 3006
@@ -134,7 +142,9 @@ async function startDefaultServer() {
     // gives us discovery without enumerating every namespace.
     componentsDir: 'storage/framework/defaults/resources/components',
     layoutsDir: userLayoutsPath,
-    partialsDir: userComponentsPath,
+    // Modern Stacks apps keep include fragments in resources/components;
+    // omit only when no conventional include directory exists.
+    ...(userPartialsPath && { partialsDir: userPartialsPath }),
     fallbackLayoutsDir: defaultLayoutsPath,
     fallbackPartialsDir: defaultViewsPath,
     quiet: true,
@@ -143,10 +153,6 @@ async function startDefaultServer() {
     auth: {
       cookieName: authCookie,
       redirectTo: '/login',
-      // Postline pages require a signed-in user; `/` is guarded
-      // client-side in the layout (a '/' prefix here would also match
-      // /login and loop). The public blog stays open.
-      protectedPaths: ['/queue', '/timeline', '/analytics', '/accounts', '/settings'],
     },
     onRequest: async (req: Request) => {
       const url = new URL(req.url)
@@ -161,13 +167,27 @@ async function startDefaultServer() {
       if (gated)
         return gated
 
-      // The blog is rendered by BunPress with a custom Stacks theme (see
-      // ./blog.ts). Intercept /blog and /blog/<slug> here so BunPress wins
-      // over the stx page layer; anything else (feeds, assets) falls through.
-      const { renderBlog } = await import('../blog')
-      const blogResponse = await renderBlog(req)
-      if (blogResponse)
-        return blogResponse
+      // Blog rendering. By default the blog is rendered by BunPress with a
+      // custom Stacks theme (see ./blog.ts) — intercept /blog and /blog/<slug>
+      // so BunPress wins over the stx page layer. BUT when the app ships its
+      // own stx blog views (resources/views/blog.stx), the blog is stx-native:
+      // skip BunPress entirely so /blog and /blog/<slug> fall through to the
+      // stx page layer and render consistently with the rest of the site.
+      if (existsSync(projectPath('resources/views/blog.stx'))) {
+        // stx-native blog: BunPress is skipped for /blog and /blog/<slug>
+        // (they render as stx pages), but the feed + sitemap are still served
+        // from content/blog markdown with no BunPress dependency.
+        const { renderBlogFeed } = await import('../blog')
+        const feed = await renderBlogFeed(req)
+        if (feed)
+          return feed
+      }
+      else {
+        const { renderBlog } = await import('../blog')
+        const blogResponse = await renderBlog(req)
+        if (blogResponse)
+          return blogResponse
+      }
 
       // Forward to the API dev server when this request can't possibly
       // be a stx page render. Two cases:
@@ -179,21 +199,8 @@ async function startDefaultServer() {
       if (url.pathname === '/docs' || url.pathname.startsWith('/docs/'))
         return proxyToBackend(req, docsBase, '/docs')
 
-      if (isApiBoundRequest(req, url.pathname)) {
-        // Bridge cookie auth → bearer auth: the page gate stores the token
-        // in the auth cookie, while bun-router's Auth middleware reads the
-        // Authorization header. Inject it so browser fetches stay plain.
-        if (!req.headers.get('authorization')) {
-          const cookieHeader = req.headers.get('cookie') || ''
-          const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${authCookie}=([^;]+)`))
-          if (match) {
-            const headers = new Headers(req.headers)
-            headers.set('authorization', `Bearer ${decodeURIComponent(match[1])}`)
-            return proxyToBackend(new Request(req, { headers }), apiBase)
-          }
-        }
+      if (isApiBoundRequest(req, url.pathname))
         return proxyToBackend(req, apiBase)
-      }
 
       // Optional `/locale/{code}` redirect (same as default SetLocaleAction).
       // STX i18n normally switches via `/<code>/…` paths from the injected
@@ -203,23 +210,23 @@ async function startDefaultServer() {
         const localeSwitch = url.pathname.match(/^\/locale\/([a-z]{2}(?:-[a-z]{2})?)\/?$/i)
         if (localeSwitch) {
           const { createLocaleSwitchResponse } = await import('@stacksjs/i18n')
-          return createLocaleSwitchResponse(req, localeSwitch[1], i18nConfig)
+          return createLocaleSwitchResponse(req, localeSwitch[1]!, i18nConfig)
         }
       }
 
-      // Stash cookies + url so server-script blocks rendering this
-      // request can pull them via globalThis.requestContext. We use
-      // enterWith() rather than run() because returning here would
-      // exit the async context before stx-serve resumes.
+      // Stash cookies + url so server-script blocks rendering this request can
+      // pull them via globalThis.requestContext. We use enterWith() rather than
+      // run() because returning here would exit the async context before
+      // stx-serve resumes — but enterWith()'s context is also lost across that
+      // boundary, so we additionally stash a plain global (read as a fallback by
+      // requestContext, mirroring __stxServeSearch).
       const locale = await applyRequestLocale(req)
+      const ctx: StacksRequestContext = { cookies: parseCookies(req), url: req.url, locale }
 
       ;(globalThis as { __stxServeSearch?: string }).__stxServeSearch = url.search
+      ;(globalThis as { __stxServeContext?: StacksRequestContext }).__stxServeContext = ctx
 
-      requestStore.enterWith({
-        cookies: parseCookies(req),
-        url: req.url,
-        locale,
-      })
+      requestStore.enterWith(ctx)
       return null
     },
   } as any)

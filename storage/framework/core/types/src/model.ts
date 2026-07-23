@@ -13,6 +13,16 @@ import type { SearchOptions } from './search-engine'
  */
 export type Model = Partial<ModelOptions>
 
+export type OnForeignKeyAction = 'cascade' | 'set null' | 'restrict' | 'no action'
+
+export interface ForeignKeyConfig {
+  table: string
+  column?: string
+  onDelete?: OnForeignKeyAction
+  onUpdate?: OnForeignKeyAction
+  nullable?: boolean
+}
+
 export interface BaseRelation {
   foreignKey?: string
   relationName?: string
@@ -103,7 +113,7 @@ type Action = ActionPath | ActionName | undefined
 
 export type ApiRoutes = 'index' | 'show' | 'store' | 'update' | 'destroy'
 
-export type SocialProviders = 'google' | 'github' | 'twitter' | 'facebook'
+export type SocialProviders = 'google' | 'github' | 'apple' | 'twitter' | 'facebook'
 
 export interface SeedOptions {
   count: number
@@ -252,12 +262,19 @@ export interface ModelOptions extends Base {
 }
 
 export interface Attribute {
+  /** Require a value and emit a NOT NULL database column. */
+  required?: boolean
+  /** Explicit database nullability override. */
+  nullable?: boolean
+  type?: string
   default?: string | number | boolean | Date
   unique?: boolean
   order?: number
   hidden?: boolean
   fillable?: boolean
   guarded?: boolean
+  /** Disable, infer, or explicitly configure a foreign-key constraint. */
+  foreignKey?: boolean | ForeignKeyConfig
   factory?: (faker: Faker) => any
   validation: {
     rule: ValidationType

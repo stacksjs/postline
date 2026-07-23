@@ -1,7 +1,8 @@
 {
   "name": "@stacksjs/browser",
   "type": "module",
-  "version": "0.70.45",
+  "sideEffects": false,
+  "version": "0.70.162",
   "description": "Stacks core frontend/browser functionalities.",
   "author": "Chris Breuer",
   "contributors": [
@@ -27,12 +28,16 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "bun": "./src/index.ts",
-      "import": "./dist/index.js"
+      "development": "./src/index.ts",
+      "bun": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./*": {
-      "bun": "./src/*",
-      "import": "./dist/*"
+      "development": "./src/*",
+      "bun": "./dist/*",
+      "import": "./dist/*",
+      "default": "./dist/*"
     }
   },
   "module": "dist/index.js",
@@ -48,13 +53,21 @@
   },
   "dependencies": {
     "@stacksjs/composables": "workspace:*",
-    "@stacksjs/stx": "^0.2.40",
-    "@stripe/stripe-js": "^9.0.0",
-    "bun-query-builder": "^0.1.38",
+    "@stacksjs/stx": "catalog:",
+    "bun-query-builder": "catalog:",
     "magic-regexp": "^0.11.0"
   },
+  "peerDependencies": {
+    "@stripe/stripe-js": "^9.10.0"
+  },
+  "peerDependenciesMeta": {
+    "@stripe/stripe-js": {
+      "optional": true
+    }
+  },
   "devDependencies": {
-    "better-dx": "^0.2.12",
-    "@stacksjs/utils": "workspace:*"
+    "better-dx": "catalog:",
+    "@stacksjs/utils": "workspace:*",
+    "@stripe/stripe-js": "^9.10.0"
   }
 }
