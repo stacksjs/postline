@@ -3,7 +3,8 @@
 // `@stacksjs/logging`'s async writes flush) and rely on top-level await
 // to drive the sync pipeline.
 /* eslint-disable no-console, ts/no-top-level-await */
-import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { parseOptions } from '@stacksjs/cli'
@@ -14,6 +15,7 @@ import {
   buildTemplateString,
   detectLocalStacks,
   diffSnapshots,
+  diffSnapshotsDetailed,
   MANAGED_PATHS,
   readChannel,
   readSyncedVersion,
@@ -21,6 +23,8 @@ import {
   resolveSuccessMessage,
   resolveUpgradeContext,
   resolveUpgradeMessage,
+  shouldAutoDetectLocalStacks,
+  shouldCheckDirtyManagedPaths,
   shouldShortCircuit,
   snapshotTree,
   writeChannel,
@@ -30,6 +34,12 @@ import {
   type SnapshotEntry,
   type UpgradeContext,
 } from './framework-utils'
+import {
+  runPostSyncDependencyRefresh,
+  runPostSyncMigration,
+  shouldRefreshPostSyncDependencies,
+  shouldRunPostSyncHooks,
+} from './framework-hooks'
 
 interface UpgradeOptions {
   version?: string
@@ -38,6 +48,8 @@ interface UpgradeOptions {
   force?: boolean
   /** Path to a local stacks checkout — short-circuits the GitHub download. */
   from?: string
+  /** Preview the upgrade (list what would change) without writing, installing, or migrating. */
+  dryRun?: boolean
   /** Skip the post-sync hooks (auto-imports / migrate / bun install). */
   noPostinstall?: boolean
   /** Run post-sync hooks (default true). Inverse of --no-postinstall. */
@@ -47,6 +59,23 @@ interface UpgradeOptions {
 const options = parseOptions() as UpgradeOptions
 
 const projectRoot = p.projectPath()
+
+// Node-modules app model: there is no vendored `storage/framework/core` to
+// sync framework source into. Such an app upgrades by bumping its published
+// `stacks` + `@stacksjs/*` dependency versions and reinstalling. Branch here,
+// before any vendored-core paths are read.
+if (!existsSync(p.projectPath('storage/framework/core'))) {
+  const { upgradeStacksPackages } = await import('./packages')
+  await upgradeStacksPackages(projectRoot, {
+    version: options.version,
+    canary: options.canary,
+    stable: options.stable,
+    force: options.force,
+    dryRun: options.dryRun,
+    noPostinstall: options.noPostinstall ?? options.postinstall === false,
+  })
+}
+
 const channelFile = join(projectRoot, '.stacks-channel')
 const versionFile = join(projectRoot, '.stacks-version')
 const currentChannel = readChannel(channelFile)
@@ -59,7 +88,7 @@ const currentVersion = readVersion(corePkgPath)
 // stacks checkout for instant offline updates. If neither is available,
 // fall back to gitit (GitHub).
 const explicitLocal = options.from ? p.projectPath(options.from) : null
-const detectedLocal = explicitLocal ?? detectLocalStacks(projectRoot)
+const detectedLocal = explicitLocal ?? (shouldAutoDetectLocalStacks(options) ? detectLocalStacks(projectRoot) : null)
 const usingLocal = !!detectedLocal
 
 // User-facing status output. We use `console.log` directly (not the
@@ -71,10 +100,23 @@ console.log(usingLocal
   ? `  source: local checkout at ${detectedLocal}`
   : `  source: github:stacksjs/stacks#${ctx.ref}`)
 
+// --dry-run: full preview, zero side effects. The "after" state of every
+// managed path is snapshotted from the upgrade SOURCE (the local checkout
+// for --from, or a temp-dir download outside the project for GitHub), so we
+// can list exactly what a real run would change without writing a single
+// byte into the project, installing dependencies, or running migrations.
+if (options.dryRun) {
+  await runDryRunPreview()
+  process.exit(ExitCode.Success)
+}
+
 // Pre-flight: warn (and abort, unless --force) if any managed path has
 // uncommitted git changes. We don't want `update` to silently overwrite
-// hand edits inside framework code.
-if (!options.force) {
+// hand edits inside framework code. The internal restart skips this duplicate
+// check because its parent already validated the tree before intentionally
+// syncing these managed paths.
+const alreadyRestarted = process.argv.includes('--__restarted')
+if (shouldCheckDirtyManagedPaths({ force: !!options.force, alreadyRestarted })) {
   const dirty = await detectDirtyManagedPaths(projectRoot)
   if (dirty.length > 0) {
     // Use console.warn (synchronous) — `log.warn` is async, and a follow-up
@@ -173,7 +215,6 @@ const newVersion = readVersion(corePkgPath)
 // to avoid pathological loops if the new code keeps disagreeing with
 // itself somehow.
 const ownHashAfter = await hashFileOrZero(ownPath)
-const alreadyRestarted = process.argv.includes('--__restarted')
 if (ownHashBefore !== 0n && ownHashAfter !== 0n && ownHashBefore !== ownHashAfter && !alreadyRestarted) {
   console.log('Upgrade pulled a newer version of the upgrade action — re-running once to pick up new sync paths and hooks.\n')
   // Forward the user's original args plus the sentinel.
@@ -236,7 +277,13 @@ for (const { managed, summary } of perPath) {
 // dead simple is that the user shouldn't have to chase follow-up commands.
 const runHooks = !options.noPostinstall && options.postinstall !== false
 if (runHooks) {
-  await runPostSyncHooks({ aggregate, perPath, projectRoot })
+  try {
+    await runPostSyncHooks({ aggregate, perPath, projectRoot, alreadyRestarted })
+  }
+  catch (err) {
+    console.error(`Post-sync hooks failed: ${(err as Error)?.message || err}`)
+    process.exit(ExitCode.FatalError)
+  }
 }
 
 if (ctx.channel === 'canary' && !ctx.targetVersion) {
@@ -248,6 +295,181 @@ process.exit(ExitCode.Success)
 // ===========================================================================
 // helpers
 // ===========================================================================
+
+/**
+ * `--dry-run` preview. Reports exactly what a real run would do (per-path
+ * file diffs, version change, channel/sha writes, post-sync hooks) while
+ * performing no writes itself. Runs entirely against the upgrade source:
+ * the local checkout for `--from`, or templates downloaded into a temp dir
+ * OUTSIDE the project (removed afterwards) for the GitHub path.
+ */
+async function runDryRunPreview(): Promise<void> {
+  console.log('\n  DRY RUN - preview only. No files will be written, nothing will be installed, no migrations will run.\n')
+
+  // Advisory only: a real run aborts on dirty managed paths unless --force.
+  // The preview cannot clobber anything, so warn and keep going.
+  const dirty = await detectDirtyManagedPaths(projectRoot)
+  if (dirty.length > 0) {
+    console.warn('  Note: these framework-managed paths have uncommitted changes (a real run would abort without --force):')
+    for (const path of dirty) console.warn(`    - ${path}`)
+    console.warn('')
+  }
+
+  // Up-to-date check with the same inputs as the real short-circuit.
+  let previewSha: string | null = null
+  if (!options.force && !ctx.targetVersion) {
+    previewSha = await getRemoteSha(ctx, usingLocal, detectedLocal)
+    const synced = readSyncedVersion(versionFile)
+    if (shouldShortCircuit({ force: !!options.force, targetVersion: ctx.targetVersion, remoteSha: previewSha, synced, channel: ctx.channel })) {
+      console.log(`✔ Already on the latest ${ctx.channel} (${previewSha!.slice(0, 7)}). A real run would change nothing.`)
+      return
+    }
+  }
+
+  const aggregate: ChangeSummary = { added: 0, changed: 0, removed: 0, unchanged: 0 }
+  const perPath: { managed: ManagedPath, summary: ChangeSummary }[] = []
+  let sawRemoved = 0
+  let sourceVersion: string | null = null
+
+  const tmpBase = mkdtempSync(join(tmpdir(), 'stacks-upgrade-dry-run-'))
+  try {
+    let repoTmp: string | null = null
+
+    for (const managed of MANAGED_PATHS) {
+      const localTarget = join(projectRoot, managed.localPath)
+      const before = managed.isFile
+        ? await singleFileSnapshot(localTarget)
+        : await snapshotTree(localTarget, managed.skip)
+
+      let after: Map<string, SnapshotEntry>
+      if (usingLocal && detectedLocal) {
+        const src = join(detectedLocal, managed.subPath)
+        if (!existsSync(src)) {
+          console.log(`  ${managed.label.padEnd(10)} skip: source missing at ${src}`)
+          continue
+        }
+        after = managed.isFile
+          ? await singleFileSnapshot(src)
+          : await snapshotTree(src, managed.skip)
+      }
+      else {
+        try {
+          if (managed.isFile) {
+            // Single files (buddy / bootstrap) come from one whole-repo
+            // download, mirroring syncRootFilesFromGitHub.
+            if (!repoTmp) {
+              repoTmp = join(tmpBase, 'repo')
+              await downloadTemplate(`github:stacksjs/stacks#${ctx.ref}`, {
+                dir: repoTmp,
+                force: true,
+                forceClean: true,
+                preferOffline: true,
+                silent: true,
+              })
+            }
+            after = await singleFileSnapshot(join(repoTmp, managed.subPath))
+          }
+          else {
+            const dir = join(tmpBase, managed.label)
+            await downloadTemplate(buildTemplateString(ctx.ref, managed.subPath), {
+              dir,
+              force: true,
+              forceClean: true,
+              preferOffline: !options.force,
+              silent: true,
+            })
+            after = await snapshotTree(dir, managed.skip)
+          }
+        }
+        catch (err) {
+          console.log(`  ${managed.label.padEnd(10)} preview unavailable (${(err as Error)?.message || err}); a real run would sync from github:stacksjs/stacks#${ctx.ref}`)
+          continue
+        }
+      }
+
+      const summary = diffSnapshotsDetailed(before, after)
+      aggregate.added += summary.added
+      aggregate.changed += summary.changed
+      aggregate.removed += summary.removed
+      aggregate.unchanged += summary.unchanged
+      perPath.push({ managed, summary })
+      sawRemoved += summary.removed
+
+      if (managed.isFile) {
+        const moved = summary.added + summary.changed > 0
+        console.log(`  ${managed.label.padEnd(10)} ${moved ? 'would update' : 'unchanged'}`)
+      }
+      else if (summary.added + summary.changed + summary.removed === 0) {
+        console.log(`  ${managed.label.padEnd(10)} unchanged (${summary.unchanged} files)`)
+      }
+      else {
+        console.log(`  ${managed.label.padEnd(10)} +${summary.added} ~${summary.changed} -${summary.removed} (${summary.unchanged} unchanged)`)
+        const samples = [
+          ...summary.addedFiles.map(f => `+ ${f}`),
+          ...summary.changedFiles.map(f => `~ ${f}`),
+        ]
+        for (const line of samples.slice(0, 8)) console.log(`      ${line}`)
+        if (samples.length > 8)
+          console.log(`      ... and ${samples.length - 8} more`)
+      }
+    }
+
+    // Version the sync would land on, read from the source rather than from a
+    // post-sync tree.
+    const sourcePkgPath = usingLocal && detectedLocal
+      ? join(detectedLocal, 'storage/framework/core/buddy/package.json')
+      : repoTmp
+        ? join(repoTmp, 'storage/framework/core/buddy/package.json')
+        : join(tmpBase, 'core', 'buddy', 'package.json')
+    sourceVersion = readVersion(sourcePkgPath)
+  }
+  finally {
+    rmSync(tmpBase, { recursive: true, force: true })
+  }
+
+  console.log('')
+  if (currentVersion || sourceVersion) {
+    console.log(currentVersion === sourceVersion
+      ? `  version: unchanged (v${currentVersion ?? 'unknown'})`
+      : `  version: v${currentVersion ?? 'unknown'} -> v${sourceVersion ?? 'unknown'}`)
+  }
+
+  console.log('\n  A real run would:')
+  console.log('    - sync the managed paths above into place')
+  if (!ctx.targetVersion) {
+    console.log(`    - write channel "${ctx.channel}" to .stacks-channel`)
+    console.log(previewSha
+      ? `    - record synced sha ${previewSha.slice(0, 7)} in .stacks-version`
+      : '    - record the resolved commit sha in .stacks-version (unavailable in this preview)')
+  }
+
+  const runHooks = !options.noPostinstall && options.postinstall !== false
+  if (!runHooks) {
+    console.log('    - skip post-sync hooks (--no-postinstall)')
+  }
+  else if (aggregate.added + aggregate.changed + aggregate.removed === 0) {
+    console.log('    - skip post-sync hooks (nothing changed)')
+  }
+  else {
+    console.log('    - regenerate the auto-import manifest')
+    const corePkgChanged = perPath.some((entry) => {
+      const { managed, summary } = entry
+      if (managed.isFile) return false
+      if (managed.label !== 'core' && managed.label !== 'defaults') return false
+      if (summary.added + summary.changed === 0) return false
+      return pkgJsonInTree(join(projectRoot, managed.localPath))
+    })
+    if (corePkgChanged)
+      console.log('    - run `bun install` to refresh dependencies')
+    if (existsSync(join(projectRoot, 'database', 'migrations')))
+      console.log('    - run pending migrations')
+  }
+
+  if (sawRemoved > 0)
+    console.log('\n  (-N counts files no longer shipped upstream; the sync leaves them in place.)')
+
+  console.log('\n✔ Dry run complete. No changes were made.')
+}
 
 async function detectDirtyManagedPaths(root: string): Promise<string[]> {
   // If we're not in a git repo, there's nothing to check — treat as clean.
@@ -363,6 +585,7 @@ async function syncFromLocal(stacksRoot: string, managed: ManagedPath, localTarg
   if (managed.isFile) {
     mkdirSync(dirname(localTarget), { recursive: true })
     copyFileSync(src, localTarget)
+    if (managed.executable) chmodSync(localTarget, 0o755)
     return
   }
 
@@ -410,8 +633,10 @@ async function syncRootFilesFromGitHub(ref: string): Promise<void> {
       const src = join(tmpDir, managed.subPath)
       const dest = p.projectPath(managed.localPath)
       try {
-        if (existsSync(src) && existsSync(dest))
+        if (existsSync(src) && existsSync(dest)) {
           copyFileSync(src, dest)
+          if (managed.executable) chmodSync(dest, 0o755)
+        }
       }
       catch {
         // best-effort
@@ -431,10 +656,12 @@ async function runPostSyncHooks(args: {
   aggregate: ChangeSummary
   perPath: { managed: ManagedPath, summary: ChangeSummary }[]
   projectRoot: string
+  alreadyRestarted: boolean
 }): Promise<void> {
-  const { aggregate, perPath, projectRoot } = args
+  const { aggregate, perPath, projectRoot, alreadyRestarted } = args
 
-  if (aggregate.added + aggregate.changed + aggregate.removed === 0) {
+  const changeCount = aggregate.added + aggregate.changed + aggregate.removed
+  if (!shouldRunPostSyncHooks(changeCount, alreadyRestarted)) {
     console.log('Nothing changed — skipping post-sync hooks.')
     return
   }
@@ -457,25 +684,21 @@ async function runPostSyncHooks(args: {
   //    pulls new framework package versions; the user's lockfile won't know
   //    about them until install is re-run. We only run install if a
   //    package.json moved, so no-op upgrades stay fast.
-  const corePkgChanged = perPath.some((entry) => {
+  const corePkgChanged = shouldRefreshPostSyncDependencies(perPath.some((entry) => {
     const { managed, summary } = entry
     if (managed.isFile) return false
     if (managed.label !== 'core' && managed.label !== 'defaults') return false
     if (summary.added + summary.changed === 0) return false
     return pkgJsonInTree(join(projectRoot, managed.localPath))
-  })
+  }), alreadyRestarted)
   if (corePkgChanged) {
     console.log('Running `bun install` to refresh dependencies...')
     try {
-      const proc = Bun.spawn({
-        cmd: [process.argv[0] || 'bun', 'install'],
-        cwd: projectRoot,
-        stdout: 'inherit',
-        stderr: 'inherit',
+      await runPostSyncDependencyRefresh({
+        bunExecutable: process.argv[0] || 'bun',
+        projectRoot,
+        spawn: spawnOptions => Bun.spawn(spawnOptions),
       })
-      const code = await proc.exited
-      if (code !== 0)
-        console.warn(`  bun install exited with code ${code} (non-fatal)`)
     }
     catch (err) {
       console.warn(`  bun install failed (non-fatal): ${(err as Error)?.message || err}`)
@@ -488,21 +711,13 @@ async function runPostSyncHooks(args: {
   const migrationsDir = join(projectRoot, 'database', 'migrations')
   if (existsSync(migrationsDir)) {
     console.log('Running pending migrations...')
-    try {
-      const migrateScript = p.frameworkPath('core/buddy/src/cli.ts')
-      const proc = Bun.spawn({
-        cmd: [process.argv[0] || 'bun', migrateScript, 'migrate'],
-        cwd: projectRoot,
-        stdout: 'inherit',
-        stderr: 'inherit',
-      })
-      const code = await proc.exited
-      if (code !== 0)
-        console.warn(`  migrate exited with code ${code} (non-fatal — DB may not be set up yet)`)
-    }
-    catch (err) {
-      console.warn(`  migrate failed (non-fatal): ${(err as Error)?.message || err}`)
-    }
+    const migrateScript = p.frameworkPath('core/buddy/src/cli.ts')
+    await runPostSyncMigration({
+      bunExecutable: process.argv[0] || 'bun',
+      migrateScript,
+      projectRoot,
+      spawn: spawnOptions => Bun.spawn(spawnOptions),
+    })
   }
 }
 

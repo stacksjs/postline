@@ -21,7 +21,8 @@ import process from 'node:process'
 // Lazy import logging to avoid circular dependency (logging imports path)
 async function debugLog(message: string) {
   try {
-    const { log } = await import('@stacksjs/logging')
+    const loggingPackage = '@stacksjs/' + 'logging'
+    const { log } = await import(loggingPackage)
     log.debug(message)
   }
   catch {
@@ -723,6 +724,11 @@ export function errorHandlingPath(path?: string): string {
  */
 export function eventsPath(path?: string): string {
   return corePath(`events/${path || ''}`)
+}
+
+/** Returns the path to the feature-flags core package. */
+export function featureFlagsPath(path?: string): string {
+  return corePath(`feature-flags/${path || ''}`)
 }
 
 /**
@@ -1436,16 +1442,6 @@ export function socialsPath(path?: string): string {
 
 
 /**
- * Returns the path to the `x-ray` directory within the `stacks` directory of the framework.
- *
- * @param path - The relative path to the file or directory within the x-ray directory.
- * @returns The absolute path to the specified file or directory within the x-ray directory.
- */
-export function xRayPath(path?: string): string {
-  return frameworkPath(`stacks/x-ray/${path || ''}`)
-}
-
-/**
  * Returns the path to the home directory, optionally appending a given path.
  *
  * @param path - The relative path to append to the home directory path.
@@ -1501,6 +1497,7 @@ export interface Path {
   eslintPluginPath: (path?: string) => string
   errorHandlingPath: (path?: string) => string
   eventsPath: (path?: string) => string
+  featureFlagsPath: (path?: string) => string
   coreEnvPath: (path?: string) => string
   healthPath: (path?: string) => string
   examplesPath: (type?: 'web-components') => string
@@ -1578,7 +1575,6 @@ export interface Path {
   userEmailsPath: (path?: string) => string
   utilsPath: (path?: string) => string
   validationPath: (path?: string) => string
-  xRayPath: (path?: string) => string
   homeDir: (path?: string) => string
   basename: (path: string) => string
   delimiter: () => ';' | ':'
@@ -1640,6 +1636,7 @@ export const path: Path = {
   eslintPluginPath,
   errorHandlingPath,
   eventsPath,
+  featureFlagsPath,
   coreEnvPath,
   healthPath,
   examplesPath,
@@ -1717,7 +1714,6 @@ export const path: Path = {
   userEmailsPath,
   utilsPath,
   validationPath,
-  xRayPath,
   homeDir,
 
   // path utils

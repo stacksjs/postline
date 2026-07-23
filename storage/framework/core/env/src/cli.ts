@@ -2,8 +2,8 @@
  * CLI commands for .env encryption/decryption
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { basename, dirname, resolve } from 'node:path'
 import { decryptValue, encryptValue, generateKeypair } from './crypto'
 import { parse } from './parser'
 
@@ -38,6 +38,39 @@ export interface GetOptions {
   format?: 'json' | 'shell' | 'eval'
   prettyPrint?: boolean
   cwd?: string
+}
+
+function encryptedEnvContent(envContent: string, publicKey: string, publicKeyName: string, options: Pick<EncryptOptions, 'key' | 'excludeKey'>): string {
+  const encryptedLines: string[] = [
+    '#/-------------------[DOTENV_PUBLIC_KEY]--------------------/',
+    '#/       versioned X25519 encryption for .env files         /',
+    '#/       [how it works](https://stacksjs.com/encryption)   /',
+    '#/----------------------------------------------------------/',
+    `${publicKeyName}="${publicKey}"`,
+    '',
+  ]
+
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) {
+      encryptedLines.push(line)
+      continue
+    }
+    if (trimmed.startsWith('DOTENV_PUBLIC_KEY')) continue
+    const match = trimmed.match(/^([^=]+)=(.*)$/)
+    if (!match || match[1] === undefined || match[2] === undefined) {
+      encryptedLines.push(line)
+      continue
+    }
+    const key = match[1].trim()
+    let value = match[2].trim()
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith(`'`) && value.endsWith(`'`)))
+      value = value.slice(1, -1)
+    const selected = (!options.key || key.includes(options.key)) && (!options.excludeKey || !key.includes(options.excludeKey))
+    if (selected && !value.startsWith('encrypted:')) value = encryptValue(value, publicKey)
+    encryptedLines.push(`${key}="${value}"`)
+  }
+  return encryptedLines.join('\n')
 }
 
 /**
@@ -99,76 +132,10 @@ export function encryptEnv(options: EncryptOptions = {}): { success: boolean, ou
       writeFileSync(keysPath, keysContent, 'utf-8')
     }
 
-    // Load and encrypt .env file
     const envContent = readFileSync(envPath, 'utf-8')
-    const lines = envContent.split('\n')
-    const encryptedLines: string[] = []
-
-    // Add header with public key
     const env = options.file ? options.file.replace(/^\.env\./, '').toUpperCase() : ''
     const publicKeyName = env ? `DOTENV_PUBLIC_KEY_${env}` : 'DOTENV_PUBLIC_KEY'
-
-    encryptedLines.push('#/-------------------[DOTENV_PUBLIC_KEY]--------------------/')
-    encryptedLines.push('#/            public-key encryption for .env files          /')
-    encryptedLines.push('#/       [how it works](https://stacksjs.com/encryption)   /')
-    encryptedLines.push('#/----------------------------------------------------------/')
-    encryptedLines.push(`${publicKeyName}="${publicKey}"`)
-    encryptedLines.push('')
-
-    for (const line of lines) {
-      const trimmed = line.trim()
-
-      // Keep comments and empty lines
-      if (!trimmed || trimmed.startsWith('#')) {
-        encryptedLines.push(line)
-        continue
-      }
-
-      // Skip existing public key lines
-      if (trimmed.startsWith('DOTENV_PUBLIC_KEY')) {
-        continue
-      }
-
-      // Parse key=value
-      const match = trimmed.match(/^([^=]+)=(.*)$/)
-      if (!match || match[1] === undefined || match[2] === undefined) {
-        encryptedLines.push(line)
-        continue
-      }
-
-      const key = match[1].trim()
-      let value = match[2].trim()
-
-      // Remove quotes if present
-      if ((value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith(`'`) && value.endsWith(`'`))) {
-        value = value.slice(1, -1)
-      }
-
-      // Check if key should be encrypted
-      let shouldEncrypt = true
-
-      if (options.key && !key.includes(options.key)) {
-        shouldEncrypt = false
-      }
-
-      if (options.excludeKey && key.includes(options.excludeKey)) {
-        shouldEncrypt = false
-      }
-
-      // Skip if already encrypted
-      if (value.startsWith('encrypted:')) {
-        shouldEncrypt = false
-      }
-
-      if (shouldEncrypt) {
-        value = encryptValue(value, publicKey)
-      }
-
-      encryptedLines.push(`${key}="${value}"`)
-    }
-
-    const output = encryptedLines.join('\n')
+    const output = encryptedEnvContent(envContent, publicKey, publicKeyName, options)
 
     if (options.stdout) {
       return { success: true, output }
@@ -303,6 +270,7 @@ export function setEnv(
 ): { success: boolean, output?: string, error?: string } {
   const cwd = options.cwd || process.cwd()
   const envPath = resolve(cwd, options.file || '.env')
+  const keysPath = resolve(cwd, options.keysFile || '.env.keys')
 
   try {
     let content = ''
@@ -314,11 +282,21 @@ export function setEnv(
     let found = false
     let publicKey: string | undefined
 
-    // First pass: find public key
+    // Extract environment name from file path (basename only), matching the
+    // naming scheme encryptEnv/decryptEnv use (e.g. `.env.production` ->
+    // `DOTENV_PUBLIC_KEY_PRODUCTION`), so we look for the right key line
+    // instead of only ever matching the bare, unsuffixed `DOTENV_PUBLIC_KEY=`.
+    const envFileName = options.file || '.env'
+    const baseName = envFileName.split('/').pop() || ''
+    const env = baseName.replace(/^\.env\./, '').replace(/^\.env$/, '').toUpperCase()
+    const publicKeyName = env ? `DOTENV_PUBLIC_KEY_${env}` : 'DOTENV_PUBLIC_KEY'
+    const privateKeyName = env ? `DOTENV_PRIVATE_KEY_${env}` : 'DOTENV_PRIVATE_KEY'
+
+    // First pass: find public key for this file
     for (const line of lines) {
       const trimmed = line.trim()
-      if (trimmed.startsWith('DOTENV_PUBLIC_KEY=')) {
-        const match = trimmed.match(/^DOTENV_PUBLIC_KEY=["']?([^"'\n]+)["']?/)
+      if (trimmed.startsWith(`${publicKeyName}=`)) {
+        const match = trimmed.match(/^[^=]+=["']?([^"'\n]+)["']?/)
         if (match) {
           publicKey = match[1]
         }
@@ -326,9 +304,27 @@ export function setEnv(
       }
     }
 
-    // If no public key and encryption requested, generate one
+    // A public key found in the .env file is only usable if its matching
+    // private key is actually saved in the keys file. Reusing a public key
+    // whose private key was never generated/saved (e.g. a scaffolded .env
+    // that ships a demo DOTENV_PUBLIC_KEY with no .env.keys, or a lost
+    // .env.keys) would silently encrypt the value with a key nobody can
+    // ever decrypt again.
+    if (publicKey) {
+      let hasMatchingPrivateKey = false
+      if (existsSync(keysPath)) {
+        const keysContent = readFileSync(keysPath, 'utf-8')
+        const { parsed: keys } = parse(keysContent)
+        hasMatchingPrivateKey = Boolean(keys[privateKeyName])
+      }
+
+      if (!hasMatchingPrivateKey) {
+        publicKey = undefined
+      }
+    }
+
+    // If no usable keypair and encryption requested, generate one
     if (!options.plain && !publicKey) {
-      const keysPath = resolve(cwd, options.keysFile || '.env.keys')
       const keypair = generateKeypair()
       publicKey = keypair.publicKey
 
@@ -338,14 +334,17 @@ export function setEnv(
         keysContent = readFileSync(keysPath, 'utf-8')
       }
 
-      const envFileName = options.file || '.env'
-      const baseName = envFileName.split('/').pop() || ''
-      const env = baseName.replace(/^\.env\./, '').replace(/^\.env$/, '').toUpperCase()
-      const publicKeyName = env ? `DOTENV_PUBLIC_KEY_${env}` : 'DOTENV_PUBLIC_KEY'
-      const privateKeyName = env ? `DOTENV_PRIVATE_KEY_${env}` : 'DOTENV_PRIVATE_KEY'
-
       keysContent += `\n${publicKeyName}="${keypair.publicKey}"\n${privateKeyName}="${keypair.privateKey}"\n`
       writeFileSync(keysPath, keysContent, 'utf-8')
+
+      // Drop any stale/orphaned public key line(s) for this file before
+      // adding the fresh one, so repeated regeneration can't pile up
+      // duplicate DOTENV_PUBLIC_KEY* lines.
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const lineEntry = lines[i]
+        if (lineEntry !== undefined && lineEntry.trim().startsWith(`${publicKeyName}=`))
+          lines.splice(i, 1)
+      }
 
       // Add public key to .env file
       lines.unshift(`${publicKeyName}="${publicKey}"`)
@@ -408,16 +407,26 @@ export function getEnv(
     let privateKey: string | undefined
     const keysPath = resolve(cwd, options.keysFile || '.env.keys')
 
+    const envFileName = options.file || '.env'
+    const baseName = envFileName.split('/').pop() || ''
+    const env = baseName.replace(/^\.env\./, '').replace(/^\.env$/, '').toUpperCase()
+    const privateKeyName = env ? `DOTENV_PRIVATE_KEY_${env}` : 'DOTENV_PRIVATE_KEY'
+
     if (existsSync(keysPath)) {
       const keysContent = readFileSync(keysPath, 'utf-8')
       const { parsed: keys } = parse(keysContent)
-
-      const envFileName = options.file || '.env'
-      const baseName = envFileName.split('/').pop() || ''
-      const env = baseName.replace(/^\.env\./, '').replace(/^\.env$/, '').toUpperCase()
-      const privateKeyName = env ? `DOTENV_PRIVATE_KEY_${env}` : 'DOTENV_PRIVATE_KEY'
       privateKey = keys[privateKeyName]
     }
+
+    // No .env.keys (or it lacks this env's key): fall back to the process
+    // env, the dotenvx convention for CI runners and servers, where
+    // .env.keys must never exist (it's the one file that can't be
+    // committed). Without this fallback, `buddy deploy` from GitHub
+    // Actions shipped still-encrypted `encrypted:...` ciphertext as every
+    // site's .env and the app crash-looped on config validation
+    // (stacksjs/status, 2026-07-04).
+    if (!privateKey)
+      privateKey = process.env[privateKeyName]
 
     // Load and parse .env file
     const envContent = readFileSync(envPath, 'utf-8')
@@ -546,42 +555,60 @@ export function rotateKeypair(
   const envPath = resolve(cwd, options.file || '.env')
   const keysPath = resolve(cwd, options.keysFile || '.env.keys')
 
-  // Write decrypted content temporarily
-  if (decryptResult.output) {
-    writeFileSync(envPath, decryptResult.output, 'utf-8')
-  }
-
-  // Generate new keypair
+  if (decryptResult.output === undefined) return { success: false, error: 'Rotation produced no decrypted content' }
   const keypair = generateKeypair()
-
-  // Update keys file
-  const keysContent = readFileSync(keysPath, 'utf-8')
-  const lines = keysContent.split('\n')
-
-  const env = options.file ? options.file.replace(/^\.env\./, '').toUpperCase() : ''
+  const originalEnv = readFileSync(envPath)
+  const originalKeys = readFileSync(keysPath)
+  const lines = originalKeys.toString('utf8').split('\n')
+  const envFileName = options.file || '.env'
+  const env = basename(envFileName).replace(/^\.env\./, '').replace(/^\.env$/, '').toUpperCase()
   const publicKeyName = env ? `DOTENV_PUBLIC_KEY_${env}` : 'DOTENV_PUBLIC_KEY'
   const privateKeyName = env ? `DOTENV_PRIVATE_KEY_${env}` : 'DOTENV_PRIVATE_KEY'
-
+  let replacedPublic = false
+  let replacedPrivate = false
   for (let i = 0; i < lines.length; i++) {
     const entry = lines[i]
     if (entry === undefined) continue
     if (entry.startsWith(`${publicKeyName}=`)) {
       lines[i] = `${publicKeyName}="${keypair.publicKey}"`
+      replacedPublic = true
     }
     else if (entry.startsWith(`${privateKeyName}=`)) {
       lines[i] = `${privateKeyName}="${keypair.privateKey}"`
+      replacedPrivate = true
     }
   }
+  if (!replacedPublic) lines.push(`${publicKeyName}="${keypair.publicKey}"`)
+  if (!replacedPrivate) lines.push(`${privateKeyName}="${keypair.privateKey}"`)
+  const nextKeys = `${lines.join('\n').replace(/\n+$/, '')}\n`
+  const nextEnv = encryptedEnvContent(decryptResult.output, keypair.publicKey, publicKeyName, options)
 
-  writeFileSync(keysPath, lines.join('\n'), 'utf-8')
-
-  // Re-encrypt with new keypair
-  return encryptEnv({
-    file: options.file,
-    keysFile: options.keysFile,
-    key: options.key,
-    excludeKey: options.excludeKey,
-    stdout: options.stdout,
-    cwd: options.cwd,
-  })
+  const token = `${process.pid}-${Date.now()}`
+  const envTemp = resolve(dirname(envPath), `.${basename(envPath)}.${token}.rotate`)
+  const keysTemp = resolve(dirname(keysPath), `.${basename(keysPath)}.${token}.rotate`)
+  try {
+    writeFileSync(envTemp, nextEnv, { encoding: 'utf8', mode: 0o600 })
+    writeFileSync(keysTemp, nextKeys, { encoding: 'utf8', mode: 0o600 })
+    if (options.stdout) {
+      renameSync(keysTemp, keysPath)
+      return { success: true, output: nextEnv }
+    }
+    renameSync(envTemp, envPath)
+    try {
+      renameSync(keysTemp, keysPath)
+    }
+    catch (error) {
+      writeFileSync(envPath, originalEnv)
+      throw error
+    }
+    return { success: true, output: `✔ rotated (${options.file || '.env'}) to encrypted:v2` }
+  }
+  catch (error) {
+    if (!existsSync(keysPath)) writeFileSync(keysPath, originalKeys, { mode: 0o600 })
+    return { success: false, error: `Failed to rotate without exposing plaintext: ${error instanceof Error ? error.message : 'Unknown error'}` }
+  }
+  finally {
+    rmSync(envTemp, { force: true })
+    rmSync(keysTemp, { force: true })
+  }
 }

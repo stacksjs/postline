@@ -15,11 +15,79 @@ import { Middleware } from './middleware'
 import './request-augmentation'
 import process from 'node:process'
 import { Buffer } from 'node:buffer'
+import { existsSync } from 'node:fs'
 import { timingSafeEqual } from 'node:crypto'
 import { log, report } from '@stacksjs/logging'
 import { path as p } from '@stacksjs/path'
 import { UploadedFile } from '@stacksjs/storage'
 import { applyRequestEnhancements, Router } from '@stacksjs/bun-router'
+
+// --- Split-router-instance detection (stacksjs/stacks#1975 / #1982) ---------
+// Two physically distinct @stacksjs/router modules can load in one process: an
+// app vendors storage/framework/core AND installs the published dist package,
+// and a tsconfig `paths` mapping (`@stacksjs/* -> ./*/src`) resolves core files
+// to ./router/src while root files (routes/, app/) resolve to node_modules
+// dist. Historically that split user routes onto one `route` instance while the
+// server served another's empty table — every route 404'd with NO error logged.
+//
+// That split is now HARMLESS: the `route` singleton (below) and the
+// request-context ALS (request-context.ts) are keyed on process-global Symbols,
+// so every loaded copy shares one route table and one request context. We still
+// record each loaded module and warn once — a duplicated install is wasteful
+// and worth fixing — but it no longer breaks routing, so we do NOT throw.
+const ROUTER_INSTANCES_KEY = Symbol.for('@stacksjs/router:loaded-instances')
+const loadedRouterInstances: Set<string> = ((globalThis as Record<symbol, unknown>)[ROUTER_INSTANCES_KEY] ??= new Set<string>()) as Set<string>
+loadedRouterInstances.add(import.meta.path)
+const MULTI_INSTANCE_WARNED_KEY = Symbol.for('@stacksjs/router:multi-instance-warned')
+
+/**
+ * Warn (once per process) when more than one @stacksjs/router module has loaded
+ * (stacksjs/stacks#1975 / #1982). Routing still works — the route table and
+ * request context are process-global singletons — but a duplicated install is
+ * worth surfacing. Called at serve() boot. Returns whether a split was detected
+ * so callers/tests can assert on it without capturing logs.
+ */
+export function warnOnMultipleRouterInstances(): boolean {
+  if (loadedRouterInstances.size <= 1)
+    return false
+  const g = globalThis as Record<symbol, unknown>
+  if (!g[MULTI_INSTANCE_WARNED_KEY]) {
+    g[MULTI_INSTANCE_WARNED_KEY] = true
+    const paths = [...loadedRouterInstances].map(p => `    - ${p}`).join('\n')
+    log.warn(
+      `${loadedRouterInstances.size} distinct @stacksjs/router modules loaded in one process; they now share one route `
+      + `table (stacksjs/stacks#1982) so routing still works, but this is a duplicated install worth fixing. It usually `
+      + `means an app vendors storage/framework/core AND installs the published @stacksjs/* dist, and a tsconfig \`paths\` `
+      + `mapping (\`@stacksjs/* -> ./*/src\`) splits module resolution between core files and root files. See stacksjs/stacks#1975.\n`
+      + `Loaded instances:\n${paths}`,
+    )
+  }
+  return true
+}
+
+// Resolve a scaffold-defaults file (under storage/framework/defaults). A
+// vendored checkout has it on disk and wins; a node_modules app has no
+// storage/framework, so fall back to the published @stacksjs/defaults package
+// (which ships the app/ + resources/ trees). Without this the router can't load
+// default Actions/Middleware/Controllers on a node_modules deploy and the API
+// server fails to boot.
+let __defaultsPkgRoot: string | null | undefined
+function resolveDefaultsPath(rel: string): string {
+  const vendored = p.storagePath(`framework/defaults/${rel}`)
+  if (existsSync(vendored))
+    return vendored
+  if (__defaultsPkgRoot === undefined) {
+    try {
+      const pkgJson = Bun.resolveSync('@stacksjs/defaults/package.json', process.cwd())
+      __defaultsPkgRoot = pkgJson.slice(0, pkgJson.lastIndexOf('/'))
+    }
+    catch {
+      __defaultsPkgRoot = null
+    }
+  }
+  return __defaultsPkgRoot ? `${__defaultsPkgRoot}/${rel}` : vendored
+}
+
 import { runWithRequest } from './request-context'
 import { isApiRequest, JSON_CONTENT_TYPE } from './api-shape'
 import { clearTrackedQueries, createErrorResponse, createMiddlewareErrorResponse } from './error-handler'
@@ -276,7 +344,7 @@ function isExposeRoutesAuthorized(req: Request): boolean {
 async function applyCorsIfConfigured(req: EnhancedRequest, response: Response): Promise<Response> {
   if (!req._corsConfig || !response) return response
   try {
-    const { applyCorsHeaders } = await import(p.storagePath('framework/defaults/app/Middleware/Cors.ts'))
+    const { applyCorsHeaders } = await import(resolveDefaultsPath('app/Middleware/Cors.ts'))
     return (applyCorsHeaders as (req: Request, res: Response, cfg?: unknown) => Response)(
       req as unknown as Request,
       response,
@@ -600,7 +668,7 @@ async function getMiddlewareAliases(): Promise<Record<string, string>> {
     }
     catch {
       try {
-        const defaultModule = await import(p.storagePath('framework/defaults/app/Middleware.ts'))
+        const defaultModule = await import(resolveDefaultsPath('app/Middleware.ts'))
         return defaultModule.default || {}
       }
       catch {
@@ -688,7 +756,7 @@ async function loadMiddleware(name: string): Promise<MiddlewareHandler | null> {
 
   // Fall back to framework defaults
   try {
-    const defaultPath = p.storagePath(`framework/defaults/app/Middleware/${className}.ts`)
+    const defaultPath = resolveDefaultsPath(`app/Middleware/${className}.ts`)
     const middleware = await import(defaultPath)
     const handler = (middleware.default ?? null) as MiddlewareHandler | null
     if (!handler || typeof handler.handle !== 'function') {
@@ -1155,7 +1223,7 @@ function createMiddlewareHandler(routeKey: string, handler: StacksHandler): Rout
         const safeMethod = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS'
         if (safeMethod) {
           try {
-            const { seedCsrfCookieIfMissing } = await import(p.storagePath('framework/defaults/app/Middleware/Csrf.ts'))
+            const { seedCsrfCookieIfMissing } = await import(resolveDefaultsPath('app/Middleware/Csrf.ts'))
             response = (seedCsrfCookieIfMissing as (req: Request, res: Response) => Response)(
               enhancedReq as unknown as Request,
               response,
@@ -1252,7 +1320,7 @@ function createMiddlewareHandler(routeKey: string, handler: StacksHandler): Rout
       // compression don't pay the load cost.
       if (enhancedReq._compress === true && response) {
         try {
-          const { applyCompression } = await import(p.storagePath('framework/defaults/app/Middleware/Compress.ts'))
+          const { applyCompression } = await import(resolveDefaultsPath('app/Middleware/Compress.ts'))
           return await (applyCompression as (req: Request, res: Response) => Promise<Response>)(enhancedReq as unknown as Request, response)
         }
         catch (err) {
@@ -1423,7 +1491,7 @@ async function resolveStringHandlerUncached(handlerPath: string): Promise<RouteH
 
     // Try user path first, then fall back to defaults
     const userPath = p.appPath(`${controllerPath}.ts`)
-    const defaultPath = p.storagePath(`framework/defaults/app/${controllerPath}.ts`)
+    const defaultPath = resolveDefaultsPath(`app/${controllerPath}.ts`)
     const fullPath = await fileExists(userPath) ? userPath : defaultPath
 
     try {
@@ -1463,13 +1531,13 @@ async function resolveStringHandlerUncached(handlerPath: string): Promise<RouteH
   else if (modulePath.includes('Actions')) {
     // Try user path first, then fall back to defaults
     const userPath = p.projectPath(`app/${modulePath}.ts`)
-    const defaultPath = p.storagePath(`framework/defaults/app/${modulePath}.ts`)
+    const defaultPath = resolveDefaultsPath(`app/${modulePath}.ts`)
     fullPath = await fileExists(userPath) ? userPath : defaultPath
   }
   else {
     // Generic app path - try user first, then defaults
     const userPath = p.appPath(`${modulePath}.ts`)
-    const defaultPath = p.storagePath(`framework/defaults/app/${modulePath}.ts`)
+    const defaultPath = resolveDefaultsPath(`app/${modulePath}.ts`)
     fullPath = await fileExists(userPath) ? userPath : defaultPath
   }
 
@@ -1522,7 +1590,7 @@ async function resolveStringHandlerUncached(handlerPath: string): Promise<RouteH
             // resolves to an older `@stacksjs/bun-router`.
             return Response.json(
               { error: 'Validation failed', errors: validationResult.errors },
-              422,
+              { status: 422 },
             )
           }
         }
@@ -1537,7 +1605,7 @@ async function resolveStringHandlerUncached(handlerPath: string): Promise<RouteH
           const auth = await action.authorize(req)
           if (auth instanceof Response) return auth
           if (auth === false) {
-            return Response.json({ error: 'Forbidden' }, 403)
+            return Response.json({ error: 'Forbidden' }, { status: 403 })
           }
         }
 
@@ -2064,7 +2132,7 @@ const REQUEST_METHODS: Record<string, (...args: any[]) => any> & ThisType<Enhanc
   },
   // File handling — returns UploadedFile with store/storeAs methods.
   file(key: string) {
-    const files = this.files || {}
+    const files = (this.files || {}) as Record<string, File | File[]>
     const file = files[key]
     if (!file)
       return null
@@ -2072,7 +2140,7 @@ const REQUEST_METHODS: Record<string, (...args: any[]) => any> & ThisType<Enhanc
     return rawFile ? new UploadedFile(rawFile) : null
   },
   getFiles(key: string) {
-    const files = this.files || {}
+    const files = (this.files || {}) as Record<string, File | File[]>
     const file = files[key]
     if (!file)
       return []
@@ -2080,11 +2148,11 @@ const REQUEST_METHODS: Record<string, (...args: any[]) => any> & ThisType<Enhanc
     return fileArray.map(f => new UploadedFile(f))
   },
   hasFile(key: string) {
-    const files = this.files || {}
+    const files = (this.files || {}) as Record<string, File | File[]>
     return key in files && files[key] !== undefined
   },
   allFiles() {
-    const files = this.files || {}
+    const files = (this.files || {}) as Record<string, File | File[]>
     const result: Record<string, UploadedFile | UploadedFile[]> = {}
     for (const [key, value] of Object.entries(files)) {
       if (Array.isArray(value))
@@ -2116,7 +2184,7 @@ const REQUEST_METHODS: Record<string, (...args: any[]) => any> & ThisType<Enhanc
     return token.abilities.includes(ability)
   },
   async tokenCant(ability: string) {
-    return !(await this.tokenCan(ability))
+    return !(await this.tokenCan!(ability))
   },
   // Gate / Policy macros (stacksjs/stacks#1874 F-9). Lazy-import `@stacksjs/auth`
   // to dodge the router←auth cycle; resolve the user from `_authenticatedUser`,
@@ -2129,7 +2197,7 @@ const REQUEST_METHODS: Record<string, (...args: any[]) => any> & ThisType<Enhanc
     return Gate.allows(ability, user, ...args)
   },
   async cannot(ability: string, ...args: unknown[]) {
-    return !(await this.can(ability, ...args))
+    return !(await this.can!(ability, ...args))
   },
   // Throw-on-deny variant (Laravel's `$this->authorize(...)`). Throws
   // AuthorizationException (403) on deny.
@@ -2247,6 +2315,10 @@ async function parseRequestBody(req: EnhancedRequest): Promise<void> {
       // empty string → no parse attempt). See stacksjs/stacks#1859 H-5.
       const cloned = req.clone()
       const raw = await cloned.text()
+      // Stash the exact unparsed bytes so `request.rawBody()` can return them
+      // for webhook signature verification (Stripe/GitHub/Slack). A
+      // re-serialized `jsonBody` is NOT byte-identical and fails HMAC checks.
+      ;req._rawBody = raw
       if (raw.length === 0) {
         ;req.jsonBody = {}
       }
@@ -2295,8 +2367,8 @@ async function parseRequestBody(req: EnhancedRequest): Promise<void> {
         }
       })
 
-      ;req.formBody = formBody
-      ;req.files = files
+      Reflect.set(req, 'formBody', formBody)
+      Reflect.set(req, 'files', files)
     }
   }
   catch (e) {
@@ -2589,7 +2661,7 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
           checks,
           timestamp: Date.now(),
         }
-        return Response.json(body, healthy ? 200 : 503)
+        return Response.json(body, { status: healthy ? 200 : 503 })
       })
       // Internal route-introspection endpoint. Powers `buddy dev` route
       // listing on startup and future `buddy route:list` consumers.
@@ -2607,7 +2679,7 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
       // no auth gate, publishing the full route table + action paths
       // to anyone who learned the URL.
       bunRouter.get('/__routes', (req: Request) => {
-        if (!isExposeRoutesAuthorized(req)) return Response.json({ error: 'disabled' }, 404)
+        if (!isExposeRoutesAuthorized(req)) return Response.json({ error: 'disabled' }, { status: 404 })
         return Response.json(listRegisteredRoutes())
       })
 
@@ -2624,7 +2696,7 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
         // decodeURIComponent because the signer URL-encodes the path
         // (slashes, spaces, etc.) when minting the URL — the JWT
         // claim is the raw path, so we must decode here to compare.
-        const params = req.params as Record<string, string> | undefined
+        const params = (req as Request & { params?: Record<string, string> }).params
         const rawPath = params?.path
           ? decodeURIComponent(params.path)
           : decodeURIComponent(url.pathname.replace(/^\/__storage\//, ''))
@@ -2677,7 +2749,7 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
       // exposing the route table. SwaggerUI/Insomnia/Postman can point
       // straight at this URL in dev for instant docs.
       bunRouter.get('/__openapi.json', async (req: Request) => {
-        if (!isExposeRoutesAuthorized(req)) return Response.json({ error: 'disabled' }, 404)
+        if (!isExposeRoutesAuthorized(req)) return Response.json({ error: 'disabled' }, { status: 404 })
         try {
           const { generateOpenApi } = await import('@stacksjs/api')
           const spec = await (generateOpenApi as () => Promise<unknown>)()
@@ -2686,7 +2758,7 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
         catch (err) {
           return Response.json(
             { error: 'OpenAPI generation failed', message: err instanceof Error ? err.message : String(err) },
-            500,
+            { status: 500 },
           )
         }
       })
@@ -2704,16 +2776,22 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
     //   downstream route silently breaks. See stacksjs/stacks#1870 R-2.
     // - any other handler-shaped object with a `handle()` method — also wrapped,
     //   under the same contract.
-    use(middleware: ActionHandler | Middleware | { handle: (req: EnhancedRequest) => void | Promise<void> }) {
+    use(middleware: ActionHandler | ((req: EnhancedRequest, next: () => Promise<Response>) => Response | Promise<Response>) | Middleware | { handle: (req: EnhancedRequest) => void | Promise<void> }) {
       // bunRouter.use() is async, so we need to call it properly
       // For synchronous chaining, we push directly to globalMiddleware
-      const adapted = adaptMiddlewareForBunRouter(middleware)
+      const adapted = adaptMiddlewareForBunRouter(middleware as ActionHandler)
       bunRouter.globalMiddleware.push(adapted as any)
       return stacksRouter
     },
 
     // Serve the router
     async serve(options: ServerOptions = {}): Promise<Server<unknown>> {
+      // Warn (don't crash) on a split router (#1975/#1982). The route table is
+      // now a process-global singleton, so a second instance pulled in by user
+      // route files shares the same table — routing works — but a duplicated
+      // install is still worth flagging. By now importRoutes() has run, so any
+      // second instance is already registered.
+      warnOnMultipleRouterInstances()
       return bunRouter.serve(options)
     },
 
@@ -2779,17 +2857,27 @@ export function createStacksRouter(config: StacksRouterConfig = {}): StacksRoute
         p.frameworkPath('orm/routes.ts'),
         p.frameworkPath('core/orm/routes.ts'),
       ]
+      let ormRoutesLoaded = false
       for (const candidate of ormRoutesCandidates) {
         try {
           if (await Bun.file(candidate).exists()) {
             await import(candidate)
+            ormRoutesLoaded = true
             break
           }
         }
         catch (error) {
-          log.debug(`ORM routes load failed for ${candidate}:`, error)
+          // WARN, not debug: a throwing candidate is a real problem. This
+          // loader tries the canonical copy first and falls through to the
+          // legacy one on ANY error — so a canonical file that throws at
+          // import (e.g. a hard `import config/qb.ts` on a project without
+          // one) silently serves the STALE legacy copy, and every edit to
+          // the canonical file appears to do nothing. Make that visible.
+          log.warn(`[router] ORM routes candidate failed to load, falling back to next: ${candidate}\n`, error)
         }
       }
+      if (!ormRoutesLoaded)
+        log.warn('[router] No ORM routes candidate loaded — model useApi endpoints are unavailable.')
 
       // Load routes from discovered packages
       log.debug('[router] Loading discovered package routes...')
@@ -2866,7 +2954,7 @@ export interface StacksRouterInstance {
   resource: (name: string, handler: string, options?: ResourceRouteOptions) => StacksRouterInstance
   match: (methods: string[], path: string, handler: StacksHandler) => ChainableRoute
   health: () => StacksRouterInstance
-  use: (middleware: ActionHandler) => StacksRouterInstance
+  use: (middleware: ActionHandler | ((req: EnhancedRequest, next: () => Promise<Response>) => Response | Promise<Response>)) => StacksRouterInstance
   register: (routePath: string, options?: { prefix?: string, middleware?: string | string[] }) => Promise<StacksRouterInstance>
   serve: (options?: ServerOptions) => Promise<Server<unknown>>
   handleRequest: (req: Request) => Promise<Response>
@@ -2882,8 +2970,19 @@ export interface StacksRouterInstance {
   loadDiscoveredRoutes: () => Promise<void>
 }
 
-// Create and export a default router instance
-export const route = createStacksRouter()
+// Create and export a default router instance.
+//
+// Promoted to a process-global singleton (keyed by a well-known Symbol) so
+// that if two physically distinct @stacksjs/router modules ever load in one
+// process — the dist-only-app-that-also-vendors-core split of
+// stacksjs/stacks#1975 / #1982 — they SHARE one route table instead of
+// registering user routes on one instance while the server serves another's
+// (empty) table (every route 404s). In the normal single-instance case `??=`
+// runs createStacksRouter() exactly once, so this is byte-identical to the
+// previous module-local singleton. Pairs with the request-context ALS, which
+// is globalized the same way so request state is shared across copies too.
+const ROUTE_SINGLETON_KEY = Symbol.for('@stacksjs/router:route-singleton')
+export const route: StacksRouterInstance = ((globalThis as Record<symbol, unknown>)[ROUTE_SINGLETON_KEY] ??= createStacksRouter()) as StacksRouterInstance
 
 // Promise-based route loading to prevent race conditions under concurrency
 let routesLoadPromise: Promise<void> | null = null

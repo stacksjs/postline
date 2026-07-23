@@ -1,18 +1,19 @@
 import type { CLI, DeployOptions } from '@stacksjs/types'
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { runAction } from '@stacksjs/actions'
 import { italic, onUnknownSubcommand, outro, prompts, runCommand } from "@stacksjs/cli"
-import { app, email as emailConfig, cloud as cloudConfig } from '@stacksjs/config'
-import { addDomain, hasUserDomainBeenAddedToCloud } from '../../../dns/src/drivers/aws'
+import { app, dns as dnsConfig, email as emailConfig, cloud as cloudConfig } from '@stacksjs/config'
+import { addDomain, hasUserDomainBeenAddedToCloud, syncDnsConfig } from '@stacksjs/dns'
+import { loadProjectDnsConfig } from '../config'
 import { encryptEnv, env } from '@stacksjs/env'
 import { Action } from '@stacksjs/enums'
 import { path as p } from '@stacksjs/path'
 import { ExitCode } from '@stacksjs/types'
 import { getErrorCode, getErrorMessage } from '@stacksjs/utils'
-import { ensureAppKey, ensureEnvIsSet, ensurePantryDependencies, ensurePantryInstalled } from './setup'
+import { ensureAppKey, ensureEnvIsSet } from './setup'
 
 // Use console.log for clean output without timestamps
 const log = {
@@ -124,9 +125,6 @@ async function findPantryMailBinary(): Promise<string | null> {
 async function ensureDeployPrerequisites(verbose = false): Promise<void> {
   const cwd = p.projectPath()
 
-  await ensurePantryInstalled()
-  await ensurePantryDependencies(cwd)
-
   await ensureEnvIsSet({ cwd, verbose })
   await ensureAppKey(cwd)
 }
@@ -158,7 +156,7 @@ function loadAwsCredentialsFromFile(): { accessKeyId?: string, secretAccessKey?:
 
       // Check for profile header
       const profileMatch = trimmed.match(/^\[(.+)\]$/)
-      if (profileMatch) {
+      if (profileMatch?.[1]) {
         currentProfile = profileMatch[1]
         profileCredentials[currentProfile] = {}
         continue
@@ -168,11 +166,13 @@ function loadAwsCredentialsFromFile(): { accessKeyId?: string, secretAccessKey?:
       const keyValue = trimmed.match(/^(\w+)\s*=\s*(.+)$/)
       if (keyValue && currentProfile) {
         const [, key, value] = keyValue
+        const target = profileCredentials[currentProfile]
+        if (!target || value === undefined) continue
         if (key === 'aws_access_key_id') {
-          profileCredentials[currentProfile].accessKeyId = value
+          target.accessKeyId = value
         }
         else if (key === 'aws_secret_access_key') {
-          profileCredentials[currentProfile].secretAccessKey = value
+          target.secretAccessKey = value
         }
       }
     }
@@ -202,7 +202,7 @@ function loadAwsCredentialsFromFile(): { accessKeyId?: string, secretAccessKey?:
     if (existsSync(configPath)) {
       const configContent = readFileSync(configPath, 'utf-8')
       const regionMatch = configContent.match(/region\s*=\s*(.+)/)
-      if (regionMatch) {
+      if (regionMatch?.[1]) {
         region = regionMatch[1].trim()
       }
     }
@@ -528,9 +528,16 @@ async function uploadMailServerToS3(bucketName: string, region: string, mode: st
  * Returns undefined if the project has no ts-cloud config (older projects /
  * pure AWS setups that only export the legacy `CloudConfig`).
  */
-async function loadTsCloudConfig(): Promise<any | undefined> {
+async function loadTsCloudConfig(envName?: string): Promise<any | undefined> {
   try {
-    const mod = await import(p.projectPath('config/cloud.ts'))
+    const base = p.projectPath('config/cloud.ts')
+    // Always cache-bust when an environment is known so the config module
+    // re-evaluates against the env-specific secrets just loaded into process.env
+    // — including production, whose values must win over any .env.development the
+    // env plugin auto-loaded at startup (bun caches the first import; a distinct
+    // query string forces a fresh evaluation).
+    const spec = envName ? `${base}?env=${envName}` : base
+    const mod = await import(spec)
     return mod.tsCloud
   }
   catch (err) {
@@ -548,16 +555,74 @@ function resolveProvider(tsCloudConfig: any): string {
     || 'aws'
 }
 
+/** Parse a positive-integer seconds env var, falling back to a default. */
+function readWaitSecs(name: string, defaultSecs: number): number {
+  const secs = process.env[name] ? Number.parseInt(process.env[name] as string, 10) : Number.NaN
+  return Number.isFinite(secs) && secs > 0 ? secs : defaultSecs
+}
+
+/** Human-friendly duration, e.g. `8m` or `1m30s`. */
+function fmtDuration(secs: number): string {
+  const m = Math.floor(secs / 60)
+  const s = secs % 60
+  return m ? (s ? `${m}m${s}s` : `${m}m`) : `${s}s`
+}
+
+/**
+ * Poll `check()` until it stops throwing or the timeout elapses, emitting a
+ * heartbeat every ~30s so a multi-minute wait never looks frozen (and, when
+ * backgrounded, so the caller can see it is still alive).
+ */
+async function pollUntil(opts: {
+  label: string
+  timeoutSecs: number
+  intervalMs?: number
+  check: () => void
+  timeoutMessage: (elapsedSecs: number) => string
+}): Promise<void> {
+  log.info(`${opts.label} (up to ${fmtDuration(opts.timeoutSecs)})...`)
+  const started = Date.now()
+  const deadline = started + opts.timeoutSecs * 1000
+  let lastHeartbeat = 0
+  for (;;) {
+    try {
+      opts.check()
+      return
+    }
+    catch {
+      const elapsedSecs = Math.floor((Date.now() - started) / 1000)
+      if (Date.now() > deadline)
+        throw new Error(opts.timeoutMessage(elapsedSecs))
+      if (elapsedSecs - lastHeartbeat >= 30) {
+        log.info(`  … still waiting (${elapsedSecs}s elapsed)`)
+        lastHeartbeat = elapsedSecs
+      }
+      await new Promise(r => setTimeout(r, opts.intervalMs ?? 5000))
+    }
+  }
+}
+
 /**
  * Wait until cloud-init finishes on the freshly provisioned host and the bun
  * runtime is on PATH. Cloud-init runs asynchronously after the server reports
  * "running", so deploying immediately would race the bun install and the
  * systemd unit's ExecStart (`/usr/local/bin/bun …`) would not exist yet.
+ *
+ * Timeouts are generous — cold Hetzner boots plus cloud-init installing
+ * bun/caddy can take several minutes — and overridable per environment:
+ *   TS_CLOUD_SSH_WAIT_SECS   (default 480 = 8m)  — SSH reachability
+ *   TS_CLOUD_BOOT_WAIT_SECS  (default 720 = 12m) — cloud-init + bun on PATH
  */
 async function waitForRemoteReady(ip: string, verbose: boolean): Promise<void> {
   const { execSync } = await import('node:child_process')
+  // Cloud providers recycle IPs, so a freshly-provisioned box often reuses an IP
+  // whose OLD host key is still in ~/.ssh/known_hosts. `accept-new` only accepts
+  // brand-new hosts — a *changed* key fails verification and the readiness check
+  // wrongly reports "SSH not reachable". Ignore the known_hosts file entirely for
+  // this ephemeral check (matches the actual deploy's SSH args).
   const sshArgs = [
-    '-o', 'StrictHostKeyChecking=accept-new',
+    '-o', 'StrictHostKeyChecking=no',
+    '-o', 'UserKnownHostsFile=/dev/null',
     '-o', 'BatchMode=yes',
     '-o', 'ConnectTimeout=10',
     `root@${ip}`,
@@ -570,19 +635,15 @@ async function waitForRemoteReady(ip: string, verbose: boolean): Promise<void> {
     })
 
   // 1) Wait for SSH to accept connections (server may still be booting).
-  log.info('Waiting for SSH to come up...')
-  const sshDeadline = Date.now() + 3 * 60_000
-  for (;;) {
-    try {
-      run('true')
-      break
-    }
-    catch {
-      if (Date.now() > sshDeadline)
-        throw new Error(`SSH did not become reachable on ${ip} within 3 minutes`)
-      await new Promise(r => setTimeout(r, 5000))
-    }
-  }
+  const sshWaitSecs = readWaitSecs('TS_CLOUD_SSH_WAIT_SECS', 8 * 60)
+  await pollUntil({
+    label: 'Waiting for SSH to come up',
+    timeoutSecs: sshWaitSecs,
+    check: () => { run('true') },
+    timeoutMessage: elapsed =>
+      `SSH did not become reachable on ${ip} within ${fmtDuration(sshWaitSecs)} (waited ${elapsed}s). `
+      + `The box may still be booting — raise TS_CLOUD_SSH_WAIT_SECS and retry.`,
+  })
   log.success('SSH is up')
 
   // 2) Block on cloud-init, then confirm bun landed on PATH.
@@ -594,19 +655,169 @@ async function waitForRemoteReady(ip: string, verbose: boolean): Promise<void> {
     log.debug('cloud-init status --wait returned non-zero (continuing):', err)
   }
 
-  const bunDeadline = Date.now() + 5 * 60_000
-  for (;;) {
-    try {
-      run('test -x /usr/local/bin/bun')
-      break
-    }
-    catch {
-      if (Date.now() > bunDeadline)
-        throw new Error('bun runtime did not appear at /usr/local/bin/bun within 5 minutes (cloud-init may have failed — check /var/log/cloud-init-output.log)')
-      await new Promise(r => setTimeout(r, 5000))
-    }
-  }
+  const bootWaitSecs = readWaitSecs('TS_CLOUD_BOOT_WAIT_SECS', 12 * 60)
+  await pollUntil({
+    label: 'Waiting for the bun runtime',
+    timeoutSecs: bootWaitSecs,
+    check: () => { run('test -x /usr/local/bin/bun') },
+    timeoutMessage: elapsed =>
+      `bun runtime did not appear at /usr/local/bin/bun within ${fmtDuration(bootWaitSecs)} (waited ${elapsed}s). `
+      + `cloud-init may have failed — SSH in and check /var/log/cloud-init-output.log; `
+      + `raise TS_CLOUD_BOOT_WAIT_SECS for slow regions.`,
+  })
   log.success('Server is ready (bun installed)')
+}
+
+/**
+ * Resolve (and decrypt) the deploy-target's environment file into a flat
+ * key/value map, so its values can be shipped to the server as each site's
+ * systemd `.env` content.
+ *
+ * ts-cloud's `buildSiteDeployScript` treats `site.env` as the COMPLETE
+ * content of the deployed `.env` — it doesn't read or merge in anything
+ * from the packaged release tarball (ts-cloud is a generic deploy tool; it
+ * has no idea `.env.production`/dotenvx encryption exist, that's entirely a
+ * Stacks convention). Left unaddressed, every Hetzner site deploys with
+ * ONLY whatever's in that site's own `env` override (often nothing at all)
+ * — confirmed against a real deploy (stacksjs/status#1 Phase 9): the `main`
+ * site (no `env` override) came up logging "loaded 0 variables from .env",
+ * and `api` (which only declares `{ HOST, APP_ENV }` to force the loopback
+ * bind) came up with just those 2 keys and none of its real production
+ * config, failing config validation on the still-`encrypted:...` APP_ENV
+ * ciphertext it never had a chance to decrypt (no DOTENV_PRIVATE_KEY_* in
+ * that 2-key set).
+ *
+ * Returns `{}` (not an error) when the file doesn't exist or fails to
+ * parse — an app with no `.env.production` yet shouldn't block deploying
+ * with whatever `site.env` overrides it does have.
+ */
+export async function resolveDeployEnvValues(environment: 'production' | 'staging' | 'development'): Promise<Record<string, string>> {
+  const fileName = environment === 'production'
+    ? '.env.production'
+    : environment === 'staging'
+      ? '.env.staging'
+      : existsSync(p.projectPath('.env.development'))
+        ? '.env.development'
+        : '.env'
+  const filePath = p.projectPath(fileName)
+  if (!existsSync(filePath))
+    return {}
+
+  try {
+    const { getEnv } = await import('@stacksjs/env')
+    const result = getEnv(undefined, { file: fileName, format: 'json' })
+    if (!result.success || !result.output) {
+      log.debug(`[deploy] Could not read ${fileName} for site env merging: ${result.error ?? 'unknown error'}`)
+      return {}
+    }
+
+    const parsed = JSON.parse(result.output) as Record<string, string>
+    const values: Record<string, string> = {}
+    for (const [key, value] of Object.entries(parsed)) {
+      // dotenvx crypto metadata, not application config — never ship it.
+      if (/^DOTENV_(PUBLIC|PRIVATE)_KEY/.test(key))
+        continue
+      values[key] = String(value)
+    }
+    return values
+  }
+  catch (error) {
+    log.debug(`[deploy] Failed to resolve ${fileName} for site env merging:`, error)
+    return {}
+  }
+}
+
+/**
+ * Merge the deploy-target's resolved env values underneath each site's own
+ * explicit `env` overrides, stripping a general `PORT` when the site
+ * declares its own `port` (the generated systemd unit already sets
+ * `Environment=PORT=${site.port}` — see buildSiteDeployScript in ts-cloud —
+ * so a leftover PORT in the shipped `.env` would otherwise silently win
+ * over it once the app's own dotenv loading applies file values on top of
+ * the process env).
+ */
+export function mergeSiteDeployEnv(sites: Record<string, any>, resolvedDeployEnv: Record<string, string>): Record<string, any> {
+  return Object.fromEntries(
+    Object.entries(sites).map(([siteName, site]) => {
+      if (!site)
+        return [siteName, site]
+
+      const base = { ...resolvedDeployEnv }
+      if (site.port !== undefined)
+        delete base.PORT
+      return [siteName, { ...site, env: { ...base, ...(site.env || {}) } }]
+    }),
+  )
+}
+
+/**
+ * Prefix a public host for a non-production environment: `acme.com` →
+ * `staging.acme.com`, and `www.acme.com` → `www.staging.acme.com` (keep the www
+ * label leading). Idempotent — an already-prefixed host is returned unchanged.
+ */
+function prefixHostForEnv(host: string, prefix: string): string {
+  if (host.startsWith(`${prefix}.`) || host.startsWith(`www.${prefix}.`))
+    return host
+  if (host.startsWith('www.'))
+    return `www.${prefix}.${host.slice(4)}`
+  return `${prefix}.${host}`
+}
+
+/**
+ * Make the site model environment-aware. For a non-production environment that
+ * declares a `domainPrefix` (staging → `staging`, development → `dev`), every
+ * site's public domain becomes `<prefix>.<domain>`, and URL values that point at
+ * those hosts (APP_URL, OAuth redirect URLs, redirect targets, …) are rewritten
+ * to match — so one config drives prod + staging + dev from their own branches
+ * without duplicating site blocks. Only `//<host>` URL occurrences are rewritten;
+ * bare `user@host` (e.g. mail identities) is left alone. Production is untouched.
+ */
+export function applyEnvironmentToSites(sites: Record<string, any>, environment: string, config: any): Record<string, any> {
+  const prefix: string | undefined = config?.environments?.[environment]?.domainPrefix
+  if (!prefix || environment === 'production')
+    return sites
+
+  // Every site's public host(s), longest-first so a redirect/URL that points at
+  // one site from another (e.g. www.stacksjs.com → https://stacksjs.com) is also
+  // rewritten to the prefixed target, and the most-specific host wins.
+  const allHosts: string[] = []
+  for (const site of Object.values(sites)) {
+    const d = (site as any)?.domain
+    if (typeof d === 'string') allHosts.push(d)
+    else if (Array.isArray(d)) for (const x of d) if (typeof x === 'string') allHosts.push(x)
+  }
+  allHosts.sort((a, b) => b.length - a.length)
+
+  const rewrite = (val: string): string => {
+    let r = val
+    for (const h of allHosts) {
+      const esc = h.replace(/[.]/g, '\\.')
+      r = r.replace(new RegExp(`//${esc}(?=[/:?#]|$)`, 'g'), `//${prefixHostForEnv(h, prefix)}`)
+    }
+    return r
+  }
+
+  const out: Record<string, any> = {}
+  for (const [name, site] of Object.entries(sites)) {
+    if (!site) {
+      out[name] = site
+      continue
+    }
+    const s: any = { ...site }
+    if (typeof s.domain === 'string')
+      s.domain = prefixHostForEnv(s.domain, prefix)
+    else if (Array.isArray(s.domain))
+      s.domain = s.domain.map((d: any) => (typeof d === 'string' ? prefixHostForEnv(d, prefix) : d))
+    if (typeof s.redirect === 'string')
+      s.redirect = rewrite(s.redirect)
+    if (s.env && typeof s.env === 'object') {
+      const e: Record<string, any> = { ...s.env }
+      for (const k of Object.keys(e)) if (typeof e[k] === 'string') e[k] = rewrite(e[k])
+      s.env = e
+    }
+    out[name] = s
+  }
+  return out
 }
 
 /**
@@ -639,7 +850,7 @@ async function deployToHetzner(tsCloudConfig: any, deployEnv: string, options: D
   const { createCloudDriver, deployAllComputeSites, resolveSiteKind } = await import('@stacksjs/ts-cloud')
 
   try {
-    await runHetznerDeploy({ tsCloudConfig, environment, verbose, docker: (options as any).docker === true, createCloudDriver, deployAllComputeSites, resolveSiteKind })
+    await runHetznerDeploy({ tsCloudConfig, environment, verbose, docker: (options as any).docker === true, createCloudDriver, deployAllComputeSites, resolveSiteKind, onlySite: (options as any).site || undefined })
   }
   catch (err) {
     log.error('Hetzner deploy failed:')
@@ -684,6 +895,147 @@ export function scrubLoopbackSitePortsForFirewall(tsCloudConfig: any): any {
   return { ...tsCloudConfig, sites: scrubbed }
 }
 
+/**
+ * GitHub Deployments integration for the Hetzner deploy path (best-effort).
+ *
+ * Records each server-* site's release as a GitHub Deployment against the repo
+ * that produced it — derived from the site's own git worktree (`root`), so no
+ * per-site config is needed: a site whose files come from `../adblock/dist/site`
+ * records against `chrisbbreuer/very-good-adblock`, a stacks-served site against
+ * `stacksjs/stacks`, etc. Deploys then show up under the repo's Deployments tab
+ * and the Deployments API — for MANUAL local deploys too, not just CI.
+ *
+ * Uses the `gh` CLI (already authenticated on the deploying machine). Skipped when
+ * running inside GitHub Actions (the workflow's own `environment:` records the
+ * deployment natively, so doing it here would duplicate), when opted out with
+ * `TS_CLOUD_GITHUB_DEPLOYMENTS=0`, or when `gh`/a GitHub remote is unavailable.
+ * Every failure is logged and swallowed — recording a deployment must never fail
+ * an otherwise-successful release.
+ */
+interface GithubDeploymentRecord {
+  repo: string
+  id: number
+  environment: string
+  environmentUrl?: string
+}
+
+function githubDeploymentsEnabled(): boolean {
+  return process.env.GITHUB_ACTIONS !== 'true' && process.env.TS_CLOUD_GITHUB_DEPLOYMENTS !== '0'
+}
+
+async function ghCliAvailable(): Promise<boolean> {
+  try {
+    const { execSync } = await import('node:child_process')
+    execSync('gh --version', { stdio: 'ignore' })
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
+/**
+ * owner/repo + HEAD sha for the git worktree a site's files come from, or null
+ * when `root` is missing or has no GitHub remote. Git resolves from any subdir of
+ * a worktree, including a gitignored build dir like `../adblock/dist/site`.
+ */
+async function resolveSiteGithubSource(root: string): Promise<{ repo: string, ref: string } | null> {
+  try {
+    const { execSync } = await import('node:child_process')
+    const run = (cmd: string) => execSync(cmd, { cwd: root, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+    const match = run('git config --get remote.origin.url').match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/)
+    if (!match?.[1])
+      return null
+    return { repo: match[1], ref: run('git rev-parse HEAD') }
+  }
+  catch {
+    return null
+  }
+}
+
+/** POST a deployment status. Best-effort; a failure here never fails the deploy. */
+async function setGithubDeploymentStatus(record: GithubDeploymentRecord, state: 'in_progress' | 'success' | 'failure'): Promise<void> {
+  try {
+    const { execSync } = await import('node:child_process')
+    const body = JSON.stringify({
+      state,
+      environment: record.environment,
+      ...(record.environmentUrl ? { environment_url: record.environmentUrl } : {}),
+      description: state === 'success' ? 'Deployed' : state === 'failure' ? 'Deploy failed' : 'Deploying',
+    })
+    execSync(`gh api -X POST repos/${record.repo}/deployments/${record.id}/statuses --input -`, { input: body, stdio: ['pipe', 'ignore', 'ignore'] })
+  }
+  catch (err) {
+    log.warn(`GitHub deployment status (${state}) skipped for ${record.repo}: ${getErrorMessage(err)}`)
+  }
+}
+
+/** POST a GitHub deployment + mark it in_progress. Best-effort → null on failure. */
+async function startGithubDeployment(source: { repo: string, ref: string }, environment: string, environmentUrl?: string): Promise<GithubDeploymentRecord | null> {
+  try {
+    const { execSync } = await import('node:child_process')
+    const body = JSON.stringify({
+      ref: source.ref,
+      environment,
+      description: `buddy deploy (${environment})`,
+      auto_merge: false,
+      required_contexts: [],
+      production_environment: environment === 'production',
+    })
+    const out = execSync(`gh api -X POST repos/${source.repo}/deployments --input - --jq '.id'`, { input: body, stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim()
+    const id = Number(out)
+    if (!out || !Number.isInteger(id) || id <= 0)
+      return null
+    const record: GithubDeploymentRecord = { repo: source.repo, id, environment, environmentUrl }
+    await setGithubDeploymentStatus(record, 'in_progress')
+    return record
+  }
+  catch (err) {
+    log.warn(`GitHub deployment record skipped for ${source.repo}: ${getErrorMessage(err)}`)
+    return null
+  }
+}
+
+/**
+ * Record a GitHub Deployment for each server-* site being shipped, against the
+ * repo its files come from (deduped by repo+ref so the apex/www pair, or several
+ * stacks-served sites, collapse to one). Returns the records to finalize once the
+ * release succeeds or fails. See {@link githubDeploymentsEnabled}.
+ */
+async function startGithubDeployments(args: {
+  sites: Record<string, any>
+  onlySite: string | undefined
+  environment: string
+  resolveSiteKind: (site: any) => 'bucket' | 'server-app' | 'server-static' | 'server-php' | 'redirect'
+}): Promise<GithubDeploymentRecord[]> {
+  const { sites, onlySite, environment, resolveSiteKind } = args
+  const records: GithubDeploymentRecord[] = []
+  if (!githubDeploymentsEnabled() || !(await ghCliAvailable()))
+    return records
+
+  const seen = new Set<string>()
+  for (const [siteName, site] of Object.entries<any>(sites)) {
+    if (!site || (onlySite && siteName !== onlySite))
+      continue
+    const kind = resolveSiteKind(site)
+    if (kind === 'bucket' || kind === 'redirect')
+      continue
+    const source = await resolveSiteGithubSource(site.root || '.')
+    if (!source)
+      continue
+    const key = `${source.repo}@${source.ref}`
+    if (seen.has(key))
+      continue
+    seen.add(key)
+    const record = await startGithubDeployment(source, environment, site.domain ? `https://${site.domain}` : undefined)
+    if (record) {
+      records.push(record)
+      log.info(`GitHub deployment ${record.repo}#${record.id} → ${environment}`)
+    }
+  }
+  return records
+}
+
 async function runHetznerDeploy(args: {
   tsCloudConfig: any
   environment: 'production' | 'staging' | 'development'
@@ -691,9 +1043,13 @@ async function runHetznerDeploy(args: {
   docker: boolean
   createCloudDriver: any
   deployAllComputeSites: any
-  resolveSiteKind: (site: any) => 'bucket' | 'server-app' | 'server-static'
+  resolveSiteKind: (site: any) => 'bucket' | 'server-app' | 'server-static' | 'server-php' | 'redirect'
+  /** Deploy ONLY this site (multi-tenant surgical add). Provisioning still uses
+   *  the full config so rpx keeps every existing route; only this site's files
+   *  are rebuilt/shipped and only its domain gets a DNS record. */
+  onlySite?: string
 }): Promise<void> {
-  const { tsCloudConfig, environment, verbose, docker, createCloudDriver, deployAllComputeSites, resolveSiteKind } = args
+  const { tsCloudConfig, environment, verbose, docker, createCloudDriver, deployAllComputeSites, resolveSiteKind, onlySite } = args
 
   const startTime = performance.now()
   console.log('')
@@ -704,23 +1060,109 @@ async function runHetznerDeploy(args: {
   log.info(`Location: ${tsCloudConfig.hetzner?.location || process.env.HCLOUD_LOCATION || 'fsn1'}`)
   log.info(`Size: ${tsCloudConfig.infrastructure?.compute?.size || 'small'}`)
 
+  // Auto-inject the ts-cloud management dashboard (a `dashboard.<apex>` site,
+  // behind Basic auth) BEFORE provisioning, so the dashboard flows through the
+  // WHOLE deploy: rpx routing + on-demand TLS, the DNS A record, the release
+  // tarball, and the file deploy. (ts-cloud's deployAllComputeSites would inject
+  // it too, but only AFTER provisioning/DNS, leaving it unreachable.) Idempotent
+  // and best-effort: a UI-resolution hiccup or an older ts-cloud without the
+  // export never blocks the app deploy. Set TS_CLOUD_UI_DISABLE=1 to opt out.
+  try {
+    const { ensureManagementDashboard } = (await import('@stacksjs/ts-cloud')) as any
+    if (typeof ensureManagementDashboard === 'function') {
+      ensureManagementDashboard(tsCloudConfig, {
+        cwd: process.cwd(),
+        logger: { info: (m: string) => log.info(m), warn: (m: string) => log.warn(m) },
+      })
+    }
+  }
+  catch (err) {
+    log.warn(`Management dashboard injection skipped: ${getErrorMessage(err)}`)
+  }
+
   const driver = createCloudDriver({ config: tsCloudConfig, provider: 'hetzner' })
   if (!driver.provisionComputeInfrastructure) {
     log.error('Hetzner driver does not support compute provisioning (update @stacksjs/ts-cloud).')
     process.exit(ExitCode.FatalError)
   }
 
-  log.info('Provisioning Hetzner compute infrastructure...')
-  // Provision with loopback-only site ports stripped so the firewall never
-  // exposes them (#1950); the full config still drives deployAllComputeSites.
-  const outputs = await driver.provisionComputeInfrastructure({ config: scrubLoopbackSitePortsForFirewall(tsCloudConfig), environment })
-  const ip = outputs.appPublicIp
-  log.success('Hetzner compute infrastructure ready')
+  // Attach mode: this project deploys ITS sites onto a box owned by another
+  // project (`cloud.attachTo`), instead of provisioning its own. The owner
+  // (e.g. stacks) manages the box, gateway, firewall and shared services; we
+  // only ship our site(s), add our own rpx `sites.d/<slug>.json` (additive —
+  // rpx merges every project's fragment) and our domain's DNS. Site ports are
+  // localhost-only (rpx is the sole public entry), so no firewall change is
+  // needed. Implemented purely by pinning the shared box in THIS project's
+  // ts-cloud driver state, which getComputeOutputs/findComputeTargets already
+  // honour ("record its serverId there" — for a shared box).
+  const attachTo: string | undefined = tsCloudConfig.cloud?.attachTo
+  let ip: string | undefined
+  if (attachTo) {
+    const box = await resolveAttachTargetBox(attachTo, environment)
+    if (!box?.publicIp) {
+      log.error(`Attach target '${attachTo}' has no reachable box for '${environment}'. Is '${attachTo}-${environment}-app' provisioned (by its owner)?`)
+      process.exit(ExitCode.FatalError)
+    }
+    ip = box.publicIp
+    log.info(`Attaching to '${attachTo}' box '${box.serverName}' (${ip}) — skipping provisioning`)
+
+    // The attached-to box is fronted by the owner's rpx gateway (it owns :80/:443
+    // and terminates TLS). Force rpx for our sites regardless of what the config
+    // says, so we NEVER try to stand up our own nginx + certbot — on a shared box
+    // that collides with rpx (`bind() 0.0.0.0:80: Address already in use`) and
+    // fails the deploy even though rpx already serves the site. Applies to both
+    // server-app and server-static sites: static sites become additive rpx
+    // file_server routes, not a separate nginx vhost.
+    //
+    // Also default managed TLS ON (a tenant can still opt out with an explicit
+    // `proxy.onDemandTls: false`). ts-cloud's rpx provisioning only emits the
+    // per-project cert issuance/renewal units (`/etc/rpx/renew-certs-<slug>.sh`
+    // + `rpx-cert-renew-<slug>.{service,timer}`, one idempotent set per tenant
+    // slug covering that tenant's site domains) when `proxy.onDemandTls` is set.
+    // Owner deploys set it in their own config, so their domains get certs —
+    // but an attached tenant that didn't declare it got only the sites.d
+    // fragment: its routes worked while its domain served the box's fallback
+    // cert forever, with no unit to ever issue the real one.
+    const compute = ((tsCloudConfig.infrastructure ??= {}).compute ??= {}) as Record<string, any>
+    compute.webServer = 'rpx'
+    compute.proxy = { onDemandTls: true, ...(compute.proxy ?? {}), engine: 'rpx' }
+    // Pin the shared box in OUR own driver state so ts-cloud's deploy targets it
+    // (keyed by our project's stack name — we never touch the owner's state file).
+    // This is the exact shape ts-cloud's readDriverState expects; writing it
+    // directly avoids depending on a ts-cloud export.
+    //
+    // The name MUST match ts-cloud's `resolveProjectStackName` (`<slug>-<env>`,
+    // or an explicit `project.stackName`) — that's the key findComputeTargets
+    // reads. A previous `<slug>-<env>-app` name mismatched, so the pin was never
+    // found: staging still deployed (findComputeTargets adopts the unique
+    // env=staging box) but production failed whenever a second env=production
+    // ts-cloud app server existed (e.g. uptime-status), making adoption
+    // ambiguous and leaving the pin the only resolver.
+    const stackName = tsCloudConfig.project?.stackName || `${tsCloudConfig.project?.slug || 'app'}-${environment}`
+    const stateDir = join(process.cwd(), 'storage', 'cloud', 'state')
+    mkdirSync(stateDir, { recursive: true })
+    writeFileSync(join(stateDir, `${stackName}.json`), `${JSON.stringify({
+      stackName,
+      serverId: box.serverId,
+      serverName: box.serverName,
+      publicIp: ip,
+      sshUser: 'root',
+      deployStoragePath: '/var/ts-cloud/staging',
+    }, null, 2)}\n`)
+  }
+  else {
+    log.info('Provisioning Hetzner compute infrastructure...')
+    // Provision with loopback-only site ports stripped so the firewall never
+    // exposes them (#1950); the full config still drives deployAllComputeSites.
+    const outputs = await driver.provisionComputeInfrastructure({ config: scrubLoopbackSitePortsForFirewall(tsCloudConfig), environment })
+    ip = outputs.appPublicIp
+    log.success('Hetzner compute infrastructure ready')
+    if (outputs.appInstanceId)
+      log.info(`Server ID: ${outputs.appInstanceId}`)
+  }
+
   if (ip)
     log.info(`Server IP: ${ip}`)
-  if (outputs.appInstanceId)
-    log.info(`Server ID: ${outputs.appInstanceId}`)
-
   if (!ip) {
     log.error('Provisioned server has no public IP — cannot deploy over SSH.')
     process.exit(ExitCode.FatalError)
@@ -734,7 +1176,9 @@ async function runHetznerDeploy(args: {
   // tiny (tens of MB instead of ~800MB of node_modules + pantry).
   const { execSync } = await import('node:child_process')
   const { tmpdir } = await import('node:os')
-  const sites = tsCloudConfig.sites || {}
+  // Environment-aware site model: staging/dev get `<prefix>.<domain>` hosts (+
+  // rewritten URL env values), so one config serves prod + staging + dev.
+  const sites = applyEnvironmentToSites(tsCloudConfig.sites || {}, environment, tsCloudConfig)
   const slug = tsCloudConfig.project?.slug || 'app'
   let sha: string
   try {
@@ -753,24 +1197,64 @@ async function runHetznerDeploy(args: {
     '.git',
     '.github',
     '.cache',
+    // Compiled CLI binaries (e.g. storage/framework/core/buddy/bin/buddy-linux-x64,
+    // ~110MB each × platforms = ~680MB): release/distribution artifacts, never a
+    // runtime dep — server-app sites launch from source (`bun … cli.ts serve`).
+    // Shipping them made the stacks self-deploy tarball ~476MB and stall uploads.
+    'bin',
+    // Build outputs. server-app sites ship source and (re)build on the box via
+    // preStart; server-static sites are packaged from INSIDE their built root
+    // (`-C dist/<site>/… .`), so excluding `dist` never drops a static site's
+    // files — it only strips the ~130MB of built docs/blog from source tarballs
+    // that never serve them. (frontend-dist is kept: `dist` != `frontend-dist`.)
+    'dist',
+    // stx's build cache + generated route manifest (`.stx/routes.ts`). It MUST
+    // be regenerated on the server from the shipped `resources/views` — shipping
+    // a stale/empty manifest makes production `stx serve` trust it and serve 404
+    // on every view route (e.g. `/`). Absent, stx-serve rescans and rebuilds it.
+    '.stx',
     'tmp',
     'temp',
     '.DS_Store',
     '*.log',
+    // Local env files are machine-local secrets — never ship them. The box
+    // gets its env from ts-cloud's generated EnvironmentFile (merged decrypted
+    // .env.production + site env), symlinked over release/.env at deploy time.
+    '.env',
     '.env.local',
+    '.env.keys',
     '.env.production.bak',
+    '.env.production.plain',
   ].flatMap(p => [`--exclude='${p}'`, `--exclude='*/${p}'`])
+
+  if (onlySite && !sites[onlySite]) {
+    log.error(`--site '${onlySite}' is not a configured site. Available: ${Object.keys(sites).join(', ')}`)
+    process.exit(ExitCode.FatalError)
+  }
 
   const tarballs = new Map<string, string>()
   for (const [siteName, site] of Object.entries<any>(sites)) {
     if (!site)
       continue
+    // Surgical single-site deploy: build/ship only the requested site (the box
+    // already holds every other site; provisioning above kept their rpx routes).
+    if (onlySite && siteName !== onlySite)
+      continue
     // ts-cloud's deployAllComputeSites deploys BOTH server-app sites (`start`)
     // and server-static sites (no `start`, has `root`) — and it calls
-    // tarballForSite() for each. Bucket sites are handled elsewhere. So we must
-    // produce a tarball for every non-bucket site, not just `start` ones.
+    // tarballForSite() for each. Bucket and redirect sites are NOT shipped (it
+    // filters them out), so we produce a tarball for every server-* site but
+    // skip bucket/redirect below.
     const kind = resolveSiteKind(site)
     if (kind === 'bucket')
+      continue
+
+    // Redirect-only sites (a `redirect` with no `root`/`build`/`start`, e.g.
+    // veryGoodAdblock, wwwStacksjs) ship NOTHING: deployAllComputeSites filters
+    // them out (never calls tarballForSite) and the rpx gateway answers their
+    // domain with a 301. Packaging one would tar the entire repo (~73MB) that is
+    // uploaded but never served — pure wasted bandwidth and deploy time. Skip.
+    if (kind === 'redirect')
       continue
 
     // server-static: build the site locally first so the tarball contains the
@@ -785,9 +1269,12 @@ async function runHetznerDeploy(args: {
     const root = site.root || '.'
     const tarballPath = join(tmpdir(), `${slug}-${siteName}-${sha}.tar.gz`)
     log.info(`Packaging ${root} → ${tarballPath}...`)
+    // COPYFILE_DISABLE stops macOS bsdtar from embedding AppleDouble (._*)
+    // resource-fork files — on the server those shadow real files and break
+    // anything that globs a directory (e.g. `._0001-….sql` crashes migrate).
     execSync(
       `tar czf "${tarballPath}" ${tarExcludes.join(' ')} -C "${root}" .`,
-      { stdio: verbose ? 'inherit' : 'pipe' },
+      { stdio: verbose ? 'inherit' : 'pipe', env: { ...process.env, COPYFILE_DISABLE: '1' } },
     )
     const sizeMb = Math.max(1, Math.round((statSync(tarballPath).size) / 1048576))
     log.info(`Release tarball: ~${sizeMb} MB`)
@@ -801,9 +1288,45 @@ async function runHetznerDeploy(args: {
   if (docker)
     await buildContainerImageWithPantry({ slug, sites, verbose })
 
-  log.info('Shipping release to the server...')
+  // Merge each site's real production config underneath its own explicit
+  // `env` overrides — see resolveDeployEnvValues' doc comment for why this
+  // has to happen here (ts-cloud has no idea .env.production/decryption
+  // exist) rather than inside ts-cloud itself.
+  const resolvedDeployEnv = await resolveDeployEnvValues(environment)
+  const sitesWithResolvedEnv = mergeSiteDeployEnv(sites, resolvedDeployEnv)
+
+  // Also apply the decrypted values to THIS (local, deploying) process' env —
+  // not just the env shipped to the remote sites above. reconcileHetznerDns
+  // below (and any other local-side deploy logic) reads credentials like
+  // PORKBUN_API_KEY/PORKBUN_SECRET_KEY straight from `process.env`, so a
+  // secret stored (correctly) as encrypted config in .env.production would
+  // otherwise never reach it — only a value manually exported in the shell
+  // would work. Never clobber a value the shell already set explicitly.
+  for (const [envKey, envValue] of Object.entries(resolvedDeployEnv)) {
+    if (process.env[envKey] === undefined)
+      process.env[envKey] = envValue
+  }
+
+  // Open a GitHub Deployment per shipped site (best-effort, non-fatal). Done here
+  // — after the static builds ran (so each site's `root` exists to derive its
+  // repo/ref) and before shipping — so the deployment shows as `in_progress`
+  // while the release is uploaded, then success/failure below.
+  const githubDeployments = await startGithubDeployments({ sites, onlySite, environment, resolveSiteKind })
+
+  log.info(onlySite ? `Shipping site '${onlySite}' to the server...` : 'Shipping release to the server...')
+  // For a single-site deploy, hand ts-cloud a config whose sites are narrowed to
+  // just that one so it ships only it (provisioning already reloaded rpx with the
+  // full route set, so nothing else is touched).
+  const deployConfig = onlySite
+    ? { ...tsCloudConfig, sites: { [onlySite]: sitesWithResolvedEnv[onlySite] } }
+    : { ...tsCloudConfig, sites: sitesWithResolvedEnv }
   const ok = await deployAllComputeSites({
-    config: tsCloudConfig,
+    config: deployConfig,
+    // The rpx gateway is ALWAYS regenerated from the full site model, never the
+    // narrowed single-site `deployConfig`, so a `--site` deploy can never drop the
+    // other sites' routes (the production-incident guard). Use the environment-
+    // aware full model so staging/dev route their `<prefix>.<domain>` hosts.
+    rpxConfig: { ...tsCloudConfig, sites: sitesWithResolvedEnv },
     environment,
     driver,
     sha,
@@ -830,7 +1353,32 @@ async function runHetznerDeploy(args: {
   // env) and upsert A records → the box IP. Non-fatal: a DNS hiccup shouldn't
   // fail an otherwise-successful release.
   if (ok)
-    await reconcileHetznerDns(sites, ip, log)
+    await reconcileHetznerDns(onlySite ? { [onlySite]: sites[onlySite] } : sites, ip, log)
+
+  // Reconcile the app's declared DNS records (config/dns.ts) beyond the apex/www
+  // A records above — e.g. verification TXT, extra CNAMEs. Strictly additive:
+  // only creates declared records that are missing (and never a private IP),
+  // never deletes or overwrites. Best-effort, same as the reconcilers around it.
+  if (ok)
+    await reconcileConfigDns(onlySite ? { [onlySite]: sites[onlySite] } : sites, log)
+
+  // Reconcile this app's mail routing onto the (shared) mail server from
+  // config/email.ts: register its local domain and provision its auto-forward
+  // rules (forwards.json). Idempotent, merge-based and best-effort — it never
+  // removes another tenant's domains/forwards and never fails the release.
+  if (ok) {
+    const mailRes = await provisionMailTenant(ip, log)
+    // Publish the domain's mail DNS (MX/SPF/DKIM/DMARC) so the mailboxes can
+    // actually send + receive. Best-effort, same as the tenant reconcile.
+    if (mailRes)
+      await reconcileMailDns(mailRes, ip, log)
+  }
+
+  // Close out every GitHub Deployment we opened (before the failure branch's
+  // process.exit below, so a failed release is recorded as failed, not left
+  // dangling in_progress).
+  for (const record of githubDeployments)
+    await setGithubDeploymentStatus(record, ok ? 'success' : 'failure')
 
   console.log('')
   if (ok) {
@@ -843,6 +1391,415 @@ async function runHetznerDeploy(args: {
   }
 }
 
+/** A mailbox resolved from `config/email.ts` to a concrete address + password. */
+interface ResolvedMailbox {
+  /** Full address, always `<local-part>@<domain>` (per-domain isolated mailbox). */
+  address: string
+  /** Local-part, uppercased for the `MAIL_PASSWORD_<LP>` env lookup. */
+  localPart: string
+  /** Plaintext password (from config/env, else freshly generated). */
+  password: string
+  /** True when the password was generated here (so the caller reports it). */
+  generated: boolean
+}
+
+/**
+ * Resolve `config.email.mailboxes` — which may be bare local-parts (`'chris'`),
+ * full addresses (`'chris@app.com'`), or objects (`{ email, password }`) — into
+ * concrete `<local-part>@<domain>` mailboxes with a password each. A password is
+ * taken from the entry, else `MAIL_PASSWORD_<LOCALPART>` in the env, else a
+ * strong one is generated (and flagged so the deploy prints it once).
+ */
+function resolveMailboxes(mailboxes: unknown, domain: string): ResolvedMailbox[] {
+  if (!Array.isArray(mailboxes))
+    return []
+  const out: ResolvedMailbox[] = []
+  for (const entry of mailboxes) {
+    let raw: string | undefined
+    let explicitPw: string | undefined
+    if (typeof entry === 'string')
+      raw = entry
+    else if (entry && typeof entry === 'object') {
+      raw = (entry as any).email ?? (entry as any).username
+      explicitPw = (entry as any).password
+    }
+    if (!raw || typeof raw !== 'string')
+      continue
+    const localPart = (raw.includes('@') ? raw.split('@')[0] ?? '' : raw).trim()
+    if (!localPart)
+      continue
+    const address = `${localPart}@${domain}`
+    const envPw = explicitPw || process.env[`MAIL_PASSWORD_${localPart.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`]
+    // Only provision a mailbox whose password is explicitly supplied (config
+    // object or MAIL_PASSWORD_<LOCALPART> env). A routine deploy must never
+    // conjure random-password mailboxes the operator never asked for and can't
+    // retrieve — declare the password to opt a mailbox in.
+    if (!envPw)
+      continue
+    out.push({ address, localPart: localPart.toUpperCase(), password: envPw, generated: false })
+  }
+  return out
+}
+
+/** What a mail-tenant reconcile resolved + provisioned, for the DNS step. */
+export interface MailTenantResult {
+  domain: string
+  /** The mail server's own hostname (SMTP_HOSTNAME) — the MX target. */
+  mailHost: string
+  /** base64(DER) of the domain's DKIM public key, for the `mail._domainkey` TXT. */
+  dkimPubB64?: string
+  /** Mailboxes newly created this run (address + password), for reporting. */
+  created: Array<{ address: string, password: string }>
+}
+
+/**
+ * Mail tenancy is an explicit deployment capability. The merged Stacks config
+ * always contains framework email defaults, so checking `emailConfig` alone
+ * would register the framework's own default domain for every application that
+ * does not provide `config/email.ts`.
+ */
+export function hasExplicitEmailConfig(projectRoot = p.projectPath()): boolean {
+  return existsSync(join(projectRoot, 'config', 'email.ts'))
+}
+
+/**
+ * Reconcile this app's mail configuration onto the mail server running on the
+ * box, straight from `config/email.ts`. Declarative, additive, idempotent:
+ *
+ *   1. `config.email.domain` → registered as a local delivery domain
+ *      (`SMTP_LOCAL_DOMAINS` in `/etc/mail/mail.env`).
+ *   2. A per-domain DKIM key is generated on first sight (`/opt/mail/dkim/<domain>.private`)
+ *      and registered in `DKIM_EXTRA_KEYS` so outbound mail is signed AS the domain.
+ *   3. `config.email.mailboxes` → created as per-domain isolated users
+ *      (`mail-server user:local create <lp>@<domain>`), skipping any that exist.
+ *   4. `config.email.forwards` → merged into `forwards.json` (live-reloaded).
+ *
+/**
+ * Resolve the shared box owned by another project (`cloud.attachTo`) so this
+ * project can deploy its sites onto it without provisioning. Looks the box up
+ * by the owner's ts-cloud labels (`ts-cloud/project=<owner>`,
+ * `environment=<env>`, `role=app`) — the same labels ts-cloud stamps on every
+ * app server — falling back to the conventional `<owner>-<env>-app` name. Needs
+ * only read access via HCLOUD_TOKEN (the same token the owner provisions with).
+ */
+async function resolveAttachTargetBox(
+  owner: string,
+  environment: string,
+): Promise<{ serverId: number, serverName: string, publicIp?: string } | null> {
+  const token = process.env.HCLOUD_TOKEN
+  if (!token)
+    return null
+  const pick = (servers: any[]): any | undefined =>
+    servers.find(s => s?.status !== 'off' && s?.public_net?.ipv4?.ip) || servers[0]
+  const req = async (qs: string): Promise<any[]> => {
+    try {
+      const res = await fetch(`https://api.hetzner.cloud/v1/servers?${qs}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok)
+        return []
+      return ((await res.json()) as any).servers || []
+    }
+    catch {
+      return []
+    }
+  }
+  // Label match first (robust to renames), then the conventional name.
+  const byLabel = await req(`label_selector=${encodeURIComponent(`ts-cloud/project=${owner},ts-cloud/environment=${environment},ts-cloud/role=app`)}`)
+  const chosen = pick(byLabel) || pick(await req(`name=${encodeURIComponent(`${owner}-${environment}-app`)}`))
+  if (!chosen)
+    return null
+  return { serverId: chosen.id, serverName: chosen.name, publicIp: chosen.public_net?.ipv4?.ip }
+}
+
+/**
+ * Everything is MERGE-based so a shared mail server keeps every other tenant's
+ * domains, keys, users, and forward rules untouched. Best-effort — a hiccup is
+ * logged, never fails the release. Returns what the DNS step needs (mail host +
+ * DKIM public key), or null when there is nothing to reconcile / it failed.
+ */
+export async function provisionMailTenant(ip: string, logger: typeof log): Promise<MailTenantResult | null> {
+  if (!hasExplicitEmailConfig())
+    return null
+
+  const cfg: any = emailConfig || {}
+  // Mail explicitly disabled for this app (config/email.ts `server.enabled:
+  // false`): skip the shared-mail tenant reconcile entirely — no local-domain
+  // registration, DKIM key, mailboxes, or mail DNS. Without this gate the
+  // reconcile keyed off `cfg.domain`/`from.address` alone, so an app with no
+  // mail intent still mutated the SHARED mail server + its own MX records.
+  if (cfg.server?.enabled === false)
+    return null
+
+  const domain: string | undefined = cfg.domain
+    || (typeof cfg.from?.address === 'string' && cfg.from.address.includes('@') ? cfg.from.address.split('@')[1] : undefined)
+  const forwards: Record<string, string[]> = (cfg.forwards && typeof cfg.forwards === 'object') ? cfg.forwards : {}
+  const hasForwards = Object.keys(forwards).length > 0
+  const boxes = domain ? resolveMailboxes(cfg.mailboxes, domain) : []
+
+  // Nothing declarative to reconcile — skip silently (most apps).
+  if (!domain && !hasForwards)
+    return null
+
+  const { execSync } = await import('node:child_process')
+  const sshArgs = ['-o', 'StrictHostKeyChecking=accept-new', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20', `root@${ip}`]
+
+  // Compact forwards JSON, base64'd so it survives the SSH shell hop untouched.
+  const forwardsB64 = hasForwards ? Buffer.from(JSON.stringify(forwards)).toString('base64') : ''
+  const readme = 'Auto-forwarding rules, re-read on every message (edits take effect immediately, no restart). '
+    + 'KEY = the delivered mailbox: the FULL address for per-domain isolated mailboxes (e.g. no-reply@app.com), '
+    + 'or a bare local-part for legacy role mailboxes. VALUE = list of destination addresses; targets on a local '
+    + 'domain are written straight to that mailbox Maildir, external targets are relayed. Managed by buddy deploy '
+    + 'from config/email.ts (merge-based — hand edits to other keys are preserved).'
+  const readmeB64 = Buffer.from(readme).toString('base64')
+  // address<TAB>password per mailbox, base64'd as one blob for the shell hop.
+  const boxesB64 = boxes.length ? Buffer.from(boxes.map(b => `${b.address}\t${b.password}`).join('\n')).toString('base64') : ''
+
+  // One idempotent, merge-based reconcile script. Emits keyed lines the caller
+  // parses: MAILHOST:, DKIMPUB:, MADE:<addr>, and a final MAILTENANT:<state>.
+  const script = `set -e
+DOMAIN=${domain ? `'${domain}'` : "''"}
+FWD_B64='${forwardsB64}'
+README_B64='${readmeB64}'
+BOXES_B64='${boxesB64}'
+ENVF=/etc/mail/mail.env
+FJSON=/opt/mail/forwards.json
+DKIMDIR=/opt/mail/dkim
+MS=/opt/mail/mail-server
+ENV_CHANGED=0
+# The 'user:local' CLI is direct-DB and does NOT read /etc/mail/mail.env, so
+# without SMTP_DB_PATH it writes to ./smtp.db (the SSH cwd) — a phantom DB the
+# running server never reads, and auth silently 535s. Point it at the real DB.
+export SMTP_DB_PATH="$(grep -E '^SMTP_DB_PATH=' "$ENVF" 2>/dev/null | head -1 | cut -d= -f2- || true)"
+[ -z "$SMTP_DB_PATH" ] && export SMTP_DB_PATH=/opt/mail/smtp.db
+echo "MAILHOST:$(grep -E '^SMTP_HOSTNAME=' "$ENVF" 2>/dev/null | head -1 | cut -d= -f2- || true)"
+# 1) Register the local delivery domain (merge into SMTP_LOCAL_DOMAINS).
+if [ -n "$DOMAIN" ] && [ -f "$ENVF" ]; then
+  cur=$(grep -E '^SMTP_LOCAL_DOMAINS=' "$ENVF" | head -1 | cut -d= -f2- || true)
+  case ",$cur," in
+    *",$DOMAIN,"*) : ;;
+    *) if grep -qE '^SMTP_LOCAL_DOMAINS=' "$ENVF"; then
+        sed -i "s|^SMTP_LOCAL_DOMAINS=.*|SMTP_LOCAL_DOMAINS=\${cur:+$cur,}$DOMAIN|" "$ENVF"
+      else
+        echo "SMTP_LOCAL_DOMAINS=$DOMAIN" >> "$ENVF"
+      fi
+      ENV_CHANGED=1 ;;
+  esac
+fi
+# 2) Per-domain DKIM key: generate on first sight, register in DKIM_EXTRA_KEYS.
+if [ -n "$DOMAIN" ] && [ -f "$ENVF" ]; then
+  mkdir -p "$DKIMDIR"
+  KEY="$DKIMDIR/$DOMAIN.private"
+  if [ ! -f "$KEY" ]; then
+    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$KEY" 2>/dev/null
+    chown mail-server:mail-server "$KEY" 2>/dev/null || true
+    chmod 600 "$KEY" 2>/dev/null || true
+  fi
+  ex=$(grep -E '^DKIM_EXTRA_KEYS=' "$ENVF" | head -1 | cut -d= -f2- || true)
+  ENTRY="$DOMAIN:mail:$KEY"
+  case ",$ex," in
+    *"$DOMAIN:mail:"*) : ;;
+    *) if grep -qE '^DKIM_EXTRA_KEYS=' "$ENVF"; then
+        sed -i "s|^DKIM_EXTRA_KEYS=.*|DKIM_EXTRA_KEYS=\${ex:+$ex,}$ENTRY|" "$ENVF"
+      else
+        echo "DKIM_EXTRA_KEYS=$ENTRY" >> "$ENVF"
+      fi
+      ENV_CHANGED=1 ;;
+  esac
+  echo "DKIMPUB:$(openssl rsa -in "$KEY" -pubout -outform DER 2>/dev/null | base64 -w0)"
+fi
+# 3) Create the configured mailboxes as per-domain isolated users (skip existing).
+if [ -n "$BOXES_B64" ] && [ -x "$MS" ]; then
+  echo "$BOXES_B64" | base64 -d | while IFS=$'\t' read -r addr pw; do
+    [ -z "$addr" ] && continue
+    # NOTE: 'user:local info' exits 0 even when the user is absent (it only
+    # prints "not found"), so existence is decided from the OUTPUT, not $?.
+    if "$MS" user:local info "$addr" 2>&1 | grep -qi 'not found'; then
+      if "$MS" user:local create "$addr" "$pw" "$addr" >/dev/null 2>&1; then echo "MADE:$addr"; else echo "FAIL:$addr"; fi
+    else
+      echo "EXISTS:$addr"
+    fi
+  done
+fi
+# 4) Merge auto-forward rules into forwards.json (live-reloaded; no restart).
+if [ -n "$FWD_B64" ] && [ -x /usr/local/bin/bun ]; then
+  echo "$FWD_B64" | base64 -d > /tmp/.mailtenant-fwd.json
+  echo "$README_B64" | base64 -d > /tmp/.mailtenant-readme.txt
+  /usr/local/bin/bun --bun -e '
+    const fs=require("fs"); const f="/opt/mail/forwards.json";
+    const cur={}; try{cur=JSON.parse(fs.readFileSync(f,"utf8"))}catch{}
+    const add=JSON.parse(fs.readFileSync("/tmp/.mailtenant-fwd.json","utf8"));
+    const readme=fs.readFileSync("/tmp/.mailtenant-readme.txt","utf8");
+    const merged={...cur}; delete merged._readme;
+    for(const [k,v] of Object.entries(add)) merged[k]=v;
+    const out={_readme:readme,...merged};
+    const s=JSON.stringify(out,null,2)+"\\n";
+    const prev=""; try{prev=fs.readFileSync(f,"utf8")}catch{}
+    if(s!==prev){ fs.writeFileSync(f,s); process.stdout.write("FWDCHANGED"); }
+  ' > /tmp/.mailtenant-res 2>/dev/null || true
+  chown mail-server:mail-server "$FJSON" 2>/dev/null || true
+  chmod 644 "$FJSON" 2>/dev/null || true
+  rm -f /tmp/.mailtenant-fwd.json /tmp/.mailtenant-readme.txt
+fi
+FWD_STATE=nochange; grep -q FWDCHANGED /tmp/.mailtenant-res 2>/dev/null && FWD_STATE=updated; rm -f /tmp/.mailtenant-res
+# 5) Keep the shared daemon recoverable if it crashes or stops accepting mail.
+mkdir -p /etc/systemd/system/mail.service.d
+cat > /etc/systemd/system/mail.service.d/reliability.conf <<'EOF'
+[Unit]
+StartLimitIntervalSec=60
+StartLimitBurst=10
+
+[Service]
+Restart=always
+RestartSec=2
+TimeoutStartSec=30
+TimeoutStopSec=30
+LimitCORE=infinity
+EOF
+cat > /usr/local/sbin/mail-health-check <<'EOF'
+#!/bin/sh
+set -eu
+exec 9>/run/mail-health-check.lock
+flock -n 9 || exit 0
+systemctl is-active --quiet mail || { systemctl restart mail; exit 0; }
+for port in 25 143 587 993; do
+  ss -H -ltn "sport = :$port" | grep -q . || {
+    logger -t mail-health "required TCP port $port is not listening; restarting mail"
+    systemctl restart mail
+    exit 0
+  }
+done
+EOF
+chmod 755 /usr/local/sbin/mail-health-check
+cat > /etc/systemd/system/mail-health.service <<'EOF'
+[Unit]
+Description=Check the Stacks mail daemon listeners
+After=mail.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/mail-health-check
+EOF
+cat > /etc/systemd/system/mail-health.timer <<'EOF'
+[Unit]
+Description=Check the Stacks mail daemon every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+systemctl daemon-reload
+systemctl enable --now mail-health.timer >/dev/null 2>&1
+# 6) Restart only when the startup-read env actually changed (domain or DKIM key).
+if [ "$ENV_CHANGED" = 1 ]; then systemctl restart mail 2>/dev/null || true; echo "MAILTENANT:env-changed+restarted,forwards=$FWD_STATE"; else echo "MAILTENANT:current,forwards=$FWD_STATE"; fi`
+
+  try {
+    const out = execSync(`ssh ${sshArgs.map(a => `'${a}'`).join(' ')} bash -s`, {
+      input: script,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+    const line = (out.match(/MAILTENANT:[^\n]*/) || [])[0] || 'MAILTENANT:done'
+    const mailHost = (out.match(/MAILHOST:([^\n]*)/) || [])[1]?.trim() || `mail.${domain}`
+    const dkimPubB64 = (out.match(/DKIMPUB:([^\n]*)/) || [])[1]?.trim() || undefined
+    const madeAddrs = new Set([...out.matchAll(/MADE:([^\n]+)/g)].flatMap(m => m[1] ? [m[1].trim()] : []))
+    const created = boxes.filter(b => madeAddrs.has(b.address)).map(b => ({ address: b.address, password: b.password }))
+
+    logger.success(`Mail routing reconciled (${line.replace('MAILTENANT:', '')})`)
+    if (created.length) {
+      logger.info(`Mail: created ${created.length} mailbox(es) — credentials below (save them; shown once):`)
+      for (const b of created)
+        logger.info(`  ${b.address}  ${b.password}`)
+    }
+    return domain ? { domain, mailHost, dkimPubB64, created } : null
+  }
+  catch (err) {
+    // Never fail a release on a mail-reconcile hiccup — it's additive config.
+    logger.warn(`Mail routing reconcile skipped: ${getErrorMessage(err)}`)
+    return null
+  }
+}
+
+/**
+ * Publish the mail DNS for a hosted domain via Porkbun (idempotent delete+create
+ * per record): MX → the mail host, SPF authorizing the box IP, the domain's DKIM
+ * public key at `mail._domainkey`, and a DMARC policy. Best-effort — logged, not
+ * thrown. No-op without Porkbun credentials (the records are printed to add by
+ * hand). MX targets the tenant's own `mail.<domain>` when that name already
+ * resolves to the box (own-brand mail host; requires the mail cert to cover it
+ * as a SAN), and falls back to the shared mail host (`mail.stacksjs.com`)
+ * otherwise, where no per-domain mail A record or extra TLS SAN is needed.
+ */
+export async function reconcileMailDns(res: MailTenantResult, ip: string, logger: typeof log): Promise<void> {
+  const { domain, dkimPubB64 } = res
+  let { mailHost } = res
+
+  // Prefer the tenant's own mail hostname when it already points at this box.
+  try {
+    const dns = await import('node:dns')
+    const own = `mail.${domain}`
+    if (own !== mailHost && (await dns.promises.resolve4(own)).includes(ip))
+      mailHost = own
+  }
+  catch { /* keep the shared mail host */ }
+
+  const spf = `v=spf1 ip4:${ip} ~all`
+  // DMARC aggregate reports go to the configured from-address (falling back to
+  // the first declared mailbox, then chris@) so reports reach a real inbox.
+  const cfg: any = emailConfig || {}
+  const firstBox = resolveMailboxes(cfg.mailboxes, domain)[0]?.address
+  const fromAddress = typeof cfg.from?.address === 'string' && cfg.from.address.includes('@') ? cfg.from.address : undefined
+  const rua = fromAddress || firstBox || `chris@${domain}`
+  const dmarc = `v=DMARC1; p=quarantine; rua=mailto:${rua}`
+  const dkim = dkimPubB64 ? `v=DKIM1; k=rsa; p=${dkimPubB64}` : undefined
+
+  const apiKey = process.env.PORKBUN_API_KEY
+  const secretKey = process.env.PORKBUN_SECRET_KEY
+  if (!apiKey || !secretKey) {
+    logger.warn(`Mail DNS: no Porkbun credentials — add these records for ${domain} by hand:`)
+    logger.info(`  MX    @                 10 ${mailHost}`)
+    logger.info(`  TXT   @                 ${spf}`)
+    if (dkim) logger.info(`  TXT   mail._domainkey   ${dkim}`)
+    logger.info(`  TXT   _dmarc            ${dmarc}`)
+    return
+  }
+
+  const auth = { apikey: apiKey, secretapikey: secretKey }
+  const call = async (path: string, body: Record<string, unknown>): Promise<any> => {
+    const r = await fetch(`https://api.porkbun.com/api/json/v3/${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...auth, ...body }),
+    })
+    return r.json().catch(() => ({}))
+  }
+  // Idempotent upsert: delete every record of this name+type, then recreate.
+  const upsert = async (type: string, name: string, content: string, extra: Record<string, unknown> = {}): Promise<void> => {
+    const sub = name === '@' ? '' : `/${name}`
+    await call(`dns/deleteByNameType/${domain}/${type}${sub}`, {})
+    const created = await call(`dns/create/${domain}`, { name: name === '@' ? '' : name, type, content, ttl: '600', ...extra })
+    if (created?.status !== 'SUCCESS')
+      throw new Error(`${type} ${name}: ${created?.message || 'unknown Porkbun error'}`)
+  }
+
+  try {
+    await upsert('MX', '@', mailHost, { prio: '10' })
+    await upsert('TXT', '@', spf)
+    if (dkim)
+      await upsert('TXT', 'mail._domainkey', dkim)
+    await upsert('TXT', '_dmarc', dmarc)
+    logger.success(`Mail DNS published for ${domain} (MX→${mailHost}, SPF, DKIM, DMARC)`)
+  }
+  catch (err) {
+    logger.warn(`Mail DNS reconcile skipped for ${domain}: ${getErrorMessage(err)}`)
+  }
+}
+
 /**
  * Point every site's public domain (apex + `www`) at the Hetzner box via the
  * appropriate DNS provider. Providers are resolved per-domain from the
@@ -850,6 +1807,103 @@ async function runHetznerDeploy(args: {
  * `detectDnsProvider`, so whichever registrar actually hosts the zone is used.
  * Idempotent (upsert) and best-effort — failures are logged, not thrown.
  */
+// Additively reconcile the app's config/dns.ts records (verification TXT, extra
+// records) for every site domain, using the shared provider-agnostic
+// syncDnsConfig from @stacksjs/dns. Create-only and never destructive, so it is
+// safe to run on every deploy; a no-op when config/dns.ts declares no records.
+/**
+ * Return the application zones that should receive config/dns.ts records.
+ * Redirect-only domains still receive their managed apex/www A records through
+ * reconcileHetznerDns, but must not inherit the primary app's MX, SPF, or site
+ * verification records.
+ */
+export function configDnsDomains(sites: Record<string, any>): string[] {
+  const domains = new Set<string>()
+  for (const site of Object.values(sites)) {
+    if (!site?.redirect && site?.domain && typeof site.domain === 'string')
+      domains.add(site.domain.replace(/^www\./, ''))
+  }
+  return [...domains]
+}
+
+/**
+ * Infer a DNS provider from a zone's authoritative nameservers.
+ *
+ * Provider API probes are intentionally the primary detection mechanism, but
+ * some registrars disable record API access per-domain. In that state the
+ * provider still owns the zone and should receive the attempted write so the
+ * deploy reports the real authorization error instead of incorrectly calling
+ * the zone externally managed.
+ */
+export function dnsProviderNameFromNameservers(nameservers: string[]): 'porkbun' | 'cloudflare' | 'route53' | 'godaddy' | null {
+  const normalized = nameservers.map(name => name.toLowerCase().replace(/\.$/, ''))
+
+  if (normalized.some(name => name.endsWith('.porkbun.com')))
+    return 'porkbun'
+  if (normalized.some(name => name.endsWith('.ns.cloudflare.com')))
+    return 'cloudflare'
+  if (normalized.some(name => /(^|\.)awsdns-\d+\.(?:com|net|org|co\.uk)$/.test(name)))
+    return 'route53'
+  if (normalized.some(name => name.endsWith('.domaincontrol.com')))
+    return 'godaddy'
+
+  return null
+}
+
+async function reconcileConfigDns(sites: Record<string, any>, logger: typeof log): Promise<void> {
+  const projectDnsConfig = await loadProjectDnsConfig(dnsConfig)
+  const declared = (['a', 'aaaa', 'cname', 'mx', 'txt'] as const)
+    .reduce((total, key) => total + (Array.isArray((projectDnsConfig as any)?.[key]) ? (projectDnsConfig as any)[key].length : 0), 0)
+  if (declared === 0)
+    return
+
+  for (const domain of configDnsDomains(sites)) {
+    try {
+      const result = await syncDnsConfig(domain, projectDnsConfig)
+      if (!result.provider)
+        continue // no registrar credentials resolved for this domain; skip quietly
+      if (result.created || result.failed)
+        logger.info(`DNS (config/dns.ts) ${domain}: ${result.created} created, ${result.kept} kept${result.failed ? `, ${result.failed} failed` : ''}`)
+    }
+    catch (err) {
+      logger.warn(`DNS (config/dns.ts) reconcile for ${domain} failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+}
+
+/**
+ * Best-effort post-write check that an A record for `fqdn → ip` exists at
+ * the provider. Returns true when the provider offers no list API or the
+ * listing itself fails — verification must never turn a possibly-good
+ * write into a false alarm; it exists to catch phantom successes (an
+ * upsert that edited the wrong record) at providers that CAN list their
+ * zone (Porkbun at minimum).
+ */
+async function verifyDnsRecord(provider: any, domain: string, fqdn: string, ip: string): Promise<boolean> {
+  try {
+    if (typeof provider?.listRecords !== 'function')
+      return true
+
+    // List WITHOUT a type filter: the typed listing maps to provider
+    // endpoints like Porkbun's retrieveByNameType, whose subdomain-less
+    // form returns apex records only — filtering by 'A' server-side made
+    // verification blind to every non-apex record and produced false
+    // "record is missing" warnings on healthy zones. Retrieve the full
+    // zone and match type/name/content client-side instead.
+    const res = await provider.listRecords(domain)
+    if (!res?.success || !Array.isArray(res.records))
+      return true
+
+    return res.records.some((r: any) => {
+      const name = typeof r?.name === 'string' ? r.name.replace(/\.$/, '') : ''
+      return r?.type === 'A' && name === fqdn && r?.content === ip
+    })
+  }
+  catch {
+    return true
+  }
+}
+
 async function reconcileHetznerDns(sites: Record<string, any>, ip: string, logger: typeof log): Promise<void> {
   // Collect the apex domains declared by sites (skip loopback/domain-less sites).
   const domains = new Set<string>()
@@ -866,6 +1920,8 @@ async function reconcileHetznerDns(sites: Record<string, any>, ip: string, logge
     providerConfigs.push({ provider: 'porkbun', apiKey: process.env.PORKBUN_API_KEY, secretKey: process.env.PORKBUN_SECRET_KEY })
   if (process.env.CLOUDFLARE_API_TOKEN)
     providerConfigs.push({ provider: 'cloudflare', apiToken: process.env.CLOUDFLARE_API_TOKEN })
+  if (process.env.GODADDY_API_KEY && process.env.GODADDY_API_SECRET)
+    providerConfigs.push({ provider: 'godaddy', apiKey: process.env.GODADDY_API_KEY, apiSecret: process.env.GODADDY_API_SECRET, environment: process.env.GODADDY_ENVIRONMENT })
   if (process.env.AWS_ACCESS_KEY_ID || process.env.AWS_PROFILE)
     providerConfigs.push({ provider: 'route53' })
 
@@ -876,23 +1932,90 @@ async function reconcileHetznerDns(sites: Record<string, any>, ip: string, logge
     return
   }
 
-  const { detectDnsProvider } = await import('@stacksjs/ts-cloud') as any
+  const {
+    createDnsProvider,
+    detectDnsProvider,
+    removeStaleServerAddressRecords,
+  } = await import('@stacksjs/ts-cloud') as any
   logger.info('Reconciling DNS records...')
+
+  // Best-effort A-record lookup so externally managed domains that already
+  // point at the box read as healthy instead of warning on every deploy.
+  const resolveA = async (fqdn: string): Promise<string[]> => {
+    try {
+      const { resolve4 } = await import('node:dns/promises')
+      return await resolve4(fqdn)
+    }
+    catch {
+      return []
+    }
+  }
+
+  const resolveAuthoritativeNameservers = async (domain: string): Promise<string[]> => {
+    try {
+      const { resolveNs } = await import('node:dns/promises')
+      return await resolveNs(domain)
+    }
+    catch {
+      return []
+    }
+  }
 
   for (const domain of domains) {
     try {
-      const provider = await detectDnsProvider(domain, providerConfigs)
+      let provider = await detectDnsProvider(domain, providerConfigs)
       if (!provider) {
-        logger.warn(`  DNS: no configured provider can manage ${domain} — point it manually: A ${domain} → ${ip}`)
+        const providerName = dnsProviderNameFromNameservers(await resolveAuthoritativeNameservers(domain))
+        const providerConfig = providerConfigs.find(config => config.provider === providerName)
+        if (providerConfig)
+          provider = createDnsProvider(providerConfig)
+      }
+      if (!provider) {
+        // No configured provider owns this zone — the records may still be
+        // correct (managed at the registrar). Only warn when they aren't.
+        for (const sub of ['', 'www']) {
+          const fqdn = sub ? `${sub}.${domain}` : domain
+          const current = await resolveA(fqdn)
+          if (current.includes(ip))
+            logger.success(`  DNS: ${fqdn} → ${ip} (externally managed, already correct)`)
+          else if (current.length === 0)
+            logger.warn(`  DNS: ${fqdn} does not resolve and no configured provider manages ${domain} — create it manually: A ${fqdn} → ${ip}`)
+          else
+            logger.warn(`  DNS: ${fqdn} resolves to ${current.join(', ')} but this deploy targets ${ip}, and no configured provider manages ${domain} — update it manually: A ${fqdn} → ${ip}`)
+        }
         continue
       }
       for (const sub of ['', 'www']) {
         const fqdn = sub ? `${sub}.${domain}` : domain
-        const res = await provider.upsertRecord(domain, { name: sub, type: 'A', content: ip, ttl: 600 })
-        if (res?.success === false)
-          logger.warn(`  DNS: ${fqdn} → ${ip} failed: ${res.error || 'unknown error'}`)
-        else
+        // Pass the full fqdn as the record name — the provider derives the
+        // zone root from `domain` and strips it back off the name. Passing
+        // '' for the apex made subdomain sites (dashboard.hq.training)
+        // upsert the ZONE APEX instead of their own record: the provider
+        // edited hq.training's A record, returned success, and deploy
+        // printed a phantom ✓ for a record that never existed (this was
+        // the hq.training production TLS blocker — LE could not resolve
+        // the host to validate http-01).
+        const res = await provider.upsertRecord(domain, { name: fqdn, type: 'A', content: ip, ttl: 600 })
+        if (res?.success === false) {
+          // ts-cloud providers report failures as { success: false,
+          // message } — read both fields before giving up on detail.
+          logger.warn(`  DNS: ${fqdn} → ${ip} failed: ${res.error || res.message || 'unknown error'}`)
+          continue
+        }
+        // An upsert may update only one of multiple records with the same
+        // hostname. Remove the remaining stale addresses so DNS cannot
+        // round-robin traffic back to an old host (and its stale TLS cert).
+        const cleanupWarnings = await removeStaleServerAddressRecords(provider, domain, fqdn, ip)
+        for (const warning of cleanupWarnings)
+          logger.warn(`  DNS: ${fqdn} cleanup: ${warning}`)
+        // Post-write verification against the provider API. Upsert paths
+        // have produced phantom successes, so only print ✓ once the
+        // record is confirmed to exist. Best-effort: providers without a
+        // usable list API are trusted (see verifyDnsRecord).
+        if (await verifyDnsRecord(provider, domain, fqdn, ip))
           logger.success(`  DNS: ${fqdn} → ${ip} (${provider.name})`)
+        else
+          logger.warn(`  DNS: ${fqdn} → ${ip} reported success at ${provider.name} but no matching A record exists — create it manually: A ${fqdn} → ${ip}`)
       }
     }
     catch (err: any) {
@@ -975,6 +2098,7 @@ export function deploy(buddy: CLI): void {
     .option('--prod', descriptions.production, { default: true })
     .option('--dev', descriptions.development, { default: false })
     .option('--yes', descriptions.yes, { default: false })
+    .option('--site <name>', 'Deploy only this one site to the existing server (multi-tenant surgical add)', { default: undefined })
     .option('--staging', descriptions.staging, { default: false })
     .option('--docker', 'Also build an OCI image with pantry (native, no Docker daemon) and push it to the pantry registry', { default: false })
     .option('--verbose', descriptions.verbose, { default: false })
@@ -983,12 +2107,38 @@ export function deploy(buddy: CLI): void {
 
       await ensureDeployPrerequisites(options.verbose === true)
 
-      const deployEnv = envArg || 'production'
+      // Resolve the target environment from the positional arg or the
+      // --staging/--dev/--prod flags (the flags were previously ignored, so
+      // `buddy deploy --staging` silently deployed production).
+      const deployEnv = envArg
+        || (options.staging ? 'staging' : options.dev ? 'development' : 'production')
+      const deployEnvName = deployEnv === 'prod' ? 'production' : deployEnv === 'dev' ? 'development' : deployEnv
+
+      // Deterministic, environment-aware secret resolution. Explicitly load the
+      // TARGET environment's decrypted secrets into process.env BEFORE the config
+      // is evaluated, overriding whatever the env plugin auto-loaded at startup
+      // (which prefers .env.development when present). This is what makes each
+      // app's per-env APP_KEY/DB/Stripe come from `.env.<environment>` — and,
+      // crucially, keeps a plain `buddy deploy` pinned to `.env.production`
+      // regardless of which .env* files exist locally.
+      process.env.APP_ENV = deployEnvName
+      {
+        const envFile = deployEnvName === 'production' ? '.env.production' : `.env.${deployEnvName}`
+        if (existsSync(p.projectPath(envFile))) {
+          try {
+            const { loadEnv } = await import('@stacksjs/env')
+            loadEnv({ path: envFile, env: deployEnvName, keysFile: '.env.keys', overload: true, quiet: true })
+          }
+          catch (err) {
+            log.warn(`Could not load ${envFile}: ${getErrorMessage(err)}`)
+          }
+        }
+      }
 
       // Non-AWS providers (currently Hetzner) provision + deploy over SSH via
       // ts-cloud and have nothing to do with the AWS CloudFormation path below.
       // Route them off early, before any AWS credential / domain checks run.
-      const tsCloudConfig = await loadTsCloudConfig()
+      const tsCloudConfig = await loadTsCloudConfig(deployEnvName)
       if (tsCloudConfig && resolveProvider(tsCloudConfig) === 'hetzner') {
         await deployToHetzner(tsCloudConfig, deployEnv, options)
         return
@@ -1013,7 +2163,7 @@ export function deploy(buddy: CLI): void {
         if (existsSync(prodEnvPath)) {
           const prodEnvContent = readFileSync(prodEnvPath, 'utf-8')
           const urlMatch = prodEnvContent.match(/^APP_URL=(.+)$/m)
-          if (urlMatch) {
+          if (urlMatch?.[1]) {
             productionUrl = urlMatch[1].trim()
             log.debug('Using APP_URL from .env.production:', productionUrl)
           }
@@ -1059,6 +2209,15 @@ export function deploy(buddy: CLI): void {
 }
 
 async function confirmProductionDeployment() {
+  // In a non-interactive shell (CI, a background job, piped stdin) there is no
+  // one to answer the prompt — `prompts.confirm` would hang forever. Fail fast
+  // with a clear instruction instead of stalling the pipeline.
+  if (!process.stdin.isTTY) {
+    log.error('Refusing to deploy to production from a non-interactive shell without confirmation.')
+    log.info('   ➡️  Re-run with `--yes` to confirm (e.g. in CI): `buddy deploy --prod --yes`')
+    process.exit(ExitCode.InvalidArgument)
+  }
+
   const confirmed = await prompts.confirm({
     message: 'Are you sure you want to deploy to production?',
     initial: true,
@@ -1431,6 +2590,9 @@ async function checkIfAwsIsBootstrapped(options?: DeployOptions) {
       }
     }
     catch (error: unknown) {
+      const caught = error && typeof error === 'object'
+        ? error as { message?: string, code?: string }
+        : { message: String(error) }
       log.debug(`Stack not found: ${getErrorMessage(error)}`)
       // Stack doesn't exist, we'll create it below
     }
@@ -2968,6 +4130,9 @@ echo "Mail server setup complete at $(date)"
       }
     }
     catch (error: unknown) {
+      const caught = error && typeof error === 'object'
+        ? error as { message?: string, code?: string }
+        : { message: String(error) }
       // Handle case where stack already exists (shouldn't happen now with our check)
       if (getErrorCode(error) === 'AlreadyExistsException') {
         handlingAlreadyExists = true
@@ -2987,17 +4152,17 @@ echo "Mail server setup complete at $(date)"
       }
 
       // Handle no updates needed
-      if (error.message?.includes('No updates are to be performed')) {
+      if (caught.message?.includes('No updates are to be performed')) {
         log.success('Stack is already up to date')
         return true
       }
 
       // Handle other errors
       log.error('Failed to create/update cloud infrastructure')
-      log.error(`Error: ${error.message || error}`)
+      log.error(`Error: ${caught.message || String(error)}`)
 
-      if (error.code) {
-        log.error(`AWS Error Code: ${error.code}`)
+      if (caught.code) {
+        log.error(`AWS Error Code: ${caught.code}`)
       }
 
       if (options?.verbose) {

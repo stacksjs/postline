@@ -18,32 +18,35 @@
             "type": "string",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 120
           },
           {
             "name": "workspace_name",
             "type": "string",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 120
           },
           {
             "name": "timezone",
             "type": "string",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": true,
-            "defaultValue": "America/Los_Angeles"
+            "defaultValue": "America/Los_Angeles",
+            "maxLength": 80
           },
           {
             "name": "default_audience",
             "type": "enum",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": true,
             "defaultValue": "public",
             "enumValues": [
@@ -104,7 +107,7 @@
             "type": "enum",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": false,
             "enumValues": [
               "bluesky",
@@ -113,7 +116,9 @@
               "facebook",
               "instagram",
               "tiktok",
-              "linkedin"
+              "linkedin",
+              "threads",
+              "blog"
             ]
           },
           {
@@ -121,7 +126,7 @@
             "type": "enum",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": true,
             "defaultValue": "draft",
             "enumValues": [
@@ -155,7 +160,8 @@
             "isPrimaryKey": false,
             "isUnique": false,
             "isNullable": true,
-            "hasDefault": false
+            "hasDefault": false,
+            "maxLength": 255
           },
           {
             "name": "failure_reason",
@@ -269,8 +275,9 @@
             "type": "string",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 120
           },
           {
             "name": "display_name",
@@ -278,14 +285,15 @@
             "isPrimaryKey": false,
             "isUnique": false,
             "isNullable": true,
-            "hasDefault": false
+            "hasDefault": false,
+            "maxLength": 120
           },
           {
             "name": "provider",
             "type": "enum",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": true,
             "defaultValue": "bluesky",
             "enumValues": [
@@ -304,14 +312,15 @@
             "isPrimaryKey": false,
             "isUnique": false,
             "isNullable": true,
-            "hasDefault": false
+            "hasDefault": false,
+            "maxLength": 255
           },
           {
             "name": "auth_status",
             "type": "enum",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": true,
             "defaultValue": "connected",
             "enumValues": [
@@ -413,7 +422,7 @@
             "type": "enum",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": true,
             "defaultValue": "image",
             "enumValues": [
@@ -427,7 +436,7 @@
             "type": "string",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": false
           },
           {
@@ -444,7 +453,8 @@
             "isPrimaryKey": false,
             "isUnique": false,
             "isNullable": true,
-            "hasDefault": false
+            "hasDefault": false,
+            "maxLength": 120
           },
           {
             "name": "byte_size",
@@ -519,7 +529,7 @@
             "type": "enum",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": true,
             "defaultValue": "bluesky",
             "enumValues": [
@@ -537,7 +547,7 @@
             "type": "text",
             "isPrimaryKey": false,
             "isUnique": true,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": false
           },
           {
@@ -545,8 +555,9 @@
             "type": "string",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 120
           },
           {
             "name": "author_name",
@@ -554,14 +565,15 @@
             "isPrimaryKey": false,
             "isUnique": false,
             "isNullable": true,
-            "hasDefault": false
+            "hasDefault": false,
+            "maxLength": 120
           },
           {
             "name": "body",
             "type": "text",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": false
           },
           {
@@ -569,7 +581,7 @@
             "type": "datetime",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": false
           },
           {
@@ -675,6 +687,148 @@
         ]
       },
       {
+        "table": "blog_posts",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 200
+          },
+          {
+            "name": "slug",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 220
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "excerpt",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "status",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "draft",
+            "enumValues": [
+              "draft",
+              "published",
+              "archived"
+            ]
+          },
+          {
+            "name": "published_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "post_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "posts",
+              "column": "id"
+            }
+          },
+          {
+            "name": "account_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "accounts",
+              "column": "id"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "CURRENT_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "blog_posts_status_published_at_index",
+            "columns": [
+              "status",
+              "published_at"
+            ],
+            "type": "index"
+          },
+          {
+            "name": "blog_posts_slug_unique",
+            "columns": [
+              "slug"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "blog_posts_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
+      },
+      {
         "table": "social_drivers",
         "columns": [
           {
@@ -690,7 +844,7 @@
             "type": "enum",
             "isPrimaryKey": false,
             "isUnique": true,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": false,
             "enumValues": [
               "bluesky",
@@ -707,15 +861,16 @@
             "type": "string",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 80
           },
           {
             "name": "status",
             "type": "enum",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": true,
             "defaultValue": "planned",
             "enumValues": [
@@ -729,7 +884,7 @@
             "type": "integer",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": true,
             "defaultValue": 300
           },
@@ -801,14 +956,15 @@
             "isPrimaryKey": false,
             "isUnique": false,
             "isNullable": true,
-            "hasDefault": false
+            "hasDefault": false,
+            "maxLength": 160
           },
           {
             "name": "body",
             "type": "text",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": false
           },
           {
@@ -816,7 +972,7 @@
             "type": "enum",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": true,
             "defaultValue": "draft",
             "enumValues": [
@@ -849,9 +1005,10 @@
             "type": "string",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": true,
-            "defaultValue": "America/Los_Angeles"
+            "defaultValue": "America/Los_Angeles",
+            "maxLength": 80
           },
           {
             "name": "thread_key",
@@ -859,14 +1016,15 @@
             "isPrimaryKey": false,
             "isUnique": false,
             "isNullable": true,
-            "hasDefault": false
+            "hasDefault": false,
+            "maxLength": 120
           },
           {
             "name": "source",
             "type": "enum",
             "isPrimaryKey": false,
             "isUnique": false,
-            "isNullable": true,
+            "isNullable": false,
             "hasDefault": true,
             "defaultValue": "composer",
             "enumValues": [
@@ -941,7 +1099,7 @@
       }
     ]
   },
-  "hash": "f58eb7f5849b90a72951ac803c6005b529e4bd5d6288bfe37e491b7fb195317f",
+  "hash": "74ee84aa0b7221244999b36e9ddc04f5688709d4a82fcf5b4d6be14ed9ed85fb",
   "dialect": "sqlite",
-  "updatedAt": "2026-06-30T03:25:10.477Z"
+  "updatedAt": "2026-07-23T13:02:50.073Z"
 }

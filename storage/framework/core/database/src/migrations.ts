@@ -6,8 +6,8 @@
  */
 
 import type { Result } from '@stacksjs/error-handling'
-import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { log as _log } from '@stacksjs/logging'
 
 // Defensive log wrapper to handle cases where log methods might not be initialized.
@@ -30,9 +30,11 @@ import {
   generateMigration as qbGenerateMigration,
   resetConnection,
   resetDatabase as qbResetDatabase,
+  saveMigrationSnapshot,
   setConfig,
 } from '@stacksjs/query-builder'
 import { db } from './utils'
+import { frameworkManagedColumns, withoutManagedColumnDrops, withoutManagedColumnDropSql } from './managed-columns'
 import { acquireMigrationLock } from './migration-lock'
 
 // Use environment variables via @stacksjs/env for proper type coercion
@@ -74,6 +76,12 @@ function getDriver(): string {
 function getDialect(): 'sqlite' | 'mysql' | 'postgres' {
   const driver = getDriver()
   if (driver === 'sqlite' || driver === 'mysql' || driver === 'postgres') return driver
+  // SingleStore is MySQL wire-compatible, so all of the internal migration
+  // plumbing that needs a concrete engine (connection ports, admin database,
+  // DROP TABLE) treats it as MySQL. DDL *generation* is different — it must
+  // use the real 'singlestore' dialect so bun-query-builder's SingleStore
+  // driver drops foreign keys (which SingleStore rejects). See getQbDialect.
+  if (driver === 'singlestore') return 'mysql'
   if (driver === 'dynamodb') {
     throw new Error(
       '[database] DB_CONNECTION=dynamodb is not compatible with the SQL migration runner. '
@@ -84,6 +92,16 @@ function getDialect(): 'sqlite' | 'mysql' | 'postgres' {
   throw new Error(
     `[database] Unknown DB_CONNECTION "${driver}". Allowed values: sqlite, mysql, postgres, dynamodb.`,
   )
+}
+
+/**
+ * The dialect handed to bun-query-builder's DDL generator. Identical to
+ * `getDialect()` except SingleStore is preserved (not collapsed to MySQL) so
+ * bqb selects its SingleStore driver — which drops foreign-key constraints
+ * (unsupported by SingleStore) and can emit distributed-table clauses.
+ */
+function getQbDialect(): 'sqlite' | 'mysql' | 'singlestore' | 'postgres' {
+  return getDriver() === 'singlestore' ? 'singlestore' : getDialect()
 }
 
 /**
@@ -128,6 +146,8 @@ function prepareMigrationModelsDir(): { modelsDir: string, skip: boolean } {
  *
  * SQLite does not support:
  * - ALTER TABLE ADD CONSTRAINT (foreign keys must be defined at table creation)
+ * - CREATE TYPE ... AS ENUM (SQLite has no user-defined types; enum columns
+ *   are plain TEXT, with the allowed values enforced at the validation layer)
  *
  * Note: CREATE UNIQUE INDEX files are deliberately NOT skipped — the SQLite
  * dialect driver never renders inline UNIQUE in CREATE TABLE, so the
@@ -182,6 +202,7 @@ export function preprocessSqliteMigrations(): void {
   const replayMigrations: string[] = []
 
   const addConstraintPattern = /^\s*ALTER\s+TABLE\s+.+\s+ADD\s+CONSTRAINT\s+/i
+  const createTypePattern = /^\s*CREATE\s+TYPE\s+/i
   // Match CREATE UNIQUE INDEX, capturing the index name. These files MUST run
   // on SQLite — the dialect driver never renders inline UNIQUE in CREATE
   // TABLE, so this index is the only uniqueness enforcement (#1952).
@@ -260,6 +281,20 @@ export function preprocessSqliteMigrations(): void {
     const allAddConstraint = statements.every(s => addConstraintPattern.test(s))
     if (allAddConstraint) {
       skipMigration(file, 'SQLite does not support ALTER TABLE ADD CONSTRAINT')
+      continue
+    }
+
+    // Skip files that only contain CREATE TYPE ... AS ENUM (Postgres enum
+    // types). SQLite has no user-defined types — enum columns are plain
+    // TEXT, with the allowed values enforced at the model/validation layer
+    // — so `buddy generate:migrations`' enum-type "auto-misc" files are
+    // dead on SQLite and their `CREATE TYPE` syntax otherwise dies a fresh
+    // migrate with `near "TYPE": syntax error`. Same skip-and-keep policy
+    // as ADD CONSTRAINT above: the file is valid on MySQL/Postgres, so
+    // leave it on disk and just mark it executed for SQLite. (#1916)
+    const allCreateType = statements.every(s => createTypePattern.test(s))
+    if (allCreateType) {
+      skipMigration(file, 'SQLite does not support CREATE TYPE (enum types)')
       continue
     }
 
@@ -360,22 +395,30 @@ export function preprocessSqliteMigrations(): void {
   if (droppedMigrations.length > 0 || replayMigrations.length > 0) {
     try {
       const dbPath = join(process.cwd(), dbConfig.connections.sqlite.database || 'stacks.db')
-      if (existsSync(dbPath)) {
-        const { Database } = require('bun:sqlite')
-        const writeDb = new Database(dbPath)
-        try {
-          writeDb.exec(`CREATE TABLE IF NOT EXISTS migrations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            migration TEXT NOT NULL UNIQUE,
-            executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
-          )`)
-          const insert = writeDb.prepare('INSERT OR IGNORE INTO migrations (migration) VALUES (?)')
-          for (const migration of droppedMigrations) insert.run(migration)
-          const unrecord = writeDb.prepare('DELETE FROM migrations WHERE migration = ?')
-          for (const migration of replayMigrations) unrecord.run(migration)
-        }
-        finally { writeDb.close() }
+      // Record the skips even when the DB file does NOT exist yet. On a
+      // fresh SQLite install ensureDatabaseExists() is a no-op (SQLite
+      // auto-creates on open), so the file is absent here — and if we
+      // bailed on that, the skip records would never land and the runner
+      // would then execute the very ALTER TABLE ADD CONSTRAINT / CREATE
+      // TYPE files we just skipped, dying with a "near CONSTRAINT/TYPE"
+      // syntax error on the first fresh migrate. `new Database()` creates
+      // the file; qbExecuteMigration opens the same one next and honors
+      // these records. (stacksjs/stacks#1916 fresh-install gap.)
+      mkdirSync(dirname(dbPath), { recursive: true })
+      const { Database } = require('bun:sqlite')
+      const writeDb = new Database(dbPath)
+      try {
+        writeDb.exec(`CREATE TABLE IF NOT EXISTS migrations (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          migration TEXT NOT NULL UNIQUE,
+          executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`)
+        const insert = writeDb.prepare('INSERT OR IGNORE INTO migrations (migration) VALUES (?)')
+        for (const migration of droppedMigrations) insert.run(migration)
+        const unrecord = writeDb.prepare('DELETE FROM migrations WHERE migration = ?')
+        for (const migration of replayMigrations) unrecord.run(migration)
       }
+      finally { writeDb.close() }
     }
     catch (e) {
       log.debug(`[migration] Could not record dropped migrations as executed: ${e}`)
@@ -479,7 +522,7 @@ async function ensureDatabaseExists(): Promise<void> {
 async function hideDisabledFeatureMigrations(): Promise<Array<{ original: string, hidden: string, feature: string }>> {
   const hidden: Array<{ original: string, hidden: string, feature: string }> = []
   try {
-    const { FEATURE_NAMES, migrationFeature } = await import('@stacksjs/buddy')
+    const { appModelClaimsTable, FEATURE_NAMES, migrationFeature, migrationTable } = await import('@stacksjs/buddy')
     const { feature: isFeatureEnabled } = await import('@stacksjs/config')
     const fs = await import('node:fs/promises')
 
@@ -495,6 +538,8 @@ async function hideDisabledFeatureMigrations(): Promise<Array<{ original: string
     for (const file of files) {
       const owner = (migrationFeature as (filename: string) => string | null)(file)
       if (!owner || !disabledFeatures.has(owner)) continue
+      const table = (migrationTable as (filename: string) => string | null)(file)
+      if (table && (appModelClaimsTable as (table: string) => boolean)(table)) continue
       const original = join(migrationsDir, file)
       const hiddenPath = `${original}.disabled`
       await fs.rename(original, hiddenPath)
@@ -544,7 +589,7 @@ async function countAppliedMigrations(): Promise<number> {
   try {
     const row = await (db as any)
       .selectFrom('migrations')
-      .select((eb: any) => eb.fn.count<number>('id').as('n'))
+      .select((eb: any) => eb.fn.count('id').as('n'))
       .executeTakeFirst()
     if (!row) return 0
     const n = Number(row.n ?? row.N ?? 0)
@@ -591,6 +636,73 @@ async function writeMigrateMarker(appliedCount: number): Promise<void> {
 /**
  * Run database migrations
  */
+/**
+ * Rewrite a migration's SQL to idempotent form (Postgres). `buddy generate` emits
+ * plain `ADD COLUMN`/`ADD CONSTRAINT` alters, and the framework marks some as
+ * "transient" (applied-but-not-recorded, then deleted) — so replaying them (a
+ * re-run of `buddy migrate`, or a restored committed file) fails with
+ * "column/constraint already exists". Making them idempotent removes that whole
+ * class of failure:
+ *   ADD COLUMN "x"        → ADD COLUMN IF NOT EXISTS "x"
+ *   ADD CONSTRAINT "c" …  → DROP CONSTRAINT IF EXISTS "c"; ADD CONSTRAINT "c" …
+ * The transform is itself idempotent (re-applying is a no-op) and only touches
+ * ALTER statements; CREATE TABLE/INDEX already use IF NOT EXISTS.
+ */
+function idempotentSql(sql: string): string {
+  const stmts = sql.split(';').map(s => s.trim()).filter(Boolean)
+  if (stmts.length === 0)
+    return sql
+  const out: string[] = []
+  for (const raw of stmts) {
+    const stmt = raw.replace(/\bADD\s+COLUMN\s+(?!IF\s+NOT\s+EXISTS\b)/gi, 'ADD COLUMN IF NOT EXISTS ')
+    const m = /^ALTER\s+TABLE\s+("?\w+"?)\s+ADD\s+CONSTRAINT\s+("?\w+"?)/i.exec(stmt)
+    if (m) {
+      const drop = `ALTER TABLE ${m[1]} DROP CONSTRAINT IF EXISTS ${m[2]}`
+      if ((out[out.length - 1] ?? '').toUpperCase() !== drop.toUpperCase())
+        out.push(drop)
+    }
+    out.push(stmt)
+  }
+  return `${out.join(';\n')};\n`
+}
+
+/**
+ * Rewrite every ALTER migration on disk to idempotent form (Postgres only) before
+ * they run. Mirrors the `preprocessSqliteMigrations` file-rewrite pattern; runs
+ * under the migration lock so concurrent runners can't race the disk. Skips files
+ * with no ADD COLUMN/CONSTRAINT and files that are already idempotent.
+ */
+function makeMigrationsIdempotent(): void {
+  const migrationsDir = join(process.cwd(), 'database', 'migrations')
+  let files: string[]
+  try {
+    files = readdirSync(migrationsDir).filter(f => f.endsWith('.sql'))
+  }
+  catch {
+    return
+  }
+  for (const f of files) {
+    const p = join(migrationsDir, f)
+    let sql: string
+    try {
+      sql = readFileSync(p, 'utf8')
+    }
+    catch {
+      continue
+    }
+    if (!/\bADD\s+(?:COLUMN|CONSTRAINT)\b/i.test(sql))
+      continue
+    const next = idempotentSql(sql)
+    if (next !== sql) {
+      try {
+        writeFileSync(p, next)
+        log.debug(`[migration] made idempotent: ${f}`)
+      }
+      catch { /* read-only fs — leave as-is */ }
+    }
+  }
+}
+
 export async function runDatabaseMigration(): Promise<Result<string, Error>> {
   const startedAt = Date.now()
   const hidden = await hideDisabledFeatureMigrations()
@@ -628,6 +740,11 @@ export async function runDatabaseMigration(): Promise<Result<string, Error>> {
     // other's disk state (stacksjs/stacks#1876 D-2).
     if (dialect === 'sqlite') {
       preprocessSqliteMigrations()
+    }
+    else if (dialect === 'postgres') {
+      // Make ALTER migrations idempotent so re-runs / replays of "transient"
+      // ADD COLUMN/CONSTRAINT alters don't fail on "already exists".
+      makeMigrationsIdempotent()
     }
 
     const modelsDir = path.userModelsPath()
@@ -837,8 +954,14 @@ export async function previewPendingMigrations(options: GenerateMigrationsOption
     if (skip)
       return []
     const { applyRenames, fromDb } = resolveGenerateOptions(options)
-    const result = await qbGenerateMigration(modelsDir, { dialect, dryRun: true, applyRenames, fromDb })
-    return result.operations ?? []
+    const result = await qbGenerateMigration(modelsDir, { dialect: getQbDialect(), dryRun: true, applyRenames, fromDb })
+    const operations = result.operations ?? []
+    // Framework-managed columns (trait ALTERs, not model `attributes`) are not
+    // real strays — don't surface them as destructive drops in the confirmation
+    // gate, or migrate never shows "nothing to migrate" (stacksjs/stacks#2075).
+    if (!operations.some((op: MigrationOperation) => op.kind === 'drop_column'))
+      return operations
+    return withoutManagedColumnDrops(operations, await frameworkManagedColumns())
   }
   catch (error) {
     // A preview must never block the migrate flow on its own failure — the
@@ -846,6 +969,34 @@ export async function previewPendingMigrations(options: GenerateMigrationsOption
     log.debug(`[migration] preview failed: ${error instanceof Error ? error.message : String(error)}`)
     return []
   }
+}
+
+/**
+ * Detect a dialect/snapshot mismatch in `.qb/`. Returns the name of an existing
+ * snapshot's dialect when the resolved `dialect` has no snapshot of its own but
+ * some OTHER dialect does — the signature of a misconfigured environment that
+ * would make `generateMigrations` emit a duplicate migration set. Returns null
+ * when there is no `.qb/` yet (fresh project — nothing to protect) or when the
+ * resolved dialect already has history.
+ */
+function detectSnapshotDialectMismatch(dialect: string): string | null {
+  const qbDir = join(process.cwd(), '.qb')
+  let files: string[]
+  try {
+    files = readdirSync(qbDir)
+  }
+  catch {
+    return null // no .qb dir yet — first-ever generate, nothing to clobber
+  }
+  const snapshotFor = (d: string): string => `model-snapshot.${d}.json`
+  if (files.includes(snapshotFor(dialect)))
+    return null // resolved dialect already has a snapshot — normal incremental generate
+  for (const f of files) {
+    const m = /^model-snapshot\.(\w+)\.json$/.exec(f)
+    if (m?.[1] && m[1] !== dialect)
+      return m[1]
+  }
+  return null // no snapshots at all for any dialect — nothing to conflict with
 }
 
 export async function generateMigrations(options: GenerateMigrationsOptions = {}): Promise<Result<string, Error>> {
@@ -860,6 +1011,28 @@ export async function generateMigrations(options: GenerateMigrationsOptions = {}
     configureQueryBuilder()
 
     const dialect = getDialect()
+
+    // Guard against the dialect footgun (stacksjs/stacks#1927): the qb generator
+    // diffs models against `.qb/model-snapshot.<dialect>.json`. If the resolved
+    // dialect has NO snapshot but another dialect does, the environment is almost
+    // certainly misconfigured — most commonly there is no `.env`, so
+    // `DB_CONNECTION` defaults to 'sqlite' even though the project's committed
+    // migrations + snapshot are Postgres. Generating anyway emits a FULL, second
+    // migration set in the wrong dialect (the per-statement dedup in
+    // persistGeneratedMigrations is textual and can't match across dialects), which
+    // silently collides with the committed migrations. Refuse loudly instead of
+    // clobbering; the fix is to set DB_CONNECTION (or add the `.env`).
+    const mismatch = detectSnapshotDialectMismatch(dialect)
+    if (mismatch) {
+      return err(new Error(
+        `Refusing to generate migrations: resolved dialect "${dialect}" has no snapshot in `
+        + `.qb/, but "${mismatch}" does. DB_CONNECTION is likely unset or wrong (missing .env?) — `
+        + `generating now would write a full duplicate migration set in the wrong dialect. `
+        + `Set DB_CONNECTION=${mismatch} (or your intended dialect) and retry. To intentionally `
+        + `start a new dialect from scratch, remove .qb/model-snapshot.${mismatch}.json first.`,
+      ))
+    }
+
     const { modelsDir, skip } = prepareMigrationModelsDir()
     if (skip) {
       log.debug('No app/Models directory found; using committed framework migrations')
@@ -868,10 +1041,31 @@ export async function generateMigrations(options: GenerateMigrationsOptions = {}
 
     const { applyRenames, fromDb } = resolveGenerateOptions(options)
     log.debug(`[migration] Generating migrations for dialect: ${dialect}, models: ${modelsDir}`)
-    const result = await qbGenerateMigration(modelsDir, { dialect, applyRenames, fromDb })
+    // dryRun: true — bun-query-builder's own file writer numbers migrations
+    // from its own internal counter (1, 2, 3, ...), unaware of any already-
+    // committed migration files. On a project with existing migrations that
+    // collided with committed files (e.g. a fresh 0000000001-*.sql next to
+    // the real 0000000001-*.sql), and `persistGeneratedMigrations` below —
+    // which numbers correctly, continuing from the highest existing file —
+    // then saw its own content already on disk and silently skipped writing
+    // anything. Keeping the qb call dry-run makes `persistGeneratedMigrations`
+    // the single place that ever writes a migration file.
+    const result = await qbGenerateMigration(modelsDir, { dialect: getQbDialect(), dryRun: true, applyRenames, fromDb })
+
+    // Never write a migration that drops a framework-managed column: those are
+    // guaranteed by runtime ALTERs (ensureUsersAuthColumns / ensureUuidColumns),
+    // not the model, so the differ re-proposes dropping them every run and a
+    // stray `y` destroys auth/billing data (stacksjs/stacks#2075).
+    let sqlStatements = result.sqlStatements ?? []
+    if (result.hasChanges && sqlStatements.length > 0) {
+      const filtered = withoutManagedColumnDropSql(sqlStatements, await frameworkManagedColumns(), result.operations ?? [])
+      if (filtered.removed.length > 0)
+        log.debug(`[migration] Skipped ${filtered.removed.length} generated drop(s) of framework-managed column(s) (stacksjs/stacks#2075)`)
+      sqlStatements = filtered.statements
+    }
 
     if (result.hasChanges) {
-      const written = persistGeneratedMigrations(result.sqlStatements ?? [])
+      const written = persistGeneratedMigrations(sqlStatements)
       // Only announce when we actually wrote files. `hasChanges` can be
       // true while `written === 0` if the qb diff restated statements
       // already covered by committed migrations — that's a no-op from
@@ -884,6 +1078,12 @@ export async function generateMigrations(options: GenerateMigrationsOptions = {}
     else {
       log.debug('No changes detected')
     }
+
+    // BQB is intentionally called in dry-run mode because Stacks owns file
+    // naming/persistence. Advance its model snapshot only after that writer
+    // succeeds, otherwise every run diffs against stale model state and model
+    // removals can never be observed.
+    saveMigrationSnapshot(result.plan, { dialect: getQbDialect() })
 
     return ok('Migrations generated')
   }
@@ -942,13 +1142,130 @@ interface GeneratedGroup {
   statements: string[]
 }
 
+interface GeneratedCreateStatement {
+  statement: string
+  table: string
+}
+
+interface GeneratedConstraintStatement {
+  body: string
+  references: string[]
+  statement: string
+  table: string
+}
+
+/**
+ * bun-query-builder emits foreign keys as `ALTER TABLE ... ADD CONSTRAINT`
+ * statements after its CREATE statements. For a brand-new model that used to
+ * become a second `alter-*.sql` migration even though the relationship was
+ * present when the table was first defined.
+ *
+ * Fold acyclic constraints into the owning CREATE TABLE and dependency-sort
+ * those creates so referenced tables exist first. Cyclic relationships cannot
+ * be declared inline before both tables exist, so retain only those constraints
+ * as a final create-time constraint group.
+ */
+function normalizeCreateStatements(sqlStatements: string[]): string[] {
+  const creates: GeneratedCreateStatement[] = []
+  const constraints: GeneratedConstraintStatement[] = []
+  const passthrough: string[] = []
+
+  for (const raw of sqlStatements) {
+    const statement = raw.trim()
+    if (!statement)
+      continue
+
+    const create = statement.match(/^CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?(\w+)["`]?/i)
+    if (create?.[1]) {
+      creates.push({ statement, table: create[1] })
+      continue
+    }
+
+    const constraint = statement.match(/^ALTER\s+TABLE\s+["`]?(\w+)["`]?\s+ADD\s+CONSTRAINT\s+([\s\S]+?);?$/i)
+    if (constraint?.[1] && constraint[2]) {
+      const references = [...constraint[2].matchAll(/REFERENCES\s+["`]?(\w+)["`]?/gi)]
+        .flatMap(match => match[1] ? [match[1]] : [])
+      constraints.push({ body: `CONSTRAINT ${constraint[2].replace(/;\s*$/, '')}`, references, statement, table: constraint[1] })
+      continue
+    }
+
+    passthrough.push(statement)
+  }
+
+  if (creates.length === 0)
+    return sqlStatements.map(statement => statement.trim()).filter(Boolean)
+
+  const createdTables = new Set(creates.map(create => create.table))
+  const createOrder = new Map(creates.map((create, index) => [create.table, index]))
+  const relevantConstraints = constraints.filter(constraint => createdTables.has(constraint.table))
+  const unrelatedConstraints = constraints.filter(constraint => !createdTables.has(constraint.table))
+  const dependencies = new Map(creates.map(create => [
+    create.table,
+    new Set(relevantConstraints
+      .filter(constraint => constraint.table === create.table)
+      .flatMap(constraint => constraint.references)
+      .filter(reference => reference !== create.table && createdTables.has(reference))),
+  ]))
+
+  const sortTables = (ignoredEdges = new Set<string>()): string[] => {
+    const remaining = new Set(createdTables)
+    const sorted: string[] = []
+    while (remaining.size > 0) {
+      const ready = [...remaining]
+        .filter(table => [...(dependencies.get(table) ?? [])].every((dependency) => {
+          return !remaining.has(dependency) || ignoredEdges.has(`${table}->${dependency}`)
+        }))
+        .sort((a, b) => (createOrder.get(a) ?? 0) - (createOrder.get(b) ?? 0))
+      if (ready.length === 0)
+        break
+      for (const table of ready) {
+        remaining.delete(table)
+        sorted.push(table)
+      }
+    }
+    return sorted
+  }
+
+  const initiallySorted = sortTables()
+  const cyclicTables = new Set([...createdTables].filter(table => !initiallySorted.includes(table)))
+  const deferred = relevantConstraints.filter(constraint => constraint.references.some((reference) => {
+    return reference !== constraint.table && cyclicTables.has(constraint.table) && cyclicTables.has(reference)
+  }))
+  const deferredStatements = new Set(deferred.map(constraint => constraint.statement))
+  const ignoredEdges = new Set(deferred.flatMap(constraint => constraint.references.map(reference => `${constraint.table}->${reference}`)))
+  const orderedTables = sortTables(ignoredEdges)
+  const byTable = new Map(creates.map(create => [create.table, create]))
+
+  const normalizedCreates = orderedTables.map((table) => {
+    const create = byTable.get(table)!
+    const inline = relevantConstraints.filter(constraint => constraint.table === table && !deferredStatements.has(constraint.statement))
+    if (inline.length === 0)
+      return create.statement
+
+    const closing = create.statement.lastIndexOf(')')
+    if (closing < 0)
+      return create.statement
+    const before = create.statement.slice(0, closing).trimEnd()
+    const after = create.statement.slice(closing)
+    return `${before},\n  ${inline.map(constraint => constraint.body).join(',\n  ')}\n${after}`
+  })
+
+  return [
+    ...normalizedCreates,
+    ...passthrough,
+    ...unrelatedConstraints.map(constraint => constraint.statement),
+    ...deferred.map(constraint => constraint.statement),
+  ]
+}
+
 /**
  * Group generated SQL by the migration filename style the runner already
  * uses for hand-written files: `create-<table>-table`,
  * `alter-<table>-<col>`, `create-<index>-index-in-<table>`, or
  * `drop-<table>-table`. Anything we can't match falls back to `auto-misc`.
  */
-function groupGeneratedStatements(sqlStatements: string[]): GeneratedGroup[] {
+export function groupGeneratedStatements(sqlStatements: string[]): GeneratedGroup[] {
+  const normalizedStatements = normalizeCreateStatements(sqlStatements)
   const groups = new Map<string, string[]>()
   const push = (label: string, stmt: string): void => {
     const list = groups.get(label) ?? []
@@ -956,18 +1273,40 @@ function groupGeneratedStatements(sqlStatements: string[]): GeneratedGroup[] {
     groups.set(label, list)
   }
 
-  for (const raw of sqlStatements) {
+  const createdTables = new Set(normalizedStatements.flatMap((raw) => {
+    const match = raw.trim().match(/^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?(\w+)["`]?/i)
+    return match?.[1] ? [match[1]] : []
+  }))
+
+  for (const raw of normalizedStatements) {
     const stmt = raw.trim()
     if (!stmt) continue
 
     const create = stmt.match(/^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?(\w+)["`]?/i)
     if (create) { push(`create-${create[1]}-table`, stmt); continue }
 
+    // PostgreSQL enum types must exist before any CREATE TABLE that names
+    // them. Keep all generated types in a dedicated prerequisite migration;
+    // the priority sort below guarantees it receives the first migration
+    // number even though bun-query-builder emits type statements last.
+    const createType = stmt.match(/^\s*CREATE\s+TYPE\s+/i)
+    if (createType) { push('create-database-types', stmt); continue }
+
     const alter = stmt.match(/^\s*ALTER\s+TABLE\s+["`]?(\w+)["`]?\s+(?:ADD\s+COLUMN\s+["`]?(\w+)["`]?|DROP\s+COLUMN\s+["`]?(\w+)["`]?|ADD\s+CONSTRAINT)/i)
-    if (alter) { push(`alter-${alter[1]}-${alter[2] || alter[3] || 'constraint'}`, stmt); continue }
+    const alterTable = alter?.[1]
+    if (alter && alterTable) {
+      const isCreateTimeConstraint = createdTables.has(alterTable) && !alter[2] && !alter[3]
+      push(isCreateTimeConstraint ? 'create-foreign-key-constraints' : `alter-${alterTable}-${alter[2] || alter[3] || 'constraint'}`, stmt)
+      continue
+    }
 
     const idx = stmt.match(/^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?(\w+)["`]?\s+ON\s+["`]?(\w+)["`]?/i)
-    if (idx) { push(`create-${idx[1]}-index-in-${idx[2]}`, stmt); continue }
+    const idxName = idx?.[1]
+    const idxTable = idx?.[2]
+    if (idxName && idxTable) {
+      push(createdTables.has(idxTable) ? `create-${idxTable}-table` : `create-${idxName}-index-in-${idxTable}`, stmt)
+      continue
+    }
 
     const drop = stmt.match(/^\s*DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?["`]?(\w+)["`]?/i)
     if (drop) { push(`drop-${drop[1]}-table`, stmt); continue }
@@ -975,7 +1314,9 @@ function groupGeneratedStatements(sqlStatements: string[]): GeneratedGroup[] {
     push('auto-misc', stmt)
   }
 
-  return [...groups.entries()].map(([label, statements]) => ({ label, statements }))
+  return [...groups.entries()]
+    .map(([label, statements]) => ({ label, statements }))
+    .sort((a, b) => Number(b.label === 'create-database-types') - Number(a.label === 'create-database-types'))
 }
 
 function nextMigrationNumber(migrationsDir: string): number {
@@ -1007,7 +1348,10 @@ export async function generateMigrations2(): Promise<Result<string, Error>> {
       return ok('Migrations generated')
     }
 
-    await qbGenerateMigration(modelsDir, { dialect, full: true })
+    // dryRun: true — see the comment on the equivalent call in
+    // generateMigrations() above; bun-query-builder's own file writer
+    // doesn't know about already-committed migration numbering.
+    await qbGenerateMigration(modelsDir, { dialect: getQbDialect(), full: true, dryRun: true })
 
     log.success('Migrations generated')
     return ok('Migrations generated')

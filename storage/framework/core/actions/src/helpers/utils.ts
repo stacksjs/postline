@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
-import { buddyOptions, runCommand, runCommands } from '@stacksjs/cli'
+import { buddyOptions, runCommand } from '@stacksjs/cli'
 import { err } from '@stacksjs/error-handling'
 import { log } from '@stacksjs/logging'
 import * as p from '@stacksjs/path'
@@ -13,6 +13,39 @@ import * as p from '@stacksjs/path'
 type ActionPath = string // TODO: narrow this by automating its generation
 type ActionName = string // TODO: narrow this by automating its generation
 type Action = ActionPath | ActionName | string
+
+export function publishedActionCandidates(action: string, packageRoot?: string): string[] {
+  let root = packageRoot
+
+  if (!root) {
+    try {
+      const pkgUrl = import.meta.resolve('@stacksjs/actions/package.json')
+      if (pkgUrl) {
+        const pkgPath = new URL(pkgUrl).pathname
+        root = pkgPath.slice(0, pkgPath.lastIndexOf('/'))
+      }
+    }
+    catch {
+      return []
+    }
+  }
+
+  if (!root)
+    return []
+
+  return [
+    `${root}/dist/${action}.js`,
+    `${root}/dist/src/${action}.js`,
+    `${root}/src/${action}.ts`,
+  ]
+}
+
+export function developmentConditionForProject(projectRoot: string): string {
+  return existsSync(join(projectRoot, 'storage/framework/core'))
+    && existsSync(join(projectRoot, 'node_modules/@stacksjs/env/src/index.ts'))
+    ? '--conditions development'
+    : ''
+}
 
 /**
  * Resolve a core-action name (e.g. `route/list`, `queue/status`, `dev/api`) to
@@ -49,16 +82,10 @@ async function resolveActionFile(action: string): Promise<string | null> {
   // 2/3) Find the @stacksjs/actions package root, then look for a built
   //      action JS alongside its TS source. Wrapped in try/catch because
   //      the package may not be installed at all in some layouts.
-  try {
-    const pkgUrl = import.meta.resolve('@stacksjs/actions/package.json')
-    if (pkgUrl) {
-      const pkgPath = new URL(pkgUrl).pathname
-      const pkgRoot = pkgPath.slice(0, pkgPath.lastIndexOf('/'))
-      candidates.push(`${pkgRoot}/dist/src/${action}.js`)
-      candidates.push(`${pkgRoot}/src/${action}.ts`)
-    }
-  }
-  catch { /* package not installed — skip, fall through to override only */ }
+  // The build emits a flat `dist/` (root: './src'), so `dist/<action>.js`
+  // is the current layout. `dist/src/<action>.js` is kept as a fallback for
+  // older published packages that shipped the nested layout.
+  candidates.push(...publishedActionCandidates(action))
 
   for (const candidate of candidates) {
     if (await Bun.file(candidate).exists()) return candidate
@@ -125,7 +152,7 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
       if (relativePath === action || file.endsWith(`${action}.ts`) || file.endsWith(`${action}.js`)) {
         // Direct filename match - import and execute immediately
         log.debug(`[action] Resolved: ${action} → ${file}`)
-        return await ((await import(file)).default as ActionType).handle(undefined as unknown as Parameters<ActionType['handle']>[0])
+        return await ((await import(file)).default as ActionType).handle(undefined as unknown as Parameters<ActionType['handle']>[0]) as unknown as Result<Subprocess, CommandError>
       }
       // Collect all files for potential name matching (only if direct match fails)
       matchingFiles.push(file)
@@ -138,7 +165,7 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
         const a = await import(file)
         if (a.name === action) {
           log.debug(`[action] Resolved: ${action} → ${file}`)
-          return await a.handle()
+          return await a.handle() as Result<Subprocess, CommandError>
         }
       }
       // eslint-disable-next-line unused-imports/no-unused-vars
@@ -171,9 +198,14 @@ export async function runAction(action: Action, options?: ActionOptions): Promis
   // Use --watch for dev actions to enable hot reloading
   const isDevAction = action.startsWith('dev/')
   const watchFlag = isDevAction ? '--watch' : ''
+  // Match the top-level `buddy` launcher: vendored workspace packages ship
+  // source but may not have been built yet, so their `bun` export can point at
+  // a missing/stale dist file. Keep the development condition on child action
+  // processes instead of silently dropping it at this spawn boundary.
+  const developmentCondition = developmentConditionForProject(p.projectPath())
   // Dev actions manage their own config — don't pass CLI flags that trigger dep loading
   const opts = isDevAction ? '' : (buddyOptions(options) || '')
-  const cmd = `bun ${watchFlag} ${path} ${opts}`.trimEnd()
+  const cmd = ['bun', developmentCondition, watchFlag, path, opts].filter(Boolean).join(' ')
 
   // Ensure pantry packages are resolvable via NODE_PATH
   // This allows compiled pantry packages (e.g., bun-plugin-stx/serve.js) to
@@ -224,16 +256,23 @@ export async function runActions(
       return err(`The specified action "${action}" does not exist`)
   }
 
-  const opts = buddyOptions(options) || ''
+  return await runActionSequence(actions, options)
+}
 
-  const o = {
-    cwd: options?.cwd || p.projectPath(),
-    ...options,
+export async function runActionSequence(
+  actions: Action[],
+  options: ActionOptions | undefined,
+  runner: typeof runAction = runAction,
+): Promise<any> {
+  let result: any
+
+  for (const action of actions) {
+    result = await runner(action, options)
+    if (result?.isErr)
+      return result
   }
 
-  const commands = actions.map(action => `bun ${p.relativeActionsPath(`src/${action}.ts`)} ${opts}`)
-
-  return await runCommands(commands, o)
+  return result
 }
 
 // looks in most common locations
@@ -255,6 +294,7 @@ export function hasAction(action: Action): boolean {
   const candidates = [
     ...userActionPatterns.map(pattern => p.userActionsPath(pattern)),
     ...actionPatterns.map(pattern => p.actionsPath(pattern)),
+    ...publishedActionCandidates(action),
   ]
 
   return candidates.some(candidate => existsSync(candidate))
