@@ -47,6 +47,10 @@ function deriveAppDefaults(): { name: string, url: string } {
 const appDefaults = deriveAppDefaults()
 
 export const defaults: StacksOptions = {
+  cms: { enabled: false },
+  commerce: { enabled: false },
+  marketing: { enabled: false },
+  monitoring: { enabled: false },
   ai: {
     deploy: false,
     models: [
@@ -141,6 +145,15 @@ export const defaults: StacksOptions = {
         checkPeriod: 600,
         deleteOnExpire: true,
       },
+    },
+  },
+
+  featureFlags: {
+    default: 'memory',
+    missing: 'false',
+    drivers: {
+      memory: { cloneValues: true },
+      database: { table: 'feature_flags', autoCreate: false },
     },
   },
 
@@ -390,7 +403,6 @@ export const defaults: StacksOptions = {
       'errors',
       'git',
       'lint',
-      'x-ray',
       'modules',
       'notifications',
       'objects',

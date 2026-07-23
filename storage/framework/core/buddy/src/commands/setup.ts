@@ -1,14 +1,16 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { CLI, CliOptions } from '@stacksjs/types'
 import process from 'node:process'
-import { runAction, setupSSL } from '@stacksjs/actions'
+import { runAction } from '@stacksjs/actions'
 import { log, onUnknownSubcommand, runCommand } from "@stacksjs/cli"
 import { Action } from '@stacksjs/enums'
 import { handleError } from '@stacksjs/error-handling'
 import { path as p } from '@stacksjs/path'
 import { copyFile, storage } from '@stacksjs/storage'
 import { ExitCode } from '@stacksjs/types'
+import { setupPrettyDevEnvironment } from './dev'
 
 interface SetupOptions extends CliOptions {
   skipAws?: boolean
@@ -76,7 +78,7 @@ export function setup(buddy: CLI): void {
     .action(async (options: CliOptions & { domain?: string, skipHosts?: boolean, skipTrust?: boolean }) => {
       log.debug('Running `buddy setup:ssl` ...', options)
 
-      const success = await setupSSL({
+      const success = await setupPrettyDevEnvironment({
         domain: options.domain,
         skipHosts: options.skipHosts,
         skipTrust: options.skipTrust,
@@ -107,49 +109,75 @@ export function setup(buddy: CLI): void {
 }
 
 async function isPantryInstalled(): Promise<boolean> {
-  const result = await runCommand('pantry --version', {
-    silent: true,
-    timeoutMs: PANTRY_CHECK_TIMEOUT_MS,
-  })
+  try {
+    const result = await runCommand('pantry --version', {
+      silent: true,
+      timeoutMs: PANTRY_CHECK_TIMEOUT_MS,
+    })
 
-  if (result.isOk)
-    return true
-
-  return false
+    return result.isOk
+  }
+  catch {
+    // runCommand/spawn throws (not a soft error result) when the `pantry`
+    // executable isn't on PATH — e.g. a node_modules app on a CI runner that
+    // never installed pantry. Treat that as "not installed" rather than letting
+    // the throw bubble up as an unhandled rejection that silently exits the CLI.
+    return false
+  }
 }
 
 async function installPantry(): Promise<void> {
-  const result = await runCommand(p.frameworkPath('scripts/pantry-install'), {
+  const bundledInstaller = p.frameworkPath('scripts/pantry-install')
+  const command = existsSync(bundledInstaller)
+    ? [bundledInstaller]
+    : ['sh', '-c', 'curl -fsSL https://pantry.dev | bash']
+  const result = await runCommand(command, {
     timeoutMs: PANTRY_INSTALL_TIMEOUT_MS,
   })
 
-  if (result.isOk)
+  const localBin = join(homedir(), '.local', 'bin')
+  if (!process.env.PATH?.split(':').includes(localBin))
+    process.env.PATH = `${localBin}:${process.env.PATH || ''}`
+
+  if (result.isOk && await isPantryInstalled())
     return
 
-  handleError((result as any).error)
+  if (result.isErr)
+    handleError(result.error)
+  else
+    log.error('Pantry installed but is not available on PATH. Open a new shell and run `buddy setup` again.')
   process.exit(ExitCode.FatalError)
 }
 
 export async function ensurePantryInstalled(): Promise<void> {
-  if (!(await isPantryInstalled()))
-    await installPantry()
+  if (await isPantryInstalled())
+    return
+
+  log.info('Pantry is required. Installing it from https://pantry.dev...')
+  await installPantry()
 }
 
 export async function ensurePantryDependencies(cwd: string): Promise<void> {
-  log.info('Installing Pantry dependencies...')
+  await ensurePantryInstalled()
+
+  log.info('Installing project dependencies with Pantry...')
 
   const result = await runCommand('pantry install', {
     cwd,
     timeoutMs: PANTRY_DEPENDENCIES_TIMEOUT_MS,
   })
 
-  if (result.isOk) {
-    log.success('Installed Pantry dependencies')
-    return
+  if (result.isErr) {
+    handleError(result.error)
+    process.exit(ExitCode.FatalError)
   }
 
-  handleError((result as any).error)
-  process.exit(ExitCode.FatalError)
+  if (existsSync(join(cwd, 'package.json')) && !existsSync(join(cwd, 'node_modules'))) {
+    log.error('Pantry completed without installing the project JavaScript dependencies.')
+    process.exit(ExitCode.FatalError)
+  }
+
+  log.success('Installed project dependencies with Pantry')
 }
 
 function hasAppKey(cwd: string): boolean {
@@ -162,7 +190,11 @@ function hasAppKey(cwd: string): boolean {
 }
 
 export async function ensureAppKey(cwd: string): Promise<void> {
-  if (hasAppKey(cwd)) {
+  // A node_modules app keeps APP_KEY in its encrypted `.env.<env>`, which the
+  // preloader decrypts into process.env at boot — there may be no plaintext
+  // `.env` file with an APP_KEY line. Honor the already-set env value so we
+  // don't needlessly (and, via the ./buddy wrapper, unreliably) regenerate it.
+  if (hasAppKey(cwd) || (process.env.APP_KEY && process.env.APP_KEY.length > 0)) {
     log.success('APP_KEY existed')
     return
   }
@@ -180,6 +212,39 @@ export async function ensureAppKey(cwd: string): Promise<void> {
   log.success('Generated application key')
 }
 
+async function runInitialMigration(cwd: string): Promise<void> {
+  // Setup also runs on deploy/CI targets, where onboarding must not touch
+  // the database. Only a local/dev context gets the automatic first pass.
+  const appEnv = (process.env.APP_ENV || process.env.NODE_ENV || 'local').toLowerCase()
+
+  if (!['local', 'development', 'dev', 'test'].includes(appEnv)) {
+    log.info(`Skipping initial migration in the ${appEnv} environment`)
+    return
+  }
+
+  log.info('Running initial database migration...')
+
+  try {
+    // The migrate action is non-interactive (the confirmation guards live in
+    // the `buddy migrate` command, not the action), so this is safe to run
+    // unattended. Best-effort either way: a fresh project may have no models
+    // or no reachable database yet, and neither should fail onboarding.
+    const result = await runAction(Action.Migrate, { cwd })
+
+    if (result.isErr) {
+      log.warn('Initial migration did not complete - you can run it later via ./buddy migrate')
+      log.debug(result.error)
+      return
+    }
+
+    log.success('Database is migrated')
+  }
+  catch (error) {
+    log.warn('Initial migration did not complete - you can run it later via ./buddy migrate')
+    log.debug(error)
+  }
+}
+
 async function initializeProject(options: SetupOptions): Promise<void> {
   const cwd = options.cwd || p.projectPath()
 
@@ -191,42 +256,84 @@ async function initializeProject(options: SetupOptions): Promise<void> {
     await ensureAppKey(cwd)
   }
 
+  await runInitialMigration(cwd)
+
+  ensureIdeSettings(cwd)
+
   if (!options.skipAws) {
     log.info('Ensuring AWS is connected...')
 
-    const awsResult = await runCommand('./buddy configure:aws', {
-      cwd,
-      timeoutMs: AWS_CONFIG_TIMEOUT_MS,
-    })
+    try {
+      const awsResult = await runCommand('./buddy configure:aws', {
+        cwd,
+        timeoutMs: AWS_CONFIG_TIMEOUT_MS,
+      })
 
-    if (awsResult.isErr) {
-      handleError(awsResult.error)
-      process.exit(ExitCode.FatalError)
+      if (awsResult.isErr) {
+        // AWS is only needed for deploys, so a missing/canceled configuration
+        // downgrades to a warning instead of aborting the whole setup.
+        log.warn('AWS not configured - you can do this later via ./buddy configure:aws')
+        log.debug(awsResult.error)
+      }
+      else {
+        log.success('Configured AWS')
+      }
     }
-
-    log.success('Configured AWS')
+    catch (error) {
+      log.warn('AWS not configured - you can do this later via ./buddy configure:aws')
+      log.debug(error)
+    }
   }
 
-  // TODO: ensure the IDE is setup by making sure .vscode etc exists, and if not, copy them over
-
   log.success('Project is setup')
-  log.info('Happy coding! 💙')
+  log.info('Run `./buddy doctor` anytime to check your setup. Happy coding! 💙')
+}
+
+export function ensureIdeSettings(cwd: string): void {
+  const source = p.frameworkPath('defaults/ide/vscode/.vscode')
+  const destination = join(cwd, '.vscode')
+
+  if (existsSync(destination)) {
+    log.debug('.vscode already exists; keeping the project settings')
+    return
+  }
+
+  if (!existsSync(source)) {
+    log.debug('No bundled VS Code settings found; skipping IDE setup')
+    return
+  }
+
+  cpSync(source, destination, { recursive: true })
+  log.success('Installed project VS Code settings')
 }
 
 /**
  * Maps DB_CONNECTION values to pantry package domains
  */
-const DB_CONNECTION_PACKAGES: Record<string, string> = {
-  postgres: 'postgresql.org',
-  mysql: 'mysql.com',
-  sqlite: 'sqlite.org',
+interface DatabasePackage {
+  name: string
+  version: string
+}
+
+const DB_CONNECTION_PACKAGES: Record<string, DatabasePackage> = {
+  // PostgreSQL data directories are not cross-major compatible. Keeping an
+  // unconstrained `*` here let Pantry upgrade a live v17 cluster to v18 and
+  // made the service unbootable. Pin the supported major while allowing
+  // security and patch releases within it.
+  postgres: { name: 'postgresql.org', version: '^17.10' },
+  mysql: { name: 'mysql.com', version: '*' },
+  sqlite: { name: 'sqlite.org', version: '^3.47.2' },
+}
+
+export function pantryDatabasePackage(connection: string): DatabasePackage | undefined {
+  return DB_CONNECTION_PACKAGES[connection]
 }
 
 /**
  * Reads DB_CONNECTION from .env or .env.example and returns the corresponding
  * pantry package domain, if any.
  */
-function detectDbPackage(cwd: string): string | undefined {
+function detectDbPackage(cwd: string): DatabasePackage | undefined {
   const envPath = join(cwd, '.env')
   const envExamplePath = join(cwd, '.env.example')
 
@@ -241,9 +348,9 @@ function detectDbPackage(cwd: string): string | undefined {
   if (!match)
     return undefined
 
-  const value = match[1].trim().replace(/['"]/g, '')
+  const value = match[1]!.trim().replace(/['"]/g, '')
 
-  return DB_CONNECTION_PACKAGES[value]
+  return pantryDatabasePackage(value)
 }
 
 /**
@@ -278,11 +385,11 @@ export async function optimizePantryDeps(): Promise<void> {
   const dbPackage = detectDbPackage(cwd)
 
   if (dbPackage) {
-    const alreadyHasDb = Object.keys(configDeps).some(key => key === dbPackage || key.startsWith(`${dbPackage}/`))
+    const alreadyHasDb = Object.keys(configDeps).some(key => key === dbPackage.name || key.startsWith(`${dbPackage.name}/`))
 
     if (!alreadyHasDb) {
-      log.info(`Detected DB_CONNECTION requires ${dbPackage}, adding to dependencies`)
-      configDeps[dbPackage] = '*'
+      log.info(`Detected DB_CONNECTION requires ${dbPackage.name}, adding to dependencies`)
+      configDeps[dbPackage.name] = dbPackage.version
     }
   }
 

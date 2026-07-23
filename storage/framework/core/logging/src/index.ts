@@ -287,17 +287,24 @@ async function getLogger(): Promise<Logger> {
   return _logger!
 }
 
-// Helper function to format message for logging, including request context
-function formatMessage(...args: unknown[]): string {
+// Helper function to format message for logging, including request context.
+// Exported for direct unit testing of arg handling (stacksjs/stacks#2047).
+export function formatMessage(...args: unknown[]): string {
   // Errors (bare or nested in object args) need normalizing first —
   // `JSON.stringify(new Error())` is `{}` (stacksjs/stacks#1956).
-  const base = args.map((arg) => {
-    if (arg instanceof Error)
-      return renderNormalizedError(normalizeError(arg))
-    if (typeof arg === 'object' && arg !== null)
-      return JSON.stringify(normalizeContextValue(arg), null, 2)
-    return String(arg)
-  }).join(' ')
+  const base = args
+    // Drop `undefined` args so a call with a missing trailing context/format
+    // arg — e.g. `log.warn(`... database "${name}"`, ctx)` where `ctx` is
+    // undefined — doesn't leave a stray " undefined" at the end of the line
+    // (stacksjs/stacks#2047). `null` is kept: it's usually a deliberate value.
+    .filter(arg => arg !== undefined)
+    .map((arg) => {
+      if (arg instanceof Error)
+        return renderNormalizedError(normalizeError(arg))
+      if (typeof arg === 'object' && arg !== null)
+        return JSON.stringify(normalizeContextValue(arg), null, 2)
+      return String(arg)
+    }).join(' ')
 
   // Prepend request ID if available
   const ctx = logContextStorage.getStore()
@@ -324,7 +331,7 @@ export interface Log {
    * works for back-compat but is deprecated — see {@link LogErrorOptions}.
    */
   error: (message: string | Error | unknown, error?: unknown, context?: LogContext) => Promise<void>
-  warn: (arg: string, context?: LogContext) => Promise<void>
+  warn: (arg: string, context?: unknown) => Promise<void>
   warning: (arg: string) => Promise<void>
   debug: (...args: unknown[]) => Promise<void>
   dump: (...args: unknown[]) => Promise<void>
@@ -400,11 +407,14 @@ export const log: Log = {
     await logger.success(message)
   },
 
-  warn: async (message: string, context?: LogContext) => {
+  warn: async (message: string, context?: unknown) => {
     const logger = await getLogger()
     // Normalize so Errors in the context survive clarity's JSON.stringify
     // (stacksjs/stacks#1956).
-    await logger.warn(message, context ? normalizeContext(context) as Record<string, unknown> : undefined)
+    const normalized = context === undefined
+      ? undefined
+      : normalizeContextValue(context) as Record<string, unknown>
+    await logger.warn(message, normalized)
   },
 
   warning: async (message: string) => {

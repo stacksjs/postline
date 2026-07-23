@@ -1,7 +1,30 @@
-import { stat } from 'node:fs/promises'
+import { mkdir, stat } from 'node:fs/promises'
 import { bold, dim, green, italic, log } from '@stacksjs/cli'
 import { path as p } from '@stacksjs/path'
 import { glob } from '@stacksjs/storage'
+
+/**
+ * Parse every generated declaration before a package can report a successful
+ * build. The invalid emission shapes this used to repair (`method<T>: (…) => …`
+ * and `interface Nameextends Base`) were fixed at the source in dtsx; what
+ * remains here is a pure publish-time safety net that fails the build if any
+ * `.d.ts` does not parse.
+ */
+export async function validateDeclarations(dir: string): Promise<void> {
+  const files = await glob([p.resolve(dir, 'dist', '**/*.d.ts')], { absolute: true })
+  const transpiler = new Bun.Transpiler({ loader: 'ts', target: 'bun' })
+
+  for (const file of files) {
+    const source = await Bun.file(file).text()
+
+    try {
+      transpiler.transformSync(source)
+    }
+    catch (cause) {
+      throw new Error(`Invalid declaration generated at ${file}: ${cause instanceof Error ? cause.message : String(cause)}`)
+    }
+  }
+}
 
 export async function outro(options: {
   dir: string
@@ -27,6 +50,8 @@ export async function outro(options: {
     console.log(firstLog)
     throw new Error(`Build failed: ${firstLog}`)
   }
+
+  await validateDeclarations(options.dir)
 
   // loop over all the files in the dist directory and log them and their size
   const files = await glob([p.resolve(options.dir, 'dist', '**/*')], { absolute: true })
@@ -64,7 +89,6 @@ export async function intro(options: { dir: string, pkgName?: string, styled?: b
   return { startTime: Date.now() }
 }
 
-export * from './utils'
 
 /**
  * Standard `external` list for framework package bundlers.
@@ -77,19 +101,104 @@ export * from './utils'
  *
  * Pass extra package-specific entries as `extras` and they'll be merged in.
  *
- * Notably absent: `sharp`, `vue-component-meta`, `@aws-sdk/*`. We don't ship
+ * Notably absent: `sharp`, template metadata compilers, and `@aws-sdk/*`. We don't ship
  * any of those — image work goes through the in-house `ts-images` (formerly
  * `imgx`), template metadata is parsed by our own STX-aware extractor, and
  * AWS interactions go through `ts-cloud` / our wrappers. If a build error
  * complains about one of those, the right fix is to remove the import, not
  * to add it back here.
  */
+/**
+ * Build a library package by transpiling each `src/**` file 1:1 to `dist/`,
+ * preserving the module graph, then emitting `.d.ts` alongside.
+ *
+ * WHY NOT `Bun.build` (bundling): several barrel packages here re-export named
+ * bindings from a source — `export { fromPromise } from 'ts-error-handling'`,
+ * `export { ERROR_PAGE_CSS } from './error-page'`. Bun's bundler mangles these:
+ *   - with `splitting: true` it wires cross-chunk symbols wrong, emitting an
+ *     `export { x as ok }` where `x` is never imported/declared in the file
+ *     (`SyntaxError: Exported binding 'X' needs to refer to a top-level
+ *     declared variable`);
+ *   - marking the source external instead drops the `from` clause entirely,
+ *     producing an invalid bare `export { ok }`.
+ * Affected: arrays, collections, datetime, error-handling, github, strings, ui.
+ *
+ * `Bun.Transpiler` sidesteps all of it: it strips types and leaves every
+ * import/export statement verbatim, so `export * from './handler'` and
+ * `export { ok } from 'ts-error-handling'` survive intact. Internal `./x`
+ * imports resolve to the sibling `dist/x.js`; external packages resolve from
+ * the consumer's node_modules at runtime. The `.d.ts` files still come from
+ * the dtsx plugin via a throwaway `Bun.build` (its `.js` output is discarded).
+ */
+export async function transpilePackage(options: {
+  dir: string
+  pkgName?: string
+  external?: string[]
+}): Promise<void> {
+  const { dts } = await import('bun-plugin-dtsx')
+  const srcDir = p.resolve(options.dir, 'src')
+  const distDir = p.resolve(options.dir, 'dist')
+
+  const srcFiles = (await Array.fromAsync(new Bun.Glob('**/*.ts').scan({ cwd: srcDir })))
+    .filter(f => !f.endsWith('.d.ts'))
+
+  // 1. Emit .d.ts (the accompanying .js output is overwritten in step 2).
+  await Bun.build({
+    entrypoints: srcFiles.map(f => p.resolve(srcDir, f)),
+    outdir: distDir,
+    root: srcDir,
+    target: 'bun',
+    format: 'esm',
+    splitting: false,
+    external: options.external ?? frameworkExternal(),
+    plugins: [dts({ root: srcDir, outdir: distDir })],
+  })
+
+  // 2. Clean 1:1 transpile of every src file — preserves re-exports verbatim.
+  const transpiler = new Bun.Transpiler({ loader: 'ts', target: 'bun' })
+  for (const f of srcFiles) {
+    let js = transpiler.transformSync(await Bun.file(p.resolve(srcDir, f)).text())
+    // The transpiler leaves import specifiers verbatim, so an explicit
+    // `./x.ts` extension survives into the .js output and fails to resolve
+    // against the sibling `./x.js`. Rewrite relative `.ts`/`.tsx` specifiers
+    // to `.js`. This covers both real import specifiers AND string literals
+    // that are later fed to `import()` (e.g. buddy's lazy-command map:
+    // `{ path: './commands/deploy.ts' }` → `import(cmd.path)`), which is why
+    // we match any `./`-or-`../`-rooted quoted string, not just import forms.
+    js = js.replace(/(['"])(\.\.?\/[^'"]+?)\.tsx?\1/g, '$1$2.js$1')
+    const out = p.resolve(distDir, f.replace(/\.ts$/, '.js'))
+    await mkdir(p.dirname(out), { recursive: true })
+    await Bun.write(out, js)
+  }
+}
+
 export function frameworkExternal(extras: string[] = []): string[] {
+  // A library resolves its declared dependencies from the CONSUMER's
+  // node_modules — it must not bundle them in. Read the building package's own
+  // deps (build runs with cwd = the package dir) and mark them external. Besides
+  // keeping bundles small, this dodges a bun bundler bug that mangles a
+  // re-exported named binding from a bundled dep into a non-top-level export
+  // (`SyntaxError: Exported binding 'X' needs to refer to a top-level declared
+  // variable`, e.g. `export { fromPromise } from 'ts-error-handling'`).
+  let ownDeps: string[] = []
+  try {
+    // eslint-disable-next-line ts/no-require-imports
+    const fs = require('node:fs') as typeof import('node:fs')
+    const pkg = JSON.parse(fs.readFileSync(`${process.cwd()}/package.json`, 'utf8'))
+    ownDeps = [
+      ...Object.keys(pkg.dependencies ?? {}),
+      ...Object.keys(pkg.peerDependencies ?? {}),
+      ...Object.keys(pkg.optionalDependencies ?? {}),
+    ]
+  }
+  catch {}
   return [
     // Every other framework package — they're peer-resolved at runtime via
     // node_modules. Leaving them external keeps bundles small and lets the
     // user's installed version win over the bundling package's snapshot.
     '@stacksjs/*',
+    // The building package's own declared deps (see above).
+    ...ownDeps,
     // Optional peers that aren't pulled into every project. Marking them
     // external makes the static-import-failure noise go away during build,
     // and the missing-module surfaces only when the dependent action runs.

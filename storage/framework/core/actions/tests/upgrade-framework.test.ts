@@ -14,6 +14,8 @@ const {
   shouldShortCircuit,
   resolveUpgradeMessage,
   resolveSuccessMessage,
+  shouldAutoDetectLocalStacks,
+  shouldCheckDirtyManagedPaths,
 } = await import('../src/upgrade/framework-utils')
 
 // Temp directory for isolated file operations
@@ -141,27 +143,39 @@ describe('resolveUpgradeContext', () => {
   })
 })
 
+describe('local framework source selection', () => {
+  it('does not auto-detect a checkout for an exact version pin', () => {
+    expect(shouldAutoDetectLocalStacks({ version: '0.70.104' })).toBe(false)
+  })
+
+  it('auto-detects for channel upgrades and respects explicit --from', () => {
+    expect(shouldAutoDetectLocalStacks({})).toBe(true)
+    expect(shouldAutoDetectLocalStacks({ from: '/tmp/stacks' })).toBe(false)
+    expect(shouldAutoDetectLocalStacks({ from: '/tmp/stacks', version: '0.70.104' })).toBe(false)
+  })
+})
+
 // ─── buildTemplateString ─────────────────────────────────────────────────────
 
 describe('buildTemplateString', () => {
   it('should build template for main branch', () => {
     expect(buildTemplateString('main'))
-      .toBe('github:stacksjs/stacks#main/storage/framework/core')
+      .toBe('github:stacksjs/stacks/storage/framework/core#main')
   })
 
   it('should build template for canary branch', () => {
     expect(buildTemplateString('canary'))
-      .toBe('github:stacksjs/stacks#canary/storage/framework/core')
+      .toBe('github:stacksjs/stacks/storage/framework/core#canary')
   })
 
   it('should build template for a version tag', () => {
     expect(buildTemplateString('v0.70.23'))
-      .toBe('github:stacksjs/stacks#v0.70.23/storage/framework/core')
+      .toBe('github:stacksjs/stacks/storage/framework/core#v0.70.23')
   })
 
   it('should build template for a pre-release tag', () => {
     expect(buildTemplateString('v1.0.0-beta.1'))
-      .toBe('github:stacksjs/stacks#v1.0.0-beta.1/storage/framework/core')
+      .toBe('github:stacksjs/stacks/storage/framework/core#v1.0.0-beta.1')
   })
 })
 
@@ -366,6 +380,17 @@ describe('writeSyncedVersion', () => {
 })
 
 // ─── shouldShortCircuit ──────────────────────────────────────────────────────
+
+describe('shouldCheckDirtyManagedPaths', () => {
+  it('protects direct upgrades unless the user explicitly forces them', () => {
+    expect(shouldCheckDirtyManagedPaths({ force: false, alreadyRestarted: false })).toBe(true)
+    expect(shouldCheckDirtyManagedPaths({ force: true, alreadyRestarted: false })).toBe(false)
+  })
+
+  it('trusts managed writes made by the validated parent process', () => {
+    expect(shouldCheckDirtyManagedPaths({ force: false, alreadyRestarted: true })).toBe(false)
+  })
+})
 
 describe('shouldShortCircuit', () => {
   it('should short-circuit when sha + channel match and no flags', () => {

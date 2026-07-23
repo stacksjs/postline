@@ -1,6 +1,6 @@
 /**
  * i18n bag passed to STX email templates at render time. Stacks emails
- * are STX, not vue-email — keys/values are user-defined per template.
+ * are STX templates, so keys and values are user-defined per template.
  * The shape is intentionally open: each template declares its own
  * placeholders and the renderer interpolates them as-is.
  */
@@ -277,6 +277,23 @@ export interface EmailOptions {
   }
 
   mailboxes: string[] | MailboxConfig[]
+
+  /**
+   * Auto-forwarding rules for received mail, provisioned to the mail server's
+   * readable `forwards.json` (re-read on every message — edits take effect
+   * with no restart).
+   *
+   * Key   = the delivered mailbox: the full address for a per-domain isolated
+   *         mailbox (e.g. `'no-reply@acme.com'`), or a bare local-part for a
+   *         legacy role mailbox (e.g. `'postmaster'`).
+   * Value = destination addresses. Targets on a local domain are written
+   *         straight to that mailbox's Maildir; external targets are relayed.
+   *         A copy also stays in the source mailbox.
+   *
+   * @example { 'no-reply@acme.com': ['chris@acme.com'] }
+   */
+  forwards?: Record<string, string[]>
+
   domain?: string
 
   url: string
@@ -285,7 +302,7 @@ export interface EmailOptions {
   server: EmailServerConfig
   notifications?: EmailNotificationsConfig
 
-  default: 'log' | 'ses' | 'sendgrid' | 'mailgun' | 'mailtrap' | 'smtp'
+  default: 'log' | 'capture' | 'ses' | 'sendgrid' | 'mailgun' | 'mailtrap' | 'smtp'
 
   /**
    * Suppression-list enforcement policy (stacksjs/stacks#1880).
@@ -377,7 +394,7 @@ export interface EmailMessage {
   replyTo?: EmailAddress | EmailAddress[] | string | string[]
   /** Email subject line */
   subject: string
-  /** Path to email template (Vue component) */
+  /** Path to the STX email template */
   template?: string
   /** Direct HTML content for the email body */
   html?: string

@@ -92,7 +92,7 @@ export class I18n implements I18nInstance {
    * Get translation message
    */
   tm = (key: string, locale?: string): TranslationMessages | string | undefined => {
-    return this.getMessage(key, locale)
+    return this.getMessage(key, locale ?? this.locale)
   }
 
   /**
@@ -435,7 +435,7 @@ export function createI18n(options: Partial<I18nConfig> = {}): I18n {
 }
 
 /**
- * Use i18n composable (for Vue-like usage)
+ * Use the i18n composable from an STX component.
  */
 export function useI18n(options: Partial<I18nConfig> = {}): I18nInstance {
   return createI18n(options)
@@ -478,7 +478,8 @@ function deepMerge(target: TranslationMessages, source: TranslationMessages): Tr
       )
     }
     else {
-      result[key] = sourceValue
+      if (sourceValue !== undefined)
+        result[key] = sourceValue
     }
   }
 

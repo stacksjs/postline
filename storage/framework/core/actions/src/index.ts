@@ -1,10 +1,28 @@
 export * from './action'
 export { add as runAdd } from './add'
+// The write side of the markdown blog (content/blog/*.md), used by the
+// dashboard's blog actions. The read/render side lives in ./blog and stays out
+// of this barrel because it lazy-loads BunPress.
+export {
+  type BlogPost,
+  BlogAdminError,
+  type BlogPostInput,
+  deleteBlogPost,
+  getBlogPost,
+  listBlogPosts,
+  saveBlogPost,
+  slugify as blogSlugify,
+} from './blog-admin'
 export { commit as runCommit } from './commit'
 export * from './dev'
 
 export * from './generate'
 export * from './helpers'
+// Code-style actions, exported so commands import + call them directly
+// (`import { lintProject, lintFix } from '@stacksjs/actions'`) instead of
+// spawning a deep dist path. Exported from ./lint/lint — the pure module — so
+// importing the barrel never pulls the process-exiting ./lint/index script.
+export { formatProject, lintFix, lintProject } from './lint/lint'
 export * from './setup'
 
 // makeFactory,

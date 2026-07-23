@@ -106,6 +106,12 @@ export * from './custom'
 // Auth tables migration
 export * from './auth-tables'
 
+// uuid column guarantee for `useUuid` models (stacksjs/status#1 Phase 9)
+export * from './uuid-columns'
+
+// Schema-diff guards so trait-managed columns aren't proposed for dropping (stacksjs/stacks#2075)
+export * from './managed-columns'
+
 // Notification tables migration (stacksjs/stacks#1937)
 export { migrateNotificationTables } from './notification-tables'
 
