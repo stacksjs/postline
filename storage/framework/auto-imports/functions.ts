@@ -2,6 +2,8 @@
 
 export { increment, decrement, reset, count } from '../../../resources/functions/counter'
 export { toggleDark, isDark, preferredDark } from '../../../resources/functions/dark'
+export { fetchBlogPosts, fetchBlogPost, saveBlogPost, deleteBlogPost } from '../defaults/functions/blog'
+export type { BlogPost, BlogPostDraft, BlogListResponse } from '../defaults/functions/blog'
 export { useDirectUpload } from '../defaults/functions/uploads'
 export type { PresignResponse, DirectUploadResult, UseDirectUploadOptions, UseDirectUploadHandle } from '../defaults/functions/uploads'
 export { useAnalytics } from '../defaults/functions/analytics'
