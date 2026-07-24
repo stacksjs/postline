@@ -2,7 +2,7 @@ import type { CrosspostTargetResult, PublishContent } from '../../Support/Social
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { LinkedInApiError, LinkedInDriver } from './Drivers/LinkedInDriver'
-import { ensureAccount, now, uuid } from './support'
+import { ensureAccount, expiresAt, isExpiringSoon, now, uuid } from './support'
 
 const database = db as any
 
@@ -15,6 +15,7 @@ type SocialIdentityRow = {
   auth_status: 'connected' | 'expired' | 'revoked' | 'missing'
   access_token?: string | null
   refresh_token?: string | null
+  token_expires_at?: string | null
   account_id?: number | null
   social_driver_id?: number | null
 }
@@ -125,6 +126,8 @@ export class LinkedInService {
 
     const identity = await this.saveSession({
       accessToken: token.accessToken,
+      refreshToken: token.refreshToken,
+      expiresIn: token.expiresIn,
       authorUrn,
       name: profile?.name,
     })
@@ -204,6 +207,7 @@ export class LinkedInService {
       }, {
         text: post.body,
         ...(content?.external ? { external: content.external } : {}),
+        ...(content?.media?.length ? { media: content.media } : {}),
       })
 
       await database.updateTable('post_targets').set({
@@ -238,7 +242,9 @@ export class LinkedInService {
 
   private async requireIdentity(): Promise<SocialIdentityRow> {
     const existing = await this.findIdentity()
-    if (existing?.access_token && existing.auth_status === 'connected') return existing
+    if (existing?.access_token && existing.auth_status === 'connected') {
+      return await this.refreshIfExpiring(existing)
+    }
 
     // Fall back to an env-configured token if one is available.
     if (this.config().accessToken) {
@@ -250,6 +256,41 @@ export class LinkedInService {
     throw new Error('Connect LinkedIn before publishing.')
   }
 
+  /**
+   * Refresh the access token when it's within its pre-expiry window and a
+   * refresh token is on file (LinkedIn only issues one when the app is enrolled
+   * in the refresh-token program). Best-effort: any failure leaves the current
+   * token in place so a real auth failure still surfaces at publish time.
+   */
+  private async refreshIfExpiring(identity: SocialIdentityRow): Promise<SocialIdentityRow> {
+    const cfg = this.config()
+    if (!identity.refresh_token || !isExpiringSoon(identity.token_expires_at)) return identity
+    if (!cfg.clientId || !cfg.clientSecret) return identity
+
+    try {
+      const refreshed = await this.driver.refreshAccessToken({
+        clientId: cfg.clientId,
+        clientSecret: cfg.clientSecret,
+        refreshToken: identity.refresh_token,
+      })
+      const nextExpiry = expiresAt(refreshed.expiresIn)
+      // LinkedIn rotates the refresh token on some grants — keep the new one.
+      const nextRefresh = refreshed.refreshToken ?? identity.refresh_token
+      await database.updateTable('social_identities').set({
+        access_token: refreshed.accessToken,
+        refresh_token: nextRefresh,
+        token_expires_at: nextExpiry,
+        auth_status: 'connected',
+        updated_at: now(),
+      }).where('id', '=', identity.id).execute()
+
+      return { ...identity, access_token: refreshed.accessToken, refresh_token: nextRefresh, token_expires_at: nextExpiry }
+    }
+    catch {
+      return identity
+    }
+  }
+
   private async findIdentity(): Promise<SocialIdentityRow | undefined> {
     return await database
       .selectFrom('social_identities')
@@ -259,7 +300,7 @@ export class LinkedInService {
       .executeTakeFirst()
   }
 
-  private async saveSession(input: { accessToken: string, authorUrn: string, name?: string }): Promise<SocialIdentityRow> {
+  private async saveSession(input: { accessToken: string, authorUrn: string, name?: string, refreshToken?: string, expiresIn?: number }): Promise<SocialIdentityRow> {
     const accountId = await ensureAccount()
     const driver = await this.ensureDriver()
     const existing = await this.findIdentity()
@@ -273,7 +314,8 @@ export class LinkedInService {
       external_id: input.authorUrn,
       auth_status: 'connected',
       access_token: input.accessToken,
-      refresh_token: null,
+      refresh_token: input.refreshToken ?? null,
+      token_expires_at: expiresAt(input.expiresIn),
       account_id: accountId,
       social_driver_id: driver.id,
       updated_at: savedAt,

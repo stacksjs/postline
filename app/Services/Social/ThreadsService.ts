@@ -2,7 +2,7 @@ import type { CrosspostTargetResult, PublishContent } from '../../Support/Social
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { ThreadsApiError, ThreadsDriver } from './Drivers/ThreadsDriver'
-import { ensureAccount, now, uuid } from './support'
+import { ensureAccount, expiresAt, isExpiringSoon, now, uuid } from './support'
 
 const database = db as any
 
@@ -15,6 +15,7 @@ type SocialIdentityRow = {
   auth_status: 'connected' | 'expired' | 'revoked' | 'missing'
   access_token?: string | null
   refresh_token?: string | null
+  token_expires_at?: string | null
   account_id?: number | null
   social_driver_id?: number | null
 }
@@ -118,11 +119,25 @@ export class ThreadsService {
       code,
     })
 
-    const account = await this.driver.resolveAccount(token.accessToken)
+    // Upgrade the short-lived (~1h) token to a long-lived (~60-day) one so
+    // scheduled posts keep working, then resolve the account against it. If the
+    // exchange fails, fall back to the short-lived token — publishing still
+    // works, just briefly.
+    let accessToken = token.accessToken
+    let expiresIn = token.expiresIn
+    try {
+      const longLived = await this.driver.exchangeLongLivedToken(cfg.clientSecret, token.accessToken)
+      accessToken = longLived.accessToken
+      expiresIn = longLived.expiresIn
+    }
+    catch {}
+
+    const account = await this.driver.resolveAccount(accessToken)
     const identity = await this.saveSession({
       accessToken: account.accessToken,
       threadsUserId: account.threadsUserId,
       username: account.username,
+      expiresIn,
     })
     return this.publicIdentity(identity)
   }
@@ -235,7 +250,9 @@ export class ThreadsService {
 
   private async requireIdentity(): Promise<SocialIdentityRow> {
     const existing = await this.findIdentity()
-    if (existing?.access_token && existing.auth_status === 'connected') return existing
+    if (existing?.access_token && existing.auth_status === 'connected') {
+      return await this.refreshIfExpiring(existing)
+    }
 
     if (this.config().accessToken) {
       await this.connectFromEnv()
@@ -244,6 +261,32 @@ export class ThreadsService {
     }
 
     throw new Error('Connect Threads before publishing.')
+  }
+
+  /**
+   * Refresh a long-lived token that's within its pre-expiry window, extending
+   * it another ~60 days. Best-effort: a refresh failure leaves the current
+   * token in place, so a genuinely dead token still surfaces at publish time
+   * (marking the identity expired and prompting a reconnect) rather than here.
+   */
+  private async refreshIfExpiring(identity: SocialIdentityRow): Promise<SocialIdentityRow> {
+    if (!identity.access_token || !isExpiringSoon(identity.token_expires_at)) return identity
+
+    try {
+      const refreshed = await this.driver.refreshLongLivedToken(identity.access_token)
+      const nextExpiry = expiresAt(refreshed.expiresIn)
+      await database.updateTable('social_identities').set({
+        access_token: refreshed.accessToken,
+        token_expires_at: nextExpiry,
+        auth_status: 'connected',
+        updated_at: now(),
+      }).where('id', '=', identity.id).execute()
+
+      return { ...identity, access_token: refreshed.accessToken, token_expires_at: nextExpiry }
+    }
+    catch {
+      return identity
+    }
   }
 
   private async findIdentity(): Promise<SocialIdentityRow | undefined> {
@@ -255,7 +298,7 @@ export class ThreadsService {
       .executeTakeFirst()
   }
 
-  private async saveSession(input: { accessToken: string, threadsUserId: string, username?: string }): Promise<SocialIdentityRow> {
+  private async saveSession(input: { accessToken: string, threadsUserId: string, username?: string, expiresIn?: number }): Promise<SocialIdentityRow> {
     const accountId = await ensureAccount()
     const driver = await this.ensureDriver()
     const existing = await this.findIdentity()
@@ -270,6 +313,7 @@ export class ThreadsService {
       auth_status: 'connected',
       access_token: input.accessToken,
       refresh_token: null,
+      token_expires_at: expiresAt(input.expiresIn),
       account_id: accountId,
       social_driver_id: driver.id,
       updated_at: savedAt,

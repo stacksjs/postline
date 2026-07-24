@@ -1,8 +1,8 @@
 import type { CrosspostTargetResult, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
-import { InstagramApiError, InstagramDriver } from './Drivers/InstagramDriver'
-import { ensureAccount, expiresAt, now, uuid } from './support'
+import { TwitterApiError, TwitterDriver } from './Drivers/TwitterDriver'
+import { ensureAccount, expiresAt, isExpiringSoon, now, uuid } from './support'
 
 const database = db as any
 
@@ -10,7 +10,7 @@ type SocialIdentityRow = {
   id: number
   handle: string
   display_name?: string | null
-  provider: 'instagram'
+  provider: 'twitter'
   external_id?: string | null
   auth_status: 'connected' | 'expired' | 'revoked' | 'missing'
   access_token?: string | null
@@ -22,20 +22,17 @@ type SocialIdentityRow = {
 
 type SocialDriverRow = {
   id: number
-  provider: 'instagram'
+  provider: 'twitter'
   display_name: string
   status: 'active' | 'planned' | 'disabled'
   character_limit: number
 }
 
-interface InstagramConfig {
+interface TwitterConfig {
   clientId: string
   clientSecret: string
   redirectUrl: string
-  graphVersion: string
   accessToken: string
-  userId: string
-  username: string
   scopes: string[]
 }
 
@@ -45,24 +42,20 @@ function randomState(): string {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-export class InstagramService {
-  private driver: InstagramDriver
+export class TwitterService {
+  private driver = new TwitterDriver()
+  // OAuth CSRF token + PKCE verifier stashed between the auth redirect and the
+  // callback. Postline runs single-user, so module memory is an adequate store.
   private pendingState: string | null = null
+  private pendingVerifier: string | null = null
 
-  constructor() {
-    this.driver = new InstagramDriver({ graphVersion: this.config().graphVersion })
-  }
-
-  private config(): InstagramConfig {
+  private config(): TwitterConfig {
     return {
-      clientId: String(env.INSTAGRAM_CLIENT_ID || '').trim(),
-      clientSecret: String(env.INSTAGRAM_CLIENT_SECRET || '').trim(),
-      redirectUrl: String(env.INSTAGRAM_REDIRECT_URL || '').trim(),
-      graphVersion: String(env.INSTAGRAM_GRAPH_VERSION || 'v21.0').trim(),
-      accessToken: String(env.INSTAGRAM_ACCESS_TOKEN || '').trim(),
-      userId: String(env.INSTAGRAM_USER_ID || '').trim(),
-      username: String(env.INSTAGRAM_USERNAME || '').trim(),
-      scopes: ['instagram_basic', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement'],
+      clientId: String(env.TWITTER_CLIENT_ID || '').trim(),
+      clientSecret: String(env.TWITTER_CLIENT_SECRET || '').trim(),
+      redirectUrl: String(env.TWITTER_REDIRECT_URL || '').trim(),
+      accessToken: String(env.TWITTER_ACCESS_TOKEN || '').trim(),
+      scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
     }
   }
 
@@ -73,109 +66,93 @@ export class InstagramService {
 
     return {
       connected,
-      provider: 'instagram',
+      provider: 'twitter',
       handle: identity?.handle || null,
       displayName: identity?.display_name || null,
       did: identity?.external_id || null,
       authStatus: connected ? 'connected' : (identity?.handle ? identity.auth_status : 'missing'),
       characterLimit: this.driver.characterLimit,
       canPublish: connected,
-      requiresMedia: true,
-      configuredFromEnv: Boolean(cfg.accessToken && cfg.userId),
-      oauthConfigured: Boolean(cfg.clientId && cfg.clientSecret && cfg.redirectUrl),
+      configuredFromEnv: Boolean(cfg.accessToken),
+      oauthConfigured: Boolean(cfg.clientId && cfg.redirectUrl),
     }
   }
 
-  getAuthUrl(): string {
+  /** Build the X consent URL (with PKCE) and remember the CSRF state + verifier. */
+  async getAuthUrl(): Promise<string> {
     const cfg = this.config()
-    if (!cfg.clientId || !cfg.clientSecret) {
-      throw new Error('Set INSTAGRAM_CLIENT_ID and INSTAGRAM_CLIENT_SECRET to connect Instagram.')
-    }
-    if (!cfg.redirectUrl) {
-      throw new Error('Set INSTAGRAM_REDIRECT_URL to connect Instagram.')
-    }
+    if (!cfg.clientId) throw new Error('Set TWITTER_CLIENT_ID to connect X/Twitter.')
+    if (!cfg.redirectUrl) throw new Error('Set TWITTER_REDIRECT_URL to connect X/Twitter.')
 
     this.pendingState = randomState()
-    return this.driver.getAuthUrl({
+    const { url, codeVerifier } = await this.driver.createAuthorization({
       clientId: cfg.clientId,
       redirectUrl: cfg.redirectUrl,
       scopes: cfg.scopes,
       state: this.pendingState,
     })
+    this.pendingVerifier = codeVerifier
+    return url
   }
 
+  /** Handle the OAuth redirect: exchange the code and store the tokens. */
   async handleCallback(code: string, state: string) {
     const cfg = this.config()
-    if (!code) throw new Error('Facebook did not return an authorization code.')
+    if (!code) throw new Error('X/Twitter did not return an authorization code.')
     if (this.pendingState && state !== this.pendingState) {
-      throw new Error('Instagram OAuth state mismatch. Please start the connection again.')
+      throw new Error('X/Twitter OAuth state mismatch. Please start the connection again.')
     }
+    const codeVerifier = this.pendingVerifier
+    if (!codeVerifier) throw new Error('Missing PKCE verifier — please start the X/Twitter connection again.')
     this.pendingState = null
+    this.pendingVerifier = null
 
     const token = await this.driver.exchangeCode({
       clientId: cfg.clientId,
-      clientSecret: cfg.clientSecret,
+      clientSecret: cfg.clientSecret || undefined,
       redirectUrl: cfg.redirectUrl,
       code,
+      codeVerifier,
     })
 
-    // Exchange the short-lived user token for a long-lived (~60-day) one before
-    // resolving the Page — a Page token minted from a long-lived user token does
-    // not expire on its own, so there's no per-publish refresh grant to run.
-    // Best-effort: fall back to the short-lived token if the exchange fails.
-    let userToken = token.accessToken
-    let expiresIn: number | undefined
-    try {
-      const longLived = await this.driver.exchangeLongLivedUserToken(cfg.clientId, cfg.clientSecret, token.accessToken)
-      userToken = longLived.accessToken
-      expiresIn = longLived.expiresIn
-    }
-    catch {}
-
-    const account = await this.driver.resolveAccount(userToken)
+    const profile = await this.driver.getProfile(token.accessToken)
     const identity = await this.saveSession({
-      accessToken: account.pageAccessToken,
-      igUserId: account.igUserId,
-      username: account.username,
-      expiresIn,
+      accessToken: token.accessToken,
+      refreshToken: token.refreshToken,
+      expiresIn: token.expiresIn,
+      userId: profile.id,
+      username: profile.username,
+      name: profile.name,
     })
     return this.publicIdentity(identity)
   }
 
+  /** Connect using a pre-obtained token from the environment. */
   async connectFromEnv() {
     const cfg = this.config()
     if (!cfg.accessToken) {
-      throw new Error('Set INSTAGRAM_ACCESS_TOKEN (or connect via OAuth) before using Instagram.')
+      throw new Error('Set TWITTER_ACCESS_TOKEN (or connect via OAuth) before using X/Twitter.')
     }
 
-    let igUserId = cfg.userId
-    let username = cfg.username || undefined
-    let pageAccessToken = cfg.accessToken
-    if (!igUserId) {
-      const account = await this.driver.resolveAccount(cfg.accessToken)
-      igUserId = account.igUserId
-      username = account.username
-      pageAccessToken = account.pageAccessToken
-    }
-
-    const identity = await this.saveSession({ accessToken: pageAccessToken, igUserId, username })
+    const profile = await this.driver.getProfile(cfg.accessToken)
+    const identity = await this.saveSession({
+      accessToken: cfg.accessToken,
+      userId: profile.id,
+      username: profile.username,
+      name: profile.name,
+    })
     return this.publicIdentity(identity)
   }
 
   /**
-   * Publish an already-created post row to Instagram. Never throws — failures
-   * (including the "image required" case) are recorded on the target and
-   * returned so other crosspost providers still succeed.
+   * Publish an already-created post row to X/Twitter. Never throws — failures
+   * are recorded on the target and returned so a crosspost to other providers
+   * can still succeed.
    */
   async publishToPost(
     post: { id: number, body: string },
     content?: PublishContent,
   ): Promise<CrosspostTargetResult> {
-    const media = content?.media?.[0]
-    if (!media?.url) {
-      return { provider: 'instagram', ok: false, error: 'Instagram requires an image — add an image URL.' }
-    }
-
     const driver = await this.ensureDriver()
 
     let identity: SocialIdentityRow
@@ -183,14 +160,14 @@ export class InstagramService {
       identity = await this.requireIdentity()
     }
     catch (error) {
-      return { provider: 'instagram', ok: false, error: messageOf(error) }
+      return { provider: 'twitter', ok: false, error: messageOf(error) }
     }
 
     if (post.body.length > this.driver.characterLimit) {
       return {
-        provider: 'instagram',
+        provider: 'twitter',
         ok: false,
-        error: `Instagram captions must be ${this.driver.characterLimit} characters or fewer.`,
+        error: `Twitter posts must be ${this.driver.characterLimit} characters or fewer.`,
       }
     }
 
@@ -198,7 +175,7 @@ export class InstagramService {
     const createdAt = now()
     await database.insertInto('post_targets').values({
       uuid: targetUuid,
-      provider: 'instagram',
+      provider: 'twitter',
       status: 'publishing',
       post_id: post.id,
       social_driver_id: driver.id,
@@ -220,27 +197,30 @@ export class InstagramService {
         accessToken: identity.access_token || undefined,
       }, {
         text: post.body,
-        media: content?.media,
+        ...(content?.media?.length ? { media: content.media } : {}),
+        ...(content?.reply ? { reply: content.reply } : {}),
       })
 
       await database.updateTable('post_targets').set({
         status: 'published',
         remote_uri: published.uri || null,
+        remote_cid: published.cid || null,
         failure_reason: null,
         updated_at: now(),
       }).where('id', '=', target.id).execute()
 
       return {
-        provider: 'instagram',
+        provider: 'twitter',
         ok: true,
         url: published.url,
         uri: published.uri,
+        cid: published.cid,
         targetId: Number(target.id),
       }
     }
     catch (error) {
       const message = messageOf(error)
-      if (error instanceof InstagramApiError && error.isAuthError) {
+      if (error instanceof TwitterApiError && error.isAuthError) {
         await this.markExpired(identity.id)
       }
       await database.updateTable('post_targets').set({
@@ -249,13 +229,15 @@ export class InstagramService {
         updated_at: now(),
       }).where('id', '=', target.id).execute()
 
-      return { provider: 'instagram', ok: false, error: message, targetId: Number(target.id) }
+      return { provider: 'twitter', ok: false, error: message, targetId: Number(target.id) }
     }
   }
 
   private async requireIdentity(): Promise<SocialIdentityRow> {
     const existing = await this.findIdentity()
-    if (existing?.access_token && existing.auth_status === 'connected') return existing
+    if (existing?.access_token && existing.auth_status === 'connected') {
+      return await this.refreshIfExpiring(existing)
+    }
 
     if (this.config().accessToken) {
       await this.connectFromEnv()
@@ -263,33 +245,67 @@ export class InstagramService {
       if (connected?.access_token) return connected
     }
 
-    throw new Error('Connect Instagram before publishing.')
+    throw new Error('Connect X/Twitter before publishing.')
+  }
+
+  /**
+   * Refresh the access token when it's within its pre-expiry window and a
+   * refresh token is on file (present when connected with the `offline.access`
+   * scope). Best-effort: any failure leaves the current token in place so a real
+   * auth failure still surfaces at publish time.
+   */
+  private async refreshIfExpiring(identity: SocialIdentityRow): Promise<SocialIdentityRow> {
+    const cfg = this.config()
+    if (!identity.refresh_token || !isExpiringSoon(identity.token_expires_at)) return identity
+    if (!cfg.clientId) return identity
+
+    try {
+      const refreshed = await this.driver.refreshAccessToken({
+        clientId: cfg.clientId,
+        clientSecret: cfg.clientSecret || undefined,
+        refreshToken: identity.refresh_token,
+      })
+      const nextExpiry = expiresAt(refreshed.expiresIn)
+      // X rotates the refresh token on every refresh — always keep the new one.
+      const nextRefresh = refreshed.refreshToken ?? identity.refresh_token
+      await database.updateTable('social_identities').set({
+        access_token: refreshed.accessToken,
+        refresh_token: nextRefresh,
+        token_expires_at: nextExpiry,
+        auth_status: 'connected',
+        updated_at: now(),
+      }).where('id', '=', identity.id).execute()
+
+      return { ...identity, access_token: refreshed.accessToken, refresh_token: nextRefresh, token_expires_at: nextExpiry }
+    }
+    catch {
+      return identity
+    }
   }
 
   private async findIdentity(): Promise<SocialIdentityRow | undefined> {
     return await database
       .selectFrom('social_identities')
       .selectAll()
-      .where('provider', '=', 'instagram')
+      .where('provider', '=', 'twitter')
       .orderBy('updated_at', 'desc')
       .executeTakeFirst()
   }
 
-  private async saveSession(input: { accessToken: string, igUserId: string, username?: string, expiresIn?: number }): Promise<SocialIdentityRow> {
+  private async saveSession(input: { accessToken: string, refreshToken?: string, expiresIn?: number, userId: string, username: string, name?: string }): Promise<SocialIdentityRow> {
     const accountId = await ensureAccount()
     const driver = await this.ensureDriver()
     const existing = await this.findIdentity()
     const savedAt = now()
-    const handle = (input.username || input.igUserId).trim()
 
     const values = {
-      handle,
-      display_name: input.username || null,
-      provider: 'instagram',
-      external_id: input.igUserId,
+      handle: input.username,
+      display_name: input.name || input.username,
+      provider: 'twitter',
+      external_id: input.userId,
       auth_status: 'connected',
       access_token: input.accessToken,
-      refresh_token: null,
+      refresh_token: input.refreshToken ?? null,
       token_expires_at: expiresAt(input.expiresIn),
       account_id: accountId,
       social_driver_id: driver.id,
@@ -321,7 +337,7 @@ export class InstagramService {
     const existing = await database
       .selectFrom('social_drivers')
       .selectAll()
-      .where('provider', '=', 'instagram')
+      .where('provider', '=', 'twitter')
       .executeTakeFirst()
 
     if (existing) {
@@ -343,11 +359,11 @@ export class InstagramService {
     const driverUuid = uuid()
     await database.insertInto('social_drivers').values({
       uuid: driverUuid,
-      provider: 'instagram',
-      display_name: 'Instagram',
+      provider: 'twitter',
+      display_name: 'X (Twitter)',
       status: 'active',
       character_limit: this.driver.characterLimit,
-      capabilities: JSON.stringify({ posts: true, timelines: false, oauth: true, requiresMedia: true }),
+      capabilities: JSON.stringify({ posts: true, timelines: false, oauth: true }),
       created_at: now(),
       updated_at: now(),
     }).execute()
@@ -363,7 +379,7 @@ export class InstagramService {
     if (!row) {
       return {
         connected: false,
-        provider: 'instagram',
+        provider: 'twitter',
         handle: null,
         displayName: null,
         did: null,
@@ -374,7 +390,7 @@ export class InstagramService {
     const connected = row.auth_status === 'connected' && Boolean(row.access_token)
     return {
       connected,
-      provider: 'instagram',
+      provider: 'twitter',
       handle: row.handle,
       displayName: row.display_name || null,
       did: row.external_id || null,
@@ -387,4 +403,4 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-export const instagram = new InstagramService()
+export const twitter = new TwitterService()

@@ -12,7 +12,7 @@
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Accounts</p>
         <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Publishing drivers</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">Connect Bluesky, LinkedIn, Instagram, Threads, and Mastodon to publish and crosspost from Postline.</p>
+        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">Connect Bluesky, X, LinkedIn, Instagram, Threads, and Mastodon to publish and crosspost from Postline.</p>
       </div>
     </header>
 
@@ -97,13 +97,17 @@
             <p class="sm:col-span-3 m-0 text-xs text-zinc-500">Create a token in your instance's Preferences → Development → New application (needs the <code class="px-1 py-0.5 text-xs bg-zinc-100 rounded">write:statuses</code> + <code class="px-1 py-0.5 text-xs bg-zinc-100 rounded">write:media</code> scopes).</p>
           </form>
         </article>
-        <article class="flex gap-5 items-center justify-between p-3.5 bg-zinc-50/80 border border-zinc-200 rounded-xl opacity-80">
+        <article class="flex gap-5 items-center justify-between p-3.5 bg-white border border-zinc-200 rounded-xl" data-channel="twitter">
           <div>
-            <h2 class="my-0 font-bold text-[15px] text-zinc-700">Twitter/X</h2>
-            <p class="my-1.5 text-[13px] text-zinc-600">Planned</p>
-            <span class="text-xs text-zinc-500">Driver adapter coming after the current set is stable.</span>
+            <h2 class="my-0 font-bold text-[15px]">X (Twitter)</h2>
+            <p class="my-1.5 text-[13px] text-slate-700" data-twitter-channel-handle>Not connected</p>
+            <span class="text-xs text-zinc-500" data-twitter-channel-detail>Connect X to crosspost tweets. Posting needs a paid X API tier.</span>
           </div>
-          <span class="px-2.5 py-1 font-bold text-[11px] text-zinc-500 whitespace-nowrap border border-zinc-200 rounded-full">Planned</span>
+          <div class="flex flex-col gap-2 items-end">
+            <span class="px-2.5 py-1 font-bold text-[11px] text-zinc-500 whitespace-nowrap border border-zinc-200 rounded-full" data-twitter-channel-status>Setup</span>
+            <button class="inline-flex items-center justify-center px-3 h-9 font-bold text-sm text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" data-twitter-connect>Connect with X</button>
+            <button class="hidden text-xs text-zinc-500 underline hover:text-zinc-700 transition-colors" type="button" data-twitter-connect-env>Use token from .env</button>
+          </div>
         </article>
       </div>
     </section>
@@ -287,6 +291,105 @@
       }
       else {
         startLinkedIn()
+      }
+
+      // --- X (Twitter) ---
+      const twitterHandle = root.querySelector('[data-twitter-channel-handle]')
+      const twitterDetail = root.querySelector('[data-twitter-channel-detail]')
+      const twitterStatusPill = root.querySelector('[data-twitter-channel-status]')
+      const twitterConnect = root.querySelector('[data-twitter-connect]')
+      const twitterConnectEnv = root.querySelector('[data-twitter-connect-env]')
+
+      const renderTwitter = (data) => {
+        const connected = Boolean(data?.canPublish)
+        const label = data?.handle ? `@${data.handle}` : 'Not connected'
+        if (twitterHandle) {
+          twitterHandle.textContent = connected ? label : (data?.handle ? `${label} — reconnect` : 'Not connected')
+        }
+        if (twitterDetail) {
+          twitterDetail.textContent = connected
+            ? 'Ready to crosspost tweets from Postline.'
+            : data?.oauthConfigured
+              ? 'Connect X to crosspost tweets. Posting needs a paid X API tier.'
+              : data?.configuredFromEnv
+                ? 'Token found in .env — connect to start crossposting.'
+                : 'Add X (Twitter) API keys to .env, then connect.'
+        }
+        if (twitterStatusPill) {
+          twitterStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
+          twitterStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+            connected
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : data?.handle
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-zinc-200 text-zinc-500'
+          }`
+        }
+        if (twitterConnect) {
+          twitterConnect.textContent = connected ? 'Reconnect X' : 'Connect with X'
+          if (data && !data.oauthConfigured) twitterConnect.setAttribute('disabled', 'disabled')
+          else twitterConnect.removeAttribute('disabled')
+        }
+        if (twitterConnectEnv) twitterConnectEnv.classList.toggle('hidden', !data?.configuredFromEnv)
+      }
+
+      const refreshTwitter = async () => {
+        try {
+          const response = await fetch('/api/postline/twitter/status')
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load X/Twitter status.')
+          renderTwitter(payload.data)
+        }
+        catch (error) {
+          renderTwitter(null)
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'X/Twitter' })
+        }
+      }
+
+      twitterConnect?.addEventListener('click', () => {
+        notify('Redirecting to X…', 'info', { title: 'X/Twitter' })
+        window.location.href = '/api/postline/twitter/auth'
+      })
+
+      twitterConnectEnv?.addEventListener('click', async () => {
+        twitterConnectEnv.setAttribute('disabled', 'disabled')
+        notify('Connecting X from .env…', 'info', { title: 'X/Twitter' })
+        try {
+          const response = await fetch('/api/postline/twitter/connect', { method: 'POST' })
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'X connect failed.')
+          await refreshTwitter()
+          notify('X connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
+        }
+        catch (error) {
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Connect failed' })
+        }
+        finally {
+          twitterConnectEnv.removeAttribute('disabled')
+        }
+      })
+
+      const twitterParams = new URLSearchParams(window.location.search)
+      const twitterResult = twitterParams.get('twitter')
+      if (twitterResult === 'connected') {
+        notify('X connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
+      }
+      else if (twitterResult === 'error') {
+        notify(twitterParams.get('message') || 'X connection failed.', 'error', { title: 'X/Twitter' })
+      }
+      if (twitterResult) {
+        twitterParams.delete('twitter')
+        twitterParams.delete('message')
+        const query = twitterParams.toString()
+        window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+      }
+
+      const startTwitter = () => void refreshTwitter()
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startTwitter, { once: true })
+      }
+      else {
+        startTwitter()
       }
 
       // --- Instagram ---

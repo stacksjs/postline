@@ -1,16 +1,13 @@
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
 import { mkdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
-import process from 'node:process'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import { MEDIA_DIR, publicMediaUrl } from '../../Support/Social/uploads'
 import { crosspost, crosspostProviders } from './CrosspostService'
 import { ensureAccount, now, uuid } from './support'
 
 const database = db as any
-
-/** Uploaded images for queued posts live here until publish. */
-const MEDIA_DIR = join(process.cwd(), 'storage/app/postline-media')
 
 /** Serialized into posts.content — everything beyond the text itself. */
 interface StoredContent {
@@ -379,6 +376,11 @@ export class QueueService {
             if (await file.exists()) {
               media.push({
                 bytes: new Uint8Array(await file.arrayBuffer()),
+                // Also expose a public URL so URL-only providers (Instagram,
+                // Threads) can publish the same uploaded file; byte-upload
+                // providers (Bluesky, LinkedIn, Mastodon) keep using `bytes`.
+                // Null when no public base is configured — then it's bytes-only.
+                url: publicMediaUrl(item.path) ?? undefined,
                 mimeType: item.mimeType,
                 altText: item.altText,
               })
