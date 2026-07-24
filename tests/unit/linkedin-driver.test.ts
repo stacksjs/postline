@@ -165,3 +165,51 @@ describe('LinkedInDriver.publish', () => {
     expect(postRequest(cap)).toBeUndefined()
   })
 })
+
+interface TokenCall { url: string, body: string }
+
+function mockTokenEndpoint(captured: TokenCall[], payload: Record<string, unknown>, status = 200): void {
+  globalThis.fetch = (async (input: any, init: any = {}) => {
+    captured.push({ url: String(input), body: String(init.body || '') })
+    return new Response(JSON.stringify(payload), { status })
+  }) as typeof fetch
+}
+
+describe('LinkedInDriver token exchange + refresh', () => {
+  test('exchangeCode surfaces the refresh token the base driver drops', async () => {
+    const cap: TokenCall[] = []
+    mockTokenEndpoint(cap, { access_token: 'AT1', expires_in: 5184000, refresh_token: 'RT1', refresh_token_expires_in: 31536000 })
+    const driver = new LinkedInDriver()
+
+    const token = await driver.exchangeCode({ clientId: 'c', clientSecret: 's', redirectUrl: 'https://app/cb', code: 'abc' })
+
+    expect(cap[0].url).toContain('/oauth/v2/accessToken')
+    expect(cap[0].body).toContain('grant_type=authorization_code')
+    expect(token.accessToken).toBe('AT1')
+    expect(token.refreshToken).toBe('RT1')
+    expect(token.expiresIn).toBe(5184000)
+  })
+
+  test('refreshAccessToken mints a new token from a refresh token', async () => {
+    const cap: TokenCall[] = []
+    mockTokenEndpoint(cap, { access_token: 'AT2', expires_in: 5184000, refresh_token: 'RT2' })
+    const driver = new LinkedInDriver()
+
+    const token = await driver.refreshAccessToken({ clientId: 'c', clientSecret: 's', refreshToken: 'RT1' })
+
+    expect(cap[0].body).toContain('grant_type=refresh_token')
+    expect(cap[0].body).toContain('refresh_token=RT1')
+    expect(token.accessToken).toBe('AT2')
+    expect(token.refreshToken).toBe('RT2')
+  })
+
+  test('refreshAccessToken throws when LinkedIn returns no token', async () => {
+    const cap: TokenCall[] = []
+    mockTokenEndpoint(cap, { error: 'invalid_grant' }, 400)
+    const driver = new LinkedInDriver()
+    let caught: unknown
+    await driver.refreshAccessToken({ clientId: 'c', clientSecret: 's', refreshToken: 'stale' }).catch((e) => { caught = e })
+    expect(caught).toBeInstanceOf(LinkedInApiError)
+    expect((caught as LinkedInApiError).status).toBe(400)
+  })
+})

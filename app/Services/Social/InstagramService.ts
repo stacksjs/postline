@@ -2,7 +2,7 @@ import type { CrosspostTargetResult, PublishContent } from '../../Support/Social
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { InstagramApiError, InstagramDriver } from './Drivers/InstagramDriver'
-import { ensureAccount, now, uuid } from './support'
+import { ensureAccount, expiresAt, now, uuid } from './support'
 
 const database = db as any
 
@@ -15,6 +15,7 @@ type SocialIdentityRow = {
   auth_status: 'connected' | 'expired' | 'revoked' | 'missing'
   access_token?: string | null
   refresh_token?: string | null
+  token_expires_at?: string | null
   account_id?: number | null
   social_driver_id?: number | null
 }
@@ -118,11 +119,25 @@ export class InstagramService {
       code,
     })
 
-    const account = await this.driver.resolveAccount(token.accessToken)
+    // Exchange the short-lived user token for a long-lived (~60-day) one before
+    // resolving the Page — a Page token minted from a long-lived user token does
+    // not expire on its own, so there's no per-publish refresh grant to run.
+    // Best-effort: fall back to the short-lived token if the exchange fails.
+    let userToken = token.accessToken
+    let expiresIn: number | undefined
+    try {
+      const longLived = await this.driver.exchangeLongLivedUserToken(cfg.clientId, cfg.clientSecret, token.accessToken)
+      userToken = longLived.accessToken
+      expiresIn = longLived.expiresIn
+    }
+    catch {}
+
+    const account = await this.driver.resolveAccount(userToken)
     const identity = await this.saveSession({
       accessToken: account.pageAccessToken,
       igUserId: account.igUserId,
       username: account.username,
+      expiresIn,
     })
     return this.publicIdentity(identity)
   }
@@ -260,7 +275,7 @@ export class InstagramService {
       .executeTakeFirst()
   }
 
-  private async saveSession(input: { accessToken: string, igUserId: string, username?: string }): Promise<SocialIdentityRow> {
+  private async saveSession(input: { accessToken: string, igUserId: string, username?: string, expiresIn?: number }): Promise<SocialIdentityRow> {
     const accountId = await ensureAccount()
     const driver = await this.ensureDriver()
     const existing = await this.findIdentity()
@@ -275,6 +290,7 @@ export class InstagramService {
       auth_status: 'connected',
       access_token: input.accessToken,
       refresh_token: null,
+      token_expires_at: expiresAt(input.expiresIn),
       account_id: accountId,
       social_driver_id: driver.id,
       updated_at: savedAt,
