@@ -126,11 +126,12 @@
       const detail = root.querySelector('[data-bluesky-channel-detail]')
       const status = root.querySelector('[data-bluesky-channel-status]')
       const pill = root.querySelector('[data-bluesky-channel-pill]')
-      const toast = window.postlineToast?.show
-      const blueskyApi = window.postlineBluesky
-
       const notify = (message, tone = 'neutral', options = {}) => {
-        if (toast) toast({ message, tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info', title: options.title })
+        // Resolve the toast helper at call time — it's a deferred module that
+        // loads after this inline script parses, so an eager capture is
+        // undefined on a full page load (e.g. the OAuth redirect back here).
+        const show = window.postlineToast?.show
+        if (show) show({ message, tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info', title: options.title })
         else console.log(message)
       }
 
@@ -162,7 +163,7 @@
 
       const refreshStatus = async () => {
         try {
-          const data = await blueskyApi?.fetchStatus()
+          const data = await window.postlineBluesky?.fetchStatus()
           renderStatus(data)
         }
         catch (error) {
@@ -658,7 +659,17 @@
         startMastodon()
       }
 
-      void refreshStatus()
+      // Gate the initial status fetch on DOMContentLoaded so the deferred
+      // postline-bluesky module has loaded — otherwise a connected account
+      // renders "Not connected" on a full page load. (Mirrors the other
+      // providers.)
+      const startBluesky = () => void refreshStatus()
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startBluesky, { once: true })
+      }
+      else {
+        startBluesky()
+      }
     })()
   </script>
 @endsection
