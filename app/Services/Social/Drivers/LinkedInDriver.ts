@@ -1,10 +1,24 @@
-import type { PublishedPost, PublishPostInput, SocialIdentityCredentials } from '@stacksjs/socials'
+import type { LinkedInTokenExchangeInput, PublishedPost, PublishPostInput, SocialIdentityCredentials } from '@stacksjs/socials'
 import { escapeLinkedInText, LinkedInApiError, LinkedInPublishingDriver } from '@stacksjs/socials'
 
 export { LinkedInApiError }
 
 interface InitializeUploadResponse {
   value?: { uploadUrl?: string, image?: string }
+}
+
+export interface LinkedInRefreshInput {
+  clientId: string
+  clientSecret: string
+  refreshToken: string
+}
+
+export interface LinkedInRefreshedToken {
+  accessToken: string
+  expiresIn?: number
+  /** Present only when the app is enrolled in LinkedIn's refresh-token program. */
+  refreshToken?: string
+  refreshTokenExpiresIn?: number
 }
 
 /**
@@ -19,6 +33,78 @@ interface InitializeUploadResponse {
  * single `uploadImage` step is added.
  */
 export class LinkedInDriver extends LinkedInPublishingDriver {
+  /**
+   * Exchange an authorization code for a token, additionally surfacing the
+   * `refresh_token` the base driver drops. LinkedIn only returns one when the
+   * app is enrolled in the refresh-token program; when absent, the field is
+   * simply undefined and the connection falls back to reconnect-on-expiry.
+   */
+  async exchangeCode(input: LinkedInTokenExchangeInput): Promise<LinkedInRefreshedToken & { scope?: string }> {
+    const body = new URLSearchParams({
+      grant_type: 'authorization_code',
+      code: input.code,
+      redirect_uri: input.redirectUrl,
+      client_id: input.clientId,
+      client_secret: input.clientSecret,
+    })
+
+    const payload = await this.request<{
+      access_token: string
+      expires_in?: number
+      scope?: string
+      refresh_token?: string
+      refresh_token_expires_in?: number
+    }>(`${this.authBase}/oauth/v2/accessToken`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+
+    if (!payload.access_token) {
+      throw new LinkedInApiError('LinkedIn did not return an access token.', 400, JSON.stringify(payload))
+    }
+
+    return {
+      accessToken: payload.access_token,
+      expiresIn: payload.expires_in,
+      scope: payload.scope,
+      refreshToken: payload.refresh_token,
+      refreshTokenExpiresIn: payload.refresh_token_expires_in,
+    }
+  }
+
+  /** Mint a fresh access token from a stored refresh token. */
+  async refreshAccessToken(input: LinkedInRefreshInput): Promise<LinkedInRefreshedToken> {
+    const body = new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: input.refreshToken,
+      client_id: input.clientId,
+      client_secret: input.clientSecret,
+    })
+
+    const payload = await this.request<{
+      access_token: string
+      expires_in?: number
+      refresh_token?: string
+      refresh_token_expires_in?: number
+    }>(`${this.authBase}/oauth/v2/accessToken`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+
+    if (!payload.access_token) {
+      throw new LinkedInApiError('LinkedIn did not return a refreshed access token.', 400, JSON.stringify(payload))
+    }
+
+    return {
+      accessToken: payload.access_token,
+      expiresIn: payload.expires_in,
+      refreshToken: payload.refresh_token,
+      refreshTokenExpiresIn: payload.refresh_token_expires_in,
+    }
+  }
+
   /**
    * Register and upload one image via LinkedIn's versioned Images API, then
    * return its `urn:li:image:...` id for attachment.
