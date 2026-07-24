@@ -204,6 +204,7 @@ export class LinkedInService {
       }, {
         text: post.body,
         ...(content?.external ? { external: content.external } : {}),
+        ...(content?.media?.length ? { media: content.media } : {}),
       })
 
       await database.updateTable('post_targets').set({
