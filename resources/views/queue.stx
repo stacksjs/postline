@@ -64,10 +64,14 @@
         </div>
         <strong class="text-[13px]" data-cal-title>—</strong>
       </header>
-      <div class="grid grid-cols-7 font-bold text-[11px] text-zinc-500 border-b border-zinc-200">
-        <div class="p-2 text-center">Sun</div><div class="p-2 text-center">Mon</div><div class="p-2 text-center">Tue</div><div class="p-2 text-center">Wed</div><div class="p-2 text-center">Thu</div><div class="p-2 text-center">Fri</div><div class="p-2 text-center">Sat</div>
+      <div class="overflow-x-auto">
+        <div class="min-w-[560px]">
+          <div class="grid grid-cols-7 font-bold text-[11px] text-zinc-500 border-b border-zinc-200">
+            <div class="p-2 text-center">Sun</div><div class="p-2 text-center">Mon</div><div class="p-2 text-center">Tue</div><div class="p-2 text-center">Wed</div><div class="p-2 text-center">Thu</div><div class="p-2 text-center">Fri</div><div class="p-2 text-center">Sat</div>
+          </div>
+          <div class="grid grid-cols-7" data-cal-grid></div>
+        </div>
       </div>
-      <div class="grid grid-cols-7" data-cal-grid></div>
     </section>
   </section>
 
@@ -116,6 +120,9 @@
       const liveUrlFor = (uri) => {
         const value = String(uri || '')
         if (value.startsWith('/')) return value
+        // A stored permalink (Mastodon, and any provider persisting a URL) is
+        // already linkable as-is.
+        if (/^https?:\/\//i.test(value)) return value
         const match = value.match(/^at:\/\/([^/]+)\/app\.bsky\.feed\.post\/(.+)$/)
         return match ? `https://bsky.app/profile/${encodeURIComponent(match[1])}/post/${encodeURIComponent(match[2])}` : null
       }
@@ -144,7 +151,7 @@
             </header>
             <p class="m-0 leading-normal text-[13px] text-slate-700">${escapeHtml(item.body)}</p>
             ${failure ? `<p class="m-0 text-red-700 text-xs">${escapeHtml(failure)}</p>` : ''}
-            <footer class="flex gap-2 items-center justify-end">
+            <footer class="flex flex-wrap gap-2 items-center justify-end">
               ${liveUrl ? `<a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-neutral-950 text-xs bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" href="${escapeHtml(liveUrl)}" target="_blank" rel="noopener noreferrer">View</a>` : ''}
               ${actionable ? `<a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-neutral-950 text-xs bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" href="/?edit=${item.id}" data-stx-link>Edit</a>` : ''}
               ${actionable ? `<button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-white text-xs bg-neutral-950 hover:bg-neutral-800 rounded-lg transition-colors" type="button" data-queue-publish="${item.id}">Publish now</button>` : ''}
