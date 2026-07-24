@@ -23,6 +23,11 @@ route.post('/register', 'Actions/Postline/RegisterFirstUserAction').skipCsrf().r
 route.get('/', () => response.text('hello world'))
 route.get('/coming-soon', 'Controllers/ComingSoonController@index')
 
+// Public: Instagram/Threads fetch a queued post's image server-side, so this
+// route is intentionally unauthenticated. The filename is an unguessable
+// per-upload UUID and strictly validated against traversal (MediaServeAction).
+route.get('/postline/media', 'Actions/Postline/MediaServeAction').skipCsrf()
+
 route.group({ prefix: '/postline/bluesky' }, () => {
   route.get('/status', 'Actions/Postline/BlueskyStatusAction').middleware('auth').skipCsrf()
   route.post('/connect', 'Actions/Postline/BlueskyConnectAction').middleware('auth').skipCsrf()

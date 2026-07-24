@@ -3,7 +3,7 @@ import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { crosspost, crosspostProviders } from '../../Services/Social/CrosspostService'
-import { readUploadedImage } from '../../Support/Social/uploads'
+import { persistTempMedia, readUploadedImage, removeTempMedia } from '../../Support/Social/uploads'
 
 export default new Action({
   name: 'Postline Crosspost Publish',
@@ -35,9 +35,17 @@ export default new Action({
     const imageAlt = String(request.get('image_alt') || '').trim()
 
     const media: NonNullable<Parameters<typeof crosspost.publish>[2]>['media'] = []
+    let tempMediaFile: string | null = null
     const uploadedImage = await readUploadedImage(request.file?.('image'))
-    if (uploadedImage)
-      media.push({ ...uploadedImage, altText: imageAlt || undefined })
+    if (uploadedImage) {
+      // Persist briefly so URL-only providers (Instagram/Threads) can fetch the
+      // upload server-side; byte-upload providers use the bytes. Removed once
+      // publishing finishes (Meta downloads during container creation, so the
+      // file is safe to delete by then).
+      const temp = await persistTempMedia(uploadedImage.bytes, uploadedImage.mimeType)
+      tempMediaFile = temp?.filename ?? null
+      media.push({ ...uploadedImage, url: temp?.url, altText: imageAlt || undefined })
+    }
     if (imageUrl)
       media.push({ url: imageUrl, altText: imageAlt || undefined })
 
@@ -65,6 +73,9 @@ export default new Action({
         ok: false,
         error: error instanceof Error ? error.message : String(error),
       }, { status: 422 })
+    }
+    finally {
+      if (tempMediaFile) await removeTempMedia(tempMediaFile)
     }
   },
 })
