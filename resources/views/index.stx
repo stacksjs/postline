@@ -113,7 +113,6 @@
       const connectionLabel = root.querySelector('[data-bluesky-connection-label]')
       const publishLabel = root.querySelector('[data-bluesky-publish-label]')
       const buttons = Array.from(root.querySelectorAll('[data-bluesky-publish], [data-bluesky-publish-top]'))
-      const toast = window.postlineToast?.show
       const providerToggles = root.querySelector('[data-provider-toggles]')
       const composeImageRow = root.querySelector('[data-compose-image-row]')
       const composeImage = root.querySelector('[data-compose-image]')
@@ -162,8 +161,13 @@
       let editRemoveImage = false
 
       const setStatus = (message, tone = 'neutral', options = {}) => {
-        if (toast) {
-          toast({
+        // Resolve the toast helper at call time. It's a deferred module that
+        // loads AFTER this inline script parses, so capturing it eagerly (as
+        // this used to) left it undefined on every full page load — silently
+        // dropping all feedback to the console.
+        const show = window.postlineToast?.show
+        if (show) {
+          show({
             title: options.title,
             message,
             tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info',
