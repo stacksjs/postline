@@ -13,6 +13,11 @@
       </div>
     </header>
 
+    <div class="hidden gap-3 items-center justify-between p-3.5 text-[13px] text-red-700 bg-red-50 border border-red-200 rounded-2xl" data-analytics-error>
+      <span data-analytics-error-message>Couldn't load analytics.</span>
+      <button class="inline-flex items-center justify-center px-3 h-8 font-bold text-white text-xs bg-neutral-950 hover:bg-neutral-800 rounded-lg transition-colors" type="button" data-analytics-retry>Retry</button>
+    </div>
+
     <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
       <article class="grid gap-2 p-3.5 bg-white border border-zinc-200 rounded-2xl shadow-sm">
         <span class="text-xs text-zinc-500">Posts this week</span>
