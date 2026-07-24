@@ -7,6 +7,7 @@ import { instagram } from './InstagramService'
 import { linkedin } from './LinkedInService'
 import { mastodon } from './MastodonService'
 import { threads } from './ThreadsService'
+import { twitter } from './TwitterService'
 import { ensureAccount, now, uuid } from './support'
 
 const database = db as any
@@ -18,6 +19,7 @@ interface ProviderPublisher {
 // Each provider owns its own connection/token handling behind `publishToPost`.
 const publishers: Partial<Record<SocialProvider, ProviderPublisher>> = {
   bluesky,
+  twitter,
   linkedin,
   instagram,
   threads,
