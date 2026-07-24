@@ -6,6 +6,7 @@ import { instagram } from '../../Services/Social/InstagramService'
 import { linkedin } from '../../Services/Social/LinkedInService'
 import { mastodon } from '../../Services/Social/MastodonService'
 import { threads } from '../../Services/Social/ThreadsService'
+import { twitter } from '../../Services/Social/TwitterService'
 
 export default new Action({
   name: 'Postline Providers Status',
@@ -16,6 +17,7 @@ export default new Action({
     try {
       const providers = await Promise.all([
         bluesky.status(),
+        twitter.status(),
         linkedin.status(),
         instagram.status(),
         threads.status(),
