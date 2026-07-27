@@ -62,7 +62,7 @@ Command groups defined in lazy-commands.ts:
 5. Parse and execute
 
 ### Commands that skip APP_KEY check
-`build`, `lint`, `lint:fix`, `test`, `test:types`, `test:unit`, `test:feature`, `typecheck`, `types:fix`, `types:generate`, `clean`, `fresh`, `about`, `doctor`, `setup`, `setup:ssl`, `setup:oh-my-zsh`, `deploy`
+`build`, `lint`, `lint:fix`, `test`, `test:types`, `test:unit`, `test:feature`, `typecheck`, `types:fix`, `types:generate`, `clean`, `fresh`, `about`, `doctor`, `setup`, `setup:ai`, `setup:ssl`, `setup:oh-my-zsh`, `deploy`
 
 ### buddy.config.ts Support
 Optional config file at project root. Validated with `validateConfig()`. Supports:
@@ -217,7 +217,7 @@ buddy migrate:fresh -d/--diff   # show SQL without running
 buddy migrate:dns            # DNS migration for APP_URL domain
 ```
 
-Both `migrate` and `migrate:fresh` validate that models exist in `app/Models` or `storage/framework/defaults/models` before running.
+Both `migrate` and `migrate:fresh` validate that models exist in `app/Models` or `storage/framework/defaults/app/Models` before running.
 
 ### `buddy seed` - Seed database
 ```bash
@@ -266,6 +266,22 @@ buddy make:queue-table        # create queue migration
 buddy make:stack [name]       # create full stack
 buddy make:view [name]        # create page/view (alias: make:page)
 ```
+
+### Browser extensions
+
+```bash
+buddy extension:init
+# Chrome + Firefox + Safari starter, including a universal Safari Xcode app
+
+buddy extension:init --target safari --name "My Extension" \
+  --bundle-id com.example.MyExtension --team-id TEAM123456 --platform all
+buddy extension:build
+buddy extension:safari:app --platform all --signed
+```
+
+`extension:init` defaults to all three browser targets. Generated views,
+scripts, and partials follow the standard `resources/` layout. Selecting Safari
+also scaffolds the macOS, iPhone, and iPad container project in the same step.
 
 ---
 
@@ -356,14 +372,14 @@ buddy cloud:remove             # remove cloud infrastructure (aliases: cloud:des
   --yes                        # skip confirmation
 buddy cloud:optimize-cost      # remove optional resources (jump-box)
 buddy cloud:cleanup            # clean up retained resources after stack deletion
-  # Cleans: jump-boxes, S3 buckets, Lambda functions, CloudWatch logs,
-  # Parameter Store, VPCs, Subnets, CDK remnants, IAM users
+# Cleans: jump-boxes, S3 buckets, Lambda functions, CloudWatch logs,
+# Parameter Store, VPCs, Subnets, CDK remnants, IAM users
 buddy cloud:invalidate-cache   # invalidate CloudFront cache
   --paths [paths]              # paths to invalidate
 buddy cloud:diff               # show deployed vs local template diff
 ```
 
-`cloud:remove` uses `undeployStack()` from `storage/framework/core/actions/deploy` and handles stuck stacks by creating temporary IAM roles.
+`cloud:remove` uses `undeployStack()` from `storage/framework/core/actions/src/deploy` and handles stuck stacks by creating temporary IAM roles.
 
 ---
 
@@ -529,6 +545,11 @@ Uses `@stacksjs/server` module's `down()`, `up()`, `isDownForMaintenance()`, `ma
 
 ```bash
 buddy about                  # display Stacks version, Bun/Node versions, OS, environment
+buddy ai:context             # compact deterministic project context for coding models
+  -J/--json                  # versioned machine-readable contract
+  -o/--output [path]         # write to a file instead of stdout
+  --max-chars [characters]   # prompt payload character budget (default: 4000)
+  --model [model]            # model family for heuristic token estimates
 buddy doctor                 # health checks (Bun version, Node, package.json, .env, APP_KEY)
 buddy tinker                 # interactive REPL with Stacks preloaded
   -e/--eval [expr]           # evaluate expression and exit
@@ -547,8 +568,8 @@ buddy share [type]           # share local dev server via public tunnel (localtu
   -p/--port <port>           # local port
   --server <url>             # tunnel server (default: api.localtunnel.dev)
   --subdomain <name>         # request specific subdomain
-  # Supports: frontend, api, backend, admin, dashboard, desktop, docs
-  # Auto-starts companion services (API, docs) for frontend shares
+# Supports: frontend, api, backend, admin, dashboard, desktop, docs
+# Auto-starts companion services (API, docs) for frontend shares
 buddy search                 # search engine operations
 buddy configure              # configure project
 buddy create                 # create new project
@@ -561,6 +582,10 @@ buddy ports:check            # check ports across all Stacks projects
 buddy setup                  # ensure project is set up correctly (alias: ensure)
   --skip-aws                 # skip AWS configuration
   --skip-keygen              # skip APP_KEY generation
+buddy setup:ai [provider]    # wire up an AI coding agent (alias: ai:setup)
+  provider                   # claude | codex | cursor | copilot | gemini (prompts if omitted)
+  --copy                     # copy the agent files instead of symlinking them
+  --force                    # overwrite generated files (never AGENTS.md)
 buddy setup:ssl              # setup SSL certs + hosts file (alias: ssl:setup)
   -d/--domain [domain]       # custom domain (defaults to APP_URL)
   --skip-hosts               # skip hosts file modification

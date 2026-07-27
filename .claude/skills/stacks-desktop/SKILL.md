@@ -12,8 +12,7 @@ allowed-tools: Read Edit Write Bash Grep Glob
 - Core package: `storage/framework/core/desktop/src/`
 - Source: `storage/framework/core/desktop/src/index.ts`
 - System tray views: `storage/framework/defaults/views/system-tray/`
-- System tray layouts: `storage/framework/defaults/layouts/system-tray/`
-- System tray router types: `storage/framework/types/system-tray-router.d.ts`
+- System tray layouts: `storage/framework/defaults/resources/layouts/`
 - Package: `@stacksjs/desktop`
 
 ## API
@@ -69,7 +68,7 @@ buddy build:desktop     # Build desktop application
 ## Related Files
 - System tray views use STX templates in `storage/framework/defaults/views/system-tray/`
 - System tray has its own router type definitions
-- Desktop layouts in `storage/framework/defaults/layouts/system-tray/`
+- Desktop layouts in `storage/framework/defaults/views/system-tray/`
 
 ## Gotchas
 - **Currently incomplete** — `openDevWindow()` is a stub that returns `false`
