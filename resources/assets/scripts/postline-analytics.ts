@@ -300,22 +300,67 @@ function fillStats(payload: AnalyticsPayload): void {
   }
 }
 
+let lastAnalyticsError: string | null = null
+
+function hideAnalyticsError(): void {
+  const banner = document.querySelector<HTMLElement>('[data-analytics-error]')
+  if (banner) {
+    banner.classList.add('hidden')
+    banner.classList.remove('flex')
+  }
+}
+
+function showAnalyticsError(message: string): void {
+  const page = document.querySelector<HTMLElement>('[data-testid="analytics-page"]')
+  if (!page)
+    return
+
+  const msg = page.querySelector('[data-analytics-error-message]')
+  if (msg)
+    msg.textContent = message
+  const banner = page.querySelector<HTMLElement>('[data-analytics-error]')
+  if (banner) {
+    banner.classList.remove('hidden')
+    banner.classList.add('flex')
+  }
+
+  // Stop the stat trends from claiming they're still loading forever.
+  page.querySelectorAll('[data-analytics-posts-trend], [data-analytics-engagement-trend], [data-analytics-best-channel-trend], [data-analytics-best-window-trend]')
+    .forEach((el) => { if (el.textContent === 'Loading…') el.textContent = 'Unavailable' })
+
+  const retry = page.querySelector<HTMLElement>('[data-analytics-retry]')
+  if (retry && !retry.dataset.wired) {
+    retry.dataset.wired = 'true'
+    retry.addEventListener('click', () => {
+      hideAnalyticsError()
+      void loadAnalytics()
+    })
+  }
+}
+
 async function loadAnalytics(): Promise<void> {
   if (!analyticsPromise) {
     analyticsPromise = fetch('/api/postline/analytics')
       .then(async (response) => {
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load analytics.')
+        lastAnalyticsError = null
         return payload.data as AnalyticsPayload
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         analyticsPromise = null
+        lastAnalyticsError = error instanceof Error ? error.message : 'Could not load analytics.'
         return null
       })
   }
 
   const data = await analyticsPromise
-  if (!data) return
+  if (!data) {
+    // Previously returned silently, leaving the dashboard stuck on "Loading…".
+    showAnalyticsError(lastAnalyticsError || 'Could not load analytics.')
+    return
+  }
+  hideAnalyticsError()
   points = data.series || []
   fillStats(data)
   scheduleAnalyticsRender()
