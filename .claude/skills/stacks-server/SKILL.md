@@ -185,7 +185,7 @@ Entry point for compiled production binaries. Sequence:
 1. Sets `__STACKS_BINARY_MODE__ = true` on `globalThis` (prevents auto-registration in routes)
 2. Sets `SKIP_CONFIG_LOADING = 'true'` env var
 3. Imports `loadRoutes` and `serve` from `@stacksjs/router`
-4. Loads routes from `app/Routes` registry via `loadRoutes(routeRegistry)`
+4. Loads routes from the `app/Routes.ts` registry via `loadRoutes(routeRegistry)`
 5. Loads ORM auto-generated routes from `../../orm/routes` (model CRUD endpoints)
 6. Calls `serve({ port, host })` to start the Bun HTTP server
 
@@ -208,7 +208,7 @@ function initiateImports(): void
 Registers a Bun bundler plugin (`bun-plugin-auto-imports`) that makes models, jobs, controllers, and resource functions available globally without explicit imports.
 
 Scan order (user overrides framework overrides defaults):
-- **Models**: `app/Models/` > `storage/framework/models/` > `storage/framework/defaults/models/`
+- **Models**: `app/Models/` > `storage/framework/defaults/app/Models/` > `storage/framework/defaults/app/Models/`
 - **Jobs**: `app/Jobs/`
 - **Controllers**: `app/Controllers/` > `storage/framework/defaults/app/Controllers/`
 - **Functions**: `resources/functions/`
