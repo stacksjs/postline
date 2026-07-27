@@ -51,6 +51,10 @@
           <span class="font-bold text-xs text-zinc-500">Password</span>
           <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required minlength="6" data-login-password>
         </label>
+        <label class="hidden gap-1.5" data-login-confirm-row>
+          <span class="font-bold text-xs text-zinc-500">Confirm password</span>
+          <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password_confirmation" type="password" autocomplete="new-password" placeholder="••••••••" minlength="6" data-login-confirm>
+        </label>
         <p class="hidden m-0 text-red-700 text-xs" data-login-error></p>
         <button class="inline-flex items-center justify-center px-4 h-10 font-bold text-sm text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" data-login-submit>Sign in</button>
       </form>
@@ -71,6 +75,8 @@
       const nameInput = root.querySelector('[data-login-name]')
       const emailInput = root.querySelector('[data-login-email]')
       const passwordInput = root.querySelector('[data-login-password]')
+      const confirmRow = root.querySelector('[data-login-confirm-row]')
+      const confirmInput = root.querySelector('[data-login-confirm]')
       const errorText = root.querySelector('[data-login-error]')
       const submit = root.querySelector('[data-login-submit]')
       const toggle = root.querySelector('[data-login-toggle]')
@@ -87,6 +93,12 @@
         registering = register
         nameRow?.classList.toggle('hidden', !register)
         nameRow?.classList.toggle('grid', register)
+        confirmRow?.classList.toggle('hidden', !register)
+        confirmRow?.classList.toggle('grid', register)
+        // The workspace-owning account has no recovery path, so a first-run
+        // typo must not silently create an account nobody can sign into.
+        nameInput?.toggleAttribute('required', register)
+        confirmInput?.toggleAttribute('required', register)
         if (heading) heading.textContent = register ? 'Create your workspace' : 'Sign in to Postline'
         if (subtitle) subtitle.textContent = register ? 'One account owns this Postline instance.' : 'Your personal publishing workspace.'
         if (submit) submit.textContent = register ? 'Create account' : 'Sign in'
@@ -105,6 +117,12 @@
       form?.addEventListener('submit', async (event) => {
         event.preventDefault()
         setError('')
+
+        if (registering && (passwordInput?.value || '') !== (confirmInput?.value || '')) {
+          setError('Passwords do not match.')
+          return
+        }
+
         submit?.setAttribute('disabled', 'disabled')
 
         const body = new FormData()
