@@ -12,7 +12,7 @@ Prevent destructive actions and enforce focus during debugging sessions.
 
 ## Destructive Command Detection
 
-### 🔴 CRITICAL — Block and require confirmation:
+### 🔴 CRITICAL — Block and require confirmation
 
 | Pattern | Risk |
 |---------|------|
@@ -32,7 +32,7 @@ Risk: [what will be destroyed]
 Reversible: [yes/no]
 ```
 
-### 🟡 WARNING — Warn but allow:
+### 🟡 WARNING — Warn but allow
 
 | Pattern | Risk |
 |---------|------|
@@ -44,7 +44,7 @@ Reversible: [yes/no]
 | Modifying `config/services.ts` | Contains API keys |
 | Modifying `storage/framework/core/*/src/index.ts` | Public package API |
 
-### 🟢 INFORMATIONAL — Note but don't block:
+### 🟢 INFORMATIONAL — Note but don't block
 
 | Pattern | Note |
 |---------|------|
@@ -86,7 +86,7 @@ Before commits, scan for:
 ## Stacks-Specific Guards
 
 - **Don't edit `storage/framework/types/*.d.ts`** — these are auto-generated
-- **Don't edit `storage/framework/defaults/models/`** without also generating migrations
+- **Don't edit `storage/framework/defaults/app/Models/`** without also generating migrations
 - **Don't modify `config/services.ts` in commits** — contains API keys
 - **Check `storage/framework/core/*/package.json` versions** — workspace packages should stay in sync
 

@@ -1,6 +1,6 @@
 ---
 name: stacks-crosswind
-description: Use when styling components in a Stacks application — utility-first CSS classes, theming, responsive design, variants, custom rules, or CSS generation. Crosswind is the CSS utility engine powering Stacks' Headwind config.
+description: Use when styling components in a Stacks application — utility-first CSS classes, theming, responsive design, variants, custom rules, or CSS generation. Crosswind is the CSS utility engine powering Stacks' Crosswind config.
 license: MIT
 compatibility: Bun >= 1.3.0, TypeScript
 allowed-tools: Read Edit Write Bash Grep Glob
@@ -10,11 +10,15 @@ allowed-tools: Read Edit Write Bash Grep Glob
 
 Crosswind (`@cwcss/crosswind`) is the utility-first CSS engine for Stacks — similar to Tailwind CSS but built for Bun.
 
+## Design & anti-slop skills
+
+For taste-level guidance on *which* utilities to reach for (layout variance, spacing rhythm, color calibration, motion), see the design-taste family: `stacks-design-taste` (flagship), the presets `stacks-design-soft` / `stacks-design-minimalist` / `stacks-design-brutalist`, `stacks-redesign`, `stacks-design-output`, and the image-first `stacks-image-to-code` / `stacks-imagegen-web` / `stacks-imagegen-mobile` / `stacks-brandkit`.
+
 ## Key Paths
 - Package: `node_modules/@cwcss/crosswind/`
-- UI config: `config/ui.ts` (Headwind options referencing Crosswind)
+- UI config: `config/ui.ts` (Crosswind options referencing Crosswind)
 - Default styles: `storage/framework/defaults/styles/`
-- Output: `storage/framework/assets/headwind.css`
+- Output: `storage/framework/stx/cache/cw-<hash>.css`, one file per page (stx's `stateDir`, set in `config/ui.ts`)
 
 ## Core API
 
@@ -148,17 +152,17 @@ interface ParsedClass {
 
 ```html
 <div class="flex items-center justify-between p-4 bg-white rounded-lg shadow">
-  <h1 class="text-2xl font-bold text-gray-900">Title</h1>
-  <button class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+  <h1 class="font-bold text-2xl text-gray-900">Title</h1>
+  <button class="px-4 py-2 text-white bg-blue-500 hover:bg-blue-600 rounded">
     Click me
   </button>
 </div>
 
 <!-- Arbitrary values -->
-<div class="text-[#1a1a1a] w-[calc(100%-2rem)] grid-cols-[1fr_2fr]">
+<div class="grid-cols-[1fr_2fr] w-[calc(100%-2rem)] text-[#1a1a1a]">
 
 <!-- Dark mode -->
-<div class="bg-white dark:bg-gray-900 text-black dark:text-white">
+<div class="text-black dark:text-white bg-white dark:bg-gray-900">
 
 <!-- Responsive -->
 <div class="w-full md:w-1/2 lg:w-1/3">
@@ -177,8 +181,8 @@ interface ParsedClass {
 
 ## Gotchas
 - **Not Tailwind** — Crosswind is a separate implementation with Tailwind-compatible syntax
-- **Stacks uses Headwind config** — `config/ui.ts` defines Headwind options which feed Crosswind
-- **Output goes to `storage/framework/assets/headwind.css`** — not a typical `dist/` directory
+- **Stacks uses Crosswind config** — `config/ui.ts` defines Crosswind options which feed Crosswind
+- **Output is per-page, content-hashed** — `storage/framework/stx/cache/cw-<hash>.css`, generated on demand rather than one bundled stylesheet. The directory is gitignored and safe to delete; the next request regenerates it
 - **Bun plugin available** — can be used as a Bun build plugin for automatic CSS generation
 - **Attributify mode** — optional mode where utilities can be written as HTML attributes instead of classes
 - **Bracket syntax** — `text-[#custom]` for arbitrary values, same as Tailwind JIT

@@ -23,6 +23,8 @@ buddy make:notification <name>  # Create a notification class
 buddy make:factory <name>       # Create a model factory
 buddy make:lang <name>          # Create a language/locale file
 buddy make:stack <name>         # Create a new stack
+buddy extension:init            # Create a Chrome + Firefox + Safari extension
+buddy extension:init --target safari --bundle-id com.example.Extension
 ```
 
 ## STX Scaffolding API
@@ -135,7 +137,13 @@ interface ScaffoldResult {
 | Language files | `locales/` |
 | Layouts | `resources/layouts/` |
 | Pages | `resources/views/` |
-| Stores | `resources/stores/` |
+| Stores | `storage/framework/defaults/stores/` |
+| Partials | `resources/partials/` |
+
+Browser-extension scaffolding also follows this resource layout: popup pages
+live in `resources/views/`, browser scripts in `resources/scripts/`, and shared
+includes in `resources/partials/`. Safari scaffolding creates the Xcode
+container app alongside the web-extension starter.
 
 ## Default Templates
 
