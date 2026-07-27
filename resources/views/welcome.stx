@@ -1,0 +1,74 @@
+@extends('layouts/marketing')
+
+@section('title', 'Postline: self-hosted social crossposting')
+@section('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon from one instance you own.')
+
+@section('content')
+  <div class="relative overflow-hidden min-h-[100dvh]">
+    <!-- Nav -->
+    <header class="relative z-20 mx-auto px-6 max-w-[1400px]">
+      <nav class="flex gap-4 items-center justify-between h-[72px]" aria-label="Primary">
+        <a class="inline-flex gap-2.5 items-center font-semibold text-ink" href="/welcome" aria-label="Postline home">
+          <span class="grid place-items-center h-8 w-8 font-bold text-[13px] text-on-accent bg-ink rounded-lg">P</span>
+          Postline
+        </a>
+        <div class="flex gap-2 items-center sm:gap-5">
+          <a class="hidden sm:inline px-1 text-sm text-body hover:text-ink transition-colors" href="https://github.com/stacksjs/postline">GitHub</a>
+          <a class="inline-flex items-center px-4 h-9 font-medium text-sm text-on-accent bg-ink hover:bg-neutral-800 rounded-lg transition-colors" href="/login" data-stx-link>Get started</a>
+        </div>
+      </nav>
+    </header>
+
+    <!-- Left hairline rail + mono index (desktop second-read moment) -->
+    <div class="hidden lg:flex flex-col gap-3 items-center absolute left-6 top-[132px] z-10" aria-hidden="true">
+      <span class="font-mono text-[11px] text-muted">01</span>
+      <span class="h-24 w-px bg-line"></span>
+    </div>
+
+    <!-- Hero -->
+    <section class="relative mx-auto px-6 max-w-[1400px] lg:pl-20">
+      <div class="grid items-center gap-12 pt-10 pb-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-10 lg:pt-14 lg:pb-0 lg:min-h-[calc(100dvh-72px)]">
+        <!-- Left: copy -->
+        <div class="max-w-xl">
+          <p class="font-mono text-xs text-muted tracking-[0.2em] uppercase">Self-hosted</p>
+          <h1 class="mt-5 font-semibold text-[2.75rem] text-ink tracking-tight leading-[1.03] sm:text-6xl">Post once. Every network. Yours.</h1>
+          <p class="mt-6 max-w-md text-lg text-body leading-relaxed">Schedule and crosspost to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon from one instance you run and own.</p>
+          <div class="flex flex-wrap gap-3 items-center mt-9">
+            <a class="inline-flex items-center px-5 h-12 font-medium text-on-accent bg-accent hover:bg-emerald-600 rounded-xl shadow-sm transition-colors active:scale-[0.98]" href="/login" data-stx-link>Get started</a>
+            <a class="inline-flex gap-2 items-center px-5 h-12 font-medium text-ink hover:bg-panel-2 rounded-xl transition-colors" href="https://github.com/stacksjs/postline">
+              <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
+              View on GitHub
+            </a>
+          </div>
+        </div>
+
+        <!-- Right: composer preview (a faithful mini of the real product UI) -->
+        <div class="lg:justify-self-end lg:-mr-6 lg:translate-y-6">
+          <div class="max-w-[520px] bg-panel border border-line rounded-2xl shadow-[0_40px_90px_-30px_rgba(9,9,11,0.35)] lg:rotate-[1.4deg]" role="img" aria-label="Postline composer with one post selected for all six networks">
+            <div class="flex gap-1.5 items-center px-5 h-11 border-b border-line" aria-hidden="true">
+              <span class="h-2.5 w-2.5 bg-panel-3 rounded-full"></span>
+              <span class="h-2.5 w-2.5 bg-panel-3 rounded-full"></span>
+              <span class="h-2.5 w-2.5 bg-panel-3 rounded-full"></span>
+              <span class="ml-3 font-mono text-[11px] text-muted">compose</span>
+            </div>
+            <div class="p-5">
+              <div class="flex flex-wrap gap-1.5">
+                <span class="inline-flex gap-1.5 items-center px-2.5 h-7 font-medium text-xs text-ink bg-panel-2 border border-line rounded-lg"><span class="h-3.5 w-3.5 i-simple-icons-bluesky" aria-hidden="true"></span>Bluesky</span>
+                <span class="inline-flex gap-1.5 items-center px-2.5 h-7 font-medium text-xs text-ink bg-panel-2 border border-line rounded-lg"><span class="h-3.5 w-3.5 i-simple-icons-x" aria-hidden="true"></span>X</span>
+                <span class="inline-flex gap-1.5 items-center px-2.5 h-7 font-medium text-xs text-ink bg-panel-2 border border-line rounded-lg"><span class="h-3.5 w-3.5 i-simple-icons-linkedin" aria-hidden="true"></span>LinkedIn</span>
+                <span class="inline-flex gap-1.5 items-center px-2.5 h-7 font-medium text-xs text-ink bg-panel-2 border border-line rounded-lg"><span class="h-3.5 w-3.5 i-simple-icons-instagram" aria-hidden="true"></span>Instagram</span>
+                <span class="inline-flex gap-1.5 items-center px-2.5 h-7 font-medium text-xs text-ink bg-panel-2 border border-line rounded-lg"><span class="h-3.5 w-3.5 i-simple-icons-threads" aria-hidden="true"></span>Threads</span>
+                <span class="inline-flex gap-1.5 items-center px-2.5 h-7 font-medium text-xs text-ink bg-panel-2 border border-line rounded-lg"><span class="h-3.5 w-3.5 i-simple-icons-mastodon" aria-hidden="true"></span>Mastodon</span>
+              </div>
+              <p class="mt-4 text-ink leading-relaxed">Shipping Postline v1: self-hosted crossposting to every network from one place. No SaaS, no lock-in.</p>
+              <div class="flex items-center justify-between mt-5 pt-4 border-t border-line">
+                <span class="font-mono text-xs text-muted">198 / 300</span>
+                <span class="inline-flex items-center px-4 h-9 font-medium text-sm text-on-accent bg-accent rounded-lg">Publish</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+@endsection
