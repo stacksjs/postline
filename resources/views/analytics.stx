@@ -7,45 +7,45 @@
   <section class="grid gap-5" data-postline-page="analytics" data-testid="analytics-page">
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
-        <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Analytics</p>
-        <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Publishing insights</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">How your posting has performed over the last 30 days.</p>
+        <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Analytics</p>
+        <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Publishing insights</h1>
+        <p class="mb-0 mt-1.5 text-[13px] text-muted">How your posting has performed over the last 30 days.</p>
       </div>
     </header>
 
     <div class="hidden gap-3 items-center justify-between p-3.5 text-[13px] text-red-700 bg-red-50 border border-red-200 rounded-2xl" data-analytics-error>
       <span data-analytics-error-message>Couldn't load analytics.</span>
-      <button class="inline-flex items-center justify-center px-3 h-8 font-bold text-white text-xs bg-neutral-950 hover:bg-neutral-800 rounded-lg transition-colors" type="button" data-analytics-retry>Retry</button>
+      <button class="inline-flex items-center justify-center px-3 h-8 font-bold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-lg transition-colors" type="button" data-analytics-retry>Retry</button>
     </div>
 
     <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-      <article class="grid gap-2 p-3.5 bg-white border border-zinc-200 rounded-2xl shadow-sm">
-        <span class="text-xs text-zinc-500">Posts this week</span>
+      <article class="grid gap-2 p-3.5 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="text-muted text-xs">Posts this week</span>
         <strong class="text-2xl" data-analytics-posts-week>—</strong>
-        <span class="text-xs text-zinc-500" data-analytics-posts-trend>Loading…</span>
+        <span class="text-muted text-xs" data-analytics-posts-trend>Loading…</span>
       </article>
-      <article class="grid gap-2 p-3.5 bg-white border border-zinc-200 rounded-2xl shadow-sm">
-        <span class="text-xs text-zinc-500">Engagement</span>
+      <article class="grid gap-2 p-3.5 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="text-muted text-xs">Engagement</span>
         <strong class="text-2xl" data-analytics-engagement>—</strong>
-        <span class="text-xs text-zinc-500" data-analytics-engagement-trend>Loading…</span>
+        <span class="text-muted text-xs" data-analytics-engagement-trend>Loading…</span>
       </article>
-      <article class="grid gap-2 p-3.5 bg-white border border-zinc-200 rounded-2xl shadow-sm">
-        <span class="text-xs text-zinc-500">Best channel</span>
+      <article class="grid gap-2 p-3.5 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="text-muted text-xs">Best channel</span>
         <strong class="text-2xl" data-analytics-best-channel>—</strong>
-        <span class="text-xs text-zinc-500" data-analytics-best-channel-trend>Loading…</span>
+        <span class="text-muted text-xs" data-analytics-best-channel-trend>Loading…</span>
       </article>
-      <article class="grid gap-2 p-3.5 bg-white border border-zinc-200 rounded-2xl shadow-sm">
-        <span class="text-xs text-zinc-500">Best window</span>
+      <article class="grid gap-2 p-3.5 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="text-muted text-xs">Best window</span>
         <strong class="text-2xl" data-analytics-best-window>—</strong>
-        <span class="text-xs text-zinc-500" data-analytics-best-window-trend>Loading…</span>
+        <span class="text-muted text-xs" data-analytics-best-window-trend>Loading…</span>
       </article>
     </div>
 
     <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
-        <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
+      <section class="bg-panel border border-line rounded-2xl shadow-sm">
+        <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
           <strong class="text-[13px]">Publishing activity</strong>
-          <span class="text-xs text-zinc-500">Last 30 days</span>
+          <span class="text-muted text-xs">Last 30 days</span>
         </header>
         <div class="p-3.5">
           <svg class="block h-auto w-full" viewBox="0 0 640 280" role="img" aria-label="Posts published over the last 30 days" data-analytics-chart>
@@ -66,20 +66,20 @@
       </section>
 
       <aside class="grid content-start gap-3.5">
-        <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
-          <header class="p-3.5 border-b border-zinc-200">
+        <section class="bg-panel border border-line rounded-2xl shadow-sm">
+          <header class="p-3.5 border-b border-line">
             <strong class="text-[13px]">Channel mix</strong>
           </header>
           <div class="grid gap-3 p-3.5" data-analytics-channel-mix>
-            <p class="m-0 text-xs text-zinc-500">Loading…</p>
+            <p class="m-0 text-muted text-xs">Loading…</p>
           </div>
         </section>
 
-        <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
-          <header class="p-3.5 border-b border-zinc-200">
+        <section class="bg-panel border border-line rounded-2xl shadow-sm">
+          <header class="p-3.5 border-b border-line">
             <strong class="text-[13px]">Best windows</strong>
           </header>
-          <div class="grid gap-2 p-3 text-xs text-zinc-500" data-analytics-windows>
+          <div class="grid gap-2 p-3 text-muted text-xs" data-analytics-windows>
             <p class="m-0 text-xs">Loading…</p>
           </div>
         </section>

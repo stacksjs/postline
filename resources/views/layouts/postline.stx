@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="text-neutral-950 bg-[#f3f3f1]">
+<html lang="en" class="text-ink bg-bg">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -61,67 +61,84 @@
     </script>
     <script>window.STX_ROUTER_OPTIONS = { container: '[data-postline-workspace]', viewTransitions: false };</script>
     <style>
+      /*
+       * Semantic surface tokens. Instead of a hand-maintained `.dark .utility {}`
+       * override layer shadowing every raw color utility, the views use CSS-var
+       * backed utilities (bg-panel, text-ink, border-line, …) registered in
+       * config/crosswind.ts, and theming is a variable swap in one place.
+       *   surfaces: --bg (page) / --panel (card) / --panel-2 / --panel-3 (insets)
+       *   lines:    --line
+       *   text:     --ink (headings) / --body (copy) / --muted (meta)
+       *   accent:   --accent (primary button, inverts) / --on-accent (its text)
+       */
       :root {
         color-scheme: light;
         background: #f3f3f1;
+        --bg: #f3f3f1;
+        --panel: #ffffff;
+        --panel-2: #fafafa;
+        --panel-3: #f4f4f5;
+        --line: #e4e4e7;
+        --ink: #0a0a0a;
+        --body: #3f3f46;
+        --muted: #71717a;
+        --accent: #0a0a0a;
+        --on-accent: #ffffff;
       }
 
       html.dark {
         color-scheme: dark;
         background: #0a0a0c;
+        --bg: #0a0a0c;
+        --panel: #18181b;
+        --panel-2: #1c1c1f;
+        --panel-3: #26262a;
+        --line: #2a2a2e;
+        --ink: #f4f4f5;
+        --body: #d4d4d8;
+        --muted: #a1a1aa;
+        --accent: #f4f4f5;
+        --on-accent: #0a0a0c;
       }
 
-      /*
-       * Dark theme — a scoped remap of the app's consistent utility palette.
-       * The views use a small, fixed set of hardcoded utilities (bg-white
-       * cards, zinc borders, neutral text), so one place remaps them instead
-       * of adding dark: variants to ~380 call sites. Unlayered head styles
-       * beat crosswind's layered utilities regardless of specificity.
-       */
-      html.dark body { background-color: #0a0a0c; color: #e4e4e7; }
+      html.dark body { color: var(--ink); }
 
-      /* Surfaces */
-      .dark .bg-white { background-color: #18181b; }
-      .dark .bg-\[\#f3f3f1\] { background-color: #0a0a0c; }
-      .dark .bg-zinc-50, .dark .bg-zinc-50\/80, .dark .bg-zinc-50\/48 { background-color: #1c1c1f; }
-      .dark .bg-zinc-50\/40 { background-color: rgba(255, 255, 255, 0.02); }
-      .dark .bg-zinc-100 { background-color: #26262a; }
+      /*
+       * Override layer — now only for cases CSS-var tokens can't express:
+       * opacity-modifier surfaces (bg-white/95), hover-state remaps, and the
+       * semantic STATUS colors (info/success/warning/error). Everything neutral
+       * moved to the tokens above.
+       */
+
+      /* Status surfaces */
       .dark .bg-blue-50 { background-color: #172554; }
       .dark .bg-emerald-50 { background-color: #052e2b; }
       .dark .bg-amber-50 { background-color: #3a2a08; }
       .dark .bg-red-50 { background-color: #3a1414; }
 
-      /* Borders */
-      .dark .border-zinc-200, .dark .border-zinc-200\/80, .dark .border-zinc-100 { border-color: #2a2a2e; }
+      /* Opacity-modifier surfaces (can't take a var-backed token) */
+      .dark .bg-zinc-50\/80, .dark .bg-zinc-50\/48 { background-color: #1c1c1f; }
+      .dark .bg-zinc-50\/40 { background-color: rgba(255, 255, 255, 0.02); }
+
+      /* Status borders */
+      .dark .border-zinc-200\/80 { border-color: #2a2a2e; }
       .dark .border-blue-200 { border-color: #1e3a8a; }
       .dark .border-emerald-200 { border-color: #0f766e; }
       .dark .border-amber-200 { border-color: #78500a; }
       .dark .border-red-200 { border-color: #7f1d1d; }
 
-      /* Text */
-      .dark .text-neutral-950 { color: #f4f4f5; }
-      .dark .text-slate-700 { color: #d4d4d8; }
-      .dark .text-zinc-600, .dark .text-zinc-500 { color: #a1a1aa; }
-      .dark .text-zinc-700, .dark .text-zinc-800 { color: #d4d4d8; }
+      /* Status text */
       .dark .text-blue-700, .dark .text-blue-800 { color: #93c5fd; }
-      .dark .text-emerald-700 { color: #6ee7b7; }
-      .dark .text-amber-800 { color: #fcd34d; }
+      .dark .text-emerald-700, .dark .text-emerald-800 { color: #6ee7b7; }
+      .dark .text-amber-800, .dark .text-amber-700 { color: #fcd34d; }
       .dark .text-red-700 { color: #fca5a5; }
 
-      /* Hover states (higher specificity than the base utilities above) */
+      /* Hover states (higher specificity than the base utilities) */
       .dark .hover\:bg-white:hover { background-color: #26262a; }
       .dark .hover\:bg-zinc-50:hover { background-color: #26262a; }
       .dark .hover\:bg-zinc-100:hover { background-color: #2f2f34; }
-
-      /* Primary buttons invert to light-on-dark-text so they pop on dark surfaces */
-      .dark .bg-neutral-950 { background-color: #f4f4f5; }
-      .dark .bg-neutral-950.text-white,
-      .dark .bg-neutral-950 .text-white,
-      .dark .text-white.bg-neutral-950 { color: #0a0a0c; }
+      /* Primary-button hover inverts alongside the accent token */
       .dark .hover\:bg-neutral-800:hover { background-color: #d4d4d8; }
-      /* Keep the small "P" brand mark dark-on-light */
-      .dark .bg-neutral-950.rounded-xl > span,
-      .dark [aria-label="Postline composer"] .bg-neutral-950 { color: #0a0a0c; }
 
       /* Inputs + code */
       .dark input, .dark textarea, .dark select { color: #f4f4f5; }
@@ -149,8 +166,8 @@
       .dark .bg-white\/48 { background-color: rgba(39, 39, 42, 0.48); }
 
       /* Analytics chart — CSS overrides the hardcoded SVG palette (CSS
-         fill/stroke beat presentation attributes) so the chart isn't a
-         light island on a dark page. */
+        fill/stroke beat presentation attributes) so the chart isn't a
+        light island on a dark page. */
       .dark [data-analytics-chart] rect[rx="16"] { fill: #101014; }
       .dark [data-analytics-chart] line[stroke="#e4e4e7"] { stroke: #2a2a2e; }
       .dark [data-analytics-chart] text[fill="#18181b"] { fill: #e4e4e7; }
@@ -230,13 +247,13 @@
     <link rel="stylesheet" href="/assets/styles/postline-toast.css">
     <link rel="stylesheet" href="/assets/styles/postline-timeline.css">
   </head>
-  <body class="min-h-screen min-w-80 antialiased font-sans text-neutral-950 bg-[#f3f3f1]">
+  <body class="min-h-screen min-w-80 antialiased font-sans text-ink bg-bg">
     <div class="grid grid-cols-1 grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] lg:grid-rows-1 min-h-screen duration-200 ease-out transition-[grid-template-columns]" data-postline-app data-postline-shell>
       <PostlineSidebar />
 
-      <div class="relative min-w-0 bg-[#f3f3f1]" data-postline-content-shell>
+      <div class="relative min-w-0 bg-bg" data-postline-content-shell>
         <button
-          class="inline-flex fixed left-3.5 top-3.5 z-[90] items-center justify-center h-9 w-9 text-zinc-700 hover:text-zinc-900 bg-white/95 hover:bg-white border border-zinc-200/90 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60 shadow-[0_8px_28px_rgba(24,31,42,0.12)] backdrop-blur-sm"
+          class="inline-flex fixed left-3.5 top-3.5 z-[90] items-center justify-center h-9 w-9 text-body hover:text-zinc-900 bg-white/95 hover:bg-white border border-zinc-200/90 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60 shadow-[0_8px_28px_rgba(24,31,42,0.12)] backdrop-blur-sm"
           type="button"
           aria-label="Expand sidebar"
           title="Expand sidebar"
@@ -245,7 +262,7 @@
         >
           <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true"><path fill-rule="evenodd" d="M4.75 4a.75.75 0 0 0-.75.75v10.5c0 .414.336.75.75.75h2.5a.75.75 0 0 0 0-1.5H5.5V5.5h7.69l-1.22-1.22a.75.75 0 1 1 1.06-1.06l2.5 2.5a.75.75 0 0 1 0 1.06l-2.5 2.5a.75.75 0 1 1-1.06-1.06L13.19 11H5.5v5.25h1.75a.75.75 0 0 0 0 1.5h-2.5A.75.75 0 0 0 4.75 15V4.75Z" clip-rule="evenodd"/></svg>
         </button>
-        <section class="overflow-hidden min-h-screen min-w-0 bg-[#f3f3f1] border-t border-zinc-200/80 lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace data-window-drag-region>
+        <section class="overflow-hidden min-h-screen min-w-0 bg-bg border-t border-zinc-200/80 lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace data-window-drag-region>
           <main class="p-3.5 sm:p-4 min-w-0" data-postline-router>
             @yield('content')
           </main>
