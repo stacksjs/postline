@@ -1,12 +1,95 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="text-ink bg-bg">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="@yield('description')">
-    <title>@yield('title')</title>
+    <meta name="color-scheme" content="light">
+    <title>@yield('title', 'Postline: self-hosted social crossposting')</title>
+    <meta name="description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon from one instance you own. Self-hosted, open, built on Stacks.')">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
+    <!-- Open Graph / social -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="@yield('title', 'Postline: self-hosted social crossposting')">
+    <meta property="og:description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon from one instance you own.')">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <!-- Geist (display) + Geist Mono (labels/code) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+      /*
+       * Marketing surface tokens. The landing is intentionally LIGHT-locked
+       * (one deliberate dark section owns its own colors). These values back the
+       * Crosswind semantic utilities registered in config/crosswind.ts
+       * (bg / panel / line / ink / body / muted / accent).
+       */
+      :root {
+        color-scheme: light;
+        --bg: #f4f4f2;
+        --panel: #ffffff;
+        --panel-2: #ececeb;
+        --panel-3: #e6e6e4;
+        --line: #e4e4e7;
+        --ink: #0a0a0a;
+        --body: #3f3f46;
+        --muted: #71717a;
+        --accent: #10b981;
+        --on-accent: #ffffff;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      body { background-color: var(--bg); color: var(--ink); }
+
+      .font-mono { font-family: 'Geist Mono', ui-monospace, monospace; }
+
+      ::selection { background: var(--accent); color: var(--on-accent); }
+
+      :where(a, button):focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+        border-radius: 4px;
+      }
+
+      /*
+       * Scroll-reveal via CSS scroll-driven animations — no JS, no motion library.
+       * The opacity:0 base is gated behind @supports so browsers without
+       * animation-timeline (and reduced-motion users) always render content visible.
+       */
+      @keyframes reveal-up {
+        from { opacity: 0; transform: translateY(24px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @supports (animation-timeline: view()) {
+        @media (prefers-reduced-motion: no-preference) {
+          .reveal {
+            opacity: 0;
+            animation: reveal-up linear both;
+            animation-timeline: view();
+            animation-range: entry 0% cover 28%;
+          }
+        }
+      }
+
+      /* Providers marquee — track holds two identical halves; -50% loops seamlessly. */
+      @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+      .marquee-track { animation: marquee 32s linear infinite; }
+
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        .marquee-track { animation: none; }
+      }
+    </style>
   </head>
-  <body>
+  <body class="min-w-0 antialiased">
     @yield('content')
     @yield('footer')
     @stack('scripts')
