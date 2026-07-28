@@ -14,6 +14,7 @@ import type { CrosswindOptions } from '@cwcss/crosswind'
 export default {
   content: [
     './resources/views/**/*.stx',
+    './components/**/*.stx',
     './resources/assets/scripts/**/*.{ts,js}',
   ],
 

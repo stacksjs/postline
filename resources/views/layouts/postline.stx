@@ -137,8 +137,12 @@
       .dark .hover\:bg-white:hover { background-color: #26262a; }
       .dark .hover\:bg-zinc-50:hover { background-color: #26262a; }
       .dark .hover\:bg-zinc-100:hover { background-color: #2f2f34; }
+      .dark .hover\:text-zinc-900:hover { color: #f4f4f5; }
       /* Primary-button hover inverts alongside the accent token */
       .dark .hover\:bg-neutral-800:hover { background-color: #d4d4d8; }
+
+      /* Sidebar control-button borders (opacity variants, no token) */
+      .dark .border-zinc-200\/70 { border-color: rgb(63 63 70 / 0.7); }
 
       /* Inputs + code */
       .dark input, .dark textarea, .dark select { color: #f4f4f5; }

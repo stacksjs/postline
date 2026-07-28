@@ -167,8 +167,10 @@
           renderStatus(data)
         }
         catch (error) {
+          // Inline status ("Setup" / "Not connected") communicates the failure;
+          // no toast on load so an expired session can't spam one each visit.
           renderStatus(null)
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Bluesky' })
+          console.warn('[postline] bluesky status failed:', error)
         }
       }
 

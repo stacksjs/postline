@@ -173,7 +173,10 @@
         }).join('')
       }
 
-      const refresh = async () => {
+      // `manual` = user clicked Refresh (toast feedback is wanted). On the
+      // initial auto-load we stay silent and let the inline feed state speak,
+      // so a failing load never spams a toast (and never stacks across pages).
+      const refresh = async ({ manual = false } = {}) => {
         button?.setAttribute('disabled', 'disabled')
         if (refreshLabel) refreshLabel.textContent = 'Refreshing…'
         renderSkeleton()
@@ -184,14 +187,14 @@
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky timeline sync failed.')
           renderItems(payload.data.items)
-          if (toast) toast({ title: 'Timeline', message: `Loaded ${payload.data.items?.length || 0} posts.`, tone: 'success', durationMs: 3200 })
+          if (manual && toast) toast({ title: 'Timeline', message: `Loaded ${payload.data.items?.length || 0} posts.`, tone: 'success', durationMs: 3200 })
         }
         catch (error) {
           if (list) {
             list.innerHTML = `<p class="postline-feed__empty">${escapeHtml(error instanceof Error ? error.message : String(error))}</p>`
           }
           if (meta) meta.textContent = 'Could not load feed'
-          if (toast) toast({ title: 'Timeline', message: error instanceof Error ? error.message : String(error), tone: 'error' })
+          if (manual && toast) toast({ title: 'Timeline', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'timeline-load' })
         }
         finally {
           button?.removeAttribute('disabled')
@@ -199,7 +202,7 @@
         }
       }
 
-      button?.addEventListener('click', refresh)
+      button?.addEventListener('click', () => void refresh({ manual: true }))
       void refresh()
     })()
   </script>

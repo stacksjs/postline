@@ -209,3 +209,84 @@
   border-color: rgb(63 63 70 / 0.9);
   color: #e4e4e7;
 }
+
+/* Text — the title was hard-coded near-black, invisible on the dark surface. */
+.dark .postline-toast__title {
+  color: #f4f4f5;
+}
+
+.dark .postline-toast__message {
+  color: #a1a1aa;
+}
+
+.dark .postline-toast__close {
+  color: #71717a;
+}
+
+.dark .postline-toast__close:hover {
+  color: #f4f4f5;
+  background: rgb(63 63 70 / 0.6);
+}
+
+/* Icon chips — soften the bright light-tinted circles into subtle dark tints. */
+.dark .postline-toast--success .postline-toast__icon {
+  background: rgb(5 150 105 / 0.16);
+  color: #6ee7b7;
+}
+
+.dark .postline-toast--error .postline-toast__icon {
+  background: rgb(220 38 38 / 0.16);
+  color: #fca5a5;
+}
+
+.dark .postline-toast--info .postline-toast__icon {
+  background: rgb(37 99 235 / 0.16);
+  color: #93c5fd;
+}
+
+.dark .postline-toast--neutral .postline-toast__icon {
+  background: rgb(82 82 91 / 0.22);
+  color: #d4d4d8;
+}
+
+/* Status borders on the toast shell — match the tinted icon, not a light ring. */
+.dark .postline-toast--success {
+  border-color: rgb(5 150 105 / 0.4);
+}
+
+.dark .postline-toast--error {
+  border-color: rgb(220 38 38 / 0.4);
+}
+
+.dark .postline-toast--info {
+  border-color: rgb(37 99 235 / 0.4);
+}
+
+/* Action buttons + link (Bluesky "Open"/"Copy") */
+.dark .postline-toast__url {
+  color: #93c5fd;
+}
+
+.dark .postline-toast__url:hover {
+  color: #bfdbfe;
+}
+
+.dark .postline-toast__btn--primary {
+  color: #0a0a0c;
+  background: #f4f4f5;
+  border-color: #f4f4f5;
+}
+
+.dark .postline-toast__btn--primary:hover {
+  background: #e4e4e7;
+}
+
+.dark .postline-toast__btn--secondary {
+  color: #e4e4e7;
+  background: rgb(63 63 70 / 0.4);
+  border-color: rgb(63 63 70 / 0.9);
+}
+
+.dark .postline-toast__btn--secondary:hover {
+  background: rgb(63 63 70 / 0.7);
+}
