@@ -287,8 +287,12 @@
           applyConnection(list || [])
         }
         catch (error) {
+          // Load-time provider status: degrade quietly to the inline
+          // "No accounts yet — connect one" state instead of firing an
+          // intrusive error toast. A 401 here (e.g. an expired session)
+          // would otherwise spam a toast on every page load.
           applyConnection([])
-          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Accounts' })
+          console.warn('[postline] provider status failed:', error)
         }
       }
 

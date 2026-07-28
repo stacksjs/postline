@@ -292,10 +292,12 @@
           render(payload.data.items || [])
         }
         catch (error) {
+          // Degrade to the inline error state; no toast on load/refresh so a
+          // failing fetch (e.g. an expired session) can't spam or stack.
           const message = error instanceof Error ? error.message : String(error)
           if (pendingList) pendingList.innerHTML = `<p class="m-0 p-3 text-[13px] text-muted">${escapeHtml(message)}</p>`
           if (meta) meta.textContent = 'Could not load'
-          showToast({ title: 'Queue', message, tone: 'error' })
+          console.warn('[postline] queue load failed:', error)
         }
       }
 
