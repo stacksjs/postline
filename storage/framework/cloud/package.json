@@ -46,19 +46,19 @@
     "dev": "./dev local"
   },
   "dependencies": {
-    "@stacksjs/config": "^0.70.206",
-    "@stacksjs/dns": "^0.70.206",
-    "@stacksjs/logging": "^0.70.206",
-    "@stacksjs/path": "^0.70.206",
-    "@stacksjs/queue": "^0.70.206",
-    "@stacksjs/router": "^0.70.206",
-    "@stacksjs/storage": "^0.70.206",
-    "@stacksjs/utils": "^0.70.206",
-    "@stacksjs/validation": "^0.70.206"
+    "@stacksjs/config": "^0.70.212",
+    "@stacksjs/dns": "^0.70.212",
+    "@stacksjs/logging": "^0.70.212",
+    "@stacksjs/path": "^0.70.212",
+    "@stacksjs/queue": "^0.70.212",
+    "@stacksjs/router": "^0.70.212",
+    "@stacksjs/storage": "^0.70.212",
+    "@stacksjs/utils": "^0.70.212",
+    "@stacksjs/validation": "^0.70.212"
   },
   "devDependencies": {
-    "@stacksjs/cli": "^0.70.206",
+    "@stacksjs/cli": "^0.70.212",
     "better-dx": "^0.2.7",
-    "@stacksjs/env": "^0.70.206"
+    "@stacksjs/env": "^0.70.212"
   }
 }

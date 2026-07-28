@@ -19,8 +19,8 @@
     "url": "https://github.com/stacksjs/stacks/issues"
   },
   "scripts": {
-    "build:reset": "rm -rf node_modules pantry.lock && pantry install && ./buddy generate:model-files && ./buddy lint:fix && cd storage/framework && bun run build && cd ../../",
-    "buddy": "bun ./storage/framework/core/buddy/src/cli.ts",
+    "build:reset": "rm -rf node_modules pantry.lock && bun install && ./buddy generate:types && ./buddy lint:fix",
+    "buddy": "./buddy",
     "stacks": "./buddy",
     "setup": "./bootstrap",
     "fresh": "./buddy fresh",
@@ -53,9 +53,9 @@
     "release:major": "./buddy release --bump major",
     "changelog": "./buddy changelog",
     "generate": "./buddy generate",
-    "build:framework-types": "bun --filter='@stacksjs/types' --filter='@stacksjs/validation' --filter='@stacksjs/orm' --filter='@stacksjs/actions' --filter='@stacksjs/router' --filter='@stacksjs/email' --filter='@stacksjs/logging' --filter='@stacksjs/database' --filter='@stacksjs/env' --filter='@stacksjs/socials' --filter='@stacksjs/auth' run build",
-    "typecheck": "bun run build:framework-types && bun x tsc --noEmit",
-    "types:check": "bun tsc --noEmit",
+    "typecheck": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false",
+    "typecheck:app": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false",
+    "types:check": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false",
     "types:fix": "./buddy types:fix",
     "test": "./buddy test",
     "test:ui": "./buddy test:ui",
@@ -65,7 +65,7 @@
     "stx": "./buddy"
   },
   "dependencies": {
-    "stacks": "^0.70.206"
+    "stacks": "^0.70.212"
   },
   "devDependencies": {
     "better-dx": "^0.2.12"

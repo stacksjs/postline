@@ -8,12 +8,12 @@
     "preview": "bunpress preview"
   },
   "dependencies": {
-    "@stacksjs/alias": "^0.70.206",
-    "@stacksjs/cli": "^0.70.206",
-    "@stacksjs/config": "^0.70.206",
-    "@stacksjs/env": "^0.70.206",
-    "@stacksjs/path": "^0.70.206",
-    "@stacksjs/server": "^0.70.206",
-    "@stacksjs/storage": "^0.70.206"
+    "@stacksjs/alias": "^0.70.212",
+    "@stacksjs/cli": "^0.70.212",
+    "@stacksjs/config": "^0.70.212",
+    "@stacksjs/env": "^0.70.212",
+    "@stacksjs/path": "^0.70.212",
+    "@stacksjs/server": "^0.70.212",
+    "@stacksjs/storage": "^0.70.212"
   }
 }

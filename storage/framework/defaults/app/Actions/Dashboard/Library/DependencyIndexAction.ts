@@ -32,7 +32,7 @@ export default new Action({
           if (declaredSet[depName]) continue
           declaredSet[depName] = true
           const version = allDeps[depName]
-          const isWorkspace = version === '^0.70.206' || depName.startsWith('@stacksjs/')
+          const isWorkspace = version === 'workspace:*' || depName.startsWith('@stacksjs/')
           declared.push({ name: depName, version, isWorkspace, isScoped: depName.includes('/') })
         }
       }

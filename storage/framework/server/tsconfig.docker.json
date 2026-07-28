@@ -5,14 +5,9 @@
     "jsx": "preserve",
     "lib": ["esnext"],
     "moduleDetection": "force",
-    "baseUrl": ".",
     "module": "esnext",
     "moduleResolution": "bundler",
     "paths": {
-      "@stacksjs/*": ["../storage/framework/core/*/dist"],
-      "stacks/*": ["../storage/framework/core/*/dist"],
-      "buddy": ["../storage/framework/core/buddy/dist/index.js"],
-      "buddy/*": ["../storage/framework/core/buddy/dist/*"],
       "Actions/*": ["../app/Actions/*"],
       "Jobs/*": ["../app/Jobs/*"],
       "./app/*": ["../app/*"], // it's outside the dist folder

@@ -1,22 +1,32 @@
 <script server>
-// macOS-style web sidebar (@stacksjs/components' <Sidebar theme="macos">).
-// Sections come from the discovered-models manifest + config/dashboard.ts
-// toggles — the same data that used to drive the native NSOutlineView.
+// Web sidebar for the dashboard. Framework-owned nav chrome: the markup is
+// built server-side in resources/functions/dashboard/sidebar.ts and the look
+// lives in the plain-CSS <style> block below (stx does not expand Crosswind
+// @apply in a layout <style>, so it is hand-written). Sections come
+// from the discovered-models manifest + config/dashboard.ts toggles.
 // Project-root-anchored (`~/`), not relative. The stx client bundler resolves a
 // relative import against the PAGE that extends this layout, not against this
 // file, so `../../..` silently pointed somewhere different for every page depth
 // and the bundle failed for any page more than one level under views/dashboard.
-import { buildWebSidebarSections } from '~/storage/framework/defaults/resources/functions/dashboard/sidebar'
+import { buildSidebarChunks } from '~/storage/framework/defaults/resources/functions/dashboard/sidebar'
 
-export const sidebarSections = buildWebSidebarSections()
-
-// itemId → roles, for the client-side role filter below.
-export const sidebarRoleAttrs = JSON.stringify(
-  sidebarSections.flatMap(section => section.items
-    .filter(item => item.roles && item.roles.length > 0)
-    .map(item => ({ id: item.id, roles: item.roles }))),
-)
+// Pre-rendered, self-contained sidebar HTML (home link, section nav, settings
+// link), built server-side and interpolated raw below. This intentionally does
+// NOT depend on `@stacksjs/components`' <Sidebar>: 0.2.9x stopped shipping
+// tag-resolvable .stx sources (only hashed dist/ output), so the component
+// fatal-errored the whole dashboard with an ENOENT (stacksjs/stacks#1989). Each
+// rendered <a> already carries data-required-roles, which the applyRoleFilter
+// effect below reads directly for role gating.
+export const sidebarChunks = buildSidebarChunks()
 </script>
+
+<!-- Dashboard icon stylesheet. Most dashboard icons are applied via dynamic
+    `:class="…"` bindings whose class names live in <script> state, which the stx
+    Crosswind extractor can't see — so their CSS is never generated inline and they
+    render as empty boxes. The dev server generates the full icon set once and serves
+    it here (browser-cached), instead of inlining ~260KB into every page. Route:
+    `/__deps/dashboard-icons.css` in storage/framework/core/actions/src/dev/dashboard.ts. -->
+<link rel="stylesheet" href="/__deps/dashboard-icons.css">
 
 <style>
 /*
@@ -30,6 +40,176 @@ canvas[id$="_chart"] {
   display: block;
   width: 100% !important;
   height: 100% !important;
+}
+
+/*
+ * Dashboard body + sidebar. Plain CSS on purpose: stx serves a layout's raw
+ * style rules verbatim, but it does NOT expand Crosswind @apply here, so these
+ * are hand-written. Class names match the markup built in
+ * resources/functions/dashboard/sidebar.ts. Fixed 250px pane: Home pinned top,
+ * sections scroll in the middle, Settings pinned bottom.
+ */
+/*
+ * The window background is owned by the main content pane, not the body element.
+ * In the native Craft window the WKWebView is transparent and an
+ * NSVisualEffectView (real macOS vibrancy) sits behind the sidebar strip; a
+ * solid body background would paint over it. So the body stays clear and the
+ * content color lives on the scrolling pane, which lets the frosted material
+ * read through the translucent sidebar. (Do not write angle-bracket tag names in
+ * a layout style-block comment — stx parses them as elements and breaks out.)
+ */
+body {
+  background: transparent;
+}
+[data-stx-content] {
+  min-height: 100vh;
+  background: #f4f4f5;
+}
+.dark [data-stx-content] {
+  background: #0a0a0a;
+}
+.dashboard-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px 10px;
+  overflow: hidden;
+  /* Translucent so the native NSVisualEffectView vibrancy reads through in the
+     Craft window; the blur is the frosted-glass fallback in a plain browser,
+     where there is no material behind the pane. */
+  background: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  /* No hard border: a soft cast shadow to the right lifts the translucent pane
+     ABOVE the content, so it reads as a glass layer laid on top (Finder-style)
+     rather than a flat column butted beside it. The 1px inset is the hairline. */
+  box-shadow: 1px 0 0 rgba(0, 0, 0, 0.05), 12px 0 34px -10px rgba(0, 0, 0, 0.18);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  z-index: 40;
+}
+.sidebar-header {
+  flex-shrink: 0;
+  height: 38px;
+}
+.sidebar-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.sidebar-nav::-webkit-scrollbar {
+  width: 0;
+}
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: #3a3a3c;
+  font-size: 13px;
+  font-weight: 450;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.sidebar-link:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+.sidebar-link[data-active="true"] {
+  background: #007aff;
+  color: #fff;
+}
+.sidebar-link-home {
+  font-weight: 550;
+}
+.sidebar-nav .sidebar-link {
+  margin-top: 1px;
+}
+.sidebar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  opacity: 0.82;
+}
+.sidebar-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.sidebar-link[data-active="true"] .sidebar-icon {
+  opacity: 1;
+}
+.sidebar-section {
+  margin-top: 12px;
+}
+.sidebar-section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 22px;
+  padding: 0 10px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: #8a8a8e;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.sidebar-section-label:hover {
+  color: #6a6a6e;
+}
+.sidebar-section-list {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+}
+.sidebar-section.collapsed .sidebar-section-list {
+  display: none;
+}
+.sidebar-chevron {
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  opacity: 0.7;
+}
+.sidebar-section.collapsed .sidebar-chevron {
+  transform: rotate(-45deg);
+}
+.dark .dashboard-sidebar {
+  background: rgba(28, 28, 30, 0.55);
+  box-shadow: 1px 0 0 rgba(255, 255, 255, 0.06), 12px 0 34px -10px rgba(0, 0, 0, 0.55);
+}
+.dark .sidebar-link {
+  color: #d1d1d6;
+}
+.dark .sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.dark .sidebar-link[data-active="true"] {
+  background: #0a84ff;
+  color: #fff;
+}
+.dark .sidebar-section-label {
+  color: #8d8d92;
+}
+.dark .sidebar-section-label:hover {
+  color: #aeaeb2;
 }
 </style>
 
@@ -258,66 +438,105 @@ effect(() => {
 })
 </script>
 
-<Sidebar
-  :sections="sidebarSections"
-  theme="macos"
-  width="250"
-  collapseMode="hidden"
-  shellSelector="[data-stx-shell]"
-  persistKey="dashboard-sidebar-collapsed"
->
-  <template #header>
-    <!-- Traffic lights are native (titlebarHidden window) — this strip only
-        reserves their space and acts as the window drag region. -->
-    <SidebarHeader :showWindowControls="false" />
-  </template>
-</Sidebar>
+<aside data-stx-sidebar class="dashboard-sidebar" role="navigation" aria-label="Sidebar">
+  <!-- Traffic lights are native (titlebarHidden window) — this strip reserves
+      their space at the top of the pane so the first nav row clears them. -->
+  <div class="sidebar-header"></div>
+  {{{ sidebarChunks.top }}}
+  <nav class="sidebar-nav">{{{ sidebarChunks.nav }}}</nav>
+  {{{ sidebarChunks.bottom }}}
+</aside>
 
-<!-- Role map for the wiring script below; interpolated server-side. The div is
-    hidden and holds JSON as text, because a JSON-typed script tag would get
-    rewritten by the layout script processor (see the importmap comment above).
+<script>
+// Web sidebar wiring: collapse restore, active highlight, SPA navigation.
+// Runs as a plain <script> IIFE (like the import-map script above), NOT via
+// onMount: stx gives a LAYOUT no reactive scope of its own, so its onMount /
+// effect callbacks never fire ("global mountCallbacks: 0") — the previous
+// onMount version silently never ran, which is why no link was ever highlighted.
+// A DOMContentLoaded IIFE plus the stx:navigate event cover hard loads and every
+// SPA route change without depending on a scope mount.
+;(function () {
+  if (typeof document === 'undefined') return
 
-    Do not name that tag literally here. The script processor rewrites script
-    tags inside comments too, and eating this comment's closing marker turns
-    everything below into comment text, blanking the page. -->
-<div data-sidebar-roles hidden>{{ sidebarRoleAttrs }}</div>
-
-<script client>
-// Web sidebar wiring: SPA navigation, initial selection, role gating.
-onMount(() => {
-  const roleNode = document.querySelector('div[data-sidebar-roles]')
-  let sidebarRoleList = []
-  try { sidebarRoleList = JSON.parse(roleNode?.textContent || '[]') } catch {}
-
-  const pane = document.querySelector('[data-stx-sidebar]')
-  if (!pane) return
-
-  // Role-gate rows (picked up by the applyRoleFilter effect above).
-  for (const entry of sidebarRoleList) {
-    const row = pane.querySelector(`[data-sidebar-row][data-item-id="${entry.id}"]`)
-    if (row) row.setAttribute('data-required-roles', entry.roles.join(','))
+  // Highlight the sidebar link for the CURRENT route. Longest-prefix match, so a
+  // nested/detail page (e.g. /commerce/products/42) still lights up its section
+  // link (/commerce/products); the root link (/) only ever matches the home page.
+  function syncActive(url) {
+    var pane = document.querySelector('[data-stx-sidebar]')
+    if (!pane) return
+    var path
+    try { path = new URL(url || location.href, location.origin).pathname }
+    catch (e) { path = location.pathname }
+    var norm = function (p) { return (p || '/').replace(/\/+$/, '') || '/' }
+    var cur = norm(path)
+    var best = null
+    var bestLen = -1
+    var links = pane.querySelectorAll('a.sidebar-link[href]')
+    for (var i = 0; i < links.length; i++) {
+      var href = links[i].getAttribute('href') || ''
+      if (href.indexOf('http') === 0) continue
+      var h = norm(href)
+      // `${cur}/`.startsWith(`${h}/`) catches an exact hit and any child path,
+      // while the trailing slash stops /health matching /health-check.
+      if ((cur + '/').indexOf(h + '/') === 0 && h.length > bestLen) {
+        best = links[i]
+        bestLen = h.length
+      }
+    }
+    var actives = pane.querySelectorAll('a.sidebar-link[data-active]')
+    for (var j = 0; j < actives.length; j++) actives[j].removeAttribute('data-active')
+    if (best) best.setAttribute('data-active', 'true')
   }
 
-  // Highlight the row for the current route on hard loads.
-  const activeClasses = (pane.dataset.activeClass || '').split(' ').filter(Boolean)
-  const current = pane.querySelector(`[data-sidebar-item][href="${window.location.pathname}"]`)
-  if (current && !pane.querySelector('[data-sidebar-item][data-active="true"]')) {
-    current.setAttribute('data-active', 'true')
-    current.classList.add(...activeClasses)
+  function init() {
+    var pane = document.querySelector('[data-stx-sidebar]')
+    if (!pane) return
+
+    // Restore per-section collapsed state persisted by the section toggle
+    // (the inline onclick in renderSection writes localStorage['sidebar-collapsed']).
+    try {
+      var saved = JSON.parse(localStorage.getItem('sidebar-collapsed') || '{}')
+      var sections = pane.querySelectorAll('.sidebar-section')
+      for (var i = 0; i < sections.length; i++) {
+        if (saved[sections[i].getAttribute('data-section')]) sections[i].classList.add('collapsed')
+      }
+    } catch (e) {}
+
+    syncActive()
+
+    // Bind route + click listeners once. This script can re-run on SPA fragment
+    // swaps, so guard against stacking duplicate handlers on the persistent pane.
+    if (!pane.__sidebarWired) {
+      pane.__sidebarWired = true
+
+      // Follow EVERY route change, not just sidebar clicks. navigate() dispatches
+      // stx:navigate (content links, programmatic navigate, and popstate
+      // back/forward all route through it), so the highlight tracks the real
+      // route instead of only updating when a sidebar item is clicked.
+      window.addEventListener('stx:navigate', function (event) {
+        syncActive(event && event.detail && event.detail.url)
+      })
+
+      // SPA-navigate sidebar links; fall back to full loads when the router isn't
+      // available or the target is external. The highlight is driven by the
+      // stx:navigate listener above, so we don't toggle data-active here.
+      pane.addEventListener('click', function (event) {
+        var link = event.target.closest('a.sidebar-link')
+        if (!link) return
+        var href = link.getAttribute('href')
+        if (!href || href.indexOf('http') === 0 || typeof navigate !== 'function') return
+        event.preventDefault()
+        navigate(href)
+      })
+    }
   }
 
-  // SPA-navigate sidebar links; fall back to full loads when the router
-  // isn't available.
-  pane.addEventListener('click', (event) => {
-    const link = event.target.closest('a[data-sidebar-item]')
-    if (!link || typeof navigate !== 'function') return
-    event.preventDefault()
-    navigate(link.getAttribute('href'))
-  })
-})
+  if (document.querySelector('[data-stx-sidebar]')) init()
+  else document.addEventListener('DOMContentLoaded', init)
+})();
 </script>
 
-<main data-stx-content data-stx-shell style="margin-left: var(--stx-sidebar-width, 250px); transition: margin-left 0.3s ease-out">
+<main data-stx-content style="margin-left: 250px">
   @slot('content')
 </main>
 
@@ -325,7 +544,7 @@ onMount(() => {
     Pointer-events-none on the wrapper + auto on individual toasts so
     surrounding UI stays clickable while a toast is up. -->
 <div class="flex fixed right-4 top-4 z-[60] flex-col gap-2 max-w-sm w-full pointer-events-none">
-  @foreach(toasts() as toast)
+  <template :for="toast in toasts">
     <div role="alert" aria-live="assertive" :class="toastWrapperClass(toast.type)">
       <div class="flex gap-3 items-start p-4">
         <div :class="toastIconClass(toast.type)"></div>
@@ -342,11 +561,5 @@ onMount(() => {
         </button>
       </div>
     </div>
-  @endforeach
+  </template>
 </div>
-
-<style>
-body {
-  @apply bg-neutral-100 dark:bg-neutral-950;
-}
-</style>
