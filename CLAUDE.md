@@ -21,3 +21,6 @@
 ## Commits
 
 - Use conventional commit messages (e.g., `fix:`, `feat:`, `chore:`)
+- **No AI attribution.** Never add `Co-Authored-By: Claude ...` (or any AI
+  co-author trailer) to commits, and never add "Generated with Claude Code"
+  to commits or PR bodies. This applies to this repo and to upstream PRs.
