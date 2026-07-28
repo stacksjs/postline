@@ -190,7 +190,7 @@
   background: rgb(239 246 255);
 }
 
-.postline-feed-post__stat svg {
+.postline-feed-post__stat :is(svg, span) {
   flex-shrink: 0;
 }
 

@@ -22,7 +22,7 @@ export async function fetchThreadsStatus(): Promise<ThreadsStatusPayload> {
 
 export function formatThreadsConnectionLabel(status: ThreadsStatusPayload): string {
   if (status.canPublish && status.handle) return `@${status.handle}`
-  if (status.handle) return `@${status.handle} — reconnect`
+  if (status.handle) return `@${status.handle}, reconnect`
   if (status.configuredFromEnv) return 'Configured in .env'
   if (status.oauthConfigured) return 'Connect with Threads'
   return 'Not configured'

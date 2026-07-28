@@ -258,16 +258,16 @@ function fillStats(payload: AnalyticsPayload): void {
 
   const engagement = stats.engagement
   const interactions = engagement ? engagement.likes + engagement.reposts + engagement.replies : 0
-  set('[data-analytics-engagement]', engagement?.syncedTargets ? String(interactions) : '—')
+  set('[data-analytics-engagement]', engagement?.syncedTargets ? String(interactions) : 'Not available')
   set(
     '[data-analytics-engagement-trend]',
     engagement?.syncedTargets
       ? `${engagement.likes} likes · ${engagement.reposts} reposts · ${engagement.replies} replies`
       : 'Syncs after publishing to Bluesky',
   )
-  set('[data-analytics-best-channel]', stats.bestChannel ? (providerNames[stats.bestChannel.provider] || stats.bestChannel.provider) : '—')
+  set('[data-analytics-best-channel]', stats.bestChannel ? (providerNames[stats.bestChannel.provider] || stats.bestChannel.provider) : 'Not available')
   set('[data-analytics-best-channel-trend]', stats.bestChannel ? `${stats.bestChannel.published} published posts` : 'No published posts yet')
-  set('[data-analytics-best-window]', stats.bestHour ? formatHour(stats.bestHour.hour) : '—')
+  set('[data-analytics-best-window]', stats.bestHour ? formatHour(stats.bestHour.hour) : 'Not available')
   set('[data-analytics-best-window-trend]', stats.bestHour ? `${stats.bestHour.count} posts published` : 'No published posts yet')
 
   const mix = page.querySelector('[data-analytics-channel-mix]')

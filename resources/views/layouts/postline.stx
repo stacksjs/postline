@@ -241,6 +241,15 @@
         [data-sidebar-expand-fab] {
           display: none;
         }
+
+        [data-postline-mobile-nav] {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+
+        [data-postline-mobile-nav]::-webkit-scrollbar {
+          display: none;
+        }
       }
 
       [data-postline-app] :is(a, button, [role='button']):focus-visible {
@@ -264,7 +273,7 @@
           data-sidebar-expand-fab
           data-no-window-drag
         >
-          <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true"><path fill-rule="evenodd" d="M4.75 4a.75.75 0 0 0-.75.75v10.5c0 .414.336.75.75.75h2.5a.75.75 0 0 0 0-1.5H5.5V5.5h7.69l-1.22-1.22a.75.75 0 1 1 1.06-1.06l2.5 2.5a.75.75 0 0 1 0 1.06l-2.5 2.5a.75.75 0 1 1-1.06-1.06L13.19 11H5.5v5.25h1.75a.75.75 0 0 0 0 1.5h-2.5A.75.75 0 0 0 4.75 15V4.75Z" clip-rule="evenodd"/></svg>
+          <span class="h-[18px] w-[18px] i-hugeicons-sidebar-right" aria-hidden="true"></span>
         </button>
         <section class="overflow-hidden min-h-screen min-w-0 bg-bg border-t border-zinc-200/80 lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace data-window-drag-region>
           <main class="p-3.5 sm:p-4 min-w-0" data-postline-router>

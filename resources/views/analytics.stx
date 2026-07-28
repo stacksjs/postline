@@ -21,22 +21,22 @@
     <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
       <article class="grid gap-2 p-3.5 bg-panel border border-line rounded-2xl shadow-sm">
         <span class="text-muted text-xs">Posts this week</span>
-        <strong class="text-2xl" data-analytics-posts-week>—</strong>
+        <strong class="text-2xl" data-analytics-posts-week>0</strong>
         <span class="text-muted text-xs" data-analytics-posts-trend>Loading…</span>
       </article>
       <article class="grid gap-2 p-3.5 bg-panel border border-line rounded-2xl shadow-sm">
         <span class="text-muted text-xs">Engagement</span>
-        <strong class="text-2xl" data-analytics-engagement>—</strong>
+        <strong class="text-2xl" data-analytics-engagement>Not available</strong>
         <span class="text-muted text-xs" data-analytics-engagement-trend>Loading…</span>
       </article>
       <article class="grid gap-2 p-3.5 bg-panel border border-line rounded-2xl shadow-sm">
         <span class="text-muted text-xs">Best channel</span>
-        <strong class="text-2xl" data-analytics-best-channel>—</strong>
+        <strong class="text-2xl" data-analytics-best-channel>Not available</strong>
         <span class="text-muted text-xs" data-analytics-best-channel-trend>Loading…</span>
       </article>
       <article class="grid gap-2 p-3.5 bg-panel border border-line rounded-2xl shadow-sm">
         <span class="text-muted text-xs">Best window</span>
-        <strong class="text-2xl" data-analytics-best-window>—</strong>
+        <strong class="text-2xl" data-analytics-best-window>Not available</strong>
         <span class="text-muted text-xs" data-analytics-best-window-trend>Loading…</span>
       </article>
     </div>

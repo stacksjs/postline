@@ -63,7 +63,7 @@
           </div>
         </div>
 
-        <footer class="flex gap-3 items-center justify-between p-3 border-line border-t">
+        <footer class="flex flex-col gap-3 items-stretch justify-between sm:flex-row sm:items-center p-3 border-line border-t">
           <div class="flex gap-2 items-center min-w-0">
             <span class="text-muted text-xs whitespace-nowrap" data-bluesky-count>0 / 300 characters</span>
             <span class="hidden gap-1.5 items-center px-2.5 max-w-48 min-h-7 font-bold text-muted text-xs bg-panel-2 border border-line rounded-lg" data-attach-chip>
@@ -74,7 +74,7 @@
               </button>
             </span>
           </div>
-          <div class="flex flex-wrap gap-2 items-center justify-end">
+          <div class="flex flex-nowrap gap-2 items-center justify-end w-full sm:w-auto">
             <input class="hidden" type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="Attach image" data-attach-input>
             <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach image" title="Attach image" data-attach-button>
               <span class="h-4 w-4 i-hugeicons-image-01" aria-hidden="true"></span>
@@ -89,7 +89,7 @@
             <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Preview post" title="Preview post" data-preview-post>
               <span class="h-4 w-4 i-hugeicons-view" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" data-bluesky-publish>
+            <button class="inline-flex gap-2 items-center justify-center ml-auto px-4 sm:ml-0 h-9 font-bold text-on-accent bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" data-bluesky-publish>
               <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
               <span data-bluesky-publish-label>Publish</span>
             </button>
@@ -223,7 +223,7 @@
       const renderProviderToggles = () => {
         if (!providerToggles) return
         if (providers.length === 0) {
-          providerToggles.innerHTML = '<a class="inline-flex items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-xl transition-colors" href="/accounts" data-stx-link>No accounts yet — connect one →</a>'
+          providerToggles.innerHTML = '<a class="inline-flex items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-xl transition-colors" href="/accounts" data-stx-link>No accounts yet. Connect one →</a>'
           return
         }
         providerToggles.replaceChildren(...providers.map(createProviderToggle))
@@ -656,7 +656,7 @@
           return
         }
         if (activeMode === 'thread' && allPosts().filter(post => textareaFor(post)?.value.trim()).length > 1) {
-          setStatus('Scheduling threads is not supported yet — schedule posts one at a time.', 'error', { title: 'Queue' })
+          setStatus('Scheduling threads is not supported yet. Schedule posts one at a time.', 'error', { title: 'Queue' })
           return
         }
 
@@ -694,7 +694,7 @@
           saveDraft()
           setStatus(
             payload.data.status === 'scheduled'
-              ? `Scheduled — check the Queue page to manage it.`
+              ? `Scheduled. Check the Queue page to manage it.`
               : 'Draft saved to the queue.',
             'success',
             { title: payload.data.status === 'scheduled' ? 'Scheduled' : 'Draft saved' },
@@ -843,10 +843,10 @@
           if (composeTitle) composeTitle.value = ''
           window.postlineToast?.dismiss?.('publish')
           if (failures.length && successCount === 0) {
-            setStatus(`Publish failed — ${failures.join('; ')}`, 'error', { title: 'Publish failed' })
+            setStatus(`Publish failed. ${failures.join('; ')}`, 'error', { title: 'Publish failed' })
           }
           else if (failures.length) {
-            setStatus(`Published, but some targets failed — ${failures.join('; ')}`, 'info', { title: 'Partially published', url: lastUrl })
+            setStatus(`Published, but some targets failed. ${failures.join('; ')}`, 'info', { title: 'Partially published', url: lastUrl })
           }
           else {
             setStatus(

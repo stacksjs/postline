@@ -144,7 +144,7 @@
           detail.textContent = connected
             ? 'Ready to publish and sync timeline from Postline.'
             : data?.handle
-              ? 'Saved handle found — add a valid app password to publish.'
+              ? 'Saved handle found. Add a valid app password to publish.'
               : 'Add an app password to publish and sync your timeline.'
         }
         if (status) {
@@ -209,7 +209,7 @@
         const connected = Boolean(data?.canPublish)
         const label = data?.displayName || data?.handle || 'Not connected'
         if (linkedinHandle) {
-          linkedinHandle.textContent = connected ? label : (data?.handle ? `${label} — reconnect` : 'Not connected')
+          linkedinHandle.textContent = connected ? label : (data?.handle ? `${label}, reconnect` : 'Not connected')
         }
         if (linkedinDetail) {
           linkedinDetail.textContent = connected
@@ -217,7 +217,7 @@
             : data?.oauthConfigured
               ? 'Connect with LinkedIn to crosspost member shares.'
               : data?.configuredFromEnv
-                ? 'Token found in .env — connect to start crossposting.'
+                ? 'Token found in .env. Connect to start crossposting.'
                 : 'Add LinkedIn API keys to .env, then connect.'
         }
         if (linkedinStatusPill) {
@@ -307,7 +307,7 @@
         const connected = Boolean(data?.canPublish)
         const label = data?.handle ? `@${data.handle}` : 'Not connected'
         if (twitterHandle) {
-          twitterHandle.textContent = connected ? label : (data?.handle ? `${label} — reconnect` : 'Not connected')
+          twitterHandle.textContent = connected ? label : (data?.handle ? `${label}, reconnect` : 'Not connected')
         }
         if (twitterDetail) {
           twitterDetail.textContent = connected
@@ -315,7 +315,7 @@
             : data?.oauthConfigured
               ? 'Connect X to crosspost tweets. Posting needs a paid X API tier.'
               : data?.configuredFromEnv
-                ? 'Token found in .env — connect to start crossposting.'
+                ? 'Token found in .env. Connect to start crossposting.'
                 : 'Add X (Twitter) API keys to .env, then connect.'
         }
         if (twitterStatusPill) {
@@ -406,7 +406,7 @@
         const connected = Boolean(data?.canPublish)
         const label = data?.handle ? `@${data.handle}` : 'Not connected'
         if (instagramHandle) {
-          instagramHandle.textContent = connected ? label : (data?.handle ? `${label} — reconnect` : 'Not connected')
+          instagramHandle.textContent = connected ? label : (data?.handle ? `${label}, reconnect` : 'Not connected')
         }
         if (instagramDetail) {
           instagramDetail.textContent = connected
@@ -414,7 +414,7 @@
             : data?.oauthConfigured
               ? 'Connect an Instagram Business account to crosspost. Posts require an image.'
               : data?.configuredFromEnv
-                ? 'Token found in .env — connect to start crossposting.'
+                ? 'Token found in .env. Connect to start crossposting.'
                 : 'Add Instagram Graph API keys to .env, then connect.'
         }
         if (instagramStatusPill) {
@@ -502,7 +502,7 @@
         const connected = Boolean(data?.canPublish)
         const label = data?.handle ? `@${data.handle}` : 'Not connected'
         if (threadsHandle) {
-          threadsHandle.textContent = connected ? label : (data?.handle ? `${label} — reconnect` : 'Not connected')
+          threadsHandle.textContent = connected ? label : (data?.handle ? `${label}, reconnect` : 'Not connected')
         }
         if (threadsDetail) {
           threadsDetail.textContent = connected
@@ -510,7 +510,7 @@
             : data?.oauthConfigured
               ? 'Connect a Threads account to crosspost.'
               : data?.configuredFromEnv
-                ? 'Token found in .env — connect to start crossposting.'
+                ? 'Token found in .env. Connect to start crossposting.'
                 : 'Add Threads API keys to .env, then connect.'
         }
         if (threadsStatusPill) {
@@ -598,13 +598,13 @@
 
       const renderMastodon = (data) => {
         const connected = Boolean(data?.canPublish)
-        if (mastodonHandle) mastodonHandle.textContent = connected ? data.handle : (data?.handle ? `${data.handle} — reconnect` : 'Not connected')
+        if (mastodonHandle) mastodonHandle.textContent = connected ? data.handle : (data?.handle ? `${data.handle}, reconnect` : 'Not connected')
         if (mastodonInstance && data?.instance) mastodonInstance.value = data.instance
         if (mastodonDetail) {
           mastodonDetail.textContent = connected
             ? 'Ready to crosspost from Postline.'
             : data?.configuredFromEnv
-              ? 'Token found in .env — connect to start crossposting.'
+              ? 'Token found in .env. Connect to start crossposting.'
               : 'Connect any Mastodon instance with an access token to crosspost.'
         }
         if (mastodonStatusPill) {

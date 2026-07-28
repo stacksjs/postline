@@ -5,16 +5,16 @@
 
 @section('content')
   <section class="grid gap-4" data-postline-page="timeline" data-testid="timeline-page">
-    <header class="flex gap-4 items-center justify-between min-h-11">
+    <header class="flex flex-col gap-4 items-stretch justify-between sm:flex-row sm:items-center min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Timeline</p>
         <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Home feed</h1>
         <p class="mb-0 mt-1.5 text-[13px] text-muted">Posts from your connected Bluesky account.</p>
       </div>
-      <div class="flex gap-2 items-center">
+      <div class="grid sm:flex gap-2 grid-cols-2 items-center">
         <a class="inline-flex items-center justify-center px-4 h-9 font-bold text-ink text-sm bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" href="/" data-stx-link>Compose</a>
         <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" data-bluesky-timeline-refresh>
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.312 4.818A.75.75 0 0 0 14 4H6.5a.75.75 0 0 0 0 1.5h5.992l-4.43 4.431a.75.75 0 1 0 1.06 1.06l5.784-5.784a.75.75 0 0 0 0-1.06l-5.784-5.784a.75.75 0 0 0-1.06 1.06l4.43 4.43H6a2.75 2.75 0 0 0 0 5.5h8.312a.75.75 0 0 0 .53-.22l2.25-2.25a.75.75 0 0 0-1.06-1.06l-1.72 1.72H6a1.25 1.25 0 0 1 0-2.5h7.312a.75.75 0 0 0 .53-.22l2.25-2.25a.75.75 0 0 0 0-1.06l-2.25-2.25a.75.75 0 0 0-.53-.22Z" clip-rule="evenodd"/></svg>
+          <span class="h-4 w-4 i-hugeicons-refresh" aria-hidden="true"></span>
           <span data-bluesky-timeline-refresh-label>Refresh</span>
         </button>
       </div>
@@ -45,10 +45,10 @@
       const meta = root.querySelector('[data-bluesky-timeline-meta]')
       const toast = window.postlineToast?.show
 
-      const ICON_REPLY = '<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.22 3.22A.75.75 0 0 1 8 3h7.25a.75.75 0 0 1 .53.22l3.25 3.25a.75.75 0 0 1 0 1.06l-3.25 3.25a.75.75 0 0 1-1.06-1.06L15.19 5.5H8.81l1.72 1.72a.75.75 0 1 1-1.06 1.06l-3.25-3.25a.75.75 0 0 1 0-1.06l3.25-3.25a.75.75 0 0 1 1.06 0ZM2.75 6A.75.75 0 0 1 3.5 5.25h7a.75.75 0 0 1 0 1.5h-7A.75.75 0 0 1 2.75 6Zm0 4.5a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H3.5a.75.75 0 0 1-.75-.75Zm0 4.5a.75.75 0 0 1 .75-.75h7a.75.75 0 0 1 0 1.5h-7a.75.75 0 0 1-.75-.75Z" clip-rule="evenodd"/></svg>'
-      const ICON_REPOST = '<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M15.312 4.818A.75.75 0 0 0 14 4H6.5a.75.75 0 0 0 0 1.5h5.44l-3.97 3.97a.75.75 0 1 0 1.06 1.06l5.22-5.22a.75.75 0 0 0 0-1.06l-5.22-5.22a.75.75 0 0 0-1.06 1.06l3.97 3.97H6a2.75 2.75 0 0 0 0 5.5h8.312a.75.75 0 0 0 .53-.22l2.25-2.25a.75.75 0 0 0-1.06-1.06l-1.72 1.72H6a1.25 1.25 0 0 1 0-2.5h7.312a.75.75 0 0 0 .53-.22l2.25-2.25a.75.75 0 0 0 0-1.06l-2.25-2.25a.75.75 0 0 0-.53-.22Z" clip-rule="evenodd"/></svg>'
-      const ICON_LIKE = '<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M1.66 10.68a4.5 4.5 0 0 1 6.36-4.04l.54.22V4.5a.75.75 0 0 1 1.5 0v3.88l.54-.22a4.5 4.5 0 1 1 6.02 5.9 5.48 5.48 0 0 1-1.06 1.23l-4.2 4.2a.75.75 0 0 1-1.06 0l-4.2-4.2a5.48 5.48 0 0 1-1.06-1.23 4.5 4.5 0 0 1-.44-4.68Z"/></svg>'
-      const ICON_EXTERNAL = '<svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h4a.75.75 0 0 1 0 1.5h-4Zm6.25-.75v4a.75.75 0 0 0 1.28.53l5.88-5.88a.75.75 0 0 0-1.06-1.06L11 7.94V3.5a.75.75 0 0 0-1.5 0Z" clip-rule="evenodd"/></svg>'
+      const ICON_REPLY = '<span class="h-4 w-4 i-hugeicons-comment-02" aria-hidden="true"></span>'
+      const ICON_REPOST = '<span class="h-4 w-4 i-hugeicons-repeat" aria-hidden="true"></span>'
+      const ICON_LIKE = '<span class="h-4 w-4 i-hugeicons-favourite" aria-hidden="true"></span>'
+      const ICON_EXTERNAL = '<span class="h-4 w-4 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span>'
 
       const escapeHtml = (value) => String(value || '')
         .replaceAll('&', '&amp;')

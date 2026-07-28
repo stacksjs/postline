@@ -22,7 +22,7 @@ export async function fetchLinkedInStatus(): Promise<LinkedInStatusPayload> {
 export function formatLinkedInConnectionLabel(status: LinkedInStatusPayload): string {
   if (status.canPublish && status.displayName) return status.displayName
   if (status.canPublish && status.handle) return status.handle
-  if (status.handle) return `${status.handle} — reconnect`
+  if (status.handle) return `${status.handle}, reconnect`
   if (status.configuredFromEnv) return 'Configured in .env'
   if (status.oauthConfigured) return 'Connect with LinkedIn'
   return 'Not configured'

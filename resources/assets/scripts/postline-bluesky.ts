@@ -20,7 +20,7 @@ export async function fetchBlueskyStatus(): Promise<BlueskyStatusPayload> {
 
 export function formatBlueskyConnectionLabel(status: BlueskyStatusPayload): string {
   if (status.canPublish && status.handle) return `@${status.handle}`
-  if (status.handle) return `@${status.handle} — needs app password`
+  if (status.handle) return `@${status.handle}, needs app password`
   if (status.configuredFromEnv) return 'Configured in .env'
   return 'Not connected'
 }

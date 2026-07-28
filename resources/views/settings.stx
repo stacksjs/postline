@@ -35,7 +35,7 @@
             <strong class="text-[13px]">Bluesky connection</strong>
             <p class="mb-0 mt-1 text-muted text-xs" data-settings-bluesky-summary>Checking…</p>
           </div>
-          <span class="px-2.5 py-1 font-bold text-[11px] text-muted border border-line rounded-full" data-settings-bluesky-pill>—</span>
+          <span class="px-2.5 py-1 font-bold text-[11px] text-muted border border-line rounded-full" data-settings-bluesky-pill>Checking</span>
         </header>
         <p class="m-0 leading-relaxed text-[13px] text-body">Postline uses a Bluesky app password (not your main login). You can also set <code class="px-1 py-0.5 text-xs bg-panel-3 rounded">BLUESKY_IDENTIFIER</code> and <code class="px-1 py-0.5 text-xs bg-panel-3 rounded">BLUESKY_APP_PASSWORD</code> in <code class="px-1 py-0.5 text-xs bg-panel-3 rounded">.env</code> for local dev.</p>
         <a class="inline-flex items-center justify-center px-4 h-9 w-fit font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" href="/accounts" data-stx-link>Manage on Accounts</a>
