@@ -6,15 +6,15 @@
 @section('content')
   <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
     <!-- Crosswind safelist: status pill + action + calendar classes are set from JS. -->
-    <div class="hidden text-amber-800 text-blue-700 text-emerald-700 text-red-700 text-zinc-500 text-zinc-600 bg-amber-50 bg-blue-50 bg-blue-500 bg-emerald-50 bg-emerald-500 bg-red-50 bg-red-500 bg-zinc-100 bg-zinc-400 bg-zinc-50 hover:bg-neutral-800 hover:bg-zinc-100 hover:bg-zinc-50 border-amber-200 border-blue-200 border-emerald-200 border-red-200 border-zinc-100 border-zinc-200 shadow-sm transition-colors" aria-hidden="true"></div>
+    <div class="hidden text-amber-800 text-blue-700 text-emerald-700 text-muted text-muted text-red-700 bg-amber-50 bg-blue-50 bg-blue-500 bg-emerald-50 bg-emerald-500 bg-panel-2 bg-panel-3 bg-red-50 bg-red-500 bg-zinc-400 hover:bg-neutral-800 hover:bg-zinc-100 hover:bg-zinc-50 border-amber-200 border-blue-200 border-emerald-200 border-line border-line border-red-200 shadow-sm transition-colors" aria-hidden="true"></div>
     <header class="flex flex-wrap gap-4 items-center justify-between min-h-11">
       <div>
-        <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Queue</p>
-        <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Scheduled posts</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">What's drafted, scheduled, and recently published.</p>
+        <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Queue</p>
+        <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Scheduled posts</h1>
+        <p class="mb-0 mt-1.5 text-[13px] text-muted">What's drafted, scheduled, and recently published.</p>
       </div>
       <div class="flex flex-wrap gap-2 items-center">
-        <div class="grid grid-cols-2 p-0.5 bg-zinc-100 border border-zinc-200 rounded-xl" role="group" aria-label="Queue view">
+        <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Queue view">
           <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-bold text-xs rounded-lg transition-colors" type="button" data-view-toggle="list">
             <span class="h-3.5 w-3.5 i-hugeicons-menu-01" aria-hidden="true"></span><span>List</span>
           </button>
@@ -22,7 +22,7 @@
             <span class="h-3.5 w-3.5 i-hugeicons-calendar-03" aria-hidden="true"></span><span>Calendar</span>
           </button>
         </div>
-        <a href="/" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-sm text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition-colors">
+        <a href="/" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors">
           <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
           <span>New post</span>
         </a>
@@ -30,35 +30,35 @@
     </header>
 
     <div class="grid gap-5" data-view-panel="list">
-      <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
-        <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
+      <section class="bg-panel border border-line rounded-2xl shadow-sm">
+        <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
           <strong class="text-[13px]">Upcoming &amp; drafts</strong>
-          <span class="text-xs text-zinc-500" data-queue-meta>Loading…</span>
+          <span class="text-muted text-xs" data-queue-meta>Loading…</span>
         </header>
         <div class="grid gap-2.5 p-3" data-queue-pending>
-          <p class="m-0 p-3 text-[13px] text-zinc-500" data-queue-pending-empty>Loading queue…</p>
+          <p class="m-0 p-3 text-[13px] text-muted" data-queue-pending-empty>Loading queue…</p>
         </div>
       </section>
 
-      <section class="bg-white border border-zinc-200 rounded-2xl shadow-sm">
-        <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
+      <section class="bg-panel border border-line rounded-2xl shadow-sm">
+        <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
           <strong class="text-[13px]">Recent</strong>
-          <span class="text-xs text-zinc-500" data-queue-recent-meta></span>
+          <span class="text-muted text-xs" data-queue-recent-meta></span>
         </header>
         <div class="grid gap-2.5 p-3" data-queue-recent>
-          <p class="m-0 p-3 text-[13px] text-zinc-500" data-queue-recent-empty>Loading…</p>
+          <p class="m-0 p-3 text-[13px] text-muted" data-queue-recent-empty>Loading…</p>
         </div>
       </section>
     </div>
 
-    <section class="hidden bg-white border border-zinc-200 rounded-2xl shadow-sm" data-view-panel="calendar">
-      <header class="flex gap-3 items-center justify-between p-3.5 border-b border-zinc-200">
+    <section class="hidden bg-panel border border-line rounded-2xl shadow-sm" data-view-panel="calendar">
+      <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
         <div class="flex gap-2 items-center">
-          <button class="inline-flex items-center justify-center h-8 w-8 text-zinc-600 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" type="button" aria-label="Previous month" data-cal-prev>
+          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Previous month" data-cal-prev>
             <span class="h-4 w-4 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
           </button>
-          <button class="inline-flex items-center justify-center px-3 h-8 font-bold text-neutral-950 text-xs bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" type="button" data-cal-today>Today</button>
-          <button class="inline-flex items-center justify-center h-8 w-8 text-zinc-600 bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" type="button" aria-label="Next month" data-cal-next>
+          <button class="inline-flex items-center justify-center px-3 h-8 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" data-cal-today>Today</button>
+          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Next month" data-cal-next>
             <span class="h-4 w-4 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
           </button>
         </div>
@@ -66,7 +66,7 @@
       </header>
       <div class="overflow-x-auto">
         <div class="min-w-[560px]">
-          <div class="grid grid-cols-7 font-bold text-[11px] text-zinc-500 border-b border-zinc-200">
+          <div class="grid grid-cols-7 font-bold text-[11px] text-muted border-b border-line">
             <div class="p-2 text-center">Sun</div><div class="p-2 text-center">Mon</div><div class="p-2 text-center">Tue</div><div class="p-2 text-center">Wed</div><div class="p-2 text-center">Thu</div><div class="p-2 text-center">Fri</div><div class="p-2 text-center">Sat</div>
           </div>
           <div class="grid grid-cols-7" data-cal-grid></div>
@@ -97,7 +97,7 @@
         if (status === 'scheduled') return `${base} text-blue-700 bg-blue-50 border-blue-200`
         if (status === 'publishing') return `${base} text-amber-800 bg-amber-50 border-amber-200`
         if (status === 'failed') return `${base} text-red-700 bg-red-50 border-red-200`
-        return `${base} text-zinc-600 bg-zinc-100 border-zinc-200`
+        return `${base} text-muted bg-panel-3 border-line`
       }
 
       const escapeHtml = (value) => String(value || '')
@@ -141,21 +141,21 @@
         const actionable = ['draft', 'scheduled', 'failed'].includes(item.status)
 
         return `
-          <article class="grid gap-2.5 p-3.5 bg-white border border-zinc-200 rounded-2xl" data-queue-item="${item.id}">
+          <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl" data-queue-item="${item.id}">
             <header class="flex gap-3 items-center justify-between">
               <div class="grid gap-1">
                 <span class="font-bold text-xs">${escapeHtml(when)}</span>
-                <span class="text-xs text-zinc-500">${escapeHtml(channels)}</span>
+                <span class="text-muted text-xs">${escapeHtml(channels)}</span>
               </div>
               <span class="${pillClass(item.status)}">${escapeHtml(item.status)}</span>
             </header>
-            <p class="m-0 leading-normal text-[13px] text-slate-700">${escapeHtml(item.body)}</p>
+            <p class="m-0 leading-normal text-[13px] text-body">${escapeHtml(item.body)}</p>
             ${failure ? `<p class="m-0 text-red-700 text-xs">${escapeHtml(failure)}</p>` : ''}
             <footer class="flex flex-wrap gap-2 items-center justify-end">
-              ${liveUrl ? `<a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-neutral-950 text-xs bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" href="${escapeHtml(liveUrl)}" target="_blank" rel="noopener noreferrer">View</a>` : ''}
-              ${actionable ? `<a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-neutral-950 text-xs bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" href="/?edit=${item.id}" data-stx-link>Edit</a>` : ''}
-              ${actionable ? `<button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-white text-xs bg-neutral-950 hover:bg-neutral-800 rounded-lg transition-colors" type="button" data-queue-publish="${item.id}">Publish now</button>` : ''}
-              ${actionable ? `<button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-red-700 text-xs bg-white hover:bg-zinc-50 border border-zinc-200 rounded-lg shadow-sm transition-colors" type="button" data-queue-delete="${item.id}">Delete</button>` : ''}
+              ${liveUrl ? `<a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" href="${escapeHtml(liveUrl)}" target="_blank" rel="noopener noreferrer">View</a>` : ''}
+              ${actionable ? `<a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" href="/?edit=${item.id}" data-stx-link>Edit</a>` : ''}
+              ${actionable ? `<button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-lg transition-colors" type="button" data-queue-publish="${item.id}">Publish now</button>` : ''}
+              ${actionable ? `<button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-red-700 text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" data-queue-delete="${item.id}">Delete</button>` : ''}
             </footer>
           </article>
         `
@@ -168,12 +168,12 @@
         if (pendingList) {
           pendingList.innerHTML = pending.length
             ? pending.map(itemHtml).join('')
-            : '<p class="m-0 p-3 text-[13px] text-zinc-500">Nothing queued yet. Schedule a post from the composer and it will show up here.</p>'
+            : '<p class="m-0 p-3 text-[13px] text-muted">Nothing queued yet. Schedule a post from the composer and it will show up here.</p>'
         }
         if (recentList) {
           recentList.innerHTML = recent.length
             ? recent.slice(0, 10).map(itemHtml).join('')
-            : '<p class="m-0 p-3 text-[13px] text-zinc-500">No published posts yet.</p>'
+            : '<p class="m-0 p-3 text-[13px] text-muted">No published posts yet.</p>'
         }
         if (meta) {
           const scheduled = pending.filter(item => item.status === 'scheduled').length
@@ -235,7 +235,7 @@
         const cells = []
 
         // Leading blanks from the previous month.
-        for (let i = 0; i < startOffset; i++) cells.push('<div class="p-1.5 min-h-24 bg-zinc-50/40 border-b border-r border-zinc-100"></div>')
+        for (let i = 0; i < startOffset; i++) cells.push('<div class="p-1.5 min-h-24 bg-zinc-50/40 border-b border-line border-r"></div>')
 
         for (let day = 1; day <= daysInMonth; day++) {
           const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
@@ -246,19 +246,19 @@
             const href = ['draft', 'scheduled', 'failed'].includes(item.status) ? `/?edit=${item.id}` : null
             const inner = `<span class="h-1.5 w-1.5 shrink-0 rounded-full ${dotClass(item.status)}"></span><span class="truncate">${escapeHtml(timeOf(item))} ${label}</span>`
             return href
-              ? `<a class="flex gap-1 items-center px-1 py-0.5 text-[10px] text-zinc-700 bg-zinc-50 hover:bg-zinc-100 rounded transition-colors" href="${href}" data-stx-link>${inner}</a>`
-              : `<span class="flex gap-1 items-center px-1 py-0.5 text-[10px] text-zinc-500 bg-zinc-50 rounded">${inner}</span>`
+              ? `<a class="flex gap-1 items-center px-1 py-0.5 text-[10px] text-body bg-panel-2 hover:bg-zinc-100 rounded transition-colors" href="${href}" data-stx-link>${inner}</a>`
+              : `<span class="flex gap-1 items-center px-1 py-0.5 text-[10px] text-muted bg-panel-2 rounded">${inner}</span>`
           }).join('')
           const more = dayItems.length > 3 ? `<span class="px-1 text-[10px] text-zinc-400">+${dayItems.length - 3} more</span>` : ''
           cells.push(`
-            <div class="min-h-24 p-1.5 grid content-start gap-1 border-b border-r border-zinc-100 ${isToday ? 'bg-blue-50/50' : 'bg-white'}">
-              <a class="text-[11px] font-bold ${isToday ? 'text-blue-700' : 'text-zinc-500'} hover:text-neutral-950 transition-colors" href="/?schedule=${key}" data-stx-link title="Schedule a post on this day">${day}</a>
+            <div class="min-h-24 p-1.5 grid content-start gap-1 border-b border-r border-line ${isToday ? 'bg-blue-50/50' : 'bg-panel'}">
+              <a class="text-[11px] font-bold ${isToday ? 'text-blue-700' : 'text-muted'} hover:text-neutral-950 transition-colors" href="/?schedule=${key}" data-stx-link title="Schedule a post on this day">${day}</a>
               ${chips}${more}
             </div>
           `)
         }
         // Trailing blanks to complete the last week row.
-        while (cells.length % 7 !== 0) cells.push('<div class="p-1.5 min-h-24 bg-zinc-50/40 border-b border-r border-zinc-100"></div>')
+        while (cells.length % 7 !== 0) cells.push('<div class="p-1.5 min-h-24 bg-zinc-50/40 border-b border-line border-r"></div>')
         calGrid.innerHTML = cells.join('')
       }
 
@@ -271,10 +271,10 @@
         panels.calendar?.classList.toggle('hidden', next !== 'calendar')
         viewToggles.forEach((button) => {
           const active = button.dataset.viewToggle === next
-          button.classList.toggle('bg-white', active)
-          button.classList.toggle('text-neutral-950', active)
+          button.classList.toggle('bg-panel', active)
+          button.classList.toggle('text-ink', active)
           button.classList.toggle('shadow-sm', active)
-          button.classList.toggle('text-zinc-500', !active)
+          button.classList.toggle('text-muted', !active)
         })
         try { localStorage.setItem('postline.queue.view', next) } catch {}
         if (next === 'calendar') renderCalendar()
@@ -293,7 +293,7 @@
         }
         catch (error) {
           const message = error instanceof Error ? error.message : String(error)
-          if (pendingList) pendingList.innerHTML = `<p class="m-0 p-3 text-[13px] text-zinc-500">${escapeHtml(message)}</p>`
+          if (pendingList) pendingList.innerHTML = `<p class="m-0 p-3 text-[13px] text-muted">${escapeHtml(message)}</p>`
           if (meta) meta.textContent = 'Could not load'
           showToast({ title: 'Queue', message, tone: 'error' })
         }

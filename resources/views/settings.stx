@@ -7,54 +7,54 @@
   <section class="grid gap-5" data-postline-page="settings" data-testid="settings-page">
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
-        <p class="mb-1.5 font-bold text-[11px] text-zinc-500 tracking-wider uppercase">Settings</p>
-        <h1 class="m-0 font-bold text-[22px] text-neutral-950 tracking-normal">Publishing</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-zinc-600">Defaults for Postline. Bluesky credentials live on Accounts.</p>
+        <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Settings</p>
+        <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Publishing</h1>
+        <p class="mb-0 mt-1.5 text-[13px] text-muted">Defaults for Postline. Bluesky credentials live on Accounts.</p>
       </div>
-      <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-neutral-950 text-sm bg-white hover:bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm transition-colors" type="button" data-sign-out>Sign out</button>
+      <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-ink text-sm bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" data-sign-out>Sign out</button>
     </header>
 
     <section class="grid gap-3.5 lg:grid-cols-2">
-      <article class="grid gap-3 lg:col-span-2 p-4 bg-white border border-zinc-200 rounded-2xl shadow-sm">
-        <header class="flex gap-3 items-center justify-between pb-3 border-b border-zinc-200">
+      <article class="grid gap-3 lg:col-span-2 p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <header class="flex gap-3 items-center justify-between pb-3 border-b border-line">
           <div>
             <strong class="text-[13px]">Appearance</strong>
-            <p class="mb-0 mt-1 text-xs text-zinc-500">Light, dark, or match your system.</p>
+            <p class="mb-0 mt-1 text-muted text-xs">Light, dark, or match your system.</p>
           </div>
-          <div class="grid grid-cols-3 p-0.5 bg-zinc-100 border border-zinc-200 rounded-xl" role="group" aria-label="Theme">
-            <button class="px-3 py-1.5 min-w-16 font-bold text-xs text-zinc-500 rounded-lg transition-colors" type="button" data-theme-option="light">Light</button>
-            <button class="px-3 py-1.5 min-w-16 font-bold text-xs text-zinc-500 rounded-lg transition-colors" type="button" data-theme-option="dark">Dark</button>
-            <button class="px-3 py-1.5 min-w-16 font-bold text-xs text-zinc-500 rounded-lg transition-colors" type="button" data-theme-option="system">System</button>
+          <div class="grid grid-cols-3 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Theme">
+            <button class="px-3 py-1.5 min-w-16 font-bold text-muted text-xs rounded-lg transition-colors" type="button" data-theme-option="light">Light</button>
+            <button class="px-3 py-1.5 min-w-16 font-bold text-muted text-xs rounded-lg transition-colors" type="button" data-theme-option="dark">Dark</button>
+            <button class="px-3 py-1.5 min-w-16 font-bold text-muted text-xs rounded-lg transition-colors" type="button" data-theme-option="system">System</button>
           </div>
         </header>
       </article>
 
-      <article class="grid gap-3 p-4 bg-white border border-zinc-200 rounded-2xl shadow-sm">
-        <header class="flex gap-3 items-center justify-between pb-3 border-b border-zinc-200">
+      <article class="grid gap-3 p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <header class="flex gap-3 items-center justify-between pb-3 border-b border-line">
           <div>
             <strong class="text-[13px]">Bluesky connection</strong>
-            <p class="mb-0 mt-1 text-xs text-zinc-500" data-settings-bluesky-summary>Checking…</p>
+            <p class="mb-0 mt-1 text-muted text-xs" data-settings-bluesky-summary>Checking…</p>
           </div>
-          <span class="px-2.5 py-1 font-bold text-[11px] text-zinc-500 border border-zinc-200 rounded-full" data-settings-bluesky-pill>—</span>
+          <span class="px-2.5 py-1 font-bold text-[11px] text-muted border border-line rounded-full" data-settings-bluesky-pill>—</span>
         </header>
-        <p class="m-0 leading-relaxed text-[13px] text-slate-700">Postline uses a Bluesky app password (not your main login). You can also set <code class="px-1 py-0.5 text-xs bg-zinc-100 rounded">BLUESKY_IDENTIFIER</code> and <code class="px-1 py-0.5 text-xs bg-zinc-100 rounded">BLUESKY_APP_PASSWORD</code> in <code class="px-1 py-0.5 text-xs bg-zinc-100 rounded">.env</code> for local dev.</p>
-        <a class="inline-flex items-center justify-center px-4 h-9 w-fit font-bold text-sm text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl transition-colors" href="/accounts" data-stx-link>Manage on Accounts</a>
+        <p class="m-0 leading-relaxed text-[13px] text-body">Postline uses a Bluesky app password (not your main login). You can also set <code class="px-1 py-0.5 text-xs bg-panel-3 rounded">BLUESKY_IDENTIFIER</code> and <code class="px-1 py-0.5 text-xs bg-panel-3 rounded">BLUESKY_APP_PASSWORD</code> in <code class="px-1 py-0.5 text-xs bg-panel-3 rounded">.env</code> for local dev.</p>
+        <a class="inline-flex items-center justify-center px-4 h-9 w-fit font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" href="/accounts" data-stx-link>Manage on Accounts</a>
       </article>
 
-      <article class="grid gap-3 p-4 bg-white border border-zinc-200 rounded-2xl shadow-sm">
-        <header class="flex gap-3 items-center justify-between pb-3 border-b border-zinc-200">
+      <article class="grid gap-3 p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <header class="flex gap-3 items-center justify-between pb-3 border-b border-line">
           <strong class="text-[13px]">Composer</strong>
-          <span class="text-xs text-zinc-500">Bluesky</span>
+          <span class="text-muted text-xs">Bluesky</span>
         </header>
-        <label class="flex gap-4 items-center justify-between text-[13px] text-slate-700">
+        <label class="flex gap-4 items-center justify-between text-[13px] text-body">
           <span>Character limit</span>
-          <span class="font-bold text-neutral-950" data-settings-char-limit>300</span>
+          <span class="font-bold text-ink" data-settings-char-limit>300</span>
         </label>
-        <label class="flex gap-4 items-center justify-between text-[13px] text-slate-700">
+        <label class="flex gap-4 items-center justify-between text-[13px] text-body">
           <span>Default mode</span>
-          <span class="text-zinc-600">Single post</span>
+          <span class="text-muted">Single post</span>
         </label>
-        <label class="flex gap-4 items-center justify-between text-[13px] text-slate-700">
+        <label class="flex gap-4 items-center justify-between text-[13px] text-body">
           <span>Auto-save drafts</span>
           <span class="font-bold text-emerald-700">On</span>
         </label>
@@ -82,10 +82,10 @@
       const renderTheme = (pref) => {
         themeOptions.forEach((button) => {
           const active = button.dataset.themeOption === pref
-          button.classList.toggle('bg-white', active)
-          button.classList.toggle('text-neutral-950', active)
+          button.classList.toggle('bg-panel', active)
+          button.classList.toggle('text-ink', active)
           button.classList.toggle('shadow-sm', active)
-          button.classList.toggle('text-zinc-500', !active)
+          button.classList.toggle('text-muted', !active)
         })
       }
       const currentPref = (() => { try { return localStorage.getItem('theme') || 'system' } catch { return 'system' } })()
