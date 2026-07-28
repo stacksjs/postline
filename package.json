@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.0.0",
   "private": true,
-  "description": "A minimal personal social publishing workspace built with Stacks, STX, and Craft.",
+  "description": "A modern, minimal social publishing application.",
   "author": "Chris Breuer <chris@stacksjs.org>",
   "contributors": [
     "Chris Breuer <chris@stacksjs.org>"
@@ -64,29 +64,16 @@
     "bud": "./buddy",
     "stx": "./buddy"
   },
-  "system": {
-    "bun": "^1.3.0",
-    "sqlite": "^3.47.2"
-  },
   "dependencies": {
-    "@stacksjs/bun-router": "^0.0.16",
-    "craft-native": "^0.0.37",
-    "stacks": "workspace:*"
+    "stacks": "^0.70.206"
   },
   "devDependencies": {
-    "@iconify-json/hugeicons": "^1.2.27",
-    "@iconify-json/simple-icons": "^1.2.92",
-    "@stacksjs/dtsx": "^0.11.1",
-    "better-dx": "^0.2.12",
-    "bun-plugin-dtsx": "^0.11.1"
+    "better-dx": "^0.2.12"
   },
   "workspaces": [
     "storage/framework",
     "storage/framework/libs/*",
-    "storage/framework/views/*",
-    "storage/framework/core",
-    "storage/framework/core/*",
-    "storage/framework/core/bun-create/*"
+    "storage/framework/views/*"
   ],
   "git-hooks": {
     "pre-commit": {
@@ -95,18 +82,5 @@
       }
     },
     "commit-msg": "bun x gitlint --edit .git/COMMIT_EDITMSG"
-  },
-  "catalog": {
-    "@stacksjs/clapp": "^0.2.12",
-    "@stacksjs/components": "^0.2.82",
-    "@stacksjs/gitlint": "^0.1.5",
-    "@stacksjs/stx": "^0.2.99",
-    "@stacksjs/ts-cloud": "^0.7.56",
-    "better-dx": "^0.2.17",
-    "bun-git-hooks": "^0.3.2",
-    "bun-query-builder": "^0.1.56",
-    "pickier": "^0.1.35",
-    "redis": "^5.12.1",
-    "web-ext": "^10.5.0"
   }
 }
