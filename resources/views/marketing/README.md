@@ -31,37 +31,37 @@ A public landing page for Postline (self-hosted social crossposting). Its job: c
 
 Each phase is independently reviewable. ✅ = done, ▶ = in progress, ☐ = todo.
 
-### ☐ Phase 0 — Foundation
-- **Routing:** logged-out `/` → landing; logged-in → the app. (Recommended default; see Open Decisions.)
-- **Marketing layout** `resources/views/layouts/marketing.stx`: `<head>` (SEO/OG/meta, favicon), Geist + Geist Mono, theme bootstrap, **no app chrome/sidebar**.
-- **Crosswind vars:** define the landing color vars (light + the one dark section) via the tokens already registered in `config/crosswind.ts`.
-- **Done when:** an empty landing route renders with the fonts + tokens and no app chrome.
+### ✅ Phase 0 — Foundation
+- **Routing:** `/welcome` (file-based) serves the landing; app chrome lives elsewhere. (Standalone marketing route — see Open Decisions.)
+- **Marketing layout** `resources/views/layouts/marketing.stx`: `<head>` (SEO/OG/meta, favicon), Geist + Geist Mono, light-locked `:root` tokens, **no app chrome/sidebar**.
+- **Crosswind vars:** landing color vars back the tokens registered in `config/crosswind.ts`; the one dark section owns its own colors.
 
-### ☐ Phase 1 — Hero
-- Off-grid offset composition; headline, subhead, emerald CTA, GitHub ghost link, left hairline rail.
-- Composer visual: real component preview or a labeled placeholder slot.
-- **Done when:** hero renders, fits the viewport, CTA visible without scroll.
+### ✅ Phase 1 — Hero
+- Off-grid offset composition; headline, subhead, emerald CTA, GitHub ghost link, left hairline rail (`01`).
+- Composer visual: faithful `role="img"` mini of the real product UI (six provider pills, sample post, Publish).
 
-### ☐ Phase 2 — Providers strip
-- Six real monochrome network logos (Iconify brand collection / Simple Icons), one clean row, optional slow marquee.
+### ✅ Phase 2 — Providers strip
+- Six monochrome Simple Icons logos (`@iconify-json/simple-icons`) in a slow CSS marquee, edge-masked, `sr-only` list for a11y, `prefers-reduced-motion` stops it.
 
-### ☐ Phase 3 — The Queue (product moment)
-- Queue/calendar preview panel + the three-step caption.
+### ✅ Phase 3 — The Queue (product moment)
+- Inverted classic: faithful queue preview (three scheduled rows, one live "Publishing") left; "Compose. Schedule. Crosspost." + numbered steps right.
 
-### ☐ Phase 4 — Own it (dark beat)
-- Inverted near-black section, big statement, install-command mono detail. The line a hosted SaaS can't write.
+### ✅ Phase 4 — Own it (dark beat)
+- Near-black `#0a0a0a` section, "Your keys. Your data. Your instance." + `bunx buddy deploy` mono prompt. The line a hosted SaaS can't write.
 
-### ☐ Phase 5 — Open + built on Stacks
-- Restrained credibility block (open-source · single binary · Stacks), hairline-organized.
+### ✅ Phase 5 — Open + built on Stacks
+- Hairline-joined (`gap-px` on `bg-line`) triptych: MIT licensed · single binary · built on Stacks. Not three floating cards.
 
-### ☐ Phase 6 — Close + footer
-- Final CTA (same intent/label as hero) + thin footer.
+### ✅ Phase 6 — Close + footer
+- Final CTA echoing the hero ("Post once. Own everything.") + thin footer.
 
-### ☐ Phase 7 — Motion, responsive, a11y
-- Scroll-reveal + hover + `prefers-reduced-motion`; explicit mobile collapse per section; contrast / landmarks / alt text; run the design-taste Pre-Flight checklist.
+### ▶ Phase 7 — Motion, responsive, a11y
+- Done: scroll-reveal via CSS `animation-timeline: view()` (no JS), marquee, `prefers-reduced-motion` honored; per-section mobile collapse (grid `order-*` + stacking); landmarks, `role="img"` alt text, `sr-only` provider list, focus-visible.
+- Pending: real-device visual pass on next `buddy dev`.
 
-### ☐ Phase 8 — Verify + ship
-- `pickier` + `typecheck` green; browser QA in **both themes** on the next `buddy dev`; commit on a branch + PR.
+### ▶ Phase 8 — Verify + ship
+- Done: `pickier` + `typecheck` green; var-backed opacity-modifier risk audited (swapped `bg-accent/10` → `bg-emerald-500/10`).
+- Pending: browser QA on next `buddy dev` (light-locked, so one theme); then PR.
 
 ---
 

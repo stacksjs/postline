@@ -59,8 +59,33 @@
         border-radius: 4px;
       }
 
+      /*
+       * Scroll-reveal via CSS scroll-driven animations — no JS, no motion library.
+       * The opacity:0 base is gated behind @supports so browsers without
+       * animation-timeline (and reduced-motion users) always render content visible.
+       */
+      @keyframes reveal-up {
+        from { opacity: 0; transform: translateY(24px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @supports (animation-timeline: view()) {
+        @media (prefers-reduced-motion: no-preference) {
+          .reveal {
+            opacity: 0;
+            animation: reveal-up linear both;
+            animation-timeline: view();
+            animation-range: entry 0% cover 28%;
+          }
+        }
+      }
+
+      /* Providers marquee — track holds two identical halves; -50% loops seamlessly. */
+      @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+      .marquee-track { animation: marquee 32s linear infinite; }
+
       @media (prefers-reduced-motion: reduce) {
         html { scroll-behavior: auto; }
+        .marquee-track { animation: none; }
       }
     </style>
   </head>
