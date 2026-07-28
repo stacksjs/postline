@@ -37,8 +37,8 @@
           </div>
         </header>
 
-        <div class="grid p-3">
-          <div class="flex flex-wrap gap-2 mb-2.5" data-provider-toggles role="group" aria-label="Crosspost targets">
+        <div class="grid gap-1 p-4">
+          <div class="flex flex-wrap gap-2 mb-3" data-provider-toggles role="group" aria-label="Crosspost targets">
             <span class="flex items-center px-2.5 min-h-8 text-xs text-zinc-400 bg-panel-2 border border-line rounded-xl" data-provider-empty>Loading accounts…</span>
           </div>
           <label class="hidden gap-2 items-center mb-2.5" data-compose-image-row>
@@ -57,7 +57,7 @@
                   <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
                 </button>
               </header>
-              <textarea class="min-h-24 w-full leading-relaxed text-[18px] text-ink placeholder:text-zinc-400 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" maxlength="300" placeholder="What do you want to share?" data-bluesky-text></textarea>
+              <textarea class="min-h-36 w-full leading-relaxed text-[18px] text-ink placeholder:text-zinc-400 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" maxlength="300" placeholder="What do you want to share?" data-bluesky-text></textarea>
               <div class="hidden overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview></div>
             </article>
           </div>
@@ -320,7 +320,7 @@
             <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
           </button>
         </header>
-          <textarea class="min-h-24 w-full leading-relaxed text-[18px] text-ink bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body ${number}" maxlength="300" data-bluesky-text>${escapeHtml(text)}</textarea>
+          <textarea class="min-h-36 w-full leading-relaxed text-[18px] text-ink bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body ${number}" maxlength="300" data-bluesky-text>${escapeHtml(text)}</textarea>
         <div class="hidden overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview></div>
       `
 
