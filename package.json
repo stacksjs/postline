@@ -65,7 +65,7 @@
     "stx": "./buddy"
   },
   "dependencies": {
-    "stacks": "^0.70.216"
+    "stacks": "^0.70.217"
   },
   "devDependencies": {
     "better-dx": "^0.2.12"
