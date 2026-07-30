@@ -1,6 +1,7 @@
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import { resolveVariantBody } from '../../Support/Social/variants'
 import { blog } from './BlogService'
 import { bluesky } from './BlueskyService'
 import { instagram } from './InstagramService'
@@ -142,8 +143,13 @@ export class CrosspostService {
         const publisher = publishers[provider]!
         const chain = chains.get(provider)
         // Link previews/media only make sense on the first segment.
+        //
+        // Variants are deliberately stripped: it is ambiguous whether an
+        // override should replace the first segment or the whole chain, so a
+        // thread always publishes its shared segments. Dropping the field here
+        // makes that a decision rather than an accident of drivers ignoring it.
         const segmentContent: PublishContent | undefined = index === 0
-          ? content
+          ? content ? { ...content, variants: undefined } : undefined
           : chain ? { reply: chain } : undefined
 
         const result = await publisher.publishToPost({ id: Number(post.id), body }, segmentContent)
@@ -185,7 +191,8 @@ export class CrosspostService {
     for (const provider of providers) {
       const publisher = publishers[provider]
       if (!publisher) continue
-      results.push(await publisher.publishToPost({ id: post.id, body: post.body }, content))
+      const body = resolveVariantBody(post.body, provider, content)
+      results.push(await publisher.publishToPost({ id: post.id, body }, content))
     }
     return results
   }

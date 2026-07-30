@@ -1,9 +1,11 @@
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
+import type { VariantMap } from '../../Support/Social/variants'
 import { mkdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { MEDIA_DIR, publicMediaUrl } from '../../Support/Social/uploads'
+import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/variants'
 import { crosspost, crosspostProviders } from './CrosspostService'
 import { ensureAccount, now, uuid } from './support'
 
@@ -15,6 +17,13 @@ interface StoredContent {
   title?: string
   external?: { uri: string, title: string, description?: string }
   media?: Array<{ url?: string, path?: string, mimeType?: string, altText?: string }>
+  /**
+   * Per-provider body overrides. Lives here rather than on `post_targets`
+   * because those rows are a results ledger: `save` writes placeholders that
+   * `publishAt` deletes immediately before publishing, so an override stored
+   * there would be destroyed exactly when it is needed.
+   */
+  variants?: VariantMap
 }
 
 function parseStoredContent(raw: unknown): StoredContent | null {
@@ -61,9 +70,14 @@ export interface SaveQueueInput {
   external?: { uri: string, title: string, description?: string } | null
   /** Attached image: raw bytes (stored to disk until publish) or a URL. */
   image?: { bytes?: Uint8Array, url?: string, mimeType?: string, altText?: string } | null
+  /** Per-provider body overrides; providers without one publish `text`. */
+  variants?: VariantMap | null
 }
 
-/** Edit input. `image`: undefined = keep, null = remove, object = replace. */
+/**
+ * Edit input. Both `image` and `variants` are tri-state:
+ * undefined = keep what is stored, null = clear, object = replace.
+ */
 export interface UpdateQueueInput extends Omit<SaveQueueInput, 'image'> {
   image?: { bytes?: Uint8Array, url?: string, mimeType?: string, altText?: string } | null
 }
@@ -78,6 +92,8 @@ export interface QueueEditView {
   providers: SocialProvider[]
   external: { uri: string, title: string, description?: string } | null
   image: { kind: 'file' | 'url', url: string | null } | null
+  /** Per-provider overrides, so an edit round-trips them instead of dropping them. */
+  variants: VariantMap | null
 }
 
 export class QueueService {
@@ -114,6 +130,8 @@ export class QueueService {
     const stored: StoredContent = {}
     if (input.title?.trim()) stored.title = input.title.trim()
     if (input.external?.uri && input.external.title) stored.external = input.external
+    const savedVariants = sanitizeVariants(input.variants)
+    if (savedVariants) stored.variants = savedVariants
     if (input.image?.bytes?.length) {
       const extension = (input.image.mimeType || 'image/jpeg').split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'jpg'
       const filename = `${postUuid}.${extension}`
@@ -232,6 +250,7 @@ export class QueueService {
       providers: [...new Set(targets.map((t: any) => t.provider))] as SocialProvider[],
       external: stored?.external || null,
       image: media ? { kind: media.path ? 'file' : 'url', url: media.url || null } : null,
+      variants: sanitizeVariants(stored?.variants) || null,
     }
   }
 
@@ -266,6 +285,10 @@ export class QueueService {
     const stored: StoredContent = {}
     if (input.title?.trim()) stored.title = input.title.trim()
     if (input.external?.uri && input.external.title) stored.external = input.external
+
+    // Variants: replace / clear / keep, mirroring the media tri-state below.
+    const updatedVariants = resolveStoredVariants(input.variants, existing?.variants)
+    if (updatedVariants) stored.variants = updatedVariants
 
     // Media: replace / remove / keep. Replacing or removing drops the old file.
     if (input.image === null || input.image?.bytes?.length || input.image?.url) {
@@ -347,6 +370,31 @@ export class QueueService {
 
     const anyOk = results.some(result => result.ok)
     const finishedAt = now()
+
+    // Providers that reject before reaching their own insert — an over-limit
+    // body is checked first in every service — write no result row. Their
+    // placeholder is already gone, so without this the target would vanish from
+    // the queue entirely: no row, no failure reason, and the post still marked
+    // published because some other network succeeded.
+    const written = await database
+      .selectFrom('post_targets')
+      .select(['provider'])
+      .where('post_id', '=', post.id)
+      .execute()
+    const recorded = new Set(written.map((row: any) => row.provider))
+    for (const result of results) {
+      if (recorded.has(result.provider)) continue
+      await database.insertInto('post_targets').values({
+        uuid: uuid(),
+        provider: result.provider,
+        status: 'failed',
+        failure_reason: result.error || 'Publishing failed.',
+        post_id: post.id,
+        created_at: finishedAt,
+        updated_at: finishedAt,
+      }).execute()
+    }
+
     await database.updateTable('posts').set({
       status: anyOk ? 'published' : 'failed',
       ...(anyOk ? { published_at: finishedAt } : {}),
@@ -366,6 +414,10 @@ export class QueueService {
     const content: PublishContent = {}
     if (stored.title) content.title = stored.title
     if (stored.external) content.external = stored.external
+    // Re-sanitized on read: posts.content is free-form JSON, so a hand-edited
+    // or stale row must not reach the publish path unchecked.
+    const variants = sanitizeVariants(stored.variants)
+    if (variants) content.variants = variants
 
     if (stored.media?.length) {
       const media: NonNullable<PublishContent['media']> = []

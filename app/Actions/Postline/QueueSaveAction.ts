@@ -5,6 +5,7 @@ import { response } from '@stacksjs/router'
 import { crosspostProviders } from '../../Services/Social/CrosspostService'
 import { postQueue } from '../../Services/Social/QueueService'
 import { readUploadedImage } from '../../Support/Social/uploads'
+import { parseVariantsField } from '../../Support/Social/variants'
 
 export default new Action({
   name: 'Postline Queue Save',
@@ -42,8 +43,14 @@ export default new Action({
         ? { url: imageUrl, altText: imageAlt }
         : null
 
+    // Rejected rather than dropped: silently discarding the per-network text
+    // would publish the shared body everywhere with no indication why.
+    const parsedVariants = parseVariantsField(request.get('variants'))
+    if (!parsedVariants.ok)
+      return response.json({ ok: false, error: 'Could not read the per-network text.' }, { status: 422 })
+
     try {
-      const data = await postQueue.save({ text, providers, title, scheduledAt, external, image })
+      const data = await postQueue.save({ text, providers, title, scheduledAt, external, image, variants: parsedVariants.variants })
       return response.json({ ok: true, data })
     }
     catch (error) {

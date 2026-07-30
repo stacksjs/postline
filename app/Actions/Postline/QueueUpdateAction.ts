@@ -1,10 +1,12 @@
 import type { SocialProvider } from '../../Support/Social/types'
+import type { VariantMap } from '../../Support/Social/variants'
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { crosspostProviders } from '../../Services/Social/CrosspostService'
 import { postQueue } from '../../Services/Social/QueueService'
 import { readUploadedImage } from '../../Support/Social/uploads'
+import { parseVariantsField } from '../../Support/Social/variants'
 
 export default new Action({
   name: 'Postline Queue Update',
@@ -46,8 +48,24 @@ export default new Action({
           ? null
           : undefined
 
+    // Variants tri-state, mirroring the image handling above: an omitted field
+    // keeps what is stored, a submitted-but-empty one clears. A malformed one
+    // is rejected rather than treated as empty — clearing every stored override
+    // is destructive and must never be the result of a payload we misread.
+    const rawVariants = request.get('variants')
+    let variants: VariantMap | null | undefined
+    if (rawVariants === undefined || rawVariants === null) {
+      variants = undefined
+    }
+    else {
+      const parsed = parseVariantsField(rawVariants)
+      if (!parsed.ok)
+        return response.json({ ok: false, error: 'Could not read the per-network text.' }, { status: 422 })
+      variants = parsed.variants
+    }
+
     try {
-      const data = await postQueue.update(id, { text, providers, title, scheduledAt, external, image })
+      const data = await postQueue.update(id, { text, providers, title, scheduledAt, external, image, variants })
       return response.json({ ok: true, data })
     }
     catch (error) {

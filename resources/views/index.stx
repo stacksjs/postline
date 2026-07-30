@@ -7,8 +7,13 @@
   <section class="grid gap-5" data-postline-page="composer" data-testid="composer-page">
     <!-- Crosswind safelist: utilities applied dynamically from the script below
         (provider toggles, active-post highlight, connection summary, char
-        counter) must appear in static markup so the CSS scanner emits them. -->
-    <div class="hidden text-amber-700 text-emerald-800 text-ink text-muted text-muted text-on-accent text-red-700 text-zinc-400 bg-accent bg-emerald-400 bg-emerald-50 bg-emerald-500 bg-panel bg-panel-2 bg-panel-3 bg-zinc-300 hover:bg-white border-blue-300 border-emerald-200 border-line border-neutral-950 shadow-sm cursor-not-allowed" aria-hidden="true"></div>
+        counter, per-network override rows) must appear in static markup so the
+        CSS scanner emits them.
+        `display:none` is inline, not a `hidden` class: this list now carries
+        layout utilities of its own (`grid`, `min-h-20`, `p-3`), and relying on
+        `hidden` to out-rank them would leave a visible empty block if the
+        generated stylesheet ever ordered them the other way. -->
+    <div class="grid gap-2 mt-2 p-2 p-3 min-h-20 min-h-7 leading-relaxed text-amber-700 text-emerald-800 text-ink text-muted text-muted text-on-accent text-red-700 text-sm text-zinc-400 bg-accent bg-emerald-400 bg-emerald-50 bg-emerald-500 bg-panel bg-panel-2 bg-panel-3 bg-red-500 bg-zinc-300 hover:bg-white border-blue-300 border-emerald-200 border-line border-neutral-950 outline-none rounded-lg rounded-xl shadow-sm cursor-not-allowed resize-none" style="display:none" aria-hidden="true"></div>
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Composer</p>
@@ -41,6 +46,16 @@
           <div class="flex flex-wrap gap-2 mb-3" data-provider-toggles role="group" aria-label="Crosspost targets">
             <span class="flex items-center px-2.5 min-h-8 text-xs text-zinc-400 bg-panel-2 border border-line rounded-xl" data-provider-empty>Loading accounts…</span>
           </div>
+          <!-- Per-network overrides. Rows are built by the script, one per
+              selected target. Hidden in thread mode: the server publishes a
+              thread's shared segments, so an override there would be a lie. -->
+          <div class="hidden mb-3" data-variant-section>
+            <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-bold text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-lg transition-colors" type="button" data-variant-toggle aria-expanded="false">
+              <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
+              <span data-variant-toggle-label>Customise per network</span>
+            </button>
+            <div class="hidden gap-2 mt-2" data-variant-panel></div>
+          </div>
           <label class="hidden gap-2 items-center mb-2.5" data-compose-image-row>
             <span class="h-4 w-4 text-muted i-hugeicons-image-01" aria-hidden="true"></span>
             <input class="px-3 h-9 w-full text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" type="url" inputmode="url" placeholder="Image URL (required for Instagram)" aria-label="Image URL for Instagram" data-compose-image>
@@ -57,7 +72,7 @@
                   <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
                 </button>
               </header>
-              <textarea class="min-h-36 w-full leading-relaxed text-[18px] text-ink placeholder:text-zinc-400 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" maxlength="300" placeholder="What do you want to share?" data-bluesky-text></textarea>
+              <textarea class="min-h-36 w-full leading-relaxed text-[18px] text-ink placeholder:text-zinc-400 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" placeholder="What do you want to share?" data-bluesky-text></textarea>
               <div class="hidden overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview></div>
             </article>
           </div>
@@ -65,7 +80,7 @@
 
         <footer class="flex flex-col gap-3 items-stretch justify-between sm:flex-row sm:items-center p-3 border-line border-t">
           <div class="flex gap-2 items-center min-w-0">
-            <span class="text-muted text-xs whitespace-nowrap" data-bluesky-count>0 / 300 characters</span>
+            <span class="min-w-0 text-muted text-xs truncate" data-bluesky-count>0 / 300 characters</span>
             <span class="hidden gap-1.5 items-center px-2.5 max-w-48 min-h-7 font-bold text-muted text-xs bg-panel-2 border border-line rounded-lg" data-attach-chip>
               <span class="shrink-0 h-3.5 w-3.5 i-hugeicons-image-01" aria-hidden="true"></span>
               <span class="truncate" data-attach-name></span>
@@ -114,6 +129,10 @@
       const publishLabel = root.querySelector('[data-bluesky-publish-label]')
       const buttons = Array.from(root.querySelectorAll('[data-bluesky-publish], [data-bluesky-publish-top]'))
       const providerToggles = root.querySelector('[data-provider-toggles]')
+      const variantSection = root.querySelector('[data-variant-section]')
+      const variantToggle = root.querySelector('[data-variant-toggle]')
+      const variantToggleLabel = root.querySelector('[data-variant-toggle-label]')
+      const variantPanel = root.querySelector('[data-variant-panel]')
       const composeImageRow = root.querySelector('[data-compose-image-row]')
       const composeImage = root.querySelector('[data-compose-image]')
       const scheduleToggle = root.querySelector('[data-schedule-toggle]')
@@ -156,6 +175,7 @@
       // Edit mode: /?edit=<id> loads a queued post into the composer.
       const editBanner = root.querySelector('[data-edit-banner]')
       const composerHeading = root.querySelector('[data-composer-heading]')
+      const editParam = new URLSearchParams(window.location.search).get('edit')
       let editingId = null
       let editHadImage = false
       let editRemoveImage = false
@@ -183,17 +203,23 @@
       const connectedProviders = () => providers.filter(provider => provider.canPublish)
       const selectedConnected = () => connectedProviders().filter(provider => selected.has(provider.provider))
 
+      // The tightest limit among selected targets. Used for the counter's
+      // denominator only — it is never enforced on the textarea, because
+      // capping input at the shortest network's limit would silently shorten
+      // the post for every other network too.
       const effectiveLimit = () => {
         const limits = selectedConnected().map(provider => provider.characterLimit).filter(Boolean)
         return limits.length ? Math.min(...limits) : 300
       }
 
-      const applyMaxLength = () => {
-        const limit = effectiveLimit()
-        allPosts().forEach((post) => {
-          textareaFor(post)?.setAttribute('maxlength', String(limit))
-        })
-      }
+      /**
+       * Selected targets that would reject what they are actually going to
+       * receive. A provider with an override is measured against that override,
+       * not the shared body — otherwise the advisory reports on text the
+       * provider will never see, and is wrong in both directions.
+       */
+      const overLimitProviders = () => selectedConnected()
+        .filter(provider => provider.characterLimit && bodyFor(provider.provider).length > provider.characterLimit)
 
       const toggleClass = (isSelected, connected) => {
         const base = 'inline-flex gap-1.5 items-center px-2.5 min-h-8 text-xs font-bold border rounded-xl transition-colors'
@@ -216,7 +242,7 @@
           button.title = `Connect ${label} on the Accounts page to crosspost here.`
         }
         const dot = isSelected ? 'bg-emerald-400' : 'bg-zinc-300'
-        button.innerHTML = `<span class="h-2 w-2 rounded-full ${dot}" aria-hidden="true"></span><span>${label}</span>`
+        button.innerHTML = `<span class="h-2 w-2 rounded-full ${dot}" aria-hidden="true" data-provider-dot></span><span>${label}</span>`
         return button
       }
 
@@ -227,6 +253,182 @@
           return
         }
         providerToggles.replaceChildren(...providers.map(createProviderToggle))
+      }
+
+      // Per-network overrides: provider -> { text, shared }. `shared` is the
+      // body captured when the override was created, so a later edit to the
+      // shared text can be reported as having left this copy behind.
+      const variants = new Map()
+      let variantsOpen = false
+
+      const sharedBody = () => activeTextarea()?.value || ''
+
+      /**
+       * Overrides only apply to a single-post composer: `publishThread` strips
+       * them server-side. Rendering and payload building share this one test so
+       * a state that cannot show an override can never send one either.
+       */
+      const variantsAvailable = () => selectedConnected().length > 0 && allPosts().length === 1
+
+      /** Overrides worth sending: blank ones inherit, so they are dropped. */
+      const variantsPayload = () => {
+        const payload = {}
+        if (!variantsAvailable()) return payload
+        variants.forEach((entry, provider) => {
+          if (entry.text.trim()) payload[provider] = entry.text
+        })
+        return payload
+      }
+
+      /** The body a provider will actually receive — mirrors resolveVariantBody. */
+      const bodyFor = (provider) => {
+        const entry = variantsAvailable() ? variants.get(provider) : undefined
+        return entry && entry.text.trim() ? entry.text : sharedBody()
+      }
+
+      const isVariantStale = entry => entry.shared !== sharedBody()
+
+      const variantRow = (status) => {
+        const provider = status.provider
+        const label = providerLabel(provider)
+        const entry = variants.get(provider)
+        const limit = status.characterLimit || 0
+
+        const row = document.createElement('div')
+        row.className = 'grid gap-2 p-3 bg-panel-2 border border-line rounded-xl'
+        row.dataset.variantRow = provider
+
+        const head = document.createElement('div')
+        head.className = 'flex gap-2 items-center justify-between'
+
+        const name = document.createElement('span')
+        name.className = 'font-bold text-ink text-xs'
+        name.textContent = label
+
+        const action = document.createElement('button')
+        action.type = 'button'
+        action.className = 'inline-flex items-center px-2.5 min-h-7 font-bold text-muted text-xs bg-panel hover:bg-white border border-line rounded-lg transition-colors'
+        action.dataset.variantAction = entry ? 'reset' : 'fork'
+        action.dataset.variantProvider = provider
+        action.textContent = entry ? 'Use shared text' : 'Customise'
+
+        head.append(name, action)
+        row.append(head)
+
+        if (!entry) {
+          const inherit = document.createElement('p')
+          inherit.className = 'text-muted text-xs'
+          const length = sharedBody().length
+          inherit.textContent = limit && length > limit
+            ? `Uses the shared text - ${length} / ${limit}, too long for ${label}`
+            : `Uses the shared text${limit ? ` - ${length} / ${limit}` : ''}`
+          inherit.dataset.variantInherit = provider
+          row.append(inherit)
+          return row
+        }
+
+        const area = document.createElement('textarea')
+        area.className = 'p-2 min-h-20 w-full leading-relaxed text-ink text-sm bg-panel border border-line outline-none rounded-lg resize-none'
+        area.value = entry.text
+        area.setAttribute('aria-label', `${label} post body`)
+        area.dataset.variantInput = provider
+        row.append(area)
+
+        const meta = document.createElement('p')
+        meta.className = 'text-muted text-xs'
+        meta.dataset.variantMeta = provider
+        row.append(meta)
+
+        // Always present, shown or hidden by updateVariantMeta. Creating it up
+        // front means staleness can be re-evaluated on every keystroke without
+        // rebuilding the row and stealing focus.
+        const stale = document.createElement('p')
+        stale.className = 'hidden text-amber-700 text-xs'
+        stale.dataset.variantStale = provider
+        stale.textContent = 'The shared text changed after you customised this.'
+        row.append(stale)
+
+        return row
+      }
+
+      /**
+       * Refresh per-row counts and the staleness notice in place, so typing in
+       * either the shared body or an override never rebuilds the panel.
+       */
+      const updateVariantMeta = () => {
+        selectedConnected().forEach((status) => {
+          const provider = status.provider
+          const limit = status.characterLimit || 0
+          const entry = variants.get(provider)
+          const inherit = variantPanel?.querySelector(`[data-variant-inherit="${provider}"]`)
+          if (inherit) {
+            const length = sharedBody().length
+            const over = Boolean(limit) && length > limit
+            inherit.textContent = over
+              ? `Uses the shared text - ${length} / ${limit}, too long for ${providerLabel(provider)}`
+              : `Uses the shared text${limit ? ` - ${length} / ${limit}` : ''}`
+            inherit.classList.toggle('text-red-700', over)
+            inherit.classList.toggle('text-muted', !over)
+          }
+          const meta = variantPanel?.querySelector(`[data-variant-meta="${provider}"]`)
+          if (meta && entry) {
+            const length = entry.text.length
+            const over = Boolean(limit) && length > limit
+            meta.textContent = limit ? `${length} / ${limit} characters` : `${length} characters`
+            meta.classList.toggle('text-red-700', over)
+            meta.classList.toggle('text-muted', !over)
+          }
+          const stale = variantPanel?.querySelector(`[data-variant-stale="${provider}"]`)
+          if (stale) stale.classList.toggle('hidden', !entry || !isVariantStale(entry))
+        })
+      }
+
+      const updateVariantToggleLabel = () => {
+        if (!variantToggleLabel) return
+        const active = Object.keys(variantsPayload()).length
+        variantToggleLabel.textContent = variantsOpen
+          ? 'Hide per-network text'
+          : active
+            ? `Customise per network (${active})`
+            : 'Customise per network'
+      }
+
+      /**
+       * Replace one row after a fork/reset instead of the whole panel, so the
+       * other rows keep their caret, selection and undo history.
+       */
+      const refreshVariantRow = (provider) => {
+        const existing = variantPanel?.querySelector(`[data-variant-row="${provider}"]`)
+        const status = selectedConnected().find(item => item.provider === provider)
+        if (!existing || !status) {
+          renderVariantPanel()
+          return
+        }
+        const replacement = variantRow(status)
+        existing.replaceWith(replacement)
+        replacement.querySelector('[data-variant-input]')?.focus()
+        updateVariantToggleLabel()
+        updateVariantMeta()
+      }
+
+      const renderVariantPanel = () => {
+        if (!variantSection || !variantPanel) return
+        const targets = selectedConnected()
+        const available = variantsAvailable()
+        variantSection.classList.toggle('hidden', !available)
+        if (!available) variantsOpen = false
+
+        updateVariantToggleLabel()
+        variantToggle?.setAttribute('aria-expanded', variantsOpen ? 'true' : 'false')
+        variantPanel.classList.toggle('hidden', !variantsOpen)
+        variantPanel.classList.toggle('grid', variantsOpen)
+        if (!variantsOpen) {
+          variantPanel.replaceChildren()
+          return
+        }
+
+        variantPanel.replaceChildren(...targets.map(variantRow))
+        updateVariantMeta()
       }
 
       const renderConnectionSummary = () => {
@@ -259,7 +461,7 @@
         const wantsTitle = selected.has('blog') && connectedProviders().some(provider => provider.provider === 'blog')
         composeTitle?.classList.toggle('hidden', !wantsTitle)
         composeTitle?.classList.toggle('block', wantsTitle)
-        applyMaxLength()
+        renderVariantPanel()
         updateCount()
       }
 
@@ -320,7 +522,7 @@
             <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
           </button>
         </header>
-          <textarea class="min-h-36 w-full leading-relaxed text-[18px] text-ink bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body ${number}" maxlength="300" data-bluesky-text>${escapeHtml(text)}</textarea>
+          <textarea class="min-h-36 w-full leading-relaxed text-[18px] text-ink bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body ${number}" data-bluesky-text>${escapeHtml(text)}</textarea>
         <div class="hidden overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview></div>
       `
 
@@ -343,7 +545,21 @@
             mode: ['single', 'thread', 'draft'].includes(draft.mode) ? draft.mode : 'single',
             posts: draft.posts
               .slice(0, 24)
-              .map(post => ({ text: String(post?.text || '').slice(0, 300) })),
+              // Corruption guard, not a content cap: 10000 mirrors the largest
+              // target limit (BLOG_CHARACTER_LIMIT). Capping at the tightest
+              // network's limit here would silently destroy a long post on
+              // reload, since saveDraft stores the full text.
+              .map(post => ({ text: String(post?.text || '').slice(0, 10000) })),
+            variants: Array.isArray(draft.variants)
+              ? draft.variants
+                  .slice(0, 12)
+                  .filter(entry => entry && typeof entry.provider === 'string')
+                  .map(entry => ({
+                    provider: entry.provider,
+                    text: String(entry.text || '').slice(0, 10000),
+                    shared: String(entry.shared || '').slice(0, 10000),
+                  }))
+              : [],
           }
         }
         catch {
@@ -352,12 +568,19 @@
       }
 
       const saveDraft = () => {
+        // Editing a queued post must never write into the local composer draft,
+        // or that post's text and overrides leak into the next fresh post.
+        // Guarding the writer covers every caller, not just the two that used
+        // to be inside the edit-mode check at the bottom of this file.
+        if (editParam) return
         try {
           const posts = allPosts()
           localStorage.setItem(draftKey, JSON.stringify({
             activeIndex: Math.max(0, posts.indexOf(activePost)),
             mode: activeMode,
             posts: posts.map(post => ({ text: textareaFor(post)?.value || '' })),
+            variants: Array.from(variants.entries())
+              .map(([provider, entry]) => ({ provider, text: entry.text, shared: entry.shared })),
             updatedAt: new Date().toISOString(),
             version: 1,
           }))
@@ -379,6 +602,33 @@
         savedActiveIndex = Math.max(0, Math.min(draft.activeIndex, draft.posts.length - 1))
         postCounter = draft.posts.length
         activePost = allPosts()[savedActiveIndex] || root.querySelector('[data-composer-post]')
+        variants.clear()
+        draft.variants.forEach((entry) => {
+          variants.set(entry.provider, { text: entry.text, shared: entry.shared })
+        })
+      }
+
+      /**
+       * Mark the targets a body of `length` characters would be rejected by.
+       * Applied in place rather than by re-rendering the toggles, so a chip
+       * keeps focus and `aria-pressed` while the user types. Disabled chips are
+       * skipped — they can't be selected, so they're never over, and they own a
+       * "connect this account" title we must not clobber.
+       */
+      const markOverLimitToggles = (over) => {
+        const overKeys = new Set(over.map(provider => provider.provider))
+        Array.from(root.querySelectorAll('[data-provider-toggle]')).forEach((button) => {
+          if (button.hasAttribute('disabled')) return
+          const provider = button.dataset.providerToggle
+          const isOver = overKeys.has(provider)
+          const isSelected = button.getAttribute('aria-pressed') === 'true'
+          const dot = button.querySelector('[data-provider-dot]')
+          dot?.classList.toggle('bg-red-500', isOver)
+          dot?.classList.toggle('bg-emerald-400', !isOver && isSelected)
+          dot?.classList.toggle('bg-zinc-300', !isOver && !isSelected)
+          if (isOver) button.title = `Too long for ${providerLabel(provider)} — this target would be rejected.`
+          else button.removeAttribute('title')
+        })
       }
 
       const updateCount = () => {
@@ -386,10 +636,24 @@
         if (!textarea || !count) return
         const length = textarea.value.length
         const limit = effectiveLimit()
-        count.textContent = `${length} / ${limit} characters - ${allPosts().length} post${allPosts().length === 1 ? '' : 's'}`
-        count.classList.toggle('text-amber-700', length > limit - 40 && length <= limit)
-        count.classList.toggle('text-red-700', length >= limit)
-        count.classList.toggle('text-muted', length <= limit - 40)
+        const over = overLimitProviders()
+        const posts = allPosts().length
+
+        // Over-limit names the networks rather than the number, because with
+        // mixed targets "over" is only true for some of them.
+        count.textContent = over.length
+          ? `${length} characters - too long for ${over.map(provider => providerLabel(provider.provider)).join(', ')}`
+          : `${length} / ${limit} characters - ${posts} post${posts === 1 ? '' : 's'}`
+        // The span truncates, and the network names are at the end — keep the
+        // full message reachable when several targets are over at once.
+        count.title = count.textContent
+
+        count.classList.toggle('text-red-700', over.length > 0)
+        count.classList.toggle('text-amber-700', over.length === 0 && length > limit - 40)
+        count.classList.toggle('text-muted', over.length === 0 && length <= limit - 40)
+
+        markOverLimitToggles(over)
+        updateVariantMeta()
       }
 
       const renderLinkPreview = (post, preview) => {
@@ -497,8 +761,10 @@
         const post = createPost(postCounter, options.text || '')
         postsRoot?.append(post)
         renamePosts()
-        applyMaxLength()
         selectPost(post, { skipSave: true })
+        // Availability depends on the post count, so it has to be recomputed
+        // here: a second post makes this a thread, where overrides never apply.
+        renderVariantPanel()
         if (options.focus !== false) textareaFor(post)?.focus()
         if (options.announce !== false) setStatus(`Added post ${allPosts().length}.`, 'success')
         if (options.save !== false) saveDraft()
@@ -513,6 +779,7 @@
         post.remove()
         renamePosts()
         selectPost(next || root.querySelector('[data-composer-post]'), { skipSave: true })
+        renderVariantPanel()
         setStatus(`Removed post. ${allPosts().length} remaining.`, 'success')
         saveDraft()
       }
@@ -542,6 +809,14 @@
         const textarea = activeTextarea()
         if (textarea) textarea.value = item.text || ''
         if (composeTitle) composeTitle.value = item.title || ''
+
+        // Overrides. `shared` is seeded from the stored body so a restored
+        // override only reads as stale once this edit actually changes the text.
+        variants.clear()
+        Object.entries(item.variants || {}).forEach(([provider, text]) => {
+          if (typeof text === 'string' && text.trim())
+            variants.set(provider, { text, shared: item.text || '' })
+        })
 
         // Providers: select exactly the post's set (intersected with connected).
         selected.clear()
@@ -619,6 +894,9 @@
         const editFile = attachedFile()
         if (editFile) form.set('image', editFile, editFile.name)
         else if (editRemoveImage) form.set('remove_image', '1')
+        // Always sent, never conditional: the server treats an absent field as
+        // "keep what is stored", so clearing every override has to be explicit.
+        form.set('variants', JSON.stringify(variantsPayload()))
 
         buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
         try {
@@ -675,6 +953,8 @@
         if (queueImageUrl) form.set('image_url', queueImageUrl)
         const queueFile = attachedFile()
         if (queueFile) form.set('image', queueFile, queueFile.name)
+        const queueVariants = variantsPayload()
+        if (Object.keys(queueVariants).length) form.set('variants', JSON.stringify(queueVariants))
 
         buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
         try {
@@ -689,6 +969,9 @@
           scheduleInput?.classList.add('hidden')
           clearAttachment()
           renderLinkPreview(activePost, null)
+          // Same reason as the publish path: the overrides went with that post.
+          variants.clear()
+          renderVariantPanel()
           updateCount()
           updatePublishLabel()
           saveDraft()
@@ -744,7 +1027,7 @@
           : undefined
         const imageUrl = composeImage?.value.trim()
         const image = imageUrl ? { url: imageUrl } : undefined
-        return await social.publishCrosspost({ text, title: composedTitle(), providers: targetProviders, external, image, imageFile: attachedFile() })
+        return await social.publishCrosspost({ text, title: composedTitle(), providers: targetProviders, external, image, imageFile: attachedFile(), variants: variantsPayload() })
       }
 
       const publish = async () => {
@@ -837,6 +1120,11 @@
             renderLinkPreview(targets[0], null)
           }
 
+          // Overrides belong to the post that just went out. Leaving them set
+          // would send the previous post's per-network copy with the next one,
+          // while the shared body reads as empty — before saveDraft persists it.
+          variants.clear()
+          renderVariantPanel()
           updateCount()
           saveDraft()
           clearAttachment()
@@ -960,15 +1248,54 @@
         renderProviderToggles()
         updatePublishability()
       })
+      variantToggle?.addEventListener('click', () => {
+        variantsOpen = !variantsOpen
+        renderVariantPanel()
+      })
+      variantPanel?.addEventListener('click', (event) => {
+        const target = event.target
+        if (!(target instanceof HTMLElement)) return
+        const button = target.closest('[data-variant-action]')
+        if (!button) return
+        const provider = button.dataset.variantProvider
+        if (!provider) return
+        if (button.dataset.variantAction === 'fork') {
+          // Seed the override from the shared body so the user edits down from
+          // what they already wrote rather than starting on an empty box.
+          variants.set(provider, { text: sharedBody(), shared: sharedBody() })
+        }
+        else {
+          variants.delete(provider)
+        }
+        // Swap just this row: rebuilding the panel would drop every other row's
+        // caret and undo history, and leave focus on <body>.
+        refreshVariantRow(provider)
+        updateCount()
+        saveDraft()
+      })
+      variantPanel?.addEventListener('input', (event) => {
+        const target = event.target
+        if (!(target instanceof HTMLElement)) return
+        const provider = target.dataset.variantInput
+        if (!provider) return
+        const entry = variants.get(provider)
+        if (!entry) return
+        entry.text = target.value
+        // An override changing can flip that provider's over-limit state, which
+        // the footer counter and chip dots also report on.
+        updateCount()
+        updateVariantToggleLabel()
+        queueDraftSave()
+      })
       searchButton?.addEventListener('click', () => {
         const text = activeTextarea()?.value.trim()
         setStatus(text ? `Searching local drafts for: ${text.slice(0, 80)}` : 'Write a phrase first, then search local drafts.', text ? 'success' : 'error')
       })
       modeButtons.forEach(button => button.addEventListener('click', () => setMode(button.dataset.composerMode || 'single')))
       buttons.forEach(button => button.addEventListener('click', publish))
-      // Editing a queued post — don't restore a local draft over it, and don't
-      // save the edited content back into the draft.
-      const editParam = new URLSearchParams(window.location.search).get('edit')
+      // Editing a queued post — don't restore a local draft over it. The
+      // reciprocal guard (never writing an edit back into the draft) lives in
+      // saveDraft itself, so it holds for every caller.
       if (!editParam) {
         window.addEventListener('beforeunload', saveDraft)
         restoreDraft()

@@ -4,6 +4,7 @@ import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { crosspost, crosspostProviders } from '../../Services/Social/CrosspostService'
 import { persistTempMedia, readUploadedImage, removeTempMedia } from '../../Support/Social/uploads'
+import { parseVariantsField } from '../../Support/Social/variants'
 
 export default new Action({
   name: 'Postline Crosspost Publish',
@@ -59,7 +60,19 @@ export default new Action({
     catch {}
 
     try {
-      const content = { title, external, media: media.length ? media : undefined }
+      // Validated inside the try so the temp-media `finally` still runs on the
+      // early return. Rejected rather than dropped: silently ignoring the
+      // per-network text would publish the shared body everywhere instead.
+      const parsedVariants = parseVariantsField(request.get('variants'))
+      if (!parsedVariants.ok)
+        return response.json({ ok: false, error: 'Could not read the per-network text.' }, { status: 422 })
+
+      const content = {
+        title,
+        external,
+        media: media.length ? media : undefined,
+        variants: parsedVariants.variants || undefined,
+      }
       const data = thread.length > 1
         ? await crosspost.publishThread(thread, providers, content)
         : await crosspost.publish(thread[0] || text, providers, content)

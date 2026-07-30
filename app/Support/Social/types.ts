@@ -74,6 +74,16 @@ export interface PublishContent {
     root: { uri: string, cid: string }
     parent: { uri: string, cid: string }
   }
+  /**
+   * Per-provider body overrides. A provider listed here publishes its own text
+   * instead of the shared body; every other provider inherits. Resolved once in
+   * `CrosspostService.publishExisting` via `resolveVariantBody`, so drivers
+   * never see this field.
+   *
+   * Exists because networks have wildly different limits (Twitter 280 through
+   * blog 10000) and a single body forces the tightest one on all of them.
+   */
+  variants?: Partial<Record<SocialProvider, string>>
 }
 
 /** Outcome of publishing one post to a single provider during a crosspost. */

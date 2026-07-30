@@ -30,6 +30,11 @@ export interface CrosspostInput {
   imageFile?: File
   /** Multi-segment thread; reply-chained on providers that support it. */
   thread?: string[]
+  /**
+   * Per-provider body overrides, keyed by provider. Providers absent here
+   * publish `text`. Ignored for threads, which always use their shared segments.
+   */
+  variants?: Record<string, string>
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -75,6 +80,8 @@ export async function publishCrosspost(input: CrosspostInput): Promise<{ postId:
   }
   if (input.imageFile)
     body.set('image', input.imageFile, input.imageFile.name)
+  if (input.variants && Object.keys(input.variants).length)
+    body.set('variants', JSON.stringify(input.variants))
 
   const response = await fetch('/api/postline/publish', { method: 'POST', body })
   const payload = await response.json()
