@@ -65,10 +65,14 @@
     "stx": "./buddy"
   },
   "dependencies": {
-    "stacks": "^0.70.217"
+    "stacks": "^0.70.229"
   },
   "devDependencies": {
-    "better-dx": "^0.2.12"
+    "better-dx": "^0.2.22"
+  },
+  "overrides": {
+    "//": "bunfig 0.15.16 was cut from a branch predating `discovery`, dropping the ./discovery export 0.15.15 shipped and @stacksjs/stx imports — every stx entrypoint throws `Cannot find module 'bunfig/discovery'` under it. Hold the last good release until 0.15.17 ships from main with discovery intact, then delete this.",
+    "bunfig": "0.15.15"
   },
   "workspaces": [
     "storage/framework",
