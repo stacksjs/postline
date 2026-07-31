@@ -118,6 +118,31 @@ export interface TimelineResult {
   }>
 }
 
+/**
+ * One post the connected account authored, as returned when enumerating an
+ * account's own history for a purge. `uri` is whatever the provider's delete
+ * endpoint keys on (an AT-URI on Bluesky, a numeric id on X/Mastodon).
+ */
+export interface AuthoredPost {
+  uri: string
+  cid?: string
+  text?: string
+  postedAt?: string
+  url?: string
+}
+
+/** A page of authored posts plus the cursor for the next page (if any). */
+export interface AuthoredPostPage {
+  cursor?: string
+  posts: AuthoredPost[]
+}
+
+/** The minimum a purge needs to identify one remote post for deletion. */
+export interface RemotePostRef {
+  uri: string
+  cid?: string
+}
+
 export interface SocialDriver {
   provider: SocialProvider
   characterLimit: number

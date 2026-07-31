@@ -1,4 +1,5 @@
 import type { PublishedPost, PublishPostInput, SocialIdentityCredentials } from '@stacksjs/socials'
+import type { AuthoredPostPage } from '../../../Support/Social/types'
 
 /**
  * Full app-owned X/Twitter publishing driver. The published `@stacksjs/socials`
@@ -214,6 +215,58 @@ export class TwitterPublishingDriver {
   // X's home timeline needs elevated access we don't assume here.
   async timeline(): Promise<{ items: [] }> {
     return { items: [] }
+  }
+
+  /**
+   * One page of the authenticated account's own tweets, newest first. X caps
+   * `GET /2/users/:id/tweets` at 3,200 tweets of history — anything older than
+   * that simply cannot be enumerated (or therefore purged) through the API.
+   */
+  async listAuthoredPosts(
+    accessToken: string,
+    userId: string,
+    query: { cursor?: string, limit?: number } = {},
+  ): Promise<AuthoredPostPage> {
+    if (!accessToken) throw new Error('Twitter access token is missing for this identity.')
+    if (!userId) throw new Error('Twitter user id is required to list posts.')
+
+    const url = new URL(`${this.apiBase}/2/users/${encodeURIComponent(userId)}/tweets`)
+    url.searchParams.set('max_results', String(Math.min(Math.max(query.limit || 100, 5), 100)))
+    url.searchParams.set('tweet.fields', 'created_at')
+    if (query.cursor) url.searchParams.set('pagination_token', query.cursor)
+
+    const payload = await this.request<{
+      data?: Array<{ id: string, text?: string, created_at?: string }>
+      meta?: { next_token?: string }
+    }>(url.toString(), { headers: { authorization: `Bearer ${accessToken}` } })
+
+    return {
+      cursor: payload.meta?.next_token,
+      posts: (payload.data || []).filter(tweet => tweet?.id).map(tweet => ({
+        uri: tweet.id,
+        cid: tweet.id,
+        text: tweet.text,
+        postedAt: tweet.created_at,
+        url: `https://x.com/i/web/status/${tweet.id}`,
+      })),
+    }
+  }
+
+  /** Permanently delete one tweet. */
+  async deletePost(accessToken: string, tweetId: string): Promise<void> {
+    if (!accessToken) throw new Error('Twitter access token is missing for this identity.')
+    const id = String(tweetId || '').trim()
+    if (!id) throw new Error('A tweet id is required to delete a post.')
+
+    const payload = await this.request<{ data?: { deleted?: boolean } }>(
+      `${this.apiBase}/2/tweets/${encodeURIComponent(id)}`,
+      { method: 'DELETE', headers: { authorization: `Bearer ${accessToken}` } },
+    )
+
+    // X answers 200 with `deleted: false` when the tweet isn't the caller's.
+    if (payload.data && payload.data.deleted === false) {
+      throw new TwitterApiError(`X refused to delete tweet ${id}.`, 400, JSON.stringify(payload))
+    }
   }
 
   protected async tokenRequest(body: URLSearchParams, clientId: string, clientSecret?: string): Promise<TwitterToken> {

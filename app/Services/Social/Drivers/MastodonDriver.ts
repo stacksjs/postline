@@ -4,6 +4,7 @@ import type {
   MastodonPublished,
   MastodonPublishInput,
 } from '../../../Support/Social/mastodon'
+import type { AuthoredPostPage } from '../../../Support/Social/types'
 
 /**
  * Full app-owned Mastodon publishing driver (the published @stacksjs/socials
@@ -145,6 +146,63 @@ export class MastodonPublishingDriver {
       cid: status.id,
       url: status.url || status.uri || `${instance}/@me/${status.id}`,
     }
+  }
+
+  /**
+   * One page of the account's own statuses, newest first. Mastodon paginates
+   * by `max_id` (fetch statuses older than the last id seen), so the returned
+   * cursor is the oldest id on this page.
+   */
+  async listAuthoredPosts(
+    credentials: MastodonCredentials,
+    accountId: string,
+    query: { cursor?: string, limit?: number } = {},
+  ): Promise<AuthoredPostPage> {
+    const instance = normalizeInstance(credentials.instance)
+    if (!credentials.accessToken)
+      throw new Error('Mastodon access token is required.')
+    if (!accountId)
+      throw new Error('Mastodon account id is required to list statuses.')
+
+    const url = new URL(`${instance}/api/v1/accounts/${encodeURIComponent(accountId)}/statuses`)
+    url.searchParams.set('limit', String(Math.min(Math.max(query.limit || 40, 1), 40)))
+    // Exclude boosts: a reblog is not this account's own post to delete.
+    url.searchParams.set('exclude_reblogs', 'true')
+    if (query.cursor) url.searchParams.set('max_id', query.cursor)
+
+    const statuses = await this.request<Array<{ id: string, content?: string, url?: string, created_at?: string }>>(
+      url.toString(),
+      { headers: { authorization: `Bearer ${credentials.accessToken}` } },
+    )
+
+    const posts = (statuses || []).filter(status => status?.id).map(status => ({
+      uri: status.id,
+      cid: status.id,
+      text: status.content,
+      postedAt: status.created_at,
+      url: status.url,
+    }))
+
+    return {
+      // No page means no more history; otherwise resume below the oldest id.
+      cursor: posts.length ? posts[posts.length - 1]?.uri : undefined,
+      posts,
+    }
+  }
+
+  /** Permanently delete one status. */
+  async deletePost(credentials: MastodonCredentials, statusId: string): Promise<void> {
+    const instance = normalizeInstance(credentials.instance)
+    if (!credentials.accessToken)
+      throw new Error('Mastodon access token is required.')
+    const id = String(statusId || '').trim()
+    if (!id)
+      throw new Error('A status id is required to delete a post.')
+
+    await this.request(
+      `${instance}/api/v1/statuses/${encodeURIComponent(id)}`,
+      { method: 'DELETE', headers: { authorization: `Bearer ${credentials.accessToken}` } },
+    )
   }
 
   protected async request<T>(url: string, init: RequestInit): Promise<T> {
