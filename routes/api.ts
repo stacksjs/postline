@@ -81,4 +81,8 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/queue/delete', 'Actions/Postline/QueueDeleteAction').middleware('auth').skipCsrf()
   route.post('/queue/publish-now', 'Actions/Postline/QueuePublishNowAction').middleware('auth').skipCsrf()
   route.post('/metrics/sync', 'Actions/Postline/MetricsSyncAction').middleware('auth').skipCsrf()
+  // Bulk post deletion. Irreversible, so both halves are auth-only and rate
+  // limited — the preview generously, the destructive run tightly.
+  route.get('/purge/preview', 'Actions/Postline/PurgePreviewAction').middleware('auth').skipCsrf().rateLimit(20, 'minute')
+  route.post('/purge', 'Actions/Postline/PurgeRunAction').middleware('auth').skipCsrf().rateLimit(3, 'hour')
 })
