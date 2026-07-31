@@ -70,10 +70,6 @@
   "devDependencies": {
     "better-dx": "^0.2.22"
   },
-  "overrides": {
-    "//": "The published stacks packages depend on @stacksjs/components 0.2.119, which pins @stacksjs/stx exactly, and that stx imports the `bunfig/discovery` subpath. bunfig 0.15.16 dropped the helper and 0.15.17 collapsed the export map to root + browser + ts-plugin, so 0.15.15 is the last release those stranded copies can load. stx 0.2.148 already imports it from the bunfig root — drop this once the stacks packages depend on stx > 0.2.147.",
-    "bunfig": "0.15.15"
-  },
   "workspaces": [
     "storage/framework",
     "storage/framework/libs/*",
