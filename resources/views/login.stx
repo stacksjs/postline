@@ -6,6 +6,9 @@
 @section('content')
   <script>
     // Login uses a different layout, so it carries its own theme bootstrap.
+    // Stays a plain pre-paint script on purpose: it must run before first paint,
+    // and a hydrated directive would flash the wrong theme. See
+    // stacksjs/stx#1788 for why useColorMode cannot express this yet.
     ;(() => {
       try {
         const s = localStorage.getItem('theme') || 'system'
@@ -34,125 +37,117 @@
     <section class="grid gap-5 p-6 max-w-sm w-full bg-white border border-zinc-200 rounded-2xl shadow-sm">
       <header class="grid gap-2 justify-items-center text-center">
         <span class="grid place-items-center h-11 w-11 font-bold text-lg text-white bg-neutral-950 rounded-xl">P</span>
-        <h1 class="m-0 font-bold text-[20px] text-neutral-950" data-login-heading>Sign in to Postline</h1>
-        <p class="m-0 text-[13px] text-zinc-600" data-login-subtitle>Your personal publishing workspace.</p>
+        <h1 class="m-0 font-bold text-[20px] text-neutral-950" :text="heading()">Sign in to Postline</h1>
+        <p class="m-0 text-[13px] text-zinc-600" :text="subtitle()">Your personal publishing workspace.</p>
       </header>
 
-      <form class="grid gap-3" data-login-form>
-        <label class="hidden gap-1.5" data-login-name-row>
+      <form class="grid gap-3" @submit.prevent="onSubmit">
+        <!-- Inline display:none is the pre-hydration state. bindShow treats an
+            initial 'none' as "no original display", so showing the row clears
+            the inline style and the `grid` class takes over — no flash, and no
+            fighting between a `hidden` class and x-show. -->
+        <label class="grid gap-1.5" style="display:none" x-show="registering()">
           <span class="font-bold text-xs text-zinc-500">Name</span>
-          <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="name" autocomplete="name" placeholder="Your name" data-login-name>
+          <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="name" autocomplete="name" placeholder="Your name" x-model="accountName" :required="registering()">
         </label>
         <label class="grid gap-1.5">
           <span class="font-bold text-xs text-zinc-500">Email</span>
-          <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="email" type="email" autocomplete="username" placeholder="you@example.com" required data-login-email>
+          <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="email" type="email" autocomplete="username" placeholder="you@example.com" required x-model="email">
         </label>
         <label class="grid gap-1.5">
           <span class="font-bold text-xs text-zinc-500">Password</span>
-          <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required minlength="6" data-login-password>
+          <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required minlength="6" x-model="password">
         </label>
-        <label class="hidden gap-1.5" data-login-confirm-row>
+        <label class="grid gap-1.5" style="display:none" x-show="registering()">
           <span class="font-bold text-xs text-zinc-500">Confirm password</span>
-          <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password_confirmation" type="password" autocomplete="new-password" placeholder="••••••••" minlength="6" data-login-confirm>
+          <input class="px-3 h-10 text-neutral-950 text-sm bg-white border border-zinc-200 outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password_confirmation" type="password" autocomplete="new-password" placeholder="••••••••" minlength="6" x-model="confirmPassword" :required="registering()">
         </label>
-        <p class="hidden m-0 text-red-700 text-xs" data-login-error></p>
-        <button class="inline-flex items-center justify-center px-4 h-10 font-bold text-sm text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" data-login-submit>Sign in</button>
+        <p class="m-0 text-red-700 text-xs" style="display:none" x-show="errorMessage()" :text="errorMessage()"></p>
+        <button class="inline-flex items-center justify-center px-4 h-10 font-bold text-sm text-white bg-neutral-950 hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="busy()" :text="submitLabel()">Sign in</button>
       </form>
 
-      <button class="text-xs text-zinc-500 underline hover:text-zinc-700 transition-colors" type="button" data-login-toggle>First run? Create the workspace account</button>
+      <button class="text-xs text-zinc-500 underline hover:text-zinc-700 transition-colors" type="button" @click="toggleMode" :text="toggleLabel()">First run? Create the workspace account</button>
     </section>
   </main>
 
-  <script>
-    ;(() => {
-      const root = document.querySelector('[data-testid="login-page"]')
-      if (!root) return
+  <script client>
+    const registering = state(false)
+    const errorMessage = state('')
+    const busy = state(false)
 
-      const form = root.querySelector('[data-login-form]')
-      const heading = root.querySelector('[data-login-heading]')
-      const subtitle = root.querySelector('[data-login-subtitle]')
-      const nameRow = root.querySelector('[data-login-name-row]')
-      const nameInput = root.querySelector('[data-login-name]')
-      const emailInput = root.querySelector('[data-login-email]')
-      const passwordInput = root.querySelector('[data-login-password]')
-      const confirmRow = root.querySelector('[data-login-confirm-row]')
-      const confirmInput = root.querySelector('[data-login-confirm]')
-      const errorText = root.querySelector('[data-login-error]')
-      const submit = root.querySelector('[data-login-submit]')
-      const toggle = root.querySelector('[data-login-toggle]')
+    const accountName = state('')
+    const email = state('')
+    const password = state('')
+    const confirmPassword = state('')
 
-      let registering = false
+    const heading = derived(() => registering() ? 'Create your workspace' : 'Sign in to Postline')
+    const subtitle = derived(() => registering()
+      ? 'One account owns this Postline instance.'
+      : 'Your personal publishing workspace.')
+    const submitLabel = derived(() => registering() ? 'Create account' : 'Sign in')
+    const toggleLabel = derived(() => registering()
+      ? 'Already set up? Sign in instead'
+      : 'First run? Create the workspace account')
 
-      const setError = (message) => {
-        if (!errorText) return
-        errorText.textContent = message || ''
-        errorText.classList.toggle('hidden', !message)
+    const toggleMode = () => {
+      registering.set(!registering())
+      errorMessage.set('')
+    }
+
+    /**
+     * Persist the session and enter the app.
+     *
+     * A hard navigation rather than stx `navigate()`: the app shell reads auth
+     * state at boot, so a fresh document is what makes the new session take
+     * effect everywhere.
+     */
+    const storeTokenAndEnter = (token, expiresIn) => {
+      const maxAge = Number(expiresIn) > 0 ? Number(expiresIn) : 60 * 60 * 24 * 30
+      useCookie('auth-token', { maxAge }).set(token)
+      location.assign('/')
+    }
+
+    const onSubmit = async () => {
+      errorMessage.set('')
+
+      // The workspace-owning account has no recovery path, so a first-run typo
+      // must not silently create an account nobody can sign into.
+      if (registering() && password() !== confirmPassword()) {
+        errorMessage.set('Passwords do not match.')
+        return
       }
 
-      const setMode = (register) => {
-        registering = register
-        nameRow?.classList.toggle('hidden', !register)
-        nameRow?.classList.toggle('grid', register)
-        confirmRow?.classList.toggle('hidden', !register)
-        confirmRow?.classList.toggle('grid', register)
-        // The workspace-owning account has no recovery path, so a first-run
-        // typo must not silently create an account nobody can sign into.
-        nameInput?.toggleAttribute('required', register)
-        confirmInput?.toggleAttribute('required', register)
-        if (heading) heading.textContent = register ? 'Create your workspace' : 'Sign in to Postline'
-        if (subtitle) subtitle.textContent = register ? 'One account owns this Postline instance.' : 'Your personal publishing workspace.'
-        if (submit) submit.textContent = register ? 'Create account' : 'Sign in'
-        if (toggle) toggle.textContent = register ? 'Already set up? Sign in instead' : 'First run? Create the workspace account'
-        setError('')
-      }
+      busy.set(true)
 
-      const storeTokenAndEnter = (token, expiresIn) => {
-        const maxAge = Number(expiresIn) > 0 ? Number(expiresIn) : 60 * 60 * 24 * 30
-        document.cookie = `auth-token=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax`
-        window.location.assign('/')
-      }
+      const body = new FormData()
+      body.set('email', email().trim())
+      body.set('password', password())
+      if (registering()) body.set('name', accountName().trim())
 
-      toggle?.addEventListener('click', () => setMode(!registering))
+      try {
+        const response = await fetch(registering() ? '/api/register' : '/api/login', { method: 'POST', body })
+        const payload = await response.json().catch(() => ({}))
 
-      form?.addEventListener('submit', async (event) => {
-        event.preventDefault()
-        setError('')
-
-        if (registering && (passwordInput?.value || '') !== (confirmInput?.value || '')) {
-          setError('Passwords do not match.')
+        if (registering()) {
+          if (!response.ok || payload.ok === false)
+            throw new Error(payload.error || 'Could not create the account.')
+          const token = payload.data?.access_token
+          if (token) storeTokenAndEnter(token)
+          else registering.set(false)
           return
         }
 
-        submit?.setAttribute('disabled', 'disabled')
-
-        const body = new FormData()
-        body.set('email', emailInput?.value.trim() || '')
-        body.set('password', passwordInput?.value || '')
-        if (registering) body.set('name', nameInput?.value.trim() || '')
-
-        try {
-          const response = await fetch(registering ? '/api/register' : '/api/login', { method: 'POST', body })
-          const payload = await response.json().catch(() => ({}))
-
-          if (registering) {
-            if (!response.ok || payload.ok === false) throw new Error(payload.error || 'Could not create the account.')
-            const token = payload.data?.access_token
-            if (token) storeTokenAndEnter(token)
-            else setMode(false)
-            return
-          }
-
-          const token = payload.access_token || payload.token
-          if (!response.ok || !token) throw new Error(payload.error || payload.message || 'Incorrect email or password.')
-          storeTokenAndEnter(token, payload.expires_in)
-        }
-        catch (error) {
-          setError(error instanceof Error ? error.message : String(error))
-        }
-        finally {
-          submit?.removeAttribute('disabled')
-        }
-      })
-    })()
+        const token = payload.access_token || payload.token
+        if (!response.ok || !token)
+          throw new Error(payload.error || payload.message || 'Incorrect email or password.')
+        storeTokenAndEnter(token, payload.expires_in)
+      }
+      catch (error) {
+        errorMessage.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        busy.set(false)
+      }
+    }
   </script>
 @endsection
