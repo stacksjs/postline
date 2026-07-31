@@ -168,7 +168,7 @@
             <span class="font-bold text-red-800 text-xs">Type <code class="px-1 py-0.5 text-xs bg-panel rounded">DELETE ALL POSTS</code> to confirm</span>
             <input class="px-3 h-10 text-ink text-sm bg-panel border border-red-200 outline-none rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-100" type="text" autocomplete="off" placeholder="DELETE ALL POSTS" aria-label="Deletion confirmation phrase" data-purge-confirmation>
           </label>
-          <button class="inline-flex items-center justify-center px-4 h-10 font-bold text-sm text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 transition-colors" type="button" disabled data-purge-run>Delete permanently</button>
+          <button class="inline-flex items-center justify-center px-4 h-10 font-bold text-sm text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" disabled data-purge-run>Delete permanently</button>
           <p class="m-0 text-red-800 text-xs" data-purge-hint>Run a preview first, then type the phrase to enable deletion.</p>
         </div>
       </div>

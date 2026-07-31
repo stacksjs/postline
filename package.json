@@ -70,6 +70,10 @@
   "devDependencies": {
     "better-dx": "^0.2.12"
   },
+  "overrides": {
+    "//": "Crosswind < 0.2.13 silently dropped every variant on a whole-class utility (disabled:cursor-not-allowed, hover:cursor-pointer, md:break-inside-avoid). stx pulls in 0.2.4 transitively; pin all copies to the fixed release.",
+    "@cwcss/crosswind": "^0.2.14"
+  },
   "workspaces": [
     "storage/framework",
     "storage/framework/libs/*",
