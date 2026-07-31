@@ -475,19 +475,23 @@
         }
 
         // Number keys 1-6 jump between pages (the sidebar shows the badges).
+        // Bound through stx's useEventListener rather than a raw document
+        // listener: it unsubscribes on destroy, so repeated SPA navigations
+        // can't stack duplicate handlers. Routing goes through stx `navigate`
+        // instead of synthesising a click on a link element.
         const bindKeyboardShortcuts = () => {
+          if (window.__postlineShortcutsBound) return
+          window.__postlineShortcutsBound = true
           const routes = { 1: '/', 2: '/queue', 3: '/timeline', 4: '/analytics', 5: '/accounts', 6: '/settings' }
-          document.addEventListener('keydown', (event) => {
+          window.stx?.useEventListener('keydown', (event) => {
             if (event.metaKey || event.ctrlKey || event.altKey) return
             const target = event.target
             if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable]')) return
             const href = routes[event.key]
             if (!href || window.location.pathname === href) return
             event.preventDefault()
-            const link = document.querySelector(`[data-stx-link][href="${href}"]`)
-            if (link instanceof HTMLElement) link.click()
-            else window.location.assign(href)
-          })
+            window.stx.navigate(href)
+          }, { target: document })
         }
 
         bindSidebarCollapse()
