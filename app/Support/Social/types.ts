@@ -143,6 +143,20 @@ export interface RemotePostRef {
   cid?: string
 }
 
+/**
+ * The narrow surface a bulk purge needs from a provider. Each social service
+ * builds one of these so token refresh and identity lookup stay owned by the
+ * service that already knows how to do them.
+ */
+export interface ProviderPurgeAdapter {
+  provider: SocialProvider
+  identityId: number
+  handle: string
+  /** One page of the account's own posts; omit the cursor for the first page. */
+  listPage: (cursor?: string) => Promise<AuthoredPostPage>
+  deletePost: (ref: RemotePostRef) => Promise<void>
+}
+
 export interface SocialDriver {
   provider: SocialProvider
   characterLimit: number

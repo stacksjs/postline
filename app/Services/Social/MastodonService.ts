@@ -1,4 +1,4 @@
-import type { CrosspostTargetResult, PublishContent } from '../../Support/Social/types'
+import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { MastodonApiError, MastodonDriver, normalizeInstance } from './Drivers/MastodonDriver'
@@ -157,6 +157,25 @@ export class MastodonService {
     }
   }
 
+  /**
+   * The purge surface for Mastodon. Personal access tokens don't expire, so
+   * the identity is resolved once. Deletes key on the status id — which is
+   * stored in `remote_cid`, since `remote_uri` holds the public status URL.
+   */
+  async purgeAdapter(): Promise<ProviderPurgeAdapter> {
+    const identity = await this.requireIdentity()
+    const credentials = { instance: identity.external_id || '', accessToken: identity.access_token || '' }
+    const account = await this.driver.verifyCredentials(credentials)
+
+    return {
+      provider: 'mastodon',
+      identityId: Number(identity.id),
+      handle: identity.handle,
+      listPage: cursor => this.driver.listAuthoredPosts(credentials, account.accountId, { cursor }),
+      deletePost: ref => this.driver.deletePost(credentials, ref.cid || lastPathSegment(ref.uri)),
+    }
+  }
+
   private async requireIdentity(): Promise<SocialIdentityRow> {
     const existing = await this.findIdentity()
     if (existing?.access_token && existing.auth_status === 'connected') return existing
@@ -273,6 +292,14 @@ export class MastodonService {
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * The status id at the end of a Mastodon status URL — the fallback when a
+ * target row predates `remote_cid` being populated.
+ */
+function lastPathSegment(value: string): string {
+  return String(value || '').replace(/\/+$/, '').split('/').pop() || ''
 }
 
 export const mastodon = new MastodonService()

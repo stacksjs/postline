@@ -1,4 +1,4 @@
-import type { BlueskySession, CrosspostTargetResult, PublishContent, PublishedPost, TimelineResult } from '../../Support/Social/types'
+import type { BlueskySession, CrosspostTargetResult, ProviderPurgeAdapter, PublishContent, PublishedPost, TimelineResult } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { describeBlueskyError } from '../../Support/Social/bluesky-errors'
@@ -377,9 +377,35 @@ export class BlueskyService {
     return { ...timeline, saved }
   }
 
+  /**
+   * The purge surface for Bluesky. Every call runs through `withFreshSession`
+   * so a long-running purge survives the ~2h access-JWT lifetime, and the
+   * refreshed identity is carried forward instead of re-refreshed each time.
+   */
+  async purgeAdapter(): Promise<ProviderPurgeAdapter> {
+    let current = await this.requireIdentity()
+    const credentials = (identity: SocialIdentityRow) => ({
+      handle: identity.handle,
+      did: identity.external_id || undefined,
+      accessToken: identity.access_token || undefined,
+      refreshToken: identity.refresh_token || undefined,
+    })
+    const run = <T>(callback: (identity: SocialIdentityRow) => Promise<T>): Promise<T> =>
+      this.withFreshSession(current, callback, (refreshed) => { current = refreshed })
+
+    return {
+      provider: 'bluesky',
+      identityId: Number(current.id),
+      handle: current.handle,
+      listPage: cursor => run(identity => this.driver.listAuthoredPosts(credentials(identity), { cursor })),
+      deletePost: ref => run(identity => this.driver.deletePost(credentials(identity), ref.uri)),
+    }
+  }
+
   private async withFreshSession<T>(
     identity: SocialIdentityRow,
     callback: (identity: SocialIdentityRow) => Promise<T>,
+    onRefresh?: (identity: SocialIdentityRow) => void,
   ): Promise<T> {
     try {
       return await callback(identity)
@@ -404,6 +430,7 @@ export class BlueskyService {
           .execute()
         throw new Error('Bluesky session expired — reconnect your account on the Accounts page.')
       }
+      onRefresh?.(refreshed)
       return await callback(refreshed)
     }
   }

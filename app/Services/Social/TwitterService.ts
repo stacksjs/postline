@@ -1,4 +1,4 @@
-import type { CrosspostTargetResult, PublishContent } from '../../Support/Social/types'
+import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { TwitterApiError, TwitterDriver } from './Drivers/TwitterDriver'
@@ -230,6 +230,25 @@ export class TwitterService {
       }).where('id', '=', target.id).execute()
 
       return { provider: 'twitter', ok: false, error: message, targetId: Number(target.id) }
+    }
+  }
+
+  /**
+   * The purge surface for X. The identity (and any token refresh) is resolved
+   * once up front — X access tokens outlive a single purge run, and refreshing
+   * per request would rotate the refresh token on every delete.
+   */
+  async purgeAdapter(): Promise<ProviderPurgeAdapter> {
+    const identity = await this.requireIdentity()
+    const accessToken = identity.access_token || ''
+    const userId = identity.external_id || ''
+
+    return {
+      provider: 'twitter',
+      identityId: Number(identity.id),
+      handle: identity.handle,
+      listPage: cursor => this.driver.listAuthoredPosts(accessToken, userId, { cursor }),
+      deletePost: ref => this.driver.deletePost(accessToken, ref.uri),
     }
   }
 
