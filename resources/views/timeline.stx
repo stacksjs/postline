@@ -13,9 +13,9 @@
       </div>
       <div class="grid sm:flex gap-2 grid-cols-2 items-center">
         <a class="inline-flex items-center justify-center px-4 h-9 font-bold text-ink text-sm bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" href="/" data-stx-link>Compose</a>
-        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" data-bluesky-timeline-refresh>
+        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="busy()" @click="refreshManual">
           <span class="h-4 w-4 i-hugeicons-refresh" aria-hidden="true"></span>
-          <span data-bluesky-timeline-refresh-label>Refresh</span>
+          <span :text="refreshLabel()">Refresh</span>
         </button>
       </div>
     </header>
@@ -24,96 +24,16 @@
       <div class="postline-feed__header">
         <div>
           <strong class="font-bold text-sm text-zinc-900">Following</strong>
-          <p class="m-0 mt-0.5 text-muted text-xs" data-bluesky-timeline-meta>Loading feed…</p>
+          <p class="m-0 mt-0.5 text-muted text-xs" :text="metaText()">Loading feed…</p>
         </div>
         <span class="px-2.5 py-1 font-bold text-[11px] text-blue-700 bg-blue-50 border border-blue-200 rounded-full">Bluesky</span>
       </div>
-      <div class="postline-feed__list" data-bluesky-timeline-list>
-        <p class="postline-feed__loading" data-bluesky-timeline-empty>Loading your timeline…</p>
-      </div>
-    </div>
-  </section>
-
-  <script>
-    ;(() => {
-      const root = document.querySelector('[data-testid="timeline-page"]')
-      if (!root) return
-
-      const button = root.querySelector('[data-bluesky-timeline-refresh]')
-      const refreshLabel = root.querySelector('[data-bluesky-timeline-refresh-label]')
-      const list = root.querySelector('[data-bluesky-timeline-list]')
-      const meta = root.querySelector('[data-bluesky-timeline-meta]')
-      const toast = window.postlineToast?.show
-
-      const ICON_REPLY = '<span class="h-4 w-4 i-hugeicons-comment-02" aria-hidden="true"></span>'
-      const ICON_REPOST = '<span class="h-4 w-4 i-hugeicons-repeat" aria-hidden="true"></span>'
-      const ICON_LIKE = '<span class="h-4 w-4 i-hugeicons-favourite" aria-hidden="true"></span>'
-      const ICON_EXTERNAL = '<span class="h-4 w-4 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span>'
-
-      const escapeHtml = (value) => String(value || '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;')
-
-      const formatCount = (value) => {
-        const n = Number(value) || 0
-        if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
-        if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`
-        return String(n)
-      }
-
-      const formatRelativeTime = (iso) => {
-        const date = new Date(iso)
-        if (Number.isNaN(date.getTime())) return ''
-        const diff = Date.now() - date.getTime()
-        const minutes = Math.floor(diff / 60000)
-        if (minutes < 1) return 'now'
-        if (minutes < 60) return `${minutes}m`
-        const hours = Math.floor(minutes / 60)
-        if (hours < 24) return `${hours}h`
-        const days = Math.floor(hours / 24)
-        if (days < 7) return `${days}d`
-        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-      }
-
-      const avatarGradient = (handle) => {
-        let hash = 0
-        for (let i = 0; i < handle.length; i++) hash = handle.charCodeAt(i) + ((hash << 5) - hash)
-        const hues = [215, 168, 280, 32, 340, 128, 48, 12]
-        const hue = hues[Math.abs(hash) % hues.length]
-        return `--postline-avatar-a:hsl(${hue} 72% 58%);--postline-avatar-b:hsl(${hue} 68% 42%)`
-      }
-
-      const initials = (handle, name) => {
-        if (name) {
-          const parts = name.trim().split(/\s+/).slice(0, 2)
-          if (parts.length) return parts.map(part => part[0]?.toUpperCase() || '').join('')
-        }
-        return handle.replace(/[^a-z0-9]/gi, '').slice(0, 2).toUpperCase() || 'PL'
-      }
-
-      const profileUrl = (handle) => `https://bsky.app/profile/${encodeURIComponent(handle)}`
-
-      const postUrl = (item) => {
-        if (item.postUrl) return item.postUrl
-        const id = String(item.uri || '').split('/').pop()
-        return id ? `https://bsky.app/profile/${encodeURIComponent(item.authorHandle)}/post/${id}` : profileUrl(item.authorHandle)
-      }
-
-      const linkifyBody = (text) => {
-        const escaped = escapeHtml(text)
-        return escaped.replace(
-          /(https?:\/\/[^\s<]+)/g,
-          '<a class="postline-feed-post__link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
-        )
-      }
-
-      const renderSkeleton = () => {
-        if (!list) return
-        list.innerHTML = Array.from({ length: 4 }, () => `
-          <div class="postline-feed__skeleton">
+      <div class="postline-feed__list">
+        <!-- x-show lives on a wrapper, never on the x-for element itself:
+            bindFor returns as soon as it sees the loop attribute, so an x-show
+            sharing that element is silently never bound. -->
+        <div x-show="busy()">
+          <div class="postline-feed__skeleton" x-for="row in skeletonRows()">
             <div class="postline-feed__skeleton-row">
               <div class="postline-feed__skeleton-avatar"></div>
               <div class="postline-feed__skeleton-lines">
@@ -123,87 +43,196 @@
               </div>
             </div>
           </div>
-        `).join('')
-      }
+        </div>
 
-      const renderItems = (items) => {
-        if (!list || !Array.isArray(items)) return
-        if (items.length === 0) {
-          list.innerHTML = '<p class="postline-feed__empty">No posts in your feed yet. Publish from the composer or refresh again.</p>'
-          if (meta) meta.textContent = '0 posts'
-          return
-        }
+        <p class="postline-feed__empty" x-show="feedError()" :text="feedError()"></p>
+        <p class="postline-feed__empty" x-show="showEmpty()">No posts in your feed yet. Publish from the composer or refresh again.</p>
 
-        if (meta) meta.textContent = `${items.length} post${items.length === 1 ? '' : 's'}`
-        list.innerHTML = items.map((item) => {
-          const handle = item.authorHandle || 'unknown.bsky.social'
-          const name = item.authorName || handle
-          const url = postUrl(item)
-          const avatarMarkup = item.authorAvatar
-            ? `<img src="${escapeHtml(item.authorAvatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
-            : escapeHtml(initials(handle, name))
-
-          return `
-            <article class="postline-feed-post">
-              <div class="postline-feed-post__layout">
-                <a class="postline-feed-post__avatar" href="${escapeHtml(profileUrl(handle))}" target="_blank" rel="noopener noreferrer" style="${avatarGradient(handle)}" aria-label="${escapeHtml(name)}">${avatarMarkup}</a>
-                <div class="postline-feed-post__main">
-                  <div class="postline-feed-post__meta">
-                    <div class="postline-feed-post__identity">
-                      <div class="postline-feed-post__name-row">
-                        <a class="postline-feed-post__name" href="${escapeHtml(profileUrl(handle))}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a>
-                        <a class="postline-feed-post__handle" href="${escapeHtml(profileUrl(handle))}" target="_blank" rel="noopener noreferrer">@${escapeHtml(handle)}</a>
-                        <span class="postline-feed-post__dot">·</span>
-                        <time class="postline-feed-post__time" datetime="${escapeHtml(item.postedAt)}">${escapeHtml(formatRelativeTime(item.postedAt))}</time>
-                      </div>
-                      <span class="postline-feed-post__provider">Bluesky</span>
-                    </div>
-                    <a class="postline-feed-post__open" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" aria-label="Open post on Bluesky" title="Open on Bluesky">${ICON_EXTERNAL}</a>
+        <article class="postline-feed-post" x-for="item in items()">
+          <div class="postline-feed-post__layout">
+            <!-- @bind:style, not :style — the latter routes to bindStyle, which
+                expects an object; this is a raw custom-property declaration. -->
+            <a class="postline-feed-post__avatar" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer" @bind:style="item.gradient" :aria-label="item.name">
+              <img x-if="item.avatar" :src="item.avatar" alt="" loading="lazy" referrerpolicy="no-referrer">
+              <span x-else>{{ item.initials }}</span>
+            </a>
+            <div class="postline-feed-post__main">
+              <div class="postline-feed-post__meta">
+                <div class="postline-feed-post__identity">
+                  <div class="postline-feed-post__name-row">
+                    <a class="postline-feed-post__name" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer">{{ item.name }}</a>
+                    <a class="postline-feed-post__handle" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer">@{{ item.handle }}</a>
+                    <span class="postline-feed-post__dot">·</span>
+                    <time class="postline-feed-post__time" :datetime="item.postedAt">{{ item.relativeTime }}</time>
                   </div>
-                  <p class="postline-feed-post__body">${linkifyBody(item.body || '')}</p>
-                  <div class="postline-feed-post__actions">
-                    <a class="postline-feed-post__stat" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${ICON_REPLY}<span>${formatCount(item.replyCount)}</span></a>
-                    <span class="postline-feed-post__stat">${ICON_REPOST}<span>${formatCount(item.repostCount)}</span></span>
-                    <span class="postline-feed-post__stat">${ICON_LIKE}<span>${formatCount(item.likeCount)}</span></span>
-                  </div>
+                  <span class="postline-feed-post__provider">Bluesky</span>
                 </div>
+                <a class="postline-feed-post__open" :href="item.url" target="_blank" rel="noopener noreferrer" aria-label="Open post on Bluesky" title="Open on Bluesky">
+                  <span class="h-4 w-4 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span>
+                </a>
               </div>
-            </article>
-          `
-        }).join('')
+              <!-- x-html, not interpolation: the body carries anchor markup for
+                  any URLs it contains. `linkifyBody` HTML-escapes the text
+                  BEFORE inserting anchors, so nothing user-authored is trusted. -->
+              <p class="postline-feed-post__body" x-html="item.bodyHtml"></p>
+              <div class="postline-feed-post__actions">
+                <a class="postline-feed-post__stat" :href="item.url" target="_blank" rel="noopener noreferrer">
+                  <span class="h-4 w-4 i-hugeicons-comment-02" aria-hidden="true"></span><span>{{ item.replies }}</span>
+                </a>
+                <span class="postline-feed-post__stat">
+                  <span class="h-4 w-4 i-hugeicons-repeat" aria-hidden="true"></span><span>{{ item.reposts }}</span>
+                </span>
+                <span class="postline-feed-post__stat">
+                  <span class="h-4 w-4 i-hugeicons-favourite" aria-hidden="true"></span><span>{{ item.likes }}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <script client>
+    const items = state([])
+    const metaText = state('Loading feed…')
+    const refreshLabel = state('Refresh')
+    const busy = state(false)
+    const feedError = state('')
+    const loaded = state(false)
+
+    const skeletonRows = () => [1, 2, 3, 4]
+    const showEmpty = derived(() => loaded() && !feedError() && items().length === 0)
+
+    const escapeHtml = value => String(value || '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll('\'', '&#039;')
+
+    const formatCount = (value) => {
+      const n = Number(value) || 0
+      if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+      if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`
+      return String(n)
+    }
+
+    const formatRelativeTime = (iso) => {
+      const date = new Date(iso)
+      if (Number.isNaN(date.getTime())) return ''
+      const minutes = Math.floor((Date.now() - date.getTime()) / 60000)
+      if (minutes < 1) return 'now'
+      if (minutes < 60) return `${minutes}m`
+      const hours = Math.floor(minutes / 60)
+      if (hours < 24) return `${hours}h`
+      const days = Math.floor(hours / 24)
+      if (days < 7) return `${days}d`
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    }
+
+    const avatarGradient = (handle) => {
+      let hash = 0
+      for (let i = 0; i < handle.length; i++) hash = handle.charCodeAt(i) + ((hash << 5) - hash)
+      const hues = [215, 168, 280, 32, 340, 128, 48, 12]
+      const hue = hues[Math.abs(hash) % hues.length]
+      return `--postline-avatar-a:hsl(${hue} 72% 58%);--postline-avatar-b:hsl(${hue} 68% 42%)`
+    }
+
+    const initialsFor = (handle, name) => {
+      if (name) {
+        const parts = name.trim().split(/\s+/).slice(0, 2)
+        if (parts.length) return parts.map(part => part[0]?.toUpperCase() || '').join('')
       }
+      return handle.replace(/[^a-z0-9]/gi, '').slice(0, 2).toUpperCase() || 'PL'
+    }
 
-      // `manual` = user clicked Refresh (toast feedback is wanted). On the
-      // initial auto-load we stay silent and let the inline feed state speak,
-      // so a failing load never spams a toast (and never stacks across pages).
-      const refresh = async ({ manual = false } = {}) => {
-        button?.setAttribute('disabled', 'disabled')
-        if (refreshLabel) refreshLabel.textContent = 'Refreshing…'
-        renderSkeleton()
-        if (meta) meta.textContent = 'Syncing…'
+    const profileUrl = handle => `https://bsky.app/profile/${encodeURIComponent(handle)}`
 
-        try {
-          const response = await fetch('/api/postline/bluesky/timeline?limit=30')
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky timeline sync failed.')
-          renderItems(payload.data.items)
-          if (manual && toast) toast({ title: 'Timeline', message: `Loaded ${payload.data.items?.length || 0} posts.`, tone: 'success', durationMs: 3200 })
-        }
-        catch (error) {
-          if (list) {
-            list.innerHTML = `<p class="postline-feed__empty">${escapeHtml(error instanceof Error ? error.message : String(error))}</p>`
-          }
-          if (meta) meta.textContent = 'Could not load feed'
-          if (manual && toast) toast({ title: 'Timeline', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'timeline-load' })
-        }
-        finally {
-          button?.removeAttribute('disabled')
-          if (refreshLabel) refreshLabel.textContent = 'Refresh'
+    const postUrl = (item) => {
+      if (item.postUrl) return item.postUrl
+      const id = String(item.uri || '').split('/').pop()
+      return id
+        ? `https://bsky.app/profile/${encodeURIComponent(item.authorHandle)}/post/${id}`
+        : profileUrl(item.authorHandle)
+    }
+
+    const linkifyBody = text => escapeHtml(text).replace(
+      /(https?:\/\/[^\s<]+)/g,
+      '<a class="postline-feed-post__link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
+    )
+
+    /**
+     * Flatten an API item into exactly what the template renders. Doing the
+     * derivation once here keeps the markup free of expression logic and means
+     * each row is plain data by the time x-for sees it.
+     */
+    const toRow = (item) => {
+      const handle = item.authorHandle || 'unknown.bsky.social'
+      const name = item.authorName || handle
+      return {
+        handle,
+        name,
+        url: postUrl(item),
+        avatar: item.authorAvatar || '',
+        initials: initialsFor(handle, name),
+        gradient: avatarGradient(handle),
+        postedAt: item.postedAt || '',
+        relativeTime: formatRelativeTime(item.postedAt),
+        bodyHtml: linkifyBody(item.body || ''),
+        replies: formatCount(item.replyCount),
+        reposts: formatCount(item.repostCount),
+        likes: formatCount(item.likeCount),
+      }
+    }
+
+    /**
+     * `manual` = the user clicked Refresh, so toast feedback is wanted. The
+     * initial auto-load stays silent and lets the inline feed state speak, so a
+     * failing load never spams a toast or stacks one across pages.
+     */
+    const refresh = async ({ manual = false } = {}) => {
+      busy.set(true)
+      refreshLabel.set('Refreshing…')
+      feedError.set('')
+      metaText.set('Syncing…')
+
+      try {
+        const response = await fetch('/api/postline/bluesky/timeline?limit=30')
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky timeline sync failed.')
+
+        const rows = Array.isArray(payload.data.items) ? payload.data.items.map(toRow) : []
+        items.set(rows)
+        metaText.set(`${rows.length} post${rows.length === 1 ? '' : 's'}`)
+        if (manual) {
+          postlineToast?.show?.({
+            title: 'Timeline',
+            message: `Loaded ${rows.length} posts.`,
+            tone: 'success',
+            durationMs: 3200,
+          })
         }
       }
+      catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        items.set([])
+        feedError.set(message)
+        metaText.set('Could not load feed')
+        if (manual)
+          postlineToast?.show?.({ title: 'Timeline', message, tone: 'error', id: 'timeline-load' })
+      }
+      finally {
+        busy.set(false)
+        loaded.set(true)
+        refreshLabel.set('Refresh')
+      }
+    }
 
-      button?.addEventListener('click', () => void refresh({ manual: true }))
+    const refreshManual = () => void refresh({ manual: true })
+
+    onMount(() => {
       void refresh()
-    })()
+    })
   </script>
 @endsection

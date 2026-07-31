@@ -5,8 +5,6 @@
 
 @section('content')
   <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
-    <!-- Crosswind safelist: status pill + action + calendar classes are set from JS. -->
-    <div class="hidden text-amber-800 text-blue-700 text-emerald-700 text-muted text-muted text-red-700 bg-amber-50 bg-blue-50 bg-blue-500 bg-emerald-50 bg-emerald-500 bg-panel-2 bg-panel-3 bg-red-50 bg-red-500 bg-zinc-400 hover:bg-neutral-800 hover:bg-zinc-100 hover:bg-zinc-50 border-amber-200 border-blue-200 border-emerald-200 border-line border-line border-red-200 shadow-sm transition-colors" aria-hidden="true"></div>
     <header class="flex flex-wrap gap-4 items-center justify-between min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Queue</p>
@@ -15,10 +13,10 @@
       </div>
       <div class="flex flex-wrap gap-2 items-center">
         <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Queue view">
-          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-bold text-xs rounded-lg transition-colors" type="button" data-view-toggle="list">
+          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-bold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'list'" @click="setView('list')">
             <span class="h-3.5 w-3.5 i-hugeicons-menu-01" aria-hidden="true"></span><span>List</span>
           </button>
-          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-bold text-xs rounded-lg transition-colors" type="button" data-view-toggle="calendar">
+          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-bold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'calendar'" @click="setView('calendar')">
             <span class="h-3.5 w-3.5 i-hugeicons-calendar-03" aria-hidden="true"></span><span>Calendar</span>
           </button>
         </div>
@@ -29,322 +27,339 @@
       </div>
     </header>
 
-    <div class="grid gap-5" data-view-panel="list">
+    <div class="grid gap-5" x-show="view() === 'list'">
       <section class="bg-panel border border-line rounded-2xl shadow-sm">
         <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
           <strong class="text-[13px]">Upcoming &amp; drafts</strong>
-          <span class="text-muted text-xs" data-queue-meta>Loading…</span>
+          <span class="text-muted text-xs" :text="metaText()">Loading…</span>
         </header>
-        <div class="grid gap-2.5 p-3" data-queue-pending>
-          <p class="m-0 p-3 text-[13px] text-muted" data-queue-pending-empty>Loading queue…</p>
+        <div class="grid gap-2.5 p-3">
+          <p class="m-0 p-3 text-[13px] text-muted" x-show="loadError()" :text="loadError()"></p>
+          <p class="m-0 p-3 text-[13px] text-muted" x-show="showPendingEmpty()">Nothing queued yet. Schedule a post from the composer and it will show up here.</p>
+          <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl" x-for="row in pending()">
+            <header class="flex gap-3 items-center justify-between">
+              <div class="grid gap-1">
+                <span class="font-bold text-xs">{{ row.when }}</span>
+                <span class="text-muted text-xs">{{ row.channels }}</span>
+              </div>
+              <span class="px-2 py-1 font-bold text-[11px] whitespace-nowrap border rounded-full" data-status-pill :data-status="row.status">{{ row.status }}</span>
+            </header>
+            <p class="m-0 leading-normal text-[13px] text-body">{{ row.body }}</p>
+            <p class="m-0 text-red-700 text-xs" x-show="row.failure" :text="row.failure"></p>
+            <footer class="flex flex-wrap gap-2 items-center justify-end">
+              <a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
+              <a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" x-show="row.actionable" :href="row.editUrl" data-stx-link>Edit</a>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-lg transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="publishItem(row.id)">Publish now</button>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-red-700 text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="deleteItem(row.id)">Delete</button>
+            </footer>
+          </article>
         </div>
       </section>
 
       <section class="bg-panel border border-line rounded-2xl shadow-sm">
         <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
           <strong class="text-[13px]">Recent</strong>
-          <span class="text-muted text-xs" data-queue-recent-meta></span>
+          <span class="text-muted text-xs" :text="recentMetaText()"></span>
         </header>
-        <div class="grid gap-2.5 p-3" data-queue-recent>
-          <p class="m-0 p-3 text-[13px] text-muted" data-queue-recent-empty>Loading…</p>
+        <div class="grid gap-2.5 p-3">
+          <p class="m-0 p-3 text-[13px] text-muted" x-show="showRecentEmpty()">No published posts yet.</p>
+          <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl" x-for="row in recent()">
+            <header class="flex gap-3 items-center justify-between">
+              <div class="grid gap-1">
+                <span class="font-bold text-xs">{{ row.when }}</span>
+                <span class="text-muted text-xs">{{ row.channels }}</span>
+              </div>
+              <span class="px-2 py-1 font-bold text-[11px] whitespace-nowrap border rounded-full" data-status-pill :data-status="row.status">{{ row.status }}</span>
+            </header>
+            <p class="m-0 leading-normal text-[13px] text-body">{{ row.body }}</p>
+            <p class="m-0 text-red-700 text-xs" x-show="row.failure" :text="row.failure"></p>
+            <footer class="flex flex-wrap gap-2 items-center justify-end">
+              <a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
+            </footer>
+          </article>
         </div>
       </section>
     </div>
 
-    <section class="hidden bg-panel border border-line rounded-2xl shadow-sm" data-view-panel="calendar">
+    <section class="bg-panel border border-line rounded-2xl shadow-sm" style="display:none" x-show="view() === 'calendar'">
       <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
         <div class="flex gap-2 items-center">
-          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Previous month" data-cal-prev>
+          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Previous month" @click="prevMonth">
             <span class="h-4 w-4 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
           </button>
-          <button class="inline-flex items-center justify-center px-3 h-8 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" data-cal-today>Today</button>
-          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Next month" data-cal-next>
+          <button class="inline-flex items-center justify-center px-3 h-8 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" @click="goToday">Today</button>
+          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Next month" @click="nextMonth">
             <span class="h-4 w-4 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
           </button>
         </div>
-        <strong class="text-[13px]" data-cal-title>Calendar</strong>
+        <strong class="text-[13px]" :text="calTitle()">Calendar</strong>
       </header>
       <div class="overflow-x-auto">
         <div class="min-w-[560px]">
           <div class="grid grid-cols-7 font-bold text-[11px] text-muted border-b border-line">
             <div class="p-2 text-center">Sun</div><div class="p-2 text-center">Mon</div><div class="p-2 text-center">Tue</div><div class="p-2 text-center">Wed</div><div class="p-2 text-center">Thu</div><div class="p-2 text-center">Fri</div><div class="p-2 text-center">Sat</div>
           </div>
-          <div class="grid grid-cols-7" data-cal-grid></div>
+          <div class="grid grid-cols-7">
+            <div class="grid content-start gap-1 p-1.5 min-h-24 border-b border-line border-r" data-cal-cell :data-blank="cell.blank" :data-today="cell.isToday" x-for="cell in calCells()">
+              <a class="font-bold text-[11px] hover:text-neutral-950 transition-colors" data-cal-day x-show="!cell.blank" :href="cell.scheduleUrl" data-stx-link title="Schedule a post on this day">{{ cell.day }}</a>
+              <a class="flex gap-1 items-center px-1 py-0.5 text-[10px] text-body bg-panel-2 hover:bg-zinc-100 rounded transition-colors" x-for="chip in cell.chips" :href="chip.href" data-stx-link>
+                <span class="shrink-0 h-1.5 w-1.5 rounded-full" data-cal-dot :data-status="chip.status"></span>
+                <span class="truncate">{{ chip.label }}</span>
+              </a>
+              <span class="px-1 text-[10px] text-zinc-400" x-show="cell.more" :text="cell.more"></span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
   </section>
 
-  <script>
-    ;(() => {
-      const root = document.querySelector('[data-testid="queue-page"]')
-      if (!root) return
+  <style>
+    /* Status colours bind through a data attribute rather than :class, so no
+      dynamically-applied class exists and the page needs no Crosswind
+      safelist entry at all. */
+    [data-view-toggle] { color: var(--muted); }
+    [data-view-toggle][data-active] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
 
-      const pendingList = root.querySelector('[data-queue-pending]')
-      const recentList = root.querySelector('[data-queue-recent]')
-      const meta = root.querySelector('[data-queue-meta]')
-      const recentMeta = root.querySelector('[data-queue-recent-meta]')
-      // Resolve the toast helper at call time — it's a deferred module that
-      // loads after this inline script parses, so an eager capture would be
-      // undefined on a full page load and drop every message to the console.
-      const showToast = options => window.postlineToast?.show?.(options)
+    [data-status-pill] { color: var(--muted); background: var(--panel-3); border-color: var(--line); }
+    [data-status-pill][data-status="published"] { color: rgb(4 120 87); background: rgb(236 253 245); border-color: rgb(167 243 208); }
+    [data-status-pill][data-status="scheduled"] { color: rgb(29 78 216); background: rgb(239 246 255); border-color: rgb(191 219 254); }
+    [data-status-pill][data-status="publishing"] { color: rgb(146 64 14); background: rgb(255 251 235); border-color: rgb(253 230 138); }
+    [data-status-pill][data-status="failed"] { color: rgb(185 28 28); background: rgb(254 242 242); border-color: rgb(254 202 202); }
+    html.dark [data-status-pill][data-status="published"] { color: rgb(110 231 183); background: rgb(6 78 59 / 0.3); border-color: rgb(6 78 59); }
+    html.dark [data-status-pill][data-status="scheduled"] { color: rgb(147 197 253); background: rgb(30 58 138 / 0.3); border-color: rgb(30 58 138); }
+    html.dark [data-status-pill][data-status="publishing"] { color: rgb(252 211 77); background: rgb(120 53 15 / 0.3); border-color: rgb(120 53 15); }
+    html.dark [data-status-pill][data-status="failed"] { color: rgb(252 165 165); background: rgb(127 29 29 / 0.3); border-color: rgb(127 29 29); }
 
-      const PENDING = new Set(['draft', 'scheduled', 'publishing', 'failed'])
+    [data-cal-dot] { background: rgb(161 161 170); }
+    [data-cal-dot][data-status="published"] { background: rgb(16 185 129); }
+    [data-cal-dot][data-status="failed"] { background: rgb(239 68 68); }
+    [data-cal-dot][data-status="scheduled"] { background: rgb(59 130 246); }
 
-      const pillClass = (status) => {
-        const base = 'px-2 py-1 font-bold text-[11px] rounded-full border whitespace-nowrap'
-        if (status === 'published') return `${base} text-emerald-700 bg-emerald-50 border-emerald-200`
-        if (status === 'scheduled') return `${base} text-blue-700 bg-blue-50 border-blue-200`
-        if (status === 'publishing') return `${base} text-amber-800 bg-amber-50 border-amber-200`
-        if (status === 'failed') return `${base} text-red-700 bg-red-50 border-red-200`
-        return `${base} text-muted bg-panel-3 border-line`
+    [data-cal-cell] { background: var(--panel); }
+    [data-cal-cell][data-blank] { background: var(--panel-2); }
+    [data-cal-cell][data-today] { background: rgb(239 246 255 / 0.6); }
+    html.dark [data-cal-cell][data-today] { background: rgb(30 58 138 / 0.2); }
+    [data-cal-day] { color: var(--muted); }
+    [data-cal-cell][data-today] [data-cal-day] { color: rgb(29 78 216); }
+    html.dark [data-cal-cell][data-today] [data-cal-day] { color: rgb(147 197 253); }
+  </style>
+
+  <script client>
+    const PENDING = new Set(['draft', 'scheduled', 'publishing', 'failed'])
+    const ACTIONABLE = new Set(['draft', 'scheduled', 'failed'])
+
+    const items = state([])
+    const loadError = state('')
+    const loaded = state(false)
+    const busyId = state(0)
+    const calMonthStart = state(monthStart(new Date()))
+
+    // A fresh key, not the legacy 'postline.queue.view': useLocalStorage
+    // JSON.parses whatever is already stored, and the old value was a bare
+    // string ("list"), which would throw and take the whole script down.
+    const view = useLocalStorage('postline.queue.view.v2', 'list')
+
+    function monthStart(date) {
+      return new Date(date.getFullYear(), date.getMonth(), 1)
+    }
+
+    function localDayKey(date) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    }
+
+    // Server timestamps are UTC "YYYY-MM-DD HH:MM:SS" — render in local time.
+    const parseUtc = (value) => {
+      if (!value) return null
+      const date = new Date(`${String(value).replace(' ', 'T')}Z`)
+      return Number.isNaN(date.getTime()) ? null : date
+    }
+
+    const formatTime = (value) => {
+      const date = parseUtc(value)
+      if (!date) return value || ''
+      return date.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    }
+
+    const providerLabel = provider => postlineSocial?.providerLabel(provider) || provider
+
+    const liveUrlFor = (uri) => {
+      const value = String(uri || '')
+      if (value.startsWith('/')) return value
+      // A stored permalink (Mastodon, and any provider persisting a URL) is
+      // already linkable as-is.
+      if (/^https?:\/\//i.test(value)) return value
+      const match = value.match(/^at:\/\/([^/]+)\/app\.bsky\.feed\.post\/(.+)$/)
+      return match ? `https://bsky.app/profile/${encodeURIComponent(match[1])}/post/${encodeURIComponent(match[2])}` : ''
+    }
+
+    /** Flatten an API item into exactly what a row renders. */
+    const toRow = (item) => {
+      const when = item.status === 'scheduled'
+        ? `Scheduled · ${formatTime(item.scheduledAt)}`
+        : item.status === 'published'
+          ? `Published · ${formatTime(item.publishedAt || item.createdAt)}`
+          : `${item.status[0].toUpperCase()}${item.status.slice(1)} · ${formatTime(item.createdAt)}`
+      const extras = [item.hasImage ? 'image' : '', item.hasLink ? 'link card' : ''].filter(Boolean).join(' · ')
+      const channels = (item.providers.map(target => providerLabel(target.provider)).join(', ') || 'No channel')
+        + (extras ? ` · ${extras}` : '')
+      return {
+        id: item.id,
+        status: item.status,
+        body: item.body,
+        when,
+        channels,
+        failure: item.providers.find(target => target.failureReason)?.failureReason || '',
+        liveUrl: liveUrlFor(item.providers.find(target => target.remoteUri)?.remoteUri),
+        editUrl: `/?edit=${item.id}`,
+        actionable: ACTIONABLE.has(item.status),
+        scheduledAt: item.scheduledAt,
+        publishedAt: item.publishedAt,
+        title: item.title,
+      }
+    }
+
+    const rows = derived(() => items().map(toRow))
+    const pending = derived(() => rows().filter(row => PENDING.has(row.status)))
+    const recent = derived(() => rows().filter(row => !PENDING.has(row.status)).slice(0, 10))
+
+    const showPendingEmpty = derived(() => loaded() && !loadError() && pending().length === 0)
+    const showRecentEmpty = derived(() => loaded() && !loadError() && recent().length === 0)
+
+    const metaText = derived(() => {
+      if (!loaded()) return 'Loading…'
+      if (loadError()) return 'Could not load'
+      const scheduled = pending().filter(row => row.status === 'scheduled').length
+      const drafts = pending().filter(row => row.status === 'draft').length
+      return `${scheduled} scheduled · ${drafts} draft${drafts === 1 ? '' : 's'}`
+    })
+
+    const recentMetaText = derived(() => {
+      const n = recent().length
+      return `${n} post${n === 1 ? '' : 's'}`
+    })
+
+    const calTitle = derived(() =>
+      calMonthStart().toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))
+
+    /**
+     * The month grid as plain data. Derived rather than painted, so changing
+     * month or reloading the queue rebuilds it with no manual repaint call.
+     */
+    const calCells = derived(() => {
+      const start = calMonthStart()
+      const year = start.getFullYear()
+      const month = start.getMonth()
+
+      const byDay = new Map()
+      for (const row of rows()) {
+        const date = parseUtc(row.scheduledAt || row.publishedAt)
+        if (!date) continue
+        const key = localDayKey(date)
+        if (!byDay.has(key)) byDay.set(key, [])
+        byDay.get(key).push({ row, date })
       }
 
-      const escapeHtml = (value) => String(value || '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;')
+      const cells = []
+      const startOffset = new Date(year, month, 1).getDay()
+      const daysInMonth = new Date(year, month + 1, 0).getDate()
+      const todayKey = localDayKey(new Date())
 
-      const providerLabel = (provider) => window.postlineSocial?.providerLabel(provider) || provider
+      for (let i = 0; i < startOffset; i++) cells.push({ blank: true, chips: [] })
 
-      // Server timestamps are UTC "YYYY-MM-DD HH:MM:SS" — render in local time.
-      const formatTime = (value) => {
-        if (!value) return ''
-        const date = new Date(`${value.replace(' ', 'T')}Z`)
-        if (Number.isNaN(date.getTime())) return value
-        return date.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-      }
-
-      const liveUrlFor = (uri) => {
-        const value = String(uri || '')
-        if (value.startsWith('/')) return value
-        // A stored permalink (Mastodon, and any provider persisting a URL) is
-        // already linkable as-is.
-        if (/^https?:\/\//i.test(value)) return value
-        const match = value.match(/^at:\/\/([^/]+)\/app\.bsky\.feed\.post\/(.+)$/)
-        return match ? `https://bsky.app/profile/${encodeURIComponent(match[1])}/post/${encodeURIComponent(match[2])}` : null
-      }
-
-      const itemHtml = (item) => {
-        const when = item.status === 'scheduled'
-          ? `Scheduled · ${formatTime(item.scheduledAt)}`
-          : item.status === 'published'
-            ? `Published · ${formatTime(item.publishedAt || item.createdAt)}`
-            : `${item.status[0].toUpperCase()}${item.status.slice(1)} · ${formatTime(item.createdAt)}`
-        const extras = [item.hasImage ? 'image' : '', item.hasLink ? 'link card' : ''].filter(Boolean).join(' · ')
-        const channels = (item.providers.map(target => providerLabel(target.provider)).join(', ') || 'No channel') + (extras ? ` · ${extras}` : '')
-        const failure = item.providers.find(target => target.failureReason)?.failureReason
-        const liveUri = item.providers.find(target => target.remoteUri)?.remoteUri
-        const liveUrl = liveUrlFor(liveUri)
-        const actionable = ['draft', 'scheduled', 'failed'].includes(item.status)
-
-        return `
-          <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl" data-queue-item="${item.id}">
-            <header class="flex gap-3 items-center justify-between">
-              <div class="grid gap-1">
-                <span class="font-bold text-xs">${escapeHtml(when)}</span>
-                <span class="text-muted text-xs">${escapeHtml(channels)}</span>
-              </div>
-              <span class="${pillClass(item.status)}">${escapeHtml(item.status)}</span>
-            </header>
-            <p class="m-0 leading-normal text-[13px] text-body">${escapeHtml(item.body)}</p>
-            ${failure ? `<p class="m-0 text-red-700 text-xs">${escapeHtml(failure)}</p>` : ''}
-            <footer class="flex flex-wrap gap-2 items-center justify-end">
-              ${liveUrl ? `<a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" href="${escapeHtml(liveUrl)}" target="_blank" rel="noopener noreferrer">View</a>` : ''}
-              ${actionable ? `<a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" href="/?edit=${item.id}" data-stx-link>Edit</a>` : ''}
-              ${actionable ? `<button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-lg transition-colors" type="button" data-queue-publish="${item.id}">Publish now</button>` : ''}
-              ${actionable ? `<button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-red-700 text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" data-queue-delete="${item.id}">Delete</button>` : ''}
-            </footer>
-          </article>
-        `
-      }
-
-      const render = (items) => {
-        const pending = items.filter(item => PENDING.has(item.status))
-        const recent = items.filter(item => !PENDING.has(item.status))
-
-        if (pendingList) {
-          pendingList.innerHTML = pending.length
-            ? pending.map(itemHtml).join('')
-            : '<p class="m-0 p-3 text-[13px] text-muted">Nothing queued yet. Schedule a post from the composer and it will show up here.</p>'
-        }
-        if (recentList) {
-          recentList.innerHTML = recent.length
-            ? recent.slice(0, 10).map(itemHtml).join('')
-            : '<p class="m-0 p-3 text-[13px] text-muted">No published posts yet.</p>'
-        }
-        if (meta) {
-          const scheduled = pending.filter(item => item.status === 'scheduled').length
-          const drafts = pending.filter(item => item.status === 'draft').length
-          meta.textContent = `${scheduled} scheduled · ${drafts} draft${drafts === 1 ? '' : 's'}`
-        }
-        if (recentMeta) recentMeta.textContent = `${recent.length} post${recent.length === 1 ? '' : 's'}`
-
-        cachedItems = items
-        renderCalendar()
-      }
-
-      // ---- Calendar view ----
-      const calGrid = root.querySelector('[data-cal-grid]')
-      const calTitle = root.querySelector('[data-cal-title]')
-      let cachedItems = []
-      let calMonth = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1) })()
-
-      const dotClass = (status) => {
-        if (status === 'published') return 'bg-emerald-500'
-        if (status === 'failed') return 'bg-red-500'
-        if (status === 'scheduled') return 'bg-blue-500'
-        return 'bg-zinc-400'
-      }
-
-      // Local Y-M-D key for a post's effective calendar date.
-      const dayKey = (item) => {
-        const raw = item.scheduledAt || item.publishedAt
-        if (!raw) return null
-        const d = new Date(`${raw.replace(' ', 'T')}Z`)
-        if (Number.isNaN(d.getTime())) return null
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      }
-      const timeOf = (item) => {
-        const raw = item.scheduledAt || item.publishedAt
-        const d = new Date(`${raw.replace(' ', 'T')}Z`)
-        return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-      }
-
-      const renderCalendar = () => {
-        if (!calGrid) return
-        const year = calMonth.getFullYear()
-        const month = calMonth.getMonth()
-        if (calTitle) calTitle.textContent = calMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-
-        // Only dated posts (scheduled or published) land on the calendar.
-        const byDay = new Map()
-        for (const item of cachedItems) {
-          const key = dayKey(item)
-          if (!key) continue
-          if (!byDay.has(key)) byDay.set(key, [])
-          byDay.get(key).push(item)
-        }
-
-        const first = new Date(year, month, 1)
-        const startOffset = first.getDay()
-        const daysInMonth = new Date(year, month + 1, 0).getDate()
-        const todayKey = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })()
-        const cells = []
-
-        // Leading blanks from the previous month.
-        for (let i = 0; i < startOffset; i++) cells.push('<div class="p-1.5 min-h-24 bg-zinc-50/40 border-b border-line border-r"></div>')
-
-        for (let day = 1; day <= daysInMonth; day++) {
-          const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-          const dayItems = (byDay.get(key) || []).sort((a, b) => (a.scheduledAt || a.publishedAt).localeCompare(b.scheduledAt || b.publishedAt))
-          const isToday = key === todayKey
-          const chips = dayItems.slice(0, 3).map((item) => {
-            const label = escapeHtml((item.title || item.body || '').slice(0, 22) || 'post')
-            const href = ['draft', 'scheduled', 'failed'].includes(item.status) ? `/?edit=${item.id}` : null
-            const inner = `<span class="h-1.5 w-1.5 shrink-0 rounded-full ${dotClass(item.status)}"></span><span class="truncate">${escapeHtml(timeOf(item))} ${label}</span>`
-            return href
-              ? `<a class="flex gap-1 items-center px-1 py-0.5 text-[10px] text-body bg-panel-2 hover:bg-zinc-100 rounded transition-colors" href="${href}" data-stx-link>${inner}</a>`
-              : `<span class="flex gap-1 items-center px-1 py-0.5 text-[10px] text-muted bg-panel-2 rounded">${inner}</span>`
-          }).join('')
-          const more = dayItems.length > 3 ? `<span class="px-1 text-[10px] text-zinc-400">+${dayItems.length - 3} more</span>` : ''
-          cells.push(`
-            <div class="min-h-24 p-1.5 grid content-start gap-1 border-b border-r border-line ${isToday ? 'bg-blue-50/50' : 'bg-panel'}">
-              <a class="text-[11px] font-bold ${isToday ? 'text-blue-700' : 'text-muted'} hover:text-neutral-950 transition-colors" href="/?schedule=${key}" data-stx-link title="Schedule a post on this day">${day}</a>
-              ${chips}${more}
-            </div>
-          `)
-        }
-        // Trailing blanks to complete the last week row.
-        while (cells.length % 7 !== 0) cells.push('<div class="p-1.5 min-h-24 bg-zinc-50/40 border-b border-line border-r"></div>')
-        calGrid.innerHTML = cells.join('')
-      }
-
-      // ---- View toggle (persisted) ----
-      const viewToggles = Array.from(root.querySelectorAll('[data-view-toggle]'))
-      const panels = { list: root.querySelector('[data-view-panel="list"]'), calendar: root.querySelector('[data-view-panel="calendar"]') }
-      const setView = (view) => {
-        const next = view === 'calendar' ? 'calendar' : 'list'
-        panels.list?.classList.toggle('hidden', next !== 'list')
-        panels.calendar?.classList.toggle('hidden', next !== 'calendar')
-        viewToggles.forEach((button) => {
-          const active = button.dataset.viewToggle === next
-          button.classList.toggle('bg-panel', active)
-          button.classList.toggle('text-ink', active)
-          button.classList.toggle('shadow-sm', active)
-          button.classList.toggle('text-muted', !active)
+      for (let day = 1; day <= daysInMonth; day++) {
+        const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        const dayItems = (byDay.get(key) || []).sort((a, b) => a.date - b.date)
+        cells.push({
+          blank: false,
+          day,
+          isToday: key === todayKey,
+          scheduleUrl: `/?schedule=${key}`,
+          chips: dayItems.slice(0, 3).map(({ row, date }) => ({
+            status: row.status,
+            href: row.actionable ? row.editUrl : row.liveUrl || row.editUrl,
+            label: `${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} ${(row.title || row.body || '').slice(0, 22) || 'post'}`,
+          })),
+          more: dayItems.length > 3 ? `+${dayItems.length - 3} more` : '',
         })
-        try { localStorage.setItem('postline.queue.view', next) } catch {}
-        if (next === 'calendar') renderCalendar()
-      }
-      viewToggles.forEach(button => button.addEventListener('click', () => setView(button.dataset.viewToggle)))
-      root.querySelector('[data-cal-prev]')?.addEventListener('click', () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1); renderCalendar() })
-      root.querySelector('[data-cal-next]')?.addEventListener('click', () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1); renderCalendar() })
-      root.querySelector('[data-cal-today]')?.addEventListener('click', () => { const d = new Date(); calMonth = new Date(d.getFullYear(), d.getMonth(), 1); renderCalendar() })
-
-      const refresh = async () => {
-        try {
-          const response = await fetch('/api/postline/queue')
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the queue.')
-          render(payload.data.items || [])
-        }
-        catch (error) {
-          // Degrade to the inline error state; no toast on load/refresh so a
-          // failing fetch (e.g. an expired session) can't spam or stack.
-          const message = error instanceof Error ? error.message : String(error)
-          if (pendingList) pendingList.innerHTML = `<p class="m-0 p-3 text-[13px] text-muted">${escapeHtml(message)}</p>`
-          if (meta) meta.textContent = 'Could not load'
-          console.warn('[postline] queue load failed:', error)
-        }
       }
 
-      const post = async (path, id) => {
-        const form = new FormData()
-        form.set('id', String(id))
-        const response = await fetch(path, { method: 'POST', body: form })
+      while (cells.length % 7 !== 0) cells.push({ blank: true, chips: [] })
+      return cells
+    })
+
+    const setView = next => view.set(next === 'calendar' ? 'calendar' : 'list')
+    const prevMonth = () => calMonthStart.set(new Date(calMonthStart().getFullYear(), calMonthStart().getMonth() - 1, 1))
+    const nextMonth = () => calMonthStart.set(new Date(calMonthStart().getFullYear(), calMonthStart().getMonth() + 1, 1))
+    const goToday = () => calMonthStart.set(monthStart(new Date()))
+
+    const refresh = async () => {
+      try {
+        const response = await fetch('/api/postline/queue')
         const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Request failed.')
-        return payload.data
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the queue.')
+        items.set(payload.data.items || [])
+        loadError.set('')
       }
+      catch (error) {
+        // Degrade to the inline error state; no toast on load/refresh so a
+        // failing fetch (e.g. an expired session) can't spam or stack.
+        items.set([])
+        loadError.set(error instanceof Error ? error.message : String(error))
+        console.warn('[postline] queue load failed:', error)
+      }
+      finally {
+        loaded.set(true)
+      }
+    }
 
-      root.addEventListener('click', async (event) => {
-        const target = event.target
-        if (!(target instanceof HTMLElement)) return
+    const post = async (path, id) => {
+      const form = new FormData()
+      form.set('id', String(id))
+      const response = await fetch(path, { method: 'POST', body: form })
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Request failed.')
+      return payload.data
+    }
 
-        const publishButton = target.closest('[data-queue-publish]')
-        if (publishButton) {
-          publishButton.setAttribute('disabled', 'disabled')
-          try {
-            await post('/api/postline/queue/publish-now', publishButton.dataset.queuePublish)
-            showToast({ title: 'Published', message: 'Post published.', tone: 'success' })
-          }
-          catch (error) {
-            showToast({ title: 'Publish failed', message: error instanceof Error ? error.message : String(error), tone: 'error' })
-          }
-          await refresh()
-          return
-        }
+    const runAction = async (id, path, success, failure) => {
+      busyId.set(id)
+      try {
+        await post(path, id)
+        postlineToast?.show?.({ title: success.title, message: success.message, tone: 'success' })
+      }
+      catch (error) {
+        postlineToast?.show?.({
+          title: failure,
+          message: error instanceof Error ? error.message : String(error),
+          tone: 'error',
+        })
+      }
+      finally {
+        busyId.set(0)
+      }
+      await refresh()
+    }
 
-        const deleteButton = target.closest('[data-queue-delete]')
-        if (deleteButton) {
-          if (!window.confirm('Delete this post? This cannot be undone.')) return
-          deleteButton.setAttribute('disabled', 'disabled')
-          try {
-            await post('/api/postline/queue/delete', deleteButton.dataset.queueDelete)
-            showToast({ title: 'Removed', message: 'Post removed from the queue.', tone: 'success' })
-          }
-          catch (error) {
-            showToast({ title: 'Delete failed', message: error instanceof Error ? error.message : String(error), tone: 'error' })
-          }
-          await refresh()
-        }
-      })
+    const publishItem = id => void runAction(
+      id,
+      '/api/postline/queue/publish-now',
+      { title: 'Published', message: 'Post published.' },
+      'Publish failed',
+    )
 
-      try { setView(localStorage.getItem('postline.queue.view') || 'list') } catch { setView('list') }
+    const deleteItem = (id) => {
+      if (!confirm('Delete this post? This cannot be undone.')) return
+      void runAction(
+        id,
+        '/api/postline/queue/delete',
+        { title: 'Removed', message: 'Post removed from the queue.' },
+        'Delete failed',
+      )
+    }
+
+    onMount(() => {
       void refresh()
-    })()
+    })
   </script>
 @endsection
