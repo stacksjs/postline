@@ -71,7 +71,7 @@
     "better-dx": "^0.2.22"
   },
   "overrides": {
-    "//": "bunfig 0.15.16 was cut from a branch predating `discovery`, dropping the ./discovery export 0.15.15 shipped and @stacksjs/stx imports — every stx entrypoint throws `Cannot find module 'bunfig/discovery'` under it. Hold the last good release until 0.15.17 ships from main with discovery intact, then delete this.",
+    "//": "@stacksjs/stx 0.2.147 imports `bunfig/discovery`, and no published bunfig still serves that subpath: 0.15.16 dropped the helper entirely, and 0.15.17 collapsed the export map to root + browser + ts-plugin. 0.15.15 is the last release the published stx can load. stx main already imports it from the bunfig root — delete this override once that ships (> 0.2.147).",
     "bunfig": "0.15.15"
   },
   "workspaces": [
