@@ -111,6 +111,68 @@
         </article>
       </div>
     </section>
+
+    <section class="bg-panel border border-red-200 rounded-2xl shadow-sm" data-purge-card>
+      <header class="flex gap-3 items-center justify-between p-4 border-b border-red-200">
+        <div>
+          <strong class="text-[13px] text-red-700">Danger zone</strong>
+          <p class="mb-0 mt-1 text-[13px] text-muted">Permanently delete posts from your connected accounts. This cannot be undone.</p>
+        </div>
+        <span class="text-red-600 text-xl i-lucide-triangle-alert" aria-hidden="true"></span>
+      </header>
+
+      <div class="grid gap-4 p-4">
+        <fieldset class="grid gap-2 m-0 p-0 border-0">
+          <legend class="mb-1 p-0 font-bold text-muted text-xs">What to delete</legend>
+          <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
+            <input class="mt-0.5" type="radio" name="purge-scope" value="tracked" checked data-purge-scope>
+            <span>
+              <span class="block font-bold text-[13px] text-ink">Posts Postline published</span>
+              <span class="block mt-0.5 text-muted text-xs">Only posts sent from this workspace. Anything you posted elsewhere stays.</span>
+            </span>
+          </label>
+          <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
+            <input class="mt-0.5" type="radio" name="purge-scope" value="all" data-purge-scope>
+            <span>
+              <span class="block font-bold text-[13px] text-ink">Everything on the account</span>
+              <span class="block mt-0.5 text-muted text-xs">Every post the account ever made, including posts created outside Postline.</span>
+            </span>
+          </label>
+        </fieldset>
+
+        <fieldset class="grid gap-2 m-0 p-0 border-0">
+          <legend class="mb-1 p-0 font-bold text-muted text-xs">Accounts</legend>
+          <div class="flex flex-wrap gap-3">
+            <label class="inline-flex gap-2 items-center text-[13px]">
+              <input type="checkbox" value="bluesky" checked data-purge-provider> Bluesky
+            </label>
+            <label class="inline-flex gap-2 items-center text-[13px]">
+              <input type="checkbox" value="twitter" checked data-purge-provider> X (Twitter)
+            </label>
+            <label class="inline-flex gap-2 items-center text-[13px]">
+              <input type="checkbox" value="mastodon" checked data-purge-provider> Mastodon
+            </label>
+          </div>
+          <p class="m-0 text-muted text-xs">LinkedIn, Instagram, and Threads can't delete posts through their APIs — remove those in their own apps.</p>
+        </fieldset>
+
+        <div class="flex flex-wrap gap-3 items-center">
+          <button class="inline-flex items-center justify-center px-4 h-10 font-bold text-ink text-sm bg-panel hover:bg-panel-3 border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" data-purge-preview>Preview what would be deleted</button>
+          <span class="text-muted text-xs" data-purge-summary>No preview yet.</span>
+        </div>
+
+        <div class="grid hidden gap-2" data-purge-results></div>
+
+        <div class="grid gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
+          <label class="grid gap-1.5">
+            <span class="font-bold text-red-800 text-xs">Type <code class="px-1 py-0.5 text-xs bg-panel rounded">DELETE ALL POSTS</code> to confirm</span>
+            <input class="px-3 h-10 text-ink text-sm bg-panel border border-red-200 outline-none rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-100" type="text" autocomplete="off" placeholder="DELETE ALL POSTS" aria-label="Deletion confirmation phrase" data-purge-confirmation>
+          </label>
+          <button class="inline-flex items-center justify-center px-4 h-10 font-bold text-sm text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" disabled data-purge-run>Delete permanently</button>
+          <p class="m-0 text-red-800 text-xs" data-purge-hint>Run a preview first, then type the phrase to enable deletion.</p>
+        </div>
+      </div>
+    </section>
   </section>
 
   <script>
@@ -660,6 +722,137 @@
       else {
         startMastodon()
       }
+
+      // --- Danger zone: bulk post deletion ---
+      const purgeCard = root.querySelector('[data-purge-card]')
+      const purgePreview = root.querySelector('[data-purge-preview]')
+      const purgeRun = root.querySelector('[data-purge-run]')
+      const purgeConfirmation = root.querySelector('[data-purge-confirmation]')
+      const purgeSummary = root.querySelector('[data-purge-summary]')
+      const purgeResults = root.querySelector('[data-purge-results]')
+      const purgeHint = root.querySelector('[data-purge-hint]')
+      const PURGE_PHRASE = 'DELETE ALL POSTS'
+
+      // A preview is only valid for the selection it ran against — changing
+      // scope or accounts invalidates it and re-locks the delete button.
+      let previewedSelection = null
+
+      const purgeScope = () => root.querySelector('[data-purge-scope]:checked')?.value || 'tracked'
+      const purgeProviders = () => Array.from(root.querySelectorAll('[data-purge-provider]:checked')).map(input => input.value)
+      const purgeSelection = () => `${purgeScope()}:${purgeProviders().sort().join(',')}`
+
+      const renderPurgeResults = (data) => {
+        if (!purgeResults) return
+        const rows = data?.providers || []
+        purgeResults.classList.toggle('hidden', rows.length === 0)
+        purgeResults.innerHTML = ''
+
+        for (const row of rows) {
+          const item = document.createElement('div')
+          item.className = 'p-3 text-[13px] border border-line rounded-xl'
+          const detail = !row.supported || !row.connected
+            ? row.skippedReason || 'Not available.'
+            : `${row.matched} post${row.matched === 1 ? '' : 's'} would be deleted${row.truncated ? ' (capped at 2000 per run — run again for the rest)' : ''}.`
+          const heading = document.createElement('strong')
+          heading.textContent = row.handle ? `${row.provider} — ${row.handle}` : row.provider
+          const body = document.createElement('p')
+          body.className = 'my-1 text-muted'
+          body.textContent = detail
+          item.append(heading, body)
+          purgeResults.append(item)
+        }
+      }
+
+      const syncPurgeButton = () => {
+        const phraseOk = purgeConfirmation?.value === PURGE_PHRASE
+        const previewOk = previewedSelection === purgeSelection()
+        const enabled = Boolean(phraseOk && previewOk && purgeProviders().length)
+        if (purgeRun) purgeRun.disabled = !enabled
+        if (purgeHint) {
+          purgeHint.textContent = !purgeProviders().length
+            ? 'Pick at least one account.'
+            : !previewOk
+              ? 'Run a preview for this selection first.'
+              : !phraseOk
+                ? `Type ${PURGE_PHRASE} exactly to enable deletion.`
+                : 'This permanently deletes the posts listed above.'
+        }
+      }
+
+      purgeCard?.addEventListener('change', (event) => {
+        // Any change to scope or accounts stales the preview.
+        if (event.target?.matches('[data-purge-scope], [data-purge-provider]')) previewedSelection = null
+        syncPurgeButton()
+      })
+      purgeConfirmation?.addEventListener('input', syncPurgeButton)
+
+      purgePreview?.addEventListener('click', async () => {
+        const providers = purgeProviders()
+        if (!providers.length) {
+          notify('Pick at least one account to preview.', 'error', { title: 'Danger zone' })
+          return
+        }
+
+        purgePreview.setAttribute('disabled', 'disabled')
+        if (purgeSummary) purgeSummary.textContent = 'Counting…'
+        try {
+          const query = new URLSearchParams({ scope: purgeScope(), providers: providers.join(',') })
+          const response = await fetch(`/api/postline/purge/preview?${query.toString()}`)
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Preview failed.')
+
+          renderPurgeResults(payload.data)
+          previewedSelection = purgeSelection()
+          if (purgeSummary) purgeSummary.textContent = `${payload.data.matched} post${payload.data.matched === 1 ? '' : 's'} matched.`
+        }
+        catch (error) {
+          previewedSelection = null
+          if (purgeSummary) purgeSummary.textContent = 'Preview failed.'
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Danger zone' })
+        }
+        finally {
+          purgePreview.removeAttribute('disabled')
+          syncPurgeButton()
+        }
+      })
+
+      purgeRun?.addEventListener('click', async () => {
+        const scope = purgeScope()
+        const label = scope === 'all' ? 'every post on the selected accounts' : 'every post Postline published'
+        // Last stop before an irreversible action.
+        if (!window.confirm(`Permanently delete ${label}? This cannot be undone.`)) return
+
+        purgeRun.disabled = true
+        notify('Deleting posts…', 'info', { title: 'Danger zone' })
+        try {
+          const body = new FormData()
+          body.set('scope', scope)
+          body.set('providers', purgeProviders().join(','))
+          body.set('confirmation', purgeConfirmation?.value || '')
+
+          const response = await fetch('/api/postline/purge', { method: 'POST', body })
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Deletion failed.')
+
+          renderPurgeResults(payload.data)
+          previewedSelection = null
+          if (purgeConfirmation) purgeConfirmation.value = ''
+          if (purgeSummary) purgeSummary.textContent = `${payload.data.deleted} deleted, ${payload.data.failed} failed.`
+          notify(
+            `Deleted ${payload.data.deleted} post${payload.data.deleted === 1 ? '' : 's'}.${payload.data.failed ? ` ${payload.data.failed} failed.` : ''}`,
+            payload.data.failed ? 'error' : 'success',
+            { title: 'Danger zone' },
+          )
+        }
+        catch (error) {
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Deletion failed' })
+        }
+        finally {
+          syncPurgeButton()
+        }
+      })
+
+      syncPurgeButton()
 
       // Gate the initial status fetch on DOMContentLoaded so the deferred
       // postline-bluesky module has loaded — otherwise a connected account
