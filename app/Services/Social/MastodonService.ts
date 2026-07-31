@@ -62,7 +62,7 @@ export class MastodonService {
     if (!accessToken)
       throw new Error('A Mastodon access token is required.')
 
-    const account = await this.driver.verifyCredentials({ instance, accessToken })
+    const account = await this.driver.verifyCredentials({ handle: '', did: instance, accessToken })
     const identity = await this.saveSession({ instance, accessToken, account })
     return this.publicIdentity(identity)
   }
@@ -122,7 +122,7 @@ export class MastodonService {
 
     try {
       const published = await this.driver.publish(
-        { instance: identity.external_id || '', accessToken: identity.access_token || '' },
+        this.credentialsFor(identity),
         { text: post.body, media: content?.media, reply: content?.reply },
       )
 
@@ -164,15 +164,29 @@ export class MastodonService {
    */
   async purgeAdapter(): Promise<ProviderPurgeAdapter> {
     const identity = await this.requireIdentity()
-    const credentials = { instance: identity.external_id || '', accessToken: identity.access_token || '' }
-    const account = await this.driver.verifyCredentials(credentials)
+    const credentials = this.credentialsFor(identity)
 
     return {
       provider: 'mastodon',
       identityId: Number(identity.id),
       handle: identity.handle,
-      listPage: cursor => this.driver.listAuthoredPosts(credentials, account.accountId, { cursor }),
-      deletePost: ref => this.driver.deletePost(credentials, ref.cid || lastPathSegment(ref.uri)),
+      listPage: cursor => this.driver.listAuthoredPosts(credentials, { cursor }),
+      // The driver falls back to the id in a stored status URL, which is what
+      // `remote_uri` holds for Mastodon targets.
+      deletePost: ref => this.driver.deletePost(credentials, ref),
+    }
+  }
+
+  /**
+   * The framework credential shape. Mastodon has no single host, so the
+   * instance base URL travels in `did` — the slot LinkedIn uses for the member
+   * URN and Instagram for the account id.
+   */
+  private credentialsFor(identity: SocialIdentityRow) {
+    return {
+      handle: identity.handle,
+      did: identity.external_id || undefined,
+      accessToken: identity.access_token || undefined,
     }
   }
 
@@ -292,14 +306,6 @@ export class MastodonService {
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
-}
-
-/**
- * The status id at the end of a Mastodon status URL — the fallback when a
- * target row predates `remote_cid` being populated.
- */
-function lastPathSegment(value: string): string {
-  return String(value || '').replace(/\/+$/, '').split('/').pop() || ''
 }
 
 export const mastodon = new MastodonService()

@@ -398,7 +398,7 @@ export class BlueskyService {
       identityId: Number(current.id),
       handle: current.handle,
       listPage: cursor => run(identity => this.driver.listAuthoredPosts(credentials(identity), { cursor })),
-      deletePost: ref => run(identity => this.driver.deletePost(credentials(identity), ref.uri)),
+      deletePost: ref => run(identity => this.driver.deletePost(credentials(identity), ref)),
     }
   }
 

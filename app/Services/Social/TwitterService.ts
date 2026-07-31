@@ -240,15 +240,19 @@ export class TwitterService {
    */
   async purgeAdapter(): Promise<ProviderPurgeAdapter> {
     const identity = await this.requireIdentity()
-    const accessToken = identity.access_token || ''
-    const userId = identity.external_id || ''
+    const credentials = {
+      handle: identity.handle,
+      // `did` carries the numeric X user id the timeline endpoint keys on.
+      did: identity.external_id || undefined,
+      accessToken: identity.access_token || undefined,
+    }
 
     return {
       provider: 'twitter',
       identityId: Number(identity.id),
       handle: identity.handle,
-      listPage: cursor => this.driver.listAuthoredPosts(accessToken, userId, { cursor }),
-      deletePost: ref => this.driver.deletePost(accessToken, ref.uri),
+      listPage: cursor => this.driver.listAuthoredPosts(credentials, { cursor }),
+      deletePost: ref => this.driver.deletePost(credentials, ref),
     }
   }
 

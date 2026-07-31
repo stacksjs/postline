@@ -248,16 +248,19 @@ export class LinkedInService {
    */
   async purgeAdapter(): Promise<ProviderPurgeAdapter> {
     const identity = await this.requireIdentity()
-    const accessToken = identity.access_token || ''
-    // `external_id` carries the member URN (urn:li:person:{sub}).
-    const authorUrn = identity.external_id || ''
+    const credentials = {
+      handle: identity.handle,
+      // `external_id` carries the member URN (urn:li:person:{sub}).
+      did: identity.external_id || undefined,
+      accessToken: identity.access_token || undefined,
+    }
 
     return {
       provider: 'linkedin',
       identityId: Number(identity.id),
       handle: identity.handle,
-      listPage: cursor => this.driver.listAuthoredPosts(accessToken, authorUrn, { cursor }),
-      deletePost: ref => this.driver.deletePost(accessToken, ref.uri),
+      listPage: cursor => this.driver.listAuthoredPosts(credentials, { cursor }),
+      deletePost: ref => this.driver.deletePost(credentials, ref),
     }
   }
 

@@ -65,6 +65,7 @@
     "stx": "./buddy"
   },
   "dependencies": {
+    "@stacksjs/socials": "^0.70.231",
     "stacks": "^0.70.229"
   },
   "devDependencies": {

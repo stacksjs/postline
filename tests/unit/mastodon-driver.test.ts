@@ -4,7 +4,7 @@ import { MastodonApiError, MastodonPublishingDriver, normalizeInstance } from '.
 const realFetch = globalThis.fetch
 afterEach(() => { globalThis.fetch = realFetch })
 
-const creds = { instance: 'https://mastodon.social', accessToken: 'tok' }
+const creds = { handle: '@glenn@mastodon.social', did: 'https://mastodon.social', accessToken: 'tok' }
 
 interface Captured { url: string, method: string, body: any, headers: any }
 
