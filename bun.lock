@@ -23,10 +23,6 @@
       },
     },
   },
-  "overrides": {
-    "//": "Crosswind < 0.2.13 silently dropped every variant on a whole-class utility (disabled:cursor-not-allowed, hover:cursor-pointer, md:break-inside-avoid). stx pulls in 0.2.4 transitively; pin all copies to the fixed release.",
-    "@cwcss/crosswind": "^0.2.14",
-  },
   "packages": {
     "@cwcss/crosswind": ["@cwcss/crosswind@0.2.14", "", { "dependencies": { "@stacksjs/clapp": "^0.2.0", "bunfig": "^0.15.15" }, "bin": { "crosswind": "./dist/cli.js" } }, "sha512-Gj+NbYToRWg68PpkSy/Jb/SXwATEdkGHviOAsYOgUGo3oeFbmQQ+yr4e9AXU7aii+X6CXh2DW3+bTDWhRYtCzA=="],
 
