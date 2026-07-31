@@ -1,4 +1,4 @@
-import type { CrosspostTargetResult, PublishContent } from '../../Support/Social/types'
+import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { LinkedInApiError, LinkedInDriver } from './Drivers/LinkedInDriver'
@@ -237,6 +237,27 @@ export class LinkedInService {
       }).where('id', '=', target.id).execute()
 
       return { provider: 'linkedin', ok: false, error: message, targetId: Number(target.id) }
+    }
+  }
+
+  /**
+   * The purge surface for LinkedIn. Deleting keys on the post URN stored in
+   * `remote_uri`. Enumerating the account's full history additionally needs
+   * `r_member_social`, which publishing-only apps don't hold — the driver
+   * turns that rejection into an actionable message.
+   */
+  async purgeAdapter(): Promise<ProviderPurgeAdapter> {
+    const identity = await this.requireIdentity()
+    const accessToken = identity.access_token || ''
+    // `external_id` carries the member URN (urn:li:person:{sub}).
+    const authorUrn = identity.external_id || ''
+
+    return {
+      provider: 'linkedin',
+      identityId: Number(identity.id),
+      handle: identity.handle,
+      listPage: cursor => this.driver.listAuthoredPosts(accessToken, authorUrn, { cursor }),
+      deletePost: ref => this.driver.deletePost(accessToken, ref.uri),
     }
   }
 

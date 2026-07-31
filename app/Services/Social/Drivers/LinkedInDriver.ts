@@ -1,4 +1,5 @@
 import type { LinkedInTokenExchangeInput, PublishedPost, PublishPostInput, SocialIdentityCredentials } from '@stacksjs/socials'
+import type { AuthoredPostPage } from '../../../Support/Social/types'
 import { escapeLinkedInText, LinkedInApiError, LinkedInPublishingDriver } from '@stacksjs/socials'
 
 export { LinkedInApiError }
@@ -154,6 +155,91 @@ export class LinkedInDriver extends LinkedInPublishingDriver {
     }
 
     return image
+  }
+
+  /**
+   * One page of the member's own posts via the Posts API author finder.
+   *
+   * LinkedIn gates this finder behind `r_member_social`, which most apps are
+   * never granted — publishing only needs `w_member_social`. A 403 here is
+   * therefore the norm, not a bug, so it is translated into an actionable
+   * message rather than surfaced as a raw API error.
+   */
+  async listAuthoredPosts(
+    accessToken: string,
+    authorUrn: string,
+    query: { cursor?: string, limit?: number } = {},
+  ): Promise<AuthoredPostPage> {
+    if (!accessToken) throw new Error('LinkedIn access token is missing for this identity.')
+    if (!authorUrn) throw new Error('LinkedIn member URN is required to list posts.')
+
+    const count = Math.min(Math.max(query.limit || 50, 1), 100)
+    const start = Number(query.cursor || 0) || 0
+    const url = new URL(`${this.apiBase}/rest/posts`)
+    url.searchParams.set('q', 'author')
+    url.searchParams.set('author', authorUrn)
+    url.searchParams.set('count', String(count))
+    url.searchParams.set('start', String(start))
+
+    let payload: { elements?: Array<{ id?: string, commentary?: string, createdAt?: number }> }
+    try {
+      payload = await this.request(url.toString(), {
+        headers: {
+          'authorization': `Bearer ${accessToken}`,
+          'linkedin-version': this.apiVersion,
+          'x-restli-protocol-version': '2.0.0',
+        },
+      })
+    }
+    catch (error) {
+      if (error instanceof LinkedInApiError && (error.status === 403 || error.status === 401)) {
+        throw new LinkedInApiError(
+          'LinkedIn will not list this account\'s posts — the Posts author finder needs the r_member_social permission, which this app does not hold. Delete posts Postline published instead.',
+          error.status,
+          error.body,
+        )
+      }
+      throw error
+    }
+
+    const posts = (payload.elements || []).filter(element => element?.id).map(element => ({
+      uri: String(element.id),
+      text: element.commentary,
+      postedAt: element.createdAt ? new Date(element.createdAt).toISOString() : undefined,
+      url: `https://www.linkedin.com/feed/update/${element.id}`,
+    }))
+
+    return {
+      // Offset paging: stop as soon as a short page comes back.
+      cursor: posts.length === count ? String(start + count) : undefined,
+      posts,
+    }
+  }
+
+  /** Permanently delete one member share by its post URN. */
+  async deletePost(accessToken: string, postUrn: string): Promise<void> {
+    if (!accessToken) throw new Error('LinkedIn access token is missing for this identity.')
+    const urn = String(postUrn || '').trim()
+    if (!urn) throw new Error('A LinkedIn post URN is required to delete a post.')
+
+    const response = await fetch(`${this.apiBase}/rest/posts/${encodeURIComponent(urn)}`, {
+      method: 'DELETE',
+      headers: {
+        'authorization': `Bearer ${accessToken}`,
+        'linkedin-version': this.apiVersion,
+        'x-restli-protocol-version': '2.0.0',
+      },
+    })
+
+    // 404 means it is already gone — the desired end state either way.
+    if (!response.ok && response.status !== 404) {
+      const text = await response.text().catch(() => '')
+      throw new LinkedInApiError(
+        `LinkedIn API failed (${response.status}): ${text || response.statusText}`,
+        response.status,
+        text,
+      )
+    }
   }
 
   /**

@@ -152,8 +152,11 @@
             <label class="inline-flex gap-2 items-center text-[13px]">
               <input type="checkbox" value="mastodon" checked data-purge-provider> Mastodon
             </label>
+            <label class="inline-flex gap-2 items-center text-[13px]">
+              <input type="checkbox" value="linkedin" checked data-purge-provider> LinkedIn
+            </label>
           </div>
-          <p class="m-0 text-muted text-xs">LinkedIn, Instagram, and Threads can't delete posts through their APIs — remove those in their own apps.</p>
+          <p class="m-0 text-muted text-xs">LinkedIn can delete the posts Postline published; listing its full history needs a partner permission most apps don't hold. Instagram and Threads can't delete posts at all through their APIs — remove those in their own apps.</p>
         </fieldset>
 
         <div class="flex flex-wrap gap-3 items-center">
@@ -750,9 +753,13 @@
         for (const row of rows) {
           const item = document.createElement('div')
           item.className = 'p-3 text-[13px] border border-line rounded-xl'
-          const detail = !row.supported || !row.connected
-            ? row.skippedReason || 'Not available.'
-            : `${row.matched} post${row.matched === 1 ? '' : 's'} would be deleted${row.truncated ? ' (capped at 2000 per run — run again for the rest)' : ''}.`
+          // A skip reason always wins — it explains a zero that would otherwise
+          // read as "nothing to delete" (e.g. LinkedIn refusing to list history).
+          const detail = row.skippedReason
+            ? row.skippedReason
+            : !row.supported || !row.connected
+                ? 'Not available.'
+                : `${row.matched} post${row.matched === 1 ? '' : 's'} would be deleted${row.truncated ? ' (capped at 2000 per run — run again for the rest)' : ''}.`
           const heading = document.createElement('strong')
           heading.textContent = row.handle ? `${row.provider} — ${row.handle}` : row.provider
           const body = document.createElement('p')

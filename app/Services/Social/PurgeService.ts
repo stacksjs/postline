@@ -1,6 +1,7 @@
 import type { AuthoredPost, ProviderPurgeAdapter, SocialProvider } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { bluesky } from './BlueskyService'
+import { linkedin } from './LinkedInService'
 import { mastodon } from './MastodonService'
 import { ensureAccount, now, uuid } from './support'
 import { twitter } from './TwitterService'
@@ -18,11 +19,17 @@ const database = db as any
 export const PURGE_CONFIRMATION = 'DELETE ALL POSTS'
 
 /** Providers whose API can delete a post the account authored. */
-export const PURGEABLE_PROVIDERS: SocialProvider[] = ['bluesky', 'twitter', 'mastodon']
+export const PURGEABLE_PROVIDERS: SocialProvider[] = ['bluesky', 'twitter', 'mastodon', 'linkedin']
 
-/** Why the remaining providers can't take part, shown verbatim in the UI. */
+/**
+ * Why the remaining providers can't take part, shown verbatim in the UI.
+ *
+ * LinkedIn is absent by design: it deletes fine, and `all` scope is attempted
+ * rather than pre-blocked — enumerating history needs `r_member_social`, which
+ * an approved partner app may well hold. When it doesn't, the driver's 403 is
+ * translated into an actionable skip reason at run time.
+ */
 const UNSUPPORTED_REASONS: Partial<Record<SocialProvider, string>> = {
-  linkedin: 'LinkedIn deletion is not wired up yet — remove posts from LinkedIn directly.',
   instagram: 'The Instagram Graph API cannot delete feed posts — remove them in the Instagram app.',
   threads: 'The Threads API cannot delete posts — remove them in the Threads app.',
   facebook: 'Facebook is not a connected publishing target.',
@@ -192,8 +199,13 @@ export class PurgeService {
         : await this.collectTracked(provider, adapter.identityId)
     }
     catch (error) {
-      result.errors.push(messageOf(error))
-      await this.recordRun(result, scope, dryRun, 'failed', messageOf(error))
+      // A provider that can delete but not enumerate lands here in `all` scope.
+      // Surface it as a skip with the reason, so the UI explains the way
+      // forward instead of reporting a bare zero.
+      const message = messageOf(error)
+      result.skippedReason = message
+      result.errors.push(message)
+      await this.recordRun(result, scope, dryRun, 'skipped', message)
       return result
     }
 
@@ -256,6 +268,7 @@ export class PurgeService {
     if (provider === 'bluesky') return await bluesky.purgeAdapter()
     if (provider === 'twitter') return await twitter.purgeAdapter()
     if (provider === 'mastodon') return await mastodon.purgeAdapter()
+    if (provider === 'linkedin') return await linkedin.purgeAdapter()
     throw new Error(`${provider} cannot delete posts through its API.`)
   }
 

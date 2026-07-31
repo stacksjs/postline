@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { BlueskyDriver, parseAtUri } from '../../app/Services/Social/Drivers/BlueskyDriver'
+import { LinkedInApiError, LinkedInDriver } from '../../app/Services/Social/Drivers/LinkedInDriver'
 import { MastodonDriver } from '../../app/Services/Social/Drivers/MastodonDriver'
 import { TwitterApiError, TwitterDriver } from '../../app/Services/Social/Drivers/TwitterDriver'
 import { postPurge, PURGE_CONFIRMATION, PURGEABLE_PROVIDERS } from '../../app/Services/Social/PurgeService'
@@ -143,12 +144,59 @@ describe('MastodonDriver purge operations', () => {
   })
 })
 
+describe('LinkedInDriver purge operations', () => {
+  test('deletes a post by its URN', async () => {
+    const cap: Captured[] = []
+    mockApi(cap, () => new Response('', { status: 204 }))
+
+    await new LinkedInDriver().deletePost('AT', 'urn:li:ugcPost:123')
+
+    expect(cap[0]?.url).toEndWith('/rest/posts/urn%3Ali%3AugcPost%3A123')
+    expect(cap[0]?.method).toBe('DELETE')
+  })
+
+  test('treats an already-deleted post as success', async () => {
+    mockApi([], () => new Response('not found', { status: 404 }))
+    await expect(new LinkedInDriver().deletePost('AT', 'urn:li:share:9')).resolves.toBeUndefined()
+  })
+
+  test('surfaces a real failure', async () => {
+    mockApi([], () => new Response('nope', { status: 500 }))
+    await expect(new LinkedInDriver().deletePost('AT', 'urn:li:share:9')).rejects.toThrow(LinkedInApiError)
+  })
+
+  test('lists authored posts with offset paging', async () => {
+    const cap: Captured[] = []
+    const elements = Array.from({ length: 50 }, (_, i) => ({ id: `urn:li:share:${i}`, commentary: `post ${i}` }))
+    mockApi(cap, () => new Response(JSON.stringify({ elements }), { status: 200 }))
+
+    const page = await new LinkedInDriver().listAuthoredPosts('AT', 'urn:li:person:abc')
+
+    expect(cap[0]?.url).toContain('q=author')
+    expect(cap[0]?.url).toContain('author=urn%3Ali%3Aperson%3Aabc')
+    expect(page.posts).toHaveLength(50)
+    // A full page means more may follow; the cursor is the next offset.
+    expect(page.cursor).toBe('50')
+  })
+
+  test('stops paging on a short page', async () => {
+    mockApi([], () => new Response(JSON.stringify({ elements: [{ id: 'urn:li:share:1' }] }), { status: 200 }))
+    const page = await new LinkedInDriver().listAuthoredPosts('AT', 'urn:li:person:abc')
+    expect(page.cursor).toBeUndefined()
+  })
+
+  test('explains the missing permission when LinkedIn refuses to list', async () => {
+    mockApi([], () => new Response('{"status":403}', { status: 403 }))
+    await expect(new LinkedInDriver().listAuthoredPosts('AT', 'urn:li:person:abc'))
+      .rejects.toThrow(/r_member_social/)
+  })
+})
+
 describe('purge safeguards', () => {
   test('only providers with a delete API are purgeable', () => {
-    expect(PURGEABLE_PROVIDERS).toEqual(['bluesky', 'twitter', 'mastodon'])
+    expect(PURGEABLE_PROVIDERS).toEqual(['bluesky', 'twitter', 'mastodon', 'linkedin'])
     expect(PURGEABLE_PROVIDERS).not.toContain('instagram')
     expect(PURGEABLE_PROVIDERS).not.toContain('threads')
-    expect(PURGEABLE_PROVIDERS).not.toContain('linkedin')
   })
 
   test('refuses to execute without the exact confirmation phrase', async () => {
