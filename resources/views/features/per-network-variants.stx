@@ -1,0 +1,92 @@
+@extends('layouts/marketing')
+
+@section('title', 'Different limits, same idea - Postline')
+@section('description', 'Override the text for any single network without maintaining six separate drafts of the same post.')
+@section('canonical', 'https://postline.stacksjs.com/features/per-network-variants')
+@section('ogImage', 'https://postline.stacksjs.com/images/og/feature-per-network-variants.png')
+
+@section('content')
+  <article class="mx-auto px-6 max-w-[1400px]">
+    <!-- Hero. Left-aligned, asset-free: this is a detail page, so the headline
+        and the single CTA carry it. -->
+    <header class="grid gap-6 pb-14 pt-16 lg:pt-20 max-w-3xl">
+      <nav class="flex gap-2 items-center text-[13px] text-muted" aria-label="Breadcrumb">
+        <a class="hover:text-ink transition-colors" href="/">Postline</a>
+        <span aria-hidden="true">/</span>
+        <span class="text-body">Features</span>
+      </nav>
+      <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">Different limits, same idea</h1>
+      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">X gives you 280 characters. Bluesky gives you 300, Mastodon 500, LinkedIn 3000. Writing to the tightest limit makes every post worse. Variants let one network differ without forking the draft.</p>
+      <div class="flex flex-wrap gap-3 items-center">
+        <a class="inline-flex items-center px-5 h-11 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl transition-colors" href="/login" data-stx-link>Get started</a>
+        <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">Read the source</a>
+      </div>
+    </header>
+
+    <!-- Body. Two stacked prose blocks, not a card grid: this is reading
+        material, and cards would add chrome without adding hierarchy. -->
+    <section class="grid gap-10 lg:gap-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] py-14 border-line border-t">
+      <div class="grid gap-10">
+        <div class="grid gap-3 max-w-[62ch]">
+          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Override only what needs it</h2>
+          <p class="m-0 leading-relaxed text-body">The shared body is the default. Any network you give a variant to publishes that instead, and the rest keep inheriting, so a small tweak stays a small tweak.</p>
+        </div>
+        <div class="grid gap-3 max-w-[62ch]">
+          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Counted against the right limit</h2>
+          <p class="m-0 leading-relaxed text-body">The composer counts each variant against the character limit of the network it belongs to, so you find out before publishing rather than after.</p>
+        </div>
+      </div>
+
+      <aside class="lg:pt-1">
+        <ul class="m-0 p-0 list-none border-line border-t divide-line divide-y">
+          <li class="flex gap-3 items-start py-4">
+            <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
+            <span class="text-[15px] text-body">One shared body, optional per-network overrides</span>
+          </li>
+          <li class="flex gap-3 items-start py-4">
+            <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
+            <span class="text-[15px] text-body">Live character counts per network</span>
+          </li>
+          <li class="flex gap-3 items-start py-4">
+            <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
+            <span class="text-[15px] text-body">No duplicate drafts to keep in sync</span>
+          </li>
+        </ul>
+      </aside>
+    </section>
+
+    <!-- Related. A plain divided list rather than three equal cards. -->
+    <section class="py-14 border-line border-t">
+      <h2 class="m-0 font-semibold text-ink text-xl tracking-tight">More features</h2>
+      <ul class="grid gap-0 m-0 mt-6 p-0 list-none divide-line divide-y">
+        <li>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/features/crossposting" data-stx-link>
+            <span class="grid gap-1">
+              <span class="font-semibold text-[15px] text-ink">Crossposting</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Write once and publish to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon in a single pass.</span>
+            </span>
+            <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+          </a>
+        </li>
+        <li>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/features/scheduling" data-stx-link>
+            <span class="grid gap-1">
+              <span class="font-semibold text-[15px] text-ink">Scheduling</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Schedule posts ahead in your own timezone and let the queue publish them, or send immediately.</span>
+            </span>
+            <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+          </a>
+        </li>
+        <li>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/features/analytics" data-stx-link>
+            <span class="grid gap-1">
+              <span class="font-semibold text-[15px] text-ink">Analytics</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Pull likes, reposts and replies back from the networks that report them, against the posts you published.</span>
+            </span>
+            <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+          </a>
+        </li>
+      </ul>
+    </section>
+  </article>
+@endsection

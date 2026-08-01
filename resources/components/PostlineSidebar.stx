@@ -82,7 +82,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
 
     <a
       class="flex relative z-10 gap-3 items-center mb-5 px-2 py-2 text-body rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500"
-      href="/"
+      href="/composer"
       data-stx-link
       data-stx-exact-active-class="text-ink"
       data-sidebar-collapsible-content="true"

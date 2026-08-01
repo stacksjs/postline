@@ -1,1335 +1,182 @@
-@extends('layouts/postline')
+@extends('layouts/marketing')
 
-@section('title', 'Postline - Composer')
-@section('description', 'Write, schedule, publish, and review social posts from a clean personal workspace.')
+@section('title', 'Postline: self-hosted social crossposting')
+@section('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon from one instance you own.')
+@section('canonical', 'https://postline.stacksjs.com/')
+@section('ogImage', 'https://postline.stacksjs.com/images/og/home.png')
 
 @section('content')
-  <section class="grid gap-5" data-postline-page="composer" data-testid="composer-page">
-    <!-- Crosswind safelist: utilities applied dynamically from the script below
-        (provider toggles, active-post highlight, connection summary, char
-        counter, per-network override rows) must appear in static markup so the
-        CSS scanner emits them.
-        `display:none` is inline, not a `hidden` class: this list now carries
-        layout utilities of its own (`grid`, `min-h-20`, `p-3`), and relying on
-        `hidden` to out-rank them would leave a visible empty block if the
-        generated stylesheet ever ordered them the other way. -->
-    <div class="grid gap-2 mt-2 p-2 p-3 min-h-20 min-h-7 leading-relaxed text-amber-700 text-emerald-800 text-ink text-muted text-muted text-on-accent text-red-700 text-sm text-zinc-400 bg-accent bg-emerald-400 bg-emerald-50 bg-emerald-500 bg-panel bg-panel-2 bg-panel-3 bg-red-500 bg-zinc-300 hover:bg-white border-blue-300 border-emerald-200 border-line border-neutral-950 outline-none rounded-lg rounded-xl shadow-sm cursor-not-allowed resize-none" style="display:none" aria-hidden="true"></div>
-    <header class="flex gap-4 items-center justify-between min-h-11">
-      <div>
-        <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Composer</p>
-        <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Write a post</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-muted">Draft once, then publish to every connected account.</p>
-      </div>
-    </header>
-    <div class="grid">
-      <section class="grid content-start grid-rows-[auto_auto_auto] self-start bg-panel border border-line rounded-2xl shadow-sm" aria-label="Post composer">
-        <div class="hidden flex-wrap gap-3 items-center justify-between px-3 py-2 text-xs bg-blue-50 border-b border-blue-200" data-edit-banner>
-          <span class="font-bold text-blue-800">Editing a queued post</span>
-          <a class="inline-flex items-center px-2.5 min-h-6 font-bold text-blue-800 bg-panel hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors" href="/" data-stx-link>Cancel</a>
-        </div>
-        <header class="flex flex-wrap gap-3 items-center justify-between p-3 border-b border-line">
-          <div class="flex gap-2 items-center">
-            <strong class="text-[13px]" data-composer-heading>New post</strong>
-            <a class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-bold text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-lg transition-colors" href="/accounts" data-stx-link data-bluesky-connection data-no-window-drag>
-              <span class="h-2 w-2 bg-zinc-300 rounded-full" data-bluesky-connection-dot aria-hidden="true"></span>
-              <span data-bluesky-connection-label>Checking accounts…</span>
+  <div class="overflow-hidden relative min-h-[100dvh]">
+
+    <!-- Left hairline rail + mono index (desktop second-read moment) -->
+    <div class="hidden lg:flex absolute left-6 top-[132px] z-10 flex-col gap-3 items-center" aria-hidden="true">
+      <span class="font-mono text-[11px] text-muted">01</span>
+      <span class="h-24 w-px bg-line"></span>
+    </div>
+
+    <!-- Hero -->
+    <section class="relative mx-auto px-6 lg:pl-20 max-w-[1400px]">
+      <div class="grid gap-12 items-center lg:gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] pb-16 pt-10 lg:pb-0 lg:pt-14 lg:min-h-[calc(100dvh-72px)]">
+        <!-- Left: copy -->
+        <div class="max-w-xl">
+          <p class="font-mono text-muted text-xs tracking-[0.2em] uppercase">Self-hosted</p>
+          <h1 class="mt-5 font-semibold leading-[1.03] text-[2.75rem] text-ink tracking-tight sm:text-6xl">Post once. Every network. Yours.</h1>
+          <p class="mt-6 max-w-md leading-relaxed text-body text-lg">Schedule and crosspost to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon from one instance you run and own.</p>
+          <div class="flex flex-wrap gap-3 items-center mt-9">
+            <a class="inline-flex items-center px-5 h-12 font-medium text-on-accent bg-accent hover:bg-emerald-600 rounded-xl shadow-sm transition-colors active:scale-[0.98]" href="/login" data-stx-link>Get started</a>
+            <a class="inline-flex gap-2 items-center px-5 h-12 font-medium text-ink hover:bg-panel-2 rounded-xl transition-colors" href="https://github.com/stacksjs/postline">
+              <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
+              View on GitHub
             </a>
           </div>
-          <div class="grid grid-cols-3 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Post mode">
-            <button class="px-2.5 py-1.5 min-w-19 text-ink text-xs bg-panel rounded-lg shadow-sm transition-colors" type="button" data-composer-mode="single">Single</button>
-            <button class="px-2.5 py-1.5 min-w-19 text-muted text-xs rounded-lg transition-colors" type="button" data-composer-mode="thread">Thread</button>
-            <button class="px-2.5 py-1.5 min-w-19 text-muted text-xs rounded-lg transition-colors" type="button" data-composer-mode="draft">Draft</button>
-          </div>
-        </header>
-
-        <div class="grid gap-1 p-4">
-          <div class="flex flex-wrap gap-2 mb-3" data-provider-toggles role="group" aria-label="Crosspost targets">
-            <span class="flex items-center px-2.5 min-h-8 text-xs text-zinc-400 bg-panel-2 border border-line rounded-xl" data-provider-empty>Loading accounts…</span>
-          </div>
-          <!-- Per-network overrides. Rows are built by the script, one per
-              selected target. Hidden in thread mode: the server publishes a
-              thread's shared segments, so an override there would be a lie. -->
-          <div class="hidden mb-3" data-variant-section>
-            <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-bold text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-lg transition-colors" type="button" data-variant-toggle aria-expanded="false">
-              <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
-              <span data-variant-toggle-label>Customise per network</span>
-            </button>
-            <div class="hidden gap-2 mt-2" data-variant-panel></div>
-          </div>
-          <label class="hidden gap-2 items-center mb-2.5" data-compose-image-row>
-            <span class="h-4 w-4 text-muted i-hugeicons-image-01" aria-hidden="true"></span>
-            <input class="px-3 h-9 w-full text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" type="url" inputmode="url" placeholder="Image URL (required for Instagram)" aria-label="Image URL for Instagram" data-compose-image>
-          </label>
-          <input class="hidden mb-2 w-full font-bold leading-snug text-[22px] text-ink placeholder:text-zinc-400 bg-transparent border-0 outline-none" type="text" maxlength="200" placeholder="Post title" aria-label="Blog post title" data-compose-title>
-          <div class="grid overflow-y-auto content-start gap-4 pr-1 max-h-72" data-composer-posts>
-            <article class="grid gap-2 pb-3 last:pb-0 border-b border-line last:border-b-0" data-composer-post data-active="true">
-              <header class="flex gap-3 items-center justify-between">
-                <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-bold text-on-accent text-xs bg-accent rounded-lg" type="button" data-select-post>
-                  <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
-                  <span data-post-label>Post 1</span>
-                </button>
-                <button class="hidden items-center justify-center h-7 w-7 text-muted hover:text-zinc-700 bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Remove post" title="Remove post" data-remove-post>
-                  <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
-                </button>
-              </header>
-              <textarea class="min-h-36 w-full leading-relaxed text-[18px] text-ink placeholder:text-zinc-400 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" placeholder="What do you want to share?" data-bluesky-text></textarea>
-              <div class="hidden overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview></div>
-            </article>
-          </div>
         </div>
 
-        <footer class="flex flex-col gap-3 items-stretch justify-between sm:flex-row sm:items-center p-3 border-line border-t">
-          <div class="flex gap-2 items-center min-w-0">
-            <span class="min-w-0 text-muted text-xs truncate" data-bluesky-count>0 / 300 characters</span>
-            <span class="hidden gap-1.5 items-center px-2.5 max-w-48 min-h-7 font-bold text-muted text-xs bg-panel-2 border border-line rounded-lg" data-attach-chip>
-              <span class="shrink-0 h-3.5 w-3.5 i-hugeicons-image-01" aria-hidden="true"></span>
-              <span class="truncate" data-attach-name></span>
-              <button class="inline-flex items-center justify-center shrink-0 h-4 w-4 text-muted hover:text-zinc-800 transition-colors" type="button" aria-label="Remove attached image" data-attach-clear>
-                <span class="h-3 w-3 i-hugeicons-cancel-01" aria-hidden="true"></span>
-              </button>
-            </span>
+        <!-- Right: composer preview (a faithful mini of the real product UI) -->
+        <div class="lg:justify-self-end lg:-mr-6 lg:translate-y-6">
+          <div class="max-w-[520px] bg-panel border border-line rounded-2xl shadow-[0_40px_90px_-30px_rgba(9,9,11,0.35)] lg:rotate-[1.4deg]" role="img" aria-label="Postline composer with one post selected for all six networks">
+            <div class="flex gap-1.5 items-center px-5 h-11 border-b border-line" aria-hidden="true">
+              <span class="h-2.5 w-2.5 bg-panel-3 rounded-full"></span>
+              <span class="h-2.5 w-2.5 bg-panel-3 rounded-full"></span>
+              <span class="h-2.5 w-2.5 bg-panel-3 rounded-full"></span>
+              <span class="ml-3 font-mono text-[11px] text-muted">compose</span>
+            </div>
+            <div class="p-5">
+              <div class="flex flex-wrap gap-1.5">
+                <span class="inline-flex gap-1.5 items-center px-2.5 h-7 font-medium text-ink text-xs bg-panel-2 border border-line rounded-lg"><span class="h-3.5 w-3.5 i-simple-icons-bluesky" aria-hidden="true"></span>Bluesky</span>
+                <span class="inline-flex gap-1.5 items-center px-2.5 h-7 font-medium text-ink text-xs bg-panel-2 border border-line rounded-lg"><span class="h-3.5 w-3.5 i-simple-icons-x" aria-hidden="true"></span>X</span>
+                <span class="inline-flex gap-1.5 items-center px-2.5 h-7 font-medium text-ink text-xs bg-panel-2 border border-line rounded-lg"><span class="h-3.5 w-3.5 i-simple-icons-linkedin" aria-hidden="true"></span>LinkedIn</span>
+                <span class="inline-flex gap-1.5 items-center px-2.5 h-7 font-medium text-ink text-xs bg-panel-2 border border-line rounded-lg"><span class="h-3.5 w-3.5 i-simple-icons-instagram" aria-hidden="true"></span>Instagram</span>
+                <span class="inline-flex gap-1.5 items-center px-2.5 h-7 font-medium text-ink text-xs bg-panel-2 border border-line rounded-lg"><span class="h-3.5 w-3.5 i-simple-icons-threads" aria-hidden="true"></span>Threads</span>
+                <span class="inline-flex gap-1.5 items-center px-2.5 h-7 font-medium text-ink text-xs bg-panel-2 border border-line rounded-lg"><span class="h-3.5 w-3.5 i-simple-icons-mastodon" aria-hidden="true"></span>Mastodon</span>
+              </div>
+              <p class="mt-4 leading-relaxed text-ink">Shipping Postline v1: self-hosted crossposting to every network from one place. No SaaS, no lock-in.</p>
+              <div class="flex items-center justify-between mt-5 pt-4 border-line border-t">
+                <span class="font-mono text-muted text-xs">198 / 300</span>
+                <span class="inline-flex items-center px-4 h-9 font-medium text-on-accent text-sm bg-accent rounded-lg">Publish</span>
+              </div>
+            </div>
           </div>
-          <div class="flex flex-nowrap gap-2 items-center justify-end w-full sm:w-auto">
-            <input class="hidden" type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="Attach image" data-attach-input>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach image" title="Attach image" data-attach-button>
-              <span class="h-4 w-4 i-hugeicons-image-01" aria-hidden="true"></span>
-            </button>
-            <input class="hidden px-2 h-9 text-ink text-xs bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" type="datetime-local" aria-label="Schedule time" data-compose-schedule>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Schedule post" title="Schedule post" data-schedule-toggle>
-              <span class="h-4 w-4 i-hugeicons-calendar-03" aria-hidden="true"></span>
-            </button>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Add post" title="Add post" data-add-post>
-              <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
-            </button>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Preview post" title="Preview post" data-preview-post>
-              <span class="h-4 w-4 i-hugeicons-view" aria-hidden="true"></span>
-            </button>
-            <button class="inline-flex gap-2 items-center justify-center ml-auto px-4 sm:ml-0 h-9 font-bold text-on-accent bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" data-bluesky-publish>
-              <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
-              <span data-bluesky-publish-label>Publish</span>
-            </button>
-          </div>
-        </footer>
-      </section>
+        </div>
+      </div>
+    </section>
+  </div>
 
+  <!-- 02 · Providers strip -->
+  <section class="relative bg-panel border-line border-y" aria-label="Supported networks">
+    <ul class="sr-only">
+      <li>Bluesky</li><li>X</li><li>LinkedIn</li><li>Instagram</li><li>Threads</li><li>Mastodon</li>
+    </ul>
+    <div class="mx-auto px-6 max-w-[1400px]">
+      <div class="flex flex-col gap-6 sm:flex-row sm:gap-12 sm:items-center py-9">
+        <p class="shrink-0 font-mono leading-relaxed text-muted text-xs tracking-[0.2em] uppercase">One post,<br class="hidden sm:block"> six networks</p>
+        <div class="overflow-hidden relative grow [mask-image:linear-gradient(90deg,transparent,#000_7%,#000_93%,transparent)]">
+          <ul class="flex gap-12 items-center w-max marquee-track" aria-hidden="true">
+            <ProviderChip icon="bluesky" name="Bluesky" />
+            <ProviderChip icon="x" name="X" />
+            <ProviderChip icon="linkedin" name="LinkedIn" />
+            <ProviderChip icon="instagram" name="Instagram" />
+            <ProviderChip icon="threads" name="Threads" />
+            <ProviderChip icon="mastodon" name="Mastodon" />
+            <ProviderChip icon="bluesky" name="Bluesky" />
+            <ProviderChip icon="x" name="X" />
+            <ProviderChip icon="linkedin" name="LinkedIn" />
+            <ProviderChip icon="instagram" name="Instagram" />
+            <ProviderChip icon="threads" name="Threads" />
+            <ProviderChip icon="mastodon" name="Mastodon" />
+          </ul>
+        </div>
+      </div>
     </div>
   </section>
 
-  <script>
-    ;(() => {
-      const root = document.querySelector('[data-testid="composer-page"]')
-      if (!root) return
-      if (root.dataset.composerReady === 'true') return
-      root.dataset.composerReady = 'true'
-
-      const count = root.querySelector('[data-bluesky-count]')
-      const connection = root.querySelector('[data-bluesky-connection]')
-      const connectionDot = root.querySelector('[data-bluesky-connection-dot]')
-      const connectionLabel = root.querySelector('[data-bluesky-connection-label]')
-      const publishLabel = root.querySelector('[data-bluesky-publish-label]')
-      const buttons = Array.from(root.querySelectorAll('[data-bluesky-publish], [data-bluesky-publish-top]'))
-      const providerToggles = root.querySelector('[data-provider-toggles]')
-      const variantSection = root.querySelector('[data-variant-section]')
-      const variantToggle = root.querySelector('[data-variant-toggle]')
-      const variantToggleLabel = root.querySelector('[data-variant-toggle-label]')
-      const variantPanel = root.querySelector('[data-variant-panel]')
-      const composeImageRow = root.querySelector('[data-compose-image-row]')
-      const composeImage = root.querySelector('[data-compose-image]')
-      const scheduleToggle = root.querySelector('[data-schedule-toggle]')
-      const scheduleInput = root.querySelector('[data-compose-schedule]')
-      const attachButton = root.querySelector('[data-attach-button]')
-      const attachInput = root.querySelector('[data-attach-input]')
-      const attachChip = root.querySelector('[data-attach-chip]')
-      const attachName = root.querySelector('[data-attach-name]')
-      const attachClear = root.querySelector('[data-attach-clear]')
-
-      const attachedFile = () => attachInput?.files?.[0] || undefined
-      const composeTitle = root.querySelector('[data-compose-title]')
-      const composedTitle = () => composeTitle?.value.trim() || undefined
-
-      const clearAttachment = () => {
-        if (attachInput) attachInput.value = ''
-        attachChip?.classList.add('hidden')
-        attachChip?.classList.remove('inline-flex')
-      }
-      const postsRoot = root.querySelector('[data-composer-posts]')
-      const addPostButton = root.querySelector('[data-add-post]')
-      const previewButton = root.querySelector('[data-preview-post]')
-      const refreshButton = root.querySelector('[data-composer-refresh]')
-      const searchButton = root.querySelector('[data-composer-search]')
-      const modeButtons = Array.from(root.querySelectorAll('[data-composer-mode]'))
-      const linkPreviewCache = new Map()
-      const urlPattern = /https?:\/\/[^\s<>"']+/i
-      const draftKey = 'postline:composer-draft:v1'
-      let activePost = root.querySelector('[data-composer-post]')
-      let postCounter = root.querySelectorAll('[data-composer-post]').length
-      let activeMode = modeButtons.find(button => button.classList.contains('bg-panel'))?.dataset.composerMode || 'single'
-      let savedActiveIndex = 0
-      let previewTimer
-      let draftSaveTimer
-
-      let canPublish = false
-      let providers = []
-      const selected = new Set()
-
-      // Edit mode: /?edit=<id> loads a queued post into the composer.
-      const editBanner = root.querySelector('[data-edit-banner]')
-      const composerHeading = root.querySelector('[data-composer-heading]')
-      const editParam = new URLSearchParams(window.location.search).get('edit')
-      let editingId = null
-      let editHadImage = false
-      let editRemoveImage = false
-
-      const setStatus = (message, tone = 'neutral', options = {}) => {
-        // Resolve the toast helper at call time. It's a deferred module that
-        // loads AFTER this inline script parses, so capturing it eagerly (as
-        // this used to) left it undefined on every full page load — silently
-        // dropping all feedback to the console.
-        const show = window.postlineToast?.show
-        if (show) {
-          show({
-            title: options.title,
-            message,
-            tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info',
-            url: options.url,
-            id: options.id,
-          })
-          return
-        }
-        console.log(`[postline] ${message}`)
-      }
-
-      const providerLabel = provider => window.postlineSocial?.providerLabel(provider) || provider
-      const connectedProviders = () => providers.filter(provider => provider.canPublish)
-      const selectedConnected = () => connectedProviders().filter(provider => selected.has(provider.provider))
-
-      // The tightest limit among selected targets. Used for the counter's
-      // denominator only — it is never enforced on the textarea, because
-      // capping input at the shortest network's limit would silently shorten
-      // the post for every other network too.
-      const effectiveLimit = () => {
-        const limits = selectedConnected().map(provider => provider.characterLimit).filter(Boolean)
-        return limits.length ? Math.min(...limits) : 300
-      }
-
-      /**
-       * Selected targets that would reject what they are actually going to
-       * receive. A provider with an override is measured against that override,
-       * not the shared body — otherwise the advisory reports on text the
-       * provider will never see, and is wrong in both directions.
-       */
-      const overLimitProviders = () => selectedConnected()
-        .filter(provider => provider.characterLimit && bodyFor(provider.provider).length > provider.characterLimit)
-
-      const toggleClass = (isSelected, connected) => {
-        const base = 'inline-flex gap-1.5 items-center px-2.5 min-h-8 text-xs font-bold border rounded-xl transition-colors'
-        if (!connected) return `${base} border-line bg-panel-2 text-zinc-400 cursor-not-allowed`
-        return isSelected
-          ? `${base} border-neutral-950 bg-accent text-on-accent`
-          : `${base} border-line bg-panel-2 text-muted hover:bg-white`
-      }
-
-      const createProviderToggle = (status) => {
-        const label = providerLabel(status.provider)
-        const isSelected = selected.has(status.provider) && status.canPublish
-        const button = document.createElement('button')
-        button.type = 'button'
-        button.dataset.providerToggle = status.provider
-        button.setAttribute('aria-pressed', isSelected ? 'true' : 'false')
-        button.className = toggleClass(isSelected, status.canPublish)
-        if (!status.canPublish) {
-          button.setAttribute('disabled', 'disabled')
-          button.title = `Connect ${label} on the Accounts page to crosspost here.`
-        }
-        const dot = isSelected ? 'bg-emerald-400' : 'bg-zinc-300'
-        button.innerHTML = `<span class="h-2 w-2 rounded-full ${dot}" aria-hidden="true" data-provider-dot></span><span>${label}</span>`
-        return button
-      }
-
-      const renderProviderToggles = () => {
-        if (!providerToggles) return
-        if (providers.length === 0) {
-          providerToggles.innerHTML = '<a class="inline-flex items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-xl transition-colors" href="/accounts" data-stx-link>No accounts yet. Connect one →</a>'
-          return
-        }
-        providerToggles.replaceChildren(...providers.map(createProviderToggle))
-      }
-
-      // Per-network overrides: provider -> { text, shared }. `shared` is the
-      // body captured when the override was created, so a later edit to the
-      // shared text can be reported as having left this copy behind.
-      const variants = new Map()
-      let variantsOpen = false
-
-      const sharedBody = () => activeTextarea()?.value || ''
-
-      /**
-       * Overrides only apply to a single-post composer: `publishThread` strips
-       * them server-side. Rendering and payload building share this one test so
-       * a state that cannot show an override can never send one either.
-       */
-      const variantsAvailable = () => selectedConnected().length > 0 && allPosts().length === 1
-
-      /** Overrides worth sending: blank ones inherit, so they are dropped. */
-      const variantsPayload = () => {
-        const payload = {}
-        if (!variantsAvailable()) return payload
-        variants.forEach((entry, provider) => {
-          if (entry.text.trim()) payload[provider] = entry.text
-        })
-        return payload
-      }
-
-      /** The body a provider will actually receive — mirrors resolveVariantBody. */
-      const bodyFor = (provider) => {
-        const entry = variantsAvailable() ? variants.get(provider) : undefined
-        return entry && entry.text.trim() ? entry.text : sharedBody()
-      }
-
-      const isVariantStale = entry => entry.shared !== sharedBody()
-
-      const variantRow = (status) => {
-        const provider = status.provider
-        const label = providerLabel(provider)
-        const entry = variants.get(provider)
-        const limit = status.characterLimit || 0
-
-        const row = document.createElement('div')
-        row.className = 'grid gap-2 p-3 bg-panel-2 border border-line rounded-xl'
-        row.dataset.variantRow = provider
-
-        const head = document.createElement('div')
-        head.className = 'flex gap-2 items-center justify-between'
-
-        const name = document.createElement('span')
-        name.className = 'font-bold text-ink text-xs'
-        name.textContent = label
-
-        const action = document.createElement('button')
-        action.type = 'button'
-        action.className = 'inline-flex items-center px-2.5 min-h-7 font-bold text-muted text-xs bg-panel hover:bg-white border border-line rounded-lg transition-colors'
-        action.dataset.variantAction = entry ? 'reset' : 'fork'
-        action.dataset.variantProvider = provider
-        action.textContent = entry ? 'Use shared text' : 'Customise'
-
-        head.append(name, action)
-        row.append(head)
-
-        if (!entry) {
-          const inherit = document.createElement('p')
-          inherit.className = 'text-muted text-xs'
-          const length = sharedBody().length
-          inherit.textContent = limit && length > limit
-            ? `Uses the shared text - ${length} / ${limit}, too long for ${label}`
-            : `Uses the shared text${limit ? ` - ${length} / ${limit}` : ''}`
-          inherit.dataset.variantInherit = provider
-          row.append(inherit)
-          return row
-        }
-
-        const area = document.createElement('textarea')
-        area.className = 'p-2 min-h-20 w-full leading-relaxed text-ink text-sm bg-panel border border-line outline-none rounded-lg resize-none'
-        area.value = entry.text
-        area.setAttribute('aria-label', `${label} post body`)
-        area.dataset.variantInput = provider
-        row.append(area)
-
-        const meta = document.createElement('p')
-        meta.className = 'text-muted text-xs'
-        meta.dataset.variantMeta = provider
-        row.append(meta)
-
-        // Always present, shown or hidden by updateVariantMeta. Creating it up
-        // front means staleness can be re-evaluated on every keystroke without
-        // rebuilding the row and stealing focus.
-        const stale = document.createElement('p')
-        stale.className = 'hidden text-amber-700 text-xs'
-        stale.dataset.variantStale = provider
-        stale.textContent = 'The shared text changed after you customised this.'
-        row.append(stale)
-
-        return row
-      }
-
-      /**
-       * Refresh per-row counts and the staleness notice in place, so typing in
-       * either the shared body or an override never rebuilds the panel.
-       */
-      const updateVariantMeta = () => {
-        selectedConnected().forEach((status) => {
-          const provider = status.provider
-          const limit = status.characterLimit || 0
-          const entry = variants.get(provider)
-          const inherit = variantPanel?.querySelector(`[data-variant-inherit="${provider}"]`)
-          if (inherit) {
-            const length = sharedBody().length
-            const over = Boolean(limit) && length > limit
-            inherit.textContent = over
-              ? `Uses the shared text - ${length} / ${limit}, too long for ${providerLabel(provider)}`
-              : `Uses the shared text${limit ? ` - ${length} / ${limit}` : ''}`
-            inherit.classList.toggle('text-red-700', over)
-            inherit.classList.toggle('text-muted', !over)
-          }
-          const meta = variantPanel?.querySelector(`[data-variant-meta="${provider}"]`)
-          if (meta && entry) {
-            const length = entry.text.length
-            const over = Boolean(limit) && length > limit
-            meta.textContent = limit ? `${length} / ${limit} characters` : `${length} characters`
-            meta.classList.toggle('text-red-700', over)
-            meta.classList.toggle('text-muted', !over)
-          }
-          const stale = variantPanel?.querySelector(`[data-variant-stale="${provider}"]`)
-          if (stale) stale.classList.toggle('hidden', !entry || !isVariantStale(entry))
-        })
-      }
-
-      const updateVariantToggleLabel = () => {
-        if (!variantToggleLabel) return
-        const active = Object.keys(variantsPayload()).length
-        variantToggleLabel.textContent = variantsOpen
-          ? 'Hide per-network text'
-          : active
-            ? `Customise per network (${active})`
-            : 'Customise per network'
-      }
-
-      /**
-       * Replace one row after a fork/reset instead of the whole panel, so the
-       * other rows keep their caret, selection and undo history.
-       */
-      const refreshVariantRow = (provider) => {
-        const existing = variantPanel?.querySelector(`[data-variant-row="${provider}"]`)
-        const status = selectedConnected().find(item => item.provider === provider)
-        if (!existing || !status) {
-          renderVariantPanel()
-          return
-        }
-        const replacement = variantRow(status)
-        existing.replaceWith(replacement)
-        replacement.querySelector('[data-variant-input]')?.focus()
-        updateVariantToggleLabel()
-        updateVariantMeta()
-      }
-
-      const renderVariantPanel = () => {
-        if (!variantSection || !variantPanel) return
-        const targets = selectedConnected()
-        const available = variantsAvailable()
-        variantSection.classList.toggle('hidden', !available)
-        if (!available) variantsOpen = false
-
-        updateVariantToggleLabel()
-        variantToggle?.setAttribute('aria-expanded', variantsOpen ? 'true' : 'false')
-        variantPanel.classList.toggle('hidden', !variantsOpen)
-        variantPanel.classList.toggle('grid', variantsOpen)
-        if (!variantsOpen) {
-          variantPanel.replaceChildren()
-          return
-        }
-
-        variantPanel.replaceChildren(...targets.map(variantRow))
-        updateVariantMeta()
-      }
-
-      const renderConnectionSummary = () => {
-        const connected = connectedProviders()
-        const ready = connected.length > 0
-        if (connectionLabel) {
-          connectionLabel.textContent = ready
-            ? `${connected.map(provider => providerLabel(provider.provider)).join(', ')} ready`
-            : 'Connect an account'
-        }
-        connection?.classList.toggle('border-emerald-200', ready)
-        connection?.classList.toggle('bg-emerald-50', ready)
-        connection?.classList.toggle('text-emerald-800', ready)
-        connectionDot?.classList.toggle('bg-emerald-500', ready)
-        connectionDot?.classList.toggle('bg-zinc-300', !ready)
-      }
-
-      const updatePublishability = () => {
-        canPublish = selectedConnected().length > 0
-        buttons.forEach((button) => {
-          if (canPublish) button.removeAttribute('disabled')
-          else button.setAttribute('disabled', 'disabled')
-        })
-        // The image field is only meaningful for Instagram, which rejects
-        // text-only posts.
-        const needsImage = selected.has('instagram') && connectedProviders().some(provider => provider.provider === 'instagram')
-        composeImageRow?.classList.toggle('hidden', !needsImage)
-        composeImageRow?.classList.toggle('flex', needsImage)
-        // Long-form title field appears whenever the blog is a target.
-        const wantsTitle = selected.has('blog') && connectedProviders().some(provider => provider.provider === 'blog')
-        composeTitle?.classList.toggle('hidden', !wantsTitle)
-        composeTitle?.classList.toggle('block', wantsTitle)
-        renderVariantPanel()
-        updateCount()
-      }
-
-      const applyConnection = (list) => {
-        providers = Array.isArray(list) ? list : []
-        const connectedKeys = connectedProviders().map(provider => provider.provider)
-        // Default to every connected provider; otherwise drop any selected
-        // provider that is no longer connected.
-        if (selected.size === 0) {
-          connectedKeys.forEach(key => selected.add(key))
-        }
-        else {
-          ;[...selected].forEach((key) => {
-            if (!connectedKeys.includes(key)) selected.delete(key)
-          })
-        }
-        renderProviderToggles()
-        renderConnectionSummary()
-        updatePublishability()
-      }
-
-      const refreshConnection = async () => {
-        try {
-          const list = await window.postlineSocial?.fetchProviders()
-          applyConnection(list || [])
-        }
-        catch (error) {
-          // Load-time provider status: degrade quietly to the inline
-          // "No accounts yet — connect one" state instead of firing an
-          // intrusive error toast. A 401 here (e.g. an expired session)
-          // would otherwise spam a toast on every page load.
-          applyConnection([])
-          console.warn('[postline] provider status failed:', error)
-        }
-      }
-
-      const textareaFor = post => post?.querySelector('[data-bluesky-text]')
-      const previewFor = post => post?.querySelector('[data-link-preview]')
-      const allPosts = () => Array.from(root.querySelectorAll('[data-composer-post]'))
-      const activeTextarea = () => textareaFor(activePost) || root.querySelector('[data-bluesky-text]')
-      const activePreview = () => previewFor(activePost)
-      const firstUrl = value => value.match(urlPattern)?.[0]?.replace(/[),.;]+$/, '')
-
-      const escapeHtml = value => String(value || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;')
-
-      const postTemplate = (number, text = '') => `
-        <header class="flex gap-3 items-center justify-between">
-          <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-bold text-muted text-xs bg-panel-3 rounded-lg" type="button" data-select-post>
-            <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
-            <span data-post-label>Post ${number}</span>
-          </button>
-          <button class="inline-flex items-center justify-center h-7 w-7 text-muted hover:text-zinc-700 bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Remove post" title="Remove post" data-remove-post>
-            <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
-          </button>
-        </header>
-          <textarea class="min-h-36 w-full leading-relaxed text-[18px] text-ink bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body ${number}" data-bluesky-text>${escapeHtml(text)}</textarea>
-        <div class="hidden overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview></div>
-      `
-
-      const createPost = (number, text = '') => {
-        const post = document.createElement('article')
-        post.className = 'grid gap-2 pb-4 last:pb-0 border-b border-line last:border-b-0'
-        post.dataset.composerPost = ''
-        post.dataset.active = 'false'
-        post.innerHTML = postTemplate(number, text)
-        return post
-      }
-
-      const readDraft = () => {
-        try {
-          const draft = JSON.parse(localStorage.getItem(draftKey) || 'null')
-          if (!draft || !Array.isArray(draft.posts) || draft.posts.length === 0) return null
-
-          return {
-            activeIndex: Number.isFinite(draft.activeIndex) ? draft.activeIndex : 0,
-            mode: ['single', 'thread', 'draft'].includes(draft.mode) ? draft.mode : 'single',
-            posts: draft.posts
-              .slice(0, 24)
-              // Corruption guard, not a content cap: 10000 mirrors the largest
-              // target limit (BLOG_CHARACTER_LIMIT). Capping at the tightest
-              // network's limit here would silently destroy a long post on
-              // reload, since saveDraft stores the full text.
-              .map(post => ({ text: String(post?.text || '').slice(0, 10000) })),
-            variants: Array.isArray(draft.variants)
-              ? draft.variants
-                  .slice(0, 12)
-                  .filter(entry => entry && typeof entry.provider === 'string')
-                  .map(entry => ({
-                    provider: entry.provider,
-                    text: String(entry.text || '').slice(0, 10000),
-                    shared: String(entry.shared || '').slice(0, 10000),
-                  }))
-              : [],
-          }
-        }
-        catch {
-          return null
-        }
-      }
-
-      const saveDraft = () => {
-        // Editing a queued post must never write into the local composer draft,
-        // or that post's text and overrides leak into the next fresh post.
-        // Guarding the writer covers every caller, not just the two that used
-        // to be inside the edit-mode check at the bottom of this file.
-        if (editParam) return
-        try {
-          const posts = allPosts()
-          localStorage.setItem(draftKey, JSON.stringify({
-            activeIndex: Math.max(0, posts.indexOf(activePost)),
-            mode: activeMode,
-            posts: posts.map(post => ({ text: textareaFor(post)?.value || '' })),
-            variants: Array.from(variants.entries())
-              .map(([provider, entry]) => ({ provider, text: entry.text, shared: entry.shared })),
-            updatedAt: new Date().toISOString(),
-            version: 1,
-          }))
-        }
-        catch {}
-      }
-
-      const queueDraftSave = () => {
-        clearTimeout(draftSaveTimer)
-        draftSaveTimer = setTimeout(saveDraft, 100)
-      }
-
-      const restoreDraft = () => {
-        const draft = readDraft()
-        if (!draft || !postsRoot) return
-
-        postsRoot.replaceChildren(...draft.posts.map((post, index) => createPost(index + 1, post.text)))
-        activeMode = draft.mode
-        savedActiveIndex = Math.max(0, Math.min(draft.activeIndex, draft.posts.length - 1))
-        postCounter = draft.posts.length
-        activePost = allPosts()[savedActiveIndex] || root.querySelector('[data-composer-post]')
-        variants.clear()
-        draft.variants.forEach((entry) => {
-          variants.set(entry.provider, { text: entry.text, shared: entry.shared })
-        })
-      }
-
-      /**
-       * Mark the targets a body of `length` characters would be rejected by.
-       * Applied in place rather than by re-rendering the toggles, so a chip
-       * keeps focus and `aria-pressed` while the user types. Disabled chips are
-       * skipped — they can't be selected, so they're never over, and they own a
-       * "connect this account" title we must not clobber.
-       */
-      const markOverLimitToggles = (over) => {
-        const overKeys = new Set(over.map(provider => provider.provider))
-        Array.from(root.querySelectorAll('[data-provider-toggle]')).forEach((button) => {
-          if (button.hasAttribute('disabled')) return
-          const provider = button.dataset.providerToggle
-          const isOver = overKeys.has(provider)
-          const isSelected = button.getAttribute('aria-pressed') === 'true'
-          const dot = button.querySelector('[data-provider-dot]')
-          dot?.classList.toggle('bg-red-500', isOver)
-          dot?.classList.toggle('bg-emerald-400', !isOver && isSelected)
-          dot?.classList.toggle('bg-zinc-300', !isOver && !isSelected)
-          if (isOver) button.title = `Too long for ${providerLabel(provider)} — this target would be rejected.`
-          else button.removeAttribute('title')
-        })
-      }
-
-      const updateCount = () => {
-        const textarea = activeTextarea()
-        if (!textarea || !count) return
-        const length = textarea.value.length
-        const limit = effectiveLimit()
-        const over = overLimitProviders()
-        const posts = allPosts().length
-
-        // Over-limit names the networks rather than the number, because with
-        // mixed targets "over" is only true for some of them.
-        count.textContent = over.length
-          ? `${length} characters - too long for ${over.map(provider => providerLabel(provider.provider)).join(', ')}`
-          : `${length} / ${limit} characters - ${posts} post${posts === 1 ? '' : 's'}`
-        // The span truncates, and the network names are at the end — keep the
-        // full message reachable when several targets are over at once.
-        count.title = count.textContent
-
-        count.classList.toggle('text-red-700', over.length > 0)
-        count.classList.toggle('text-amber-700', over.length === 0 && length > limit - 40)
-        count.classList.toggle('text-muted', over.length === 0 && length <= limit - 40)
-
-        markOverLimitToggles(over)
-        updateVariantMeta()
-      }
-
-      const renderLinkPreview = (post, preview) => {
-        const container = previewFor(post)
-        if (!container) return
-
-        if (!preview) {
-          container.classList.add('hidden')
-          container.innerHTML = ''
-          delete post.dataset.externalUri
-          delete post.dataset.externalTitle
-          delete post.dataset.externalDescription
-          return
-        }
-
-        post.dataset.externalUri = preview.url
-        post.dataset.externalTitle = preview.title
-        post.dataset.externalDescription = preview.description || ''
-        container.classList.remove('hidden')
-        container.innerHTML = `
-          ${preview.image ? `<div class="h-28 bg-center bg-cover bg-panel-3 border-b border-line" style="background-image:url('${escapeHtml(preview.image)}')"></div>` : ''}
-          <div class="grid gap-1 p-3">
-            <div class="font-bold text-[11px] text-muted uppercase">${escapeHtml(preview.domain)}</div>
-            <div class="font-bold text-ink text-sm">${escapeHtml(preview.title)}</div>
-            ${preview.description ? `<div class="leading-normal line-clamp-2 text-[13px] text-muted">${escapeHtml(preview.description)}</div>` : ''}
+  <!-- 03 · The queue (product moment) -->
+  <section id="queue" class="relative mx-auto px-6 py-20 sm:py-28 lg:py-32 max-w-[1400px]">
+    <div class="grid gap-12 items-center lg:gap-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+      <!-- Faithful queue preview -->
+      <div class="order-2 lg:order-1 reveal">
+        <div class="overflow-hidden bg-panel border border-line rounded-2xl shadow-[0_40px_90px_-40px_rgba(9,9,11,0.3)]" role="img" aria-label="Postline queue showing three scheduled posts, one currently publishing">
+          <div class="flex items-center justify-between px-5 h-12 border-b border-line" aria-hidden="true">
+            <span class="font-mono text-[11px] text-muted">queue</span>
+            <span class="font-mono text-[11px] text-muted">this week</span>
           </div>
-        `
-      }
+          <ul class="divide-line divide-y">
+            <QueueRow slot="Mon 09:00" body="Shipping Postline v1: crosspost everywhere from one place." icons="bluesky,x,mastodon" status="published" />
+            <QueueRow slot="Wed 13:30" body="New guide: self-hosting your own social crossposter." icons="linkedin,threads" status="publishing" />
+            <QueueRow slot="Fri 18:00" body="Weekend build log: what shipped and what is next." icons="instagram,x" status="scheduled" />
+          </ul>
+        </div>
+      </div>
+      <!-- Caption -->
+      <div class="order-1 lg:order-2 max-w-md reveal">
+        <SectionLabel index="02" label="Queue" />
+        <h2 class="mt-5 font-semibold leading-[1.05] text-3xl text-ink tracking-tight sm:text-5xl">Compose. Schedule.<br>Crosspost.</h2>
+        <p class="mt-5 leading-relaxed text-body text-lg">Write once, pick your networks, and set a time. Postline queues it and publishes to each place on schedule.</p>
+        <ul class="mt-8 border-line border-t divide-line divide-y">
+          <li class="flex gap-3 items-center py-3.5"><span class="grid place-items-center shrink-0 h-6 w-6 font-mono text-[11px] text-muted bg-panel-2 border border-line rounded-md">1</span><span class="text-body text-sm">One composer for every network</span></li>
+          <li class="flex gap-3 items-center py-3.5"><span class="grid place-items-center shrink-0 h-6 w-6 font-mono text-[11px] text-muted bg-panel-2 border border-line rounded-md">2</span><span class="text-body text-sm">Per-network limits and previews</span></li>
+          <li class="flex gap-3 items-center py-3.5"><span class="grid place-items-center shrink-0 h-6 w-6 font-mono text-[11px] text-muted bg-panel-2 border border-line rounded-md">3</span><span class="text-body text-sm">Schedule ahead or publish now</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
 
-      const updateLinkPreview = async (post = activePost) => {
-        const textarea = textareaFor(post)
-        if (!post || !textarea) return
-        const url = firstUrl(textarea.value)
-        if (!url) {
-          renderLinkPreview(post, null)
-          return
-        }
+  <!-- 04 · Own it (dark beat) -->
+  <section class="relative text-white bg-[#0a0a0a]" aria-label="Self-hosted and owned">
+    <div class="mx-auto px-6 py-24 sm:py-32 max-w-[1400px]">
+      <div class="max-w-3xl reveal">
+        <SectionLabel index="03" label="Own it" onDark />
+        <h2 class="mt-6 font-semibold leading-[1.05] text-4xl tracking-tight sm:text-6xl">Your keys. Your data.<br>Your instance.</h2>
+        <p class="mt-6 max-w-xl leading-relaxed text-lg text-white/60">No middleman holds your tokens or stands between you and your audience. Postline runs on a server you own. Deploy it in one command and keep everything.</p>
+        <div class="inline-flex gap-3 items-center mt-9 px-4 h-12 font-mono text-sm bg-white/5 border border-white/10 rounded-xl">
+          <span class="text-accent" aria-hidden="true">$</span>
+          <span class="text-white/90">bunx buddy deploy</span>
+        </div>
+      </div>
+    </div>
+  </section>
 
-        if (post.dataset.previewUrl === url && post.dataset.externalTitle) return
-        post.dataset.previewUrl = url
+  <!-- 05 · Open + built on Stacks -->
+  <section class="relative mx-auto px-6 py-20 sm:py-28 max-w-[1400px]">
+    <div class="max-w-2xl reveal">
+      <SectionLabel index="04" label="Open" />
+      <h2 class="mt-6 font-semibold leading-tight text-3xl text-ink tracking-tight sm:text-5xl">Open source, and yours to change.</h2>
+    </div>
+    <div class="grid overflow-hidden gap-px sm:grid-cols-3 mt-12 bg-line border border-line rounded-2xl reveal">
+      <ValueCard icon="source-code" title="MIT licensed" description="Read every line, fork it, and ship your own. No black boxes." />
+      <ValueCard icon="package" title="Single binary" description="One Bun binary to run. No sprawling services to babysit." />
+      <ValueCard icon="layers-01" title="Built on Stacks" description="A full-stack TypeScript framework underneath, end to end." />
+    </div>
+  </section>
 
-        try {
-          if (!linkPreviewCache.has(url)) {
-            const response = await fetch(`/api/postline/bluesky/link-preview?url=${encodeURIComponent(url)}`)
-            const payload = await response.json()
-            if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not render link preview.')
-            linkPreviewCache.set(url, payload.data)
-          }
-          renderLinkPreview(post, linkPreviewCache.get(url))
-        }
-        catch {
-          renderLinkPreview(post, {
-            url,
-            domain: new URL(url).hostname.replace(/^www\./, ''),
-            title: url,
-            description: '',
-          })
-        }
-      }
+  <!-- 06 · Close -->
+  <section class="relative border-line border-t">
+    <div class="mx-auto px-6 py-24 sm:py-32 max-w-[1400px] text-center">
+      <div class="mx-auto max-w-2xl reveal">
+        <h2 class="font-semibold leading-[1.05] text-4xl text-ink tracking-tight sm:text-6xl">Post once. Own everything.</h2>
+        <p class="mt-5 leading-relaxed text-body text-lg">Stand up your own Postline and crosspost from one place you control.</p>
+        <div class="flex flex-wrap gap-3 justify-center mt-9">
+          <a class="inline-flex items-center px-5 h-12 font-medium text-on-accent bg-accent hover:bg-emerald-600 rounded-xl shadow-sm transition-colors active:scale-[0.98]" href="/login" data-stx-link>Get started</a>
+          <a class="inline-flex gap-2 items-center px-5 h-12 font-medium text-ink hover:bg-panel-2 rounded-xl transition-colors" href="https://github.com/stacksjs/postline">
+            <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
+            Star on GitHub
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
 
-      const queuePreviewUpdate = (post = activePost) => {
-        clearTimeout(previewTimer)
-        previewTimer = setTimeout(() => {
-          void updateLinkPreview(post)
-        }, 250)
-      }
-
-      const renamePosts = () => {
-        allPosts().forEach((post, index) => {
-          const number = index + 1
-          const select = post.querySelector('[data-select-post]')
-          const label = select?.querySelector('[data-post-label]')
-          const remove = post.querySelector('[data-remove-post]')
-          const textarea = textareaFor(post)
-          if (label) label.textContent = `Post ${number}`
-          if (textarea) textarea.setAttribute('aria-label', `Post body ${number}`)
-          remove?.classList.toggle('hidden', allPosts().length === 1)
-          remove?.classList.toggle('inline-flex', allPosts().length > 1)
-        })
-      }
-
-      const selectPost = (post, options = {}) => {
-        if (!post) return
-        activePost = post
-        allPosts().forEach((item) => {
-          const active = item === post
-          const select = item.querySelector('[data-select-post]')
-          item.dataset.active = active ? 'true' : 'false'
-          item.classList.toggle('border-neutral-950', active)
-          item.classList.toggle('border-blue-300', active)
-          item.classList.toggle('shadow-sm', active)
-          item.classList.toggle('border-line', !active)
-          select?.classList.toggle('bg-accent', active)
-          select?.classList.toggle('text-on-accent', active)
-          select?.classList.toggle('bg-panel-3', !active)
-          select?.classList.toggle('text-muted', !active)
-        })
-        updateCount()
-        void updateLinkPreview(post)
-        if (!options.skipSave) queueDraftSave()
-      }
-
-      const addPost = (options = {}) => {
-        postCounter += 1
-        const post = createPost(postCounter, options.text || '')
-        postsRoot?.append(post)
-        renamePosts()
-        selectPost(post, { skipSave: true })
-        // Availability depends on the post count, so it has to be recomputed
-        // here: a second post makes this a thread, where overrides never apply.
-        renderVariantPanel()
-        if (options.focus !== false) textareaFor(post)?.focus()
-        if (options.announce !== false) setStatus(`Added post ${allPosts().length}.`, 'success')
-        if (options.save !== false) saveDraft()
-        return post
-      }
-
-      const removePost = (post) => {
-        if (!post || allPosts().length === 1) return
-        const next = post.nextElementSibling?.matches('[data-composer-post]')
-          ? post.nextElementSibling
-          : post.previousElementSibling
-        post.remove()
-        renamePosts()
-        selectPost(next || root.querySelector('[data-composer-post]'), { skipSave: true })
-        renderVariantPanel()
-        setStatus(`Removed post. ${allPosts().length} remaining.`, 'success')
-        saveDraft()
-      }
-
-      const updatePublishLabel = () => {
-        if (!publishLabel) return
-        if (editingId) publishLabel.textContent = scheduleInput?.value ? 'Update schedule' : 'Update post'
-        else if (activeMode === 'draft') publishLabel.textContent = 'Save draft'
-        else if (scheduleInput?.value) publishLabel.textContent = 'Schedule'
-        else publishLabel.textContent = 'Publish'
-      }
-
-      // Convert a UTC "YYYY-MM-DD HH:MM:SS" to the datetime-local input value.
-      const utcToLocalInput = (utc) => {
-        const date = new Date(`${utc.replace(' ', 'T')}Z`)
-        if (Number.isNaN(date.getTime())) return ''
-        return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
-      }
-
-      const enterEditMode = (item) => {
-        editingId = item.id
-        editBanner?.classList.remove('hidden')
-        editBanner?.classList.add('flex')
-        if (composerHeading) composerHeading.textContent = `Editing post #${item.id}`
-
-        // Text (single-post edit — threads edit one segment).
-        const textarea = activeTextarea()
-        if (textarea) textarea.value = item.text || ''
-        if (composeTitle) composeTitle.value = item.title || ''
-
-        // Overrides. `shared` is seeded from the stored body so a restored
-        // override only reads as stale once this edit actually changes the text.
-        variants.clear()
-        Object.entries(item.variants || {}).forEach(([provider, text]) => {
-          if (typeof text === 'string' && text.trim())
-            variants.set(provider, { text, shared: item.text || '' })
-        })
-
-        // Providers: select exactly the post's set (intersected with connected).
-        selected.clear()
-        for (const provider of item.providers || []) selected.add(provider)
-        renderProviderToggles()
-        updatePublishability()
-
-        // Schedule.
-        if (item.scheduledAt && scheduleInput) {
-          scheduleInput.value = utcToLocalInput(item.scheduledAt)
-          scheduleInput.classList.remove('hidden')
-        }
-
-        // Link card.
-        if (item.external?.uri) {
-          activePost.dataset.externalUri = item.external.uri
-          activePost.dataset.externalTitle = item.external.title || ''
-          activePost.dataset.externalDescription = item.external.description || ''
-        }
-
-        // Existing image → show a "kept" chip; attaching a new file replaces,
-        // clearing it marks removal.
-        editHadImage = Boolean(item.image)
-        editRemoveImage = false
-        if (item.image) {
-          if (attachName) attachName.textContent = item.image.url ? 'Current image (URL)' : 'Current image'
-          attachChip?.classList.remove('hidden')
-          attachChip?.classList.add('inline-flex')
-        }
-
-        updateCount()
-        void updateLinkPreview(activePost)
-        updatePublishLabel()
-      }
-
-      const loadEditPost = async (id) => {
-        try {
-          const response = await fetch(`/api/postline/queue/item?id=${encodeURIComponent(id)}`)
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the post.')
-          enterEditMode(payload.data)
-        }
-        catch (error) {
-          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Edit' })
-        }
-      }
-
-      const updateQueued = async () => {
-        const text = activeTextarea()?.value.trim()
-        if (!text) {
-          setStatus('Write something before updating.', 'error')
-          activeTextarea()?.focus()
-          return
-        }
-        const targetProviders = selectedConnected().map(provider => provider.provider)
-        if (targetProviders.length === 0) {
-          setStatus('Select a connected account.', 'error', { title: 'Not connected' })
-          return
-        }
-
-        const form = new FormData()
-        form.set('id', String(editingId))
-        form.set('text', text)
-        form.set('providers', targetProviders.join(','))
-        const editTitle = composedTitle()
-        if (editTitle) form.set('title', editTitle)
-        if (scheduleInput?.value) form.set('scheduled_at', toUtcTimestamp(scheduleInput.value))
-        if (activePost?.dataset.externalUri && activePost.dataset.externalTitle) {
-          form.set('external_uri', activePost.dataset.externalUri)
-          form.set('external_title', activePost.dataset.externalTitle)
-          form.set('external_description', activePost.dataset.externalDescription || '')
-        }
-        const editImageUrl = composeImage?.value.trim()
-        if (editImageUrl) form.set('image_url', editImageUrl)
-        const editFile = attachedFile()
-        if (editFile) form.set('image', editFile, editFile.name)
-        else if (editRemoveImage) form.set('remove_image', '1')
-        // Always sent, never conditional: the server treats an absent field as
-        // "keep what is stored", so clearing every override has to be explicit.
-        form.set('variants', JSON.stringify(variantsPayload()))
-
-        buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
-        try {
-          const response = await fetch('/api/postline/queue/update', { method: 'POST', body: form })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not update the post.')
-          setStatus('Post updated.', 'success', { title: 'Updated' })
-          // Back to the queue to see the change.
-          window.location.assign('/queue')
-        }
-        catch (error) {
-          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Update failed' })
-          buttons.forEach((button) => { if (canPublish) button.removeAttribute('disabled') })
-        }
-      }
-
-      const toUtcTimestamp = (localValue) => {
-        const date = new Date(localValue)
-        if (Number.isNaN(date.getTime())) throw new Error('Pick a valid schedule time.')
-        return date.toISOString().slice(0, 19).replace('T', ' ')
-      }
-
-      // Draft mode and schedule-time both save to the server-side queue
-      // instead of publishing immediately.
-      const saveToQueue = async (scheduleValue) => {
-        const text = activeTextarea()?.value.trim()
-        if (!text) {
-          setStatus('Write something before saving.', 'error')
-          activeTextarea()?.focus()
-          return
-        }
-        const targetProviders = selectedConnected().map(provider => provider.provider)
-        if (targetProviders.length === 0) {
-          setStatus('Select a connected account before saving to the queue.', 'error', { title: 'Not connected' })
-          return
-        }
-        if (activeMode === 'thread' && allPosts().filter(post => textareaFor(post)?.value.trim()).length > 1) {
-          setStatus('Scheduling threads is not supported yet. Schedule posts one at a time.', 'error', { title: 'Queue' })
-          return
-        }
-
-        const form = new FormData()
-        form.set('text', text)
-        form.set('providers', targetProviders.join(','))
-        const queueTitle = composedTitle()
-        if (queueTitle) form.set('title', queueTitle)
-        if (scheduleValue) form.set('scheduled_at', toUtcTimestamp(scheduleValue))
-        if (activePost?.dataset.externalUri && activePost.dataset.externalTitle) {
-          form.set('external_uri', activePost.dataset.externalUri)
-          form.set('external_title', activePost.dataset.externalTitle)
-          form.set('external_description', activePost.dataset.externalDescription || '')
-        }
-        const queueImageUrl = composeImage?.value.trim()
-        if (queueImageUrl) form.set('image_url', queueImageUrl)
-        const queueFile = attachedFile()
-        if (queueFile) form.set('image', queueFile, queueFile.name)
-        const queueVariants = variantsPayload()
-        if (Object.keys(queueVariants).length) form.set('variants', JSON.stringify(queueVariants))
-
-        buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
-        try {
-          const response = await fetch('/api/postline/queue', { method: 'POST', body: form })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save to the queue.')
-
-          const textarea = activeTextarea()
-          if (textarea) textarea.value = ''
-          if (scheduleInput) scheduleInput.value = ''
-          if (composeTitle) composeTitle.value = ''
-          scheduleInput?.classList.add('hidden')
-          clearAttachment()
-          renderLinkPreview(activePost, null)
-          // Same reason as the publish path: the overrides went with that post.
-          variants.clear()
-          renderVariantPanel()
-          updateCount()
-          updatePublishLabel()
-          saveDraft()
-          setStatus(
-            payload.data.status === 'scheduled'
-              ? `Scheduled. Check the Queue page to manage it.`
-              : 'Draft saved to the queue.',
-            'success',
-            { title: payload.data.status === 'scheduled' ? 'Scheduled' : 'Draft saved' },
-          )
-        }
-        catch (error) {
-          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Queue' })
-        }
-        finally {
-          buttons.forEach((button) => {
-            if (canPublish) button.removeAttribute('disabled')
-          })
-        }
-      }
-
-      const setMode = (mode, options = {}) => {
-        const nextMode = ['single', 'thread', 'draft'].includes(mode) ? mode : 'single'
-        activeMode = nextMode
-        modeButtons.forEach((button) => {
-          const active = button.dataset.composerMode === nextMode
-          button.classList.toggle('bg-panel', active)
-          button.classList.toggle('text-ink', active)
-          button.classList.toggle('shadow-sm', active)
-          button.classList.toggle('text-muted', !active)
-        })
-        if (nextMode === 'thread' && allPosts().length === 1 && !options.skipThreadPost) {
-          addPost({ announce: false, focus: false, save: false })
-        }
-        updatePublishLabel()
-        if (!options.silent) setStatus(`${nextMode[0].toUpperCase()}${nextMode.slice(1)} mode selected.`, 'success')
-        if (!options.skipSave) saveDraft()
-      }
-
-      const publishOne = async (post, targetProviders) => {
-        const social = window.postlineSocial
-        if (!social) throw new Error('Publishing is still loading. Try again in a moment.')
-        const textarea = textareaFor(post)
-        if (!textarea) throw new Error('Missing post body.')
-        const text = textarea.value.trim()
-        if (!text) throw new Error('Write something before publishing.')
-        const external = (post?.dataset.externalUri && post.dataset.externalTitle)
-          ? {
-              uri: post.dataset.externalUri,
-              title: post.dataset.externalTitle,
-              description: post.dataset.externalDescription || '',
-            }
-          : undefined
-        const imageUrl = composeImage?.value.trim()
-        const image = imageUrl ? { url: imageUrl } : undefined
-        return await social.publishCrosspost({ text, title: composedTitle(), providers: targetProviders, external, image, imageFile: attachedFile(), variants: variantsPayload() })
-      }
-
-      const publish = async () => {
-        // Editing a queued post always updates it in place (never publishes).
-        if (editingId) {
-          await updateQueued()
-          return
-        }
-        if (activeMode === 'draft' || scheduleInput?.value) {
-          await saveToQueue(scheduleInput?.value || null)
-          return
-        }
-
-        const targetProviders = selectedConnected().map(provider => provider.provider)
-        if (targetProviders.length === 0) {
-          setStatus('Select a connected account on the Accounts page before publishing.', 'error', { title: 'Not connected' })
-          return
-        }
-
-        const targets = activeMode === 'thread'
-          ? allPosts().filter(post => textareaFor(post)?.value.trim())
-          : [activePost].filter(Boolean)
-
-        if (targets.length === 0) {
-          setStatus('Write something before publishing.', 'error')
-          activeTextarea()?.focus()
-          return
-        }
-
-        const providerNames = targetProviders.map(providerLabel).join(', ')
-        buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
-        if (publishLabel) publishLabel.textContent = 'Publishing…'
-        setStatus(
-          targets.length > 1 ? `Publishing ${targets.length} posts to ${providerNames}…` : `Publishing to ${providerNames}…`,
-          'info',
-          { title: 'Publishing', id: 'publish' },
-        )
-
-        try {
-          let lastUrl
-          const failures = []
-          let successCount = 0
-          const collect = (data) => {
-            for (const result of data.results || []) {
-              if (result.ok) {
-                successCount += 1
-                if (result.url) lastUrl = result.url
-              }
-              else {
-                failures.push(`${providerLabel(result.provider)}: ${result.error || 'failed'}`)
-              }
-            }
-          }
-
-          if (targets.length > 1) {
-            // Threads go up in one request so the server can reply-chain the
-            // segments on providers that support it (Bluesky).
-            const social = window.postlineSocial
-            if (!social) throw new Error('Publishing is still loading. Try again in a moment.')
-            const first = targets[0]
-            const external = (first?.dataset.externalUri && first.dataset.externalTitle)
-              ? { uri: first.dataset.externalUri, title: first.dataset.externalTitle, description: first.dataset.externalDescription || '' }
-              : undefined
-            const imageUrl = composeImage?.value.trim()
-            const thread = targets.map(post => textareaFor(post)?.value.trim() || '')
-            collect(await social.publishCrosspost({
-              text: thread[0],
-              title: composedTitle(),
-              thread,
-              providers: targetProviders,
-              external,
-              image: imageUrl ? { url: imageUrl } : undefined,
-              imageFile: attachedFile(),
-            }))
-          }
-          else {
-            collect(await publishOne(targets[0], targetProviders))
-          }
-
-          if (activeMode === 'thread') {
-            allPosts().forEach((post) => {
-              const textarea = textareaFor(post)
-              if (textarea) textarea.value = ''
-              renderLinkPreview(post, null)
-            })
-          }
-          else {
-            const textarea = textareaFor(targets[0])
-            if (textarea) textarea.value = ''
-            renderLinkPreview(targets[0], null)
-          }
-
-          // Overrides belong to the post that just went out. Leaving them set
-          // would send the previous post's per-network copy with the next one,
-          // while the shared body reads as empty — before saveDraft persists it.
-          variants.clear()
-          renderVariantPanel()
-          updateCount()
-          saveDraft()
-          clearAttachment()
-          if (composeTitle) composeTitle.value = ''
-          window.postlineToast?.dismiss?.('publish')
-          if (failures.length && successCount === 0) {
-            setStatus(`Publish failed. ${failures.join('; ')}`, 'error', { title: 'Publish failed' })
-          }
-          else if (failures.length) {
-            setStatus(`Published, but some targets failed. ${failures.join('; ')}`, 'info', { title: 'Partially published', url: lastUrl })
-          }
-          else {
-            setStatus(
-              targets.length > 1
-                ? `Published ${targets.length} posts to ${providerNames}.`
-                : `Your post is live on ${providerNames}.`,
-              'success',
-              { title: 'Published', url: lastUrl },
-            )
-          }
-        }
-        catch (error) {
-          window.postlineToast?.dismiss?.('publish')
-          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Publish failed' })
-        }
-        finally {
-          updatePublishLabel()
-          buttons.forEach(button => {
-            if (canPublish) button.removeAttribute('disabled')
-          })
-        }
-      }
-
-      postsRoot?.addEventListener('click', (event) => {
-        const target = event.target
-        if (!(target instanceof HTMLElement)) return
-        const post = target.closest('[data-composer-post]')
-        if (target.closest('[data-select-post]')) selectPost(post)
-        if (target.closest('[data-remove-post]')) removePost(post)
-      })
-      postsRoot?.addEventListener('input', (event) => {
-        const target = event.target
-        if (!(target instanceof HTMLTextAreaElement)) return
-        const post = target.closest('[data-composer-post]')
-        selectPost(post, { skipSave: true })
-        queuePreviewUpdate(post)
-        queueDraftSave()
-      })
-      postsRoot?.addEventListener('focusin', (event) => {
-        const target = event.target
-        if (!(target instanceof HTMLTextAreaElement)) return
-        const post = target.closest('[data-composer-post]')
-        selectPost(post)
-        updateCount()
-      })
-      scheduleToggle?.addEventListener('click', () => {
-        if (!scheduleInput) return
-        const showing = scheduleInput.classList.toggle('hidden') === false
-        if (showing) {
-          // Local-time floor so the picker can't select the past.
-          const soon = new Date(Date.now() + 5 * 60 * 1000)
-          soon.setSeconds(0, 0)
-          scheduleInput.min = new Date(soon.getTime() - soon.getTimezoneOffset() * 60 * 1000).toISOString().slice(0, 16)
-          scheduleInput.focus()
-        }
-        else {
-          scheduleInput.value = ''
-        }
-        updatePublishLabel()
-      })
-      scheduleInput?.addEventListener('input', updatePublishLabel)
-      attachButton?.addEventListener('click', () => attachInput?.click())
-      attachInput?.addEventListener('change', () => {
-        const file = attachedFile()
-        if (!file) {
-          clearAttachment()
-          return
-        }
-        if (file.size > 1_000_000) {
-          clearAttachment()
-          setStatus('Images must be 1MB or smaller for Bluesky.', 'error', { title: 'Attachment' })
-          return
-        }
-        if (attachName) attachName.textContent = file.name
-        attachChip?.classList.remove('hidden')
-        attachChip?.classList.add('inline-flex')
-      })
-      attachClear?.addEventListener('click', () => {
-        // In edit mode, clearing an existing image marks it for removal.
-        if (editingId && editHadImage && !attachedFile()) editRemoveImage = true
-        clearAttachment()
-      })
-      addPostButton?.addEventListener('click', addPost)
-      previewButton?.addEventListener('click', () => {
-        const text = activeTextarea()?.value.trim()
-        void updateLinkPreview()
-        setStatus(text ? `Preview: ${text}` : 'Nothing to preview yet.', text ? 'success' : 'error')
-      })
-      refreshButton?.addEventListener('click', async () => {
-        refreshButton.setAttribute('disabled', 'disabled')
-        try {
-          await refreshConnection()
-          setStatus(
-            canPublish ? 'Accounts are ready to publish.' : 'Connect an account on the Accounts page.',
-            canPublish ? 'success' : 'error',
-            { title: 'Accounts' },
-          )
-        }
-        finally {
-          refreshButton.removeAttribute('disabled')
-        }
-      })
-      providerToggles?.addEventListener('click', (event) => {
-        const target = event.target
-        if (!(target instanceof HTMLElement)) return
-        const button = target.closest('[data-provider-toggle]')
-        if (!button || button.hasAttribute('disabled')) return
-        const provider = button.dataset.providerToggle
-        if (selected.has(provider)) selected.delete(provider)
-        else selected.add(provider)
-        renderProviderToggles()
-        updatePublishability()
-      })
-      variantToggle?.addEventListener('click', () => {
-        variantsOpen = !variantsOpen
-        renderVariantPanel()
-      })
-      variantPanel?.addEventListener('click', (event) => {
-        const target = event.target
-        if (!(target instanceof HTMLElement)) return
-        const button = target.closest('[data-variant-action]')
-        if (!button) return
-        const provider = button.dataset.variantProvider
-        if (!provider) return
-        if (button.dataset.variantAction === 'fork') {
-          // Seed the override from the shared body so the user edits down from
-          // what they already wrote rather than starting on an empty box.
-          variants.set(provider, { text: sharedBody(), shared: sharedBody() })
-        }
-        else {
-          variants.delete(provider)
-        }
-        // Swap just this row: rebuilding the panel would drop every other row's
-        // caret and undo history, and leave focus on <body>.
-        refreshVariantRow(provider)
-        updateCount()
-        saveDraft()
-      })
-      variantPanel?.addEventListener('input', (event) => {
-        const target = event.target
-        if (!(target instanceof HTMLElement)) return
-        const provider = target.dataset.variantInput
-        if (!provider) return
-        const entry = variants.get(provider)
-        if (!entry) return
-        entry.text = target.value
-        // An override changing can flip that provider's over-limit state, which
-        // the footer counter and chip dots also report on.
-        updateCount()
-        updateVariantToggleLabel()
-        queueDraftSave()
-      })
-      searchButton?.addEventListener('click', () => {
-        const text = activeTextarea()?.value.trim()
-        setStatus(text ? `Searching local drafts for: ${text.slice(0, 80)}` : 'Write a phrase first, then search local drafts.', text ? 'success' : 'error')
-      })
-      modeButtons.forEach(button => button.addEventListener('click', () => setMode(button.dataset.composerMode || 'single')))
-      buttons.forEach(button => button.addEventListener('click', publish))
-      // Editing a queued post — don't restore a local draft over it. The
-      // reciprocal guard (never writing an edit back into the draft) lives in
-      // saveDraft itself, so it holds for every caller.
-      if (!editParam) {
-        window.addEventListener('beforeunload', saveDraft)
-        restoreDraft()
-      }
-      setMode(activeMode, { silent: true, skipSave: true, skipThreadPost: true })
-      renamePosts()
-      selectPost(allPosts()[savedActiveIndex] || activePost, { skipSave: true })
-      updateCount()
-      void updateLinkPreview(activePost)
-      // Wait for the social module (a deferred `type=module` script) before the
-      // first provider fetch so window.postlineSocial is guaranteed to exist.
-      // Load the edit post only after connection so provider toggles resolve.
-      // /?schedule=YYYY-MM-DD (from the queue calendar) opens the schedule
-      // input pre-set to 09:00 local on that day.
-      const scheduleParam = new URLSearchParams(window.location.search).get('schedule')
-      const applyScheduleParam = () => {
-        if (!scheduleParam || !scheduleInput || !/^\d{4}-\d{2}-\d{2}$/.test(scheduleParam)) return
-        scheduleInput.value = `${scheduleParam}T09:00`
-        scheduleInput.classList.remove('hidden')
-        updatePublishLabel()
-        activeTextarea()?.focus()
-      }
-
-      const start = async () => {
-        await refreshConnection()
-        if (editParam) await loadEditPost(editParam)
-        else applyScheduleParam()
-      }
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => void start(), { once: true })
-      }
-      else {
-        void start()
-      }
-    })()
-  </script>
+  <!-- Footer -->
+  <footer class="border-line border-t">
+    <div class="flex flex-col gap-4 items-center sm:flex-row sm:justify-between mx-auto px-6 py-8 max-w-[1400px]">
+      <a class="inline-flex gap-2.5 items-center font-semibold text-ink" href="/welcome" aria-label="Postline home">
+        <span class="grid place-items-center h-7 w-7 font-bold text-[12px] text-on-accent bg-ink rounded-md">P</span>
+        Postline
+      </a>
+      <p class="order-3 sm:order-2 font-mono text-muted text-xs">Self-hosted · MIT · Built on Stacks</p>
+      <div class="flex order-2 sm:order-3 gap-5 items-center text-muted text-sm">
+        <a class="hover:text-ink transition-colors" href="/login" data-stx-link>Get started</a>
+        <a class="inline-flex gap-1.5 items-center hover:text-ink transition-colors" href="https://github.com/stacksjs/postline"><span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>GitHub</a>
+      </div>
+    </div>
+  </footer>
 @endsection

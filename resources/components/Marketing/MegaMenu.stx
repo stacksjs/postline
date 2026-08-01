@@ -1,0 +1,147 @@
+<script server>
+// The nav is generated from the catalog so a new page appears here without
+// this file changing.
+import { FEATURES, USE_CASES } from '../../../app/Support/Marketing/catalog'
+
+const features = FEATURES
+const useCases = USE_CASES
+</script>
+
+<template>
+  <header class="sticky top-0 z-40 bg-bg/85 border-b border-line backdrop-blur-md">
+    <nav class="flex gap-4 items-center justify-between mx-auto px-6 h-[68px] max-w-[1400px]" aria-label="Primary">
+      <a class="inline-flex gap-2.5 items-center shrink-0 font-semibold text-ink" href="/" aria-label="Postline home">
+        <span class="grid place-items-center h-8 w-8 font-bold text-[13px] text-on-accent bg-ink rounded-lg">P</span>
+        Postline
+      </a>
+
+      <!-- Desktop nav. The panels are opened by hover AND focus-within, with no
+          script: a hover-only menu is unreachable by keyboard, and a
+          script-driven one would not work before hydration. -->
+      <div class="hidden lg:flex gap-1 items-center h-full">
+        <div class="flex items-center h-full menu-item">
+          <a
+            class="inline-flex gap-1.5 items-center px-3 h-9 text-body text-sm hover:bg-panel-2 rounded-lg transition-colors"
+            href="/features"
+            data-stx-link
+          >
+            Features
+            <span class="h-4 w-4 i-hugeicons-arrow-down-01 menu-chevron" aria-hidden="true"></span>
+          </a>
+
+          <div class="absolute inset-x-0 top-full bg-panel border-b border-line menu-panel">
+            <div class="grid gap-x-10 gap-y-6 md:grid-cols-3 mx-auto px-6 py-8 max-w-[1400px]">
+              @foreach (features as feature)
+                <a class="grid gap-1 -m-3 p-3 hover:bg-panel-2 rounded-xl transition-colors group" href="/features/{{ feature.slug }}" data-stx-link>
+                  <span class="inline-flex gap-2.5 items-center font-semibold text-[15px] text-ink">
+                    <span class="h-5 w-5 text-muted group-hover:text-accent i-hugeicons-{{ feature.icon }} transition-colors" aria-hidden="true"></span>
+                    {{ feature.nav }}
+                  </span>
+                  <span class="leading-relaxed text-[13px] text-muted">{{ feature.summary }}</span>
+                </a>
+              @endforeach
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center h-full menu-item">
+          <a
+            class="inline-flex gap-1.5 items-center px-3 h-9 text-body text-sm hover:bg-panel-2 rounded-lg transition-colors"
+            href="/use-cases"
+            data-stx-link
+          >
+            Use cases
+            <span class="h-4 w-4 i-hugeicons-arrow-down-01 menu-chevron" aria-hidden="true"></span>
+          </a>
+
+          <div class="absolute inset-x-0 top-full bg-panel border-b border-line menu-panel">
+            <div class="grid gap-x-10 gap-y-6 md:grid-cols-3 mx-auto px-6 py-8 max-w-[1400px]">
+              @foreach (useCases as useCase)
+                <a class="grid gap-1 -m-3 p-3 hover:bg-panel-2 rounded-xl transition-colors group" href="/use-cases/{{ useCase.slug }}" data-stx-link>
+                  <span class="inline-flex gap-2.5 items-center font-semibold text-[15px] text-ink">
+                    <span class="h-5 w-5 text-muted group-hover:text-accent i-hugeicons-{{ useCase.icon }} transition-colors" aria-hidden="true"></span>
+                    {{ useCase.nav }}
+                  </span>
+                  <span class="leading-relaxed text-[13px] text-muted">{{ useCase.summary }}</span>
+                </a>
+              @endforeach
+            </div>
+          </div>
+        </div>
+
+        <a class="inline-flex items-center px-3 h-9 text-body text-sm hover:bg-panel-2 rounded-lg transition-colors" href="https://github.com/stacksjs/postline">GitHub</a>
+      </div>
+
+      <div class="flex gap-2 items-center shrink-0">
+        <a class="hidden sm:inline-flex items-center px-3 h-9 text-body text-sm hover:bg-panel-2 rounded-lg transition-colors" href="/login" data-stx-link>Sign in</a>
+        <a class="inline-flex items-center px-4 h-9 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-lg transition-colors" href="/login" data-stx-link>Get started</a>
+      </div>
+    </nav>
+
+    <!-- Small screens get a native disclosure instead of a hover panel. -->
+    <details class="lg:hidden border-line border-t">
+      <summary class="flex items-center justify-between px-6 h-12 text-body text-sm cursor-pointer">
+        Browse
+        <span class="h-4 w-4 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
+      </summary>
+      <div class="grid gap-5 pb-6 px-6">
+        <div class="grid gap-2">
+          <p class="m-0 font-mono text-[11px] text-muted tracking-[0.18em] uppercase">Features</p>
+          @foreach (features as feature)
+            <a class="text-[15px] text-body hover:text-ink transition-colors" href="/features/{{ feature.slug }}" data-stx-link>{{ feature.nav }}</a>
+          @endforeach
+        </div>
+        <div class="grid gap-2">
+          <p class="m-0 font-mono text-[11px] text-muted tracking-[0.18em] uppercase">Use cases</p>
+          @foreach (useCases as useCase)
+            <a class="text-[15px] text-body hover:text-ink transition-colors" href="/use-cases/{{ useCase.slug }}" data-stx-link>{{ useCase.nav }}</a>
+          @endforeach
+        </div>
+      </div>
+    </details>
+  </header>
+</template>
+
+<style>
+  /* The panel is positioned against the header, so the trigger only needs to
+    own the hover/focus state. */
+  .menu-item { position: static; }
+
+  .menu-panel {
+    position: absolute;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    /* Motivated motion: the panel drops from the bar it belongs to, so it reads
+      as attached to the item that opened it. */
+    transition:
+      opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+      visibility 0s linear 0.18s;
+  }
+
+  .menu-item:hover .menu-panel,
+  .menu-item:focus-within .menu-panel {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition-delay: 0s;
+  }
+
+  .menu-chevron {
+    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .menu-item:hover .menu-chevron,
+  .menu-item:focus-within .menu-chevron {
+    transform: rotate(180deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .menu-panel,
+    .menu-chevron {
+      transition: none;
+      transform: none;
+    }
+  }
+</style>

@@ -128,6 +128,19 @@ export default {
     default: '',
   },
 
+  // Hetzner API token. Declared so the encrypted value in .env.production is
+  // actually readable: the loader only exposes keys present in this schema, so
+  // an undeclared key reads as empty however well it is encrypted.
+  HCLOUD_TOKEN: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  SUDO_PASSWORD: {
+    validation: schema.string(),
+    default: '',
+  },
+
   AWS_ACCESS_KEY_ID: {
     validation: schema.string(),
     default: '',

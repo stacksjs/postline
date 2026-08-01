@@ -104,7 +104,7 @@
     const storeTokenAndEnter = (token, expiresIn) => {
       const maxAge = Number(expiresIn) > 0 ? Number(expiresIn) : 60 * 60 * 24 * 30
       useCookie('auth-token', { maxAge }).set(token)
-      location.assign('/')
+      location.assign('/composer')
     }
 
     const onSubmit = async () => {
