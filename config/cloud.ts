@@ -16,6 +16,22 @@ import { env } from '@stacksjs/env'
  * @see https://github.com/stacksjs/ts-cloud
  */
 
+/**
+ * Persistent data outside the release tree.
+ *
+ * ts-cloud deploys into `releases/<sha>` and flips a `current` symlink, so a
+ * database stored under the app directory belongs to exactly one release: the
+ * next deploy lands in a new tree, `buddy migrate` creates an empty file there,
+ * and every account, queued post and subscriber from the previous release is
+ * gone — with the old copy left behind, so nothing looks like it failed.
+ *
+ * Both sites point at this one absolute path. `sharedPaths` would also survive
+ * deploys, but only per-site: `main` and `api` deploy to separate directories
+ * and would each get their own copy of a database they are supposed to share.
+ */
+const DATA_DIR = '/var/lib/postline'
+const DB_DATABASE_PATH = `${DATA_DIR}/postline.sqlite`
+
 // ts-cloud configuration for deployment
 export const tsCloud: TsCloudConfig = {
   /**
@@ -571,9 +587,34 @@ export const tsCloud: TsCloudConfig = {
       // the gateway proxies each subdomain to its own loopback port.
       port: 3100,
       preStart: [
+        // The database lives outside the release tree (see DB_DATABASE_PATH) so
+        // it survives deploys; create it before migrating into it.
+        `mkdir -p ${DATA_DIR}`,
         'bun install --production',
         './buddy migrate',
       ],
+      // The page server reverse-proxies `/api/**` to the API process. Name that
+      // port explicitly: the framework default (3008) is already owned by a
+      // *different* tenant on this shared box, and an unconfigured proxy would
+      // post Postline's form submissions into that app instead.
+      env: { PORT_API: '3101', DB_DATABASE_PATH },
+    },
+
+    // Postline's own API process, bound to loopback and reached only through
+    // the main site's `/api/**` proxy — so it needs no domain of its own.
+    // Unlike the framework repo, a consumer app has no framework source to
+    // compile an entry from: the installed package ships one prebuilt.
+    api: {
+      root: '.',
+      start: 'bun node_modules/@stacksjs/actions/dist/serve/api.js',
+      port: 3101,
+      preStart: [
+        `mkdir -p ${DATA_DIR}`,
+        'bun install --production',
+      ],
+      // Same database file as the main site — the API is where every write
+      // actually lands, so the two must not drift onto separate copies.
+      env: { HOST: '127.0.0.1', APP_ENV: 'production', NODE_ENV: 'production', DB_DATABASE_PATH },
     },
   },
 }
