@@ -563,7 +563,10 @@ export const tsCloud: TsCloudConfig = {
       root: '.',
       path: '/',
       domain: env.APP_DOMAIN || 'postline.stacksjs.com',
-      start: 'bun storage/framework/runtime/production/serve.js',
+      // The installed buddy ships this entry prebuilt. Stacks itself compiles
+      // an equivalent from `core/buddy/src/serve-entry.ts` during deploy, but a
+      // consumer app has no framework source to build from — it has the package.
+      start: 'bun node_modules/@stacksjs/buddy/dist/serve-entry.js',
       // Distinct from the apex app's :3000 — both processes share this box and
       // the gateway proxies each subdomain to its own loopback port.
       port: 3100,
