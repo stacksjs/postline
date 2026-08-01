@@ -113,6 +113,14 @@ export default {
     default: 'mysql',
   },
 
+  // SQLite file location. Deployments point this outside the release
+  // directory: a release is a fresh tree, so a database living inside one is
+  // replaced — and silently emptied — by the next deploy.
+  DB_DATABASE_PATH: {
+    validation: schema.string(),
+    default: 'database/postline.sqlite',
+  },
+
   DB_HOST: {
     validation: schema.string(),
     default: 'localhost',
