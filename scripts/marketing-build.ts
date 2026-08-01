@@ -7,7 +7,7 @@
  *
  *   bun scripts/marketing-build.ts
  */
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import type { MarketingEntry } from '../app/Support/Marketing/catalog'
@@ -130,6 +130,7 @@ ${entries.map(e => `      <li>
 }
 
 const written: string[] = []
+const removed: string[] = []
 
 for (const [kind, entries, dir] of [
   ['feature', FEATURES, 'features'],
@@ -137,6 +138,17 @@ for (const [kind, entries, dir] of [
 ] as const) {
   const outDir = join(root, 'resources/views', dir)
   mkdirSync(outDir, { recursive: true })
+
+  // Remove pages whose slug no longer exists. Without this a renamed entry
+  // leaves its old page live and routable — `self-hosting` outlived its rename
+  // to `own-your-keys` and shipped to production alongside it.
+  const keep = new Set(['index.stx', ...entries.map(entry => `${entry.slug}.stx`)])
+  for (const file of readdirSync(outDir)) {
+    if (file.endsWith('.stx') && !keep.has(file)) {
+      rmSync(join(outDir, file))
+      removed.push(`resources/views/${dir}/${file}`)
+    }
+  }
 
   writeFileSync(join(outDir, 'index.stx'), indexPage(kind, entries))
   written.push(`resources/views/${dir}/index.stx`)
@@ -156,6 +168,10 @@ const fix = Bun.spawnSync(
 )
 if (fix.exitCode !== 0)
   console.warn('pickier --fix did not run cleanly; check class ordering by hand')
+
+// eslint-disable-next-line no-console
+if (removed.length)
+  console.log(`Removed ${removed.length} stale page(s):\n${removed.map(r => `  ${r}`).join('\n')}`)
 
 // eslint-disable-next-line no-console
 console.log(`Generated ${written.length} marketing pages:\n${written.map(w => `  ${w}`).join('\n')}`)
