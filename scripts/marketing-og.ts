@@ -26,7 +26,7 @@ const bodyFont = loadFont(new Uint8Array(readFileSync(join(fontsDir, 'Geist-400.
 // cards and the pages are the same palette rather than two near-misses.
 const INK = { r: 10, g: 10, b: 10 }
 const BODY = { r: 63, g: 63, b: 70 }
-const ACCENT = { r: 16, g: 185, b: 129 }
+const ACCENT = { r: 37, g: 99, b: 235 }
 const PAPER = { r: 244, g: 244, b: 242 }
 
 /** The Postline mark: a rounded black square with a white P, drawn to match the nav. */
@@ -76,7 +76,7 @@ interface Card {
 const cards: Card[] = [
   {
     file: 'home',
-    eyebrow: 'Self-hosted',
+    eyebrow: 'Open source',
     title: 'Post once. Everywhere.',
     subtitle: fit('One composer for Bluesky, X, LinkedIn and Mastodon.'),
   },

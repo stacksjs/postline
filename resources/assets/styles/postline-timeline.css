@@ -267,7 +267,7 @@
 }
 
 /* Dark theme — the feed uses its own classes (not utilities), so it needs
-   its own overrides to match the app's .dark remap. */
+  its own overrides to match the app's .dark remap. */
 .dark .postline-feed__header,
 .dark .postline-feed__list { background: #18181b; }
 .dark .postline-feed__header { border-bottom-color: #2a2a2e; }

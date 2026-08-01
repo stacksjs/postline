@@ -1,0 +1,56 @@
+<script server>
+// Driven by the same catalog as the mega menu, so the footer cannot fall out of
+// step with the nav when a page is added.
+import { FEATURES, USE_CASES } from '../../../app/Support/Marketing/catalog'
+
+const features = FEATURES
+const useCases = USE_CASES
+const year = new Date().getFullYear()
+</script>
+
+<template>
+  <footer class="border-line border-t" aria-labelledby="footer-heading">
+    <h2 id="footer-heading" class="sr-only">Site</h2>
+
+    <div class="grid gap-10 lg:gap-12 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] mx-auto px-6 py-16 max-w-[1400px]">
+      <div class="max-w-[38ch]">
+        <a class="inline-flex gap-2.5 items-center font-semibold text-ink" href="/" aria-label="Postline home">
+          <span class="grid place-items-center h-8 w-8 font-bold text-[13px] text-on-accent bg-ink rounded-lg">P</span>
+          Postline
+        </a>
+        <p class="m-0 mt-4 leading-relaxed text-[13px] text-muted">
+          Open source crossposting for Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Runs on your machine, with your tokens.
+        </p>
+      </div>
+
+      <nav class="grid content-start gap-3" aria-label="Features">
+        <p class="m-0 font-medium text-[13px] text-ink">Features</p>
+        @foreach (features as feature)
+          <a class="text-[13px] text-muted hover:text-ink transition-colors" href="/features/{{ feature.slug }}" data-stx-link>{{ feature.nav }}</a>
+        @endforeach
+      </nav>
+
+      <nav class="grid content-start gap-3" aria-label="Use cases">
+        <p class="m-0 font-medium text-[13px] text-ink">Use cases</p>
+        @foreach (useCases as useCase)
+          <a class="text-[13px] text-muted hover:text-ink transition-colors" href="/use-cases/{{ useCase.slug }}" data-stx-link>{{ useCase.nav }}</a>
+        @endforeach
+      </nav>
+
+      <nav class="grid content-start gap-3" aria-label="Project">
+        <p class="m-0 font-medium text-[13px] text-ink">Project</p>
+        <a class="text-[13px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline">Source</a>
+        <a class="text-[13px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline/releases">Releases</a>
+        <a class="text-[13px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline/issues">Issues</a>
+        <a class="text-[13px] text-muted hover:text-ink transition-colors" href="/login" data-stx-link>Sign in</a>
+      </nav>
+    </div>
+
+    <div class="border-line border-t">
+      <div class="flex flex-col gap-3 justify-between sm:flex-row sm:items-center mx-auto px-6 py-6 max-w-[1400px]">
+        <p class="m-0 text-[13px] text-muted">MIT licensed. Built on Stacks.</p>
+        <p class="m-0 text-[13px] text-muted">&copy; {{ year }} Postline</p>
+      </div>
+    </div>
+  </footer>
+</template>

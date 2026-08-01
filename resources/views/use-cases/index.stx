@@ -38,7 +38,7 @@
           <span class="grid place-items-center h-10 w-10 text-ink bg-panel border border-line rounded-xl i-hugeicons-source-code" aria-hidden="true"></span>
           <span class="grid gap-1.5">
             <span class="font-semibold text-ink text-lg">Maintainers</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Announce releases across networks from a project you can read, fork and run yourself.</span>
+            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Announce releases across networks from a tool you can read, fork and audit before it touches your accounts.</span>
           </span>
           <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>
@@ -48,7 +48,7 @@
           <span class="grid place-items-center h-10 w-10 text-ink bg-panel border border-line rounded-xl i-hugeicons-building-03" aria-hidden="true"></span>
           <span class="grid gap-1.5">
             <span class="font-semibold text-ink text-lg">Agencies</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Manage posting for a handful of accounts on your own instance, without a per-seat subscription.</span>
+            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Manage posting for a handful of client accounts without a per-seat subscription or a vendor holding their tokens.</span>
           </span>
           <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>

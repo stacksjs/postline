@@ -33,7 +33,7 @@
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Keep the record</h2>
-          <p class="m-0 leading-relaxed text-body">Every published post and its engagement stays in your own database, so a year of building in public is something you own rather than something you rent.</p>
+          <p class="m-0 leading-relaxed text-body">Every published post and its engagement stays in your own database. A year of building in public stays readable even if you stop using a network.</p>
         </div>
       </div>
 
@@ -72,7 +72,7 @@
           <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/open-source-maintainers" data-stx-link>
             <span class="grid gap-1">
               <span class="font-semibold text-[15px] text-ink">Maintainers</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Announce releases across networks from a project you can read, fork and run yourself.</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Announce releases across networks from a tool you can read, fork and audit before it touches your accounts.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>
@@ -81,7 +81,7 @@
           <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/agencies" data-stx-link>
             <span class="grid gap-1">
               <span class="font-semibold text-[15px] text-ink">Agencies</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Manage posting for a handful of accounts on your own instance, without a per-seat subscription.</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Manage posting for a handful of client accounts without a per-seat subscription or a vendor holding their tokens.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>

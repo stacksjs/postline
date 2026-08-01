@@ -1,0 +1,120 @@
+<template>
+  <!--
+    Email capture, posting to the framework's SubscriberEmailAction. That action
+    already owns the hard parts: per-IP rate limiting, dedupe against the
+    subscribers unique index, and the confirmation mail. This is the form.
+
+    Behaviour is bound from an inline script by data attribute rather than stx
+    client directives: directives are stripped from components rendered through
+    a layout, which would leave the form inert with no visible sign of it.
+  -->
+  <section class="border-line border-t" aria-labelledby="subscribe-heading" data-subscribe>
+    <div class="grid gap-8 lg:gap-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] mx-auto px-6 py-20 max-w-[1400px]">
+      <div class="max-w-[46ch]">
+        <h2 id="subscribe-heading" class="m-0 font-semibold leading-[1.1] text-3xl text-ink tracking-tight sm:text-4xl">
+          Hear when it ships
+        </h2>
+        <p class="m-0 mt-4 leading-relaxed text-body">
+          Occasional notes on releases and what changed. No drip sequence, and one click to leave.
+        </p>
+      </div>
+
+      <div class="lg:pt-2">
+        <form class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]" data-subscribe-form novalidate>
+          <div class="grid gap-1.5">
+            <label class="font-medium text-[13px] text-body" for="subscribe-email">Email address</label>
+            <input
+              id="subscribe-email"
+              class="px-3.5 h-11 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-accent focus:ring-2 focus:ring-blue-100"
+              type="email"
+              name="email"
+              autocomplete="email"
+              placeholder="you@example.com"
+              aria-describedby="subscribe-status"
+              data-subscribe-email
+              required
+            >
+          </div>
+
+          <div class="flex sm:items-end">
+            <button
+              class="inline-flex items-center justify-center px-5 h-11 w-full sm:w-auto font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl disabled:opacity-60 transition-colors"
+              type="submit"
+              data-subscribe-submit
+            >
+              Subscribe
+            </button>
+          </div>
+
+          <!-- Reserved line: the message lands in space already occupied, so
+              submitting never shifts the section under the reader. -->
+          <p
+            id="subscribe-status"
+            class="sm:col-span-2 m-0 min-h-5 text-[13px] text-muted"
+            role="status"
+            aria-live="polite"
+            data-subscribe-status
+          ></p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    ;(() => {
+      const root = document.querySelector('[data-subscribe]')
+      if (!root) return
+
+      const form = root.querySelector('[data-subscribe-form]')
+      const input = root.querySelector('[data-subscribe-email]')
+      const submit = root.querySelector('[data-subscribe-submit]')
+      const status = root.querySelector('[data-subscribe-status]')
+
+      const say = (text, tone) => {
+        status.textContent = text
+        status.className = `sm:col-span-2 m-0 min-h-5 text-[13px] ${
+          tone === 'error' ? 'text-red-600' : tone === 'ok' ? 'text-accent' : 'text-muted'
+        }`
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault()
+        const email = (input.value || '').trim()
+
+        // Validate before the request so an obvious typo does not spend one of
+        // the ten attempts the endpoint allows per minute.
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          say('Enter a valid email address.', 'error')
+          input.focus()
+          return
+        }
+
+        submit.disabled = true
+        submit.textContent = 'Adding...'
+        say('', 'muted')
+
+        try {
+          const body = new FormData()
+          body.set('email', email)
+          body.set('source', 'postline-marketing')
+
+          const response = await fetch('/api/subscribe', { method: 'POST', body })
+          const payload = await response.json().catch(() => ({}))
+
+          if (!response.ok || payload.success === false)
+            throw new Error(payload.message || 'That did not go through. Try again in a moment.')
+
+          say(payload.message === 'Already subscribed' ? 'You are already on the list.' : 'Check your inbox to confirm.', 'ok')
+          input.value = ''
+        }
+        catch (error) {
+          say(error instanceof Error ? error.message : String(error), 'error')
+        }
+        finally {
+          submit.disabled = false
+          submit.textContent = 'Subscribe'
+        }
+      })
+    })()
+  </script>
+</template>

@@ -1,7 +1,7 @@
 @extends('layouts/marketing')
 
 @section('title', 'Accounts you actually control - Postline')
-@section('description', 'Manage posting for a handful of accounts on your own instance, without a per-seat subscription.')
+@section('description', 'Manage posting for a handful of client accounts without a per-seat subscription or a vendor holding their tokens.')
 @section('canonical', 'https://postline.stacksjs.com/use-cases/agencies')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-agencies.png')
 
@@ -16,7 +16,7 @@
         <span class="text-body">Use cases</span>
       </nav>
       <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">Accounts you actually control</h1>
-      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">Scheduling tools price by seat and by account, and hold the access tokens for clients you are responsible for. Running your own instance removes both problems at once.</p>
+      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">Scheduling tools price by seat and by account, and hold the access tokens for clients you are responsible for. Running the tool yourself removes both problems at once.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <a class="inline-flex items-center px-5 h-11 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl transition-colors" href="/login" data-stx-link>Get started</a>
         <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">Read the source</a>
@@ -29,11 +29,11 @@
       <div class="grid gap-10">
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">No per-seat pricing</h2>
-          <p class="m-0 leading-relaxed text-body">The cost of an instance does not change with the number of accounts connected to it, because there is no vendor in the middle metering it.</p>
+          <p class="m-0 leading-relaxed text-body">Cost does not change with the number of accounts connected, because there is no vendor in the middle metering it.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Clean handover</h2>
-          <p class="m-0 leading-relaxed text-body">When an engagement ends, the tokens are revoked on your instance and the posting history goes with the client rather than staying locked in a platform.</p>
+          <p class="m-0 leading-relaxed text-body">When an engagement ends, revoke the tokens and hand over the posting history. Nothing stays locked inside a platform the client cannot reach.</p>
         </div>
       </div>
 
@@ -45,7 +45,7 @@
           </li>
           <li class="flex gap-3 items-start py-4">
             <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">Client tokens stay on infrastructure you control</span>
+            <span class="text-[15px] text-body">Client tokens stay on hardware you control</span>
           </li>
           <li class="flex gap-3 items-start py-4">
             <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
@@ -81,7 +81,7 @@
           <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/open-source-maintainers" data-stx-link>
             <span class="grid gap-1">
               <span class="font-semibold text-[15px] text-ink">Maintainers</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Announce releases across networks from a project you can read, fork and run yourself.</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Announce releases across networks from a tool you can read, fork and audit before it touches your accounts.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>

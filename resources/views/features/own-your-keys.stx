@@ -1,9 +1,9 @@
 @extends('layouts/marketing')
 
-@section('title', 'Reach every community - Postline')
-@section('description', 'Developers are split across Bluesky, X and Mastodon. Reach all of them without choosing a favourite.')
-@section('canonical', 'https://postline.stacksjs.com/use-cases/developer-advocates')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-developer-advocates.png')
+@section('title', 'Nobody holds your tokens - Postline')
+@section('description', 'Your access tokens live in your own database, on your own machine. There is no vendor in the middle.')
+@section('canonical', 'https://postline.stacksjs.com/features/own-your-keys')
+@section('ogImage', 'https://postline.stacksjs.com/images/og/feature-own-your-keys.png')
 
 @section('content')
   <article class="mx-auto px-6 max-w-[1400px]">
@@ -13,10 +13,10 @@
       <nav class="flex gap-2 items-center text-[13px] text-muted" aria-label="Breadcrumb">
         <a class="hover:text-ink transition-colors" href="/">Postline</a>
         <span aria-hidden="true">/</span>
-        <span class="text-body">Use cases</span>
+        <span class="text-body">Features</span>
       </nav>
-      <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">Reach every community</h1>
-      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">Technical audiences fragmented across networks, and no single one of them is where everyone is. Posting to only one means writing off part of your community.</p>
+      <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">Nobody holds your tokens</h1>
+      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">Every hosted crossposting service asks for write access to your social accounts and keeps those tokens on their servers. Postline is the same software with the tokens in a database you control.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <a class="inline-flex items-center px-5 h-11 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl transition-colors" href="/login" data-stx-link>Get started</a>
         <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">Read the source</a>
@@ -28,12 +28,12 @@
     <section class="grid gap-10 lg:gap-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] py-14 border-line border-t">
       <div class="grid gap-10">
         <div class="grid gap-3 max-w-[62ch]">
-          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Tuned per network</h2>
-          <p class="m-0 leading-relaxed text-body">Mastodon and Bluesky reward a different register than LinkedIn. Per-network variants let one post read naturally on each without maintaining separate drafts.</p>
+          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Tokens stay where you put them</h2>
+          <p class="m-0 leading-relaxed text-body">OAuth tokens and app passwords are encrypted with a key your instance generates. Nobody else has a copy, because there is nobody else.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
-          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Measure where it worked</h2>
-          <p class="m-0 leading-relaxed text-body">Engagement is stored per network, so it is obvious which communities respond to which kind of post rather than which network is loudest overall.</p>
+          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Run it wherever suits you</h2>
+          <p class="m-0 leading-relaxed text-body">It is one Bun process and a SQLite file. That runs on a laptop, and it runs on a small server if you want the queue publishing while the laptop is shut.</p>
         </div>
       </div>
 
@@ -41,15 +41,15 @@
         <ul class="m-0 p-0 list-none border-line border-t divide-line divide-y">
           <li class="flex gap-3 items-start py-4">
             <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">Cover fragmented developer communities</span>
+            <span class="text-[15px] text-body">Tokens encrypted with a key only you hold</span>
           </li>
           <li class="flex gap-3 items-start py-4">
             <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">Adjust tone per network</span>
+            <span class="text-[15px] text-body">One process and one file, no broker to run</span>
           </li>
           <li class="flex gap-3 items-start py-4">
             <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">Per-network engagement, not a blended average</span>
+            <span class="text-[15px] text-body">MIT licensed, so you can read every line</span>
           </li>
         </ul>
       </aside>
@@ -57,31 +57,31 @@
 
     <!-- Related. A plain divided list rather than three equal cards. -->
     <section class="py-14 border-line border-t">
-      <h2 class="m-0 font-semibold text-ink text-xl tracking-tight">More use cases</h2>
+      <h2 class="m-0 font-semibold text-ink text-xl tracking-tight">More features</h2>
       <ul class="grid gap-0 m-0 mt-6 p-0 list-none divide-line divide-y">
         <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/founders" data-stx-link>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/features/crossposting" data-stx-link>
             <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Founders</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Post launches, changelogs and build notes to every network without doing it six times.</span>
+              <span class="font-semibold text-[15px] text-ink">Crossposting</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Write once and publish to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon in a single pass.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>
         </li>
         <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/open-source-maintainers" data-stx-link>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/features/scheduling" data-stx-link>
             <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Maintainers</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Announce releases across networks from a tool you can read, fork and audit before it touches your accounts.</span>
+              <span class="font-semibold text-[15px] text-ink">Scheduling</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Schedule posts ahead in your own timezone and let the queue publish them, or send immediately.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>
         </li>
         <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/agencies" data-stx-link>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/features/per-network-variants" data-stx-link>
             <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Agencies</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Manage posting for a handful of client accounts without a per-seat subscription or a vendor holding their tokens.</span>
+              <span class="font-semibold text-[15px] text-ink">Per-network variants</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Override the text for any single network without maintaining six separate drafts of the same post.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>

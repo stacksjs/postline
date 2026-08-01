@@ -31,7 +31,7 @@ const label = status.charAt(0).toUpperCase() + status.slice(1)
       @endforeach
     </span>
     @if (isPublishing)
-      <span class="inline-flex gap-1.5 items-center shrink-0 px-2.5 h-6 font-medium text-[11px] text-emerald-600 bg-emerald-500/10 border border-emerald-500/30 rounded-full">
+      <span class="inline-flex gap-1.5 items-center shrink-0 px-2.5 h-6 font-medium text-[11px] text-blue-700 bg-blue-500/10 border border-blue-500/30 rounded-full">
         <span class="h-1.5 w-1.5 bg-accent rounded-full"></span>{{ label }}
       </span>
     @else

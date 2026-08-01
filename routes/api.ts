@@ -20,6 +20,11 @@ route.post('/login', 'Actions/Auth/LoginAction').skipCsrf().rateLimit(5, 'minute
 // exists (overrides the open framework default).
 route.post('/register', 'Actions/Postline/RegisterFirstUserAction').skipCsrf().rateLimit(3, 'minute')
 
+// Marketing email capture. The framework action owns rate limiting, dedupe and
+// the confirmation mail; this just exposes it. Unauthenticated by necessity, so
+// the action's per-IP throttle is the guard.
+route.post('/subscribe', 'Actions/SubscriberEmailAction').skipCsrf()
+
 route.get('/', () => response.text('hello world'))
 route.get('/coming-soon', 'Controllers/ComingSoonController@index')
 

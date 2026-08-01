@@ -4,28 +4,28 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
-    <title>@yield('title', 'Postline: self-hosted social crossposting')</title>
-    <meta name="description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon from one instance you own. Self-hosted, open, built on Stacks.')">
+    <title>@yield('title', 'Postline: open source social crossposting')</title>
+    <meta name="description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, runs on your machine, nobody else holds your tokens.')">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/images/postline-icon-180.png">
     <link rel="canonical" href="@yield('canonical', 'https://postline.stacksjs.com/')">
     <meta name="theme-color" content="#f4f4f2">
 
     <!-- Open Graph / social. The card image is absolute: relative URLs are not
-         resolved by crawlers, which is why summary_large_image previously
-         rendered with no image at all. -->
+        resolved by crawlers, which is why summary_large_image previously
+        rendered with no image at all. -->
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Postline">
     <meta property="og:url" content="@yield('canonical', 'https://postline.stacksjs.com/')">
-    <meta property="og:title" content="@yield('title', 'Postline: self-hosted social crossposting')">
-    <meta property="og:description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon from one instance you own.')">
+    <meta property="og:title" content="@yield('title', 'Postline: open source social crossposting')">
+    <meta property="og:description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, and nobody else holds your tokens.')">
     <meta property="og:image" content="@yield('ogImage', 'https://postline.stacksjs.com/images/postline-og.png')">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Postline — one composer publishing to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon.">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="@yield('title', 'Postline: self-hosted social crossposting')">
-    <meta name="twitter:description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon from one instance you own.')">
+    <meta name="twitter:title" content="@yield('title', 'Postline: open source social crossposting')">
+    <meta name="twitter:description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, and nobody else holds your tokens.')">
     <meta name="twitter:image" content="@yield('ogImage', 'https://postline.stacksjs.com/images/postline-og.png')">
 
     <!-- Geist (display) + Geist Mono (labels/code) -->
@@ -50,7 +50,7 @@
         --ink: #0a0a0a;
         --body: #3f3f46;
         --muted: #71717a;
-        --accent: #10b981;
+        --accent: #2563eb;
         --on-accent: #ffffff;
       }
 
@@ -105,10 +105,13 @@
   </head>
   <body class="min-w-0 antialiased">
     <!-- Shared chrome: every marketing page gets the same nav, so the mega menu
-         is defined once here rather than repeated per page. -->
+        is defined once here rather than repeated per page. -->
     <MegaMenu />
     @yield('content')
-    @yield('footer')
+    <!-- Shared chrome: subscribe then footer, on every marketing page, so a new
+        page picks both up without remembering to include them. -->
+    <Subscribe />
+    <SiteFooter />
     @stack('scripts')
   </body>
 </html>

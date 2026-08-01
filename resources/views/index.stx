@@ -1,7 +1,7 @@
 @extends('layouts/marketing')
 
-@section('title', 'Postline: self-hosted social crossposting')
-@section('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon from one instance you own.')
+@section('title', 'Postline: open source social crossposting')
+@section('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, runs on your machine, nobody else holds your tokens.')
 @section('canonical', 'https://postline.stacksjs.com/')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/home.png')
 
@@ -19,11 +19,11 @@
       <div class="grid gap-12 items-center lg:gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] pb-16 pt-10 lg:pb-0 lg:pt-14 lg:min-h-[calc(100dvh-72px)]">
         <!-- Left: copy -->
         <div class="max-w-xl">
-          <p class="font-mono text-muted text-xs tracking-[0.2em] uppercase">Self-hosted</p>
+          <p class="font-mono text-muted text-xs tracking-[0.2em] uppercase">Open source</p>
           <h1 class="mt-5 font-semibold leading-[1.03] text-[2.75rem] text-ink tracking-tight sm:text-6xl">Post once. Every network. Yours.</h1>
-          <p class="mt-6 max-w-md leading-relaxed text-body text-lg">Schedule and crosspost to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon from one instance you run and own.</p>
+          <p class="mt-6 max-w-md leading-relaxed text-body text-lg">Crosspost to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Free, open source, and nobody else holds your tokens.</p>
           <div class="flex flex-wrap gap-3 items-center mt-9">
-            <a class="inline-flex items-center px-5 h-12 font-medium text-on-accent bg-accent hover:bg-emerald-600 rounded-xl shadow-sm transition-colors active:scale-[0.98]" href="/login" data-stx-link>Get started</a>
+            <a class="inline-flex items-center px-5 h-12 font-medium text-on-accent bg-accent hover:bg-blue-700 rounded-xl shadow-sm transition-colors active:scale-[0.98]" href="/login" data-stx-link>Get started</a>
             <a class="inline-flex gap-2 items-center px-5 h-12 font-medium text-ink hover:bg-panel-2 rounded-xl transition-colors" href="https://github.com/stacksjs/postline">
               <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
               View on GitHub
@@ -49,7 +49,7 @@
                 <span class="inline-flex gap-1.5 items-center px-2.5 h-7 font-medium text-ink text-xs bg-panel-2 border border-line rounded-lg"><span class="h-3.5 w-3.5 i-simple-icons-threads" aria-hidden="true"></span>Threads</span>
                 <span class="inline-flex gap-1.5 items-center px-2.5 h-7 font-medium text-ink text-xs bg-panel-2 border border-line rounded-lg"><span class="h-3.5 w-3.5 i-simple-icons-mastodon" aria-hidden="true"></span>Mastodon</span>
               </div>
-              <p class="mt-4 leading-relaxed text-ink">Shipping Postline v1: self-hosted crossposting to every network from one place. No SaaS, no lock-in.</p>
+              <p class="mt-4 leading-relaxed text-ink">Shipping Postline v1: open source crossposting to every network from one place. No SaaS, no lock-in.</p>
               <div class="flex items-center justify-between mt-5 pt-4 border-line border-t">
                 <span class="font-mono text-muted text-xs">198 / 300</span>
                 <span class="inline-flex items-center px-4 h-9 font-medium text-on-accent text-sm bg-accent rounded-lg">Publish</span>
@@ -121,15 +121,15 @@
   </section>
 
   <!-- 04 · Own it (dark beat) -->
-  <section class="relative text-white bg-[#0a0a0a]" aria-label="Self-hosted and owned">
+  <section class="relative text-white bg-[#0a0a0a]" aria-label="Open source and owned">
     <div class="mx-auto px-6 py-24 sm:py-32 max-w-[1400px]">
       <div class="max-w-3xl reveal">
         <SectionLabel index="03" label="Own it" onDark />
-        <h2 class="mt-6 font-semibold leading-[1.05] text-4xl tracking-tight sm:text-6xl">Your keys. Your data.<br>Your instance.</h2>
-        <p class="mt-6 max-w-xl leading-relaxed text-lg text-white/60">No middleman holds your tokens or stands between you and your audience. Postline runs on a server you own. Deploy it in one command and keep everything.</p>
+        <h2 class="mt-6 font-semibold leading-[1.05] text-4xl tracking-tight sm:text-6xl">Your keys. Your data.<br>Your machine.</h2>
+        <p class="mt-6 max-w-xl leading-relaxed text-lg text-white/60">No middleman holds your tokens or stands between you and your audience. Run it on your laptop, or put it on a small server when you want the queue publishing overnight.</p>
         <div class="inline-flex gap-3 items-center mt-9 px-4 h-12 font-mono text-sm bg-white/5 border border-white/10 rounded-xl">
           <span class="text-accent" aria-hidden="true">$</span>
-          <span class="text-white/90">bunx buddy deploy</span>
+          <span class="text-white/90">bunx postline</span>
         </div>
       </div>
     </div>
@@ -155,7 +155,7 @@
         <h2 class="font-semibold leading-[1.05] text-4xl text-ink tracking-tight sm:text-6xl">Post once. Own everything.</h2>
         <p class="mt-5 leading-relaxed text-body text-lg">Stand up your own Postline and crosspost from one place you control.</p>
         <div class="flex flex-wrap gap-3 justify-center mt-9">
-          <a class="inline-flex items-center px-5 h-12 font-medium text-on-accent bg-accent hover:bg-emerald-600 rounded-xl shadow-sm transition-colors active:scale-[0.98]" href="/login" data-stx-link>Get started</a>
+          <a class="inline-flex items-center px-5 h-12 font-medium text-on-accent bg-accent hover:bg-blue-700 rounded-xl shadow-sm transition-colors active:scale-[0.98]" href="/login" data-stx-link>Get started</a>
           <a class="inline-flex gap-2 items-center px-5 h-12 font-medium text-ink hover:bg-panel-2 rounded-xl transition-colors" href="https://github.com/stacksjs/postline">
             <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
             Star on GitHub
@@ -165,18 +165,4 @@
     </div>
   </section>
 
-  <!-- Footer -->
-  <footer class="border-line border-t">
-    <div class="flex flex-col gap-4 items-center sm:flex-row sm:justify-between mx-auto px-6 py-8 max-w-[1400px]">
-      <a class="inline-flex gap-2.5 items-center font-semibold text-ink" href="/welcome" aria-label="Postline home">
-        <span class="grid place-items-center h-7 w-7 font-bold text-[12px] text-on-accent bg-ink rounded-md">P</span>
-        Postline
-      </a>
-      <p class="order-3 sm:order-2 font-mono text-muted text-xs">Self-hosted · MIT · Built on Stacks</p>
-      <div class="flex order-2 sm:order-3 gap-5 items-center text-muted text-sm">
-        <a class="hover:text-ink transition-colors" href="/login" data-stx-link>Get started</a>
-        <a class="inline-flex gap-1.5 items-center hover:text-ink transition-colors" href="https://github.com/stacksjs/postline"><span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>GitHub</a>
-      </div>
-    </div>
-  </footer>
 @endsection

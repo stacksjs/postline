@@ -69,6 +69,7 @@
     "stacks": "^0.70.231"
   },
   "devDependencies": {
+    "@iconify-json/simple-icons": "^1.2.92",
     "better-dx": "^0.2.22"
   },
   "workspaces": [

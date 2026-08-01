@@ -64,11 +64,11 @@
         </a>
       </li>
       <li>
-        <a class="grid gap-4 items-start sm:grid-cols-[auto_minmax(0,1fr)_auto] py-6 group" href="/features/self-hosting" data-stx-link>
-          <span class="grid place-items-center h-10 w-10 text-ink bg-panel border border-line rounded-xl i-hugeicons-server-stack-01" aria-hidden="true"></span>
+        <a class="grid gap-4 items-start sm:grid-cols-[auto_minmax(0,1fr)_auto] py-6 group" href="/features/own-your-keys" data-stx-link>
+          <span class="grid place-items-center h-10 w-10 text-ink bg-panel border border-line rounded-xl i-hugeicons-key-01" aria-hidden="true"></span>
           <span class="grid gap-1.5">
-            <span class="font-semibold text-ink text-lg">Self-hosting</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Run Postline on infrastructure you control. No middleman holds your tokens or sits between you and your audience.</span>
+            <span class="font-semibold text-ink text-lg">Own your keys</span>
+            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Your access tokens live in your own database, on your own machine. There is no vendor in the middle.</span>
           </span>
           <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>

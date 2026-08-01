@@ -35,6 +35,10 @@
           <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Publish now when plans change</h2>
           <p class="m-0 leading-relaxed text-body">Anything in the queue can be sent immediately without rewriting it. The scheduled entry becomes a published one, keeping its history.</p>
         </div>
+        <div class="grid gap-3 max-w-[62ch]">
+          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">What the queue needs</h2>
+          <p class="m-0 leading-relaxed text-body">A scheduled post fires when Postline is running. On a laptop that means while the app is open; put it on a small always-on box and the queue keeps publishing overnight.</p>
+        </div>
       </div>
 
       <aside class="lg:pt-1">
