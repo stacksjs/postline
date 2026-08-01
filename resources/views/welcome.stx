@@ -82,18 +82,18 @@
         <p class="shrink-0 font-mono leading-relaxed text-muted text-xs tracking-[0.2em] uppercase">One post,<br class="hidden sm:block"> six networks</p>
         <div class="overflow-hidden relative grow [mask-image:linear-gradient(90deg,transparent,#000_7%,#000_93%,transparent)]">
           <ul class="flex gap-12 items-center w-max marquee-track" aria-hidden="true">
-            <li class="inline-flex gap-2.5 items-center text-muted"><span class="h-5 w-5 i-simple-icons-bluesky"></span><span class="font-medium text-sm">Bluesky</span></li>
-            <li class="inline-flex gap-2.5 items-center text-muted"><span class="h-5 w-5 i-simple-icons-x"></span><span class="font-medium text-sm">X</span></li>
-            <li class="inline-flex gap-2.5 items-center text-muted"><span class="h-5 w-5 i-simple-icons-linkedin"></span><span class="font-medium text-sm">LinkedIn</span></li>
-            <li class="inline-flex gap-2.5 items-center text-muted"><span class="h-5 w-5 i-simple-icons-instagram"></span><span class="font-medium text-sm">Instagram</span></li>
-            <li class="inline-flex gap-2.5 items-center text-muted"><span class="h-5 w-5 i-simple-icons-threads"></span><span class="font-medium text-sm">Threads</span></li>
-            <li class="inline-flex gap-2.5 items-center text-muted"><span class="h-5 w-5 i-simple-icons-mastodon"></span><span class="font-medium text-sm">Mastodon</span></li>
-            <li class="inline-flex gap-2.5 items-center text-muted"><span class="h-5 w-5 i-simple-icons-bluesky"></span><span class="font-medium text-sm">Bluesky</span></li>
-            <li class="inline-flex gap-2.5 items-center text-muted"><span class="h-5 w-5 i-simple-icons-x"></span><span class="font-medium text-sm">X</span></li>
-            <li class="inline-flex gap-2.5 items-center text-muted"><span class="h-5 w-5 i-simple-icons-linkedin"></span><span class="font-medium text-sm">LinkedIn</span></li>
-            <li class="inline-flex gap-2.5 items-center text-muted"><span class="h-5 w-5 i-simple-icons-instagram"></span><span class="font-medium text-sm">Instagram</span></li>
-            <li class="inline-flex gap-2.5 items-center text-muted"><span class="h-5 w-5 i-simple-icons-threads"></span><span class="font-medium text-sm">Threads</span></li>
-            <li class="inline-flex gap-2.5 items-center text-muted"><span class="h-5 w-5 i-simple-icons-mastodon"></span><span class="font-medium text-sm">Mastodon</span></li>
+            <ProviderChip icon="bluesky" name="Bluesky" />
+            <ProviderChip icon="x" name="X" />
+            <ProviderChip icon="linkedin" name="LinkedIn" />
+            <ProviderChip icon="instagram" name="Instagram" />
+            <ProviderChip icon="threads" name="Threads" />
+            <ProviderChip icon="mastodon" name="Mastodon" />
+            <ProviderChip icon="bluesky" name="Bluesky" />
+            <ProviderChip icon="x" name="X" />
+            <ProviderChip icon="linkedin" name="LinkedIn" />
+            <ProviderChip icon="instagram" name="Instagram" />
+            <ProviderChip icon="threads" name="Threads" />
+            <ProviderChip icon="mastodon" name="Mastodon" />
           </ul>
         </div>
       </div>
@@ -111,30 +111,15 @@
             <span class="font-mono text-[11px] text-muted">this week</span>
           </div>
           <ul class="divide-line divide-y">
-            <li class="flex gap-4 items-center px-5 py-4">
-              <span class="shrink-0 w-11 font-mono text-muted text-xs">Mon 09:00</span>
-              <p class="grow min-w-0 text-ink text-sm truncate">Shipping Postline v1: crosspost everywhere from one place.</p>
-              <span class="hidden sm:flex gap-1.5 items-center shrink-0 text-muted" aria-hidden="true"><span class="h-4 w-4 i-simple-icons-bluesky"></span><span class="h-4 w-4 i-simple-icons-x"></span><span class="h-4 w-4 i-simple-icons-mastodon"></span></span>
-              <span class="inline-flex items-center shrink-0 px-2.5 h-6 font-medium text-[11px] text-muted bg-panel-2 border border-line rounded-full">Published</span>
-            </li>
-            <li class="flex gap-4 items-center px-5 py-4">
-              <span class="shrink-0 w-11 font-mono text-muted text-xs">Wed 13:30</span>
-              <p class="grow min-w-0 text-ink text-sm truncate">New guide: self-hosting your own social crossposter.</p>
-              <span class="hidden sm:flex gap-1.5 items-center shrink-0 text-muted" aria-hidden="true"><span class="h-4 w-4 i-simple-icons-linkedin"></span><span class="h-4 w-4 i-simple-icons-threads"></span></span>
-              <span class="inline-flex gap-1.5 items-center shrink-0 px-2.5 h-6 font-medium text-[11px] text-emerald-600 bg-emerald-500/10 border border-emerald-500/30 rounded-full"><span class="h-1.5 w-1.5 bg-accent rounded-full"></span>Publishing</span>
-            </li>
-            <li class="flex gap-4 items-center px-5 py-4">
-              <span class="shrink-0 w-11 font-mono text-muted text-xs">Fri 18:00</span>
-              <p class="grow min-w-0 text-ink text-sm truncate">Weekend build log: what shipped and what is next.</p>
-              <span class="hidden sm:flex gap-1.5 items-center shrink-0 text-muted" aria-hidden="true"><span class="h-4 w-4 i-simple-icons-instagram"></span><span class="h-4 w-4 i-simple-icons-x"></span></span>
-              <span class="inline-flex items-center shrink-0 px-2.5 h-6 font-medium text-[11px] text-muted bg-panel-2 border border-line rounded-full">Scheduled</span>
-            </li>
+            <QueueRow slot="Mon 09:00" body="Shipping Postline v1: crosspost everywhere from one place." icons="bluesky,x,mastodon" status="published" />
+            <QueueRow slot="Wed 13:30" body="New guide: self-hosting your own social crossposter." icons="linkedin,threads" status="publishing" />
+            <QueueRow slot="Fri 18:00" body="Weekend build log: what shipped and what is next." icons="instagram,x" status="scheduled" />
           </ul>
         </div>
       </div>
       <!-- Caption -->
       <div class="order-1 lg:order-2 max-w-md reveal">
-        <p class="font-mono text-muted text-xs tracking-[0.2em] uppercase">02 / Queue</p>
+        <SectionLabel index="02" label="Queue" />
         <h2 class="mt-5 font-semibold leading-[1.05] text-3xl text-ink tracking-tight sm:text-5xl">Compose. Schedule.<br>Crosspost.</h2>
         <p class="mt-5 leading-relaxed text-body text-lg">Write once, pick your networks, and set a time. Postline queues it and publishes to each place on schedule.</p>
         <ul class="mt-8 border-line border-t divide-line divide-y">
@@ -150,7 +135,7 @@
   <section class="relative text-white bg-[#0a0a0a]" aria-label="Self-hosted and owned">
     <div class="mx-auto px-6 py-24 sm:py-32 max-w-[1400px]">
       <div class="max-w-3xl reveal">
-        <p class="font-mono text-white/50 text-xs tracking-[0.2em] uppercase">03 / Own it</p>
+        <SectionLabel index="03" label="Own it" onDark />
         <h2 class="mt-6 font-semibold leading-[1.05] text-4xl tracking-tight sm:text-6xl">Your keys. Your data.<br>Your instance.</h2>
         <p class="mt-6 max-w-xl leading-relaxed text-lg text-white/60">No middleman holds your tokens or stands between you and your audience. Postline runs on a server you own. Deploy it in one command and keep everything.</p>
         <div class="inline-flex gap-3 items-center mt-9 px-4 h-12 font-mono text-sm bg-white/5 border border-white/10 rounded-xl">
@@ -164,25 +149,13 @@
   <!-- 05 · Open + built on Stacks -->
   <section class="relative mx-auto px-6 py-20 sm:py-28 max-w-[1400px]">
     <div class="max-w-2xl reveal">
-      <p class="font-mono text-muted text-xs tracking-[0.2em] uppercase">04 / Open</p>
+      <SectionLabel index="04" label="Open" />
       <h2 class="mt-6 font-semibold leading-tight text-3xl text-ink tracking-tight sm:text-5xl">Open source, and yours to change.</h2>
     </div>
     <div class="grid overflow-hidden gap-px sm:grid-cols-3 mt-12 bg-line border border-line rounded-2xl reveal">
-      <div class="p-6 sm:p-8 bg-bg">
-        <span class="grid place-items-center h-10 w-10 text-ink bg-panel border border-line rounded-xl i-hugeicons-source-code"></span>
-        <h3 class="mt-5 font-semibold text-ink">MIT licensed</h3>
-        <p class="mt-2 leading-relaxed text-body text-sm">Read every line, fork it, and ship your own. No black boxes.</p>
-      </div>
-      <div class="p-6 sm:p-8 bg-bg">
-        <span class="grid place-items-center h-10 w-10 text-ink bg-panel border border-line rounded-xl i-hugeicons-package"></span>
-        <h3 class="mt-5 font-semibold text-ink">Single binary</h3>
-        <p class="mt-2 leading-relaxed text-body text-sm">One Bun binary to run. No sprawling services to babysit.</p>
-      </div>
-      <div class="p-6 sm:p-8 bg-bg">
-        <span class="grid place-items-center h-10 w-10 text-ink bg-panel border border-line rounded-xl i-hugeicons-layers-01"></span>
-        <h3 class="mt-5 font-semibold text-ink">Built on Stacks</h3>
-        <p class="mt-2 leading-relaxed text-body text-sm">A full-stack TypeScript framework underneath, end to end.</p>
-      </div>
+      <ValueCard icon="source-code" title="MIT licensed" description="Read every line, fork it, and ship your own. No black boxes." />
+      <ValueCard icon="package" title="Single binary" description="One Bun binary to run. No sprawling services to babysit." />
+      <ValueCard icon="layers-01" title="Built on Stacks" description="A full-stack TypeScript framework underneath, end to end." />
     </div>
   </section>
 

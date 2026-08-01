@@ -7,12 +7,26 @@
     <title>@yield('title', 'Postline: self-hosted social crossposting')</title>
     <meta name="description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon from one instance you own. Self-hosted, open, built on Stacks.')">
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/images/postline-icon-180.png">
+    <link rel="canonical" href="@yield('canonical', 'https://postline.sh/')">
+    <meta name="theme-color" content="#f4f4f2">
 
-    <!-- Open Graph / social -->
+    <!-- Open Graph / social. The card image is absolute: relative URLs are not
+         resolved by crawlers, which is why summary_large_image previously
+         rendered with no image at all. -->
     <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Postline">
+    <meta property="og:url" content="@yield('canonical', 'https://postline.sh/')">
     <meta property="og:title" content="@yield('title', 'Postline: self-hosted social crossposting')">
     <meta property="og:description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon from one instance you own.')">
+    <meta property="og:image" content="@yield('ogImage', 'https://postline.sh/images/postline-og.png')">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Postline — one composer publishing to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon.">
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="@yield('title', 'Postline: self-hosted social crossposting')">
+    <meta name="twitter:description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon from one instance you own.')">
+    <meta name="twitter:image" content="@yield('ogImage', 'https://postline.sh/images/postline-og.png')">
 
     <!-- Geist (display) + Geist Mono (labels/code) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">

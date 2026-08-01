@@ -1,0 +1,20 @@
+<script server>
+import { defineProps, withDefaults } from 'stx'
+
+interface ValueCardProps {
+  /** Iconify hugeicons slug, e.g. "source-code". */
+  icon: string
+  title: string
+  description: string
+}
+
+const { icon, title, description } = withDefaults(defineProps<ValueCardProps>(), {})
+</script>
+
+<template>
+  <div class="p-6 sm:p-8 bg-bg">
+    <span class="grid place-items-center h-10 w-10 text-ink bg-panel border border-line rounded-xl i-hugeicons-{{ icon }}"></span>
+    <h3 class="mt-5 font-semibold text-ink">{{ title }}</h3>
+    <p class="mt-2 leading-relaxed text-body text-sm">{{ description }}</p>
+  </div>
+</template>

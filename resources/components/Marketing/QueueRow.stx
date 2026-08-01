@@ -1,0 +1,41 @@
+<script server>
+import { defineProps, withDefaults } from 'stx'
+
+interface QueueRowProps {
+  /** Slot label, e.g. "Mon 09:00". */
+  slot: string
+  body: string
+  /** Comma-separated simple-icons slugs, e.g. "bluesky,x,mastodon". */
+  icons: string
+  /** One of: published | publishing | scheduled. */
+  status: string
+}
+
+const { slot, body, icons, status } = withDefaults(
+  defineProps<QueueRowProps>(),
+  { status: 'scheduled' },
+)
+
+const iconList = icons.split(',').filter(Boolean)
+const isPublishing = status === 'publishing'
+const label = status.charAt(0).toUpperCase() + status.slice(1)
+</script>
+
+<template>
+  <li class="flex gap-4 items-center px-5 py-4">
+    <span class="shrink-0 w-11 font-mono text-muted text-xs">{{ slot }}</span>
+    <p class="grow min-w-0 text-ink text-sm truncate">{{ body }}</p>
+    <span class="hidden sm:flex gap-1.5 items-center shrink-0 text-muted" aria-hidden="true">
+      @foreach (iconList as icon)
+        <span class="h-4 w-4 i-simple-icons-{{ icon }}"></span>
+      @endforeach
+    </span>
+    @if (isPublishing)
+      <span class="inline-flex gap-1.5 items-center shrink-0 px-2.5 h-6 font-medium text-[11px] text-emerald-600 bg-emerald-500/10 border border-emerald-500/30 rounded-full">
+        <span class="h-1.5 w-1.5 bg-accent rounded-full"></span>{{ label }}
+      </span>
+    @else
+      <span class="inline-flex items-center shrink-0 px-2.5 h-6 font-medium text-[11px] text-muted bg-panel-2 border border-line rounded-full">{{ label }}</span>
+    @endif
+  </li>
+</template>

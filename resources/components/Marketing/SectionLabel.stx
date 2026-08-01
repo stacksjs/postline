@@ -1,0 +1,23 @@
+<script server>
+import { defineProps, withDefaults } from 'stx'
+
+interface SectionLabelProps {
+  /** Two-digit index, e.g. "02". */
+  index: string
+  /** Short label following the index, e.g. "Queue". */
+  label: string
+  /** Set on the one dark section, where muted grey has too little contrast. */
+  onDark?: boolean
+}
+
+const { index, label, onDark } = withDefaults(
+  defineProps<SectionLabelProps>(),
+  { onDark: false },
+)
+</script>
+
+<template>
+  <p class="font-mono text-xs tracking-[0.2em] uppercase {{ onDark ? 'text-white/50' : 'text-muted' }}">
+    {{ index }} / {{ label }}
+  </p>
+</template>
