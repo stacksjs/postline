@@ -32,6 +32,14 @@ import { env } from '@stacksjs/env'
 const DATA_DIR = '/var/lib/postline'
 const DB_DATABASE_PATH = `${DATA_DIR}/postline.sqlite`
 
+/**
+ * The release tarball is packed from the working tree, not from git — so
+ * gitignoring the local database stops it being committed but not shipped. It
+ * has been travelling to the server in every release: developer data, uploaded
+ * media rows and all, landing next to production's own copy.
+ */
+const SQLITE_EXCLUDES = ['*.sqlite', '*.sqlite-shm', '*.sqlite-wal']
+
 // ts-cloud configuration for deployment
 export const tsCloud: TsCloudConfig = {
   /**
@@ -598,6 +606,7 @@ export const tsCloud: TsCloudConfig = {
       // *different* tenant on this shared box, and an unconfigured proxy would
       // post Postline's form submissions into that app instead.
       env: { PORT_API: '3101', DB_DATABASE_PATH },
+      exclude: SQLITE_EXCLUDES,
     },
 
     // Postline's own API process, bound to loopback and reached only through
@@ -615,6 +624,7 @@ export const tsCloud: TsCloudConfig = {
       // Same database file as the main site — the API is where every write
       // actually lands, so the two must not drift onto separate copies.
       env: { HOST: '127.0.0.1', APP_ENV: 'production', NODE_ENV: 'production', DB_DATABASE_PATH },
+      exclude: SQLITE_EXCLUDES,
     },
   },
 }
