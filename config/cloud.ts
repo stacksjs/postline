@@ -22,9 +22,27 @@ export const tsCloud: TsCloudConfig = {
    * Project configuration
    */
   project: {
-    name: 'stacks',
-    slug: 'stacks',
-    region: 'us-east-1', // Default AWS region
+    name: 'postline',
+    slug: 'postline',
+    region: 'us-east-1',
+  },
+
+  stateDir: 'storage/cloud',
+
+  /**
+   * Postline is a tenant of the shared `stacks` Hetzner box, not the owner of
+   * its own server.
+   *
+   * `attachTo` is what makes that true rather than aspirational: it stops this
+   * project from provisioning or reconciling the box's infrastructure. The
+   * host also serves stacksjs.com, mail, PostgreSQL and ten other tenants, and
+   * its Hetzner firewall is reconciled from whichever config claims ownership
+   * — so deploying without this would silently rewrite the shared firewall
+   * from Postline's (much smaller) port list and drop public mail.
+   */
+  cloud: {
+    provider: 'hetzner',
+    attachTo: 'stacks',
   },
 
   /**
@@ -538,10 +556,21 @@ export const tsCloud: TsCloudConfig = {
    * For multi-site deployments
    */
   sites: {
+    // Served on its own subdomain rather than a path on stacksjs.com, so it
+    // never competes with the apex app's `/` route in the gateway's
+    // longest-prefix routing.
     main: {
-      root: '/var/www/app',
+      root: '.',
       path: '/',
-      domain: env.APP_DOMAIN || 'stacksjs.com',
+      domain: env.APP_DOMAIN || 'postline.stacksjs.com',
+      start: 'bun storage/framework/runtime/production/serve.js',
+      // Distinct from the apex app's :3000 — both processes share this box and
+      // the gateway proxies each subdomain to its own loopback port.
+      port: 3100,
+      preStart: [
+        'bun install --production',
+        './buddy migrate',
+      ],
     },
   },
 }
