@@ -91,6 +91,7 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/campaigns/post', 'Actions/Postline/CampaignPostSaveAction').middleware('auth').skipCsrf()
   route.post('/campaigns/post/move', 'Actions/Postline/CampaignPostMoveAction').middleware('auth').skipCsrf()
   route.post('/campaigns/post/delete', 'Actions/Postline/CampaignPostDeleteAction').middleware('auth').skipCsrf()
+  route.get('/campaigns/ai/status', 'Actions/Postline/CampaignAIStatusAction').middleware('auth').skipCsrf()
   route.post('/campaigns/generate', 'Actions/Postline/CampaignGenerateAction').middleware('auth').skipCsrf().rateLimit(10, 'hour')
   route.post('/campaigns/activate', 'Actions/Postline/CampaignActivateAction').middleware('auth').skipCsrf().rateLimit(5, 'hour')
   route.get('/listening', 'Actions/Postline/KeywordMonitorListAction').middleware('auth').skipCsrf()

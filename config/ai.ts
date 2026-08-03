@@ -8,7 +8,23 @@ import type { AiConfig } from '@stacksjs/types'
  * have any questions, feel free to reach out via Discord or GitHub Discussions.
  */
 export default {
-  default: 'openai',
+  default: Bun.env.AI_PROVIDER || 'openai',
+
+  drivers: {
+    openai: {
+      model: Bun.env.OPENAI_MODEL || 'gpt-4o',
+      maxTokens: 6000,
+      baseUrl: Bun.env.OPENAI_BASE_URL,
+    },
+    anthropic: {
+      model: Bun.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
+      maxTokens: 6000,
+    },
+    ollama: {
+      host: Bun.env.OLLAMA_HOST || 'http://localhost:11434',
+      model: Bun.env.OLLAMA_MODEL || 'llama3.2',
+    },
+  },
 
   models: [
     // 'amazon.titan-embed-text-v1',
