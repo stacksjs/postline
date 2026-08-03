@@ -94,6 +94,45 @@
   </section>
 
   <script client>
+    /**
+     * Wire shapes for `/api/postline/timeline`, declared where they are used.
+     *
+     * These describe what the BROWSER receives, which is a flattened projection
+     * of `app/Support/Social/types.ts` — deliberately separate, because the wire
+     * shape and the server shape are free to diverge. Local to this block on
+     * purpose: nothing outside this view refers to them, and a shared ambient
+     * `.d.ts` would be an unenforced second source of truth for one file's
+     * internals.
+     */
+    interface TimelineApiItem {
+      uri?: string | null
+      postUrl?: string | null
+      authorHandle?: string | null
+      authorName?: string | null
+      authorAvatar?: string | null
+      postedAt?: string | null
+      body?: string | null
+      replyCount?: number | null
+      repostCount?: number | null
+      likeCount?: number | null
+    }
+
+    /** A timeline post flattened to exactly what one row renders. */
+    interface TimelineRow {
+      handle: string
+      name: string
+      url: string
+      avatar: string
+      initials: string
+      gradient: string
+      postedAt: string
+      relativeTime: string
+      bodyHtml: string
+      replies: string
+      reposts: string
+      likes: string
+    }
+
     const items = state([])
     const metaText = state('Loading feed…')
     const refreshLabel = state('Refresh')

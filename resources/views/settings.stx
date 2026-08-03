@@ -67,6 +67,16 @@
 
 
   <script client>
+    /**
+     * The stored theme preference.
+     *
+     * `'system'`, not `'auto'` — the layout's pre-paint bootstrap matches on
+     * `'system'`, and `useColorMode` cannot be used here because it only reads
+     * localStorage after hydration begins (stacksjs/stx#1794) and writes a
+     * hard-coded `light|dark|auto` vocabulary (stacksjs/stx#1788).
+     */
+    type ThemePreference = 'light' | 'dark' | 'system'
+
     const readStoredTheme = () => {
       try {
         return localStorage.getItem('theme') || 'system'

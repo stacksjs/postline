@@ -116,6 +116,57 @@
 
 
   <script client>
+    /**
+     * Wire shapes for `/api/postline/queue/*`, declared where they are used.
+     *
+     * These describe what the BROWSER receives, which is a flattened projection
+     * of `app/Support/Social/types.ts` — deliberately separate, because the wire
+     * shape and the server shape are free to diverge. Local to this block on
+     * purpose: nothing outside this view refers to them, and a shared ambient
+     * `.d.ts` would be an unenforced second source of truth for one file's
+     * internals.
+     */
+    interface QueueApiTarget {
+      provider: string
+      failureReason?: string | null
+      remoteUri?: string | null
+    }
+
+    interface QueueApiItem {
+      id: number
+      status: string
+      body: string
+      title?: string | null
+      createdAt?: string | null
+      scheduledAt?: string | null
+      publishedAt?: string | null
+      hasImage?: boolean
+      hasLink?: boolean
+      providers: QueueApiTarget[]
+    }
+
+    /** A queue entry flattened to exactly what one row renders. */
+    interface QueueRow {
+      id: number
+      status: string
+      body: string
+      when: string
+      channels: string
+      failure: string
+      liveUrl: string
+      editUrl: string
+      actionable: boolean
+      scheduledAt?: string | null
+      publishedAt?: string | null
+      title?: string | null
+    }
+
+    /** Toast copy for a queue action's success branch. */
+    interface QueueActionCopy {
+      title: string
+      message: string
+    }
+
     const PENDING = new Set(['draft', 'scheduled', 'publishing', 'failed'])
     const ACTIONABLE = new Set(['draft', 'scheduled', 'failed'])
 
