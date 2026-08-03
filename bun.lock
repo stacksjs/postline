@@ -5,6 +5,7 @@
     "": {
       "name": "postline",
       "dependencies": {
+        "@stacksjs/ai": "^0.70.255",
         "@stacksjs/socials": "^0.70.253",
         "stacks": "^0.70.253",
       },
@@ -22,7 +23,7 @@
       "name": "hello-world-fx",
       "version": "0.70.40",
       "devDependencies": {
-        "stacks": "^0.70.217",
+        "stacks": "^0.70.253",
       },
     },
   },
@@ -41,7 +42,7 @@
 
     "@stacksjs/actions": ["@stacksjs/actions@0.70.253", "", { "dependencies": { "@stacksjs/bumpx": "^0.2.6", "@stacksjs/bunpress": "^0.1.18", "@stacksjs/config": "0.70.253", "@stacksjs/logsmith": "^0.2.3", "@stacksjs/registry": "0.70.253", "@stacksjs/stx": "^0.2.148", "@stacksjs/ts-cloud": "^0.7.92", "@stacksjs/ts-md": "^0.1.1" }, "peerDependencies": { "pickier": "^0.1.35" }, "optionalPeers": ["pickier"] }, "sha512-7diTGmawg+PqYf/sqqjz2TODacIOq1c2DBK7FJupzdGjroGONMpD8lBn/5pYka7im8O/KYneBsKn7xwVkM8i+Q=="],
 
-    "@stacksjs/ai": ["@stacksjs/ai@0.70.253", "", { "dependencies": { "@stacksjs/ts-cloud": "^0.7.92" }, "peerDependencies": { "@anthropic-ai/claude-agent-sdk": "^0.2.79" }, "optionalPeers": ["@anthropic-ai/claude-agent-sdk"] }, "sha512-5yE+Tu1C/VKO4iMDOXTtRp9ZslJ0pECGDR1kNwfqzQqfI5EH6LuALE38KBeZbdKNoJ6p7QOXQFXCvs6vUPEYmA=="],
+    "@stacksjs/ai": ["@stacksjs/ai@0.70.255", "", { "dependencies": { "@stacksjs/ts-cloud": "^0.7.92" }, "peerDependencies": { "@anthropic-ai/claude-agent-sdk": "^0.2.79" }, "optionalPeers": ["@anthropic-ai/claude-agent-sdk"] }, "sha512-9GZ0LE4PsnHtfzq+ysZKzmTIxPG4Opp1wYQV9oCgp/jIIHjK3Ev/joBqmUnbHm+IzJUjEANLq0LWTg1UG6U/Fw=="],
 
     "@stacksjs/alias": ["@stacksjs/alias@0.70.253", "", {}, "sha512-eHLX4Nz11zVQsrcwmg/+XLWcebM49oPI+uvhxk3BWO9qG+IcLpzmniJbPHfYBvHp6kZvO2rKfGGUtucWqjkxNg=="],
 
@@ -439,6 +440,8 @@
 
     "@stacksjs/browser-extension/ts-pantry": ["ts-pantry@0.11.12", "", { "dependencies": { "@stacksjs/ts-cloud": "^0.7.26", "bunfig": "^0.15.6", "ts-web-scraper": "^0.1.1" }, "bin": { "ts-pantry": "./dist/bin/cli.js" } }, "sha512-146XCJbLqS3/smBcB0pdaHwz2iuVORE6D0sAB+SsoMObms/4R7gCqIHv0T/wVEbV/42TEz0GVsLfMJ5eZ94gxw=="],
 
+    "@stacksjs/buddy/@stacksjs/ai": ["@stacksjs/ai@0.70.253", "", { "dependencies": { "@stacksjs/ts-cloud": "^0.7.92" }, "peerDependencies": { "@anthropic-ai/claude-agent-sdk": "^0.2.79" }, "optionalPeers": ["@anthropic-ai/claude-agent-sdk"] }, "sha512-5yE+Tu1C/VKO4iMDOXTtRp9ZslJ0pECGDR1kNwfqzQqfI5EH6LuALE38KBeZbdKNoJ6p7QOXQFXCvs6vUPEYmA=="],
+
     "@stacksjs/buddy/ts-pantry": ["ts-pantry@0.11.12", "", { "dependencies": { "@stacksjs/ts-cloud": "^0.7.26", "bunfig": "^0.15.6", "ts-web-scraper": "^0.1.1" }, "bin": { "ts-pantry": "./dist/bin/cli.js" } }, "sha512-146XCJbLqS3/smBcB0pdaHwz2iuVORE6D0sAB+SsoMObms/4R7gCqIHv0T/wVEbV/42TEz0GVsLfMJ5eZ94gxw=="],
 
     "@stacksjs/config/ts-pantry": ["ts-pantry@0.11.12", "", { "dependencies": { "@stacksjs/ts-cloud": "^0.7.26", "bunfig": "^0.15.6", "ts-web-scraper": "^0.1.1" }, "bin": { "ts-pantry": "./dist/bin/cli.js" } }, "sha512-146XCJbLqS3/smBcB0pdaHwz2iuVORE6D0sAB+SsoMObms/4R7gCqIHv0T/wVEbV/42TEz0GVsLfMJ5eZ94gxw=="],
@@ -450,5 +453,7 @@
     "@stacksjs/stx/ts-images": ["ts-images@0.1.11", "", { "dependencies": { "@stacksjs/ts-avif": "^0.1.0", "@stacksjs/ts-bmp": "^0.1.0", "@stacksjs/ts-png": "^0.1.2", "@stacksjs/ts-svg": "^0.1.1", "@stacksjs/ts-webp": "^0.1.0", "ts-gif": "^0.1.2", "ts-jpeg": "^0.3.1" }, "bin": { "imgx": "./dist/bin/cli.js" } }, "sha512-b5g1uADQR1Ytg4mS0EyFEce9jWhxC/kj1f5ChTVnnpPZV8NhI+aEW8YbH+LMDRCzCE1HRJiUIweUPqMkMAytIA=="],
 
     "@stacksjs/ts-analytics/bun-query-builder": ["bun-query-builder@0.1.63", "", { "dependencies": { "@stacksjs/clapp": "^0.2.0", "@stacksjs/ts-faker": "^0.1.8", "@stacksjs/ts-validation": "^0.5.0", "dynamodb-tooling": "^0.3.5" }, "bin": { "qb": "./dist/bin/cli.js", "qbx": "./dist/bin/cli.js", "query-builder": "./dist/bin/cli.js" } }, "sha512-cywlLKmwXCJAop8H7VwlHEbLKjy9KUfuyps1BGy4rkj2eSvMWU68bgkJlVC4+Q4rFFqMeGMXY78LyEgwU/QBDQ=="],
+
+    "stacks/@stacksjs/ai": ["@stacksjs/ai@0.70.253", "", { "dependencies": { "@stacksjs/ts-cloud": "^0.7.92" }, "peerDependencies": { "@anthropic-ai/claude-agent-sdk": "^0.2.79" }, "optionalPeers": ["@anthropic-ai/claude-agent-sdk"] }, "sha512-5yE+Tu1C/VKO4iMDOXTtRp9ZslJ0pECGDR1kNwfqzQqfI5EH6LuALE38KBeZbdKNoJ6p7QOXQFXCvs6vUPEYmA=="],
   }
 }
