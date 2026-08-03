@@ -115,7 +115,7 @@
     </div>
   </section>
 
-  <script>
+  <script client>
     ;(() => {
       const root = document.querySelector('[data-testid="composer-page"]')
       if (!root) return
@@ -165,8 +165,6 @@
       let postCounter = root.querySelectorAll('[data-composer-post]').length
       let activeMode = modeButtons.find(button => button.classList.contains('bg-panel'))?.dataset.composerMode || 'single'
       let savedActiveIndex = 0
-      let previewTimer
-      let draftSaveTimer
 
       let canPublish = false
       let providers = []
@@ -175,7 +173,7 @@
       // Edit mode: /?edit=<id> loads a queued post into the composer.
       const editBanner = root.querySelector('[data-edit-banner]')
       const composerHeading = root.querySelector('[data-composer-heading]')
-      const editParam = new URLSearchParams(window.location.search).get('edit')
+      const editParam = useRoute().query.edit || null
       let editingId = null
       let editHadImage = false
       let editRemoveImage = false
@@ -588,10 +586,10 @@
         catch {}
       }
 
-      const queueDraftSave = () => {
-        clearTimeout(draftSaveTimer)
-        draftSaveTimer = setTimeout(saveDraft, 100)
-      }
+      // useDebounce, not a bare timer: it cancels its own pending call and is
+      // torn down with the scope, so a pending save cannot fire against a
+      // detached DOM after an SPA swap.
+      const queueDraftSave = useDebounce(saveDraft, 100)
 
       const restoreDraft = () => {
         const draft = readDraft()
@@ -714,12 +712,8 @@
         }
       }
 
-      const queuePreviewUpdate = (post = activePost) => {
-        clearTimeout(previewTimer)
-        previewTimer = setTimeout(() => {
-          void updateLinkPreview(post)
-        }, 250)
-      }
+      const runPreviewUpdate = useDebounce((post) => { void updateLinkPreview(post) }, 250)
+      const queuePreviewUpdate = (post = activePost) => runPreviewUpdate(post)
 
       const renamePosts = () => {
         allPosts().forEach((post, index) => {
@@ -905,7 +899,7 @@
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not update the post.')
           setStatus('Post updated.', 'success', { title: 'Updated' })
           // Back to the queue to see the change.
-          window.location.assign('/queue')
+          navigate('/queue', true)
         }
         catch (error) {
           setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Update failed' })
@@ -1297,7 +1291,7 @@
       // reciprocal guard (never writing an edit back into the draft) lives in
       // saveDraft itself, so it holds for every caller.
       if (!editParam) {
-        window.addEventListener('beforeunload', saveDraft)
+        useEventListener('beforeunload', saveDraft, { target: window })
         restoreDraft()
       }
       setMode(activeMode, { silent: true, skipSave: true, skipThreadPost: true })
@@ -1310,7 +1304,7 @@
       // Load the edit post only after connection so provider toggles resolve.
       // /?schedule=YYYY-MM-DD (from the queue calendar) opens the schedule
       // input pre-set to 09:00 local on that day.
-      const scheduleParam = new URLSearchParams(window.location.search).get('schedule')
+      const scheduleParam = useRoute().query.schedule || null
       const applyScheduleParam = () => {
         if (!scheduleParam || !scheduleInput || !/^\d{4}-\d{2}-\d{2}$/.test(scheduleParam)) return
         scheduleInput.value = `${scheduleParam}T09:00`
@@ -1324,12 +1318,7 @@
         if (editParam) await loadEditPost(editParam)
         else applyScheduleParam()
       }
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => void start(), { once: true })
-      }
-      else {
-        void start()
-      }
+      onMount(() => { void start() })
     })()
   </script>
 @endsection

@@ -57,11 +57,12 @@ const BASELINE: Record<string, number> = {
   'dist-layout-published': 0, //  a layout emitted as a public page and put in the sitemap
 
   // --- debts, each with an owner ---
-  'dom-guard': 30, //             composer.stx + accounts.stx. Cleared by the signals migration.
+  'dom-guard': 24, //             composer.stx (11) + accounts.stx (13). The remaining composer
+  //                              hits are all document.createElement — cleared by declarative rendering.
   'inline-style-attr': 52, //     mostly the leftover desktop demo; the rest is pre-hydration
   //                              display:none, whose sanctioned form is a :class with literals.
   'plain-internal-anchor': 85, // rule 9 / StxLink. The marketing pages dominate this.
-  'unmanaged-timer': 2, //        rule 6.7 — both in composer.stx; useTimeout/useDebounce instead.
+  'unmanaged-timer': 0, //        cleared — composer's two timers are useDebounce now.
 }
 
 /**
@@ -328,5 +329,10 @@ if (update) {
 if (loosened && !update)
   console.log(`\n  ${loosened} check(s) improved. Lower their baselines so the ratchet holds.`)
 
-console.log(failed ? `\n  ${failed} gate(s) failed.\n` : '\n  All gates pass.\n')
+if (failed)
+  console.log(`\n  ${failed} gate(s) failed.\n`)
+else if (loosened)
+  console.log(`\n  No regressions — but ${loosened} baseline(s) are now stale.\n`)
+else
+  console.log('\n  All gates pass.\n')
 process.exit(failed || loosened ? 1 : 0)
