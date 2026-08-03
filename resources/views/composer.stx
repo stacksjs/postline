@@ -281,7 +281,7 @@
             selected: isSelected,
             over,
             title: !connected
-              ? `Connect ${label} on the Accounts page to crosspost here.`
+              ? `Connect ${label} in Settings → Channels to crosspost here.`
               : over
                 ? `Too long for ${label} — this target would be rejected.`
                 : '',
@@ -1060,7 +1060,7 @@
 
         const targetProviders = selectedConnected().map(provider => provider.provider)
         if (targetProviders.length === 0) {
-          setStatus('Select a connected account on the Accounts page before publishing.', 'error', { title: 'Not connected' })
+          setStatus('Select a connected account in Settings → Channels before publishing.', 'error', { title: 'Not connected' })
           return
         }
 
@@ -1245,9 +1245,9 @@
         try {
           await refreshConnection()
           setStatus(
-            canPublish ? 'Accounts are ready to publish.' : 'Connect an account on the Accounts page.',
+            canPublish ? 'Accounts are ready to publish.' : 'Connect an account in Settings → Channels.',
             canPublish ? 'success' : 'error',
-            { title: 'Accounts' },
+            { title: 'Channels' },
           )
         }
         finally {

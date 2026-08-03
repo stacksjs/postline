@@ -5,14 +5,19 @@
 @section('content')
   @meta('description', 'Configure Postline publishing defaults.')
   <section class="grid gap-5" data-postline-page="settings" data-testid="settings-page">
-    <header class="flex gap-4 items-center justify-between min-h-11">
+    <header class="grid gap-4 items-center sm:grid-cols-[minmax(0,1fr)_auto] min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Settings</p>
         <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Publishing</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-muted">Defaults for Postline. Bluesky credentials live on Accounts.</p>
+        <p class="mb-0 mt-1.5 text-[13px] text-muted">Configure how Postline looks, publishes, and connects.</p>
       </div>
-      <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-ink text-sm bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" @click="signOut">Sign out</button>
+      <button class="inline-flex items-center justify-center px-4 h-9 w-fit font-bold text-ink text-sm bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" @click="signOut">Sign out</button>
     </header>
+
+    <nav class="flex gap-1 p-1 w-fit bg-panel-3 border border-line rounded-xl" aria-label="Settings sections">
+      <a class="inline-flex items-center justify-center px-3 h-8 font-bold text-ink text-xs bg-panel border border-line rounded-lg shadow-sm" href="/settings" data-stx-link aria-current="page">General</a>
+      <a class="inline-flex items-center justify-center px-3 h-8 font-bold text-muted text-xs hover:text-ink rounded-lg transition-colors" href="/accounts" data-stx-link>Channels</a>
+    </nav>
 
     <section class="grid gap-3.5 lg:grid-cols-2">
       <article class="grid gap-3 lg:col-span-2 p-4 bg-panel border border-line rounded-2xl shadow-sm">
@@ -35,13 +40,13 @@
       <article class="grid gap-3 p-4 bg-panel border border-line rounded-2xl shadow-sm">
         <header class="flex gap-3 items-center justify-between pb-3 border-b border-line">
           <div>
-            <strong class="text-[13px]">Bluesky connection</strong>
+            <strong class="text-[13px]">Publishing channels</strong>
             <p class="mb-0 mt-1 text-muted text-xs" :text="blueskySummary()">Checking…</p>
           </div>
           <span class="px-2.5 py-1 font-bold text-[11px] border rounded-full" data-bluesky-pill :data-state="blueskyState()" :text="blueskyPill()">Checking</span>
         </header>
-        <p class="m-0 leading-relaxed text-[13px] text-body">Postline uses a Bluesky app password (not your main login). You can also set <code class="px-1 py-0.5 text-xs bg-panel-3 rounded">BLUESKY_IDENTIFIER</code> and <code class="px-1 py-0.5 text-xs bg-panel-3 rounded">BLUESKY_APP_PASSWORD</code> in <code class="px-1 py-0.5 text-xs bg-panel-3 rounded">.env</code> for local dev.</p>
-        <a class="inline-flex items-center justify-center px-4 h-9 w-fit font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" href="/accounts" data-stx-link>Manage on Accounts</a>
+        <p class="m-0 leading-relaxed text-[13px] text-body">Connect Bluesky, LinkedIn, Instagram, Threads, X, and Mastodon from the Channels section. Credentials stay in your workspace.</p>
+        <a class="inline-flex items-center justify-center px-4 h-9 w-fit font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" href="/accounts" data-stx-link>Manage channels</a>
       </article>
 
       <article class="grid gap-3 p-4 bg-panel border border-line rounded-2xl shadow-sm">

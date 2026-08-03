@@ -1,127 +1,149 @@
 @extends('layouts/postline')
 
-@section('title', 'Postline - Accounts')
+@section('title', 'Postline - Settings - Channels')
 
 @section('content')
-  @meta('description', 'Manage social publishing accounts and drivers in Postline.')
-  <section class="grid gap-5" data-postline-page="accounts" data-testid="accounts-page">
+  @meta('description', 'Connect and manage publishing channels in Postline settings.')
+  <section class="grid gap-4" data-postline-page="accounts" data-testid="accounts-page">
     <!-- Crosswind safelist: connection status-pill colors are set dynamically
         via JS, so list them in static markup for the CSS scanner. -->
     <div class="hidden text-amber-800 text-emerald-700 text-muted bg-amber-50 bg-emerald-50 border-amber-200 border-emerald-200 border-line" aria-hidden="true"></div>
-    <header class="flex gap-4 items-center justify-between min-h-11">
+    <header class="grid gap-4 items-center sm:grid-cols-[minmax(0,1fr)_auto] min-h-11">
       <div>
-        <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Accounts</p>
-        <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Publishing drivers</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-muted">Connect Bluesky, X, LinkedIn, Instagram, Threads, and Mastodon to publish and crosspost from Postline.</p>
+        <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Settings</p>
+        <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Connect your channels</h1>
+        <p class="mb-0 mt-1.5 text-[13px] text-muted">Bring every place you publish into one calm, reliable workspace.</p>
       </div>
+      <a class="inline-flex gap-2 items-center justify-center px-4 h-9 w-fit font-bold text-ink text-sm bg-panel hover:bg-white border border-line rounded-xl shadow-sm transition-colors" href="/composer" data-stx-link>
+        <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>
+        Open Composer
+      </a>
     </header>
 
-    <form id="bluesky-connect-form" class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] p-4 bg-panel border border-line rounded-2xl shadow-sm" data-bluesky-connect-form>
-      <label class="grid gap-1.5">
-        <span class="font-bold text-muted text-xs">Bluesky handle</span>
-        <input class="px-3 h-10 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="identifier" placeholder="name.bsky.social" autocomplete="username" data-bluesky-identifier required>
-      </label>
-      <label class="grid gap-1.5">
-        <span class="font-bold text-muted text-xs">App password</span>
-        <input class="px-3 h-10 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password" type="password" autocomplete="current-password" placeholder="xxxx-xxxx-xxxx-xxxx" data-bluesky-password required>
-      </label>
-      <div class="flex items-end">
-        <button class="inline-flex items-center justify-center px-4 h-10 w-full sm:w-auto font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" data-bluesky-connect-submit>Connect Bluesky</button>
-      </div>
-      <p class="sm:col-span-3 m-0 text-muted text-xs">Create an app password in Bluesky Settings → Privacy and security → App passwords.</p>
-    </form>
+    <nav class="flex gap-1 p-1 w-fit bg-panel-3 border border-line rounded-xl" aria-label="Settings sections">
+      <a class="inline-flex items-center justify-center px-3 h-8 font-bold text-muted text-xs hover:text-ink rounded-lg transition-colors" href="/settings" data-stx-link>General</a>
+      <a class="inline-flex items-center justify-center px-3 h-8 font-bold text-ink text-xs bg-panel border border-line rounded-lg shadow-sm" href="/accounts" data-stx-link aria-current="page">Channels</a>
+    </nav>
 
-    <section class="bg-panel border border-line rounded-2xl shadow-sm" data-bluesky-channel-card>
-      <header class="flex gap-3 items-center justify-between p-4 border-b border-line">
-        <strong class="text-[13px]">Channels</strong>
-        <span class="text-muted text-xs" data-bluesky-channel-pill>Loading…</span>
+    <div class="grid gap-3 sm:grid-cols-3">
+      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-blue-700 text-lg bg-blue-50 rounded-xl i-hugeicons-share-08" aria-hidden="true"></span>
+        <div><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Destinations</span><strong class="block mt-1 text-ink text-sm">7 publishing channels</strong></div>
+      </article>
+      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-emerald-700 text-lg bg-emerald-50 rounded-xl i-hugeicons-shield-key" aria-hidden="true"></span>
+        <div><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Credentials</span><strong class="block mt-1 text-ink text-sm">Stored in your workspace</strong></div>
+      </article>
+      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-violet-700 bg-violet-50 rounded-xl i-hugeicons-radar-02" aria-hidden="true"></span>
+        <div><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Listening</span><a class="block mt-1 font-bold text-ink text-sm hover:underline" href="/listening" data-stx-link>Watch brand mentions</a></div>
+      </article>
+    </div>
+
+    <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" data-bluesky-channel-card>
+      <header class="flex gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
+        <div><strong class="text-ink text-sm">Publishing destinations</strong><p class="m-0 mt-1 text-muted text-xs">Connect only the channels you actually use.</p></div>
+        <span class="px-2.5 py-1 font-bold text-[11px] text-muted bg-panel-2 border border-line rounded-full">7 destinations</span>
       </header>
-      <div class="grid gap-2.5 p-3" data-bluesky-channels>
-        <article class="flex flex-col gap-3 justify-between sm:flex-row sm:gap-5 sm:items-center p-3.5 bg-panel border border-line rounded-xl" data-channel="bluesky">
-          <div>
-            <h2 class="my-0 font-bold text-[15px]">Bluesky</h2>
+      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" data-bluesky-channels>
+        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="bluesky">
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-blue-600 text-xl bg-blue-50 rounded-xl i-simple-icons-bluesky" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-bluesky-channel-status>Setup</span></div>
+            <h2 class="mb-0 mt-4 font-bold text-[15px]">Bluesky</h2>
             <p class="my-1.5 text-[13px] text-body" data-bluesky-channel-handle>Not connected</p>
-            <span class="text-muted text-xs" data-bluesky-channel-detail>Add an app password to publish and sync your timeline.</span>
+            <p class="m-0 text-muted text-xs" data-bluesky-channel-detail>Add an app password to publish and sync your timeline.</p>
           </div>
-          <span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-bluesky-channel-status>Setup</span>
+          <details class="group">
+            <summary class="inline-flex items-center justify-center h-9 w-full font-bold list-none text-ink text-xs bg-panel-2 hover:bg-white border border-line rounded-xl transition-colors cursor-pointer">Manage Bluesky</summary>
+            <form id="bluesky-connect-form" class="grid gap-2 pt-3" data-bluesky-connect-form>
+              <input class="px-3 h-9 text-ink text-xs bg-white border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="identifier" placeholder="name.bsky.social" autocomplete="username" aria-label="Bluesky handle" data-bluesky-identifier required>
+              <input class="px-3 h-9 text-ink text-xs bg-white border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password" type="password" autocomplete="current-password" placeholder="App password" aria-label="Bluesky app password" data-bluesky-password required>
+              <button class="inline-flex items-center justify-center px-3 h-9 w-full font-bold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" data-bluesky-connect-submit>Connect Bluesky</button>
+              <p class="m-0 text-[11px] text-muted">Use an app password from Bluesky Settings, never your account password.</p>
+            </form>
+          </details>
         </article>
-        <article class="flex flex-col gap-3 justify-between sm:flex-row sm:gap-5 sm:items-center p-3.5 bg-panel border border-line rounded-xl" data-channel="linkedin">
-          <div>
-            <h2 class="my-0 font-bold text-[15px]">LinkedIn</h2>
+        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="linkedin">
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-[#0a66c2] text-xl bg-blue-50 rounded-xl i-simple-icons-linkedin" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-linkedin-channel-status>Setup</span></div>
+            <h2 class="mb-0 mt-4 font-bold text-[15px]">LinkedIn</h2>
             <p class="my-1.5 text-[13px] text-body" data-linkedin-channel-handle>Not connected</p>
-            <span class="text-muted text-xs" data-linkedin-channel-detail>Connect with LinkedIn to crosspost member shares.</span>
+            <p class="m-0 text-muted text-xs" data-linkedin-channel-detail>Connect with LinkedIn to crosspost member shares.</p>
           </div>
-          <div class="flex flex-col gap-2 items-end">
-            <span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-linkedin-channel-status>Setup</span>
-            <button class="inline-flex items-center justify-center px-3 h-9 font-bold text-sm text-white bg-[#0a66c2] hover:bg-[#0857a6] rounded-xl disabled:opacity-50 transition-colors" type="button" data-linkedin-connect>Connect with LinkedIn</button>
-            <button class="hidden text-muted text-xs underline hover:text-zinc-700 transition-colors" type="button" data-linkedin-connect-env>Use token from .env</button>
+          <div class="grid gap-2">
+            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-bold text-white text-xs bg-[#0a66c2] hover:bg-[#0857a6] rounded-xl disabled:opacity-50 transition-colors" type="button" data-linkedin-connect>Connect LinkedIn</button>
+            <button class="hidden text-muted text-xs underline hover:text-zinc-700 transition-colors" type="button" data-linkedin-connect-env>Use configured token</button>
           </div>
         </article>
-        <article class="flex flex-col gap-3 justify-between sm:flex-row sm:gap-5 sm:items-center p-3.5 bg-panel border border-line rounded-xl" data-channel="instagram">
-          <div>
-            <h2 class="my-0 font-bold text-[15px]">Instagram</h2>
+        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="instagram">
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-pink-600 text-xl bg-pink-50 rounded-xl i-simple-icons-instagram" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-instagram-channel-status>Setup</span></div>
+            <h2 class="mb-0 mt-4 font-bold text-[15px]">Instagram</h2>
             <p class="my-1.5 text-[13px] text-body" data-instagram-channel-handle>Not connected</p>
-            <span class="text-muted text-xs" data-instagram-channel-detail>Connect an Instagram Business account to crosspost. Posts require an image.</span>
+            <p class="m-0 text-muted text-xs" data-instagram-channel-detail>Connect an Instagram Business account to crosspost. Posts require an image.</p>
           </div>
-          <div class="flex flex-col gap-2 items-end">
-            <span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-instagram-channel-status>Setup</span>
-            <button class="inline-flex items-center justify-center px-3 h-9 font-bold text-sm text-white bg-gradient-to-tr from-amber-500 to-purple-600 via-pink-600 rounded-xl disabled:opacity-50 hover:opacity-90 transition-opacity" type="button" data-instagram-connect>Connect with Instagram</button>
-            <button class="hidden text-muted text-xs underline hover:text-zinc-700 transition-colors" type="button" data-instagram-connect-env>Use token from .env</button>
+          <div class="grid gap-2">
+            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-bold text-white text-xs bg-gradient-to-tr from-amber-500 to-purple-600 via-pink-600 rounded-xl disabled:opacity-50 hover:opacity-90 transition-opacity" type="button" data-instagram-connect>Connect Instagram</button>
+            <button class="hidden text-muted text-xs underline hover:text-zinc-700 transition-colors" type="button" data-instagram-connect-env>Use configured token</button>
           </div>
         </article>
-        <article class="flex flex-col gap-3 justify-between sm:flex-row sm:gap-5 sm:items-center p-3.5 bg-panel border border-line rounded-xl" data-channel="threads">
-          <div>
-            <h2 class="my-0 font-bold text-[15px]">Threads</h2>
+        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="threads">
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl i-simple-icons-threads" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-threads-channel-status>Setup</span></div>
+            <h2 class="mb-0 mt-4 font-bold text-[15px]">Threads</h2>
             <p class="my-1.5 text-[13px] text-body" data-threads-channel-handle>Not connected</p>
-            <span class="text-muted text-xs" data-threads-channel-detail>Connect a Threads account to crosspost.</span>
+            <p class="m-0 text-muted text-xs" data-threads-channel-detail>Connect a Threads account to crosspost.</p>
           </div>
-          <div class="flex flex-col gap-2 items-end">
-            <span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-threads-channel-status>Setup</span>
-            <button class="inline-flex items-center justify-center px-3 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" data-threads-connect>Connect with Threads</button>
-            <button class="hidden text-muted text-xs underline hover:text-zinc-700 transition-colors" type="button" data-threads-connect-env>Use token from .env</button>
+          <div class="grid gap-2">
+            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-bold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" data-threads-connect>Connect Threads</button>
+            <button class="hidden text-muted text-xs underline hover:text-zinc-700 transition-colors" type="button" data-threads-connect-env>Use configured token</button>
           </div>
         </article>
-        <article class="grid gap-3 p-3.5 bg-panel border border-line rounded-xl" data-channel="mastodon">
-          <div class="flex gap-5 items-center justify-between">
-            <div>
-              <h2 class="my-0 font-bold text-[15px]">Mastodon</h2>
-              <p class="my-1.5 text-[13px] text-body" data-mastodon-channel-handle>Not connected</p>
-              <span class="text-muted text-xs" data-mastodon-channel-detail>Connect any Mastodon instance with an access token to crosspost.</span>
-            </div>
-            <span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-mastodon-channel-status>Setup</span>
-          </div>
-          <form class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]" data-mastodon-connect-form>
-            <input class="px-3 h-9 text-ink text-sm bg-panel border border-line outline-none rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="instance" placeholder="mastodon.social" autocomplete="url" aria-label="Mastodon instance" data-mastodon-instance required>
-            <input class="px-3 h-9 text-ink text-sm bg-panel border border-line outline-none rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="access_token" type="password" placeholder="Access token" autocomplete="off" aria-label="Mastodon access token" data-mastodon-token required>
-            <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-lg disabled:opacity-50 transition-colors" type="submit" data-mastodon-connect-submit>Connect</button>
-            <p class="sm:col-span-3 m-0 text-muted text-xs">Create a token in your instance's Preferences → Development → New application (needs the <code class="px-1 py-0.5 text-xs bg-panel-3 rounded">write:statuses</code> + <code class="px-1 py-0.5 text-xs bg-panel-3 rounded">write:media</code> scopes).</p>
-          </form>
-        </article>
-        <article class="flex flex-col gap-3 justify-between sm:flex-row sm:gap-5 sm:items-center p-3.5 bg-panel border border-line rounded-xl" data-channel="twitter">
-          <div>
-            <h2 class="my-0 font-bold text-[15px]">X (Twitter)</h2>
+        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="twitter">
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 rounded-xl i-simple-icons-x" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-twitter-channel-status>Setup</span></div>
+            <h2 class="mb-0 mt-4 font-bold text-[15px]">X</h2>
             <p class="my-1.5 text-[13px] text-body" data-twitter-channel-handle>Not connected</p>
-            <span class="text-muted text-xs" data-twitter-channel-detail>Connect X to crosspost tweets. Posting needs a paid X API tier.</span>
+            <p class="m-0 text-muted text-xs" data-twitter-channel-detail>Connect X to crosspost tweets. Posting needs a paid X API tier.</p>
           </div>
-          <div class="flex flex-col gap-2 items-end">
-            <span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-twitter-channel-status>Setup</span>
-            <button class="inline-flex items-center justify-center px-3 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" data-twitter-connect>Connect with X</button>
-            <button class="hidden text-muted text-xs underline hover:text-zinc-700 transition-colors" type="button" data-twitter-connect-env>Use token from .env</button>
+          <div class="grid gap-2">
+            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-bold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" data-twitter-connect>Connect X</button>
+            <button class="hidden text-muted text-xs underline hover:text-zinc-700 transition-colors" type="button" data-twitter-connect-env>Use configured token</button>
           </div>
+        </article>
+        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="blog">
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl i-hugeicons-quill-write-02" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full">Ready</span></div>
+            <h2 class="mb-0 mt-4 font-bold text-[15px]">Blog</h2>
+            <p class="my-1.5 text-[13px] text-body">Built into Postline</p>
+            <p class="m-0 text-muted text-xs">Publish long-form posts to your site without another account.</p>
+          </div>
+          <a class="inline-flex items-center justify-center h-9 font-bold text-ink text-xs bg-panel-2 hover:bg-white border border-line rounded-xl" href="/blog" data-stx-link>Open Blog</a>
+        </article>
+        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="mastodon">
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-indigo-600 text-xl bg-indigo-50 rounded-xl i-simple-icons-mastodon" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-mastodon-channel-status>Setup</span></div>
+            <h2 class="mb-0 mt-4 font-bold text-[15px]">Mastodon</h2>
+            <p class="my-1.5 text-[13px] text-body" data-mastodon-channel-handle>Not connected</p>
+            <p class="m-0 text-muted text-xs" data-mastodon-channel-detail>Connect any Mastodon instance with an access token to crosspost.</p>
+          </div>
+          <details class="group">
+            <summary class="inline-flex items-center justify-center h-9 w-full font-bold list-none text-ink text-xs bg-panel-2 hover:bg-white border border-line rounded-xl transition-colors cursor-pointer">Manage Mastodon</summary>
+            <form class="grid gap-2 pt-3" data-mastodon-connect-form>
+              <input class="px-3 h-9 text-ink text-xs bg-white border border-line outline-none rounded-xl focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" name="instance" placeholder="mastodon.social" autocomplete="url" aria-label="Mastodon instance" data-mastodon-instance required>
+              <input class="px-3 h-9 text-ink text-xs bg-white border border-line outline-none rounded-xl focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" name="access_token" type="password" placeholder="Access token" autocomplete="off" aria-label="Mastodon access token" data-mastodon-token required>
+              <button class="inline-flex items-center justify-center px-3 h-9 w-full font-bold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" data-mastodon-connect-submit>Connect Mastodon</button>
+              <p class="m-0 text-[11px] text-muted">Create a token in your instance settings with status and media write access.</p>
+            </form>
+          </details>
         </article>
       </div>
     </section>
 
-    <section class="bg-panel border border-red-200 rounded-2xl shadow-sm" data-purge-card>
-      <header class="flex gap-3 items-center justify-between p-4 border-b border-red-200">
-        <div>
-          <strong class="text-[13px] text-red-700">Danger zone</strong>
-          <p class="mb-0 mt-1 text-[13px] text-muted">Permanently delete posts from your connected accounts. This cannot be undone.</p>
-        </div>
-        <span class="text-red-600 text-xl i-lucide-triangle-alert" aria-hidden="true"></span>
-      </header>
+    <details class="overflow-hidden bg-panel border border-line rounded-2xl open:border-red-200 shadow-sm group" data-purge-card>
+      <summary class="flex gap-3 items-center justify-between p-4 list-none hover:bg-panel-2 transition-colors cursor-pointer">
+        <div class="flex gap-3 items-center"><span class="grid place-items-center h-9 w-9 text-red-600 bg-red-50 rounded-xl i-lucide-triangle-alert" aria-hidden="true"></span><div>
+          <strong class="text-[13px] text-ink">Post removal tools</strong>
+          <p class="mb-0 mt-1 text-muted text-xs">Preview or permanently remove posts from connected accounts.</p>
+        </div></div>
+        <span class="h-4 w-4 text-muted transition-transform group-open:rotate-180 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
+      </summary>
 
-      <div class="grid gap-4 p-4">
+      <div class="grid gap-4 p-4 border-red-200 border-t">
+        <div class="flex gap-2 items-center p-3 text-red-800 text-xs bg-red-50 border border-red-200 rounded-xl"><span class="shrink-0 h-4 w-4 i-hugeicons-alert-02" aria-hidden="true"></span><span>Deletion is permanent. Postline always shows a preview and requires an exact confirmation phrase first.</span></div>
         <fieldset class="grid gap-2 m-0 p-0 border-0">
           <legend class="mb-1 p-0 font-bold text-muted text-xs">What to delete</legend>
           <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
@@ -175,7 +197,7 @@
           <p class="m-0 text-red-800 text-xs" data-purge-hint>Run a preview first, then type the phrase to enable deletion.</p>
         </div>
       </div>
-    </section>
+    </details>
   </section>
 
   <script>
@@ -190,7 +212,6 @@
       const handle = root.querySelector('[data-bluesky-channel-handle]')
       const detail = root.querySelector('[data-bluesky-channel-detail]')
       const status = root.querySelector('[data-bluesky-channel-status]')
-      const pill = root.querySelector('[data-bluesky-channel-pill]')
       const notify = (message, tone = 'neutral', options = {}) => {
         // Resolve the toast helper at call time — it's a deferred module that
         // loads after this inline script parses, so an eager capture is
@@ -222,7 +243,6 @@
                 : 'border-line text-muted'
           }`
         }
-        if (pill) pill.textContent = connected ? 'Bluesky ready' : 'Action required'
         if (submit) submit.textContent = connected ? 'Reconnect Bluesky' : 'Connect Bluesky'
       }
 
@@ -242,7 +262,7 @@
       form?.addEventListener('submit', async (event) => {
         event.preventDefault()
         submit?.setAttribute('disabled', 'disabled')
-        notify('Connecting to Bluesky…', 'info', { title: 'Accounts' })
+        notify('Connecting to Bluesky…', 'info', { title: 'Channels' })
 
         try {
           const response = await fetch('/api/postline/bluesky/connect', {
