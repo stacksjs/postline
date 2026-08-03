@@ -1,9 +1,9 @@
 @extends('layouts/postline')
 
 @section('title', 'Postline - Settings')
-@section('description', 'Configure Postline publishing defaults.')
 
 @section('content')
+  @meta('description', 'Configure Postline publishing defaults.')
   <section class="grid gap-5" data-postline-page="settings" data-testid="settings-page">
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>

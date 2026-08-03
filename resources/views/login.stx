@@ -1,9 +1,9 @@
 @extends('layouts/default')
 
 @section('title', 'Postline - Sign in')
-@section('description', 'Sign in to your Postline workspace.')
 
 @section('content')
+  @meta('description', 'Sign in to your Postline workspace.')
   <script>
     // Login uses a different layout, so it carries its own theme bootstrap.
     // Stays a plain pre-paint script on purpose: it must run before first paint,

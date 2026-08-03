@@ -1,70 +1,64 @@
-<!DOCTYPE html>
-<html lang="en" class="text-ink bg-bg">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light dark">
-    <meta name="description" content="@yield('description', 'Postline is a clean personal workspace for social publishing.')">
-    <title>@yield('title', 'Postline')</title>
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <script>
-      // Client-side auth guard: the server gate covers the listed pages,
-      // and this covers `/` (which can't be a protected prefix without
-      // also matching /login). The API rejects unauthenticated calls
-      // regardless — this is UX, not the security boundary.
-      ;(() => {
-        if (!/(?:^|;\s*)auth-token=/.test(document.cookie))
-          window.location.replace('/login')
-      })()
-    </script>
-    <script>
-      // Cookie → bearer bridge (app-owned so framework upgrades can't clobber
-      // it). bun-router's Auth middleware reads the Authorization header, but
-      // the page gate stores the token in the auth-token cookie — attach it to
-      // same-origin /api/ fetches so every page script authenticates without
-      // per-call plumbing. The frontend proxy forwards the header to the API.
-      ;(() => {
-        const nativeFetch = window.fetch.bind(window)
-        const readToken = () => document.cookie.match(/(?:^|;\s*)auth-token=([^;]+)/)?.[1]
-        window.fetch = (input, init = {}) => {
-          try {
-            const url = typeof input === 'string' ? input : input?.url || ''
-            const sameOriginApi = url.startsWith('/api/') || url.startsWith(`${window.location.origin}/api/`)
-            const token = readToken()
-            if (sameOriginApi && token) {
-              const headers = new Headers(init.headers || (typeof input !== 'string' ? input.headers : undefined))
-              if (!headers.has('authorization')) headers.set('authorization', `Bearer ${decodeURIComponent(token)}`)
-              return nativeFetch(input, { ...init, headers })
-            }
-          } catch {}
-          return nativeFetch(input, init)
-        }
-      })()
-    </script>
-    <script>
-      // Theme bootstrap — runs before paint to avoid a flash. Stored
-      // preference is 'light' | 'dark' | 'system' (default system).
-      ;(() => {
-        const root = document.documentElement
+@head
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <script>
+    // Client-side auth guard: the server gate covers the listed pages,
+    // and this covers `/` (which can't be a protected prefix without
+    // also matching /login). The API rejects unauthenticated calls
+    // regardless — this is UX, not the security boundary.
+    ;(() => {
+      if (!/(?:^|;\s*)auth-token=/.test(document.cookie))
+        window.location.replace('/login')
+    })()
+  </script>
+  <script>
+    // Cookie → bearer bridge (app-owned so framework upgrades can't clobber
+    // it). bun-router's Auth middleware reads the Authorization header, but
+    // the page gate stores the token in the auth-token cookie — attach it to
+    // same-origin /api/ fetches so every page script authenticates without
+    // per-call plumbing. The frontend proxy forwards the header to the API.
+    ;(() => {
+      const nativeFetch = window.fetch.bind(window)
+      const readToken = () => document.cookie.match(/(?:^|;\s*)auth-token=([^;]+)/)?.[1]
+      window.fetch = (input, init = {}) => {
         try {
-          const stored = window.localStorage?.getItem('theme') || 'system'
-          const dark = stored === 'dark' || (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-          root.classList.toggle('dark', dark)
-          root.setAttribute('data-theme', dark ? 'dark' : 'light')
-
-          const sidebarCollapsed = window.localStorage?.getItem('postline.sidebar.collapsed') === 'true'
-          root.classList.toggle('postline-sidebar-collapsed', sidebarCollapsed)
-          root.dataset.stxSidebarCollapsed = sidebarCollapsed ? 'true' : 'false'
-          root.style.setProperty('--postline-sidebar-width', sidebarCollapsed ? '0px' : '286px')
+          const url = typeof input === 'string' ? input : input?.url || ''
+          const sameOriginApi = url.startsWith('/api/') || url.startsWith(`${window.location.origin}/api/`)
+          const token = readToken()
+          if (sameOriginApi && token) {
+            const headers = new Headers(init.headers || (typeof input !== 'string' ? input.headers : undefined))
+            if (!headers.has('authorization')) headers.set('authorization', `Bearer ${decodeURIComponent(token)}`)
+            return nativeFetch(input, { ...init, headers })
+          }
         } catch {}
-      })()
-    </script>
-    <script>window.STX_ROUTER_OPTIONS = { container: '[data-postline-workspace]', viewTransitions: false };</script>
-    <link rel="stylesheet" href="/assets/styles/postline-toast.css">
-    <link rel="stylesheet" href="/assets/styles/postline-timeline.css">
-  </head>
-  <body class="min-h-screen min-w-80 antialiased font-sans text-ink bg-bg">
-    <div class="grid grid-cols-1 grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] lg:grid-rows-1 min-h-screen duration-200 ease-out transition-[grid-template-columns]" data-postline-app data-postline-shell>
+        return nativeFetch(input, init)
+      }
+    })()
+  </script>
+  <script>
+    // Theme bootstrap — runs before paint to avoid a flash. Stored
+    // preference is 'light' | 'dark' | 'system' (default system).
+    ;(() => {
+      const root = document.documentElement
+      try {
+        const stored = window.localStorage?.getItem('theme') || 'system'
+        const dark = stored === 'dark' || (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        root.classList.toggle('dark', dark)
+        root.setAttribute('data-theme', dark ? 'dark' : 'light')
+
+        const sidebarCollapsed = window.localStorage?.getItem('postline.sidebar.collapsed') === 'true'
+        root.classList.toggle('postline-sidebar-collapsed', sidebarCollapsed)
+        root.dataset.stxSidebarCollapsed = sidebarCollapsed ? 'true' : 'false'
+        root.style.setProperty('--postline-sidebar-width', sidebarCollapsed ? '0px' : '286px')
+      } catch {}
+    })()
+  </script>
+  <script>window.STX_ROUTER_OPTIONS = { container: '[data-postline-workspace]', viewTransitions: false };</script>
+  <link rel="stylesheet" href="/assets/styles/postline-toast.css">
+  <link rel="stylesheet" href="/assets/styles/postline-timeline.css">
+@endhead
+
+    <div class="grid grid-cols-1 grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] lg:grid-rows-1 min-h-screen min-w-80 antialiased font-sans text-ink bg-bg duration-200 ease-out transition-[grid-template-columns]" data-postline-app data-postline-shell>
       <PostlineSidebar />
 
       <div class="relative min-w-0 bg-bg" data-postline-content-shell>
@@ -310,5 +304,3 @@
       })()
     </script>
     @stack('scripts')
-  </body>
-</html>

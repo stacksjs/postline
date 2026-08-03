@@ -1,9 +1,9 @@
 @extends('layouts/postline')
 
 @section('title', 'Postline - Accounts')
-@section('description', 'Manage social publishing accounts and drivers in Postline.')
 
 @section('content')
+  @meta('description', 'Manage social publishing accounts and drivers in Postline.')
   <section class="grid gap-5" data-postline-page="accounts" data-testid="accounts-page">
     <!-- Crosswind safelist: connection status-pill colors are set dynamically
         via JS, so list them in static markup for the CSS scanner. -->

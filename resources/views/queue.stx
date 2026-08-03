@@ -1,9 +1,9 @@
 @extends('layouts/postline')
 
 @section('title', 'Postline - Queue')
-@section('description', 'Review scheduled and drafted social posts in Postline.')
 
 @section('content')
+  @meta('description', 'Review scheduled and drafted social posts in Postline.')
   <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
     <header class="flex flex-wrap gap-4 items-center justify-between min-h-11">
       <div>

@@ -1,9 +1,9 @@
 @extends('layouts/postline')
 
 @section('title', 'Postline - Timeline')
-@section('description', 'Read connected social timelines from Postline.')
 
 @section('content')
+  @meta('description', 'Read connected social timelines from Postline.')
   <section class="grid gap-4" data-postline-page="timeline" data-testid="timeline-page">
     <header class="flex flex-col gap-4 items-stretch justify-between sm:flex-row sm:items-center min-h-11">
       <div>

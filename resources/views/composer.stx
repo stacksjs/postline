@@ -1,9 +1,9 @@
 @extends('layouts/postline')
 
 @section('title', 'Postline - Composer')
-@section('description', 'Write, schedule, publish, and review social posts from a clean personal workspace.')
 
 @section('content')
+  @meta('description', 'Write, schedule, publish, and review social posts from a clean personal workspace.')
   <section class="grid gap-5" data-postline-page="composer" data-testid="composer-page">
     <!-- Crosswind safelist: utilities applied dynamically from the script below
         (provider toggles, active-post highlight, connection summary, char

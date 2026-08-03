@@ -1,9 +1,9 @@
 @extends('layouts/postline')
 
 @section('title', 'Postline - Analytics')
-@section('description', 'Review lightweight publishing analytics in Postline.')
 
 @section('content')
+  @meta('description', 'Review lightweight publishing analytics in Postline.')
   <section class="grid gap-5" data-postline-page="analytics" data-testid="analytics-page">
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
