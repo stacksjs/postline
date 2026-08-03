@@ -72,7 +72,7 @@
                 </a>
               </div>
               <!-- x-html, not interpolation: the body carries anchor markup for
-                  any URLs it contains. `linkifyBody` HTML-escapes the text
+                  any URLs it contains. linkifyBody HTML-escapes the text
                   BEFORE inserting anchors, so nothing user-authored is trusted. -->
               <p class="postline-feed-post__body" x-html="item.bodyHtml"></p>
               <div class="postline-feed-post__actions">

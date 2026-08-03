@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<!-- `marketing` opts this layout into the landing-page token set in
-    config/crosswind.ts: a light-locked palette with an emerald accent and
-    warmer surfaces. Without it the page falls back to the app tokens. -->
+<!-- The marketing class opts this layout into the landing-page token set in
+    config/crosswind.ts: a light-locked palette with its own accent and warmer
+    surfaces. Without it the page falls back to the app tokens. -->
 <html lang="en" class="text-ink bg-bg marketing">
   <head>
     <meta charset="utf-8">

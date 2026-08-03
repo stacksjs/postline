@@ -9,9 +9,9 @@
         (provider toggles, active-post highlight, connection summary, char
         counter, per-network override rows) must appear in static markup so the
         CSS scanner emits them.
-        `display:none` is inline, not a `hidden` class: this list now carries
-        layout utilities of its own (`grid`, `min-h-20`, `p-3`), and relying on
-        `hidden` to out-rank them would leave a visible empty block if the
+        display:none is inline, not a hidden class: this list now carries
+        layout utilities of its own (grid, min-h-20, p-3), and relying on
+        hidden to out-rank them would leave a visible empty block if the
         generated stylesheet ever ordered them the other way. -->
     <div class="grid gap-2 mt-2 p-2 p-3 min-h-20 min-h-7 leading-relaxed text-amber-700 text-emerald-800 text-ink text-muted text-muted text-on-accent text-red-700 text-sm text-zinc-400 bg-accent bg-emerald-400 bg-emerald-50 bg-emerald-500 bg-panel bg-panel-2 bg-panel-3 bg-red-500 bg-zinc-300 hover:bg-white border-blue-300 border-emerald-200 border-line border-neutral-950 outline-none rounded-lg rounded-xl shadow-sm cursor-not-allowed resize-none" style="display:none" aria-hidden="true"></div>
     <header class="flex gap-4 items-center justify-between min-h-11">

@@ -46,6 +46,41 @@ jobs:
       - name: Lint
         run: bun run lint
 
+  stx-gate:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Use cached node_modules
+        uses: actions/cache@v5
+        with:
+          path: node_modules
+          key: node-modules-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            node-modules-
+
+      - name: Install dependencies
+        run: bun install
+
+      # The build must run first: three of the gates inspect dist/, and they
+      # exist because a mis-resolved component once shipped every page with no
+      # navigation and a leaked home directory path — while the build exited 0.
+      - name: Build
+        run: ./buddy build
+
+      - name: stx gate
+        run: bun run gate
+
   typecheck:
     runs-on: ${{ matrix.os }}
 
