@@ -31,7 +31,6 @@
     "build": "./buddy build",
     "prod": "./buddy build",
     "deploy": "./buddy deploy",
-    "gate": "bun run scripts/stx-gate.ts",
     "lint": "./buddy lint",
     "lint:fix": "./buddy lint:fix",
     "format": "./buddy format",
