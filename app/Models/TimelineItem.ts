@@ -28,7 +28,7 @@ export default defineModel({
       required: true,
       fillable: true,
       default: 'bluesky',
-      validation: { rule: schema.enum(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin']).required() },
+      validation: { rule: schema.enum(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin', 'threads']).required() },
       factory: () => 'bluesky',
     },
     remoteUri: {

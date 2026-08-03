@@ -10,7 +10,7 @@ export default defineModel({
   traits: {
     useUuid: true,
     useTimestamps: true,
-    useSeeder: { count: 7 },
+    useSeeder: { count: 8 },
     useApi: {
       uri: 'social-drivers',
       routes: ['index', 'store', 'show', 'update', 'destroy'],
@@ -25,15 +25,15 @@ export default defineModel({
       unique: true,
       fillable: true,
       validation: {
-        rule: schema.enum(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin']).required(),
+        rule: schema.enum(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin', 'threads']).required(),
       },
-      factory: faker => faker.helpers.arrayElement(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin']),
+      factory: faker => faker.helpers.arrayElement(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin', 'threads']),
     },
     displayName: {
       required: true,
       fillable: true,
       validation: { rule: schema.string().required().min(2).max(80) },
-      factory: faker => faker.helpers.arrayElement(['Bluesky', 'Twitter/X', 'Mastodon', 'Facebook', 'Instagram', 'TikTok', 'LinkedIn']),
+      factory: faker => faker.helpers.arrayElement(['Bluesky', 'Twitter/X', 'Mastodon', 'Facebook', 'Instagram', 'TikTok', 'LinkedIn', 'Threads']),
     },
     status: {
       required: true,

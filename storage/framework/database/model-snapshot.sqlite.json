@@ -3,1101 +3,6 @@
     "dialect": "sqlite",
     "tables": [
       {
-        "table": "accounts",
-        "columns": [
-          {
-            "name": "id",
-            "type": "bigint",
-            "isPrimaryKey": true,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false
-          },
-          {
-            "name": "name",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false,
-            "maxLength": 120
-          },
-          {
-            "name": "workspace_name",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false,
-            "maxLength": 120
-          },
-          {
-            "name": "timezone",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "America/Los_Angeles",
-            "maxLength": 80
-          },
-          {
-            "name": "default_audience",
-            "type": "enum",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "public",
-            "enumValues": [
-              "public",
-              "followers",
-              "private"
-            ]
-          },
-          {
-            "name": "created_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "CURRENT_TIMESTAMP"
-          },
-          {
-            "name": "updated_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "uuid",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": true,
-            "isNullable": true,
-            "hasDefault": false
-          }
-        ],
-        "indexes": [
-          {
-            "name": "accounts_uuid_unique",
-            "columns": [
-              "uuid"
-            ],
-            "type": "unique"
-          }
-        ]
-      },
-      {
-        "table": "post_targets",
-        "columns": [
-          {
-            "name": "id",
-            "type": "bigint",
-            "isPrimaryKey": true,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false
-          },
-          {
-            "name": "provider",
-            "type": "enum",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false,
-            "enumValues": [
-              "bluesky",
-              "twitter",
-              "mastodon",
-              "facebook",
-              "instagram",
-              "tiktok",
-              "linkedin",
-              "threads",
-              "blog"
-            ]
-          },
-          {
-            "name": "status",
-            "type": "enum",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "draft",
-            "enumValues": [
-              "draft",
-              "scheduled",
-              "publishing",
-              "published",
-              "failed",
-              "skipped"
-            ]
-          },
-          {
-            "name": "scheduled_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "remote_uri",
-            "type": "text",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "remote_cid",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "maxLength": 255
-          },
-          {
-            "name": "failure_reason",
-            "type": "text",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "metrics",
-            "type": "json",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "post_id",
-            "type": "bigint",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "references": {
-              "table": "posts",
-              "column": "id"
-            }
-          },
-          {
-            "name": "social_driver_id",
-            "type": "bigint",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "references": {
-              "table": "social_drivers",
-              "column": "id"
-            }
-          },
-          {
-            "name": "social_identity_id",
-            "type": "bigint",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "references": {
-              "table": "social_identities",
-              "column": "id"
-            }
-          },
-          {
-            "name": "created_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "CURRENT_TIMESTAMP"
-          },
-          {
-            "name": "updated_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "uuid",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": true,
-            "isNullable": true,
-            "hasDefault": false
-          }
-        ],
-        "indexes": [
-          {
-            "name": "post_targets_provider_status_index",
-            "columns": [
-              "provider",
-              "status"
-            ],
-            "type": "index"
-          },
-          {
-            "name": "post_targets_uuid_unique",
-            "columns": [
-              "uuid"
-            ],
-            "type": "unique"
-          }
-        ]
-      },
-      {
-        "table": "social_identities",
-        "columns": [
-          {
-            "name": "id",
-            "type": "bigint",
-            "isPrimaryKey": true,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false
-          },
-          {
-            "name": "handle",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false,
-            "maxLength": 120
-          },
-          {
-            "name": "display_name",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "maxLength": 120
-          },
-          {
-            "name": "provider",
-            "type": "enum",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "bluesky",
-            "enumValues": [
-              "bluesky",
-              "twitter",
-              "mastodon",
-              "facebook",
-              "instagram",
-              "tiktok",
-              "linkedin"
-            ]
-          },
-          {
-            "name": "external_id",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "maxLength": 255
-          },
-          {
-            "name": "auth_status",
-            "type": "enum",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "connected",
-            "enumValues": [
-              "connected",
-              "expired",
-              "revoked",
-              "missing"
-            ]
-          },
-          {
-            "name": "access_token",
-            "type": "text",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "refresh_token",
-            "type": "text",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "account_id",
-            "type": "bigint",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "references": {
-              "table": "accounts",
-              "column": "id"
-            }
-          },
-          {
-            "name": "social_driver_id",
-            "type": "bigint",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "references": {
-              "table": "social_drivers",
-              "column": "id"
-            }
-          },
-          {
-            "name": "created_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "CURRENT_TIMESTAMP"
-          },
-          {
-            "name": "updated_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "uuid",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": true,
-            "isNullable": true,
-            "hasDefault": false
-          }
-        ],
-        "indexes": [
-          {
-            "name": "social_identities_uuid_unique",
-            "columns": [
-              "uuid"
-            ],
-            "type": "unique"
-          }
-        ]
-      },
-      {
-        "table": "media_assets",
-        "columns": [
-          {
-            "name": "id",
-            "type": "bigint",
-            "isPrimaryKey": true,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false
-          },
-          {
-            "name": "type",
-            "type": "enum",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "image",
-            "enumValues": [
-              "image",
-              "video",
-              "link"
-            ]
-          },
-          {
-            "name": "url",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false
-          },
-          {
-            "name": "alt_text",
-            "type": "text",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "mime_type",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "maxLength": 120
-          },
-          {
-            "name": "byte_size",
-            "type": "integer",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": true,
-            "defaultValue": 0
-          },
-          {
-            "name": "post_id",
-            "type": "bigint",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "references": {
-              "table": "posts",
-              "column": "id"
-            }
-          },
-          {
-            "name": "created_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "CURRENT_TIMESTAMP"
-          },
-          {
-            "name": "updated_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "uuid",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": true,
-            "isNullable": true,
-            "hasDefault": false
-          }
-        ],
-        "indexes": [
-          {
-            "name": "media_assets_uuid_unique",
-            "columns": [
-              "uuid"
-            ],
-            "type": "unique"
-          }
-        ]
-      },
-      {
-        "table": "timeline_items",
-        "columns": [
-          {
-            "name": "id",
-            "type": "bigint",
-            "isPrimaryKey": true,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false
-          },
-          {
-            "name": "provider",
-            "type": "enum",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "bluesky",
-            "enumValues": [
-              "bluesky",
-              "twitter",
-              "mastodon",
-              "facebook",
-              "instagram",
-              "tiktok",
-              "linkedin"
-            ]
-          },
-          {
-            "name": "remote_uri",
-            "type": "text",
-            "isPrimaryKey": false,
-            "isUnique": true,
-            "isNullable": false,
-            "hasDefault": false
-          },
-          {
-            "name": "author_handle",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false,
-            "maxLength": 120
-          },
-          {
-            "name": "author_name",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "maxLength": 120
-          },
-          {
-            "name": "body",
-            "type": "text",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false
-          },
-          {
-            "name": "posted_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false
-          },
-          {
-            "name": "like_count",
-            "type": "integer",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": true,
-            "defaultValue": 0
-          },
-          {
-            "name": "repost_count",
-            "type": "integer",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": true,
-            "defaultValue": 0
-          },
-          {
-            "name": "reply_count",
-            "type": "integer",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": true,
-            "defaultValue": 0
-          },
-          {
-            "name": "social_driver_id",
-            "type": "bigint",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "references": {
-              "table": "social_drivers",
-              "column": "id"
-            }
-          },
-          {
-            "name": "social_identity_id",
-            "type": "bigint",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "references": {
-              "table": "social_identities",
-              "column": "id"
-            }
-          },
-          {
-            "name": "created_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "CURRENT_TIMESTAMP"
-          },
-          {
-            "name": "updated_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "uuid",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": true,
-            "isNullable": true,
-            "hasDefault": false
-          }
-        ],
-        "indexes": [
-          {
-            "name": "timeline_items_provider_posted_at_index",
-            "columns": [
-              "provider",
-              "posted_at"
-            ],
-            "type": "index"
-          },
-          {
-            "name": "timeline_items_remote_uri_unique",
-            "columns": [
-              "remote_uri"
-            ],
-            "type": "unique"
-          },
-          {
-            "name": "timeline_items_uuid_unique",
-            "columns": [
-              "uuid"
-            ],
-            "type": "unique"
-          }
-        ]
-      },
-      {
-        "table": "blog_posts",
-        "columns": [
-          {
-            "name": "id",
-            "type": "bigint",
-            "isPrimaryKey": true,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false
-          },
-          {
-            "name": "title",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false,
-            "maxLength": 200
-          },
-          {
-            "name": "slug",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": true,
-            "isNullable": false,
-            "hasDefault": false,
-            "maxLength": 220
-          },
-          {
-            "name": "body",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false
-          },
-          {
-            "name": "excerpt",
-            "type": "text",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "status",
-            "type": "enum",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "draft",
-            "enumValues": [
-              "draft",
-              "published",
-              "archived"
-            ]
-          },
-          {
-            "name": "published_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "post_id",
-            "type": "bigint",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "references": {
-              "table": "posts",
-              "column": "id"
-            }
-          },
-          {
-            "name": "account_id",
-            "type": "bigint",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "references": {
-              "table": "accounts",
-              "column": "id"
-            }
-          },
-          {
-            "name": "created_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "CURRENT_TIMESTAMP"
-          },
-          {
-            "name": "updated_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "uuid",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": true,
-            "isNullable": true,
-            "hasDefault": false
-          }
-        ],
-        "indexes": [
-          {
-            "name": "blog_posts_status_published_at_index",
-            "columns": [
-              "status",
-              "published_at"
-            ],
-            "type": "index"
-          },
-          {
-            "name": "blog_posts_slug_unique",
-            "columns": [
-              "slug"
-            ],
-            "type": "unique"
-          },
-          {
-            "name": "blog_posts_uuid_unique",
-            "columns": [
-              "uuid"
-            ],
-            "type": "unique"
-          }
-        ]
-      },
-      {
-        "table": "social_drivers",
-        "columns": [
-          {
-            "name": "id",
-            "type": "bigint",
-            "isPrimaryKey": true,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false
-          },
-          {
-            "name": "provider",
-            "type": "enum",
-            "isPrimaryKey": false,
-            "isUnique": true,
-            "isNullable": false,
-            "hasDefault": false,
-            "enumValues": [
-              "bluesky",
-              "twitter",
-              "mastodon",
-              "facebook",
-              "instagram",
-              "tiktok",
-              "linkedin"
-            ]
-          },
-          {
-            "name": "display_name",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false,
-            "maxLength": 80
-          },
-          {
-            "name": "status",
-            "type": "enum",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "planned",
-            "enumValues": [
-              "active",
-              "planned",
-              "disabled"
-            ]
-          },
-          {
-            "name": "character_limit",
-            "type": "integer",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": 300
-          },
-          {
-            "name": "capabilities",
-            "type": "json",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "created_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "CURRENT_TIMESTAMP"
-          },
-          {
-            "name": "updated_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "uuid",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": true,
-            "isNullable": true,
-            "hasDefault": false
-          }
-        ],
-        "indexes": [
-          {
-            "name": "social_drivers_provider_unique",
-            "columns": [
-              "provider"
-            ],
-            "type": "unique"
-          },
-          {
-            "name": "social_drivers_uuid_unique",
-            "columns": [
-              "uuid"
-            ],
-            "type": "unique"
-          }
-        ]
-      },
-      {
-        "table": "posts",
-        "columns": [
-          {
-            "name": "id",
-            "type": "bigint",
-            "isPrimaryKey": true,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false
-          },
-          {
-            "name": "title",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "maxLength": 160
-          },
-          {
-            "name": "body",
-            "type": "text",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": false
-          },
-          {
-            "name": "status",
-            "type": "enum",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "draft",
-            "enumValues": [
-              "draft",
-              "scheduled",
-              "publishing",
-              "published",
-              "failed",
-              "archived"
-            ]
-          },
-          {
-            "name": "scheduled_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "published_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "timezone",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "America/Los_Angeles",
-            "maxLength": 80
-          },
-          {
-            "name": "thread_key",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "maxLength": 120
-          },
-          {
-            "name": "source",
-            "type": "enum",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "composer",
-            "enumValues": [
-              "composer",
-              "import",
-              "api"
-            ]
-          },
-          {
-            "name": "notes",
-            "type": "text",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "account_id",
-            "type": "bigint",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false,
-            "references": {
-              "table": "accounts",
-              "column": "id"
-            }
-          },
-          {
-            "name": "created_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": false,
-            "hasDefault": true,
-            "defaultValue": "CURRENT_TIMESTAMP"
-          },
-          {
-            "name": "updated_at",
-            "type": "datetime",
-            "isPrimaryKey": false,
-            "isUnique": false,
-            "isNullable": true,
-            "hasDefault": false
-          },
-          {
-            "name": "uuid",
-            "type": "string",
-            "isPrimaryKey": false,
-            "isUnique": true,
-            "isNullable": true,
-            "hasDefault": false
-          }
-        ],
-        "indexes": [
-          {
-            "name": "posts_status_scheduled_at_index",
-            "columns": [
-              "status",
-              "scheduled_at"
-            ],
-            "type": "index"
-          },
-          {
-            "name": "posts_uuid_unique",
-            "columns": [
-              "uuid"
-            ],
-            "type": "unique"
-          }
-        ]
-      },
-      {
         "table": "print_devices",
         "columns": [
           {
@@ -1202,6 +107,95 @@
         "indexes": [
           {
             "name": "print_devices_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
+      },
+      {
+        "table": "accounts",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 120
+          },
+          {
+            "name": "workspace_name",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 120
+          },
+          {
+            "name": "timezone",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "America/Los_Angeles",
+            "maxLength": 80
+          },
+          {
+            "name": "default_audience",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "public",
+            "enumValues": [
+              "public",
+              "followers",
+              "private"
+            ]
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "CURRENT_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "accounts_uuid_unique",
             "columns": [
               "uuid"
             ],
@@ -1657,6 +651,167 @@
           },
           {
             "name": "payments_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
+      },
+      {
+        "table": "campaign_posts",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 160
+          },
+          {
+            "name": "body",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "providers",
+            "type": "json",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "pillar",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "story",
+            "enumValues": [
+              "teaser",
+              "story",
+              "education",
+              "proof",
+              "launch",
+              "follow-up"
+            ]
+          },
+          {
+            "name": "status",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "idea",
+            "enumValues": [
+              "idea",
+              "ready",
+              "queued",
+              "published",
+              "skipped"
+            ]
+          },
+          {
+            "name": "scheduled_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "position",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": 0
+          },
+          {
+            "name": "launch_campaign_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "launch_campaigns",
+              "column": "id"
+            }
+          },
+          {
+            "name": "post_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "posts",
+              "column": "id"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "CURRENT_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "campaign_posts_campaign_scheduled_at_index",
+            "columns": [
+              "launch_campaign_id",
+              "scheduled_at"
+            ],
+            "type": "index"
+          },
+          {
+            "name": "campaign_posts_status_index",
+            "columns": [
+              "status"
+            ],
+            "type": "index"
+          },
+          {
+            "name": "campaign_posts_uuid_unique",
             "columns": [
               "uuid"
             ],
@@ -2701,6 +1856,174 @@
         ]
       },
       {
+        "table": "post_targets",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "provider",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "bluesky",
+              "twitter",
+              "mastodon",
+              "facebook",
+              "instagram",
+              "tiktok",
+              "linkedin",
+              "threads",
+              "blog"
+            ]
+          },
+          {
+            "name": "status",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "draft",
+            "enumValues": [
+              "draft",
+              "scheduled",
+              "publishing",
+              "published",
+              "failed",
+              "skipped"
+            ]
+          },
+          {
+            "name": "scheduled_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "remote_uri",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "remote_cid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 255
+          },
+          {
+            "name": "failure_reason",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "metrics",
+            "type": "json",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "post_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "posts",
+              "column": "id"
+            }
+          },
+          {
+            "name": "social_driver_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "social_drivers",
+              "column": "id"
+            }
+          },
+          {
+            "name": "social_identity_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "social_identities",
+              "column": "id"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "CURRENT_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "post_targets_provider_status_index",
+            "columns": [
+              "provider",
+              "status"
+            ],
+            "type": "index"
+          },
+          {
+            "name": "post_targets_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
+      },
+      {
         "table": "products",
         "columns": [
           {
@@ -3604,6 +2927,156 @@
         "indexes": [
           {
             "name": "labels_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
+      },
+      {
+        "table": "launch_campaigns",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 120
+          },
+          {
+            "name": "objective",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "audience",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "tone",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "clear",
+            "enumValues": [
+              "clear",
+              "bold",
+              "warm",
+              "technical",
+              "playful"
+            ]
+          },
+          {
+            "name": "status",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "draft",
+            "enumValues": [
+              "draft",
+              "active",
+              "paused",
+              "completed",
+              "archived"
+            ]
+          },
+          {
+            "name": "start_date",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "end_date",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "timezone",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "America/Los_Angeles",
+            "maxLength": 80
+          },
+          {
+            "name": "account_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "accounts",
+              "column": "id"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "CURRENT_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "launch_campaigns_status_start_date_index",
+            "columns": [
+              "status",
+              "start_date"
+            ],
+            "type": "index"
+          },
+          {
+            "name": "launch_campaigns_uuid_unique",
             "columns": [
               "uuid"
             ],
@@ -4979,6 +4452,269 @@
           },
           {
             "name": "teams_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
+      },
+      {
+        "table": "social_identities",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "handle",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 120
+          },
+          {
+            "name": "display_name",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 120
+          },
+          {
+            "name": "provider",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "bluesky",
+            "enumValues": [
+              "bluesky",
+              "twitter",
+              "mastodon",
+              "facebook",
+              "instagram",
+              "tiktok",
+              "linkedin",
+              "threads"
+            ]
+          },
+          {
+            "name": "external_id",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 255
+          },
+          {
+            "name": "auth_status",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "connected",
+            "enumValues": [
+              "connected",
+              "expired",
+              "revoked",
+              "missing"
+            ]
+          },
+          {
+            "name": "access_token",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "refresh_token",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "token_expires_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "account_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "accounts",
+              "column": "id"
+            }
+          },
+          {
+            "name": "social_driver_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "social_drivers",
+              "column": "id"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "CURRENT_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "social_identities_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
+      },
+      {
+        "table": "media_assets",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "type",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "image",
+            "enumValues": [
+              "image",
+              "video",
+              "link"
+            ]
+          },
+          {
+            "name": "url",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "alt_text",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "mime_type",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 120
+          },
+          {
+            "name": "byte_size",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": true,
+            "defaultValue": 0
+          },
+          {
+            "name": "post_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "posts",
+              "column": "id"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "CURRENT_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "media_assets_uuid_unique",
             "columns": [
               "uuid"
             ],
@@ -6698,6 +6434,180 @@
         ]
       },
       {
+        "table": "timeline_items",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "provider",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "bluesky",
+            "enumValues": [
+              "bluesky",
+              "twitter",
+              "mastodon",
+              "facebook",
+              "instagram",
+              "tiktok",
+              "linkedin",
+              "threads"
+            ]
+          },
+          {
+            "name": "remote_uri",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "author_handle",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 120
+          },
+          {
+            "name": "author_name",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 120
+          },
+          {
+            "name": "body",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "posted_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "like_count",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": true,
+            "defaultValue": 0
+          },
+          {
+            "name": "repost_count",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": true,
+            "defaultValue": 0
+          },
+          {
+            "name": "reply_count",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": true,
+            "defaultValue": 0
+          },
+          {
+            "name": "social_driver_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "social_drivers",
+              "column": "id"
+            }
+          },
+          {
+            "name": "social_identity_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "social_identities",
+              "column": "id"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "CURRENT_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "timeline_items_provider_posted_at_index",
+            "columns": [
+              "provider",
+              "posted_at"
+            ],
+            "type": "index"
+          },
+          {
+            "name": "timeline_items_remote_uri_unique",
+            "columns": [
+              "remote_uri"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "timeline_items_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
+      },
+      {
         "table": "loyalty_points",
         "columns": [
           {
@@ -6971,6 +6881,148 @@
           }
         ],
         "indexes": []
+      },
+      {
+        "table": "blog_posts",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 200
+          },
+          {
+            "name": "slug",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 220
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "excerpt",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "status",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "draft",
+            "enumValues": [
+              "draft",
+              "published",
+              "archived"
+            ]
+          },
+          {
+            "name": "published_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "post_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "posts",
+              "column": "id"
+            }
+          },
+          {
+            "name": "account_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "accounts",
+              "column": "id"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "CURRENT_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "blog_posts_status_published_at_index",
+            "columns": [
+              "status",
+              "published_at"
+            ],
+            "type": "index"
+          },
+          {
+            "name": "blog_posts_slug_unique",
+            "columns": [
+              "slug"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "blog_posts_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
       },
       {
         "table": "subscriptions",
@@ -8140,6 +8192,118 @@
         ]
       },
       {
+        "table": "social_drivers",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "provider",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "bluesky",
+              "twitter",
+              "mastodon",
+              "facebook",
+              "instagram",
+              "tiktok",
+              "linkedin",
+              "threads"
+            ]
+          },
+          {
+            "name": "display_name",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 80
+          },
+          {
+            "name": "status",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "planned",
+            "enumValues": [
+              "active",
+              "planned",
+              "disabled"
+            ]
+          },
+          {
+            "name": "character_limit",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": 300
+          },
+          {
+            "name": "capabilities",
+            "type": "json",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "CURRENT_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "social_drivers_provider_unique",
+            "columns": [
+              "provider"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "social_drivers_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
+      },
+      {
         "table": "cart_items",
         "columns": [
           {
@@ -8561,10 +8725,168 @@
             "type": "unique"
           }
         ]
+      },
+      {
+        "table": "posts",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 160
+          },
+          {
+            "name": "body",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "status",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "draft",
+            "enumValues": [
+              "draft",
+              "scheduled",
+              "publishing",
+              "published",
+              "failed",
+              "archived"
+            ]
+          },
+          {
+            "name": "scheduled_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "published_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "timezone",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "America/Los_Angeles",
+            "maxLength": 80
+          },
+          {
+            "name": "thread_key",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 120
+          },
+          {
+            "name": "source",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "composer",
+            "enumValues": [
+              "composer",
+              "import",
+              "api"
+            ]
+          },
+          {
+            "name": "notes",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "account_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "accounts",
+              "column": "id"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "CURRENT_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "posts_status_scheduled_at_index",
+            "columns": [
+              "status",
+              "scheduled_at"
+            ],
+            "type": "index"
+          },
+          {
+            "name": "posts_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
       }
     ]
   },
-  "hash": "0f5d1d78568205c0daca513cbaae9fdea817d01ff894f956e3a50c5d0db048fb",
+  "hash": "277dbe22c6dab68109d2e61afa045bc36f2ea9ba3488b2feb8e2e7ff145d59cb",
   "dialect": "sqlite",
-  "updatedAt": "2026-08-01T18:57:29.045Z"
+  "updatedAt": "2026-08-03T15:21:38.616Z"
 }

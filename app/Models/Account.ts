@@ -17,7 +17,7 @@ export default defineModel({
     },
   },
 
-  hasMany: ['SocialIdentity', 'Post'],
+  hasMany: ['SocialIdentity', 'Post', 'BlogPost', 'LaunchCampaign', 'PurgeRun'],
 
   attributes: {
     name: {

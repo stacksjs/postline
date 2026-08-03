@@ -1,6 +1,8 @@
 import type { AppConfig } from '@stacksjs/types'
 import { env } from '@stacksjs/env'
 
+type PostlineAppConfig = AppConfig & { appPath: string }
+
 /**
  * **Application Configuration**
  *
@@ -13,6 +15,7 @@ export default {
   description: 'A clean personal workspace for writing, scheduling, publishing, and reading social timelines.',
   env: env.APP_ENV ?? 'local',
   url: env.APP_URL ?? 'postline.localhost',
+  appPath: '/composer',
   redirectUrls: ['postline.localhost', 'bsky.app'],
   debug: env.DEBUG ?? false,
   key: env.APP_KEY,
@@ -27,4 +30,4 @@ export default {
   locale: 'en',
   fallbackLocale: 'en',
   cipher: 'aes-256-cbc',
-} satisfies AppConfig
+} satisfies PostlineAppConfig

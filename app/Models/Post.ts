@@ -28,7 +28,7 @@ export default defineModel({
   },
 
   belongsTo: ['Account'],
-  hasMany: ['PostTarget', 'MediaAsset'],
+  hasMany: ['PostTarget', 'MediaAsset', 'BlogPost', 'CampaignPost'],
 
   attributes: {
     title: {

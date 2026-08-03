@@ -1,0 +1,682 @@
+@extends('layouts/postline')
+
+@section('title', 'Postline - Campaigns')
+@section('description', 'Plan multi-week social launches, draft campaign posts with AI, and send them into the Postline queue.')
+
+@section('content')
+  <section class="grid gap-4 campaigns-page" data-postline-page="campaigns" data-testid="campaigns-page">
+    <header class="flex flex-wrap gap-3 items-center justify-between min-h-11">
+      <div class="min-w-0">
+        <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Campaign Builder</p>
+        <div class="flex flex-wrap gap-2 items-center">
+          <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Plan the whole launch</h1>
+          <span class="campaign-status" :data-status="campaign()?.status" x-show="campaign()" :text="campaign()?.status"></span>
+        </div>
+        <p class="mb-0 mt-1.5 text-[13px] text-muted">Shape the story across weeks, then move the finished plan into your publishing queue.</p>
+      </div>
+      <div class="flex flex-wrap gap-2 items-center">
+        <label class="sr-only" for="campaign-picker">Current campaign</label>
+        <select id="campaign-picker" class="px-3 h-9 min-w-44 text-[13px] text-ink bg-panel border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40" x-show="campaignsList().length" @change="selectCampaign($event.target.value)">
+          <option x-for="option in campaignsList()" :value="option.id" :selected="option.id === campaign()?.id">{{ option.name }}</option>
+        </select>
+        <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Campaign view" x-show="campaign()">
+          <button class="campaign-view-toggle" type="button" :data-active="view() === 'calendar'" @click="view.set('calendar')">
+            <span class="h-3.5 w-3.5 i-hugeicons-calendar-03" aria-hidden="true"></span><span>Calendar</span>
+          </button>
+          <button class="campaign-view-toggle" type="button" :data-active="view() === 'list'" @click="view.set('list')">
+            <span class="h-3.5 w-3.5 i-hugeicons-menu-01" aria-hidden="true"></span><span>List</span>
+          </button>
+        </div>
+        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" type="button" @click="openCampaignForm()">
+          <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
+          <span>New campaign</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="campaign-kpis" x-show="campaign()">
+      <div><span>Window</span><strong :text="campaignWindow()">-</strong></div>
+      <div><span>Planned</span><strong>{{ posts().length }}</strong></div>
+      <div><span>Ready</span><strong>{{ readyCount() }}</strong></div>
+      <div><span>In queue</span><strong>{{ queuedCount() }}</strong></div>
+    </div>
+
+    <div class="campaign-loading" x-show="loading()" aria-live="polite">
+      <div></div><div></div><div></div>
+      <p>Opening your campaign workspace...</p>
+    </div>
+
+    <section class="campaign-empty" x-show="!loading() && !campaign() && panelMode() !== 'campaign'">
+      <span class="campaign-empty__mark i-hugeicons-flowchart-01" aria-hidden="true"></span>
+      <p>Campaigns turn a launch brief into a sequence of useful posts.</p>
+      <h2>Start with the story, not the schedule.</h2>
+      <p class="campaign-empty__copy">Set the goal and launch window. Postline will give you a six-week planning board you can fill by hand or draft with AI.</p>
+      <button class="inline-flex gap-2 items-center justify-center px-5 h-10 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" type="button" @click="openCampaignForm()">
+        <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
+        Create a campaign
+      </button>
+    </section>
+
+    <div class="campaign-workspace" x-show="!loading() && (campaign() || panelMode() === 'campaign')">
+      <section class="campaign-board" x-show="campaign()">
+        <header class="campaign-board__header">
+          <div class="flex gap-2 items-center">
+            <button class="campaign-icon-button" type="button" aria-label="Previous six weeks" @click="shiftCalendar(-42)"><span class="i-hugeicons-arrow-left-02" aria-hidden="true"></span></button>
+            <button class="campaign-today-button" type="button" @click="goToCampaign">Campaign start</button>
+            <button class="campaign-icon-button" type="button" aria-label="Next six weeks" @click="shiftCalendar(42)"><span class="i-hugeicons-arrow-right-02" aria-hidden="true"></span></button>
+          </div>
+          <div class="min-w-0 text-right">
+            <strong :text="calendarTitle()">Six-week plan</strong>
+            <span>Drag any unqueued post to move it</span>
+          </div>
+        </header>
+
+        <div class="campaign-calendar-wrap" x-show="view() === 'calendar'">
+          <div class="campaign-calendar">
+            <div class="campaign-weekday">Sun</div><div class="campaign-weekday">Mon</div><div class="campaign-weekday">Tue</div><div class="campaign-weekday">Wed</div><div class="campaign-weekday">Thu</div><div class="campaign-weekday">Fri</div><div class="campaign-weekday">Sat</div>
+            <div
+              class="campaign-day"
+              x-for="cell in calendarCells()"
+              :data-today="cell.today"
+              :data-outside="cell.outside"
+              :data-drop-active="dragOverDay() === cell.key"
+              @dragover="allowDrop($event, cell.key)"
+              @dragleave="leaveDrop(cell.key)"
+              @drop="dropOnDay($event, cell.key)"
+            >
+              <header>
+                <span>{{ cell.day }}</span>
+                <button type="button" :aria-label="`Add post on ${cell.label}`" @click="openPostForm(null, cell.key)"><span class="i-hugeicons-plus-sign" aria-hidden="true"></span></button>
+              </header>
+              <div class="campaign-day__posts">
+                <article
+                  class="campaign-post-card"
+                  x-for="item in cell.posts"
+                  :data-pillar="item.pillar"
+                  :data-queued="!!item.postId"
+                  :draggable="!item.postId"
+                  @dragstart="beginDrag($event, item)"
+                  @dragend="endDrag"
+                  @click="openPostForm(item)"
+                  tabindex="0"
+                  role="button"
+                >
+                  <div class="campaign-post-card__meta">
+                    <span>{{ timeLabel(item.scheduledAt) }}</span>
+                    <span>{{ item.pillar }}</span>
+                  </div>
+                  <strong>{{ item.title }}</strong>
+                  <p>{{ item.body }}</p>
+                  <footer>
+                    <span class="campaign-provider-stack"><i x-for="provider in item.providers.slice(0, 3)" :title="providerLabel(provider)">{{ providerInitial(provider) }}</i></span>
+                    <span class="campaign-post-state" :data-status="item.status">{{ item.status }}</span>
+                  </footer>
+                </article>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="campaign-list" x-show="view() === 'list'">
+          <div class="campaign-list__empty" x-show="posts().length === 0">No posts planned yet. Add one or ask the planner to draft a sequence.</div>
+          <article class="campaign-list-row" x-for="item in posts()" @click="openPostForm(item)" tabindex="0" role="button">
+            <div class="campaign-list-row__date">
+              <strong>{{ shortDate(item.scheduledAt) }}</strong>
+              <span>{{ timeLabel(item.scheduledAt) }}</span>
+            </div>
+            <div class="campaign-list-row__copy">
+              <strong>{{ item.title }}</strong>
+              <p>{{ item.body }}</p>
+            </div>
+            <span class="campaign-pillar-label" :data-pillar="item.pillar">{{ item.pillar }}</span>
+            <span class="campaign-list-row__channels">{{ item.providers.map(providerLabel).join(', ') }}</span>
+            <span class="campaign-post-state" :data-status="item.status">{{ item.status }}</span>
+          </article>
+        </div>
+      </section>
+
+      <aside class="campaign-panel" aria-label="Campaign tools">
+        <section x-show="panelMode() === 'planner' && campaign()">
+          <header class="campaign-panel__heading">
+            <span class="i-hugeicons-ai-beautify" aria-hidden="true"></span>
+            <div><strong>Plan with AI</strong><p>Draft the sequence, then make every post yours.</p></div>
+          </header>
+
+          <div class="campaign-brief-card">
+            <div><span>Goal</span><p :text="campaign()?.objective || 'Add a campaign goal to focus the plan.'"></p></div>
+            <div><span>Audience</span><p :text="campaign()?.audience || 'Your existing social audience.'"></p></div>
+            <div class="campaign-brief-pair"><p><span>Tone</span><strong :text="campaign()?.tone"></strong></p><p><span>Duration</span><strong :text="`${campaignDuration()} days`"></strong></p></div>
+          </div>
+
+          <label class="campaign-field">
+            <span>Channels</span>
+            <div class="campaign-channel-picker" x-show="connectedProviders().length">
+              <button type="button" x-for="provider in connectedProviders()" :data-selected="plannerProviders().includes(provider.provider)" @click="togglePlannerProvider(provider.provider)">
+                <i>{{ providerInitial(provider.provider) }}</i><span>{{ providerLabel(provider.provider) }}</span>
+              </button>
+            </div>
+            <a class="campaign-connect-link" href="/accounts" data-stx-link x-show="providersLoaded() && connectedProviders().length === 0">Connect a social account before planning posts.</a>
+            <small x-show="!providersLoaded()">Checking connected accounts...</small>
+          </label>
+
+          <label class="campaign-field">
+            <span>Creative direction <small>optional</small></span>
+            <textarea rows="4" placeholder="Topics to include, proof points, launch moments..." x-model="direction"></textarea>
+          </label>
+          <label class="campaign-field campaign-field--row">
+            <span>Number of posts</span>
+            <select x-model="generationCount">
+              <option value="6">6 posts</option><option value="8">8 posts</option><option value="12">12 posts</option><option value="16">16 posts</option>
+            </select>
+          </label>
+
+          <button class="campaign-ai-button" type="button" :disabled="busy() || plannerProviders().length === 0" @click="generatePlan">
+            <span class="i-hugeicons-ai-beautify" aria-hidden="true"></span>
+            <span :text="busyAction() === 'generate' ? 'Building the plan...' : posts().length ? 'Add another sequence' : 'Draft campaign plan'"></span>
+          </button>
+          <p class="campaign-ai-note" x-show="lastPlanMode()">{{ lastPlanMode() === 'ai' ? 'Drafted with your configured AI provider.' : 'Drafted with Postline\'s local planning template. Add an AI key in settings for custom generation.' }}</p>
+
+          <div class="campaign-panel__actions" x-show="posts().length">
+            <button type="button" @click="openCampaignForm(campaign())">Edit brief</button>
+            <button type="button" @click="openPostForm(null)">Add post</button>
+          </div>
+
+          <div class="campaign-schedule-box" x-show="unqueuedCount()">
+            <div><strong>Ready for the queue?</strong><p>This creates scheduled posts. Future edits move to Queue.</p></div>
+            <button type="button" :disabled="busy()" @click="activateCampaign">
+              <span class="i-hugeicons-calendar-check-in-01" aria-hidden="true"></span>
+              <span :text="busyAction() === 'activate' ? 'Scheduling...' : `Schedule ${unqueuedCount()} posts`"></span>
+            </button>
+          </div>
+        </section>
+
+        <template :if="panelMode() === 'campaign'">
+        <section>
+          <header class="campaign-panel__heading">
+            <span class="i-hugeicons-rocket-01" aria-hidden="true"></span>
+            <div><strong :text="campaignDraftId() ? 'Edit campaign brief' : 'New campaign'"></strong><p>The brief keeps every post pointed at the same outcome.</p></div>
+          </header>
+          <form class="campaign-form" @submit="saveCampaign($event)">
+            <label class="campaign-field"><span>Name</span><input ref="campaignNameInput" required maxlength="120" placeholder="Autumn product launch" x-model="campaignName"></label>
+            <label class="campaign-field"><span>Goal</span><textarea ref="campaignObjectiveInput" required rows="4" placeholder="What should this campaign make happen?" x-model="campaignObjective"></textarea></label>
+            <label class="campaign-field"><span>Audience</span><input ref="campaignAudienceInput" placeholder="Founders planning a launch" x-model="campaignAudience"></label>
+            <label class="campaign-field"><span>Tone</span><select ref="campaignToneInput" x-model="campaignTone"><option value="clear">Clear</option><option value="bold">Bold</option><option value="warm">Warm</option><option value="technical">Technical</option><option value="playful">Playful</option></select></label>
+            <div class="campaign-form__dates">
+              <label class="campaign-field"><span>Start</span><input ref="campaignStartDateInput" required type="date" x-model="campaignStartDate"></label>
+              <label class="campaign-field"><span>End</span><input ref="campaignEndDateInput" required type="date" x-model="campaignEndDate"></label>
+            </div>
+            <div class="campaign-form__footer">
+              <button class="campaign-secondary-button" type="button" @click="closePanel">Cancel</button>
+              <button class="campaign-primary-button" type="submit" :disabled="busy()"><span :text="busyAction() === 'campaign' ? 'Saving...' : 'Save campaign'"></span></button>
+            </div>
+          </form>
+        </section>
+        </template>
+
+        <template :if="panelMode() === 'post'">
+        <section>
+          <header class="campaign-panel__heading">
+            <span class="i-hugeicons-edit-02" aria-hidden="true"></span>
+            <div><strong :text="postDraftId() ? 'Edit planned post' : 'Add planned post'"></strong><p x-show="!queuedPostId()">Tune the copy, channels, pillar, and timing.</p><p x-show="queuedPostId()">This post is already in Queue.</p></div>
+          </header>
+          <form class="campaign-form" @submit="savePost($event)">
+            <div class="campaign-queued-notice" x-show="queuedPostId()"><span class="i-hugeicons-checkmark-circle-02" aria-hidden="true"></span><p><strong>{{ postTitle() }}</strong><span>{{ postBody() }}</span><small>Publishing owns this post now. Open it in Queue to edit or reschedule.</small></p></div>
+            <div class="grid gap-4" x-show="!queuedPostId()">
+              <label class="campaign-field"><span>Working title</span><input ref="postTitleInput" required maxlength="160" placeholder="The first signal" x-model="postTitle"></label>
+              <label class="campaign-field"><span>Post copy</span><textarea ref="postBodyInput" required rows="8" maxlength="4000" placeholder="Write the post..." x-model="postBody"></textarea><small>{{ postBody().length }} characters</small></label>
+              <div class="campaign-form__dates">
+                <label class="campaign-field"><span>Date and time</span><input ref="postScheduledAtInput" required type="datetime-local" x-model="postScheduledAt"></label>
+                <label class="campaign-field"><span>Pillar</span><select ref="postPillarInput" x-model="postPillar"><option value="teaser">Teaser</option><option value="story">Story</option><option value="education">Education</option><option value="proof">Proof</option><option value="launch">Launch</option><option value="follow-up">Follow-up</option></select></label>
+              </div>
+              <label class="campaign-field"><span>Channels</span><div class="campaign-channel-picker"><button type="button" x-for="provider in connectedProviders()" :data-selected="postProviders().includes(provider.provider)" @click="togglePostProvider(provider.provider)"><i>{{ providerInitial(provider.provider) }}</i><span>{{ providerLabel(provider.provider) }}</span></button></div></label>
+              <label class="campaign-ready-check"><input type="checkbox" :checked="postStatus() === 'ready'" @change="postStatus.set($event.target.checked ? 'ready' : 'idea')"><span><strong>Mark ready</strong><small>Ready posts still stay in the plan until you schedule the campaign.</small></span></label>
+            </div>
+            <div class="campaign-form__footer">
+              <button class="campaign-danger-button" type="button" x-show="postDraftId() && !queuedPostId()" @click="deletePost">Delete</button>
+              <button class="campaign-secondary-button" type="button" @click="closePanel">Close</button>
+              <a class="campaign-primary-button" x-show="queuedPostId()" :href="`/?edit=${queuedPostId()}`" data-stx-link>Edit in Queue</a>
+              <button class="campaign-primary-button" type="submit" x-show="!queuedPostId()" :disabled="busy()"><span :text="busyAction() === 'post' ? 'Saving...' : 'Save post'"></span></button>
+            </div>
+          </form>
+        </section>
+        </template>
+      </aside>
+    </div>
+
+    <div class="campaign-toast" :data-tone="notice().tone" x-show="notice().message" role="status" aria-live="polite">
+      <span :class="notice().tone === 'error' ? 'i-hugeicons-alert-02' : 'i-hugeicons-checkmark-circle-02'" aria-hidden="true"></span>
+      <p><strong>{{ notice().title }}</strong><span>{{ notice().message }}</span></p>
+      <button type="button" aria-label="Dismiss" @click="notice.set({ title: '', message: '', tone: 'success' })"><span class="i-hugeicons-cancel-01" aria-hidden="true"></span></button>
+    </div>
+  </section>
+
+  <link rel="stylesheet" href="/assets/styles/postline-campaigns.css">
+
+  <script client>
+    const campaignsList = state([])
+    const campaign = state(null)
+    const posts = state([])
+    const loading = state(true)
+    const busyAction = state('')
+    const panelMode = state('planner')
+    const view = useLocalStorage('postline.campaigns.view', 'calendar')
+    const connectedProviders = state([])
+    const providersLoaded = state(false)
+    const plannerProviders = state([])
+    const generationCount = state(8)
+    const direction = state('')
+    const lastPlanMode = state('')
+    const calendarStart = state('')
+    const draggedPostId = state(0)
+    const dragOverDay = state('')
+    const notice = state({ title: '', message: '', tone: 'success' })
+    const campaignDraftId = state(0)
+    const campaignName = state('')
+    const campaignObjective = state('')
+    const campaignAudience = state('')
+    const campaignTone = state('clear')
+    const initialCampaignDraft = emptyCampaignDraft()
+    const campaignStartDate = state(initialCampaignDraft.startDate)
+    const campaignEndDate = state(initialCampaignDraft.endDate)
+    const postDraftId = state(0)
+    const queuedPostId = state(0)
+    const postTitle = state('')
+    const postBody = state('')
+    const postProviders = state([])
+    const postPillar = state('story')
+    const postStatus = state('idea')
+    const postScheduledAt = state('')
+    const campaignNameInput = useRef('campaignNameInput')
+    const campaignObjectiveInput = useRef('campaignObjectiveInput')
+    const campaignAudienceInput = useRef('campaignAudienceInput')
+    const campaignToneInput = useRef('campaignToneInput')
+    const campaignStartDateInput = useRef('campaignStartDateInput')
+    const campaignEndDateInput = useRef('campaignEndDateInput')
+    const postTitleInput = useRef('postTitleInput')
+    const postBodyInput = useRef('postBodyInput')
+    const postScheduledAtInput = useRef('postScheduledAtInput')
+    const postPillarInput = useRef('postPillarInput')
+    const noticeTimeout = useTimeout(() => notice.set({ title: '', message: '', tone: 'success' }), 5200)
+
+    const busy = derived(() => Boolean(busyAction()))
+    const readyCount = derived(() => posts().filter(item => item.status === 'ready').length)
+    const queuedCount = derived(() => posts().filter(item => item.postId).length)
+    const unqueuedCount = derived(() => posts().filter(item => !item.postId && item.status !== 'skipped').length)
+
+    function dateKey(date) {
+      return date.toISOString().slice(0, 10)
+    }
+
+    function parseDay(key) {
+      return new Date(`${String(key).slice(0, 10)}T12:00:00`)
+    }
+
+    function addDays(key, amount) {
+      const date = parseDay(key)
+      date.setDate(date.getDate() + amount)
+      return dateKey(date)
+    }
+
+    function sundayFor(key) {
+      const date = parseDay(key)
+      date.setDate(date.getDate() - date.getDay())
+      return dateKey(date)
+    }
+
+    function emptyCampaignDraft() {
+      const start = new Date()
+      start.setDate(start.getDate() + 1)
+      const end = new Date(start)
+      end.setDate(end.getDate() + 41)
+      return { id: 0, name: '', objective: '', audience: '', tone: 'clear', startDate: dateKey(start), endDate: dateKey(end) }
+    }
+
+    function emptyPostDraft(day) {
+      const key = day || campaign()?.startDate || dateKey(new Date())
+      return { id: 0, postId: null, title: '', body: '', providers: [...plannerProviders()], pillar: 'story', status: 'idea', scheduledAt: `${key}T09:00` }
+    }
+
+    function providerLabel(provider) {
+      return postlineSocial?.providerLabel(provider) || `${provider.charAt(0).toUpperCase()}${provider.slice(1)}`
+    }
+
+    function providerInitial(provider) {
+      const initials = { bluesky: 'B', twitter: 'X', mastodon: 'M', instagram: 'I', linkedin: 'in', threads: 'T', blog: 'W' }
+      return initials[provider] || provider.charAt(0).toUpperCase()
+    }
+
+    function timeLabel(value) {
+      const raw = String(value || '')
+      const parts = raw.slice(11, 16).split(':')
+      const hour = Number(parts[0] || 0)
+      return `${hour % 12 || 12}:${parts[1] || '00'} ${hour >= 12 ? 'PM' : 'AM'}`
+    }
+
+    function shortDate(value) {
+      return parseDay(String(value).slice(0, 10)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', weekday: 'short' })
+    }
+
+    const campaignWindow = derived(() => {
+      const current = campaign()
+      if (!current) return '-'
+      const start = parseDay(current.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      const end = parseDay(current.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      return `${start} - ${end}`
+    })
+
+    const campaignDuration = derived(() => {
+      const current = campaign()
+      if (!current) return 0
+      return Math.max(1, Math.round((parseDay(current.endDate) - parseDay(current.startDate)) / 86400000) + 1)
+    })
+
+    const calendarTitle = derived(() => {
+      if (!calendarStart()) return 'Six-week plan'
+      const start = parseDay(calendarStart())
+      const end = parseDay(addDays(calendarStart(), 41))
+      const first = start.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })
+      const last = end.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+      return `${first} - ${last}`
+    })
+
+    const calendarCells = derived(() => {
+      if (!calendarStart()) return []
+      const current = campaign()
+      const today = dateKey(new Date())
+      return Array.from({ length: 42 }, (_, index) => {
+        const key = addDays(calendarStart(), index)
+        const date = parseDay(key)
+        return {
+          key,
+          day: date.getDate(),
+          label: date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' }),
+          today: key === today,
+          outside: current ? key < current.startDate || key > current.endDate : false,
+          posts: posts().filter(item => item.scheduledAt.slice(0, 10) === key),
+        }
+      })
+    })
+
+    async function api(path, fields, method = 'POST') {
+      const body = new FormData()
+      for (const [key, value] of Object.entries(fields || {})) {
+        if (value !== undefined && value !== null) body.set(key, Array.isArray(value) ? value.join(',') : String(value))
+      }
+      const response = await fetch(path, method === 'GET' ? undefined : { method, body })
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Request failed.')
+      return payload.data
+    }
+
+    function showNotice(title, message, tone = 'success') {
+      notice.set({ title, message, tone })
+      noticeTimeout.start()
+    }
+
+    async function loadCampaigns(selectedId) {
+      loading.set(true)
+      try {
+        const query = selectedId ? `?id=${encodeURIComponent(selectedId)}` : ''
+        const data = await api(`/api/postline/campaigns${query}`, {}, 'GET')
+        campaignsList.set(data.campaigns || [])
+        campaign.set(data.selected?.campaign || null)
+        posts.set(data.selected?.posts || [])
+        if (campaign()) calendarStart.set(sundayFor(campaign().startDate))
+      }
+      catch (error) {
+        showNotice('Could not open campaigns', error instanceof Error ? error.message : String(error), 'error')
+      }
+      finally {
+        loading.set(false)
+      }
+    }
+
+    async function loadProviders() {
+      try {
+        const all = await postlineSocial.fetchProviders()
+        const connected = all.filter(item => item.connected && item.canPublish)
+        connectedProviders.set(connected)
+        plannerProviders.set(connected.map(item => item.provider))
+      }
+      catch {
+        connectedProviders.set([])
+      }
+      finally {
+        providersLoaded.set(true)
+      }
+    }
+
+    function selectCampaign(id) {
+      panelMode.set('planner')
+      void loadCampaigns(Number(id))
+    }
+
+    function openCampaignForm(current) {
+      const source = current || null
+      const draft = source
+        ? { id: source.id, name: source.name, objective: source.objective, audience: source.audience, tone: source.tone, startDate: source.startDate, endDate: source.endDate }
+        : emptyCampaignDraft()
+      campaignDraftId.set(draft.id)
+      campaignName.set(draft.name)
+      campaignObjective.set(draft.objective)
+      campaignAudience.set(draft.audience)
+      campaignTone.set(draft.tone)
+      campaignStartDate.set(draft.startDate)
+      campaignEndDate.set(draft.endDate)
+      panelMode.set('campaign')
+      void nextTick(() => {
+        void nextTick(() => {
+          if (campaignNameInput.current) campaignNameInput.current.value = draft.name
+          if (campaignObjectiveInput.current) campaignObjectiveInput.current.value = draft.objective
+          if (campaignAudienceInput.current) campaignAudienceInput.current.value = draft.audience
+          if (campaignToneInput.current) campaignToneInput.current.value = draft.tone
+          if (campaignStartDateInput.current) campaignStartDateInput.current.value = draft.startDate
+          if (campaignEndDateInput.current) campaignEndDateInput.current.value = draft.endDate
+        })
+      })
+    }
+
+    function openPostForm(item, day) {
+      if (!campaign()) return
+      const draft = item
+        ? { ...item, scheduledAt: item.scheduledAt.replace(' ', 'T').slice(0, 16), providers: [...item.providers] }
+        : emptyPostDraft(day)
+      postDraftId.set(draft.id)
+      queuedPostId.set(draft.postId || 0)
+      postTitle.set(draft.title)
+      postBody.set(draft.body)
+      postProviders.set([...draft.providers])
+      postPillar.set(draft.pillar)
+      postStatus.set(draft.status)
+      postScheduledAt.set(draft.scheduledAt)
+      panelMode.set('post')
+      void nextTick(() => {
+        void nextTick(() => {
+          if (postTitleInput.current) postTitleInput.current.value = draft.title
+          if (postBodyInput.current) postBodyInput.current.value = draft.body
+          if (postScheduledAtInput.current) postScheduledAtInput.current.value = draft.scheduledAt
+          if (postPillarInput.current) postPillarInput.current.value = draft.pillar
+        })
+      })
+    }
+
+    function closePanel() {
+      panelMode.set(campaign() ? 'planner' : '')
+    }
+
+    async function saveCampaign(event) {
+      event.preventDefault()
+      busyAction.set('campaign')
+      try {
+        const data = await api('/api/postline/campaigns', {
+          id: campaignDraftId() || undefined,
+          name: campaignName(),
+          objective: campaignObjective(),
+          audience: campaignAudience(),
+          tone: campaignTone(),
+          start_date: campaignStartDate(),
+          end_date: campaignEndDate(),
+        })
+        await loadCampaigns(data.campaign.id)
+        panelMode.set('planner')
+        showNotice(campaignDraftId() ? 'Brief updated' : 'Campaign created', `${data.campaign.name} is ready to plan.`)
+      }
+      catch (error) {
+        showNotice('Could not save campaign', error instanceof Error ? error.message : String(error), 'error')
+      }
+      finally {
+        busyAction.set('')
+      }
+    }
+
+    function togglePlannerProvider(provider) {
+      const current = plannerProviders()
+      plannerProviders.set(current.includes(provider) ? current.filter(value => value !== provider) : [...current, provider])
+    }
+
+    function togglePostProvider(provider) {
+      if (queuedPostId()) return
+      const current = postProviders()
+      postProviders.set(current.includes(provider) ? current.filter(value => value !== provider) : [...current, provider])
+    }
+
+    async function savePost(event) {
+      event.preventDefault()
+      if (queuedPostId()) return
+      busyAction.set('post')
+      try {
+        await api('/api/postline/campaigns/post', {
+          campaign_id: campaign().id,
+          id: postDraftId() || undefined,
+          title: postTitle(),
+          body: postBody(),
+          providers: postProviders(),
+          pillar: postPillar(),
+          status: postStatus(),
+          scheduled_at: postScheduledAt().replace('T', ' '),
+        })
+        await loadCampaigns(campaign().id)
+        panelMode.set('planner')
+        showNotice(postDraftId() ? 'Post updated' : 'Post added', 'The campaign plan is up to date.')
+      }
+      catch (error) {
+        showNotice('Could not save post', error instanceof Error ? error.message : String(error), 'error')
+      }
+      finally {
+        busyAction.set('')
+      }
+    }
+
+    async function deletePost() {
+      if (!postDraftId() || queuedPostId()) return
+      busyAction.set('delete')
+      try {
+        await api('/api/postline/campaigns/post/delete', { campaign_id: campaign().id, id: postDraftId() })
+        await loadCampaigns(campaign().id)
+        panelMode.set('planner')
+        showNotice('Post removed', 'The rest of the campaign is unchanged.')
+      }
+      catch (error) {
+        showNotice('Could not remove post', error instanceof Error ? error.message : String(error), 'error')
+      }
+      finally {
+        busyAction.set('')
+      }
+    }
+
+    async function generatePlan() {
+      if (!campaign() || plannerProviders().length === 0) return
+      busyAction.set('generate')
+      try {
+        const data = await api('/api/postline/campaigns/generate', {
+          campaign_id: campaign().id,
+          count: generationCount(),
+          providers: plannerProviders(),
+          direction: direction(),
+        })
+        lastPlanMode.set(data.mode)
+        await loadCampaigns(campaign().id)
+        showNotice('Plan drafted', `${data.posts.length} posts were added across the campaign window.`)
+      }
+      catch (error) {
+        showNotice('Could not draft the plan', error instanceof Error ? error.message : String(error), 'error')
+      }
+      finally {
+        busyAction.set('')
+      }
+    }
+
+    async function activateCampaign() {
+      if (!campaign() || !unqueuedCount()) return
+      busyAction.set('activate')
+      try {
+        const data = await api('/api/postline/campaigns/activate', { campaign_id: campaign().id })
+        await loadCampaigns(campaign().id)
+        const detail = data.errors.length ? `${data.queued} scheduled. ${data.errors.length} need attention.` : `${data.queued} posts are now in Queue.`
+        showNotice(data.errors.length ? 'Campaign partly scheduled' : 'Campaign scheduled', detail, data.errors.length ? 'error' : 'success')
+      }
+      catch (error) {
+        showNotice('Could not schedule campaign', error instanceof Error ? error.message : String(error), 'error')
+      }
+      finally {
+        busyAction.set('')
+      }
+    }
+
+    function beginDrag(event, item) {
+      if (item.postId) return
+      draggedPostId.set(item.id)
+      event.dataTransfer.effectAllowed = 'move'
+      event.dataTransfer.setData('text/plain', String(item.id))
+    }
+
+    function allowDrop(event, day) {
+      if (!draggedPostId()) return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+      dragOverDay.set(day)
+    }
+
+    function leaveDrop(day) {
+      if (dragOverDay() === day) dragOverDay.set('')
+    }
+
+    async function dropOnDay(event, day) {
+      event.preventDefault()
+      const id = draggedPostId() || Number(event.dataTransfer.getData('text/plain'))
+      const item = posts().find(candidate => candidate.id === id)
+      dragOverDay.set('')
+      draggedPostId.set(0)
+      if (!item || item.postId || item.scheduledAt.slice(0, 10) === day) return
+      const previous = item.scheduledAt
+      const next = `${day} ${item.scheduledAt.slice(11, 19) || '09:00:00'}`
+      posts.set(posts().map(candidate => candidate.id === id ? { ...candidate, scheduledAt: next } : candidate))
+      try {
+        await api('/api/postline/campaigns/post/move', { campaign_id: campaign().id, id, scheduled_at: next })
+        showNotice('Post moved', `${item.title} is now planned for ${shortDate(next)}.`)
+      }
+      catch (error) {
+        posts.set(posts().map(candidate => candidate.id === id ? { ...candidate, scheduledAt: previous } : candidate))
+        showNotice('Could not move post', error instanceof Error ? error.message : String(error), 'error')
+      }
+    }
+
+    function endDrag() {
+      draggedPostId.set(0)
+      dragOverDay.set('')
+    }
+
+    function shiftCalendar(days) {
+      calendarStart.set(addDays(calendarStart(), days))
+    }
+
+    function goToCampaign() {
+      if (campaign()) calendarStart.set(sundayFor(campaign().startDate))
+    }
+
+    onMount(() => {
+      void loadCampaigns()
+      void loadProviders()
+    })
+  </script>
+@endsection

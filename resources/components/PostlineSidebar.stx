@@ -17,6 +17,7 @@ const navLinks = [
   { href: '/timeline', label: 'Timeline', shortcut: '3', icon: 'i-hugeicons-news' },
   { href: '/analytics', label: 'Analytics', shortcut: '4', icon: 'i-hugeicons-chart-line-data-01' },
   { href: '/accounts', label: 'Accounts', shortcut: '5', icon: 'i-hugeicons-user-multiple' },
+  { href: '/campaigns', label: 'Campaigns', shortcut: '6', icon: 'i-hugeicons-flowchart-01' },
 ].map((link) => ({
   ...link,
   active: link.href === '/'
@@ -113,7 +114,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
       >
         <span class="h-[18px] w-[18px] text-muted i-hugeicons-quill-write-02" aria-hidden="true"></span>
         <span class="flex-1 font-medium truncate" data-sidebar-expanded>Blog</span>
-        <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>6</span>
+        <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>7</span>
       </a>
     </nav>
 
@@ -128,7 +129,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
     >
       <span class="h-[18px] w-[18px] i-hugeicons-settings-02 {{ settingsActive ? 'text-ink' : 'text-muted' }}" aria-hidden="true"></span>
       <span class="flex-1 font-medium" data-sidebar-expanded>Settings</span>
-      <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>7</span>
+      <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>8</span>
     </a>
   </aside>
   </div>

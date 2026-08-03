@@ -1,1 +1,0 @@
-CREATE INDEX IF NOT EXISTS "blog_posts_blog_posts_status_published_at_index" ON "blog_posts" ("status", "published_at");

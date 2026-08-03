@@ -37,7 +37,7 @@ export default defineModel({
       required: true,
       fillable: true,
       default: 'bluesky',
-      validation: { rule: schema.enum(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin']).required() },
+      validation: { rule: schema.enum(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin', 'threads']).required() },
       factory: () => 'bluesky',
     },
     externalId: {
@@ -65,6 +65,13 @@ export default defineModel({
       hidden: true,
       fillable: true,
       validation: { rule: schema.string().max(4000).optional() },
+      factory: () => null,
+    },
+    tokenExpiresAt: {
+      required: false,
+      hidden: true,
+      fillable: true,
+      validation: { rule: schema.timestamp().optional() },
       factory: () => null,
     },
   },
