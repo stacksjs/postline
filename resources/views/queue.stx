@@ -114,36 +114,6 @@
     </section>
   </section>
 
-  <style>
-    /* Status colours bind through a data attribute rather than :class, so no
-      dynamically-applied class exists and the page needs no Crosswind
-      safelist entry at all. */
-    [data-view-toggle] { color: var(--muted); }
-    [data-view-toggle][data-active] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
-
-    [data-status-pill] { color: var(--muted); background: var(--panel-3); border-color: var(--line); }
-    [data-status-pill][data-status="published"] { color: rgb(4 120 87); background: rgb(236 253 245); border-color: rgb(167 243 208); }
-    [data-status-pill][data-status="scheduled"] { color: rgb(29 78 216); background: rgb(239 246 255); border-color: rgb(191 219 254); }
-    [data-status-pill][data-status="publishing"] { color: rgb(146 64 14); background: rgb(255 251 235); border-color: rgb(253 230 138); }
-    [data-status-pill][data-status="failed"] { color: rgb(185 28 28); background: rgb(254 242 242); border-color: rgb(254 202 202); }
-    html.dark [data-status-pill][data-status="published"] { color: rgb(110 231 183); background: rgb(6 78 59 / 0.3); border-color: rgb(6 78 59); }
-    html.dark [data-status-pill][data-status="scheduled"] { color: rgb(147 197 253); background: rgb(30 58 138 / 0.3); border-color: rgb(30 58 138); }
-    html.dark [data-status-pill][data-status="publishing"] { color: rgb(252 211 77); background: rgb(120 53 15 / 0.3); border-color: rgb(120 53 15); }
-    html.dark [data-status-pill][data-status="failed"] { color: rgb(252 165 165); background: rgb(127 29 29 / 0.3); border-color: rgb(127 29 29); }
-
-    [data-cal-dot] { background: rgb(161 161 170); }
-    [data-cal-dot][data-status="published"] { background: rgb(16 185 129); }
-    [data-cal-dot][data-status="failed"] { background: rgb(239 68 68); }
-    [data-cal-dot][data-status="scheduled"] { background: rgb(59 130 246); }
-
-    [data-cal-cell] { background: var(--panel); }
-    [data-cal-cell][data-blank] { background: var(--panel-2); }
-    [data-cal-cell][data-today] { background: rgb(239 246 255 / 0.6); }
-    html.dark [data-cal-cell][data-today] { background: rgb(30 58 138 / 0.2); }
-    [data-cal-day] { color: var(--muted); }
-    [data-cal-cell][data-today] [data-cal-day] { color: rgb(29 78 216); }
-    html.dark [data-cal-cell][data-today] [data-cal-day] { color: rgb(147 197 253); }
-  </style>
 
   <script client>
     const PENDING = new Set(['draft', 'scheduled', 'publishing', 'failed'])

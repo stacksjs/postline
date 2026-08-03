@@ -65,27 +65,6 @@
     </section>
   </section>
 
-  <style>
-    [data-theme-option] { color: var(--muted); }
-    [data-theme-option][data-active] {
-      background: var(--panel);
-      color: var(--ink);
-      box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    }
-    [data-bluesky-pill] { border-color: var(--line); color: var(--muted); }
-    [data-bluesky-pill][data-state="ready"] {
-      border-color: rgb(167 243 208); background: rgb(236 253 245); color: rgb(4 120 87);
-    }
-    [data-bluesky-pill][data-state="setup"] {
-      border-color: rgb(253 230 138); background: rgb(255 251 235); color: rgb(146 64 14);
-    }
-    html.dark [data-bluesky-pill][data-state="ready"] {
-      border-color: rgb(6 78 59); background: rgb(6 78 59 / 0.3); color: rgb(110 231 183);
-    }
-    html.dark [data-bluesky-pill][data-state="setup"] {
-      border-color: rgb(120 53 15); background: rgb(120 53 15 / 0.3); color: rgb(252 211 77);
-    }
-  </style>
 
   <script client>
     const readStoredTheme = () => {
