@@ -65,10 +65,11 @@
     "stx": "./buddy"
   },
   "dependencies": {
-    "@stacksjs/socials": "^0.70.231",
-    "stacks": "^0.70.231"
+    "@stacksjs/socials": "^0.70.253",
+    "stacks": "^0.70.253"
   },
   "devDependencies": {
+    "@iconify-json/lucide": "^1.2.121",
     "@iconify-json/simple-icons": "^1.2.92",
     "better-dx": "^0.2.22"
   },
