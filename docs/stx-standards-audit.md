@@ -28,6 +28,33 @@ holding imperative DOM code classifies as **server**. Always write
 
 ---
 
+## Blocked on upstream
+
+Two conversions are deliberately not done, each for a verified framework
+reason rather than a lack of appetite:
+
+**The marketing layout keeps its `<!DOCTYPE>`.** Its design tokens are scoped
+to a class on the root element, and `generateDocumentShell` has no `htmlAttrs`
+support — the option is typed at `head.d.ts:193` and computed at
+`process.js:279`, then never read, while its sibling `bodyAttrs` *is* emitted.
+Removing the shell today silently strips the landing page's palette, base font
+and mega-menu CSS. Filed as [stacksjs/stx#1798](https://github.com/stacksjs/stx/issues/1798)
+(fixed upstream, awaiting a release). When it ships, drop the exemption from
+`DOCTYPE_EXEMPT` in `scripts/stx-gate.ts`.
+
+**The composer's textareas stay imperative.** `bindModel`'s text branch is
+`effect(() => { el.value = getValue() ?? '' })` with no check that the value
+changed, and the runtime contains zero `selectionStart`/`setSelectionRange`.
+Every keystroke therefore re-assigns `.value`, which sends the caret to the end.
+It is invisible while appending — which is why `x-model` on the login inputs
+feels fine — and breaks editing mid-text. The code being replaced deliberately
+never writes back to the textarea while typing. Adopting `x-model` there would
+be a regression. Filed as [stacksjs/stx#1799](https://github.com/stacksjs/stx/issues/1799).
+
+This also constrains the remaining nine `document.createElement` calls in
+`composer.stx`: seven build the per-network override rows and one builds a post
+article, all of which own a textarea. They convert cleanly once #1799 lands.
+
 ## Reading the paths below
 
 Findings were recorded **before** the Stage 0 moves, so they cite the old
