@@ -16,16 +16,15 @@ const navLinks = [
   { href: '/queue', label: 'Queue', shortcut: '2', icon: 'i-hugeicons-calendar-03' },
   { href: '/timeline', label: 'Timeline', shortcut: '3', icon: 'i-hugeicons-news' },
   { href: '/analytics', label: 'Analytics', shortcut: '4', icon: 'i-hugeicons-chart-line-data-01' },
-  { href: '/accounts', label: 'Accounts', shortcut: '5', icon: 'i-hugeicons-user-multiple' },
-  { href: '/campaigns', label: 'Campaigns', shortcut: '6', icon: 'i-hugeicons-flowchart-01' },
-  { href: '/listening', label: 'Listening', shortcut: '7', icon: 'i-hugeicons-radar-02' },
-  { href: '/blog', label: 'Blog', shortcut: '8', icon: 'i-hugeicons-quill-write-02' },
+  { href: '/campaigns', label: 'Campaigns', shortcut: '5', icon: 'i-hugeicons-flowchart-01' },
+  { href: '/listening', label: 'Listening', shortcut: '6', icon: 'i-hugeicons-radar-02' },
+  { href: '/blog', label: 'Blog', shortcut: '7', icon: 'i-hugeicons-quill-write-02' },
 ].map((link) => ({
   ...link,
   active: currentPath === link.href || currentPath.startsWith(`${link.href}/`),
 }))
 
-const settingsActive = currentPath === '/settings' || currentPath.startsWith('/settings/')
+const settingsActive = currentPath === '/accounts' || currentPath === '/settings' || currentPath.startsWith('/settings/')
 </script>
 
 <template>
@@ -115,13 +114,13 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
       data-stx-exact-active-class="text-ink bg-[#e8e8e6]/90"
       data-sidebar-collapsible-content="true"
       data-no-window-drag
-      title="Open Settings (9)"
+      title="Open Settings (8)"
       class="relative z-10 mt-auto flex w-full items-center gap-3 rounded-[14px] px-3 py-1.5 text-left text-[13.5px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ settingsActive ? 'bg-[#e8e8e6]/90 text-ink' : 'text-body' }}"
       aria-current="{{ settingsActive ? 'page' : 'false' }}"
     >
       <span class="h-[18px] w-[18px] i-hugeicons-settings-02 {{ settingsActive ? 'text-ink' : 'text-muted' }}" aria-hidden="true"></span>
       <span class="flex-1 font-medium" data-sidebar-expanded>Settings</span>
-      <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-sans text-[11px] text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded aria-label="Shortcut 9">9</kbd>
+      <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-sans text-[11px] text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded aria-label="Shortcut 8">8</kbd>
     </a>
   </aside>
   </div>
