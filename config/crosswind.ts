@@ -164,7 +164,7 @@ const DARK_OVERRIDES: string = `
 .dark .bg-white\\/48 { background-color: rgba(39, 39, 42, 0.48); }
 
 /* Analytics chart — CSS fill/stroke beat SVG presentation attributes, so the
-   chart is not a light island on a dark page. */
+  chart is not a light island on a dark page. */
 .dark [data-analytics-chart] rect[rx="16"] { fill: #101014; }
 .dark [data-analytics-chart] line[stroke="#e4e4e7"] { stroke: #2a2a2e; }
 .dark [data-analytics-chart] text[fill="#18181b"] { fill: #e4e4e7; }
