@@ -52,10 +52,16 @@ export type TimelineItem = import('@stacksjs/socials').TimelineResult['items'][n
 export type SocialProvider = SocialPublishingProvider | 'blog'
 
 /**
- * Kept local: core's `PublishPostInput` carries `langs` and `reply` for thread
- * chaining, and Postline's carries `media` instead. Neither is a superset, so
- * this is a real fork rather than a copy - reconciling it means deciding
- * upstream whether media belongs in the core input.
+ * Kept local, but only just: core's `PublishPostInput` is a strict superset.
+ *
+ * It carries everything here plus `langs`, `reply` and `facets`, and the one
+ * thing stopping a straight re-export is optionality - this requires
+ * `media[].url`, core allows `url` OR `bytes` because Bluesky uploads a blob.
+ * Verified both directions: a value of this type is assignable to core's, and
+ * core's is not assignable to this.
+ *
+ * So adopting core's means auditing every `media` consumer for a missing
+ * `url`. Worth doing, but it is a behaviour change rather than a type move.
  */
 export interface PublishPostInput {
   text: string
