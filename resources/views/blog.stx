@@ -1,0 +1,120 @@
+@extends('layouts/postline')
+
+@section('title', 'Postline - Blog')
+@section('description', 'Manage long-form posts published through Postline.')
+
+@section('content')
+  <section class="grid gap-4" data-postline-page="blog" data-testid="blog-page">
+    <header class="flex flex-col gap-4 items-stretch justify-between sm:flex-row sm:items-center min-h-11">
+      <div>
+        <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Blog</p>
+        <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Long-form publishing</h1>
+        <p class="mb-0 mt-1.5 text-[13px] text-muted">Write once in Composer, publish to your site, and keep every article easy to find.</p>
+      </div>
+      <a class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" href="/composer" data-stx-link data-no-window-drag>
+        <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>
+        Write a post
+      </a>
+    </header>
+
+    <div class="grid gap-3 sm:grid-cols-3">
+      <article class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="font-bold text-[11px] text-muted tracking-wider uppercase">Published</span>
+        <strong class="block mt-2 text-2xl text-ink" :text="String(items().length)">0</strong>
+      </article>
+      <article class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="font-bold text-[11px] text-muted tracking-wider uppercase">Latest</span>
+        <strong class="block mt-2 text-ink text-sm truncate" :text="latestTitle()">No posts yet</strong>
+      </article>
+      <article class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="font-bold text-[11px] text-muted tracking-wider uppercase">Workflow</span>
+        <strong class="block mt-2 text-ink text-sm">Composer → Blog</strong>
+      </article>
+    </div>
+
+    <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" aria-label="Published blog posts">
+      <header class="flex gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
+        <div>
+          <h2 class="m-0 font-bold text-ink text-sm">Published posts</h2>
+          <p class="m-0 mt-1 text-muted text-xs" :text="summaryText()">Loading your blog…</p>
+        </div>
+        <button class="inline-flex gap-2 items-center justify-center px-3 h-8 font-bold text-ink text-xs bg-panel-2 hover:bg-white border border-line rounded-lg disabled:opacity-50 transition-colors" type="button" :disabled="loading()" @click="loadPosts">
+          <span class="h-3.5 w-3.5 i-hugeicons-refresh" aria-hidden="true"></span>
+          Refresh
+        </button>
+      </header>
+
+      <div class="grid gap-3 place-items-center px-6 py-16 text-center" x-show="loading()">
+        <span class="h-7 w-7 text-muted animate-spin i-hugeicons-loading-03" aria-hidden="true"></span>
+        <p class="m-0 text-muted text-sm">Loading published posts…</p>
+      </div>
+
+      <div class="grid gap-3 place-items-center px-6 py-16 text-center" x-show="showEmpty()">
+        <span class="grid place-items-center h-12 w-12 text-muted text-xl bg-panel-2 rounded-2xl i-hugeicons-quill-write-02" aria-hidden="true"></span>
+        <div>
+          <h2 class="m-0 font-bold text-base text-ink">Your first article starts in Composer</h2>
+          <p class="m-0 mt-1 max-w-md text-muted text-sm">Choose Blog as a channel, add a title, and publish. It will appear here without leaving the app shell.</p>
+        </div>
+        <a class="inline-flex items-center justify-center px-4 h-9 font-bold text-ink text-sm bg-panel-2 hover:bg-white border border-line rounded-xl" href="/composer" data-stx-link>Open Composer</a>
+      </div>
+
+      <div class="divide-line divide-y" x-show="!loading() && items().length">
+        <article class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center p-4 hover:bg-panel-2/50 transition-colors" x-for="item in items()">
+          <div class="min-w-0">
+            <div class="flex gap-2 items-center mb-1.5">
+              <span class="px-2 py-0.5 font-bold text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full">Published</span>
+              <time class="text-muted text-xs" :datetime="item.publishedAt" :text="dateLabel(item.publishedAt)"></time>
+            </div>
+            <h3 class="m-0 font-bold text-[15px] text-ink" :text="item.title"></h3>
+            <p class="m-0 mt-1 line-clamp-2 text-[13px] text-muted" :text="item.excerpt || item.body"></p>
+          </div>
+          <a class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-bold text-ink text-xs bg-panel hover:bg-white border border-line rounded-lg" :href="`/blog/${item.slug}`" target="_blank" rel="noopener noreferrer">
+            View live
+            <span class="h-3.5 w-3.5 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span>
+          </a>
+        </article>
+      </div>
+
+      <p class="m-0 px-4 py-3 text-red-700 text-sm bg-red-50 border-red-100 border-t" x-show="errorMessage()" :text="errorMessage()"></p>
+    </section>
+  </section>
+
+  <script client>
+    const items = state([])
+    const loading = state(true)
+    const loaded = state(false)
+    const errorMessage = state('')
+
+    const latestTitle = derived(() => items()[0]?.title || 'No posts yet')
+    const showEmpty = derived(() => loaded() && !loading() && !errorMessage() && items().length === 0)
+    const summaryText = derived(() => errorMessage() || `${items().length} published post${items().length === 1 ? '' : 's'}`)
+
+    const dateLabel = (value: string | null | undefined): string => {
+      const date = new Date(value)
+      return Number.isNaN(date.getTime())
+        ? 'Published'
+        : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    }
+
+    const loadPosts = async () => {
+      loading.set(true)
+      errorMessage.set('')
+      try {
+        const response = await fetch('/api/postline/blog')
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load blog posts.')
+        items.set(Array.isArray(payload.data?.items) ? payload.data.items : [])
+      }
+      catch (error) {
+        items.set([])
+        errorMessage.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        loading.set(false)
+        loaded.set(true)
+      }
+    }
+
+    onMount(() => void loadPosts())
+  </script>
+@endsection
