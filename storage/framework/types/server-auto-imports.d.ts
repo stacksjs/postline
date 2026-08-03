@@ -60,6 +60,7 @@ declare global {
   const useStorage: typeof import('@stacksjs/browser')['useStorage']
   const Account: typeof import('../../../app/Models/Account')['default']
   const PostTarget: typeof import('../../../app/Models/PostTarget')['default']
+  const PurgeRun: typeof import('../../../app/Models/PurgeRun')['default']
   const SocialIdentity: typeof import('../../../app/Models/SocialIdentity')['default']
   const MediaAsset: typeof import('../../../app/Models/MediaAsset')['default']
   const TimelineItem: typeof import('../../../app/Models/TimelineItem')['default']
