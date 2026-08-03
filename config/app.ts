@@ -1,7 +1,7 @@
 import type { AppConfig } from '@stacksjs/types'
 import { env } from '@stacksjs/env'
 
-type PostlineAppConfig = AppConfig & { appPath: string }
+type PostlineAppConfig = AppConfig & { appPath: string, devLaunch: 'native' }
 
 /**
  * **Application Configuration**
@@ -16,6 +16,7 @@ export default {
   env: env.APP_ENV ?? 'local',
   url: env.APP_URL ?? 'postline.localhost',
   appPath: '/composer',
+  devLaunch: 'native',
   redirectUrls: ['postline.localhost', 'bsky.app'],
   debug: env.DEBUG ?? false,
   key: env.APP_KEY,
