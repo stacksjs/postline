@@ -1,34 +1,62 @@
-export type SocialProvider =
-  | 'bluesky'
-  | 'twitter'
-  | 'mastodon'
-  | 'facebook'
-  | 'instagram'
-  | 'tiktok'
-  | 'linkedin'
-  | 'threads'
-  | 'blog'
+/**
+ * Postline's social types.
+ *
+ * Eight of these used to be hand-copied from `@stacksjs/socials`, byte for
+ * byte, and were drifting silently - `PublishPostInput` had already forked. The
+ * framework is where the crossposting contract lives (it ships drivers for
+ * Bluesky, Mastodon, X, Threads, LinkedIn, Instagram and Facebook), so the
+ * shared ones are re-exported from there rather than restated.
+ *
+ * Re-exported through this module rather than imported directly by the twenty
+ * consumers, so `import { ... } from '../../Support/Social/types'` keeps
+ * working and the app keeps one place to see its own social surface.
+ *
+ * What stays local, and why, is below. The rule: if it is identical to core,
+ * it is a re-export; if it genuinely differs, it is declared here with the
+ * reason.
+ */
 
-export interface SocialIdentityCredentials {
-  handle: string
-  did?: string
-  accessToken?: string
-  refreshToken?: string
-}
+import type { SocialPublishingProvider } from '@stacksjs/socials'
 
-export interface BlueskySessionCredentials {
-  identifier: string
-  password: string
-}
+export type {
+  /** One page of an account's own posts, for a purge. */
+  AuthoredPost,
+  AuthoredPostPage,
+  BlueskySession,
+  BlueskySessionCredentials,
+  RemotePostRef,
+  SocialIdentityCredentials,
+  TimelineQuery,
+  TimelineResult,
+} from '@stacksjs/socials'
 
-export interface BlueskySession {
-  did: string
-  handle: string
-  displayName?: string
-  accessJwt: string
-  refreshJwt: string
-}
+/**
+ * One timeline post.
+ *
+ * Core names this `TimelineItem` as of stacksjs/stacks#2207, but Postline
+ * installs `@stacksjs/socials` from the registry, so it cannot re-export the
+ * name until a release carries it. Derived from `TimelineResult` in the
+ * meantime, which is the same type by construction - swap this for a
+ * re-export once the version lands.
+ */
+export type TimelineItem = import('@stacksjs/socials').TimelineResult['items'][number]
 
+/**
+ * Core's publishing providers plus `blog`.
+ *
+ * Postline crossposts to its own blog alongside the social networks, which is
+ * not something the framework knows about - so the union extends rather than
+ * replaces. Written as a union with the core type so a provider added upstream
+ * arrives here for free.
+ */
+export type SocialProvider = SocialPublishingProvider | 'blog'
+
+/**
+ * Kept local: core's `PublishPostInput` carries `langs` and `reply` for thread
+ * chaining, and Postline's carries `media` instead. Neither is a superset, so
+ * this is a real fork rather than a copy - reconciling it means deciding
+ * upstream whether media belongs in the core input.
+ */
 export interface PublishPostInput {
   text: string
   scheduledAt?: string
@@ -43,6 +71,10 @@ export interface PublishPostInput {
   }>
 }
 
+/**
+ * Kept local: structurally core's `PublishedPost`, but `provider` is the
+ * extended union above, so a blog crosspost can be represented.
+ */
 export interface PublishedPost {
   provider: SocialProvider
   uri: string
@@ -97,52 +129,6 @@ export interface CrosspostTargetResult {
   error?: string
 }
 
-export interface TimelineQuery {
-  cursor?: string
-  limit?: number
-}
-
-export interface TimelineResult {
-  cursor?: string
-  items: Array<{
-    uri: string
-    authorHandle: string
-    authorName?: string
-    authorAvatar?: string
-    postUrl?: string
-    body: string
-    postedAt: string
-    likeCount: number
-    repostCount: number
-    replyCount: number
-  }>
-}
-
-/**
- * One post the connected account authored, as returned when enumerating an
- * account's own history for a purge. `uri` is whatever the provider's delete
- * endpoint keys on (an AT-URI on Bluesky, a numeric id on X/Mastodon).
- */
-export interface AuthoredPost {
-  uri: string
-  cid?: string
-  text?: string
-  postedAt?: string
-  url?: string
-}
-
-/** A page of authored posts plus the cursor for the next page (if any). */
-export interface AuthoredPostPage {
-  cursor?: string
-  posts: AuthoredPost[]
-}
-
-/** The minimum a purge needs to identify one remote post for deletion. */
-export interface RemotePostRef {
-  uri: string
-  cid?: string
-}
-
 /**
  * The narrow surface a bulk purge needs from a provider. Each social service
  * builds one of these so token refresh and identity lookup stay owned by the
@@ -153,15 +139,20 @@ export interface ProviderPurgeAdapter {
   identityId: number
   handle: string
   /** One page of the account's own posts; omit the cursor for the first page. */
-  listPage: (cursor?: string) => Promise<AuthoredPostPage>
-  deletePost: (ref: RemotePostRef) => Promise<void>
+  listPage: (cursor?: string) => Promise<import('@stacksjs/socials').AuthoredPostPage>
+  deletePost: (ref: import('@stacksjs/socials').RemotePostRef) => Promise<void>
 }
 
+/**
+ * Postline's driver contract. Core's `SocialPublishingDriver` is the same
+ * shape minus the two Bluesky session hooks and with core's narrower provider
+ * union, so this stays local until session handling moves upstream.
+ */
 export interface SocialDriver {
   provider: SocialProvider
   characterLimit: number
-  createSession?: (credentials: BlueskySessionCredentials) => Promise<BlueskySession>
-  refreshSession?: (refreshToken: string) => Promise<BlueskySession>
-  publish(identity: SocialIdentityCredentials, post: PublishPostInput): Promise<PublishedPost>
-  timeline(identity: SocialIdentityCredentials, query?: TimelineQuery): Promise<TimelineResult>
+  createSession?: (credentials: import('@stacksjs/socials').BlueskySessionCredentials) => Promise<import('@stacksjs/socials').BlueskySession>
+  refreshSession?: (refreshToken: string) => Promise<import('@stacksjs/socials').BlueskySession>
+  publish: (identity: import('@stacksjs/socials').SocialIdentityCredentials, post: PublishPostInput) => Promise<PublishedPost>
+  timeline: (identity: import('@stacksjs/socials').SocialIdentityCredentials, query?: import('@stacksjs/socials').TimelineQuery) => Promise<import('@stacksjs/socials').TimelineResult>
 }
