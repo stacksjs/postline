@@ -2,6 +2,17 @@
 /**
  * stx pre-merge gate.
  *
+ * UPSTREAMED. This now lives in core as `./buddy lint:stx`
+ * (stacksjs/stacks#2206), because every check here is a generic stx standard
+ * and keeping it in one app meant no other app had it - and `buddy update`
+ * would have wiped it. The core version keeps its baselines in
+ * `.stx-gate.json` and its `--update` rewrites that file instead of printing
+ * numbers to paste by hand.
+ *
+ * DELETE THIS FILE once Postline is on a Stacks release that carries the
+ * command, and point `package.json`'s `gate` script at `./buddy lint:stx`.
+ * Until then this copy is what runs, so any fix made here belongs upstream too.
+ *
  * Adapted from chapter 12 of the stx standards, plus three build-output checks
  * that are Postline-specific. Those exist because a real bug shipped past every
  * other gate: a mis-resolved component put an error string where the sidebar
