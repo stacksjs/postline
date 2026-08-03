@@ -93,6 +93,11 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/campaigns/post/delete', 'Actions/Postline/CampaignPostDeleteAction').middleware('auth').skipCsrf()
   route.post('/campaigns/generate', 'Actions/Postline/CampaignGenerateAction').middleware('auth').skipCsrf().rateLimit(10, 'hour')
   route.post('/campaigns/activate', 'Actions/Postline/CampaignActivateAction').middleware('auth').skipCsrf().rateLimit(5, 'hour')
+  route.get('/listening', 'Actions/Postline/KeywordMonitorListAction').middleware('auth').skipCsrf()
+  route.post('/listening', 'Actions/Postline/KeywordMonitorSaveAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
+  route.post('/listening/delete', 'Actions/Postline/KeywordMonitorDeleteAction').middleware('auth').skipCsrf().rateLimit(20, 'minute')
+  route.post('/listening/scan', 'Actions/Postline/KeywordMonitorScanAction').middleware('auth').skipCsrf().rateLimit(20, 'hour')
+  route.post('/listening/read', 'Actions/Postline/KeywordMentionReadAction').middleware('auth').skipCsrf().rateLimit(120, 'minute')
   // Bulk post deletion. Irreversible, so both halves are auth-only and rate
   // limited — the preview generously, the destructive run tightly.
   route.get('/purge/preview', 'Actions/Postline/PurgePreviewAction').middleware('auth').skipCsrf().rateLimit(20, 'minute')

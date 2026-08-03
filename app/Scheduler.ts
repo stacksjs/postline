@@ -26,6 +26,12 @@ export default function () {
     .job('SyncEngagementMetrics')
     .everyThirtyMinutes()
 
+  // Watch configured brand and product keywords across connected networks
+  schedule
+    .job('ScanKeywordMonitors')
+    .everyFiveMinutes()
+    .withoutOverlapping(5)
+
   // Run a custom action every five minutes
   // schedule.action('CleanupTempFiles').everyFiveMinutes()
 
