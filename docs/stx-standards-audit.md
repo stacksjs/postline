@@ -30,17 +30,16 @@ holding imperative DOM code classifies as **server**. Always write
 
 ## Blocked on upstream
 
-Two conversions are deliberately not done, each for a verified framework
-reason rather than a lack of appetite:
+**Resolved — the marketing layout.** It kept its `<!DOCTYPE>` because its design
+tokens are scoped to a class on the root element and `generateDocumentShell`
+dropped `htmlAttrs`. Filed as
+[stacksjs/stx#1798](https://github.com/stacksjs/stx/issues/1798), fixed in
+**stx 0.2.153**, and the layout now sets its root class through `htmlAttrs`.
+Every `.stx` under `resources/` is now free of a hand-written document shell
+except the email templates and the leftover desktop demo.
 
-**The marketing layout keeps its `<!DOCTYPE>`.** Its design tokens are scoped
-to a class on the root element, and `generateDocumentShell` has no `htmlAttrs`
-support — the option is typed at `head.d.ts:193` and computed at
-`process.js:279`, then never read, while its sibling `bodyAttrs` *is* emitted.
-Removing the shell today silently strips the landing page's palette, base font
-and mega-menu CSS. Filed as [stacksjs/stx#1798](https://github.com/stacksjs/stx/issues/1798)
-(fixed upstream, awaiting a release). When it ships, drop the exemption from
-`DOCTYPE_EXEMPT` in `scripts/stx-gate.ts`.
+One conversion is still deliberately not done, for a verified framework reason
+rather than a lack of appetite:
 
 **The composer's textareas stay imperative.** `bindModel`'s text branch is
 `effect(() => { el.value = getValue() ?? '' })` with no check that the value

@@ -1,43 +1,48 @@
-<!DOCTYPE html>
-<!-- The marketing class opts this layout into the landing-page token set in
-    config/crosswind.ts: a light-locked palette with its own accent and warmer
-    surfaces. Without it the page falls back to the app tokens. -->
-<html lang="en" class="text-ink bg-bg marketing">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light">
-    <title>@yield('title', 'Postline: open source social crossposting')</title>
-    <meta name="description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, runs on your machine, nobody else holds your tokens.')">
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/images/postline-icon-180.png">
-    <link rel="canonical" href="@yield('canonical', 'https://postline.stacksjs.com/')">
-    <meta name="theme-color" content="#f4f4f2">
+<script server>
+  // htmlAttrs puts the marketing class on the root element, which is what the
+  // landing-page design tokens in config/crosswind.ts are scoped to. Supported
+  // as of stx 0.2.153 (stacksjs/stx#1798) — before that the option was typed
+  // and computed but never emitted, which is why this layout kept its own
+  // document shell until now.
+  useHead({
+    htmlAttrs: { class: 'text-ink bg-bg marketing' },
+    bodyAttrs: { class: 'min-w-0 antialiased' },
+  })
+</script>
 
-    <!-- Open Graph / social. The card image is absolute: relative URLs are not
-        resolved by crawlers, which is why summary_large_image previously
-        rendered with no image at all. -->
-    <meta property="og:type" content="website">
-    <meta property="og:site_name" content="Postline">
-    <meta property="og:url" content="@yield('canonical', 'https://postline.stacksjs.com/')">
-    <meta property="og:title" content="@yield('title', 'Postline: open source social crossposting')">
-    <meta property="og:description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, and nobody else holds your tokens.')">
-    <meta property="og:image" content="@yield('ogImage', 'https://postline.stacksjs.com/images/postline-og.png')">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="Postline — one composer publishing to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon.">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="@yield('title', 'Postline: open source social crossposting')">
-    <meta name="twitter:description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, and nobody else holds your tokens.')">
-    <meta name="twitter:image" content="@yield('ogImage', 'https://postline.stacksjs.com/images/postline-og.png')">
+@head
+  <meta name="color-scheme" content="light">
+  <title>@yield('title', 'Postline: open source social crossposting')</title>
+  <meta name="description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, runs on your machine, nobody else holds your tokens.')">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/images/postline-icon-180.png">
+  <link rel="canonical" href="@yield('canonical', 'https://postline.stacksjs.com/')">
+  <meta name="theme-color" content="#f4f4f2">
 
-    <!-- Geist (display) + Geist Mono (labels/code) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Open Graph / social. The card image is absolute: relative URLs are not
+      resolved by crawlers, which is why summary_large_image previously
+      rendered with no image at all. -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Postline">
+  <meta property="og:url" content="@yield('canonical', 'https://postline.stacksjs.com/')">
+  <meta property="og:title" content="@yield('title', 'Postline: open source social crossposting')">
+  <meta property="og:description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, and nobody else holds your tokens.')">
+  <meta property="og:image" content="@yield('ogImage', 'https://postline.stacksjs.com/images/postline-og.png')">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Postline — one composer publishing to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="@yield('title', 'Postline: open source social crossposting')">
+  <meta name="twitter:description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, and nobody else holds your tokens.')">
+  <meta name="twitter:image" content="@yield('ogImage', 'https://postline.stacksjs.com/images/postline-og.png')">
 
-  </head>
-  <body class="min-w-0 antialiased">
+  <!-- Geist (display) + Geist Mono (labels/code) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+@endhead
+
     <!-- Shared chrome: every marketing page gets the same nav, so the mega menu
         is defined once here rather than repeated per page. -->
     <MegaMenu />
@@ -47,5 +52,3 @@
     <Subscribe />
     <SiteFooter />
     @stack('scripts')
-  </body>
-</html>
