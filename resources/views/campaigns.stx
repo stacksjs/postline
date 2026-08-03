@@ -137,15 +137,43 @@
 
       <aside class="campaign-panel" aria-label="Campaign tools">
         <section x-show="panelMode() === 'planner' && campaign()">
-          <header class="campaign-panel__heading">
-            <span class="i-hugeicons-ai-beautify" aria-hidden="true"></span>
-            <div><strong>Plan with AI</strong><p>Draft the sequence, then make every post yours.</p></div>
-          </header>
+          <div class="campaign-assistant-heading">
+            <header class="campaign-panel__heading">
+              <span class="i-hugeicons-ai-beautify" aria-hidden="true"></span>
+              <div><strong>Campaign Assistant</strong><p>Turn the brief into a launch sequence you can edit.</p></div>
+            </header>
+            <span class="campaign-ai-provider" :data-mode="aiStatus().mode">
+              <i :class="aiStatus().mode === 'ai' ? 'i-hugeicons-ai-beautify' : 'i-hugeicons-cpu'" aria-hidden="true"></i>
+              <span :text="aiProviderLabel()"></span>
+            </span>
+          </div>
 
           <div class="campaign-brief-card">
             <div><span>Goal</span><p :text="campaign()?.objective || 'Add a campaign goal to focus the plan.'"></p></div>
             <div><span>Audience</span><p :text="campaign()?.audience || 'Your existing social audience.'"></p></div>
             <div class="campaign-brief-pair"><p><span>Tone</span><strong :text="campaign()?.tone"></strong></p><p><span>Duration</span><strong :text="`${campaignDuration()} days`"></strong></p></div>
+          </div>
+
+          <div class="campaign-assistant-thread" aria-live="polite">
+            <article data-role="assistant">
+              <span class="i-hugeicons-ai-beautify" aria-hidden="true"></span>
+              <p :text="assistantIntro()"></p>
+            </article>
+            <article x-for="message in assistantMessages()" :data-role="message.role">
+              <span :class="message.role === 'assistant' ? 'i-hugeicons-ai-beautify' : 'i-hugeicons-user-circle'" aria-hidden="true"></span>
+              <p><span :text="message.text"></span><small x-show="message.meta" :text="message.meta"></small></p>
+            </article>
+            <article class="campaign-assistant-thinking" x-show="busyAction() === 'generate'" data-role="assistant">
+              <span class="i-hugeicons-ai-beautify" aria-hidden="true"></span>
+              <p><span>Reading the brief, checking the calendar, and shaping the sequence...</span></p>
+            </article>
+          </div>
+
+          <div class="campaign-assistant-prompts" aria-label="Assistant shortcuts">
+            <button type="button" x-for="suggestion in assistantSuggestions" :data-active="assistantStrategy() === suggestion.id" @click="chooseAssistantPrompt(suggestion)">
+              <span :class="suggestion.icon" aria-hidden="true"></span>
+              <span>{{ suggestion.label }}</span>
+            </button>
           </div>
 
           <label class="campaign-field">
@@ -159,9 +187,9 @@
             <small x-show="!providersLoaded()">Checking connected accounts...</small>
           </label>
 
-          <label class="campaign-field">
-            <span>Creative direction <small>optional</small></span>
-            <textarea rows="4" placeholder="Topics to include, proof points, launch moments..." x-model="direction"></textarea>
+          <label class="campaign-assistant-composer campaign-field">
+            <span>Ask the assistant <small>optional</small></span>
+            <textarea rows="4" maxlength="2000" placeholder="What should this sequence emphasize, avoid, or teach?" x-model="direction"></textarea>
           </label>
           <label class="campaign-field campaign-field--row">
             <span>Number of posts</span>
@@ -172,9 +200,9 @@
 
           <button class="campaign-ai-button" type="button" :disabled="busy() || plannerProviders().length === 0" @click="generatePlan">
             <span class="i-hugeicons-ai-beautify" aria-hidden="true"></span>
-            <span :text="busyAction() === 'generate' ? 'Building the plan...' : posts().length ? 'Add another sequence' : 'Draft campaign plan'"></span>
+            <span :text="busyAction() === 'generate' ? 'Building your plan...' : posts().length ? 'Ask for another sequence' : 'Build campaign plan'"></span>
           </button>
-          <p class="campaign-ai-note" x-show="lastPlanMode()">{{ lastPlanMode() === 'ai' ? 'Drafted with your configured AI provider.' : 'Drafted with Postline\'s local planning template. Add an AI key in settings for custom generation.' }}</p>
+          <p class="campaign-ai-note" x-show="lastPlanMode()" :text="lastPlanMode() === 'ai' ? 'Generated with Stacks AI and your configured provider.' : 'Generated with Postline\'s local planning engine.'"></p>
 
           <div class="campaign-panel__actions" x-show="posts().length">
             <button type="button" @click="openCampaignForm(campaign())">Edit brief</button>
@@ -265,6 +293,9 @@
     const plannerProviders = state([])
     const generationCount = state(8)
     const direction = state('')
+    const assistantStrategy = state('full-launch')
+    const assistantMessages = state([])
+    const aiStatus = state({ mode: 'checking', provider: '', model: '', configured: false })
     const lastPlanMode = state('')
     const calendarStart = state('')
     const draggedPostId = state(0)
@@ -302,6 +333,25 @@
     const readyCount = derived(() => posts().filter(item => item.status === 'ready').length)
     const queuedCount = derived(() => posts().filter(item => item.postId).length)
     const unqueuedCount = derived(() => posts().filter(item => !item.postId && item.status !== 'skipped').length)
+    const assistantSuggestions = [
+      { id: 'full-launch', label: 'Full launch', prompt: 'Build a balanced story from early awareness through launch and follow-up.', icon: 'i-hugeicons-rocket-01' },
+      { id: 'launch-week', label: 'Launch week', prompt: 'Focus this sequence around launch week, with anticipation, launch-day clarity, and follow-up.', icon: 'i-hugeicons-calendar-03' },
+      { id: 'education', label: 'Teach first', prompt: 'Lead with useful lessons for our audience and keep direct promotion secondary.', icon: 'i-hugeicons-book-open-02' },
+      { id: 'proof', label: 'Show proof', prompt: 'Emphasize demonstrations, credible evidence, and concrete outcomes.', icon: 'i-hugeicons-chart-evaluation' },
+      { id: 'fill-gaps', label: 'Fill gaps', prompt: 'Study the posts already planned and fill missing pillars or quiet dates without repeating ideas.', icon: 'i-hugeicons-grid-table' },
+    ]
+
+    const aiProviderLabel = derived(() => {
+      const status = aiStatus()
+      if (status.mode === 'checking') return 'Checking AI'
+      if (status.mode !== 'ai') return 'Local planner'
+      const provider = `${status.provider || 'AI'}`
+      return `${provider.charAt(0).toUpperCase()}${provider.slice(1)}`
+    })
+
+    const assistantIntro = derived(() => aiStatus().mode === 'ai'
+      ? 'I can use your campaign brief, connected channels, and existing calendar to build a structured plan with Stacks AI.'
+      : 'I can build a reliable local plan now. Configure OpenAI, Anthropic, or Ollama to make the drafts respond more deeply to your direction.')
 
     function dateKey(date) {
       return date.toISOString().slice(0, 10)
@@ -446,6 +496,21 @@
       }
     }
 
+    async function loadAIStatus() {
+      try {
+        const status = await api('/api/postline/campaigns/ai/status', {}, 'GET')
+        aiStatus.set(status)
+      }
+      catch {
+        aiStatus.set({ mode: 'template', provider: '', model: '', configured: false })
+      }
+    }
+
+    function chooseAssistantPrompt(suggestion) {
+      assistantStrategy.set(suggestion.id)
+      direction.set(suggestion.prompt)
+    }
+
     function selectCampaign(id) {
       panelMode.set('planner')
       void loadCampaigns(Number(id))
@@ -587,18 +652,41 @@
     async function generatePlan() {
       if (!campaign() || plannerProviders().length === 0) return
       busyAction.set('generate')
+      const requestText = direction().trim() || assistantSuggestions.find(item => item.id === assistantStrategy())?.prompt || 'Build a balanced campaign plan.'
+      assistantMessages.set([...assistantMessages(), { role: 'user', text: requestText, meta: '' }])
       try {
         const data = await api('/api/postline/campaigns/generate', {
           campaign_id: campaign().id,
           count: generationCount(),
           providers: plannerProviders(),
           direction: direction(),
+          strategy: assistantStrategy(),
         })
         lastPlanMode.set(data.mode)
+        aiStatus.set({
+          ...aiStatus(),
+          mode: data.mode,
+          provider: data.mode === 'ai' ? data.provider : '',
+          model: data.model || '',
+          configured: data.mode === 'ai',
+        })
+        assistantMessages.set([
+          ...assistantMessages(),
+          {
+            role: 'assistant',
+            text: data.assistant,
+            meta: `${data.posts.length} posts added${data.model ? ` with ${data.model}` : ''}${data.promptAdjusted ? '. Unsafe prompt-like instructions were removed.' : ''}`,
+          },
+        ])
+        direction.set('')
         await loadCampaigns(campaign().id)
         showNotice('Plan drafted', `${data.posts.length} posts were added across the campaign window.`)
       }
       catch (error) {
+        assistantMessages.set([
+          ...assistantMessages(),
+          { role: 'assistant', text: error instanceof Error ? error.message : String(error), meta: 'No posts were added.' },
+        ])
         showNotice('Could not draft the plan', error instanceof Error ? error.message : String(error), 'error')
       }
       finally {
@@ -677,6 +765,7 @@
     onMount(() => {
       void loadCampaigns()
       void loadProviders()
+      void loadAIStatus()
     })
   </script>
 @endsection
