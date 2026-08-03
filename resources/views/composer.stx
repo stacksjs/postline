@@ -25,7 +25,7 @@
       <section class="grid content-start grid-rows-[auto_auto_auto] self-start bg-panel border border-line rounded-2xl shadow-sm" aria-label="Post composer">
         <div class="hidden flex-wrap gap-3 items-center justify-between px-3 py-2 text-xs bg-blue-50 border-b border-blue-200" data-edit-banner>
           <span class="font-bold text-blue-800">Editing a queued post</span>
-          <a class="inline-flex items-center px-2.5 min-h-6 font-bold text-blue-800 bg-panel hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors" href="/" data-stx-link>Cancel</a>
+          <a class="inline-flex items-center px-2.5 min-h-6 font-bold text-blue-800 bg-panel hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors" href="/composer" data-stx-link>Cancel</a>
         </div>
         <header class="flex flex-wrap gap-3 items-center justify-between p-3 border-b border-line">
           <div class="flex gap-2 items-center">

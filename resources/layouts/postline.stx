@@ -279,7 +279,7 @@
           })
         }
 
-        // Number keys 1-8 jump between pages (the sidebar shows the badges).
+        // Number keys 1-9 jump between pages (the sidebar shows the badges).
         // Bound through stx's useEventListener rather than a raw document
         // listener: it unsubscribes on destroy, so repeated SPA navigations
         // can't stack duplicate handlers. Routing goes through stx `navigate`
@@ -287,7 +287,7 @@
         const bindKeyboardShortcuts = () => {
           if (window.__postlineShortcutsBound) return
           window.__postlineShortcutsBound = true
-          const routes = { 1: '/', 2: '/queue', 3: '/timeline', 4: '/analytics', 5: '/accounts', 6: '/campaigns', 7: '/blog', 8: '/settings' }
+          const routes = { 1: '/composer', 2: '/queue', 3: '/timeline', 4: '/analytics', 5: '/accounts', 6: '/campaigns', 7: '/listening', 8: '/blog', 9: '/settings' }
           window.stx?.useEventListener('keydown', (event) => {
             if (event.metaKey || event.ctrlKey || event.altKey) return
             const target = event.target
@@ -299,10 +299,29 @@
           }, { target: document })
         }
 
+        // Clicking the already-active destination is a no-op. Apart from
+        // avoiding needless work, this prevents page-init success feedback
+        // from being replayed when someone repeatedly clicks the same tab.
+        const bindIdempotentNavigation = () => {
+          if (window.__postlineIdempotentNavigationBound) return
+          window.__postlineIdempotentNavigationBound = true
+          window.stx?.useEventListener('click', (event) => {
+            if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+            const link = event.target instanceof Element ? event.target.closest('a[data-stx-link]') : null
+            if (!(link instanceof HTMLAnchorElement) || link.target === '_blank' || link.hasAttribute('download')) return
+            const destination = new URL(link.href, window.location.href)
+            const current = new URL(window.location.href)
+            if (destination.origin !== current.origin || destination.pathname !== current.pathname || destination.search !== current.search || destination.hash !== current.hash) return
+            event.preventDefault()
+            event.stopImmediatePropagation()
+          }, { target: document, capture: true })
+        }
+
         bindSidebarCollapse()
         bindShellHistory()
         bindWindowDragRegions()
         bindKeyboardShortcuts()
+        bindIdempotentNavigation()
         syncNativeShell()
         window.addEventListener('stx:load', bindShellHistory)
         window.addEventListener('stx:load', bindSidebarCollapse)

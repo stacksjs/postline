@@ -234,7 +234,7 @@
             <div class="campaign-form__footer">
               <button class="campaign-danger-button" type="button" x-show="postDraftId() && !queuedPostId()" @click="deletePost">Delete</button>
               <button class="campaign-secondary-button" type="button" @click="closePanel">Close</button>
-              <a class="campaign-primary-button" x-show="queuedPostId()" :href="`/?edit=${queuedPostId()}`" data-stx-link>Edit in Queue</a>
+              <a class="campaign-primary-button" x-show="queuedPostId()" :href="`/composer?edit=${queuedPostId()}`" data-stx-link>Edit in Composer</a>
               <button class="campaign-primary-button" type="submit" x-show="!queuedPostId()" :disabled="busy()"><span :text="busyAction() === 'post' ? 'Saving...' : 'Save post'"></span></button>
             </div>
           </form>

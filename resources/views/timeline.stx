@@ -12,7 +12,7 @@
         <p class="mb-0 mt-1.5 text-[13px] text-muted">Posts from your connected Bluesky account.</p>
       </div>
       <div class="grid sm:flex gap-2 grid-cols-2 items-center">
-        <a class="inline-flex items-center justify-center px-4 h-9 font-bold text-ink text-sm bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" href="/" data-stx-link>Compose</a>
+        <a class="inline-flex items-center justify-center px-4 h-9 font-bold text-ink text-sm bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" href="/composer" data-stx-link>Compose</a>
         <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="busy()" @click="refreshManual">
           <span class="h-4 w-4 i-hugeicons-refresh" aria-hidden="true"></span>
           <span :text="refreshLabel()">Refresh</span>

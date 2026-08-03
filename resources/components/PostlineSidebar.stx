@@ -12,17 +12,17 @@ catch {
 }
 
 const navLinks = [
-  { href: '/', label: 'Composer', shortcut: '1', icon: 'i-hugeicons-edit-02' },
+  { href: '/composer', label: 'Composer', shortcut: '1', icon: 'i-hugeicons-edit-02' },
   { href: '/queue', label: 'Queue', shortcut: '2', icon: 'i-hugeicons-calendar-03' },
   { href: '/timeline', label: 'Timeline', shortcut: '3', icon: 'i-hugeicons-news' },
   { href: '/analytics', label: 'Analytics', shortcut: '4', icon: 'i-hugeicons-chart-line-data-01' },
   { href: '/accounts', label: 'Accounts', shortcut: '5', icon: 'i-hugeicons-user-multiple' },
   { href: '/campaigns', label: 'Campaigns', shortcut: '6', icon: 'i-hugeicons-flowchart-01' },
+  { href: '/listening', label: 'Listening', shortcut: '7', icon: 'i-hugeicons-radar-02' },
+  { href: '/blog', label: 'Blog', shortcut: '8', icon: 'i-hugeicons-quill-write-02' },
 ].map((link) => ({
   ...link,
-  active: link.href === '/'
-    ? currentPath === '/'
-    : currentPath === link.href || currentPath.startsWith(`${link.href}/`),
+  active: currentPath === link.href || currentPath.startsWith(`${link.href}/`),
 }))
 
 const settingsActive = currentPath === '/settings' || currentPath.startsWith('/settings/')
@@ -38,6 +38,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
         data-stx-link
         data-stx-active-class="text-ink bg-white shadow-sm"
         data-stx-exact-active-class="text-ink bg-white shadow-sm"
+        data-no-window-drag
         class="inline-flex shrink-0 gap-1.5 items-center px-3 py-1.5 text-xs font-medium whitespace-nowrap rounded-full transition-colors hover:bg-white/60 {{ link.active ? 'bg-white text-ink shadow-sm' : 'text-muted' }}"
         aria-current="{{ link.active ? 'page' : 'false' }}"
       >
@@ -46,17 +47,11 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
       </a>
     @endforeach
     <a
-      href="/blog"
-      class="inline-flex gap-1.5 items-center shrink-0 px-3 py-1.5 font-medium text-muted text-xs whitespace-nowrap hover:bg-white/60 rounded-full transition-colors"
-    >
-      <span class="h-4 w-4 i-hugeicons-quill-write-02" aria-hidden="true"></span>
-      <span>Blog</span>
-    </a>
-    <a
       href="/settings"
       data-stx-link
       data-stx-active-class="text-ink bg-white shadow-sm"
       data-stx-exact-active-class="text-ink bg-white shadow-sm"
+      data-no-window-drag
       class="inline-flex shrink-0 gap-1.5 items-center px-3 py-1.5 text-xs font-medium whitespace-nowrap rounded-full transition-colors hover:bg-white/60 {{ settingsActive ? 'bg-white text-ink shadow-sm' : 'text-muted' }}"
       aria-current="{{ settingsActive ? 'page' : 'false' }}"
     >
@@ -87,6 +82,7 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
       data-stx-link
       data-stx-exact-active-class="text-ink"
       data-sidebar-collapsible-content="true"
+      data-no-window-drag
       aria-label="Postline composer"
     >
       <span class="grid place-items-center h-9 w-9 font-bold text-on-accent text-sm bg-accent rounded-xl">P</span>
@@ -100,22 +96,16 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
           data-stx-link
           data-stx-active-class="text-ink bg-[#e8e8e6]/90"
           data-stx-exact-active-class="text-ink bg-[#e8e8e6]/90"
+          data-no-window-drag
+          title="Open {{ link.label }} ({{ link.shortcut }})"
           class="flex w-full items-center gap-3 rounded-[14px] px-3 py-1.5 text-left text-[13.5px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ link.active ? 'bg-[#e8e8e6]/90 text-ink' : 'text-body' }}"
           aria-current="{{ link.active ? 'page' : 'false' }}"
         >
           <span class="h-[18px] w-[18px] {{ link.icon }} {{ link.active ? 'text-ink' : 'text-muted' }}" aria-hidden="true"></span>
           <span class="flex-1 font-medium truncate" data-sidebar-expanded>{{ link.label }}</span>
-          <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>{{ link.shortcut }}</span>
+          <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-sans text-[11px] text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded aria-label="Shortcut {{ link.shortcut }}">{{ link.shortcut }}</kbd>
         </a>
       @endforeach
-      <a
-        href="/blog"
-        class="flex gap-3 items-center px-3 py-1.5 w-full text-[13.5px] text-body text-left focus-visible:bg-white/38 hover:bg-white/38 rounded-[14px] focus-visible:outline-none transition-colors"
-      >
-        <span class="h-[18px] w-[18px] text-muted i-hugeicons-quill-write-02" aria-hidden="true"></span>
-        <span class="flex-1 font-medium truncate" data-sidebar-expanded>Blog</span>
-        <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>7</span>
-      </a>
     </nav>
 
     <a
@@ -124,12 +114,14 @@ const settingsActive = currentPath === '/settings' || currentPath.startsWith('/s
       data-stx-active-class="text-ink bg-[#e8e8e6]/90"
       data-stx-exact-active-class="text-ink bg-[#e8e8e6]/90"
       data-sidebar-collapsible-content="true"
+      data-no-window-drag
+      title="Open Settings (9)"
       class="relative z-10 mt-auto flex w-full items-center gap-3 rounded-[14px] px-3 py-1.5 text-left text-[13.5px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ settingsActive ? 'bg-[#e8e8e6]/90 text-ink' : 'text-body' }}"
       aria-current="{{ settingsActive ? 'page' : 'false' }}"
     >
       <span class="h-[18px] w-[18px] i-hugeicons-settings-02 {{ settingsActive ? 'text-ink' : 'text-muted' }}" aria-hidden="true"></span>
       <span class="flex-1 font-medium" data-sidebar-expanded>Settings</span>
-      <span class="grid place-items-center px-1.5 h-5 min-w-5 text-[11px] text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded>8</span>
+      <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-sans text-[11px] text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded aria-label="Shortcut 9">9</kbd>
     </a>
   </aside>
   </div>

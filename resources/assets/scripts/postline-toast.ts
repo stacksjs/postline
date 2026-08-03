@@ -8,6 +8,8 @@ export interface PostlineToastOptions {
   durationMs?: number
   /** Replaces an existing toast with this id (e.g. dismiss "Publishing" on success). */
   id?: string
+  /** Suppress an identical recent toast. Set to 0 when repeats are intentional. */
+  dedupeMs?: number
 }
 
 const ICONS: Record<PostlineToastTone, string> = {
@@ -20,7 +22,41 @@ const ICONS: Record<PostlineToastTone, string> = {
 const SPINNER = `<svg class="postline-toast__spinner" viewBox="0 0 20 20" fill="none" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="2" stroke-opacity="0.25"/><path d="M17 10a7 7 0 0 0-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`
 
 const toastRegistry = new Map<string, HTMLElement>()
+const recentToasts = new Map<string, number>()
 let stylesheetLinked = false
+const RECENT_TOASTS_KEY = 'postline.toast.recent'
+
+function toastFingerprint(options: PostlineToastOptions, tone: PostlineToastTone, title: string): string {
+  return [tone, title, options.message, options.url || ''].join('\u001f')
+}
+
+function wasRecentlyShown(fingerprint: string, dedupeMs: number): boolean {
+  if (dedupeMs <= 0) return false
+
+  const shownAt = recentToasts.get(fingerprint) || (() => {
+    try {
+      const stored = JSON.parse(window.sessionStorage?.getItem(RECENT_TOASTS_KEY) || '{}')
+      return Number(stored[fingerprint]) || 0
+    }
+    catch {
+      return 0
+    }
+  })()
+
+  const current = Date.now()
+  if (current - shownAt < dedupeMs) return true
+  recentToasts.set(fingerprint, current)
+
+  try {
+    const recent = Object.fromEntries(
+      [...recentToasts.entries()].filter(([, timestamp]) => current - timestamp < 60_000),
+    )
+    window.sessionStorage?.setItem(RECENT_TOASTS_KEY, JSON.stringify(recent))
+  }
+  catch {}
+
+  return false
+}
 
 function ensureStyles(): void {
   if (stylesheetLinked) return
@@ -80,10 +116,12 @@ function dismissToastById(id: string): void {
 export function showPostlineToast(options: PostlineToastOptions): void {
   ensureStyles()
 
-  if (options.id) dismissToastById(options.id)
-
   const tone = options.tone ?? 'neutral'
   const title = options.title ?? (tone === 'success' ? 'Published' : tone === 'error' ? 'Error' : tone === 'info' ? 'Working' : 'Postline')
+  const dedupeMs = options.dedupeMs ?? (tone === 'success' ? 6000 : 2000)
+  if (wasRecentlyShown(toastFingerprint(options, tone, title), dedupeMs)) return
+
+  if (options.id) dismissToastById(options.id)
   const durationMs = options.durationMs ?? (tone === 'error' ? 12000 : tone === 'info' ? 0 : 8000)
   const isLoading = tone === 'info' && /publish/i.test(title)
 
