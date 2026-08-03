@@ -43,8 +43,34 @@
         </header>
 
         <div class="grid gap-1 p-4">
-          <div class="flex flex-wrap gap-2 mb-3" data-provider-toggles role="group" aria-label="Crosspost targets">
-            <span class="flex items-center px-2.5 min-h-8 text-xs text-zinc-400 bg-panel-2 border border-line rounded-xl" data-provider-empty>Loading accounts…</span>
+          <!-- Chips render from the providerRows() signal. Their selected /
+              disabled / over-limit states ride on data-attributes and are styled
+              in config/crosswind.ts, because a class string composed in the
+              browser is invisible to the Crosswind extractor. -->
+          <div class="flex flex-wrap gap-2 mb-3" role="group" aria-label="Crosspost targets">
+            <!-- Object-form :class, rather than an inline display rule plus
+                x-show. The string form of :class MERGES with the static class
+                list, so a static hidden class would never come back off; the
+                object form goes through classList.add/remove instead. Its keys
+                are single-quoted literals, so the Crosswind extractor still
+                sees them, and the static class is the pre-hydration state. -->
+            <span class="flex items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 border border-line rounded-xl" :class="{ 'hidden': !providersPending() }">Loading accounts…</span>
+            <a class="hidden inline-flex items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-xl transition-colors" :class="{ 'hidden': !providersEmpty() }" href="/accounts" data-stx-link>No accounts yet. Connect one →</a>
+            <button
+              class="inline-flex gap-1.5 items-center px-2.5 min-h-8 font-bold text-xs border rounded-xl transition-colors"
+              type="button"
+              x-for="row in providerRows()"
+              :data-provider-toggle="row.provider"
+              :data-selected="row.selected"
+              :data-over="row.over"
+              :disabled="!row.connected"
+              :title="row.title"
+              :aria-pressed="row.selected"
+              @click="toggleProvider(row.provider)"
+            >
+              <span class="h-2 w-2 rounded-full" data-provider-dot aria-hidden="true"></span>
+              <span :text="row.label"></span>
+            </button>
           </div>
           <!-- Per-network overrides. Rows are built by the script, one per
               selected target. Hidden in thread mode: the server publishes a
@@ -128,7 +154,6 @@
       const connectionLabel = root.querySelector('[data-bluesky-connection-label]')
       const publishLabel = root.querySelector('[data-bluesky-publish-label]')
       const buttons = Array.from(root.querySelectorAll('[data-bluesky-publish], [data-bluesky-publish-top]'))
-      const providerToggles = root.querySelector('[data-provider-toggles]')
       const variantSection = root.querySelector('[data-variant-section]')
       const variantToggle = root.querySelector('[data-variant-toggle]')
       const variantToggleLabel = root.querySelector('[data-variant-toggle-label]')
@@ -167,8 +192,19 @@
       let savedActiveIndex = 0
 
       let canPublish = false
-      let providers = []
-      const selected = new Set()
+
+      // Signals, not plain values: the provider chips render from these through
+      // x-for, so every mutation repaints with no hand-written render pass.
+      // `selected` is an array rather than a Set because a Set mutates in place
+      // and would never trip the signal.
+      const providers = state([])
+      const selectedList = state([])
+      const providersLoaded = state(false)
+
+      const selectedHas = (provider) => selectedList().includes(provider)
+      const selectedAdd = (provider) => { if (!selectedHas(provider)) selectedList.set([...selectedList(), provider]) }
+      const selectedDelete = (provider) => selectedList.set(selectedList().filter(entry => entry !== provider))
+      const selectedClear = () => selectedList.set([])
 
       // Edit mode: /?edit=<id> loads a queued post into the composer.
       const editBanner = root.querySelector('[data-edit-banner]')
@@ -198,8 +234,8 @@
       }
 
       const providerLabel = provider => window.postlineSocial?.providerLabel(provider) || provider
-      const connectedProviders = () => providers.filter(provider => provider.canPublish)
-      const selectedConnected = () => connectedProviders().filter(provider => selected.has(provider.provider))
+      const connectedProviders = () => providers().filter(provider => provider.canPublish)
+      const selectedConnected = () => connectedProviders().filter(provider => selectedHas(provider.provider))
 
       // The tightest limit among selected targets. Used for the counter's
       // denominator only — it is never enforced on the textarea, because
@@ -219,40 +255,51 @@
       const overLimitProviders = () => selectedConnected()
         .filter(provider => provider.characterLimit && bodyFor(provider.provider).length > provider.characterLimit)
 
-      const toggleClass = (isSelected, connected) => {
-        const base = 'inline-flex gap-1.5 items-center px-2.5 min-h-8 text-xs font-bold border rounded-xl transition-colors'
-        if (!connected) return `${base} border-line bg-panel-2 text-zinc-400 cursor-not-allowed`
-        return isSelected
-          ? `${base} border-neutral-950 bg-accent text-on-accent`
-          : `${base} border-line bg-panel-2 text-muted hover:bg-white`
+      /**
+       * Everything one provider chip renders, as plain data.
+       *
+       * State rides on data-attributes and is styled from config/crosswind.ts
+       * rather than by composing a class string here. The Crosswind extractor
+       * only pulls single-quoted literals out of a :class value, so a computed
+       * class string generates no utilities at all and would need a
+       * hand-maintained safelist entry to survive.
+       *
+       * The over-limit flag is folded in here too, replacing a pass that used to
+       * walk the rendered chips and toggle dot classes by hand.
+       */
+      const providerRows = derived(() => {
+        const overKeys = new Set(overLimitProviders().map(entry => entry.provider))
+        return providers().map((status) => {
+          const connected = Boolean(status.canPublish)
+          const isSelected = connected && selectedHas(status.provider)
+          const label = providerLabel(status.provider)
+          const over = isSelected && overKeys.has(status.provider)
+          return {
+            provider: status.provider,
+            label,
+            connected,
+            selected: isSelected,
+            over,
+            title: !connected
+              ? `Connect ${label} on the Accounts page to crosspost here.`
+              : over
+                ? `Too long for ${label} — this target would be rejected.`
+                : '',
+          }
+        })
+      })
+
+      const providersPending = derived(() => !providersLoaded())
+      const providersEmpty = derived(() => providersLoaded() && providers().length === 0)
+
+      const toggleProvider = (provider) => {
+        if (selectedHas(provider)) selectedDelete(provider)
+        else selectedAdd(provider)
+        updatePublishability()
       }
 
-      const createProviderToggle = (status) => {
-        const label = providerLabel(status.provider)
-        const isSelected = selected.has(status.provider) && status.canPublish
-        const button = document.createElement('button')
-        button.type = 'button'
-        button.dataset.providerToggle = status.provider
-        button.setAttribute('aria-pressed', isSelected ? 'true' : 'false')
-        button.className = toggleClass(isSelected, status.canPublish)
-        if (!status.canPublish) {
-          button.setAttribute('disabled', 'disabled')
-          button.title = `Connect ${label} on the Accounts page to crosspost here.`
-        }
-        const dot = isSelected ? 'bg-emerald-400' : 'bg-zinc-300'
-        button.innerHTML = `<span class="h-2 w-2 rounded-full ${dot}" aria-hidden="true" data-provider-dot></span><span>${label}</span>`
-        return button
-      }
-
-      const renderProviderToggles = () => {
-        if (!providerToggles) return
-        if (providers.length === 0) {
-          providerToggles.innerHTML = '<a class="inline-flex items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-xl transition-colors" href="/accounts" data-stx-link>No accounts yet. Connect one →</a>'
-          return
-        }
-        providerToggles.replaceChildren(...providers.map(createProviderToggle))
-      }
-
+      
+      
       // Per-network overrides: provider -> { text, shared }. `shared` is the
       // body captured when the override was created, so a later edit to the
       // shared text can be reported as having left this copy behind.
@@ -452,11 +499,11 @@
         })
         // The image field is only meaningful for Instagram, which rejects
         // text-only posts.
-        const needsImage = selected.has('instagram') && connectedProviders().some(provider => provider.provider === 'instagram')
+        const needsImage = selectedHas('instagram') && connectedProviders().some(provider => provider.provider === 'instagram')
         composeImageRow?.classList.toggle('hidden', !needsImage)
         composeImageRow?.classList.toggle('flex', needsImage)
         // Long-form title field appears whenever the blog is a target.
-        const wantsTitle = selected.has('blog') && connectedProviders().some(provider => provider.provider === 'blog')
+        const wantsTitle = selectedHas('blog') && connectedProviders().some(provider => provider.provider === 'blog')
         composeTitle?.classList.toggle('hidden', !wantsTitle)
         composeTitle?.classList.toggle('block', wantsTitle)
         renderVariantPanel()
@@ -464,19 +511,19 @@
       }
 
       const applyConnection = (list) => {
-        providers = Array.isArray(list) ? list : []
+        providers.set(Array.isArray(list) ? list : [])
+        providersLoaded.set(true)
         const connectedKeys = connectedProviders().map(provider => provider.provider)
         // Default to every connected provider; otherwise drop any selected
         // provider that is no longer connected.
-        if (selected.size === 0) {
-          connectedKeys.forEach(key => selected.add(key))
+        if (selectedList().length === 0) {
+          connectedKeys.forEach(key => selectedAdd(key))
         }
         else {
-          ;[...selected].forEach((key) => {
-            if (!connectedKeys.includes(key)) selected.delete(key)
+          ;[...selectedList()].forEach((key) => {
+            if (!connectedKeys.includes(key)) selectedDelete(key)
           })
         }
-        renderProviderToggles()
         renderConnectionSummary()
         updatePublishability()
       }
@@ -606,29 +653,7 @@
         })
       }
 
-      /**
-       * Mark the targets a body of `length` characters would be rejected by.
-       * Applied in place rather than by re-rendering the toggles, so a chip
-       * keeps focus and `aria-pressed` while the user types. Disabled chips are
-       * skipped — they can't be selected, so they're never over, and they own a
-       * "connect this account" title we must not clobber.
-       */
-      const markOverLimitToggles = (over) => {
-        const overKeys = new Set(over.map(provider => provider.provider))
-        Array.from(root.querySelectorAll('[data-provider-toggle]')).forEach((button) => {
-          if (button.hasAttribute('disabled')) return
-          const provider = button.dataset.providerToggle
-          const isOver = overKeys.has(provider)
-          const isSelected = button.getAttribute('aria-pressed') === 'true'
-          const dot = button.querySelector('[data-provider-dot]')
-          dot?.classList.toggle('bg-red-500', isOver)
-          dot?.classList.toggle('bg-emerald-400', !isOver && isSelected)
-          dot?.classList.toggle('bg-zinc-300', !isOver && !isSelected)
-          if (isOver) button.title = `Too long for ${providerLabel(provider)} — this target would be rejected.`
-          else button.removeAttribute('title')
-        })
-      }
-
+      
       const updateCount = () => {
         const textarea = activeTextarea()
         if (!textarea || !count) return
@@ -650,7 +675,6 @@
         count.classList.toggle('text-amber-700', over.length === 0 && length > limit - 40)
         count.classList.toggle('text-muted', over.length === 0 && length <= limit - 40)
 
-        markOverLimitToggles(over)
         updateVariantMeta()
       }
 
@@ -813,9 +837,8 @@
         })
 
         // Providers: select exactly the post's set (intersected with connected).
-        selected.clear()
-        for (const provider of item.providers || []) selected.add(provider)
-        renderProviderToggles()
+        selectedClear()
+        for (const provider of item.providers || []) selectedAdd(provider)
         updatePublishability()
 
         // Schedule.
@@ -1231,18 +1254,7 @@
           refreshButton.removeAttribute('disabled')
         }
       })
-      providerToggles?.addEventListener('click', (event) => {
-        const target = event.target
-        if (!(target instanceof HTMLElement)) return
-        const button = target.closest('[data-provider-toggle]')
-        if (!button || button.hasAttribute('disabled')) return
-        const provider = button.dataset.providerToggle
-        if (selected.has(provider)) selected.delete(provider)
-        else selected.add(provider)
-        renderProviderToggles()
-        updatePublishability()
-      })
-      variantToggle?.addEventListener('click', () => {
+            variantToggle?.addEventListener('click', () => {
         variantsOpen = !variantsOpen
         renderVariantPanel()
       })

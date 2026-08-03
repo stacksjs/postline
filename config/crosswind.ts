@@ -290,6 +290,32 @@ html.dark [data-cal-cell][data-today] [data-cal-day] { color: rgb(147 197 253); 
 `
 
 /**
+ * Composer provider chips.
+ *
+ * Bound with `:data-selected` / `:data-over` / `:disabled` rather than a
+ * computed `:class`, for the same reason as the queue pills: the extractor only
+ * reads single-quoted literals out of a `:class` value, so a class string built
+ * in the browser generates no utilities and would need a hand-maintained
+ * safelist. Driving it from attributes deletes that safelist entirely.
+ *
+ * Checked for specificity ties against the chip's own static classes — those
+ * are layout and typography only, so nothing here competes with a utility.
+ */
+const COMPOSER_CHIPS: string = `
+[data-provider-toggle] { border-color: var(--line); background: var(--panel-2); color: var(--muted); }
+[data-provider-toggle]:not([disabled]):hover { background: #ffffff; }
+[data-provider-toggle][data-selected] { border-color: #0a0a0a; background: var(--accent); color: var(--on-accent); }
+[data-provider-toggle][disabled] { color: #a1a1aa; cursor: not-allowed; }
+
+[data-provider-toggle] [data-provider-dot] { background: #d4d4d8; }
+[data-provider-toggle][data-selected] [data-provider-dot] { background: #34d399; }
+[data-provider-toggle][data-over] [data-provider-dot] { background: #ef4444; }
+
+html.dark [data-provider-toggle]:not([disabled]):hover { background: #26262a; }
+html.dark [data-provider-toggle][disabled] { color: #52525b; }
+`
+
+/**
  * Settings theme picker and Bluesky connection pill. Same data-attribute
  * approach and same verified absence of competing colour utilities as
  * QUEUE_STATUS above.
@@ -467,6 +493,7 @@ export default {
     { getCSS: (): string => APP_SHELL },
     { getCSS: (): string => QUEUE_STATUS },
     { getCSS: (): string => SETTINGS_STATUS },
+    { getCSS: (): string => COMPOSER_CHIPS },
     { getCSS: (): string => MARKETING_BASE },
     { getCSS: (): string => MEGA_MENU },
   ],
