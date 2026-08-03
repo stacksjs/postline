@@ -41,7 +41,7 @@ import { defaultConfig } from '@cwcss/crosswind'
  */
 
 /** App surfaces, light. The default for every page that is not the landing. */
-const APP_LIGHT = `
+const APP_LIGHT: string = `
   color-scheme: light;
   background: #f3f3f1;
   --bg: #f3f3f1;
@@ -57,7 +57,7 @@ const APP_LIGHT = `
 `
 
 /** App surfaces, dark. */
-const APP_DARK = `
+const APP_DARK: string = `
   color-scheme: dark;
   background: #0a0a0c;
   --bg: #0a0a0c;
@@ -78,7 +78,7 @@ const APP_DARK = `
  * override rather than a second competing `:root`. The marketing layout opts in
  * with `class="marketing"` on the root element.
  */
-const MARKETING = `
+const MARKETING: string = `
   color-scheme: light;
   --bg: #f4f4f2;
   --panel: #ffffff;
@@ -92,7 +92,7 @@ const MARKETING = `
   --on-accent: #ffffff;
 `
 
-const TOKENS = `
+const TOKENS: string = `
 :root { ${APP_LIGHT} }
 html.dark { ${APP_DARK} }
 html.marketing { ${MARKETING} }
@@ -112,7 +112,7 @@ html.dark body { color: var(--ink); }
  * These survive on specificity (`.dark .bg-blue-50` is 0,2,0 against the
  * utility's 0,1,0), not on source order, so moving them here is safe.
  */
-const DARK_OVERRIDES = `
+const DARK_OVERRIDES: string = `
 .dark .bg-blue-50 { background-color: #172554; }
 .dark .bg-emerald-50 { background-color: #052e2b; }
 .dark .bg-amber-50 { background-color: #3a2a08; }
@@ -173,7 +173,7 @@ const DARK_OVERRIDES = `
 `
 
 /** App shell: sidebar collapse animation, native-window chrome, focus rings. */
-const APP_SHELL = `
+const APP_SHELL: string = `
 @property --postline-sidebar-width {
   syntax: '<length>';
   inherits: true;
@@ -261,7 +261,7 @@ html.postline-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fa
  * Verified free of specificity ties: none of these elements carries a competing
  * colour utility in its `class` attribute.
  */
-const QUEUE_STATUS = `
+const QUEUE_STATUS: string = `
 [data-view-toggle] { color: var(--muted); }
 [data-view-toggle][data-active] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
 
@@ -294,7 +294,7 @@ html.dark [data-cal-cell][data-today] [data-cal-day] { color: rgb(147 197 253); 
  * approach and same verified absence of competing colour utilities as
  * QUEUE_STATUS above.
  */
-const SETTINGS_STATUS = `
+const SETTINGS_STATUS: string = `
 [data-theme-option] { color: var(--muted); }
 [data-theme-option][data-active] {
   background: var(--panel);
@@ -325,7 +325,7 @@ html.dark [data-bluesky-pill][data-state="setup"] {
  * `@supports` so browsers without `animation-timeline` (and reduced-motion
  * users) always render content visible.
  */
-const MARKETING_BASE = `
+const MARKETING_BASE: string = `
 html.marketing {
   font-family: Geist, ui-sans-serif, system-ui, sans-serif;
   scroll-behavior: smooth;
@@ -409,11 +409,11 @@ export default {
     // `box-sizing: border-box`, the margin reset and the form normalisation
     // from every page.
     ...(defaultConfig.preflights ?? []),
-    { getCSS: () => TOKENS },
-    { getCSS: () => DARK_OVERRIDES },
-    { getCSS: () => APP_SHELL },
-    { getCSS: () => QUEUE_STATUS },
-    { getCSS: () => SETTINGS_STATUS },
-    { getCSS: () => MARKETING_BASE },
+    { getCSS: (): string => TOKENS },
+    { getCSS: (): string => DARK_OVERRIDES },
+    { getCSS: (): string => APP_SHELL },
+    { getCSS: (): string => QUEUE_STATUS },
+    { getCSS: (): string => SETTINGS_STATUS },
+    { getCSS: (): string => MARKETING_BASE },
   ],
 } satisfies CrosswindOptions

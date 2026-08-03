@@ -96,14 +96,14 @@
      *      which matches on 'system'.
      * Revisit once either is addressed.
      */
-    const applyTheme = (pref) => {
+    const applyTheme = (pref: ThemePreference): void => {
       const dark = pref === 'dark'
         || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
       document.documentElement.classList.toggle('dark', dark)
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
     }
 
-    const setTheme = (pref) => {
+    const setTheme = (pref: ThemePreference): void => {
       themePref.set(pref)
       try {
         localStorage.setItem('theme', pref)

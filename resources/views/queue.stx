@@ -130,30 +130,30 @@
     // string ("list"), which would throw and take the whole script down.
     const view = useLocalStorage('postline.queue.view.v2', 'list')
 
-    function monthStart(date) {
+    function monthStart(date: Date): Date {
       return new Date(date.getFullYear(), date.getMonth(), 1)
     }
 
-    function localDayKey(date) {
+    function localDayKey(date: Date): string {
       return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
     }
 
     // Server timestamps are UTC "YYYY-MM-DD HH:MM:SS" — render in local time.
-    const parseUtc = (value) => {
+    const parseUtc = (value: string | null | undefined): Date | null => {
       if (!value) return null
       const date = new Date(`${String(value).replace(' ', 'T')}Z`)
       return Number.isNaN(date.getTime()) ? null : date
     }
 
-    const formatTime = (value) => {
+    const formatTime = (value: string | null | undefined): string => {
       const date = parseUtc(value)
       if (!date) return value || ''
       return date.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
     }
 
-    const providerLabel = provider => postlineSocial?.providerLabel(provider) || provider
+    const providerLabel = (provider: string): string => postlineSocial?.providerLabel(provider) || provider
 
-    const liveUrlFor = (uri) => {
+    const liveUrlFor = (uri: string | null | undefined): string => {
       const value = String(uri || '')
       if (value.startsWith('/')) return value
       // A stored permalink (Mastodon, and any provider persisting a URL) is
@@ -164,7 +164,7 @@
     }
 
     /** Flatten an API item into exactly what a row renders. */
-    const toRow = (item) => {
+    const toRow = (item: QueueApiItem): QueueRow => {
       const when = item.status === 'scheduled'
         ? `Scheduled · ${formatTime(item.scheduledAt)}`
         : item.status === 'published'
@@ -283,7 +283,7 @@
       }
     }
 
-    const post = async (path, id) => {
+    const post = async (path: string, id: number): Promise<unknown> => {
       const form = new FormData()
       form.set('id', String(id))
       const response = await fetch(path, { method: 'POST', body: form })
@@ -292,7 +292,7 @@
       return payload.data
     }
 
-    const runAction = async (id, path, success, failure) => {
+    const runAction = async (id: number, path: string, success: QueueActionCopy, failure: string): Promise<void> => {
       busyId.set(id)
       try {
         await post(path, id)
@@ -311,14 +311,14 @@
       await refresh()
     }
 
-    const publishItem = id => void runAction(
+    const publishItem = (id: number): void => void runAction(
       id,
       '/api/postline/queue/publish-now',
       { title: 'Published', message: 'Post published.' },
       'Publish failed',
     )
 
-    const deleteItem = (id) => {
+    const deleteItem = (id: number): void => {
       if (!confirm('Delete this post? This cannot be undone.')) return
       void runAction(
         id,

@@ -86,7 +86,7 @@
      * state at boot, so a fresh document is what makes the new session take
      * effect everywhere.
      */
-    const storeTokenAndEnter = (token, expiresIn) => {
+    const storeTokenAndEnter = (token: string, expiresIn?: number | string | null): void => {
       const maxAge = Number(expiresIn) > 0 ? Number(expiresIn) : 60 * 60 * 24 * 30
       useCookie('auth-token', { maxAge }).set(token)
       location.assign('/composer')

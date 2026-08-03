@@ -111,14 +111,14 @@
       .replaceAll('"', '&quot;')
       .replaceAll('\'', '&#039;')
 
-    const formatCount = (value) => {
+    const formatCount = (value: number | null | undefined): string => {
       const n = Number(value) || 0
       if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
       if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`
       return String(n)
     }
 
-    const formatRelativeTime = (iso) => {
+    const formatRelativeTime = (iso: string | null | undefined): string => {
       const date = new Date(iso)
       if (Number.isNaN(date.getTime())) return ''
       const minutes = Math.floor((Date.now() - date.getTime()) / 60000)
@@ -131,7 +131,7 @@
       return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
     }
 
-    const avatarGradient = (handle) => {
+    const avatarGradient = (handle: string): string => {
       let hash = 0
       for (let i = 0; i < handle.length; i++) hash = handle.charCodeAt(i) + ((hash << 5) - hash)
       const hues = [215, 168, 280, 32, 340, 128, 48, 12]
@@ -139,7 +139,7 @@
       return `--postline-avatar-a:hsl(${hue} 72% 58%);--postline-avatar-b:hsl(${hue} 68% 42%)`
     }
 
-    const initialsFor = (handle, name) => {
+    const initialsFor = (handle: string, name?: string | null): string => {
       if (name) {
         const parts = name.trim().split(/\s+/).slice(0, 2)
         if (parts.length) return parts.map(part => part[0]?.toUpperCase() || '').join('')
@@ -147,9 +147,9 @@
       return handle.replace(/[^a-z0-9]/gi, '').slice(0, 2).toUpperCase() || 'PL'
     }
 
-    const profileUrl = handle => `https://bsky.app/profile/${encodeURIComponent(handle)}`
+    const profileUrl = (handle: string): string => `https://bsky.app/profile/${encodeURIComponent(handle)}`
 
-    const postUrl = (item) => {
+    const postUrl = (item: TimelineApiItem): string => {
       if (item.postUrl) return item.postUrl
       const id = String(item.uri || '').split('/').pop()
       return id
@@ -157,7 +157,7 @@
         : profileUrl(item.authorHandle)
     }
 
-    const linkifyBody = text => escapeHtml(text).replace(
+    const linkifyBody = (text: string): string => escapeHtml(text).replace(
       /(https?:\/\/[^\s<]+)/g,
       '<a class="postline-feed-post__link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
     )
@@ -167,7 +167,7 @@
      * derivation once here keeps the markup free of expression logic and means
      * each row is plain data by the time x-for sees it.
      */
-    const toRow = (item) => {
+    const toRow = (item: TimelineApiItem): TimelineRow => {
       const handle = item.authorHandle || 'unknown.bsky.social'
       const name = item.authorName || handle
       return {

@@ -17,6 +17,7 @@
     "*.ts",
     "app/Actions/**/*.ts",
     "*.d.ts",
+    "types/**/*.d.ts",
     "app/Models/**/*.ts",
     "app/Services/**/*.ts",
     "app/Support/**/*.ts"
