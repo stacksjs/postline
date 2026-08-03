@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
+import { kanbanError } from './kanban-response'
 
 interface ColumnReorder {
   columnId: number
@@ -50,7 +51,7 @@ export default new Action({
     const body = (request as any).jsonBody as ReorderInput | undefined ?? {}
 
     if (!Array.isArray(body.columns) || body.columns.length === 0) {
-      return { error: '`columns` must be a non-empty array.', status: 400 }
+      return kanbanError('`columns` must be a non-empty array.', 400)
     }
 
     // Parse + validate. Each entry needs a positive integer columnId
@@ -59,19 +60,19 @@ export default new Action({
     const allCardIds = new Set<number>()
     for (const raw of body.columns) {
       if (!raw || typeof raw !== 'object')
-        return { error: '`columns[]` entry must be an object.', status: 400 }
+        return kanbanError('`columns[]` entry must be an object.', 400)
       const columnId = Number((raw as any).columnId)
       if (!Number.isFinite(columnId) || columnId <= 0)
-        return { error: '`columns[].columnId` must be a positive integer.', status: 400 }
+        return kanbanError('`columns[].columnId` must be a positive integer.', 400)
       if (!Array.isArray((raw as any).order))
-        return { error: '`columns[].order` must be an array.', status: 400 }
+        return kanbanError('`columns[].order` must be an array.', 400)
       const order: number[] = []
       for (const v of (raw as any).order) {
         const n = Number(v)
         if (!Number.isFinite(n) || n <= 0)
-          return { error: '`columns[].order` contains an invalid card id.', status: 400 }
+          return kanbanError('`columns[].order` contains an invalid card id.', 400)
         if (allCardIds.has(n))
-          return { error: 'A card id appears in more than one column.', status: 400 }
+          return kanbanError('A card id appears in more than one column.', 400)
         allCardIds.add(n)
         order.push(n)
       }
@@ -91,11 +92,11 @@ export default new Action({
         columnIds,
       ).execute() as Array<{ id: number, board_id: number }>
       if (colRows.length !== columnIds.length) {
-        return { error: 'One or more column ids do not exist.', status: 400 }
+        return kanbanError('One or more column ids do not exist.', 400)
       }
       const boardIds = new Set(colRows.map(r => r.board_id))
       if (boardIds.size > 1) {
-        return { error: 'All columns in a reorder request must belong to the same board.', status: 400 }
+        return kanbanError('All columns in a reorder request must belong to the same board.', 400)
       }
       const boardId = colRows[0].board_id
 
@@ -109,7 +110,7 @@ export default new Action({
           [...cardIdList, boardId],
         ).execute() as Array<{ id: number }>
         if (cardRows.length !== cardIdList.length) {
-          return { error: 'One or more card ids do not belong to the named board.', status: 400 }
+          return kanbanError('One or more card ids do not belong to the named board.', 400)
         }
       }
 
@@ -118,7 +119,8 @@ export default new Action({
       // moving across columns get both columns of their row rewritten;
       // cards staying put still get their position rewritten (cheap,
       // idempotent).
-      const txOps = async (qb: any) => {
+      await db.transaction(async (rawTrx) => {
+        const qb = rawTrx as unknown as typeof db
         for (const { columnId, order } of reorders) {
           for (let i = 0; i < order.length; i++) {
             await qb.updateTable('cards')
@@ -127,22 +129,13 @@ export default new Action({
               .execute()
           }
         }
-      }
-      try {
-        await (db as any).transaction(txOps)
-      }
-      catch {
-        // Driver-specific transaction shape failed — sequential is
-        // safe (each UPDATE is idempotent), but the page should
-        // refetch on failure to confirm the final state.
-        await txOps(db)
-      }
+      })
 
       return { moved: allCardIds.size, boardId }
     }
     catch (err) {
       console.error('[dashboard/kanban] CardsReorderAction failed:', err)
-      return { error: err instanceof Error ? err.message : 'unknown error', status: 500 }
+      return kanbanError(err instanceof Error ? err.message : 'unknown error', 500)
     }
   },
 })

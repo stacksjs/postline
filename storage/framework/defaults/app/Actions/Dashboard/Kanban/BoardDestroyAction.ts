@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
+import { kanbanError } from './kanban-response'
 
 /**
  * `DELETE /api/dashboard/kanban/boards/:id` (stacksjs/stacks#1846 Phase 2).
@@ -26,18 +27,12 @@ export default new Action({
     const rawId = (request as any)?.params?.id ?? (request as any)?.param?.('id') ?? null
     const id = Number(rawId)
     if (!Number.isFinite(id) || id <= 0) {
-      return { error: 'Invalid board id', status: 400 }
+      return kanbanError('Invalid board id', 400)
     }
 
     try {
-      // Wrap in a transaction so partial failures roll back. If the
-      // active dialect doesn't support transactions through
-      // `db.transaction` (some shapes pass through to the underlying
-      // bun-query-builder which has driver-specific implementations),
-      // fall through to a best-effort sequential delete — the deletes
-      // are idempotent, so re-running the same DELETE on the same id
-      // is safe.
-      const txOps = async (qb: any) => {
+      await db.transaction(async (rawTrx) => {
+        const qb = rawTrx as unknown as typeof db
         // Pivots + card-scoped children first — they reference cards.
         await qb.unsafe(
           'DELETE FROM card_labels WHERE card_id IN (SELECT id FROM cards WHERE board_id = ?)',
@@ -60,25 +55,13 @@ export default new Action({
         await qb.deleteFrom('labels').where('board_id', '=', id).execute()
         // Finally the board itself.
         await qb.deleteFrom('boards').where('id', '=', id).execute()
-      }
-
-      try {
-        await (db as any).transaction(txOps)
-      }
-      catch (txErr) {
-        // Transaction unavailable or driver-specific shape failed —
-        // run sequentially. If this fails mid-way the next call to
-        // the same action will pick up where the previous one left
-        // off (all deletes are idempotent).
-        console.warn('[dashboard/kanban] BoardDestroyAction transaction unavailable, falling back to sequential:', txErr)
-        await txOps(db)
-      }
+      })
 
       return { deleted: true, id }
     }
     catch (err) {
       console.error('[dashboard/kanban] BoardDestroyAction failed:', err)
-      return { error: err instanceof Error ? err.message : 'unknown error', status: 500 }
+      return kanbanError(err instanceof Error ? err.message : 'unknown error', 500)
     }
   },
 })

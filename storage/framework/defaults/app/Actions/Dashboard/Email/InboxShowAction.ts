@@ -1,11 +1,8 @@
 import { Action } from '@stacksjs/actions'
 import { emailSDK } from '@stacksjs/email'
-import { config } from '@stacksjs/config'
-
-function defaultMailbox(): string {
-  const domain = (config as any)?.email?.domain || 'stacksjs.com'
-  return `chris@${domain}`
-}
+import { response } from '@stacksjs/router'
+import { defaultMailbox } from './mail-preference'
+import { sanitizeInboxHtml } from './sanitize-inbox-html'
 
 export default new Action({
   name: 'InboxShowAction',
@@ -18,27 +15,25 @@ export default new Action({
       const mailbox = request?.query?.mailbox || defaultMailbox()
       const messageId = request?.params?.id
 
-      if (!messageId) {
-        return { error: 'messageId is required' }
-      }
+      if (!messageId)
+        return response.json({ message: 'A message ID is required.' }, 422)
 
       const email = await emailSDK.getEmail(mailbox, messageId)
-      if (!email) {
-        return { error: 'Email not found' }
-      }
+      if (!email)
+        return response.json({ message: 'Email not found.' }, 404)
 
       return {
         mailbox,
         messageId,
-        html: email.html ?? '',
+        html: sanitizeInboxHtml(email.html ?? ''),
         text: email.text ?? '',
         metadata: email.metadata,
       }
     }
     catch (err) {
-      return {
-        error: err instanceof Error ? err.message : 'unknown error',
-      }
+      return response.json({
+        message: err instanceof Error ? err.message : 'Email content could not be loaded.',
+      }, 503)
     }
   },
 })

@@ -102,6 +102,12 @@ route.post('/api/email/unsubscribe', 'Actions/UnsubscribeAction').name('email.un
 // the action itself.
 route.post('/api/contact', 'Actions/ContactAction').name('contact.send').skipCsrf()
 
+// Team invitation bearers are high-entropy, single-use tokens. The public
+// read supplies the acceptance screen; the write still requires a real
+// authenticated user whose email matches the invitation.
+route.get('/api/team-invitation-links/{token}', 'Actions/Teams/ShowInvitationAction').rateLimit(30, 'minute')
+route.post('/api/team-invitations/{token}/accept', 'Actions/Teams/AcceptInvitationAction').middleware('auth').rateLimit(10, 'minute')
+
 // ============================================================================
 // Storefront (anonymous cart + multi-step checkout)
 //
@@ -225,13 +231,7 @@ route.group({ prefix: '/dashboard', middleware: 'auth' }, () => {
   route.get('/health', 'Actions/Dashboard/DashboardHealthAction')
   route.get('/services', 'Actions/Dashboard/ServiceHealthAction')
   route.get('/buddy', 'Actions/Dashboard/BuddyDashboardAction')
-  route.get('/actions/list', 'Actions/Dashboard/Actions/GetActions')
   route.get('/settings', 'Actions/Dashboard/Settings/SettingsIndexAction')
-  // Dashboard's omnisearch endpoint. Lived at root `/search` until users
-  // building a public site discovered it shadowed `resources/views/search.stx`
-  // (a registered route always wins over a same-path stx file). Now scoped
-  // under /dashboard so userland keeps `/search` for their own pages.
-  route.get('/search', 'Actions/Dashboard/Search/GlobalSearchAction')
 })
 
 // ============================================================================
@@ -362,7 +362,6 @@ route.group({ prefix: '/cms', middleware: 'auth' }, () => {
   route.patch('/pages/{id}', 'Actions/Cms/PageUpdateAction')
   route.delete('/pages/{id}', 'Actions/Cms/PageDestroyAction')
 
-  route.get('/seo', 'Actions/Dashboard/Content/SeoIndexAction')
   route.get('/files', 'Actions/Dashboard/Content/FileIndexAction')
 })
 
@@ -400,6 +399,7 @@ route.group({ prefix: '/api/commerce', middleware: 'auth' }, () => {
   route.get('/products/units', 'Actions/Commerce/Product/ProductUnitIndexAction')
   route.get('/products/units/{id}', 'Actions/Commerce/Product/ProductUnitShowAction')
   route.post('/products/units', 'Actions/Commerce/Product/ProductUnitStoreAction')
+  route.patch('/products/units/{id}', 'Actions/Commerce/Product/ProductUnitUpdateAction')
   route.delete('/products/units/{id}', 'Actions/Commerce/Product/ProductUnitDestroyAction')
 
   route.get('/product-categories', 'Actions/Commerce/Product/ProductCategoryIndexAction')
@@ -411,7 +411,7 @@ route.group({ prefix: '/api/commerce', middleware: 'auth' }, () => {
   route.get('/product-manufacturers', 'Actions/Commerce/Product/ManufacturerIndexAction')
   route.get('/product-manufacturers/{id}', 'Actions/Commerce/Product/ManufacturerShowAction')
   route.post('/product-manufacturers', 'Actions/Commerce/Product/ManufacturerStoreAction')
-  route.patch('/product-manufacturers/{id}', 'Actions/Commerce/Product/ProductManufacturerUpdateAction')
+  route.patch('/product-manufacturers/{id}', 'Actions/Commerce/Product/ManufacturerUpdateAction')
   route.delete('/product-manufacturers/{id}', 'Actions/Commerce/Product/ManufacturerDestroyAction')
 
   route.get('/orders', 'Actions/Commerce/OrderIndexAction')
@@ -453,6 +453,7 @@ route.group({ prefix: '/api/commerce', middleware: 'auth' }, () => {
   route.get('/products/reviews/{id}', 'Actions/Commerce/ReviewShowAction')
   route.post('/products/reviews', 'Actions/Commerce/ReviewStoreAction')
   route.patch('/products/reviews/{id}', 'Actions/Commerce/ReviewUpdateAction')
+  route.delete('/products/reviews/{id}', 'Actions/Commerce/ReviewDestroyAction')
 
   route.get('/receipts', 'Actions/Commerce/ReceiptIndexAction')
   route.get('/receipts/{id}', 'Actions/Commerce/ReceiptShowAction')
@@ -532,6 +533,7 @@ route.group({ prefix: '/api/commerce', middleware: 'auth' }, () => {
   route.get('/drivers/{id}', 'Actions/Commerce/Shipping/DriverShowAction')
   route.post('/drivers', 'Actions/Commerce/Shipping/DriverStoreAction')
   route.patch('/drivers/{id}', 'Actions/Commerce/Shipping/DriverUpdateAction')
+  route.delete('/drivers/{id}', 'Actions/Commerce/Shipping/DriverDestroyAction')
 
   // Renamed from `/digital` — frontend composable expects `/digital-deliveries`.
   route.get('/digital-deliveries', 'Actions/Commerce/Shipping/DigitalDeliveryIndexAction')
@@ -582,19 +584,6 @@ route.group({ prefix: '/queue', middleware: 'auth' }, () => {
 })
 
 // ============================================================================
-// Inbox — captured transactional emails (log driver)
-//
-// Auth-gated: the rendered email body can include reset links, billing
-// receipts, and PII. Treat as sensitive even though the log driver is
-// "dev-only" — staging environments are still real.
-// ============================================================================
-
-route.group({ prefix: '/inbox', middleware: 'auth' }, () => {
-  route.get('/', 'Actions/Dashboard/Inbox/InboxIndexAction')
-  route.get('/{id}', 'Actions/Dashboard/Inbox/InboxShowAction')
-})
-
-// ============================================================================
 // Releases
 // ============================================================================
 
@@ -617,8 +606,6 @@ route.group({ prefix: '/api/settings', middleware: 'auth' }, () => {
 // ============================================================================
 
 route.group({ prefix: '/api/data', middleware: 'auth' }, () => {
-  route.get('/dashboard', 'Actions/Dashboard/Data/DataDashboardAction')
-  route.get('/access-tokens', 'Actions/Dashboard/Data/AccessTokenIndexAction')
   route.get('/subscribers', 'Actions/Dashboard/Data/SubscriberIndexAction')
   route.get('/teams', 'Actions/Dashboard/Data/TeamIndexAction')
   route.get('/users', 'Actions/Dashboard/Data/UserIndexAction')
@@ -630,8 +617,6 @@ route.group({ prefix: '/api/data', middleware: 'auth' }, () => {
 // ============================================================================
 
 route.group({ prefix: '/infrastructure', middleware: 'auth' }, () => {
-  route.get('/commands', 'Actions/Dashboard/Infrastructure/CommandIndexAction')
-  route.get('/requests', 'Actions/Dashboard/Infrastructure/RequestIndexAction')
   route.get('/servers', 'Actions/Dashboard/Infrastructure/ServerIndexAction')
   route.get('/dns', 'Actions/Dashboard/Infrastructure/DnsIndexAction')
   route.get('/environment', 'Actions/Dashboard/Infrastructure/EnvironmentIndexAction')
@@ -642,7 +627,7 @@ route.group({ prefix: '/infrastructure', middleware: 'auth' }, () => {
   route.get('/cloud', 'Actions/Dashboard/Cloud/CloudIndexAction')
 })
 
-route.get('/api/serverless', 'Actions/Dashboard/Cloud/CloudIndexAction').middleware('auth')
+route.get('/api/serverless', 'Actions/Dashboard/Cloud/ServerlessIndexAction').middleware('auth')
 
 // ============================================================================
 // Dashboard Views — Commerce
@@ -688,10 +673,10 @@ route.group({ prefix: '/api/marketing', middleware: 'auth' }, () => {
 // ============================================================================
 
 route.group({ prefix: '/api/notifications', middleware: 'auth' }, () => {
-  route.get('/dashboard', 'Actions/Dashboard/Notifications/NotificationDashboardAction')
-  route.get('/email', 'Actions/Dashboard/Notifications/NotificationDashboardAction')
-  route.get('/sms', 'Actions/Dashboard/Notifications/NotificationDashboardAction')
-  route.get('/history', 'Actions/Dashboard/Notifications/NotificationDashboardAction')
+  route.get('/dashboard', 'Actions/Dashboard/Notifications/NotificationDeliveryOverviewAction')
+  route.get('/email', 'Actions/Dashboard/Notifications/NotificationDeliveryIndexAction')
+  route.get('/sms', 'Actions/Dashboard/Notifications/NotificationDeliveryIndexAction')
+  route.get('/history', 'Actions/Dashboard/Notifications/NotificationDeliveryHistoryAction')
 })
 
 // ============================================================================

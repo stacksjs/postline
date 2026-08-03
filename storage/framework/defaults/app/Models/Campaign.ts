@@ -18,7 +18,15 @@ export default defineModel({
     useApi: {
       uri: 'campaigns',
       routes: ['index', 'store', 'show', 'update', 'destroy'],
+      middleware: ['auth'],
     },
+    useSearch: {
+      displayable: ['id', 'name', 'type', 'status', 'subject', 'scheduledAt', 'sentAt'],
+      searchable: ['name', 'description', 'subject'],
+      sortable: ['name', 'type', 'status', 'scheduledAt', 'sentAt', 'createdAt', 'updatedAt'],
+      filterable: ['type', 'status', 'emailListId', 'currency'],
+    },
+    observe: true,
   },
 
   attributes: {
@@ -87,7 +95,7 @@ export default defineModel({
       required: false,
       fillable: true,
       validation: {
-        rule: schema.string().max(255),
+        rule: schema.string(),
       },
       factory: faker => faker.helpers.arrayElement(['newsletter-default', 'product-update', 'promo']),
     },
@@ -212,6 +220,16 @@ export default defineModel({
         rule: schema.number().min(0),
       },
       factory: faker => faker.number.float({ min: 0, max: 5000, fractionDigits: 2 }),
+    },
+
+    currency: {
+      required: true,
+      fillable: true,
+      default: 'USD',
+      validation: {
+        rule: schema.string().required().max(3),
+      },
+      factory: faker => faker.helpers.arrayElement(['USD', 'EUR', 'GBP', 'CAD', 'AUD']),
     },
 
     startDate: {

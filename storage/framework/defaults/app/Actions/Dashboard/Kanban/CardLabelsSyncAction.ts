@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
+import { kanbanError } from './kanban-response'
 
 interface SyncInput {
   labelIds?: unknown
@@ -29,17 +30,17 @@ export default new Action({
     const rawId = (request as any)?.params?.id ?? (request as any)?.param?.('id') ?? null
     const cardId = Number(rawId)
     if (!Number.isFinite(cardId) || cardId <= 0)
-      return { error: 'Invalid card id', status: 400 }
+      return kanbanError('Invalid card id', 400)
 
     const body = (request as any).jsonBody as SyncInput | undefined ?? {}
     if (!Array.isArray(body.labelIds))
-      return { error: '`labelIds` must be an array of label ids (possibly empty).', status: 400 }
+      return kanbanError('`labelIds` must be an array of label ids (possibly empty).', 400)
 
     const labelIds: number[] = []
     for (const v of body.labelIds) {
       const n = Number(v)
       if (!Number.isFinite(n) || n <= 0)
-        return { error: '`labelIds` contains an invalid id.', status: 400 }
+        return kanbanError('`labelIds` contains an invalid id.', 400)
       labelIds.push(n)
     }
     const uniqueLabelIds = Array.from(new Set(labelIds))
@@ -52,7 +53,7 @@ export default new Action({
       ).execute() as Array<{ id: number, board_id: number }>
       const card = cardRows?.[0]
       if (!card)
-        return { error: 'Card not found.', status: 404 }
+        return kanbanError('Card not found.', 404)
 
       // Every label must belong to the same board (labels are
       // board-scoped per Phase 1's `labels.board_id` design).
@@ -63,25 +64,20 @@ export default new Action({
           [...uniqueLabelIds, card.board_id],
         ).execute() as Array<{ id: number }>
         if (labelRows.length !== uniqueLabelIds.length)
-          return { error: 'One or more label ids do not belong to this card\'s board.', status: 400 }
+          return kanbanError('One or more label ids do not belong to this card\'s board.', 400)
       }
 
       // Sync: drop all current pivot rows for this card, insert the
       // new set. Cheaper than diffing for the typical "user picked a
       // few labels" use case (single-digit label counts per card).
-      const txOps = async (qb: any) => {
+      await db.transaction(async (rawTrx) => {
+        const qb = rawTrx as unknown as typeof db
         await qb.deleteFrom('card_labels').where('card_id', '=', cardId).execute()
         if (uniqueLabelIds.length > 0) {
           const rows = uniqueLabelIds.map(labelId => ({ card_id: cardId, label_id: labelId }))
           await qb.insertInto('card_labels').values(rows).execute()
         }
-      }
-      try {
-        await (db as any).transaction(txOps)
-      }
-      catch {
-        await txOps(db)
-      }
+      })
 
       // Return the resolved label rows so the optimistic UI can
       // confirm its in-flight state matches what the server stored.
@@ -97,7 +93,7 @@ export default new Action({
     }
     catch (err) {
       console.error('[dashboard/kanban] CardLabelsSyncAction failed:', err)
-      return { error: err instanceof Error ? err.message : 'unknown error', status: 500 }
+      return kanbanError(err instanceof Error ? err.message : 'unknown error', 500)
     }
   },
 })

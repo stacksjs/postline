@@ -12,6 +12,7 @@
  *   bun browse.ts responsive <url> [--out-dir DIR]
  *   bun browse.ts monitor    <url> [--ms 5000]
  *   bun browse.ts snapshot   <url>
+ *   bun browse.ts crawl      <url> [--max 500] [--path /extra] [--progress]
  *
  * Browser discovery order: $BROWSE_BROWSER → PATH (chromium, google-chrome, …)
  * → common macOS app bundles → a Playwright-cached chromium as last resort.
@@ -95,6 +96,12 @@ class Cdp {
 
   private constructor(ws: WebSocket) {
     this.ws = ws
+    const rejectPending = (message: string): void => {
+      const error = new Error(message)
+      for (const pending of this.pending.values())
+        pending.reject(error)
+      this.pending.clear()
+    }
     ws.addEventListener('message', (ev: any) => {
       const msg = JSON.parse(ev.data)
       if (msg.id != null && this.pending.has(msg.id)) {
@@ -106,6 +113,8 @@ class Cdp {
         for (const l of this.listeners) l({ method: msg.method, params: msg.params })
       }
     })
+    ws.addEventListener('close', () => rejectPending('CDP connection closed'))
+    ws.addEventListener('error', () => rejectPending('CDP connection failed'))
   }
 
   static connect(wsUrl: string, timeoutMs = 10_000): Promise<Cdp> {
@@ -118,6 +127,9 @@ class Cdp {
   }
 
   send(method: string, params: Record<string, any> = {}): Promise<any> {
+    if (this.ws.readyState !== WebSocket.OPEN)
+      return Promise.reject(new Error('CDP connection is not open'))
+
     const id = ++this.id
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject })
@@ -125,16 +137,26 @@ class Cdp {
     })
   }
 
-  on(fn: (e: CdpEvent) => void): void {
+  on(fn: (e: CdpEvent) => void): () => void {
     this.listeners.push(fn)
+    return () => {
+      const index = this.listeners.indexOf(fn)
+      if (index !== -1)
+        this.listeners.splice(index, 1)
+    }
   }
 
   waitFor(method: string, predicate: (p: any) => boolean = () => true, timeoutMs = 15_000): Promise<any> {
     return new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error(`Timed out waiting for ${method}`)), timeoutMs)
-      this.on(e => {
+      let unsubscribe = () => {}
+      const t = setTimeout(() => {
+        unsubscribe()
+        reject(new Error(`Timed out waiting for ${method}`))
+      }, timeoutMs)
+      unsubscribe = this.on(e => {
         if (e.method === method && predicate(e.params)) {
           clearTimeout(t)
+          unsubscribe()
           resolve(e.params)
         }
       })
@@ -199,18 +221,54 @@ async function launch(): Promise<Session> {
 }
 
 async function openPage(port: number): Promise<Cdp> {
-  // The initial about:blank tab already exists; grab its page-level WS URL.
+  // Reuse the current page when it exists. A renderer can terminate its target
+  // after a long crawl even while Chromium itself remains healthy, so create a
+  // replacement target through CDP's HTTP endpoint when the list is empty.
   for (let i = 0; i < 50; i++) {
     try {
       const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json() as any[]
       const page = list.find(t => t.type === 'page')
       if (page?.webSocketDebuggerUrl)
         return Cdp.connect(page.webSocketDebuggerUrl)
+
+      const created = await (await fetch(
+        `http://127.0.0.1:${port}/json/new?${encodeURIComponent('about:blank')}`,
+        { method: 'PUT' },
+      )).json() as any
+      if (created?.webSocketDebuggerUrl)
+        return Cdp.connect(created.webSocketDebuggerUrl)
     }
     catch { /* not ready yet */ }
     await Bun.sleep(50)
   }
   throw new Error('Could not find a page target to attach to.')
+}
+
+interface BrowserPage {
+  cdp: Cdp
+  targetId: string
+}
+
+async function createPage(port: number): Promise<BrowserPage> {
+  const created = await (await fetch(
+    `http://127.0.0.1:${port}/json/new?${encodeURIComponent('about:blank')}`,
+    { method: 'PUT' },
+  )).json() as any
+  if (!created?.id || !created?.webSocketDebuggerUrl)
+    throw new Error('Could not create an isolated page target.')
+
+  return {
+    cdp: await Cdp.connect(created.webSocketDebuggerUrl),
+    targetId: created.id,
+  }
+}
+
+async function closePage(port: number, page: BrowserPage): Promise<void> {
+  page.cdp.close()
+  try {
+    await fetch(`http://127.0.0.1:${port}/json/close/${encodeURIComponent(page.targetId)}`)
+  }
+  catch { /* the target or browser may already have closed */ }
 }
 
 function kill(s: Session): void {
@@ -220,10 +278,23 @@ function kill(s: Session): void {
 
 // ── Page helpers ────────────────────────────────────────────────────────────
 
-interface PageState { consoleErrors: string[], console: string[], responses: { url: string, status: number, ms: number, type: string }[], mainStatus: number | null }
+interface PageState {
+  consoleErrors: string[]
+  console: string[]
+  dispose: () => void
+  responses: { url: string, status: number, ms: number, type: string }[]
+  mainStatus: number | null
+}
 
 async function gotoAndInstrument(cdp: Cdp, url: string, opts: { viewport?: { w: number, h: number }, scale?: number, timeoutMs?: number, cookies?: string[], settleMs?: number, scheme?: string } = {}): Promise<PageState> {
-  const state: PageState = { consoleErrors: [], console: [], responses: [], mainStatus: null }
+  let unsubscribe = () => {}
+  const state: PageState = {
+    consoleErrors: [],
+    console: [],
+    dispose: () => unsubscribe(),
+    responses: [],
+    mainStatus: null,
+  }
   const startById = new Map<string, number>()
 
   await cdp.send('Page.enable')
@@ -265,7 +336,7 @@ async function gotoAndInstrument(cdp: Cdp, url: string, opts: { viewport?: { w: 
     })
   }
 
-  cdp.on((e) => {
+  unsubscribe = cdp.on((e) => {
     if (e.method === 'Runtime.consoleAPICalled') {
       const text = (e.params.args || []).map((a: any) => a.value ?? a.description ?? a.type).join(' ')
       state.console.push(`[${e.params.type}] ${text}`)
@@ -283,7 +354,7 @@ async function gotoAndInstrument(cdp: Cdp, url: string, opts: { viewport?: { w: 
     }
     else if (e.method === 'Network.responseReceived') {
       const r = e.params.response
-      const started = startById.get(e.params.requestId) ?? r.timing?.requestTime * 1000 ?? 0
+      const started = startById.get(e.params.requestId) ?? (r.timing?.requestTime ?? 0) * 1000
       const ms = started ? Math.max(0, Math.round(e.params.timestamp * 1000 - started)) : 0
       state.responses.push({ url: r.url, status: r.status, ms, type: e.params.type })
       if (e.params.type === 'Document' && state.mainStatus == null)
@@ -330,13 +401,53 @@ async function captureScreenshot(cdp: Cdp, opts: { full?: boolean, element?: str
   return Buffer.from(r.data, 'base64')
 }
 
+interface CrawlPage {
+  consoleErrors: string[]
+  failedRequests: Array<{ status: number, url: string }>
+  horizontalOverflowPx: number
+  overflowingElements: Array<{
+    element: string
+    left: number
+    right: number
+    width: number
+    overflowContainer?: {
+      element: string
+      left: number
+      right: number
+      clientWidth: number
+      scrollWidth: number
+      overflowX: string
+    }
+  }>
+  path: string
+  status: number | null
+  title: string
+}
+
+function crawlTarget(candidate: string, origin: string): string | null {
+  try {
+    const url = new URL(candidate, origin)
+    if (url.origin !== origin || !['http:', 'https:'].includes(url.protocol))
+      return null
+
+    url.hash = ''
+    return url.href
+  }
+  catch {
+    return null
+  }
+}
+
 // ── CLI ─────────────────────────────────────────────────────────────────────
 
 function parseFlags(args: string[]): { positional: string[], flags: Record<string, string | boolean | Array<string | boolean>> } {
   const positional: string[] = []
   const flags: Record<string, string | boolean | Array<string | boolean>> = {}
   for (let i = 0; i < args.length; i++) {
-    const a = args[i]
+    const a = args.at(i)
+    if (a === undefined)
+      break
+
     if (a.startsWith('--')) {
       const key = a.slice(2)
       const next = args[i + 1]
@@ -363,6 +474,20 @@ function flagList(value: string | boolean | Array<string | boolean> | undefined)
   return arr.filter((v): v is string => typeof v === 'string')
 }
 
+function parseViewport(value: string | undefined): { w: number, h: number } {
+  if (!value)
+    return { w: 1280, h: 900 }
+
+  const dimensions = value.split('x')
+  const w = Number(dimensions[0])
+  const h = Number(dimensions[1])
+
+  if (dimensions.length !== 2 || !Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1)
+    throw new TypeError(`Invalid viewport "${value}". Expected WIDTHxHEIGHT, for example 1280x900.`)
+
+  return { w, h }
+}
+
 const BREAKPOINTS = [
   { device: 'Mobile S', w: 320, h: 568 },
   { device: 'Mobile L', w: 428, h: 926 },
@@ -377,7 +502,7 @@ async function main() {
   const url = positional[0]
 
   if (!command || command === 'help' || !url) {
-    console.log('Usage: bun browse.ts <navigate|screenshot|responsive|monitor|snapshot> <url> [flags]')
+    console.log('Usage: bun browse.ts <navigate|screenshot|responsive|monitor|snapshot|crawl> <url> [flags]')
     console.log('  --cookie "name=value"   repeatable; pre-seeds cookies (e.g. coming-soon bypass)')
     console.log('  --settle 1500           ms to wait after load before acting (default 700; stretch for entrance animations)')
     console.log('  --scheme dark           emulate prefers-color-scheme (light|dark) for QA of theme-aware pages')
@@ -403,19 +528,21 @@ async function main() {
         consoleErrors: state.consoleErrors,
         requests: state.responses.length,
       }, null, 2))
+      state.dispose()
       cdp.close()
     }
 
     else if (command === 'screenshot') {
       const cdp = await openPage(session.port)
-      const vp = typeof flags.viewport === 'string' ? flags.viewport.split('x').map(Number) : [1280, 900]
+      const viewport = parseViewport(typeof flags.viewport === 'string' ? flags.viewport : undefined)
       const scale = flags.scale ? Number(flags.scale) : 1
       const out = (flags.out as string) || `storage/framework/runtime/shots/${new URL(url).pathname.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'home'}.png`
       mkdirSync(out.split('/').slice(0, -1).join('/') || '.', { recursive: true })
-      await gotoAndInstrument(cdp, url, { viewport: { w: vp[0], h: vp[1] }, scale, cookies, settleMs, scheme })
+      const state = await gotoAndInstrument(cdp, url, { viewport, scale, cookies, settleMs, scheme })
       const png = await captureScreenshot(cdp, { full: !!flags.full, element: flags.element as string | undefined })
       await Bun.write(out, png)
-      console.log(JSON.stringify({ url, out, viewport: `${vp[0]}x${vp[1]}`, scale, full: !!flags.full, element: flags.element ?? null, bytes: png.length }, null, 2))
+      console.log(JSON.stringify({ url, out, viewport: `${viewport.w}x${viewport.h}`, scale, full: !!flags.full, element: flags.element ?? null, bytes: png.length }, null, 2))
+      state.dispose()
       cdp.close()
     }
 
@@ -425,7 +552,7 @@ async function main() {
       const results: any[] = []
       for (const bp of BREAKPOINTS) {
         const cdp = await openPage(session.port)
-        await gotoAndInstrument(cdp, url, { viewport: { w: bp.w, h: bp.h }, cookies, settleMs, scheme })
+        const state = await gotoAndInstrument(cdp, url, { viewport: { w: bp.w, h: bp.h }, cookies, settleMs, scheme })
         const overflow = await cdp.send('Runtime.evaluate', {
           expression: 'document.documentElement.scrollWidth > window.innerWidth ? document.documentElement.scrollWidth - window.innerWidth : 0',
           returnByValue: true,
@@ -433,6 +560,7 @@ async function main() {
         const out = join(outDir, `${bp.device.toLowerCase().replace(/\s+/g, '-')}.png`)
         await Bun.write(out, await captureScreenshot(cdp, { full: true }))
         results.push({ device: bp.device, viewport: `${bp.w}x${bp.h}`, out, horizontalOverflowPx: overflow.result?.value ?? 0 })
+        state.dispose()
         cdp.close()
       }
       console.log(JSON.stringify({ url, results }, null, 2))
@@ -453,6 +581,7 @@ async function main() {
         slowRequests: slow,
         totalRequests: state.responses.length,
       }, null, 2))
+      state.dispose()
       cdp.close()
     }
 
@@ -473,7 +602,174 @@ async function main() {
       })()`
       const r = await cdp.send('Runtime.evaluate', { expression: expr, returnByValue: true })
       console.log(JSON.stringify({ url, ...r.result?.value }, null, 2))
+      state.dispose()
       cdp.close()
+    }
+
+    else if (command === 'crawl') {
+      const start = new URL(url)
+      const max = flags.max ? Number(flags.max) : 500
+      if (!Number.isInteger(max) || max < 1)
+        throw new TypeError(`Invalid crawl max "${String(flags.max)}". Expected a positive integer.`)
+
+      const queue = [
+        start.href,
+        ...flagList(flags.path)
+          .map(path => crawlTarget(path, start.origin))
+          .filter((path): path is string => path !== null),
+      ]
+      const queued = new Set(queue)
+      const visited = new Set<string>()
+      const pages: CrawlPage[] = []
+      const crawlSettleMs = settleMs ?? 350
+      let browserPage = await createPage(session.port)
+      let cdp = browserPage.cdp
+      const replacePage = async (): Promise<void> => {
+        await closePage(session.port, browserPage)
+        browserPage = await createPage(session.port)
+        cdp = browserPage.cdp
+      }
+      const inspectPage = async (current: string): Promise<{
+        state: PageState
+        value: {
+          links?: string[]
+          overflow?: number
+          overflowing?: CrawlPage['overflowingElements']
+          title?: string
+        }
+      }> => {
+        let lastError: unknown
+        for (let attempt = 0; attempt < 2; attempt++) {
+          let state: PageState | undefined
+          try {
+            state = await gotoAndInstrument(cdp, current, {
+              cookies,
+              settleMs: crawlSettleMs,
+              scheme,
+            })
+            const inspection = await cdp.send('Runtime.evaluate', {
+              expression: `(() => ({
+              title: document.title,
+              links: Array.from(document.querySelectorAll('a[href]')).map(link => link.href),
+              overflow: Math.max(0, document.documentElement.scrollWidth - window.innerWidth),
+              overflowing: Array.from(document.querySelectorAll('body *'))
+                .map((element) => {
+                  const rect = element.getBoundingClientRect()
+                  const describe = (candidate) => {
+                    const candidateClasses = typeof candidate.className === 'string'
+                      ? candidate.className.trim().split(/\\s+/).slice(0, 3).join('.')
+                      : ''
+                    return candidate.tagName.toLowerCase()
+                      + (candidate.id ? '#' + candidate.id : '')
+                      + (candidateClasses ? '.' + candidateClasses : '')
+                  }
+                  const classes = typeof element.className === 'string'
+                    ? element.className.trim().split(/\\s+/).slice(0, 3).join('.')
+                    : ''
+                  let ancestor = element.parentElement
+                  let overflowContainer
+                  while (ancestor && ancestor !== document.body) {
+                    const overflowX = getComputedStyle(ancestor).overflowX
+                    if (['auto', 'scroll', 'hidden', 'clip'].includes(overflowX)) {
+                      const ancestorRect = ancestor.getBoundingClientRect()
+                      overflowContainer = {
+                        element: describe(ancestor),
+                        left: Math.round(ancestorRect.left),
+                        right: Math.round(ancestorRect.right),
+                        clientWidth: ancestor.clientWidth,
+                        scrollWidth: ancestor.scrollWidth,
+                        overflowX,
+                      }
+                      break
+                    }
+                    ancestor = ancestor.parentElement
+                  }
+                  return {
+                    element: element.tagName.toLowerCase()
+                      + (element.id ? '#' + element.id : '')
+                      + (classes ? '.' + classes : ''),
+                    left: Math.round(rect.left),
+                    right: Math.round(rect.right),
+                    width: Math.round(rect.width),
+                    ...(overflowContainer ? { overflowContainer } : {}),
+                  }
+                })
+                .filter(item => item.width > 0 && (item.left < -1 || item.right > window.innerWidth + 1))
+                .sort((a, b) => Math.max(b.right - window.innerWidth, -b.left) - Math.max(a.right - window.innerWidth, -a.left))
+                .slice(0, 10),
+            }))()`,
+              returnByValue: true,
+            })
+            state.dispose()
+            return { state, value: inspection.result?.value || {} }
+          }
+          catch (error) {
+            state?.dispose()
+            lastError = error
+            if (attempt === 0)
+              await replacePage()
+          }
+        }
+        throw lastError
+      }
+
+      try {
+        while (queue.length > 0 && visited.size < max) {
+          const current = queue.shift()!
+          if (visited.has(current))
+            continue
+          visited.add(current)
+
+          const { state, value } = await inspectPage(current)
+          const failedRequests = state.responses
+            .filter(response => response.status >= 400)
+            .map(response => ({ status: response.status, url: response.url }))
+          pages.push({
+            path: new URL(current).pathname + new URL(current).search,
+            title: value.title || '',
+            status: state.mainStatus,
+            consoleErrors: [...new Set(state.consoleErrors)],
+            failedRequests,
+            horizontalOverflowPx: Number(value.overflow) || 0,
+            overflowingElements: value.overflowing || [],
+          })
+          if (flags.progress) {
+            const page = pages.at(-1)!
+            console.error(`[crawl] ${pages.length} ${page.status ?? 'none'} ${page.path}`)
+          }
+
+          for (const href of value.links || []) {
+            const target = crawlTarget(href, start.origin)
+            if (!target || queued.has(target) || visited.has(target))
+              continue
+            queued.add(target)
+            queue.push(target)
+          }
+
+          if (queue.length > 0 && visited.size < max)
+            await replacePage()
+        }
+      }
+      finally {
+        await closePage(session.port, browserPage)
+      }
+
+      const failures = pages.filter(page =>
+        page.status !== 200
+        || page.consoleErrors.length > 0
+        || page.failedRequests.length > 0
+        || page.horizontalOverflowPx > 0)
+      console.log(JSON.stringify({
+        start: start.href,
+        browser: session.browser,
+        crawled: pages.length,
+        remaining: queue.length,
+        max,
+        paths: pages.map(page => page.path),
+        failures,
+      }, null, 2))
+      if (failures.length > 0)
+        process.exitCode = 1
     }
 
     else {

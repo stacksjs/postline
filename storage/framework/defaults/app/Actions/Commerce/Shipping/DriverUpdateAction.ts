@@ -3,15 +3,25 @@ import { Action } from '@stacksjs/actions'
 import { shippings } from '@stacksjs/commerce'
 
 import { response } from '@stacksjs/router'
+import { commerceIdentifier, commerceNotFound } from '../commerce-action'
 
 export default new Action({
   name: 'Driver Update',
   description: 'Driver Update ORM Action',
-  method: 'PUT',
+  method: 'PATCH',
+  model: Driver,
   async handle(request: RequestInstance) {
-    const id = request.getParam('id')
+    const identifier = commerceIdentifier(request, 'Driver')
+    if (identifier.error)
+      return identifier.error
+    const { id } = identifier
 
-    const model = await shippings.drivers.update(id, request)
+    await request.validate()
+    const data = await request.all()
+
+    const model = await shippings.drivers.update(id, data)
+    if (!model)
+      return commerceNotFound('Driver', id)
 
     return response.json(model)
   },

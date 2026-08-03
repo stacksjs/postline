@@ -1,8 +1,8 @@
 import { Action } from '@stacksjs/actions'
-import { readdirSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
-import { loadModel, safeCount } from '../../../../resources/functions/dashboard/data'
+import { countRows } from '../../../../resources/functions/dashboard/data'
 
 /**
  * `GET /api/dashboard/models` (stacksjs/stacks#1838).
@@ -24,9 +24,13 @@ interface ModelRow {
   name: string
   table: string
   href: string
-  count: number
+  count: number | null
+  attributeCount: number
   category: string
   source: 'userland' | 'framework'
+  apiUri: string
+  apiRoutes: string[]
+  error: string | null
 }
 
 interface ModelGroup {
@@ -52,21 +56,19 @@ function pluralize(word: string): string {
 
 function walkModels(dir: string, recursive: boolean): Array<{ name: string, file: string }> {
   const out: Array<{ name: string, file: string }> = []
-  try {
-    const entries = readdirSync(dir, { withFileTypes: true })
-    for (const ent of entries) {
-      const full = join(dir, ent.name)
-      if (ent.isDirectory()) {
-        if (recursive) out.push(...walkModels(full, true))
-        continue
-      }
-      if (!ent.name.endsWith('.ts')) continue
-      if (ent.name.startsWith('_') || ent.name === 'index.ts' || ent.name === 'README.ts') continue
-      out.push({ name: ent.name.replace('.ts', ''), file: full })
+  if (!existsSync(dir))
+    return out
+
+  const entries = readdirSync(dir, { withFileTypes: true })
+  for (const ent of entries) {
+    const full = join(dir, ent.name)
+    if (ent.isDirectory()) {
+      if (recursive) out.push(...walkModels(full, true))
+      continue
     }
-  }
-  catch {
-    // Missing directory — return what we have.
+    if (!ent.name.endsWith('.ts')) continue
+    if (ent.name.startsWith('_') || ent.name === 'index.ts' || ent.name === 'README.ts') continue
+    out.push({ name: ent.name.replace('.ts', ''), file: full })
   }
   return out
 }
@@ -112,37 +114,57 @@ export default new Action({
       }
     }
 
-    const enriched: ModelRow[] = []
-    for (const m of merged) {
+    const enriched = await Promise.all(merged.map(async (m): Promise<ModelRow> => {
+      let Model: any
       try {
-        const Model = await loadModel(m.name)
-        const count = await safeCount(Model)
-        enriched.push({
+        const module = await import(m.file)
+        Model = module.default ?? module
+      }
+      catch (error) {
+        return {
           name: m.name,
           table: pluralize(pascalToSnake(m.name)),
           href: `/models/${pascalToKebab(m.name)}`,
-          count,
+          count: null,
+          attributeCount: 0,
           category: categorize(m),
           source: m.source,
-        })
+          apiUri: '',
+          apiRoutes: [],
+          error: error instanceof Error ? error.message : String(error),
+        }
       }
-      catch {
-        enriched.push({
-          name: m.name,
-          table: pluralize(pascalToSnake(m.name)),
-          href: `/models/${pascalToKebab(m.name)}`,
-          count: 0,
-          category: categorize(m),
-          source: m.source,
-        })
+
+      const api = Model.traits?.useApi
+      let count: number | null = null
+      let error: string | null = null
+      try {
+        count = await countRows(Model)
       }
-    }
+      catch (cause) {
+        error = cause instanceof Error ? cause.message : String(cause)
+      }
+
+      return {
+        name: m.name,
+        table: String(Model.table || pluralize(pascalToSnake(m.name))),
+        href: `/models/${pascalToKebab(m.name)}`,
+        count,
+        attributeCount: Object.keys(Model.attributes || {}).length,
+        category: categorize(m),
+        source: m.source,
+        apiUri: typeof api === 'object' && typeof api.uri === 'string' ? `/api/${api.uri}` : '',
+        apiRoutes: typeof api === 'object' && Array.isArray(api.routes) ? api.routes.map(String) : [],
+        error,
+      }
+    }))
 
     enriched.sort((a, b) => a.name.localeCompare(b.name))
 
     const totalModels = enriched.length
-    const totalRecords = enriched.reduce((sum, m) => sum + m.count, 0)
+    const totalRecords = enriched.reduce((sum, m) => sum + (m.count ?? 0), 0)
     const userlandCount = enriched.filter(m => m.source === 'userland').length
+    const unavailableModels = enriched.filter(m => m.error !== null).length
 
     const groupMap: Record<string, ModelRow[]> = {}
     for (const m of enriched) {
@@ -163,6 +185,7 @@ export default new Action({
       totalModels,
       totalRecords,
       userlandCount,
+      unavailableModels,
       categoryGroups,
     }
   },

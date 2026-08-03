@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { getActiveJobCount, getWorkerTracker, isWorkerRunning } from '@stacksjs/queue'
+import { response } from '@stacksjs/router'
 
 export default new Action({
   name: 'QueueWorkersAction',
@@ -29,7 +30,7 @@ export default new Action({
           failed_jobs: w.failedCount,
           uptime,
           last_heartbeat: w.lastActivityAt,
-          memory: '—',
+          memory: '-',
         }
       })
 
@@ -39,8 +40,10 @@ export default new Action({
         active_jobs: getActiveJobCount(),
       }
     }
-    catch {
-      return { data: [], worker_running: false, active_jobs: 0 }
+    catch (error) {
+      return response.json({
+        message: error instanceof Error ? error.message : 'Queue workers could not be loaded.',
+      }, 503)
     }
   },
 })

@@ -1,4 +1,5 @@
 import { defineStore, derived, registerStoresClient, state } from '@stacksjs/stx'
+import { dashboardApi } from '../../../functions/dashboard-api'
 
 interface FailedJob {
   name: string
@@ -145,16 +146,13 @@ export const ciStore = defineStore('ci', () => {
     loading.set(true)
     error.set('')
     try {
-      const res = await fetch('/api/dashboard/ci/status', { headers: { accept: 'application/json' } })
-      if (!res.ok)
-        throw new Error(`HTTP ${res.status}`)
-      const data = await res.json() as {
+      const data = await dashboardApi<{
         repos: RepoStatus[]
         runners: Record<string, OrgRunnerUsage>
         fetchedAt: string
         disabled?: boolean
         error?: string
-      }
+      }>('/api/dashboard/ci/status')
 
       if (data.disabled) {
         disabled.set(true)
@@ -177,8 +175,9 @@ export const ciStore = defineStore('ci', () => {
       // if it's still valid after a refresh.
       const nextOrgs = Object.keys(data.runners ?? {})
       orgs.set(nextOrgs)
-      if (!nextOrgs.includes(activeTab()) && nextOrgs.length > 0)
-        activeTab.set(nextOrgs[0])
+      const firstOrg = nextOrgs.at(0)
+      if (!nextOrgs.includes(activeTab()) && firstOrg)
+        activeTab.set(firstOrg)
     }
     catch (e) {
       error.set(e instanceof Error ? e.message : String(e))
@@ -205,9 +204,9 @@ export const ciStore = defineStore('ci', () => {
     drilldownError.set(null)
     loadingDrilldown.set(true)
     try {
-      const res = await fetch(`/api/dashboard/ci/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/runs?limit=20`, { headers: { accept: 'application/json' } })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json() as { runs?: WorkflowRun[], error?: string, disabled?: boolean }
+      const data = await dashboardApi<{ runs?: WorkflowRun[], error?: string, disabled?: boolean }>(
+        `/api/dashboard/ci/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/runs?limit=20`,
+      )
       if (data.error)
         throw new Error(data.error)
       drilldownRuns.set(data.runs ?? [])
@@ -237,11 +236,11 @@ export const ciStore = defineStore('ci', () => {
 
     loadingRunnerHistory.set({ ...loadingRunnerHistory(), [org]: true })
     try {
-      const res = await fetch(`/api/dashboard/ci/runner-history?org=${encodeURIComponent(org)}`, {
-        headers: { accept: 'application/json' },
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json() as { samples?: Array<{ queued: number, sampledAt: string }>, error?: string, disabled?: boolean }
+      const data = await dashboardApi<{
+        samples?: Array<{ queued: number, sampledAt: string }>
+        error?: string
+        disabled?: boolean
+      }>(`/api/dashboard/ci/runner-history?org=${encodeURIComponent(org)}`)
       if (data.disabled || data.error) {
         runnerHistoryByOrg.set({ ...runnerHistoryByOrg(), [org]: [] })
         return
@@ -278,9 +277,9 @@ export const ciStore = defineStore('ci', () => {
 
     loadingJobsForRunId.set(runId)
     try {
-      const res = await fetch(`/api/dashboard/ci/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.name)}/runs/${runId}/jobs`, { headers: { accept: 'application/json' } })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json() as { jobs?: WorkflowJob[], error?: string }
+      const data = await dashboardApi<{ jobs?: WorkflowJob[], error?: string }>(
+        `/api/dashboard/ci/repos/${encodeURIComponent(target.owner)}/${encodeURIComponent(target.name)}/runs/${runId}/jobs`,
+      )
       if (data.error)
         throw new Error(data.error)
       drilldownJobsByRunId.set({ ...drilldownJobsByRunId(), [runId]: data.jobs ?? [] })

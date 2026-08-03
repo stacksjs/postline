@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
+import { kanbanError } from './kanban-response'
 
 /**
  * `DELETE /api/dashboard/kanban/columns/:id` (stacksjs/stacks#1846 Phase 2).
@@ -22,11 +23,12 @@ export default new Action({
     const rawId = (request as any)?.params?.id ?? (request as any)?.param?.('id') ?? null
     const id = Number(rawId)
     if (!Number.isFinite(id) || id <= 0) {
-      return { error: 'Invalid column id', status: 400 }
+      return kanbanError('Invalid column id', 400)
     }
 
     try {
-      const txOps = async (qb: any) => {
+      await db.transaction(async (rawTrx) => {
+        const qb = rawTrx as unknown as typeof db
         await qb.unsafe(
           'DELETE FROM card_labels WHERE card_id IN (SELECT id FROM cards WHERE column_id = ?)',
           [id],
@@ -42,18 +44,12 @@ export default new Action({
         ).execute()
         await qb.deleteFrom('cards').where('column_id', '=', id).execute()
         await qb.deleteFrom('board_columns').where('id', '=', id).execute()
-      }
-      try {
-        await (db as any).transaction(txOps)
-      }
-      catch {
-        await txOps(db)
-      }
+      })
       return { deleted: true, id }
     }
     catch (err) {
       console.error('[dashboard/kanban] ColumnDestroyAction failed:', err)
-      return { error: err instanceof Error ? err.message : 'unknown error', status: 500 }
+      return kanbanError(err instanceof Error ? err.message : 'unknown error', 500)
     }
   },
 })

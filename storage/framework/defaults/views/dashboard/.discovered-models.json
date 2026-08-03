@@ -1,6 +1,13 @@
 {
   "models": [
     {
+      "id": "analytics-event",
+      "name": "AnalyticsEvent",
+      "icon": "tablecells.fill",
+      "hasDedicatedPage": false,
+      "category": "data"
+    },
+    {
       "id": "author",
       "name": "Author",
       "icon": "person.text.rectangle.fill",
@@ -240,6 +247,13 @@
       }
     },
     {
+      "id": "mail-preference",
+      "name": "MailPreference",
+      "icon": "tablecells.fill",
+      "hasDedicatedPage": false,
+      "category": "data"
+    },
+    {
       "id": "manufacturer",
       "name": "Manufacturer",
       "icon": "building.2.fill",
@@ -257,6 +271,13 @@
       "category": "system"
     },
     {
+      "id": "notification-delivery",
+      "name": "NotificationDelivery",
+      "icon": "tablecells.fill",
+      "hasDedicatedPage": false,
+      "category": "data"
+    },
+    {
       "id": "order",
       "name": "Order",
       "icon": "list.clipboard.fill",
@@ -264,6 +285,16 @@
       "category": "commerce",
       "dashboard": {
         "highlight": true
+      }
+    },
+    {
+      "id": "order-idempotency",
+      "name": "OrderIdempotency",
+      "icon": "tablecells.fill",
+      "hasDedicatedPage": false,
+      "category": "commerce",
+      "dashboard": {
+        "enabled": false
       }
     },
     {
@@ -357,6 +388,13 @@
       "dashboard": {
         "highlight": true
       }
+    },
+    {
+      "id": "query-log",
+      "name": "QueryLog",
+      "icon": "tablecells.fill",
+      "hasDedicatedPage": false,
+      "category": "data"
     },
     {
       "id": "receipt",
@@ -471,6 +509,26 @@
       "category": "data",
       "dashboard": {
         "highlight": true
+      }
+    },
+    {
+      "id": "team-invitation",
+      "name": "TeamInvitation",
+      "icon": "tablecells.fill",
+      "hasDedicatedPage": false,
+      "category": "data",
+      "dashboard": {
+        "enabled": false
+      }
+    },
+    {
+      "id": "team-member",
+      "name": "TeamMember",
+      "icon": "tablecells.fill",
+      "hasDedicatedPage": false,
+      "category": "data",
+      "dashboard": {
+        "enabled": false
       }
     },
     {

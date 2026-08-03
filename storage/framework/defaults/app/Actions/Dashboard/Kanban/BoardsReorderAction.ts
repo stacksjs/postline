@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
+import { kanbanError } from './kanban-response'
 
 interface ReorderInput {
   /**
@@ -35,13 +36,13 @@ export default new Action({
   async handle(request) {
     const body = (request as any).jsonBody as ReorderInput | undefined ?? {}
     if (!Array.isArray(body.order) || body.order.length === 0) {
-      return { error: '`order` must be a non-empty array of board ids.', status: 400 }
+      return kanbanError('`order` must be a non-empty array of board ids.', 400)
     }
     const ids: number[] = []
     for (const v of body.order) {
       const n = Number(v)
       if (!Number.isFinite(n) || n <= 0) {
-        return { error: '`order` contains an invalid id.', status: 400 }
+        return kanbanError('`order` contains an invalid id.', 400)
       }
       ids.push(n)
     }
@@ -49,32 +50,24 @@ export default new Action({
     // multiple times with the LAST index winning, which silently
     // contradicts the visible order.
     if (new Set(ids).size !== ids.length) {
-      return { error: '`order` contains duplicate ids.', status: 400 }
+      return kanbanError('`order` contains duplicate ids.', 400)
     }
 
     try {
-      const txOps = async (qb: any) => {
+      await db.transaction(async (rawTrx) => {
+        const qb = rawTrx as unknown as typeof db
         for (let i = 0; i < ids.length; i++) {
           await qb.updateTable('boards')
             .set({ position: i })
             .where('id', '=', ids[i])
             .execute()
         }
-      }
-      try {
-        await (db as any).transaction(txOps)
-      }
-      catch {
-        // Same fallback rationale as BoardDestroyAction — UPDATE is
-        // idempotent for `position` (setting it twice to the same
-        // value is a no-op), so a partial run + retry recovers.
-        await txOps(db)
-      }
+      })
       return { reordered: ids.length }
     }
     catch (err) {
       console.error('[dashboard/kanban] BoardsReorderAction failed:', err)
-      return { error: err instanceof Error ? err.message : 'unknown error', status: 500 }
+      return kanbanError(err instanceof Error ? err.message : 'unknown error', 500)
     }
   },
 })

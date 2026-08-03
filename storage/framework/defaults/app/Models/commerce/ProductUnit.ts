@@ -89,6 +89,7 @@ export default defineModel({
     },
 
     isDefault: {
+      default: false,
       order: 5,
       fillable: true,
       validation: {
@@ -97,7 +98,7 @@ export default defineModel({
           boolean: 'Default status must be a boolean',
         },
       },
-      factory: faker => faker.datatype.boolean(0.2), // 20% chance of being default
+      factory: () => false,
     },
   },
 
