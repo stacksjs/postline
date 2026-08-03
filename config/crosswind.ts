@@ -74,7 +74,7 @@ const APP_DARK: string = `
 
 /**
  * Marketing surfaces. The landing page is deliberately LIGHT-locked and carries
- * its own accent (emerald) and slightly warmer surfaces, so these are a scoped
+ * its own accent (blue) and slightly warmer surfaces, so these are a scoped
  * override rather than a second competing `:root`. The marketing layout opts in
  * with `class="marketing"` on the root element.
  */
@@ -317,6 +317,59 @@ html.dark [data-bluesky-pill][data-state="setup"] {
 `
 
 /**
+ * Marketing mega-menu.
+ *
+ * Genuinely unreachable by a utility: descendant hover/focus-within states plus
+ * a delayed `visibility` transition, which is what lets the panel fade OUT
+ * rather than vanish. Scoped to html.marketing because MegaMenu.stx is used by
+ * the marketing layout only.
+ *
+ * The comment that used to sit inside the `.menu-panel` block has been lifted
+ * out: a comment inside a rule block is parsed as part of the declaration that
+ * follows it, and both get dropped — which would have silently removed this
+ * transition and made the panel snap.
+ */
+const MEGA_MENU: string = `
+html.marketing .menu-item { position: static; }
+
+html.marketing .menu-panel {
+  position: absolute;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+  transition:
+    opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 0.18s;
+}
+
+html.marketing .menu-item:hover .menu-panel,
+html.marketing .menu-item:focus-within .menu-panel {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+
+html.marketing .menu-chevron {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html.marketing .menu-item:hover .menu-chevron,
+html.marketing .menu-item:focus-within .menu-chevron {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.marketing .menu-panel,
+  html.marketing .menu-chevron {
+    transition: none;
+    transform: none;
+  }
+}
+`
+
+/**
  * Marketing base rules and scroll-driven reveals.
  *
  * Scoped under `html.marketing` so the landing page's typography and smooth
@@ -415,5 +468,6 @@ export default {
     { getCSS: (): string => QUEUE_STATUS },
     { getCSS: (): string => SETTINGS_STATUS },
     { getCSS: (): string => MARKETING_BASE },
+    { getCSS: (): string => MEGA_MENU },
   ],
 } satisfies CrosswindOptions
