@@ -26,6 +26,7 @@ route.post('/register', 'Actions/Postline/RegisterFirstUserAction').skipCsrf().r
 route.post('/subscribe', 'Actions/SubscriberEmailAction').skipCsrf()
 
 route.get('/', () => response.text('hello world'))
+route.get('/v1/status', () => response.json({ version: 'v1', status: 'ok' }))
 route.get('/coming-soon', 'Controllers/ComingSoonController@index')
 
 // Public: Instagram/Threads fetch a queued post's image server-side, so this
