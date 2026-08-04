@@ -85,6 +85,10 @@ jobs:
         run: |
           test -n "$HCLOUD_TOKEN"
           test -n "$DOTENV_PRIVATE_KEY_PRODUCTION"
+      - name: Create deployment SSH key
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          ssh-keygen -q -t ed25519 -N '' -C "postline-actions@github" -f "$HOME/.ssh/id_ed25519"
       - name: Deploy production
         env:
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
