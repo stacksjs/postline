@@ -186,7 +186,15 @@
           <span class="text-muted text-xs" data-purge-summary>No preview yet.</span>
         </div>
 
-        <div class="grid hidden gap-2" data-purge-results></div>
+        <!-- Rendered from the purgeRows() signal. Object-form :class, because
+            the string form of :class merges with the static list and a static
+            hidden class would never come back off. -->
+        <div class="grid hidden gap-2" :class="{ 'hidden': purgeRows().length === 0 }" data-purge-results>
+          <div class="p-3 text-[13px] border border-line rounded-xl" x-for="row in purgeRows()">
+            <strong :text="row.heading"></strong>
+            <p class="my-1 text-muted" :text="row.detail"></p>
+          </div>
+        </div>
 
         <div class="grid gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
           <label class="grid gap-1.5">
@@ -718,7 +726,6 @@
       const purgeRun = root.querySelector('[data-purge-run]')
       const purgeConfirmation = root.querySelector('[data-purge-confirmation]')
       const purgeSummary = root.querySelector('[data-purge-summary]')
-      const purgeResults = root.querySelector('[data-purge-results]')
       const purgeHint = root.querySelector('[data-purge-hint]')
       const PURGE_PHRASE = 'DELETE ALL POSTS'
 
@@ -730,31 +737,21 @@
       const purgeProviders = () => Array.from(root.querySelectorAll('[data-purge-provider]:checked')).map(input => input.value)
       const purgeSelection = () => `${purgeScope()}:${purgeProviders().sort().join(',')}`
 
-      const renderPurgeResults = (data) => {
-        if (!purgeResults) return
-        const rows = data?.providers || []
-        purgeResults.classList.toggle('hidden', rows.length === 0)
-        purgeResults.innerHTML = ''
+      const purgeResultRows = state([])
 
-        for (const row of rows) {
-          const item = document.createElement('div')
-          item.className = 'p-3 text-[13px] border border-line rounded-xl'
-          // A skip reason always wins — it explains a zero that would otherwise
-          // read as "nothing to delete" (e.g. LinkedIn refusing to list history).
-          const detail = row.skippedReason
-            ? row.skippedReason
-            : !row.supported || !row.connected
-                ? 'Not available.'
-                : `${row.matched} post${row.matched === 1 ? '' : 's'} would be deleted${row.truncated ? ' (capped at 2000 per run — run again for the rest)' : ''}.`
-          const heading = document.createElement('strong')
-          heading.textContent = row.handle ? `${row.provider} — ${row.handle}` : row.provider
-          const body = document.createElement('p')
-          body.className = 'my-1 text-muted'
-          body.textContent = detail
-          item.append(heading, body)
-          purgeResults.append(item)
-        }
-      }
+      /** One purge-result row flattened to exactly what the template renders. */
+      const purgeRows = derived(() => purgeResultRows().map((row) => ({
+        heading: row.handle ? `${row.provider} — ${row.handle}` : row.provider,
+        // A skip reason always wins — it explains a zero that would otherwise
+        // read as "nothing to delete" (e.g. LinkedIn refusing to list history).
+        detail: row.skippedReason
+          ? row.skippedReason
+          : !row.supported || !row.connected
+              ? 'Not available.'
+              : `${row.matched} post${row.matched === 1 ? '' : 's'} would be deleted${row.truncated ? ' (capped at 2000 per run — run again for the rest)' : ''}.`,
+      })))
+
+      const renderPurgeResults = (data) => purgeResultRows.set(data?.providers || [])
 
       const syncPurgeButton = () => {
         const phraseOk = purgeConfirmation?.value === PURGE_PHRASE
