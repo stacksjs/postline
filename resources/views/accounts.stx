@@ -200,7 +200,7 @@
     </details>
   </section>
 
-  <script>
+  <script client>
     ;(() => {
       const root = document.querySelector('[data-testid="accounts-page"]')
       if (!root) return
@@ -336,7 +336,7 @@
 
       linkedinConnect?.addEventListener('click', () => {
         notify('Redirecting to LinkedIn…', 'info', { title: 'LinkedIn' })
-        window.location.href = '/api/postline/linkedin/auth'
+        navigate('/api/postline/linkedin/auth', true)
       })
 
       linkedinConnectEnv?.addEventListener('click', async () => {
@@ -357,29 +357,40 @@
         }
       })
 
-      // Surface the OAuth callback result, then strip it from the URL.
-      const params = new URLSearchParams(window.location.search)
-      const linkedinResult = params.get('linkedin')
-      if (linkedinResult === 'connected') {
-        notify('LinkedIn connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
-      }
-      else if (linkedinResult === 'error') {
-        notify(params.get('message') || 'LinkedIn connection failed.', 'error', { title: 'LinkedIn' })
-      }
-      if (linkedinResult) {
-        params.delete('linkedin')
+      /**
+       * Read a provider's OAuth callback result, then strip it from the URL.
+       *
+       * Reads the query FRESH on every call. The previous code built one
+       * URLSearchParams for LinkedIn and mutated it with delete(); Instagram and
+       * Threads then read from that already-mutated object, so a callback
+       * carrying both a provider key and a message could lose the message.
+       *
+       * replaceState, not navigate(): navigate() pushes a history entry, so Back
+       * would land on a URL still carrying the callback params and re-run this
+       * handler. The runtime offers no replace-mode navigation, which is why
+       * this one raw history call survives.
+       */
+      const consumeOAuthResult = (provider) => {
+        const route = useRoute()
+        const value = route.query[provider]
+        if (!value) return null
+        const params = new URLSearchParams(route.fullPath.split('?')[1] || '')
+        const message = params.get('message')
+        params.delete(provider)
         params.delete('message')
         const query = params.toString()
-        window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
+        window.history.replaceState({}, '', `${route.path}${query ? `?${query}` : ''}`)
+        return { value, message }
       }
 
+      const linkedinCallback = consumeOAuthResult('linkedin')
+      if (linkedinCallback?.value === 'connected')
+        notify('LinkedIn connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
+      else if (linkedinCallback?.value === 'error')
+        notify(linkedinCallback.message || 'LinkedIn connection failed.', 'error', { title: 'LinkedIn' })
+
       const startLinkedIn = () => void refreshLinkedIn()
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', startLinkedIn, { once: true })
-      }
-      else {
-        startLinkedIn()
-      }
+      onMount(startLinkedIn)
 
       // --- X (Twitter) ---
       const twitterHandle = root.querySelector('[data-twitter-channel-handle]')
@@ -436,7 +447,7 @@
 
       twitterConnect?.addEventListener('click', () => {
         notify('Redirecting to X…', 'info', { title: 'X/Twitter' })
-        window.location.href = '/api/postline/twitter/auth'
+        navigate('/api/postline/twitter/auth', true)
       })
 
       twitterConnectEnv?.addEventListener('click', async () => {
@@ -457,28 +468,14 @@
         }
       })
 
-      const twitterParams = new URLSearchParams(window.location.search)
-      const twitterResult = twitterParams.get('twitter')
-      if (twitterResult === 'connected') {
+      const twitterCallback = consumeOAuthResult('twitter')
+      if (twitterCallback?.value === 'connected')
         notify('X connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
-      }
-      else if (twitterResult === 'error') {
-        notify(twitterParams.get('message') || 'X connection failed.', 'error', { title: 'X/Twitter' })
-      }
-      if (twitterResult) {
-        twitterParams.delete('twitter')
-        twitterParams.delete('message')
-        const query = twitterParams.toString()
-        window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
-      }
+      else if (twitterCallback?.value === 'error')
+        notify(twitterCallback.message || 'X connection failed.', 'error', { title: 'X/Twitter' })
 
       const startTwitter = () => void refreshTwitter()
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', startTwitter, { once: true })
-      }
-      else {
-        startTwitter()
-      }
+      onMount(startTwitter)
 
       // --- Instagram ---
       const instagramHandle = root.querySelector('[data-instagram-channel-handle]')
@@ -533,7 +530,7 @@
 
       instagramConnect?.addEventListener('click', () => {
         notify('Redirecting to Instagram…', 'info', { title: 'Instagram' })
-        window.location.href = '/api/postline/instagram/auth'
+        navigate('/api/postline/instagram/auth', true)
       })
 
       instagramConnectEnv?.addEventListener('click', async () => {
@@ -554,27 +551,14 @@
         }
       })
 
-      const instagramResult = params.get('instagram')
-      if (instagramResult === 'connected') {
+      const instagramCallback = consumeOAuthResult('instagram')
+      if (instagramCallback?.value === 'connected')
         notify('Instagram connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
-      }
-      else if (instagramResult === 'error') {
-        notify(params.get('message') || 'Instagram connection failed.', 'error', { title: 'Instagram' })
-      }
-      if (instagramResult) {
-        params.delete('instagram')
-        params.delete('message')
-        const query = params.toString()
-        window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
-      }
+      else if (instagramCallback?.value === 'error')
+        notify(instagramCallback.message || 'Instagram connection failed.', 'error', { title: 'Instagram' })
 
       const startInstagram = () => void refreshInstagram()
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', startInstagram, { once: true })
-      }
-      else {
-        startInstagram()
-      }
+      onMount(startInstagram)
 
       // --- Threads ---
       const threadsHandle = root.querySelector('[data-threads-channel-handle]')
@@ -629,7 +613,7 @@
 
       threadsConnect?.addEventListener('click', () => {
         notify('Redirecting to Threads…', 'info', { title: 'Threads' })
-        window.location.href = '/api/postline/threads/auth'
+        navigate('/api/postline/threads/auth', true)
       })
 
       threadsConnectEnv?.addEventListener('click', async () => {
@@ -650,27 +634,14 @@
         }
       })
 
-      const threadsResult = params.get('threads')
-      if (threadsResult === 'connected') {
+      const threadsCallback = consumeOAuthResult('threads')
+      if (threadsCallback?.value === 'connected')
         notify('Threads connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
-      }
-      else if (threadsResult === 'error') {
-        notify(params.get('message') || 'Threads connection failed.', 'error', { title: 'Threads' })
-      }
-      if (threadsResult) {
-        params.delete('threads')
-        params.delete('message')
-        const query = params.toString()
-        window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
-      }
+      else if (threadsCallback?.value === 'error')
+        notify(threadsCallback.message || 'Threads connection failed.', 'error', { title: 'Threads' })
 
       const startThreads = () => void refreshThreads()
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', startThreads, { once: true })
-      }
-      else {
-        startThreads()
-      }
+      onMount(startThreads)
 
       // --- Mastodon ---
       const mastodonForm = root.querySelector('[data-mastodon-connect-form]')
@@ -739,12 +710,7 @@
       })
 
       const startMastodon = () => void refreshMastodon()
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', startMastodon, { once: true })
-      }
-      else {
-        startMastodon()
-      }
+      onMount(startMastodon)
 
       // --- Danger zone: bulk post deletion ---
       const purgeCard = root.querySelector('[data-purge-card]')
@@ -886,12 +852,7 @@
       // renders "Not connected" on a full page load. (Mirrors the other
       // providers.)
       const startBluesky = () => void refreshStatus()
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', startBluesky, { once: true })
-      }
-      else {
-        startBluesky()
-      }
+      onMount(startBluesky)
     })()
   </script>
 @endsection
