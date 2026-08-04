@@ -82,13 +82,20 @@ jobs:
         env:
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
           DOTENV_PRIVATE_KEY_PRODUCTION: ${{ secrets.DOTENV_PRIVATE_KEY_PRODUCTION }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
         run: |
           test -n "$HCLOUD_TOKEN"
           test -n "$DOTENV_PRIVATE_KEY_PRODUCTION"
-      - name: Create deployment SSH key
+          test -n "$DEPLOY_SSH_PRIVATE_KEY"
+      - name: Install deployment SSH key
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
         run: |
           install -d -m 700 "$HOME/.ssh"
-          ssh-keygen -q -t ed25519 -N '' -C "postline-actions@github" -f "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keygen -y -f "$HOME/.ssh/id_ed25519" > "$HOME/.ssh/id_ed25519.pub"
+          ssh -i "$HOME/.ssh/id_ed25519" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 root@178.105.248.188 true
       - name: Deploy production
         env:
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
