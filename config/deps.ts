@@ -54,7 +54,9 @@ export const config: PantryConfig = {
      * Commands to run after database setup
      * Useful for migrations and seeding
      */
-    postDatabaseSetup: ["./buddy migrate", "./buddy seed"],
+    postDatabaseSetup: Bun.env.NODE_ENV === "production"
+      ? []
+      : ["./buddy migrate", "./buddy seed"],
 
     /**
      * Framework-specific service detection
