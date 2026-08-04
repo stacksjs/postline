@@ -8,7 +8,7 @@
     <!-- Crosswind safelist: connection status-pill colors are set dynamically
         via JS, so list them in static markup for the CSS scanner. -->
     <div class="hidden text-amber-800 text-emerald-700 text-muted bg-amber-50 bg-emerald-50 border-amber-200 border-emerald-200 border-line" aria-hidden="true"></div>
-    <header class="grid gap-4 items-center sm:grid-cols-[minmax(0,1fr)_auto] min-h-11">
+    <header class="flex flex-col gap-4 items-stretch justify-between sm:flex-row sm:items-end min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Settings</p>
         <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Connect your channels</h1>
@@ -69,7 +69,7 @@
             <p class="m-0 text-muted text-xs" data-linkedin-channel-detail>Connect with LinkedIn to crosspost member shares.</p>
           </div>
           <div class="grid gap-2">
-            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-bold text-white text-xs bg-[#0a66c2] hover:bg-[#0857a6] rounded-xl disabled:opacity-50 transition-colors" type="button" data-linkedin-connect>Connect LinkedIn</button>
+            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-bold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" data-linkedin-connect>Connect LinkedIn</button>
             <button class="hidden text-muted text-xs underline hover:text-zinc-700 transition-colors" type="button" data-linkedin-connect-env>Use configured token</button>
           </div>
         </article>
@@ -80,7 +80,7 @@
             <p class="m-0 text-muted text-xs" data-instagram-channel-detail>Connect an Instagram Business account to crosspost. Posts require an image.</p>
           </div>
           <div class="grid gap-2">
-            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-bold text-white text-xs bg-gradient-to-tr from-amber-500 to-purple-600 via-pink-600 rounded-xl disabled:opacity-50 hover:opacity-90 transition-opacity" type="button" data-instagram-connect>Connect Instagram</button>
+            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-bold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" data-instagram-connect>Connect Instagram</button>
             <button class="hidden text-muted text-xs underline hover:text-zinc-700 transition-colors" type="button" data-instagram-connect-env>Use configured token</button>
           </div>
         </article>

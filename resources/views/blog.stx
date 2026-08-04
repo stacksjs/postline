@@ -11,7 +11,7 @@
         <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Long-form publishing</h1>
         <p class="mb-0 mt-1.5 text-[13px] text-muted">Write once in Composer, publish to your site, and keep every article easy to find.</p>
       </div>
-      <a class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" href="/composer" data-stx-link data-no-window-drag>
+      <a class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" href="/composer" data-stx-link data-no-window-drag x-show="!loaded() || items().length > 0">
         <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>
         Write a post
       </a>

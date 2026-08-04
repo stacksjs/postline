@@ -239,6 +239,8 @@ html.postline-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fa
   [data-postline-mobile-nav] {
     scrollbar-width: none;
     -ms-overflow-style: none;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 28px), transparent);
   }
 
   [data-postline-mobile-nav]::-webkit-scrollbar { display: none; }
@@ -247,6 +249,59 @@ html.postline-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fa
 [data-postline-app] :is(a, button, [role='button']):focus-visible {
   outline: 2px solid rgb(82 82 91 / 0.6);
   outline-offset: 2px;
+}
+
+html.dark.has-native-sidebar [data-postline-content-shell],
+html.dark.has-native-sidebar [data-postline-workspace] {
+  background: #0a0a0c !important;
+}
+`
+
+/** Shared product UI rhythm: one radius scale, one surface language, and compact pages. */
+const APP_UI: string = `
+[data-postline-router] { width: 100%; }
+
+[data-postline-page] {
+  width: min(100%, 96rem);
+  margin-inline: auto;
+}
+
+[data-postline-page] > header:first-child {
+  min-height: 72px;
+  padding: 5px 2px 7px;
+}
+
+[data-postline-page] > header:first-child h1 {
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+[data-postline-page] .rounded-2xl { border-radius: 14px; }
+[data-postline-page] .rounded-xl { border-radius: 10px; }
+[data-postline-page] .rounded-lg { border-radius: 8px; }
+
+[data-postline-page] .shadow-sm {
+  box-shadow: 0 1px 2px rgb(24 24 27 / 0.035), 0 8px 24px rgb(24 24 27 / 0.025);
+}
+
+[data-postline-page] :is(a, button, summary) {
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-postline-page] :is(button, summary):active,
+[data-postline-page] a:active { transform: translateY(1px); }
+
+[data-postline-page] :is(input, textarea, select) { border-radius: 10px; }
+
+.dark .bg-white { background-color: var(--panel); }
+.dark .hover\:bg-white:hover { background-color: var(--panel-3); }
+
+@media (max-width: 640px) {
+  [data-postline-router] { padding: 12px; }
+  [data-postline-page] { gap: 12px; }
+  [data-postline-page] > header:first-child { min-height: auto; padding: 2px 1px 5px; }
+  [data-postline-page] > header:first-child h1 { font-size: 21px; }
 }
 `
 
@@ -491,6 +546,7 @@ export default {
     { getCSS: (): string => TOKENS },
     { getCSS: (): string => DARK_OVERRIDES },
     { getCSS: (): string => APP_SHELL },
+    { getCSS: (): string => APP_UI },
     { getCSS: (): string => QUEUE_STATUS },
     { getCSS: (): string => SETTINGS_STATUS },
     { getCSS: (): string => COMPOSER_CHIPS },
