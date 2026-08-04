@@ -623,7 +623,16 @@ export const tsCloud: TsCloudConfig = {
       ],
       // Same database file as the main site — the API is where every write
       // actually lands, so the two must not drift onto separate copies.
-      env: { HOST: '127.0.0.1', APP_ENV: 'production', NODE_ENV: 'production', DB_DATABASE_PATH },
+      env: {
+        HOST: '127.0.0.1',
+        APP_ENV: 'production',
+        NODE_ENV: 'production',
+        DB_DATABASE_PATH,
+        AI_PROVIDER: env.AI_PROVIDER || 'openai',
+        OPENAI_MODEL: env.OPENAI_MODEL || 'gpt-5.6-terra',
+        ...(env.OPENAI_API_KEY ? { OPENAI_API_KEY: env.OPENAI_API_KEY } : {}),
+        ...(env.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY } : {}),
+      },
       exclude: SQLITE_EXCLUDES,
     },
   },
