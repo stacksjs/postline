@@ -12,7 +12,7 @@ export default {
 
   drivers: {
     openai: {
-      model: Bun.env.OPENAI_MODEL || 'gpt-4o',
+      model: Bun.env.OPENAI_MODEL || 'gpt-5.6-terra',
       maxTokens: 6000,
       baseUrl: Bun.env.OPENAI_BASE_URL,
     },

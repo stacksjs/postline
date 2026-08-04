@@ -168,7 +168,7 @@ export function buildCampaignFallbackPlan(
   const audience = campaign.audience || 'the people who follow your work'
   const campaignDays = Math.max(0, Math.floor((Date.parse(campaign.endDate) - Date.parse(campaign.startDate)) / 86400000))
   const cadence = Math.max(1, Math.floor(Math.max(7, campaignDays) / Math.max(1, count - 1)))
-  const seeds: Array<Omit<PlanSuggestion, 'offsetDays' | 'providers'>> = [
+  const standardSeeds: Array<Omit<PlanSuggestion, 'offsetDays' | 'providers'>> = [
     { title: 'The first signal', body: `Something new is taking shape. Over the next few weeks, we will share how ${campaign.name} helps ${audience}.`, pillar: 'teaser', time: '09:15' },
     { title: 'Why this matters', body: `${objective} Here is the problem we kept seeing, and why we decided it was worth solving now.`, pillar: 'story', time: '10:30' },
     { title: 'A useful lesson', body: `One thing we learned while building ${campaign.name}: start with the outcome, then remove every step that does not help people reach it.`, pillar: 'education', time: '09:45' },
@@ -178,8 +178,20 @@ export function buildCampaignFallbackPlan(
     { title: 'Behind the decision', body: `A small product decision can change the whole experience. Here is one choice we made for ${campaign.name}, plus the tradeoff behind it.`, pillar: 'story', time: '09:30' },
     { title: 'One week later', body: `${campaign.name} has been out in the world for a week. Here is what is working, what surprised us, and what we are improving next.`, pillar: 'follow-up', time: '10:15' },
   ]
+  const stacksSeeds: Array<Omit<PlanSuggestion, 'offsetDays' | 'providers'>> = [
+    { title: 'One command surface', body: 'Buddy gives Stacks one command surface for local development, scaffolding, models, migrations, testing, builds, releases, and cloud deployment. The goal is simple: spend less time remembering tool syntax and more time shaping the product.', pillar: 'education', time: '09:45' },
+    { title: 'One application model', body: 'A Stacks app keeps reactive STX views, Router actions, models, jobs, and infrastructure in one TypeScript project. The interesting part is not a longer feature list. It is how those parts share conventions and work together.', pillar: 'proof', time: '11:00' },
+    { title: 'Native without a rewrite', body: 'Craft opens the same Stacks application as a native desktop window, with typed access to window, tray, files, and notifications. Postline is one working example: the browser and desktop app share the same routes, actions, and UI.', pillar: 'proof', time: '10:30' },
+    { title: 'Models own the schema', body: 'In Stacks, application models describe the data shape and Buddy derives the migration path. That keeps database changes close to the code that owns them, while SQLite, queues, scheduled jobs, and APIs stay in the same toolkit.', pillar: 'education', time: '09:30' },
+    { title: 'Why cohesion matters', body: 'Stacks is not about pretending software has no dependencies. It is about designing and maintaining the major framework capabilities together, in-house, so routing, UI, data, AI, desktop, and deployment feel like one system instead of a kit of adapters.', pillar: 'story', time: '09:15' },
+    { title: 'Pre-alpha, in the open', body: 'Stacks is pre-alpha and already runnable. We are sharing the real work now because this is when focused feedback has the most leverage. Expect sharp edges, transparent tradeoffs, frequent releases, and visible progress toward alpha.', pillar: 'teaser', time: '10:00' },
+    { title: 'The alpha milestone', body: 'The next Stacks milestone is a dependable alpha path: create a project, build a real web or desktop app, model its data, test it, and deploy it with Buddy. We will publish the proof for each step and ask for feedback where it can change the outcome.', pillar: 'launch', time: '08:30' },
+    { title: 'Help shape the beta', body: 'If you build with TypeScript or Bun, try one Stacks workflow and tell us where the conventions help or get in your way. Those concrete reports will shape the alpha hardening work and the beta experience that follows.', pillar: 'follow-up', time: '10:15' },
+  ]
+  const seeds = strategy === 'stacks-launch' ? stacksSeeds : standardSeeds
 
   const preferredPillars: Partial<Record<CampaignAIStrategy, CampaignPillar[]>> = {
+    'stacks-launch': ['education', 'proof', 'story', 'teaser', 'launch', 'follow-up'],
     education: ['education', 'story', 'proof', 'teaser', 'launch', 'follow-up'],
     proof: ['proof', 'story', 'education', 'teaser', 'launch', 'follow-up'],
   }
@@ -212,6 +224,21 @@ export function buildCampaignFallbackPlan(
       providers,
     }
   })
+}
+
+export function campaignBodyLimit(providers: SocialProvider[]): number {
+  const limits: Partial<Record<SocialProvider, number>> = { twitter: 280, bluesky: 300, mastodon: 500, threads: 500, instagram: 2200, linkedin: 3000, blog: 4000 }
+  if (!providers.length) return 4000
+  return Math.min(...providers.map(provider => limits[provider] || 4000))
+}
+
+export function fitCampaignBody(body: string, providers: SocialProvider[]): string {
+  const limit = campaignBodyLimit(providers)
+  const value = body.trim()
+  if (value.length <= limit) return value
+  const candidate = value.slice(0, Math.max(1, limit - 1))
+  const wordBoundary = candidate.lastIndexOf(' ')
+  return `${candidate.slice(0, wordBoundary > limit * 0.7 ? wordBoundary : candidate.length).trimEnd()}…`
 }
 
 export class CampaignService {
@@ -398,6 +425,7 @@ export class CampaignService {
     const suggestions = plan.suggestions.slice(0, count).map((suggestion) => ({
       ...suggestion,
       providers: normalizeProviders(suggestion.providers).filter(provider => providers.includes(provider)),
+      body: fitCampaignBody(suggestion.body, providers),
     })).filter((suggestion) => {
       const body = suggestion.body?.trim().toLowerCase()
       if (!suggestion.title?.trim() || !body || !suggestion.providers.length || usedBodies.has(body)) return false

@@ -1,7 +1,7 @@
 import type { ConfiguredAIClient } from '@stacksjs/ai'
 import { describe, expect, test } from 'bun:test'
 import { CampaignAIService } from '../../app/Services/CampaignAIService'
-import { buildCampaignFallbackPlan, normalizeProviders, scheduleFromOffset } from '../../app/Services/CampaignService'
+import { buildCampaignFallbackPlan, campaignBodyLimit, fitCampaignBody, normalizeProviders, scheduleFromOffset } from '../../app/Services/CampaignService'
 
 describe('campaign planning helpers', () => {
   test('normalizes, deduplicates, and filters campaign providers', () => {
@@ -55,6 +55,39 @@ describe('campaign planning helpers', () => {
 
     expect(new Set(bodies).size).toBe(8)
     expect(bodies).not.toContain(existing[0].body.toLowerCase())
+  })
+
+  test('gives the Stacks launch playbook a proof-led local fallback', () => {
+    const campaign = {
+      id: 1,
+      uuid: 'stacks-campaign',
+      name: 'Stacks: Pre-alpha to Beta',
+      objective: 'Show one cohesive TypeScript toolkit through working proof.',
+      audience: 'TypeScript developers',
+      tone: 'technical' as const,
+      status: 'draft' as const,
+      startDate: '2026-08-10',
+      endDate: '2026-10-04',
+      timezone: 'America/Los_Angeles',
+      postCount: 0,
+      queuedCount: 0,
+    }
+
+    const result = buildCampaignFallbackPlan(campaign, 6, ['bluesky'], 'stacks-launch')
+
+    expect(result).toHaveLength(6)
+    expect(result[0]?.pillar).toBe('education')
+    expect(result.slice(0, 4).some(post => post.pillar === 'proof')).toBe(true)
+    expect(result.every(post => post.body.length <= 300)).toBe(true)
+    expect(result.some(post => post.body.includes('Buddy'))).toBe(true)
+  })
+
+  test('fits generated copy to the strictest selected channel', () => {
+    const longBody = 'Proof should stay readable and end on a word boundary. '.repeat(12)
+
+    expect(campaignBodyLimit(['linkedin', 'twitter'])).toBe(280)
+    expect(fitCampaignBody(longBody, ['linkedin', 'twitter']).length).toBeLessThanOrEqual(280)
+    expect(fitCampaignBody(longBody, ['linkedin', 'twitter']).endsWith('…')).toBe(true)
   })
 })
 
@@ -125,6 +158,7 @@ describe('campaign AI assistant', () => {
     expect(result.promptAdjusted).toBe(true)
     expect(result.suggestions).toEqual(generatedPosts)
     expect(requestedSchema?.properties?.posts?.minItems).toBe(3)
+    expect(requestedSchema?.properties?.posts?.items?.properties?.body?.maxLength).toBe(300)
     expect(JSON.stringify(requestedMessages)).not.toContain('Ignore previous instructions')
   })
 })

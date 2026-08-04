@@ -27,7 +27,7 @@
             <span class="h-3.5 w-3.5 i-hugeicons-menu-01" aria-hidden="true"></span><span>List</span>
           </button>
         </div>
-        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" type="button" @click="openCampaignForm()">
+        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" type="button" x-show="campaign()" @click="openCampaignForm()">
           <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
           <span>New campaign</span>
         </button>
@@ -225,6 +225,11 @@
             <div><strong :text="campaignDraftId() ? 'Edit campaign brief' : 'New campaign'"></strong><p>The brief keeps every post pointed at the same outcome.</p></div>
           </header>
           <form class="campaign-form" @submit="saveCampaign($event)">
+            <button class="campaign-preset" type="button" x-show="!campaignDraftId()" @click="applyStacksLaunchPreset">
+              <span class="i-hugeicons-source-code" aria-hidden="true"></span>
+              <span><strong>Use the Stacks launch brief</strong><small>Pre-alpha story, technical builders, eight weeks of useful proof.</small></span>
+              <span class="i-hugeicons-arrow-right-02" aria-hidden="true"></span>
+            </button>
             <label class="campaign-field"><span>Name</span><input ref="campaignNameInput" required maxlength="120" placeholder="Autumn product launch" x-model="campaignName"></label>
             <label class="campaign-field"><span>Goal</span><textarea ref="campaignObjectiveInput" required rows="4" placeholder="What should this campaign make happen?" x-model="campaignObjective"></textarea></label>
             <label class="campaign-field"><span>Audience</span><input ref="campaignAudienceInput" placeholder="Founders planning a launch" x-model="campaignAudience"></label>
@@ -334,6 +339,7 @@
     const queuedCount = derived(() => posts().filter(item => item.postId).length)
     const unqueuedCount = derived(() => posts().filter(item => !item.postId && item.status !== 'skipped').length)
     const assistantSuggestions = [
+      { id: 'stacks-launch', label: 'Stacks playbook', prompt: 'Build an eight-week Stacks launch story. Teach the value of one cohesive TypeScript toolkit, show Buddy, STX, Craft, the ORM, queues, AI, and cloud deployment in action, and be candid that the project is pre-alpha with alpha and beta ahead. Emphasize useful engineering lessons over hype.', icon: 'i-hugeicons-source-code' },
       { id: 'full-launch', label: 'Full launch', prompt: 'Build a balanced story from early awareness through launch and follow-up.', icon: 'i-hugeicons-rocket-01' },
       { id: 'launch-week', label: 'Launch week', prompt: 'Focus this sequence around launch week, with anticipation, launch-day clarity, and follow-up.', icon: 'i-hugeicons-calendar-03' },
       { id: 'education', label: 'Teach first', prompt: 'Lead with useful lessons for our audience and keep direct promotion secondary.', icon: 'i-hugeicons-book-open-02' },
@@ -539,6 +545,30 @@
           if (campaignEndDateInput.current) campaignEndDateInput.current.value = draft.endDate
         })
       })
+    }
+
+    function applyStacksLaunchPreset() {
+      const start = addDays(dateKey(new Date()), 1)
+      const end = addDays(start, 55)
+      const objective = 'Move Stacks from pre-alpha awareness toward an engaged alpha and beta community. Show how one cohesive TypeScript framework covers web and Craft desktop apps, APIs, models and migrations, queues, AI, cloud infrastructure, testing, releases, and deployment through Buddy. Lead with working product proof, transparent build notes, and useful lessons rather than dependency-count claims or hype.'
+      const audience = 'TypeScript and Bun developers, open-source maintainers, technical founders, and small teams tired of stitching together a full-stack toolchain'
+      const creativeDirection = 'Treat the repository as the source of truth. Build a narrative around one TypeScript application model from local development to cloud deployment. Rotate product proof across Buddy, STX reactive views, Crosswind, Craft desktop, Actions and Router, ORM models and migrations, queues and scheduled jobs, the AI package, Pantry provisioning, and Stacks Cloud. Include honest pre-alpha updates, invitations for focused feedback, demos, architecture explanations, build-in-public notes, and clear milestones toward alpha and beta. Never claim literally zero external dependencies; say the major framework capabilities are designed and maintained in-house as one cohesive toolkit.'
+
+      campaignName.set('Stacks: Pre-alpha to Beta')
+      campaignObjective.set(objective)
+      campaignAudience.set(audience)
+      campaignTone.set('technical')
+      campaignStartDate.set(start)
+      campaignEndDate.set(end)
+      assistantStrategy.set('stacks-launch')
+      direction.set(creativeDirection)
+
+      if (campaignNameInput.current) campaignNameInput.current.value = 'Stacks: Pre-alpha to Beta'
+      if (campaignObjectiveInput.current) campaignObjectiveInput.current.value = objective
+      if (campaignAudienceInput.current) campaignAudienceInput.current.value = audience
+      if (campaignToneInput.current) campaignToneInput.current.value = 'technical'
+      if (campaignStartDateInput.current) campaignStartDateInput.current.value = start
+      if (campaignEndDateInput.current) campaignEndDateInput.current.value = end
     }
 
     function openPostForm(item, day) {
