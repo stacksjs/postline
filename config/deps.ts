@@ -79,7 +79,7 @@ export const config: PantryConfig = {
   },
 
   postSetup: {
-    enabled: true,
+    enabled: Bun.env.NODE_ENV !== "production",
     commands: [
       {
         name: "Generate model files",
