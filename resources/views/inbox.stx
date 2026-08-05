@@ -1,0 +1,409 @@
+@extends('layouts/postline')
+
+@section('title', 'Postline - Inbox')
+@section('description', 'Read and answer direct messages from every connected social network in one place.')
+
+@section('content')
+  <section class="grid gap-4" data-postline-page="inbox" data-testid="inbox-page">
+    <header class="flex flex-col gap-4 items-stretch justify-between md:flex-row md:items-center min-h-11">
+      <div>
+        <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Direct Messages</p>
+        <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Answer everyone from one inbox</h1>
+        <p class="mb-0 mt-1.5 text-[13px] text-muted">Read and reply to DMs from Bluesky, X, and Mastodon without switching apps.</p>
+      </div>
+      <div class="flex flex-wrap gap-2 items-center">
+        <button class="inline-flex gap-2 items-center justify-center px-3 h-9 font-bold text-ink text-xs bg-panel hover:bg-white border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="unreadCount() === 0" @click="markAllRead">Mark all read</button>
+        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="syncing() || connectedCount() === 0" @click="runSync">
+          <span class="h-4 w-4 i-hugeicons-refresh" :class="syncing() ? 'animate-spin' : ''" aria-hidden="true"></span>
+          <span :text="syncing() ? 'Syncing…' : 'Sync now'">Sync now</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="grid gap-3 sm:grid-cols-3">
+      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-blue-700 text-lg bg-blue-50 rounded-xl i-hugeicons-message-01" aria-hidden="true"></span>
+        <div><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Conversations</span><strong class="block mt-1 text-ink text-xl" :text="String(conversations().length)">0</strong></div>
+      </article>
+      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-violet-700 bg-violet-50 rounded-xl i-hugeicons-notification-02" aria-hidden="true"></span>
+        <div><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Unread</span><strong class="block mt-1 text-ink text-xl" :text="String(unreadCount())">0</strong></div>
+      </article>
+      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-emerald-700 text-lg bg-emerald-50 rounded-xl i-hugeicons-link-02" aria-hidden="true"></span>
+        <div class="min-w-0"><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Connected</span><strong class="block mt-1 text-ink text-sm truncate" :text="connectedLabel()">None yet</strong></div>
+      </article>
+    </div>
+
+    <div class="grid gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
+      <aside class="grid content-start gap-4" aria-label="Conversations">
+        <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm">
+          <header class="grid gap-2.5 px-4 py-3 border-b border-line">
+            <div class="flex gap-2 items-center justify-between">
+              <h2 class="m-0 font-bold text-ink text-sm" :text="statusFilter() === 'archived' ? 'Archived' : 'Inbox'">Inbox</h2>
+              <button class="px-2.5 h-7 font-bold text-[11px] text-muted hover:text-ink bg-panel-2 hover:bg-white border border-line rounded-lg transition-colors" type="button" @click="toggleStatusFilter" :text="statusFilter() === 'archived' ? 'Show inbox' : 'Show archived'">Show archived</button>
+            </div>
+            <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-line rounded-lg" @change="setProviderFilter($event.target.value)">
+              <option value="">All networks</option>
+              <option x-for="provider in providerOptions" :value="provider.id" :text="provider.label"></option>
+            </select>
+          </header>
+
+          <div class="grid gap-3 place-items-center px-6 py-16 text-center" x-show="loading()">
+            <span class="h-6 w-6 text-muted animate-spin i-hugeicons-loading-03" aria-hidden="true"></span>
+            <p class="m-0 text-muted text-sm">Loading conversations…</p>
+          </div>
+
+          <div class="grid gap-3 place-items-center px-6 py-16 text-center" x-show="showEmptyList()">
+            <span class="grid place-items-center h-12 w-12 text-blue-700 text-xl bg-blue-50 rounded-2xl i-hugeicons-message-01" aria-hidden="true"></span>
+            <div>
+              <h3 class="m-0 font-bold text-ink text-sm" :text="connectedCount() ? 'No conversations yet' : 'Connect a network first'"></h3>
+              <p class="m-0 mt-1 text-muted text-xs" :text="connectedCount() ? 'Run a sync to pull your latest DMs into Postline.' : 'Connect Bluesky, X, or Mastodon on Accounts to start reading DMs here.'"></p>
+            </div>
+          </div>
+
+          <div class="overflow-y-auto max-h-[32rem] divide-line divide-y" x-show="!loading() && conversations().length">
+            <button class="grid gap-1.5 p-3 w-full text-left hover:bg-panel-2 transition-colors" type="button" x-for="conversation in conversations()" @click="openConversation(conversation.id)" :class="conversation.id === activeId() ? 'bg-panel-2' : conversation.unreadCount ? 'bg-blue-50/30' : ''">
+              <div class="flex gap-2 items-center">
+                <span class="grid place-items-center shrink-0 h-8 w-8 font-bold text-[11px] text-white rounded-xl" :class="providerColor(conversation.provider)" :text="providerInitial(conversation.provider)"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex gap-2 items-center justify-between">
+                    <strong class="text-[13px] text-ink truncate" :text="conversation.participantName || conversation.participantHandle"></strong>
+                    <time class="shrink-0 text-[10px] text-muted" :datetime="conversation.lastMessageAt" :text="relativeTime(conversation.lastMessageAt)"></time>
+                  </div>
+                  <p class="m-0 mt-0.5 text-muted text-xs truncate" :text="previewFor(conversation)"></p>
+                </div>
+                <span class="grid place-items-center shrink-0 px-1.5 h-5 min-w-5 font-bold text-[10px] text-white bg-blue-600 rounded-full" x-show="conversation.unreadCount > 0" :text="String(conversation.unreadCount)"></span>
+              </div>
+            </button>
+          </div>
+        </section>
+
+        <section class="p-4 bg-panel border border-line rounded-2xl shadow-sm" x-show="unavailable().length">
+          <h2 class="m-0 font-bold text-ink text-sm">Not available yet</h2>
+          <p class="m-0 mt-1 text-muted text-xs">These networks are connected for publishing, but their DMs are out of reach.</p>
+          <ul class="grid gap-2 m-0 mt-3 p-0 list-none">
+            <li class="grid gap-0.5" x-for="entry in unavailable()">
+              <strong class="capitalize text-[12px] text-ink" :text="entry.provider"></strong>
+              <span class="leading-4 text-[11px] text-muted" :text="entry.reason"></span>
+            </li>
+          </ul>
+        </section>
+      </aside>
+
+      <section class="flex overflow-hidden flex-col min-h-[34rem] bg-panel border border-line rounded-2xl shadow-sm" aria-label="Conversation">
+        <div class="grid flex-1 gap-3 place-items-center px-6 py-20 text-center" x-show="!activeId()">
+          <span class="grid place-items-center h-14 w-14 text-2xl text-blue-700 bg-blue-50 rounded-2xl i-hugeicons-message-01" aria-hidden="true"></span>
+          <div>
+            <h2 class="m-0 font-bold text-base text-ink">Pick a conversation</h2>
+            <p class="m-0 mt-1 max-w-md text-muted text-sm">Choose a thread on the left to read it and reply. Postline marks it read as soon as you open it.</p>
+          </div>
+        </div>
+
+        <div class="contents" x-show="activeId()">
+          <header class="flex flex-wrap gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
+            <div class="flex gap-3 items-center min-w-0">
+              <span class="grid place-items-center shrink-0 h-9 w-9 font-bold text-white text-xs rounded-xl" :class="providerColor(activeProvider())" :text="providerInitial(activeProvider())"></span>
+              <div class="min-w-0">
+                <h2 class="m-0 font-bold text-ink text-sm truncate" :text="activeTitle()"></h2>
+                <p class="m-0 mt-0.5 text-muted text-xs truncate" :text="activeSubtitle()"></p>
+              </div>
+            </div>
+            <div class="flex gap-2 items-center">
+              <button class="px-3 h-8 font-bold text-ink text-xs bg-panel-2 hover:bg-white border border-line rounded-lg disabled:opacity-50" type="button" :disabled="refreshing()" @click="refreshThread" :text="refreshing() ? 'Refreshing…' : 'Refresh'">Refresh</button>
+              <button class="px-3 h-8 font-bold text-xs border rounded-lg transition-colors" type="button" @click="toggleArchive" :class="statusFilter() === 'archived' ? 'text-ink bg-panel-2 border-line hover:bg-white' : 'text-red-700 border-red-200 hover:bg-red-50'" :text="statusFilter() === 'archived' ? 'Restore' : 'Archive'">Archive</button>
+            </div>
+          </header>
+
+          <div class="grid overflow-y-auto content-start flex-1 gap-3 px-4 py-4 max-h-[30rem]" data-inbox-thread>
+            <p class="m-0 py-8 text-center text-muted text-sm" x-show="threadLoading()">Loading messages…</p>
+            <p class="m-0 py-8 text-center text-muted text-sm" x-show="!threadLoading() && messages().length === 0">No messages mirrored yet. Run a sync to pull this thread's history.</p>
+            <article class="flex" x-for="message in messages()" :class="message.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
+              <div class="grid gap-1 max-w-[80%]">
+                <div class="px-3.5 py-2.5 rounded-2xl" :class="message.direction === 'outgoing' ? 'bg-accent text-on-accent' : 'bg-panel-2 text-body border border-line'">
+                  <p class="m-0 leading-5 text-[13px] whitespace-pre-line" :text="message.body"></p>
+                </div>
+                <div class="flex gap-2 items-center px-1" :class="message.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
+                  <span class="text-[10px] text-muted" :text="message.direction === 'outgoing' ? 'You' : (message.authorName || message.authorHandle)"></span>
+                  <time class="text-[10px] text-muted" :datetime="message.sentAt" :text="relativeTime(message.sentAt)"></time>
+                  <span class="font-bold text-[10px] text-red-700" x-show="message.status === 'failed'" :text="message.failureReason || 'Failed to send'"></span>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <form class="grid gap-2 px-4 py-3 border-line border-t" @submit="sendReply($event)">
+            <textarea class="px-3 py-2.5 min-h-20 text-ink text-sm bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40 resize-y" placeholder="Write a reply…" x-model="draftBody" :maxlength="String(characterLimit())" @keydown="maybeSend($event)"></textarea>
+            <div class="flex flex-wrap gap-2 items-center justify-between">
+              <span class="text-[11px] text-muted" :text="`${remaining()} characters left · ⌘↵ to send`"></span>
+              <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="sending() || !draftBody().trim()">
+                <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
+                <span :text="sending() ? 'Sending…' : 'Send'">Send</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <p class="m-0 px-4 py-3 text-red-700 text-sm bg-red-50 border-red-100 border-t" x-show="errorMessage()" :text="errorMessage()"></p>
+      </section>
+    </div>
+  </section>
+
+  <script client>
+    interface InboxConversation {
+      id: number
+      provider: string
+      participantHandle: string
+      participantName?: string | null
+      lastMessageAt?: string | null
+      lastMessagePreview?: string | null
+      lastMessageOutgoing: boolean
+      unreadCount: number
+      status: string
+    }
+
+    interface InboxMessage {
+      id: number
+      provider: string
+      direction: string
+      authorHandle: string
+      authorName?: string | null
+      body: string
+      status: string
+      failureReason?: string | null
+      sentAt: string
+    }
+
+    const providerOptions = [{ id: 'bluesky', label: 'Bluesky' }, { id: 'twitter', label: 'X' }, { id: 'mastodon', label: 'Mastodon' }]
+
+    const conversations = state([])
+    const messages = state([])
+    const supported = state([])
+    const unavailable = state([])
+    const loading = state(true)
+    const threadLoading = state(false)
+    const syncing = state(false)
+    const refreshing = state(false)
+    const sending = state(false)
+    const errorMessage = state('')
+    const activeId = state(0)
+    const statusFilter = state('open')
+    const providerFilter = state('')
+    const draftBody = state('')
+    const activeCharacterLimit = state(1000)
+    let pollTimer = 0
+
+    const unreadCount = derived(() => conversations().reduce((total, item) => total + item.unreadCount, 0))
+    const connected = derived(() => supported().filter(item => item.connected))
+    const connectedCount = derived(() => connected().length)
+    const connectedLabel = derived(() => connected().length ? connected().map(item => providerLabel(item.provider)).join(', ') : 'None yet')
+    const showEmptyList = derived(() => !loading() && conversations().length === 0)
+    const activeConversation = derived(() => conversations().find(item => item.id === activeId()) || null)
+    const activeProvider = derived(() => activeConversation()?.provider || 'bluesky')
+    const activeTitle = derived(() => activeConversation()?.participantName || activeConversation()?.participantHandle || 'Conversation')
+    const activeSubtitle = derived(() => {
+      const conversation = activeConversation()
+      if (!conversation) return ''
+      return `${providerLabel(conversation.provider)} · ${conversation.participantHandle}`
+    })
+    const characterLimit = derived(() => activeCharacterLimit())
+    const remaining = derived(() => Math.max(0, characterLimit() - draftBody().length))
+
+    const providerLabel = (provider: string): string => providerOptions.find(item => item.id === provider)?.label || provider
+    const providerInitial = (provider: string): string => provider === 'twitter' ? 'X' : provider.slice(0, 1).toUpperCase()
+    const providerColor = (provider: string): string => provider === 'twitter' ? 'bg-zinc-900' : provider === 'mastodon' ? 'bg-indigo-600' : 'bg-blue-600'
+    const previewFor = (conversation: InboxConversation): string => {
+      const preview = conversation.lastMessagePreview || 'No messages yet'
+      return conversation.lastMessageOutgoing ? `You: ${preview}` : preview
+    }
+    const relativeTime = (value: string | null | undefined): string => {
+      const date = new Date(String(value || '').replace(' ', 'T') + (String(value || '').includes('Z') ? '' : 'Z'))
+      if (Number.isNaN(date.getTime())) return ''
+      const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000))
+      if (seconds < 60) return 'just now'
+      if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+      if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    }
+
+    const requestJson = async (url: string, options: RequestInit = {}) => {
+      const response = await fetch(url, options)
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Inbox request failed.')
+      return payload
+    }
+
+    const postJson = (url: string, body: Record<string, unknown>) =>
+      requestJson(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+
+    const loadConversations = async ({ quiet = false } = {}) => {
+      if (!quiet) loading.set(true)
+      errorMessage.set('')
+      try {
+        const query = new URLSearchParams({ status: statusFilter(), provider: providerFilter() })
+        const payload = await requestJson(`/api/postline/inbox?${query}`)
+        conversations.set(payload.data?.conversations || [])
+        supported.set(payload.data?.providers?.supported || [])
+        unavailable.set(payload.data?.providers?.unavailable || [])
+        // A thread that has been archived or filtered away should not stay open.
+        if (activeId() && !conversations().some(item => item.id === activeId())) closeConversation()
+      }
+      catch (error) {
+        errorMessage.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        loading.set(false)
+      }
+    }
+
+    const closeConversation = () => {
+      activeId.set(0)
+      messages.set([])
+      draftBody.set('')
+    }
+
+    const loadThread = async ({ markRead = true, quiet = false } = {}) => {
+      if (!activeId()) return
+      if (!quiet) threadLoading.set(true)
+      try {
+        const query = new URLSearchParams({ conversation_id: String(activeId()), mark_read: markRead ? '1' : '0' })
+        const payload = await requestJson(`/api/postline/inbox/thread?${query}`)
+        messages.set(payload.data?.messages || [])
+        activeCharacterLimit.set(Number(payload.data?.characterLimit || 1000))
+        if (markRead) {
+          conversations.set(conversations().map(item => item.id === activeId() ? { ...item, unreadCount: 0 } : item))
+        }
+      }
+      catch (error) {
+        errorMessage.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        threadLoading.set(false)
+      }
+    }
+
+    const openConversation = async (id: number) => {
+      if (activeId() === id) return
+      activeId.set(id)
+      messages.set([])
+      draftBody.set('')
+      await loadThread()
+    }
+
+    const setProviderFilter = async (value: string) => {
+      providerFilter.set(value)
+      await loadConversations()
+    }
+
+    const toggleStatusFilter = async () => {
+      statusFilter.set(statusFilter() === 'archived' ? 'open' : 'archived')
+      closeConversation()
+      await loadConversations()
+    }
+
+    const runSync = async () => {
+      syncing.set(true)
+      try {
+        const payload = await postJson('/api/postline/inbox/sync', { provider: providerFilter() })
+        await loadConversations({ quiet: true })
+        if (activeId()) await loadThread({ markRead: false, quiet: true })
+        const failures = payload.data?.errors?.length || 0
+        const suffix = failures ? ` ${failures} network${failures === 1 ? '' : 's'} need attention.` : ''
+        postlineToast?.show?.({
+          title: 'Inbox synced',
+          message: `${payload.data?.messages || 0} new message${payload.data?.messages === 1 ? '' : 's'}.${suffix}`,
+          tone: failures ? 'neutral' : 'success',
+          id: 'inbox-sync',
+        })
+      }
+      catch (error) {
+        postlineToast?.show?.({ title: 'Inbox sync failed', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-sync' })
+      }
+      finally {
+        syncing.set(false)
+      }
+    }
+
+    const refreshThread = async () => {
+      if (!activeId()) return
+      refreshing.set(true)
+      try {
+        await postJson('/api/postline/inbox/sync', { conversation_id: activeId() })
+        await loadThread({ quiet: true })
+        await loadConversations({ quiet: true })
+      }
+      catch (error) {
+        postlineToast?.show?.({ title: 'Could not refresh thread', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-refresh' })
+      }
+      finally {
+        refreshing.set(false)
+      }
+    }
+
+    const sendReply = async (event: SubmitEvent) => {
+      event.preventDefault()
+      const body = draftBody().trim()
+      if (!body || !activeId()) return
+      sending.set(true)
+      try {
+        const payload = await postJson('/api/postline/inbox/reply', { conversation_id: activeId(), body })
+        if (payload.data?.message) messages.set([...messages(), payload.data.message])
+        draftBody.set('')
+        await loadConversations({ quiet: true })
+      }
+      catch (error) {
+        postlineToast?.show?.({ title: 'Message not sent', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-reply' })
+      }
+      finally {
+        sending.set(false)
+      }
+    }
+
+    const maybeSend = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey)) return
+      event.preventDefault()
+      void sendReply(new SubmitEvent('submit'))
+    }
+
+    const markAllRead = async () => {
+      try {
+        await postJson('/api/postline/inbox/read', { conversation_id: 0 })
+        conversations.set(conversations().map(item => ({ ...item, unreadCount: 0 })))
+      }
+      catch (error) {
+        postlineToast?.show?.({ title: 'Could not update the inbox', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-read' })
+      }
+    }
+
+    const toggleArchive = async () => {
+      if (!activeId()) return
+      const nextStatus = statusFilter() === 'archived' ? 'open' : 'archived'
+      try {
+        await postJson('/api/postline/inbox/archive', { conversation_id: activeId(), status: nextStatus })
+        closeConversation()
+        await loadConversations()
+        postlineToast?.show?.({
+          title: nextStatus === 'archived' ? 'Conversation archived' : 'Conversation restored',
+          message: nextStatus === 'archived' ? 'It stays searchable under Archived.' : 'It is back in your inbox.',
+          tone: 'success',
+          id: 'inbox-archive',
+        })
+      }
+      catch (error) {
+        postlineToast?.show?.({ title: 'Could not update the conversation', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-archive' })
+      }
+    }
+
+    onMount(() => {
+      void loadConversations()
+      // Reads hit the local mirror, so polling is cheap; the scheduler is what
+      // actually talks to the networks, every five minutes.
+      pollTimer = window.setInterval(() => {
+        void loadConversations({ quiet: true })
+        if (activeId()) void loadThread({ markRead: false, quiet: true })
+      }, 45_000)
+    })
+    onUnmounted(() => window.clearInterval(pollTimer))
+  </script>
+@endsection

@@ -1,4 +1,4 @@
-import type { BlueskySession, CrosspostTargetResult, ProviderPurgeAdapter, PublishContent, PublishedPost, TimelineResult } from '../../Support/Social/types'
+import type { BlueskySession, CrosspostTargetResult, ProviderPurgeAdapter, PublishContent, PublishedPost, SocialIdentityCredentials, TimelineResult } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { describeBlueskyError } from '../../Support/Social/bluesky-errors'
@@ -400,6 +400,26 @@ export class BlueskyService {
       listPage: cursor => run(identity => this.driver.listAuthoredPosts(credentials(identity), { cursor })),
       deletePost: ref => run(identity => this.driver.deletePost(credentials(identity), ref)),
     }
+  }
+
+  /**
+   * Run `callback` against a live Bluesky session, refreshing the access JWT
+   * once if it has expired.
+   *
+   * The DM transport talks to `chat.bsky.convo.*`, which the publishing driver
+   * knows nothing about, but it needs exactly the session handling publishing
+   * already has. Rather than give it a second copy of connect/refresh/expire,
+   * this exposes the existing one.
+   */
+  async withSession<T>(callback: (credentials: SocialIdentityCredentials) => Promise<T>): Promise<T> {
+    const identity = await this.requireIdentity()
+
+    return await this.withFreshSession(identity, current => callback({
+      handle: current.handle,
+      did: current.external_id || undefined,
+      accessToken: current.access_token || undefined,
+      refreshToken: current.refresh_token || undefined,
+    }))
   }
 
   private async withFreshSession<T>(

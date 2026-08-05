@@ -190,6 +190,23 @@ export class MastodonService {
     }
   }
 
+  /**
+   * The credentials the DM transport needs. `handle` is the full
+   * `@user@instance` form, which is what a direct status has to be addressed
+   * to for the reply to reach the same thread.
+   */
+  async dmIdentity(): Promise<{ instance: string, accessToken: string, handle: string }> {
+    const identity = await this.requireIdentity()
+    if (!identity.external_id)
+      throw new Error('Reconnect Mastodon on the Accounts page — Postline needs your instance URL.')
+
+    return {
+      instance: String(identity.external_id),
+      accessToken: String(identity.access_token),
+      handle: identity.handle,
+    }
+  }
+
   private async requireIdentity(): Promise<SocialIdentityRow> {
     const existing = await this.findIdentity()
     if (existing?.access_token && existing.auth_status === 'connected') return existing

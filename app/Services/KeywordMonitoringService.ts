@@ -1,4 +1,5 @@
 import { db } from '@stacksjs/database'
+import { stripHtml } from '../Support/Social/text'
 import { ensureAccount, now, uuid } from './Social/support'
 
 const database = db as any
@@ -171,10 +172,6 @@ async function searchTwitter(keywords: string[], mode: MatchMode): Promise<Menti
       postedAt: post.created_at || new Date().toISOString(),
     }]
   })
-}
-
-function stripHtml(value: string): string {
-  return value.replace(/<br\s*\/?\s*>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, '\'').replace(/&quot;/g, '"').trim()
 }
 
 async function searchMastodon(keywords: string[], mode: MatchMode): Promise<MentionCandidate[]> {

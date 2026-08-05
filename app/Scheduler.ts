@@ -32,6 +32,12 @@ export default function () {
     .everyFiveMinutes()
     .withoutOverlapping(5)
 
+  // Mirror new direct messages into the inbox
+  schedule
+    .job('SyncDirectMessages')
+    .everyFiveMinutes()
+    .withoutOverlapping(5)
+
   // Run a custom action every five minutes
   // schedule.action('CleanupTempFiles').everyFiveMinutes()
 

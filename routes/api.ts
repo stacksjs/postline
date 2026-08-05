@@ -95,6 +95,15 @@ route.group({ prefix: '/postline' }, () => {
   route.get('/campaigns/ai/status', 'Actions/Postline/CampaignAIStatusAction').middleware('auth').skipCsrf()
   route.post('/campaigns/generate', 'Actions/Postline/CampaignGenerateAction').middleware('auth').skipCsrf().rateLimit(10, 'hour')
   route.post('/campaigns/activate', 'Actions/Postline/CampaignActivateAction').middleware('auth').skipCsrf().rateLimit(5, 'hour')
+  // Direct messages. Reads hit the local mirror and are cheap; the two calls
+  // that touch a network (sync, reply) are throttled, and replying tightest —
+  // it is the only one here that is visible to someone else.
+  route.get('/inbox', 'Actions/Postline/InboxListAction').middleware('auth').skipCsrf()
+  route.get('/inbox/thread', 'Actions/Postline/InboxThreadAction').middleware('auth').skipCsrf()
+  route.post('/inbox/sync', 'Actions/Postline/InboxSyncAction').middleware('auth').skipCsrf().rateLimit(60, 'hour')
+  route.post('/inbox/reply', 'Actions/Postline/InboxReplyAction').middleware('auth').skipCsrf().rateLimit(60, 'hour')
+  route.post('/inbox/read', 'Actions/Postline/InboxReadAction').middleware('auth').skipCsrf().rateLimit(120, 'minute')
+  route.post('/inbox/archive', 'Actions/Postline/InboxArchiveAction').middleware('auth').skipCsrf().rateLimit(60, 'minute')
   route.get('/listening', 'Actions/Postline/KeywordMonitorListAction').middleware('auth').skipCsrf()
   route.post('/listening', 'Actions/Postline/KeywordMonitorSaveAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
   route.post('/listening/delete', 'Actions/Postline/KeywordMonitorDeleteAction').middleware('auth').skipCsrf().rateLimit(20, 'minute')
