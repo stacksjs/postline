@@ -112,6 +112,8 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/tiers', 'Actions/Postline/TierSaveAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
   route.post('/tiers/archive', 'Actions/Postline/TierArchiveAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
   route.get('/subscribers', 'Actions/Postline/SubscribersListAction').middleware('auth').skipCsrf()
+  route.get('/sends', 'Actions/Postline/SendsListAction').middleware('auth').skipCsrf()
+  route.post('/sends', 'Actions/Postline/SendQueueAction').middleware('auth').skipCsrf().rateLimit(20, 'hour')
 
   // Discover. The feed read is public: it is the one surface meant to be seen
   // by people who do not have an account here, and gating it would defeat the

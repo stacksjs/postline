@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { db } from '@stacksjs/database'
 import { discover } from '../DiscoverService'
+import { newsletter } from '../NewsletterService'
 import { ensureAccount, now, uuid } from './support'
 
 const database = db as any
@@ -146,6 +147,26 @@ export class BlogService {
       }
       catch (error) {
         console.warn(`[postline] blog post published but Discover entry failed: ${error instanceof Error ? error.message : String(error)}`)
+      }
+
+      // Publish is send. Queued rather than delivered here for the same reason
+      // the Discover entry is written after the post: the piece is already
+      // live, and a slow or broken mail transport must not turn a successful
+      // publish into a failed one. `queue` is idempotent on the slug, so a
+      // republish never mails the same post twice.
+      try {
+        const audience = content?.audience === 'paid' ? 'paid' : 'everyone'
+        await newsletter.queue({
+          sourceKey: `blog:${slug}`,
+          subject: title,
+          body: markdownBody || body,
+          url,
+          audience,
+          postId: post.id,
+        })
+      }
+      catch (error) {
+        console.warn(`[postline] blog post published but newsletter queue failed: ${error instanceof Error ? error.message : String(error)}`)
       }
 
       return { provider: 'blog', ok: true, url, uri: url, targetId: Number(target.id) }

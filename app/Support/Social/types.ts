@@ -98,6 +98,14 @@ export interface PublishedPost {
 export interface PublishContent {
   /** Explicit post title — used by long-form targets (blog); ignored by social providers. */
   title?: string
+  /**
+   * Who receives the newsletter when this is published to the blog.
+   *
+   * `paid` is how a paywalled piece reaches only paying readers. Ignored by
+   * social providers, which have no audience of their own to segment. Absent
+   * means everyone, since a post nobody is mailed is the surprising default.
+   */
+  audience?: 'everyone' | 'paid'
   external?: {
     uri: string
     title: string
