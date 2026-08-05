@@ -42,14 +42,20 @@ export type {
 export type TimelineItem = import('@stacksjs/socials').TimelineResult['items'][number]
 
 /**
- * Core's publishing providers plus `blog`.
+ * Core's publishing providers plus Postline's own two.
  *
- * Postline crossposts to its own blog alongside the social networks, which is
- * not something the framework knows about - so the union extends rather than
- * replaces. Written as a union with the core type so a provider added upstream
+ * `blog` is the long-form target: publishing to it writes a post on your own
+ * publication. `postline` is the short-form one: it puts the post in the
+ * Discover feed other Postline readers browse.
+ *
+ * Both are deliberately modelled as providers rather than as a separate
+ * concept. A network you publish to is a network you publish to, and making
+ * ours the exception would mean every scheduling, variant, queue and metrics
+ * path needing to know about it. Neither the framework knows about them, so
+ * the union extends rather than replaces, and a provider added upstream still
  * arrives here for free.
  */
-export type SocialProvider = SocialPublishingProvider | 'blog'
+export type SocialProvider = SocialPublishingProvider | 'blog' | 'postline'
 
 /**
  * Kept local, but only just: core's `PublishPostInput` is a strict superset.

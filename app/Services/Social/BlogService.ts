@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { db } from '@stacksjs/database'
+import { discover } from '../DiscoverService'
 import { ensureAccount, now, uuid } from './support'
 
 const database = db as any
@@ -127,6 +128,25 @@ export class BlogService {
         failure_reason: null,
         updated_at: publishedAt,
       }).where('id', '=', target.id).execute()
+
+      // The long-form half of Discover. `record` returns null for an unlisted
+      // publication, so this is a no-op until the owner opts in, and it never
+      // fails the publish: the post is already live on the blog by now, and
+      // losing its feed entry is not a reason to report the publish as failed.
+      try {
+        await discover.record({
+          form: 'long',
+          sourceKey: `blog:${slug}`,
+          title,
+          body: markdownBody || body,
+          url,
+          postId: post.id,
+          publishedAt,
+        })
+      }
+      catch (error) {
+        console.warn(`[postline] blog post published but Discover entry failed: ${error instanceof Error ? error.message : String(error)}`)
+      }
 
       return { provider: 'blog', ok: true, url, uri: url, targetId: Number(target.id) }
     }

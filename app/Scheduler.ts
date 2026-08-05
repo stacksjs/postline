@@ -32,6 +32,13 @@ export default function () {
     .everyFiveMinutes()
     .withoutOverlapping(5)
 
+  // Decay Discover ranking so the feed does not become a list of whoever
+  // published most recently
+  schedule
+    .job('RerankDiscover')
+    .hourly()
+    .withoutOverlapping(10)
+
   // Mirror new direct messages into the inbox
   schedule
     .job('SyncDirectMessages')

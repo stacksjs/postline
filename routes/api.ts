@@ -95,6 +95,17 @@ route.group({ prefix: '/postline' }, () => {
   route.get('/campaigns/ai/status', 'Actions/Postline/CampaignAIStatusAction').middleware('auth').skipCsrf()
   route.post('/campaigns/generate', 'Actions/Postline/CampaignGenerateAction').middleware('auth').skipCsrf().rateLimit(10, 'hour')
   route.post('/campaigns/activate', 'Actions/Postline/CampaignActivateAction').middleware('auth').skipCsrf().rateLimit(5, 'hour')
+  // Discover. The feed read is public: it is the one surface meant to be seen
+  // by people who do not have an account here, and gating it would defeat the
+  // point of an index. Everything that writes stays behind auth.
+  route.get('/discover', 'Actions/Postline/DiscoverFeedAction').skipCsrf()
+  route.post('/discover/read', 'Actions/Postline/DiscoverReadAction').skipCsrf().rateLimit(240, 'minute')
+  route.get('/publication', 'Actions/Postline/PublicationGetAction').middleware('auth').skipCsrf()
+  route.post('/publication', 'Actions/Postline/PublicationSaveAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
+  route.post('/discover/entry/status', 'Actions/Postline/DiscoverEntryStatusAction').middleware('auth').skipCsrf().rateLimit(60, 'minute')
+  route.post('/publication/recommendations', 'Actions/Postline/RecommendationSaveAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
+  route.post('/publication/recommendations/delete', 'Actions/Postline/RecommendationDeleteAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
+
   // Direct messages. Reads hit the local mirror and are cheap; the two calls
   // that touch a network (sync, reply) are throttled, and replying tightest —
   // it is the only one here that is visible to someone else.

@@ -47,6 +47,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   threads: 'Threads',
   tiktok: 'TikTok',
   blog: 'Blog',
+  postline: 'Postline',
 }
 
 export function providerLabel(provider: string): string {

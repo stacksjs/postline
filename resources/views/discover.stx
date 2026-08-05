@@ -1,0 +1,297 @@
+@extends('layouts/postline')
+
+@section('title', 'Postline - Discover')
+@section('description', 'Read what other Postline publications are writing, in long form and short form.')
+
+@section('content')
+  <section class="grid gap-4" data-postline-page="discover" data-testid="discover-page">
+    <header class="flex flex-col gap-4 items-stretch justify-between md:flex-row md:items-center min-h-11">
+      <div>
+        <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Discover</p>
+        <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">What the network is publishing</h1>
+        <p class="mb-0 mt-1.5 text-[13px] text-muted">Essays and posts from listed Postline publications, ranked by readers rather than by spend.</p>
+      </div>
+      <div class="flex flex-wrap gap-2 items-center">
+        <span class="inline-flex gap-2 items-center px-3 h-9 text-xs bg-panel border border-line rounded-xl" :class="live() ? 'text-emerald-700' : 'text-muted'">
+          <span class="h-1.5 w-1.5 rounded-full" :class="live() ? 'bg-emerald-500' : 'bg-zinc-300'" aria-hidden="true"></span>
+          <span :text="live() ? 'Live' : 'Not live'">Not live</span>
+        </span>
+        <a class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" href="/settings" data-stx-link>
+          <span class="h-4 w-4 i-hugeicons-settings-02" aria-hidden="true"></span>
+          Publication settings
+        </a>
+      </div>
+    </header>
+
+    <!-- Listing state. The one thing a writer has to act on, so it sits above
+        the feeds rather than inside settings only. -->
+    <div class="flex flex-wrap gap-3 items-center justify-between p-4 border rounded-2xl" x-show="!publicationListed()" :class="'bg-amber-50 border-amber-200'">
+      <div class="min-w-0">
+        <strong class="block text-[13px] text-ink">Your publication is unlisted</strong>
+        <span class="block mt-0.5 text-muted text-xs">You can read Discover, but nothing you publish appears here until you list it. Short posts are still recorded and will appear the moment you do.</span>
+      </div>
+      <button class="inline-flex items-center px-3 h-9 font-bold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50" type="button" :disabled="listing()" @click="listPublication" :text="listing() ? 'Listing…' : 'List my publication'">List my publication</button>
+    </div>
+
+    <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" aria-label="Discover feed">
+        <header class="flex flex-wrap gap-3 items-center justify-between px-4 py-3 border-b border-line">
+          <div class="inline-flex p-1 bg-panel-2 border border-line rounded-xl" role="tablist" aria-label="Feed form">
+            <button class="px-3 h-8 font-bold text-xs rounded-lg transition-colors" type="button" role="tab" :aria-selected="form() === 'short'" :class="form() === 'short' ? 'text-ink bg-white shadow-sm' : 'text-muted'" @click="setForm('short')">Short form</button>
+            <button class="px-3 h-8 font-bold text-xs rounded-lg transition-colors" type="button" role="tab" :aria-selected="form() === 'long'" :class="form() === 'long' ? 'text-ink bg-white shadow-sm' : 'text-muted'" @click="setForm('long')">Long form</button>
+          </div>
+          <span class="text-muted text-xs" :text="feedSummary()"></span>
+        </header>
+
+        <div class="grid gap-3 place-items-center px-6 py-20 text-center" x-show="loading()">
+          <span class="h-7 w-7 text-muted animate-spin i-hugeicons-loading-03" aria-hidden="true"></span>
+          <p class="m-0 text-muted text-sm">Loading Discover…</p>
+        </div>
+
+        <div class="grid gap-3 place-items-center px-6 py-20 text-center" x-show="showEmpty()">
+          <span class="grid place-items-center h-14 w-14 text-2xl text-blue-700 bg-blue-50 rounded-2xl i-hugeicons-compass" aria-hidden="true"></span>
+          <div>
+            <h2 class="m-0 font-bold text-base text-ink" :text="form() === 'long' ? 'No essays yet' : 'No posts yet'"></h2>
+            <p class="m-0 mt-1 max-w-md text-muted text-sm" :text="form() === 'long' ? 'Long-form entries appear here when a listed publication publishes to its blog.' : 'Short-form entries appear here when a listed publication posts to Postline from the composer.'"></p>
+          </div>
+        </div>
+
+        <div class="divide-line divide-y" x-show="!loading() && entries().length">
+          <article class="grid gap-3 p-4 hover:bg-panel-2/45 transition-colors" x-for="entry in entries()" :data-entry-id="entry.id" :class="entry.isNew ? 'bg-emerald-50/40' : ''">
+            <div class="flex flex-wrap gap-x-2 gap-y-1 items-center">
+              <span class="grid place-items-center shrink-0 h-8 w-8 font-bold text-[11px] text-white bg-zinc-900 rounded-xl" :text="publicationInitial(entry)"></span>
+              <strong class="text-[13px] text-ink" :text="entry.publication?.name || 'Unknown publication'"></strong>
+              <span class="text-muted text-xs" x-show="entry.publication?.authorName" :text="entry.publication?.authorName"></span>
+              <span class="text-muted text-xs">·</span>
+              <time class="text-muted text-xs" :datetime="entry.publishedAt" :text="relativeTime(entry.publishedAt)"></time>
+              <span class="px-2 py-0.5 font-bold text-[10px] text-emerald-700 bg-emerald-50 rounded-full" x-show="entry.isNew">New</span>
+            </div>
+
+            <div class="grid gap-1.5">
+              <h3 class="m-0 font-semibold text-base text-ink" x-show="entry.title" :text="entry.title"></h3>
+              <p class="m-0 leading-5 text-[13px] text-body whitespace-pre-line" :text="entry.excerpt"></p>
+            </div>
+
+            <div class="flex flex-wrap gap-3 items-center text-[11px] text-muted">
+              <span :text="`${entry.readCount} read${entry.readCount === 1 ? '' : 's'}`"></span>
+              <span x-show="entry.conversionCount > 0" :text="`${entry.conversionCount} subscribed`"></span>
+              <a class="inline-flex gap-1 items-center font-bold text-accent hover:underline" x-show="entry.url" :href="entry.url" @click="markRead(entry.id)">
+                Read it
+                <span class="h-3.5 w-3.5 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+              </a>
+            </div>
+          </article>
+        </div>
+
+        <p class="m-0 px-4 py-3 text-red-700 text-sm bg-red-50 border-red-100 border-t" x-show="errorMessage()" :text="errorMessage()"></p>
+      </section>
+
+      <aside class="grid content-start gap-4" aria-label="Publications">
+        <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm">
+          <header class="px-4 py-3 border-b border-line">
+            <h2 class="m-0 font-bold text-ink text-sm">Listed publications</h2>
+            <p class="m-0 mt-1 text-muted text-xs">Ranked by subscribers and recommendations.</p>
+          </header>
+          <div class="divide-line divide-y" x-show="publicationList().length">
+            <div class="grid gap-1 p-3" x-for="item in publicationList()">
+              <div class="flex gap-2 items-center justify-between">
+                <strong class="text-[13px] text-ink truncate" :text="item.name"></strong>
+                <span class="shrink-0 font-mono text-[10px] text-muted" :text="`${item.subscriberCount}`"></span>
+              </div>
+              <span class="line-clamp-2 text-muted text-xs" :text="item.tagline || 'No tagline yet'"></span>
+              <span class="text-[10px] text-muted" x-show="item.recommendedBy > 0" :text="`Recommended by ${item.recommendedBy}`"></span>
+            </div>
+          </div>
+          <p class="m-0 px-4 py-6 text-center text-muted text-xs" x-show="!publicationList().length">No publications are listed yet.</p>
+        </section>
+      </aside>
+    </div>
+  </section>
+
+  <script client>
+    interface DiscoverEntry {
+      id: number
+      form: string
+      title?: string | null
+      excerpt: string
+      url?: string | null
+      publishedAt: string
+      readCount: number
+      conversionCount: number
+      isNew?: boolean
+      publication?: { name: string, slug: string, authorName?: string | null, subscriberCount: number } | null
+    }
+
+    const shortEntries = state([])
+    const longEntries = state([])
+    const publicationList = state([])
+    const publicationListed = state(false)
+    const form = state('short')
+    const loading = state(true)
+    const listing = state(false)
+    const live = state(false)
+    const errorMessage = state('')
+    let socket: WebSocket | null = null
+    let reconnectTimer = 0
+
+    const entries = derived(() => form() === 'long' ? longEntries() : shortEntries())
+    const showEmpty = derived(() => !loading() && !errorMessage() && entries().length === 0)
+    const feedSummary = derived(() => {
+      const count = entries().length
+      return `${count} ${form() === 'long' ? 'essay' : 'post'}${count === 1 ? '' : 's'}`
+    })
+
+    const publicationInitial = (entry: DiscoverEntry): string => (entry.publication?.name || '?').slice(0, 1).toUpperCase()
+    const relativeTime = (value: string | null | undefined): string => {
+      const date = new Date(String(value || '').replace(' ', 'T') + (String(value || '').includes('Z') ? '' : 'Z'))
+      if (Number.isNaN(date.getTime())) return ''
+      const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000))
+      if (seconds < 60) return 'just now'
+      if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+      if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    }
+
+    const requestJson = async (url: string, options: RequestInit = {}) => {
+      const response = await fetch(url, options)
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Discover request failed.')
+      return payload
+    }
+
+    const loadFeeds = async ({ quiet = false } = {}) => {
+      if (!quiet) loading.set(true)
+      errorMessage.set('')
+      try {
+        const payload = await requestJson('/api/postline/discover')
+        shortEntries.set(payload.data?.short || [])
+        longEntries.set(payload.data?.long || [])
+        publicationList.set(payload.data?.publications || [])
+        publicationListed.set(Boolean(payload.data?.publication?.listed))
+      }
+      catch (error) {
+        errorMessage.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        loading.set(false)
+      }
+    }
+
+    const setForm = (next: string) => form.set(next === 'long' ? 'long' : 'short')
+
+    const markRead = async (entryId: number) => {
+      try {
+        await requestJson('/api/postline/discover/read', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ entry_id: entryId }),
+        })
+      }
+      catch {
+        // A missed read count is not worth interrupting the reader for.
+      }
+    }
+
+    const listPublication = async () => {
+      listing.set(true)
+      try {
+        await requestJson('/api/postline/publication', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ listed: true }),
+        })
+        publicationListed.set(true)
+        await loadFeeds({ quiet: true })
+        postlineToast?.show?.({ title: 'Publication listed', message: 'Your posts now appear in Discover.', tone: 'success', id: 'discover-list' })
+      }
+      catch (error) {
+        postlineToast?.show?.({ title: 'Could not list your publication', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'discover-list' })
+      }
+      finally {
+        listing.set(false)
+      }
+    }
+
+    /**
+     * Apply one broadcast event without refetching the feed.
+     *
+     * The event carries the whole entry, so a new post can be prepended in
+     * place. Falling back to a refetch would put every connected reader on the
+     * server at the same instant, which is exactly what the broadcast exists
+     * to avoid.
+     */
+    const applyEvent = (event: string, entry: DiscoverEntry) => {
+      if (!entry?.id) return
+      const target = entry.form === 'long' ? longEntries : shortEntries
+      const without = target().filter(item => item.id !== entry.id)
+
+      if (event === 'EntryRemoved') {
+        target.set(without)
+        return
+      }
+
+      target.set([{ ...entry, isNew: event === 'EntryPublished' }, ...without])
+    }
+
+    /**
+     * Subscribe to the Discover channels.
+     *
+     * Speaks the ts-broadcasting wire protocol directly rather than importing
+     * its client, because this page ships as one stx bundle and the two
+     * channels it needs are a subscribe frame each. `live()` drives the
+     * indicator, so a reader can tell the difference between a quiet feed and
+     * a dropped connection.
+     */
+    const connect = () => {
+      const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws'
+      const url = `${scheme}://${window.location.hostname}:6001`
+
+      try {
+        socket = new WebSocket(url)
+      }
+      catch {
+        live.set(false)
+        return
+      }
+
+      socket.addEventListener('open', () => {
+        live.set(true)
+        for (const channel of ['discover.short', 'discover.long'])
+          socket?.send(JSON.stringify({ event: 'subscribe', data: { channel } }))
+      })
+
+      socket.addEventListener('message', (message) => {
+        try {
+          const frame = JSON.parse(String(message.data))
+          const name = String(frame.event || '')
+          if (!name.startsWith('Entry')) return
+          const data = typeof frame.data === 'string' ? JSON.parse(frame.data) : frame.data
+          applyEvent(name, data)
+        }
+        catch {
+          // A frame we cannot parse is a frame for somebody else.
+        }
+      })
+
+      socket.addEventListener('close', () => {
+        live.set(false)
+        // Reconnect on a fixed delay. The feed is still readable while
+        // disconnected, so this never needs to be aggressive.
+        reconnectTimer = window.setTimeout(connect, 5000)
+      })
+
+      socket.addEventListener('error', () => live.set(false))
+    }
+
+    onMount(() => {
+      void loadFeeds()
+      connect()
+    })
+
+    onUnmounted(() => {
+      window.clearTimeout(reconnectTimer)
+      socket?.close()
+    })
+  </script>
+@endsection

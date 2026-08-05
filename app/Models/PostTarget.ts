@@ -27,7 +27,10 @@ export default defineModel({
     provider: {
       required: true,
       fillable: true,
-      validation: { rule: schema.enum(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin', 'threads', 'blog']).required() },
+      // Mirrors `SocialProvider` in app/Support/Social/types.ts. The generated
+      // CHECK constraint comes from this list, so a provider added to the union
+      // without being added here fails at insert rather than at compile time.
+      validation: { rule: schema.enum(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin', 'threads', 'blog', 'postline']).required() },
       factory: faker => faker.helpers.arrayElement(['bluesky', 'twitter', 'mastodon']),
     },
     status: {
