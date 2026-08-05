@@ -1,9 +1,9 @@
 @extends('layouts/marketing')
 
-@section('title', 'Release notes that travel - Postline')
-@section('description', 'Announce releases across networks from a tool you can read, fork and audit before it touches your accounts.')
-@section('canonical', 'https://postline.stacksjs.com/use-cases/open-source-maintainers')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-open-source-maintainers.png')
+@section('title', 'Keep the whole subscription - Postline')
+@section('description', 'Run a paid publication where the platform fee is zero, because there is no platform between you and your readers.')
+@section('canonical', 'https://postline.stacksjs.com/use-cases/paid-newsletters')
+@section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-paid-newsletters.png')
 
 @section('content')
   <article class="mx-auto px-6 max-w-[1400px]">
@@ -15,8 +15,8 @@
         <span aria-hidden="true">/</span>
         <span class="text-body">Use cases</span>
       </nav>
-      <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">Release notes that travel</h1>
-      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">Giving a closed service permission to post as you is a bigger ask than it looks. Postline is MIT licensed and runs on your own machine, so you can read exactly what it does before it gets that permission.</p>
+      <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">Keep the whole subscription</h1>
+      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">A ten percent platform fee on a paid newsletter is a rent you pay forever on a relationship you built. Running the software yourself removes the fee and the intermediary at the same time.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <a class="inline-flex items-center px-5 h-11 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl transition-colors" href="/login" data-stx-link>Get started</a>
         <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">Read the source</a>
@@ -28,12 +28,16 @@
     <section class="grid gap-10 lg:gap-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] py-14 border-line border-t">
       <div class="grid gap-10">
         <div class="grid gap-3 max-w-[62ch]">
-          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Announce a release once</h2>
-          <p class="m-0 leading-relaxed text-body">Version announcements go to every network in one action, so shipping a release does not turn into a marketing chore.</p>
+          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">The maths changes immediately</h2>
+          <p class="m-0 leading-relaxed text-body">Readers pay into your Stripe account and you keep everything Stripe does not charge you for. On a list of any real size that difference is the cost of running the thing several times over.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
-          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Software you can inspect</h2>
-          <p class="m-0 leading-relaxed text-body">The whole codebase is readable and MIT licensed. If it does not do what you need, the fix is a pull request rather than a support ticket.</p>
+          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Move without asking permission</h2>
+          <p class="m-0 leading-relaxed text-body">Import brings posts, free subscribers and active paid plans across together, keeping renewal dates intact so nobody is asked to enter a card again.</p>
+        </div>
+        <div class="grid gap-3 max-w-[62ch]">
+          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Paywall the pieces worth paying for</h2>
+          <p class="m-0 leading-relaxed text-body">Free posts do the reaching, paid posts do the earning, and each one is a per-post decision rather than a plan you commit to up front.</p>
         </div>
       </div>
 
@@ -41,15 +45,15 @@
         <ul class="m-0 p-0 list-none border-line border-t divide-line divide-y">
           <li class="flex gap-3 items-start py-4">
             <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">MIT licensed, auditable end to end</span>
+            <span class="text-[15px] text-body">No percentage taken by anyone but Stripe</span>
           </li>
           <li class="flex gap-3 items-start py-4">
             <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">Runs on your machine, no account to create</span>
+            <span class="text-[15px] text-body">Import paid subscriptions without resubscribes</span>
           </li>
           <li class="flex gap-3 items-start py-4">
             <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">No vendor holding publish rights</span>
+            <span class="text-[15px] text-body">Per-post paywall with a readable preview</span>
           </li>
         </ul>
       </aside>
@@ -69,19 +73,19 @@
           </a>
         </li>
         <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/paid-newsletters" data-stx-link>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/founders" data-stx-link>
             <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Paid newsletters</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Run a paid publication where the platform fee is zero, because there is no platform between you and your readers.</span>
+              <span class="font-semibold text-[15px] text-ink">Founders</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Post launches, changelogs and build notes to every network without doing it six times.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>
         </li>
         <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/founders" data-stx-link>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/developer-advocates" data-stx-link>
             <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Founders</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Post launches, changelogs and build notes to every network without doing it six times.</span>
+              <span class="font-semibold text-[15px] text-ink">Developer advocates</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Developers are split across Bluesky, X and Mastodon. Reach all of them without choosing a favourite.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>

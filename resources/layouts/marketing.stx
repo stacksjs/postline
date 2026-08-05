@@ -12,8 +12,8 @@
 
 @head
   <meta name="color-scheme" content="light">
-  <title>@yield('title', 'Postline: open source social crossposting')</title>
-  <meta name="description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, runs on your machine, nobody else holds your tokens.')">
+  <title>@yield('title', 'Postline: publish, send and own your audience')</title>
+  <meta name="description" content="@yield('description', 'Your publication, your newsletter and your paid subscribers, on software you own. Crossposts to every network. Open source, and nobody takes a cut.')">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/images/postline-icon-180.png">
   <link rel="canonical" href="@yield('canonical', 'https://postline.stacksjs.com/')">
@@ -25,15 +25,15 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Postline">
   <meta property="og:url" content="@yield('canonical', 'https://postline.stacksjs.com/')">
-  <meta property="og:title" content="@yield('title', 'Postline: open source social crossposting')">
-  <meta property="og:description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, and nobody else holds your tokens.')">
+  <meta property="og:title" content="@yield('title', 'Postline: publish, send and own your audience')">
+  <meta property="og:description" content="@yield('description', 'Your publication, your newsletter and your paid subscribers, on software you own. Open source, and nobody takes a cut.')">
   <meta property="og:image" content="@yield('ogImage', 'https://postline.stacksjs.com/images/postline-og.png')">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Postline — one composer publishing to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon.">
+  <meta property="og:image:alt" content="Postline: one publish sends the post, emails your subscribers, and announces it on every network.">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="@yield('title', 'Postline: open source social crossposting')">
-  <meta name="twitter:description" content="@yield('description', 'Post once to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, and nobody else holds your tokens.')">
+  <meta name="twitter:title" content="@yield('title', 'Postline: publish, send and own your audience')">
+  <meta name="twitter:description" content="@yield('description', 'Your publication, your newsletter and your paid subscribers, on software you own. Open source, and nobody takes a cut.')">
   <meta name="twitter:image" content="@yield('ogImage', 'https://postline.stacksjs.com/images/postline-og.png')">
 
   <!-- Geist (display) + Geist Mono (labels/code) -->

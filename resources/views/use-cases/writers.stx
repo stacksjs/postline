@@ -1,7 +1,7 @@
 @extends('layouts/marketing')
 
-@section('title', 'Promote the piece once - Postline')
-@section('description', 'Push each essay or newsletter issue to every network, with a link card that renders properly.')
+@section('title', 'A publication you are not renting - Postline')
+@section('description', 'Publish essays to your own site, email them to your list, and promote each one across every network in one pass.')
 @section('canonical', 'https://postline.stacksjs.com/use-cases/writers')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-writers.png')
 
@@ -15,8 +15,8 @@
         <span aria-hidden="true">/</span>
         <span class="text-body">Use cases</span>
       </nav>
-      <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">Promote the piece once</h1>
-      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">Writing the piece is the work. Announcing it on five networks afterwards is not, and it is the part that quietly gets skipped when a deadline is close.</p>
+      <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">A publication you are not renting</h1>
+      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">Writing independently means the publication, the mailing list and the promotion are all your problem. Splitting them across three products means every piece is published three times, by hand, badly.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <a class="inline-flex items-center px-5 h-11 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl transition-colors" href="/login" data-stx-link>Get started</a>
         <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">Read the source</a>
@@ -28,12 +28,16 @@
     <section class="grid gap-10 lg:gap-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] py-14 border-line border-t">
       <div class="grid gap-10">
         <div class="grid gap-3 max-w-[62ch]">
-          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Link cards that render</h2>
-          <p class="m-0 leading-relaxed text-body">A link is unfurled into a proper preview card where the network supports it, so the post looks intentional rather than like a bare URL.</p>
+          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">One piece, one publish</h2>
+          <p class="m-0 leading-relaxed text-body">The essay goes live on your domain, lands in your subscribers' inboxes and gets announced on every network you post to. That is one action, not an afternoon.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
-          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Queue the whole sequence</h2>
-          <p class="m-0 leading-relaxed text-body">The announcement, the follow-up quote, and the reminder later in the week all go into the queue when the piece ships, not one at a time afterwards.</p>
+          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">The list is yours to leave with</h2>
+          <p class="m-0 leading-relaxed text-body">Subscribers and paid plans sit in your own database and your own Stripe account. Changing tools later does not cost you a single reader.</p>
+        </div>
+        <div class="grid gap-3 max-w-[62ch]">
+          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Found by people who already read</h2>
+          <p class="m-0 leading-relaxed text-body">Discover surfaces publications through the writers their readers already trust, so growth does not depend on being loud on one network.</p>
         </div>
       </div>
 
@@ -41,15 +45,15 @@
         <ul class="m-0 p-0 list-none border-line border-t divide-line divide-y">
           <li class="flex gap-3 items-start py-4">
             <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">Proper link preview cards</span>
+            <span class="text-[15px] text-body">Site, newsletter and social from one draft</span>
           </li>
           <li class="flex gap-3 items-start py-4">
             <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">Queue a full promotion sequence at once</span>
+            <span class="text-[15px] text-body">Subscribers and billing you own outright</span>
           </li>
           <li class="flex gap-3 items-start py-4">
             <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">Per-network wording without extra drafts</span>
+            <span class="text-[15px] text-body">Recommendations from writers your readers follow</span>
           </li>
         </ul>
       </aside>
@@ -59,6 +63,15 @@
     <section class="py-14 border-line border-t">
       <h2 class="m-0 font-semibold text-ink text-xl tracking-tight">More use cases</h2>
       <ul class="grid gap-0 m-0 mt-6 p-0 list-none divide-line divide-y">
+        <li>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/paid-newsletters" data-stx-link>
+            <span class="grid gap-1">
+              <span class="font-semibold text-[15px] text-ink">Paid newsletters</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Run a paid publication where the platform fee is zero, because there is no platform between you and your readers.</span>
+            </span>
+            <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+          </a>
+        </li>
         <li>
           <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/founders" data-stx-link>
             <span class="grid gap-1">
@@ -73,15 +86,6 @@
             <span class="grid gap-1">
               <span class="font-semibold text-[15px] text-ink">Developer advocates</span>
               <span class="max-w-[60ch] text-[13px] text-muted">Developers are split across Bluesky, X and Mastodon. Reach all of them without choosing a favourite.</span>
-            </span>
-            <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
-          </a>
-        </li>
-        <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/open-source-maintainers" data-stx-link>
-            <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Maintainers</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Announce releases across networks from a tool you can read, fork and audit before it touches your accounts.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>

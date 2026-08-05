@@ -77,20 +77,20 @@ const cards: Card[] = [
   {
     file: 'home',
     eyebrow: 'Open source',
-    title: 'Post once. Everywhere.',
-    subtitle: fit('One composer for Bluesky, X, LinkedIn and Mastodon.'),
+    title: 'Publish it. Send it. Own it.',
+    subtitle: fit('Your publication, your newsletter, your paid subscribers.'),
   },
   {
     file: 'feature-index',
     eyebrow: 'Features',
     title: 'Everything Postline does',
-    subtitle: fit('Crossposting, scheduling, variants, analytics, bulk delete.'),
+    subtitle: fit('Publications, newsletter, payments, discover, crossposting.'),
   },
   {
     file: 'use-case-index',
     eyebrow: 'Use cases',
     title: 'Who runs Postline',
-    subtitle: fit('Founders, advocates, maintainers, agencies and writers.'),
+    subtitle: fit('Writers, paid newsletters, founders, advocates, agencies.'),
   },
   ...ALL_ENTRIES.map(entry => ({
     file: `${entry.kind}-${entry.slug}`,

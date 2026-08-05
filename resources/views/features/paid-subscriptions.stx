@@ -1,9 +1,9 @@
 @extends('layouts/marketing')
 
-@section('title', 'Nobody holds your list - Postline')
-@section('description', 'Your posts, your subscribers, your revenue and your access tokens all live in a database you run. There is no vendor in the middle.')
-@section('canonical', 'https://postline.stacksjs.com/features/own-your-keys')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/feature-own-your-keys.png')
+@section('title', 'Charge for it, keep all of it - Postline')
+@section('description', 'Turn on paid tiers, mark posts subscriber-only, and take payment straight into your own Stripe account.')
+@section('canonical', 'https://postline.stacksjs.com/features/paid-subscriptions')
+@section('ogImage', 'https://postline.stacksjs.com/images/og/feature-paid-subscriptions.png')
 
 @section('content')
   <article class="mx-auto px-6 max-w-[1400px]">
@@ -15,8 +15,8 @@
         <span aria-hidden="true">/</span>
         <span class="text-body">Features</span>
       </nav>
-      <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">Nobody holds your list</h1>
-      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">Every hosted publishing service holds the two things that matter: the relationship with your readers and permission to post as you. Postline is the same software with both of those in a database you control.</p>
+      <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">Charge for it, keep all of it</h1>
+      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">Postline takes no percentage, because there is no Postline in the middle to take one. Readers pay into your Stripe account, and the subscriber list that comes with them sits in your database rather than on somebody else's dashboard.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <a class="inline-flex items-center px-5 h-11 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl transition-colors" href="/login" data-stx-link>Get started</a>
         <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">Read the source</a>
@@ -28,16 +28,16 @@
     <section class="grid gap-10 lg:gap-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] py-14 border-line border-t">
       <div class="grid gap-10">
         <div class="grid gap-3 max-w-[62ch]">
-          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">The audience is not rented</h2>
-          <p class="m-0 leading-relaxed text-body">Subscribers, payments and posts are rows you can query, back up and export. A platform cannot change its terms on a list it does not have.</p>
+          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">No platform cut</h2>
+          <p class="m-0 leading-relaxed text-body">Your Stripe keys, your payouts, your customers. The only fee is the one Stripe charges you directly, which is the same fee you would pay running checkout yourself.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
-          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Tokens stay where you put them</h2>
-          <p class="m-0 leading-relaxed text-body">OAuth tokens and app passwords are encrypted with a key your instance generates. Nobody else has a copy, because there is nobody else.</p>
+          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Free and paid in one publication</h2>
+          <p class="m-0 leading-relaxed text-body">Any post can be free, paid, or free for a while and paid afterwards. Readers see a preview and a subscribe prompt rather than a dead end.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
-          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Run it wherever suits you</h2>
-          <p class="m-0 leading-relaxed text-body">It is one Bun process and a SQLite file. That runs on a laptop, and it runs on a small server if you want the queue publishing while the laptop is shut.</p>
+          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Leaving costs you nothing</h2>
+          <p class="m-0 leading-relaxed text-body">Subscriptions live in your Stripe account, so moving away from Postline does not cancel a single one of them. There is no billing relationship to renegotiate.</p>
         </div>
       </div>
 
@@ -45,15 +45,15 @@
         <ul class="m-0 p-0 list-none border-line border-t divide-line divide-y">
           <li class="flex gap-3 items-start py-4">
             <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">Subscribers and revenue in your own database</span>
+            <span class="text-[15px] text-body">Monthly, annual and founding tiers</span>
           </li>
           <li class="flex gap-3 items-start py-4">
             <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">Tokens encrypted with a key only you hold</span>
+            <span class="text-[15px] text-body">Per-post paywall with a readable preview</span>
           </li>
           <li class="flex gap-3 items-start py-4">
             <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">MIT licensed, so you can read every line</span>
+            <span class="text-[15px] text-body">Payouts and customers stay in your Stripe</span>
           </li>
         </ul>
       </aside>
@@ -82,10 +82,10 @@
           </a>
         </li>
         <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/features/paid-subscriptions" data-stx-link>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/features/discover" data-stx-link>
             <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Paid subscriptions</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Turn on paid tiers, mark posts subscriber-only, and take payment straight into your own Stripe account.</span>
+              <span class="font-semibold text-[15px] text-ink">Discover</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Publications on the Postline network recommend each other, so new readers arrive through someone they already trust.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>

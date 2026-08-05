@@ -1,7 +1,7 @@
 @extends('layouts/marketing')
 
 @section('title', 'One composer, six networks - Postline')
-@section('description', 'Write once and publish to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon in a single pass.')
+@section('description', 'Announce what you publish everywhere at once, or post to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon on their own.')
 @section('canonical', 'https://postline.stacksjs.com/features/crossposting')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/feature-crossposting.png')
 
@@ -16,7 +16,7 @@
         <span class="text-body">Features</span>
       </nav>
       <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">One composer, six networks</h1>
-      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">Every network wants the same post in a slightly different shape. Postline takes one draft, adapts it per network, and publishes to all of them from a single action.</p>
+      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">A publication needs somewhere to send people from. Postline takes one draft, adapts it per network, and publishes to all of them in a single action, whether it is announcing an essay or just a post.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <a class="inline-flex items-center px-5 h-11 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl transition-colors" href="/login" data-stx-link>Get started</a>
         <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">Read the source</a>
@@ -60,28 +60,28 @@
       <h2 class="m-0 font-semibold text-ink text-xl tracking-tight">More features</h2>
       <ul class="grid gap-0 m-0 mt-6 p-0 list-none divide-line divide-y">
         <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/features/scheduling" data-stx-link>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/features/publications" data-stx-link>
             <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Scheduling</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Schedule posts ahead in your own timezone and let the queue publish them, or send immediately.</span>
+              <span class="font-semibold text-[15px] text-ink">Publications</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Write long-form posts to a publication you own, at your own domain, with nothing sitting between you and the page.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>
         </li>
         <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/features/per-network-variants" data-stx-link>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/features/newsletter" data-stx-link>
             <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Per-network variants</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Override the text for any single network without maintaining six separate drafts of the same post.</span>
+              <span class="font-semibold text-[15px] text-ink">Newsletter</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Publishing a post emails it to your subscribers. The web page and the send are one action, not two tools.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>
         </li>
         <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/features/analytics" data-stx-link>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/features/paid-subscriptions" data-stx-link>
             <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Analytics</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Pull likes, reposts and replies back from the networks that report them, against the posts you published.</span>
+              <span class="font-semibold text-[15px] text-ink">Paid subscriptions</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Turn on paid tiers, mark posts subscriber-only, and take payment straight into your own Stripe account.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>

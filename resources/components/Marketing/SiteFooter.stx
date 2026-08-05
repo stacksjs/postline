@@ -19,7 +19,7 @@ const year = new Date().getFullYear()
           Postline
         </a>
         <p class="m-0 mt-4 leading-relaxed text-[13px] text-muted">
-          Open source crossposting for Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Runs on your machine, with your tokens.
+          Open source publishing: your site, your newsletter, your paid subscribers, and a crosspost to every network. Runs on your machine, with your keys.
         </p>
       </div>
 

@@ -60,28 +60,28 @@
       <h2 class="m-0 font-semibold text-ink text-xl tracking-tight">More use cases</h2>
       <ul class="grid gap-0 m-0 mt-6 p-0 list-none divide-line divide-y">
         <li>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/writers" data-stx-link>
+            <span class="grid gap-1">
+              <span class="font-semibold text-[15px] text-ink">Writers</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Publish essays to your own site, email them to your list, and promote each one across every network in one pass.</span>
+            </span>
+            <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+          </a>
+        </li>
+        <li>
+          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/paid-newsletters" data-stx-link>
+            <span class="grid gap-1">
+              <span class="font-semibold text-[15px] text-ink">Paid newsletters</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Run a paid publication where the platform fee is zero, because there is no platform between you and your readers.</span>
+            </span>
+            <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+          </a>
+        </li>
+        <li>
           <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/developer-advocates" data-stx-link>
             <span class="grid gap-1">
               <span class="font-semibold text-[15px] text-ink">Developer advocates</span>
               <span class="max-w-[60ch] text-[13px] text-muted">Developers are split across Bluesky, X and Mastodon. Reach all of them without choosing a favourite.</span>
-            </span>
-            <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
-          </a>
-        </li>
-        <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/open-source-maintainers" data-stx-link>
-            <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Maintainers</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Announce releases across networks from a tool you can read, fork and audit before it touches your accounts.</span>
-            </span>
-            <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
-          </a>
-        </li>
-        <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/agencies" data-stx-link>
-            <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Agencies</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Manage posting for a handful of client accounts without a per-seat subscription or a vendor holding their tokens.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>
