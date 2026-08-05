@@ -1,5 +1,6 @@
 import type { DmMessageCandidate } from '../../app/Support/Social/direct-messages'
 import { describe, expect, test } from 'bun:test'
+import { describeGraphError } from '../../app/Services/Social/DirectMessages/instagram'
 import { canonicalAcct } from '../../app/Services/Social/DirectMessages/mastodon'
 import { groupIntoConversations } from '../../app/Services/Social/DirectMessages/twitter'
 import { DM_PROVIDERS, DM_UNAVAILABLE, isDmProvider } from '../../app/Support/Social/direct-messages'
@@ -21,9 +22,10 @@ function event(overrides: Partial<DmMessageCandidate>): DmMessageCandidate {
 
 describe('dm provider registry', () => {
   test('only the networks with a working DM API are listed', () => {
-    expect([...DM_PROVIDERS]).toEqual(['bluesky', 'twitter', 'mastodon'])
+    expect([...DM_PROVIDERS]).toEqual(['bluesky', 'twitter', 'mastodon', 'instagram'])
     expect(isDmProvider('bluesky')).toBe(true)
-    expect(isDmProvider('instagram')).toBe(false)
+    expect(isDmProvider('instagram')).toBe(true)
+    expect(isDmProvider('threads')).toBe(false)
     expect(isDmProvider(undefined)).toBe(false)
   })
 
@@ -84,6 +86,32 @@ describe('mastodon account matching', () => {
 
   test('a blank account never matches anything', () => {
     expect(canonicalAcct('', 'https://mastodon.social')).toBe('')
+  })
+})
+
+describe('instagram graph errors', () => {
+  test('the 24-hour rule is explained rather than surfaced as a code', () => {
+    const outsideWindow = describeGraphError({ error: { code: 10, error_subcode: 2534022, message: 'This message is sent outside of allowed window.' } }, 400)
+    expect(outsideWindow).toContain('24 hours')
+    // Meta sends subcode 2534022 under more than one code, so the subcode
+    // alone has to be enough to recognise it.
+    expect(describeGraphError({ error: { error_subcode: 2534022 } }, 400)).toContain('24 hours')
+  })
+
+  test('a dead token and a missing permission give different instructions', () => {
+    expect(describeGraphError({ error: { code: 190 } }, 400)).toContain('Reconnect')
+    expect(describeGraphError({ error: { code: 200 } }, 403)).toContain('instagram_manage_messages')
+  })
+
+  test('rate limiting says to wait, not to reconnect', () => {
+    const message = describeGraphError({ error: { code: 4 } }, 400)
+    expect(message).toContain('rate limit')
+    expect(message).not.toContain('Reconnect')
+  })
+
+  test('an unrecognised error keeps whatever Meta said', () => {
+    expect(describeGraphError({ error: { code: 999, message: 'Something specific broke.' } }, 500)).toBe('Something specific broke.')
+    expect(describeGraphError({}, 500)).toBe('Instagram returned HTTP 500.')
   })
 })
 

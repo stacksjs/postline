@@ -16,7 +16,7 @@
 import type { SocialProvider } from './types'
 
 /** Networks Postline can currently read and answer DMs on. */
-export const DM_PROVIDERS = ['bluesky', 'twitter', 'mastodon'] as const
+export const DM_PROVIDERS = ['bluesky', 'twitter', 'mastodon', 'instagram'] as const
 
 export type DmProvider = typeof DM_PROVIDERS[number]
 
@@ -27,7 +27,6 @@ export type DmProvider = typeof DM_PROVIDERS[number]
  * limitation with a cause, rather than as something Postline forgot.
  */
 export const DM_UNAVAILABLE: Partial<Record<SocialProvider, string>> = {
-  instagram: 'Instagram DMs need a Professional account with the instagram_manage_messages permission, which Postline does not request yet.',
   threads: 'Threads has no public messaging API — its inbox is app-only.',
   linkedin: 'LinkedIn messaging is limited to partner-approved apps.',
   facebook: 'Facebook Page messaging needs the pages_messaging permission, which Postline does not request yet.',

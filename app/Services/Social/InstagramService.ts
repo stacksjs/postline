@@ -62,7 +62,18 @@ export class InstagramService {
       accessToken: String(env.INSTAGRAM_ACCESS_TOKEN || '').trim(),
       userId: String(env.INSTAGRAM_USER_ID || '').trim(),
       username: String(env.INSTAGRAM_USERNAME || '').trim(),
-      scopes: ['instagram_basic', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement'],
+      // `instagram_manage_messages` and `pages_messaging` are what the DM inbox
+      // runs on. They are requested on every connect rather than behind a flag,
+      // because Meta only grants scopes at consent time — a connection made
+      // without them cannot gain them later without reconnecting.
+      scopes: [
+        'instagram_basic',
+        'instagram_content_publish',
+        'instagram_manage_messages',
+        'pages_show_list',
+        'pages_read_engagement',
+        'pages_messaging',
+      ],
     }
   }
 
@@ -250,6 +261,24 @@ export class InstagramService {
       }).where('id', '=', target.id).execute()
 
       return { provider: 'instagram', ok: false, error: message, targetId: Number(target.id) }
+    }
+  }
+
+  /**
+   * The credentials the DM transport needs. `igUserId` is both the node every
+   * messaging call is addressed to and the participant id that marks a message
+   * as ours, so it is required rather than optional here.
+   */
+  async dmIdentity(): Promise<{ accessToken: string, igUserId: string, handle: string, graphVersion: string }> {
+    const identity = await this.requireIdentity()
+    if (!identity.external_id)
+      throw new Error('Reconnect Instagram on the Accounts page — Postline needs your Instagram account id to read DMs.')
+
+    return {
+      accessToken: String(identity.access_token),
+      igUserId: String(identity.external_id),
+      handle: identity.handle,
+      graphVersion: this.config().graphVersion,
     }
   }
 

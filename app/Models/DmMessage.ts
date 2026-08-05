@@ -29,7 +29,7 @@ export default defineModel({
     provider: {
       required: true,
       fillable: true,
-      validation: { rule: schema.enum(['bluesky', 'twitter', 'mastodon']).required() },
+      validation: { rule: schema.enum(['bluesky', 'twitter', 'mastodon', 'instagram']).required() },
       factory: () => 'bluesky',
     },
     /**

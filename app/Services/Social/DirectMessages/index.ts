@@ -8,6 +8,7 @@
 
 import type { DmProvider, DmTransport } from '../../../Support/Social/direct-messages'
 import { BlueskyDmTransport } from './bluesky'
+import { InstagramDmTransport } from './instagram'
 import { MastodonDmTransport } from './mastodon'
 import { TwitterDmTransport } from './twitter'
 
@@ -15,6 +16,7 @@ const transports: Record<DmProvider, DmTransport> = {
   bluesky: new BlueskyDmTransport(),
   twitter: new TwitterDmTransport(),
   mastodon: new MastodonDmTransport(),
+  instagram: new InstagramDmTransport(),
 }
 
 export function getDmTransport(provider: DmProvider): DmTransport {

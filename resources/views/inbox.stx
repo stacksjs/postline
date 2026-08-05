@@ -1,7 +1,7 @@
 @extends('layouts/postline')
 
 @section('title', 'Postline - Inbox')
-@section('description', 'Read and answer direct messages from every connected social network in one place.')
+@section('description', 'Read and answer direct messages from Bluesky, X, Mastodon, and Instagram in one place.')
 
 @section('content')
   <section class="grid gap-4" data-postline-page="inbox" data-testid="inbox-page">
@@ -9,7 +9,7 @@
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Direct Messages</p>
         <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Answer everyone from one inbox</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-muted">Read and reply to DMs from Bluesky, X, and Mastodon without switching apps.</p>
+        <p class="mb-0 mt-1.5 text-[13px] text-muted">Read and reply to DMs from Bluesky, X, Mastodon, and Instagram without switching apps.</p>
       </div>
       <div class="flex flex-wrap gap-2 items-center">
         <button class="inline-flex gap-2 items-center justify-center px-3 h-9 font-bold text-ink text-xs bg-panel hover:bg-white border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="unreadCount() === 0" @click="markAllRead">Mark all read</button>
@@ -58,7 +58,7 @@
             <span class="grid place-items-center h-12 w-12 text-blue-700 text-xl bg-blue-50 rounded-2xl i-hugeicons-message-01" aria-hidden="true"></span>
             <div>
               <h3 class="m-0 font-bold text-ink text-sm" :text="connectedCount() ? 'No conversations yet' : 'Connect a network first'"></h3>
-              <p class="m-0 mt-1 text-muted text-xs" :text="connectedCount() ? 'Run a sync to pull your latest DMs into Postline.' : 'Connect Bluesky, X, or Mastodon on Accounts to start reading DMs here.'"></p>
+              <p class="m-0 mt-1 text-muted text-xs" :text="connectedCount() ? 'Run a sync to pull your latest DMs into Postline.' : 'Connect Bluesky, X, Mastodon, or Instagram on Accounts to start reading DMs here.'"></p>
             </div>
           </div>
 
@@ -136,6 +136,7 @@
             <textarea class="px-3 py-2.5 min-h-20 text-ink text-sm bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40 resize-y" placeholder="Write a reply…" x-model="draftBody" :maxlength="String(characterLimit())" @keydown="maybeSend($event)"></textarea>
             <div class="flex flex-wrap gap-2 items-center justify-between">
               <span class="text-[11px] text-muted" :text="`${remaining()} characters left · ⌘↵ to send`"></span>
+              <span class="basis-full text-[11px] text-amber-700" x-show="replyWindowClosed()">Instagram only allows replies within 24 hours of their last message. This thread is past that, so a reply will be rejected until they write again.</span>
               <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="sending() || !draftBody().trim()">
                 <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
                 <span :text="sending() ? 'Sending…' : 'Send'">Send</span>
@@ -174,7 +175,7 @@
       sentAt: string
     }
 
-    const providerOptions = [{ id: 'bluesky', label: 'Bluesky' }, { id: 'twitter', label: 'X' }, { id: 'mastodon', label: 'Mastodon' }]
+    const providerOptions = [{ id: 'bluesky', label: 'Bluesky' }, { id: 'twitter', label: 'X' }, { id: 'mastodon', label: 'Mastodon' }, { id: 'instagram', label: 'Instagram' }]
 
     const conversations = state([])
     const messages = state([])
@@ -208,10 +209,25 @@
     })
     const characterLimit = derived(() => activeCharacterLimit())
     const remaining = derived(() => Math.max(0, characterLimit() - draftBody().length))
+    /**
+     * Instagram rejects replies more than 24 hours after the other person's
+     * last message. Warning before the send beats a failed send afterwards, so
+     * this reads the newest incoming message rather than the thread's activity
+     * — our own replies do not reopen the window.
+     */
+    const replyWindowClosed = derived(() => {
+      if (activeProvider() !== 'instagram') return false
+      const incoming = messages().filter(item => item.direction === 'incoming')
+      const latest = incoming[incoming.length - 1]
+      if (!latest) return false
+      const sentAt = new Date(String(latest.sentAt).replace(' ', 'T') + (String(latest.sentAt).includes('Z') ? '' : 'Z'))
+      if (Number.isNaN(sentAt.getTime())) return false
+      return Date.now() - sentAt.getTime() > 86_400_000
+    })
 
     const providerLabel = (provider: string): string => providerOptions.find(item => item.id === provider)?.label || provider
     const providerInitial = (provider: string): string => provider === 'twitter' ? 'X' : provider.slice(0, 1).toUpperCase()
-    const providerColor = (provider: string): string => provider === 'twitter' ? 'bg-zinc-900' : provider === 'mastodon' ? 'bg-indigo-600' : 'bg-blue-600'
+    const providerColor = (provider: string): string => provider === 'twitter' ? 'bg-zinc-900' : provider === 'mastodon' ? 'bg-indigo-600' : provider === 'instagram' ? 'bg-pink-600' : 'bg-blue-600'
     const previewFor = (conversation: InboxConversation): string => {
       const preview = conversation.lastMessagePreview || 'No messages yet'
       return conversation.lastMessageOutgoing ? `You: ${preview}` : preview
