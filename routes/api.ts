@@ -25,6 +25,12 @@ route.post('/register', 'Actions/Postline/RegisterFirstUserAction').skipCsrf().r
 // the action's per-IP throttle is the guard.
 route.post('/subscribe', 'Actions/SubscriberEmailAction').skipCsrf()
 
+// Stripe's webhook. Unauthenticated by necessity and deliberately not rate
+// limited: Stripe retries failed deliveries in bursts, and throttling those
+// would drop subscription events rather than delay them. The signature check
+// inside the action is the guard.
+route.post('/stripe/webhook', 'Actions/Postline/StripeWebhookAction').skipCsrf()
+
 route.get('/', () => response.text('hello world'))
 route.get('/v1/status', () => response.json({ version: 'v1', status: 'ok' }))
 route.get('/coming-soon', 'Controllers/ComingSoonController@index')
@@ -95,6 +101,18 @@ route.group({ prefix: '/postline' }, () => {
   route.get('/campaigns/ai/status', 'Actions/Postline/CampaignAIStatusAction').middleware('auth').skipCsrf()
   route.post('/campaigns/generate', 'Actions/Postline/CampaignGenerateAction').middleware('auth').skipCsrf().rateLimit(10, 'hour')
   route.post('/campaigns/activate', 'Actions/Postline/CampaignActivateAction').middleware('auth').skipCsrf().rateLimit(5, 'hour')
+  // Paid subscriptions. The three public routes are the reader-facing half:
+  // subscribing, confirming a double opt-in, and leaving. All three are rate
+  // limited per IP, since none of them can require a session.
+  route.post('/subscribe', 'Actions/Postline/SubscribeAction').skipCsrf().rateLimit(10, 'minute')
+  route.get('/subscribe/confirm', 'Actions/Postline/SubscriberConfirmAction').skipCsrf().rateLimit(30, 'minute')
+  route.get('/subscribe/unsubscribe', 'Actions/Postline/SubscriberUnsubscribeAction').skipCsrf().rateLimit(30, 'minute')
+  route.post('/checkout', 'Actions/Postline/CheckoutAction').skipCsrf().rateLimit(10, 'minute')
+  route.get('/tiers', 'Actions/Postline/TiersListAction').middleware('auth').skipCsrf()
+  route.post('/tiers', 'Actions/Postline/TierSaveAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
+  route.post('/tiers/archive', 'Actions/Postline/TierArchiveAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
+  route.get('/subscribers', 'Actions/Postline/SubscribersListAction').middleware('auth').skipCsrf()
+
   // Discover. The feed read is public: it is the one surface meant to be seen
   // by people who do not have an account here, and gating it would defeat the
   // point of an index. Everything that writes stays behind auth.
