@@ -112,6 +112,10 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/tiers', 'Actions/Postline/TierSaveAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
   route.post('/tiers/archive', 'Actions/Postline/TierArchiveAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
   route.get('/subscribers', 'Actions/Postline/SubscribersListAction').middleware('auth').skipCsrf()
+  // Import. Writes a lot of rows from one call, so it is throttled tightly.
+  route.post('/import/subscribers', 'Actions/Postline/ImportSubscribersAction').middleware('auth').skipCsrf().rateLimit(10, 'hour')
+  route.post('/import/posts', 'Actions/Postline/ImportPostsAction').middleware('auth').skipCsrf().rateLimit(10, 'hour')
+
   // Comments. Reading a thread and posting to it are public, because a reader
   // is not an account holder; posting is throttled hard, and an unknown
   // commenter is held for review rather than rejected.
