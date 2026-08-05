@@ -1,0 +1,302 @@
+@extends('layouts/postline')
+
+@section('title', 'Postline - Publication')
+@section('description', 'Your publication, readers, paid tiers, sends, comments and imports in one place.')
+
+@section('content')
+  <section class="grid gap-4" data-postline-page="publication" data-testid="publication-page">
+    <header class="flex flex-col gap-4 items-stretch justify-between md:flex-row md:items-center min-h-11">
+      <div>
+        <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Publication</p>
+        <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal" :text="publication()?.name || 'Your publication'">Your publication</h1>
+        <p class="mb-0 mt-1.5 text-[13px] text-muted">Readers, paid tiers, sends and the conversation, all in one database you own.</p>
+      </div>
+      <span class="inline-flex gap-2 items-center px-3 h-9 text-xs bg-panel border border-line rounded-xl" :class="publication()?.listed ? 'text-emerald-700' : 'text-muted'">
+        <span class="h-1.5 w-1.5 rounded-full" :class="publication()?.listed ? 'bg-emerald-500' : 'bg-zinc-300'" aria-hidden="true"></span>
+        <span :text="publication()?.listed ? 'Listed in Discover' : 'Unlisted'">Unlisted</span>
+      </span>
+    </header>
+
+    <div class="grid gap-3 sm:grid-cols-4">
+      <article class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Readers</span>
+        <strong class="block mt-1 text-ink text-xl" :text="String(stats().active || 0)">0</strong>
+      </article>
+      <article class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Paying</span>
+        <strong class="block mt-1 text-ink text-xl" :text="String(stats().paid || 0)">0</strong>
+      </article>
+      <article class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="block font-bold text-[10px] text-muted tracking-wider uppercase">MRR</span>
+        <strong class="block mt-1 text-ink text-xl" :text="money(stats().mrrCents || 0)">$0</strong>
+      </article>
+      <article class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Pending</span>
+        <strong class="block mt-1 text-ink text-xl" :text="String(stats().pending || 0)">0</strong>
+      </article>
+    </div>
+
+    <nav class="inline-flex overflow-x-auto p-1 bg-panel-2 border border-line rounded-xl" role="tablist" aria-label="Publication sections">
+      <button class="shrink-0 px-3 h-8 font-bold text-xs rounded-lg transition-colors" type="button" role="tab" x-for="item in tabs" :aria-selected="tab() === item.id" :class="tab() === item.id ? 'text-ink bg-white shadow-sm' : 'text-muted'" @click="tab.set(item.id)" :text="item.label"></button>
+    </nav>
+
+    <p class="m-0 px-4 py-3 text-red-700 text-sm bg-red-50 border border-red-100 rounded-xl" x-show="errorMessage()" :text="errorMessage()"></p>
+
+    <!-- Readers -->
+    <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" x-show="tab() === 'readers'" aria-label="Readers">
+      <header class="flex flex-wrap gap-3 items-center justify-between px-4 py-3 border-b border-line">
+        <h2 class="m-0 font-bold text-ink text-sm">Readers</h2>
+        <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-line rounded-lg" @change="setReaderFilter($event.target.value)">
+          <option value="">Everyone</option>
+          <option value="active">Active</option>
+          <option value="pending">Pending confirmation</option>
+          <option value="unsubscribed">Unsubscribed</option>
+        </select>
+      </header>
+      <p class="m-0 px-4 py-10 text-center text-muted text-sm" x-show="!readers().length">No readers yet.</p>
+      <div class="divide-line divide-y" x-show="readers().length">
+        <div class="flex flex-wrap gap-x-3 gap-y-1 items-center justify-between p-3" x-for="reader in readers()">
+          <div class="min-w-0">
+            <strong class="block text-[13px] text-ink truncate" :text="reader.email"></strong>
+            <span class="block text-muted text-xs" :text="reader.name || 'No name'"></span>
+          </div>
+          <div class="flex gap-2 items-center">
+            <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="reader.plan === 'paid' ? 'text-emerald-700 bg-emerald-50' : 'text-muted bg-panel-2'" :text="reader.plan"></span>
+            <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="reader.status === 'active' ? 'text-blue-700 bg-blue-50' : 'text-muted bg-panel-2'" :text="reader.status"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tiers -->
+    <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]" x-show="tab() === 'tiers'" aria-label="Paid tiers">
+      <div class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm">
+        <header class="px-4 py-3 border-b border-line">
+          <h2 class="m-0 font-bold text-ink text-sm">Paid tiers</h2>
+          <p class="m-0 mt-1 text-muted text-xs" :text="billingConfigured() ? 'Readers pay into your own Stripe account.' : 'Set STRIPE_SECRET_KEY to take payments.'"></p>
+        </header>
+        <p class="m-0 px-4 py-10 text-center text-muted text-sm" x-show="!tiers().length">No tiers yet.</p>
+        <div class="divide-line divide-y" x-show="tiers().length">
+          <div class="flex flex-wrap gap-3 items-center justify-between p-3" x-for="tier in tiers()">
+            <div class="min-w-0">
+              <strong class="block text-[13px] text-ink" :text="tier.name"></strong>
+              <span class="block text-muted text-xs" :text="`${money(tier.amountCents)} / ${tier.interval}`"></span>
+            </div>
+            <div class="flex gap-2 items-center">
+              <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="tier.ready ? 'text-emerald-700 bg-emerald-50' : 'text-amber-700 bg-amber-50'" :text="tier.ready ? 'live' : 'not in Stripe'"></span>
+              <button class="px-2.5 h-7 font-bold text-[11px] text-red-700 hover:bg-red-50 border border-red-200 rounded-lg" type="button" x-show="tier.active" @click="archiveTier(tier.id)">Archive</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form class="grid content-start gap-3 p-4 bg-panel border border-line rounded-2xl shadow-sm" @submit="saveTier($event)">
+        <h2 class="m-0 font-bold text-ink text-sm">New tier</h2>
+        <label class="grid gap-1.5"><span class="font-bold text-body text-xs">Name</span><input class="px-3 h-9 text-ink text-sm bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40" required maxlength="80" placeholder="Monthly" x-model="tierName"></label>
+        <label class="grid gap-1.5"><span class="font-bold text-body text-xs">Amount in cents</span><input class="px-3 h-9 text-ink text-sm bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40" type="number" min="100" required placeholder="700" x-model="tierAmount"><small class="text-[11px] text-muted">700 is 7.00. Minimum 100.</small></label>
+        <label class="grid gap-1.5"><span class="font-bold text-body text-xs">Billing period</span><select class="px-3 h-9 text-ink text-sm bg-bg border border-line outline-none rounded-xl" x-model="tierInterval"><option value="month">Monthly</option><option value="year">Annual</option></select></label>
+        <button class="inline-flex items-center justify-center h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50" type="submit" :disabled="saving() || !billingConfigured()" :text="saving() ? 'Creating…' : 'Create tier'">Create tier</button>
+      </form>
+    </section>
+
+    <!-- Sends -->
+    <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" x-show="tab() === 'sends'" aria-label="Newsletter sends">
+      <header class="px-4 py-3 border-b border-line">
+        <h2 class="m-0 font-bold text-ink text-sm">Sends</h2>
+        <p class="m-0 mt-1 text-muted text-xs" :text="mailConfigured() ? 'Publishing to your blog queues a send automatically.' : 'Configure a mail transport to deliver sends.'"></p>
+      </header>
+      <p class="m-0 px-4 py-10 text-center text-muted text-sm" x-show="!sends().length">Nothing sent yet.</p>
+      <div class="divide-line divide-y" x-show="sends().length">
+        <div class="grid gap-1.5 p-3" x-for="send in sends()">
+          <div class="flex flex-wrap gap-2 items-center justify-between">
+            <strong class="text-[13px] text-ink truncate" :text="send.subject"></strong>
+            <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="send.status === 'sent' ? 'text-emerald-700 bg-emerald-50' : send.status === 'failed' ? 'text-red-700 bg-red-50' : 'text-blue-700 bg-blue-50'" :text="send.status"></span>
+          </div>
+          <div class="flex flex-wrap gap-3 text-[11px] text-muted">
+            <span :text="`${send.deliveredCount} of ${send.recipientCount} delivered`"></span>
+            <span x-show="send.failedCount > 0" class="text-red-700" :text="`${send.failedCount} failed`"></span>
+            <span :text="send.audience === 'paid' ? 'paying readers' : 'everyone'"></span>
+          </div>
+          <span class="text-[11px] text-red-700" x-show="send.lastError" :text="send.lastError"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comments -->
+    <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" x-show="tab() === 'comments'" aria-label="Comment moderation">
+      <header class="px-4 py-3 border-b border-line">
+        <h2 class="m-0 font-bold text-ink text-sm">Held for review</h2>
+        <p class="m-0 mt-1 text-muted text-xs">Comments from readers who are not on your list yet.</p>
+      </header>
+      <p class="m-0 px-4 py-10 text-center text-muted text-sm" x-show="!queue().length">Nothing waiting.</p>
+      <div class="divide-line divide-y" x-show="queue().length">
+        <div class="grid gap-2 p-3" x-for="comment in queue()">
+          <div class="flex flex-wrap gap-2 items-center">
+            <strong class="text-[13px] text-ink" :text="comment.authorName"></strong>
+            <span class="px-2 py-0.5 font-bold text-[10px] text-amber-700 bg-amber-50 rounded-full" :text="comment.status"></span>
+          </div>
+          <p class="m-0 leading-5 text-[13px] text-body whitespace-pre-line" :text="comment.body"></p>
+          <div class="flex gap-2">
+            <button class="px-2.5 h-7 font-bold text-[11px] text-emerald-700 hover:bg-emerald-50 border border-emerald-200 rounded-lg" type="button" @click="moderate(comment.id, 'visible')">Approve</button>
+            <button class="px-2.5 h-7 font-bold text-[11px] text-red-700 hover:bg-red-50 border border-red-200 rounded-lg" type="button" @click="moderate(comment.id, 'spam')">Spam</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Import -->
+    <section class="grid gap-3 p-4 bg-panel border border-line rounded-2xl shadow-sm" x-show="tab() === 'import'" aria-label="Import">
+      <div>
+        <h2 class="m-0 font-bold text-ink text-sm">Import readers</h2>
+        <p class="m-0 mt-1 text-muted text-xs">Paste a CSV export. Running it twice updates rather than duplicating, and anyone who already unsubscribed stays unsubscribed.</p>
+      </div>
+      <textarea class="px-3 py-2.5 min-h-40 font-mono text-ink text-xs bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40 resize-y" placeholder="email,name,plan,status&#10;reader@example.com,A Reader,paid,active" x-model="importCsv"></textarea>
+      <div class="flex flex-wrap gap-2 items-center">
+        <button class="inline-flex items-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50" type="button" :disabled="importing() || !importCsv().trim()" @click="runImport" :text="importing() ? 'Importing…' : 'Import readers'">Import readers</button>
+        <span class="text-muted text-xs" x-show="importReport()" :text="importSummary()"></span>
+      </div>
+      <ul class="grid gap-1 m-0 p-0 list-none" x-show="importReport()?.reasons?.length">
+        <li class="text-[11px] text-amber-700" x-for="reason in (importReport()?.reasons || [])" :text="reason"></li>
+      </ul>
+    </section>
+  </section>
+
+  <script client>
+    const tabs = [
+      { id: 'readers', label: 'Readers' },
+      { id: 'tiers', label: 'Paid tiers' },
+      { id: 'sends', label: 'Sends' },
+      { id: 'comments', label: 'Comments' },
+      { id: 'import', label: 'Import' },
+    ]
+
+    const tab = state('readers')
+    const publication = state(null)
+    const stats = state({})
+    const readers = state([])
+    const tiers = state([])
+    const sends = state([])
+    const queue = state([])
+    const billingConfigured = state(false)
+    const mailConfigured = state(false)
+    const errorMessage = state('')
+    const saving = state(false)
+    const importing = state(false)
+    const readerFilter = state('')
+    const importCsv = state('')
+    const importReport = state(null)
+    const tierName = state('')
+    const tierAmount = state('700')
+    const tierInterval = state('month')
+
+    const money = (cents: number): string => `$${((Number(cents) || 0) / 100).toFixed(2)}`
+    const importSummary = derived(() => {
+      const report = importReport()
+      if (!report) return ''
+      return `${report.imported} added, ${report.updated} updated, ${report.skipped} skipped`
+    })
+
+    const requestJson = async (url: string, options: RequestInit = {}) => {
+      const response = await fetch(url, options)
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Request failed.')
+      return payload
+    }
+
+    const postJson = (url: string, body: Record<string, unknown>) =>
+      requestJson(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+
+    const loadAll = async () => {
+      errorMessage.set('')
+      try {
+        // One pass over every section, so switching tabs never waits on a
+        // request. The whole payload is a few hundred rows at most.
+        const [pub, subs, tierData, sendData, commentQueue] = await Promise.all([
+          requestJson('/api/postline/publication'),
+          requestJson(`/api/postline/subscribers?status=${encodeURIComponent(readerFilter())}`),
+          requestJson('/api/postline/tiers'),
+          requestJson('/api/postline/sends'),
+          requestJson('/api/postline/comments/queue'),
+        ])
+
+        publication.set(pub.data?.publication || null)
+        readers.set(subs.data?.subscribers || [])
+        stats.set(subs.data?.stats || {})
+        tiers.set(tierData.data?.tiers || [])
+        billingConfigured.set(Boolean(tierData.data?.configured))
+        sends.set(sendData.data?.sends || [])
+        mailConfigured.set(Boolean(sendData.data?.configured))
+        queue.set(commentQueue.data?.comments || [])
+      }
+      catch (error) {
+        errorMessage.set(error instanceof Error ? error.message : String(error))
+      }
+    }
+
+    const setReaderFilter = async (value: string) => {
+      readerFilter.set(value)
+      await loadAll()
+    }
+
+    const saveTier = async (event: SubmitEvent) => {
+      event.preventDefault()
+      saving.set(true)
+      try {
+        await postJson('/api/postline/tiers', {
+          name: tierName(),
+          amount_cents: Number(tierAmount()),
+          interval: tierInterval(),
+        })
+        tierName.set('')
+        await loadAll()
+        postlineToast?.show?.({ title: 'Tier created', message: 'Readers can subscribe to it now.', tone: 'success', id: 'tier-save' })
+      }
+      catch (error) {
+        postlineToast?.show?.({ title: 'Could not create the tier', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'tier-save' })
+      }
+      finally {
+        saving.set(false)
+      }
+    }
+
+    const archiveTier = async (id: number) => {
+      if (!window.confirm('Archive this tier? Existing subscribers keep their plan.')) return
+      try {
+        await postJson('/api/postline/tiers/archive', { id })
+        await loadAll()
+      }
+      catch (error) {
+        postlineToast?.show?.({ title: 'Could not archive the tier', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'tier-archive' })
+      }
+    }
+
+    const moderate = async (id: number, status: string) => {
+      try {
+        await postJson('/api/postline/comments/moderate', { id, status })
+        queue.set(queue().filter(item => item.id !== id))
+      }
+      catch (error) {
+        postlineToast?.show?.({ title: 'Could not moderate that comment', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'comment-moderate' })
+      }
+    }
+
+    const runImport = async () => {
+      importing.set(true)
+      importReport.set(null)
+      try {
+        const payload = await postJson('/api/postline/import/subscribers', { csv: importCsv() })
+        importReport.set(payload.data?.report || null)
+        await loadAll()
+        postlineToast?.show?.({ title: 'Import finished', message: importSummary(), tone: 'success', id: 'import' })
+      }
+      catch (error) {
+        postlineToast?.show?.({ title: 'Import failed', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'import' })
+      }
+      finally {
+        importing.set(false)
+      }
+    }
+
+    onMount(() => { void loadAll() })
+  </script>
+@endsection

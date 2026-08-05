@@ -287,7 +287,7 @@
         const bindKeyboardShortcuts = () => {
           if (window.__postlineShortcutsBound) return
           window.__postlineShortcutsBound = true
-          const routes = { 1: '/composer', 2: '/queue', 3: '/timeline', 4: '/analytics', 5: '/campaigns', 6: '/listening', 7: '/inbox', 8: '/discover', 9: '/blog', 0: '/settings' }
+          const routes = { 1: '/composer', 2: '/queue', 3: '/timeline', 4: '/analytics', 5: '/campaigns', 6: '/listening', 7: '/inbox', 8: '/discover', 9: '/publication', 0: '/blog' }
           window.stx?.useEventListener('keydown', (event) => {
             if (event.metaKey || event.ctrlKey || event.altKey) return
             const target = event.target

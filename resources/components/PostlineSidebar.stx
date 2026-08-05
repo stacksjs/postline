@@ -20,7 +20,8 @@ const navLinks = [
   { href: '/listening', label: 'Listening', shortcut: '6', icon: 'i-hugeicons-radar-02' },
   { href: '/inbox', label: 'Inbox', shortcut: '7', icon: 'i-hugeicons-message-01' },
   { href: '/discover', label: 'Discover', shortcut: '8', icon: 'i-hugeicons-compass' },
-  { href: '/blog', label: 'Blog', shortcut: '9', icon: 'i-hugeicons-quill-write-02' },
+  { href: '/publication', label: 'Publication', shortcut: '9', icon: 'i-hugeicons-user-multiple' },
+  { href: '/blog', label: 'Blog', shortcut: '0', icon: 'i-hugeicons-quill-write-02' },
 ].map((link) => ({
   ...link,
   active: currentPath === link.href || currentPath.startsWith(`${link.href}/`),
