@@ -62,6 +62,17 @@
     })()
   </script>
   <script>window.STX_ROUTER_OPTIONS = { container: '[data-ot-workspace]', viewTransitions: false };</script>
+  <!--
+    The newsroom runs on two of the paper's four faces: the display serif for
+    page headings and the condensed gothic for labels. The body face is
+    deliberately NOT loaded here — a workspace is read in short bursts at small
+    sizes, where the UI sans is more legible than Baskerville, and each family
+    dropped is a request the app shell does not make on every cold load. The
+    masthead face is marketing-only.
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Oswald:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/styles/toast.css">
   <link rel="stylesheet" href="/assets/styles/timeline.css">
 @endhead

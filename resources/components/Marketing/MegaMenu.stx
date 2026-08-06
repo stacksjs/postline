@@ -25,7 +25,7 @@ const printedOn = new Date().toLocaleDateString('en-US', {
       The section bar below it is what follows the reader down the page.
     -->
     <div class="mx-auto px-6 max-w-[1400px]">
-      <div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 pb-2 pt-3">
+      <div class="flex flex-wrap gap-x-6 gap-y-1 items-baseline justify-between pb-2 pt-3">
         <p class="m-0 folio">Vol. I &middot; No. 1</p>
         <p class="m-0 folio">{{ printedOn }}</p>
         <p class="m-0 folio">Open source &middot; Price: free</p>
@@ -34,7 +34,7 @@ const printedOn = new Date().toLocaleDateString('en-US', {
       <div class="rule-thin"></div>
 
       <a class="block py-5 text-center text-ink" href="/" aria-label="The Open Times, home">
-        <span class="block masthead text-[13vw] leading-[0.9] sm:text-6xl md:text-7xl lg:text-[5.25rem]">The Open Times</span>
+        <span class="block leading-[0.9] text-[13vw] sm:text-6xl md:text-7xl lg:text-[5.25rem] masthead">The Open Times</span>
       </a>
 
       <div class="rule-double"></div>
@@ -44,7 +44,7 @@ const printedOn = new Date().toLocaleDateString('en-US', {
         first story: what the paper is, in one line, in the smallest type on the
         page.
       -->
-      <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 pb-2 pt-2.5">
+      <div class="flex flex-wrap gap-x-5 gap-y-1 items-center justify-center pb-2 pt-2.5">
         <p class="m-0 folio">Written here</p>
         <span class="h-1 w-1 bg-muted" aria-hidden="true"></span>
         <p class="m-0 folio">Mailed by you</p>
@@ -64,7 +64,7 @@ const printedOn = new Date().toLocaleDateString('en-US', {
               hover-only menu is unreachable by keyboard, and a script-driven
               one would not work before hydration. -->
           <div class="flex items-center h-full menu-item">
-            <a class="inline-flex gap-1.5 items-center px-3 h-full folio hover:text-accent transition-colors" href="/features" data-stx-link>
+            <a class="inline-flex gap-1.5 items-center px-3 h-full hover:text-accent transition-colors folio" href="/features" data-stx-link>
               Features
               <span class="h-3.5 w-3.5 i-hugeicons-arrow-down-01 menu-chevron" aria-hidden="true"></span>
             </a>
@@ -85,7 +85,7 @@ const printedOn = new Date().toLocaleDateString('en-US', {
           </div>
 
           <div class="flex items-center h-full menu-item">
-            <a class="inline-flex gap-1.5 items-center px-3 h-full folio hover:text-accent transition-colors" href="/use-cases" data-stx-link>
+            <a class="inline-flex gap-1.5 items-center px-3 h-full hover:text-accent transition-colors folio" href="/use-cases" data-stx-link>
               Desks
               <span class="h-3.5 w-3.5 i-hugeicons-arrow-down-01 menu-chevron" aria-hidden="true"></span>
             </a>
@@ -105,21 +105,21 @@ const printedOn = new Date().toLocaleDateString('en-US', {
             </div>
           </div>
 
-          <a class="inline-flex items-center px-3 h-full folio hover:text-accent transition-colors" href="https://github.com/stacksjs/opentimes">Press room</a>
+          <a class="inline-flex items-center px-3 h-full hover:text-accent transition-colors folio" href="https://github.com/stacksjs/opentimes">Press room</a>
         </div>
 
         <p class="lg:hidden m-0 folio">The Open Times</p>
 
         <div class="flex gap-4 items-center shrink-0">
-          <a class="hidden sm:inline-flex items-center folio hover:text-accent transition-colors" href="/login" data-stx-link>Subscriber sign-in</a>
+          <a class="hidden sm:inline-flex items-center hover:text-accent transition-colors folio" href="/login" data-stx-link>Subscriber sign-in</a>
           <a class="inline-flex items-center px-4 h-8 text-[11px] ink-button" href="/login" data-stx-link>Start a paper</a>
         </div>
       </div>
     </nav>
 
     <!-- Small screens get a native disclosure instead of a hover panel. -->
-    <details class="lg:hidden border-line border-b">
-      <summary class="flex items-center justify-between px-6 h-11 folio cursor-pointer">
+    <details class="lg:hidden border-b border-line">
+      <summary class="flex items-center justify-between px-6 h-11 cursor-pointer folio">
         Index
         <span class="h-4 w-4 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
       </summary>

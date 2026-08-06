@@ -66,9 +66,12 @@
   },
   "dependencies": {
     "@stacksjs/ai": "^0.70.255",
+    "@stacksjs/payments": "0.70.255",
+    "@stacksjs/realtime": "0.70.255",
     "@stacksjs/socials": "^0.70.253",
     "stacks": "^0.70.255",
     "stripe": "^22.4.0",
+    "ts-broadcasting": "0.0.9",
     "ts-medium-editor": "^0.1.6"
   },
   "devDependencies": {

@@ -1,4 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#0a0a0a"/>
-  <text x="32" y="45" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="38" font-weight="700" fill="#ffffff" text-anchor="middle">P</text>
+<!--
+  The Open Times mark: the nameplate's initials on newsprint, ruled top and
+  bottom the way a masthead is.
+
+  Deliberately not the blackletter face — a webfont cannot be relied on inside
+  an SVG a browser renders in a 16px tab, and UnifrakturMaguntia at that size is
+  an inkblot. A bold serif "OT" between two rules reads at every size and still
+  belongs to the same identity.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="The Open Times">
+  <rect width="64" height="64" fill="#f1ecdd"/>
+  <rect x="6" y="11" width="52" height="3" fill="#17130f"/>
+  <rect x="6" y="50" width="52" height="3" fill="#17130f"/>
+  <text x="32" y="43" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="700" fill="#17130f" text-anchor="middle" letter-spacing="1">OT</text>
 </svg>

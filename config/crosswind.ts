@@ -307,10 +307,23 @@ const APP_UI: string = `
   padding: 5px 2px 7px;
 }
 
+/*
+  Page headings in the workspace are set in the paper's display face, so the
+  newsroom is recognisably the same publication as the front page. Body copy and
+  controls stay in the UI sans: this surface is read in short bursts at small
+  sizes, where a book serif costs legibility for atmosphere.
+*/
 [data-ot-page] > header:first-child h1 {
-  letter-spacing: -0.025em;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
   line-height: 1.15;
 }
+
+/* Section eyebrows and meta rows across the workspace, matching the front page. */
+[data-ot-page] .kicker,
+[data-ot-page] .folio,
+[data-ot-page] .byline { font-family: var(--font-label); }
 
 [data-ot-page] .rounded-2xl { border-radius: 14px; }
 [data-ot-page] .rounded-xl { border-radius: 10px; }

@@ -179,28 +179,28 @@ body {
  * ======================================================================== */
 html[data-appearance="arc"] {
   /* Warmer and a shade deeper than the content card it carries. The stx `arc`
-     theme paints its pane at #f7f5f1 over whatever sits behind it; here the
-     panel IS the backdrop, so it has to be flat and darker than white or the
-     floating card has no edge to read against. */
+    theme paints its pane at #f7f5f1 over whatever sits behind it; here the
+    panel IS the backdrop, so it has to be flat and darker than white or the
+    floating card has no edge to read against. */
   --dash-arc-panel: #efebe4;
   --dash-arc-gap: 10px;
   --dash-arc-radius: 12px;
 }
 /* The dark class is written onto the root element itself, so it stacks with
-   the appearance attribute rather than sitting above it. */
+  the appearance attribute rather than sitting above it. */
 html[data-appearance="arc"].dark {
   --dash-arc-panel: #171717;
 }
 
 /* The gap around the content card is the body showing through, which is what
-   makes the card read as floating on the sidebar rather than beside it. */
+  makes the card read as floating on the sidebar rather than beside it. */
 html[data-appearance="arc"] body {
   background: var(--dash-arc-panel);
 }
 
 /* The card owns scrolling, so the page must not also scroll: a document
-   scrollbar would eat the right-hand gap and there would be nothing for it to
-   scroll anyway. */
+  scrollbar would eat the right-hand gap and there would be nothing for it to
+  scroll anyway. */
 html[data-appearance="arc"],
 html[data-appearance="arc"] body {
   height: 100%;
@@ -210,35 +210,35 @@ html[data-appearance="arc"] body {
 html[data-appearance="arc"] [data-stx-content] {
   /* Only three margins. `margin-left` is deliberately left to the base rule.
 
-     It is the one margin that transitions (0.3s, for the sidebar collapse),
-     and overriding a transitioned longhand with a `calc()` over two custom
-     properties wedges the interpolation in WebKit: switching appearance leaves
-     it stuck at the old value until a reload. Inheriting the base declaration
-     means the property never changes when the appearance does, so there is
-     nothing to wedge — and the collapse animation keeps working identically in
+    It is the one margin that transitions (0.3s, for the sidebar collapse),
+    and overriding a transitioned longhand with a `calc()` over two custom
+    properties wedges the interpolation in WebKit: switching appearance leaves
+    it stuck at the old value until a reload. Inheriting the base declaration
+    means the property never changes when the appearance does, so there is
+    nothing to wedge — and the collapse animation keeps working identically in
     both styles.
 
-     The panel strip down the card's left side is the sidebar's own trailing
-     padding, which is where it comes from in Arc too. */
+    The panel strip down the card's left side is the sidebar's own trailing
+    padding, which is where it comes from in Arc too. */
   margin-top: var(--dash-arc-gap);
   margin-right: var(--dash-arc-gap);
   margin-bottom: var(--dash-arc-gap);
   /* Beats the base rule's `min-height: 100vh`, which would otherwise hold the
-     card a full viewport tall and push its bottom edge off-screen — losing the
-     one gap that shows it is floating. */
+    card a full viewport tall and push its bottom edge off-screen — losing the
+    one gap that shows it is floating. */
   min-height: 0;
   /* The card is exactly the viewport minus its own gaps, and scrolls its own
-     content. Letting the page scroll instead would grow the card past the
-     bottom of the window, so the one edge that proves it is floating — the
-     panel showing beneath it — would only ever appear at the end of a long
-     page. This is also what Arc does: the sidebar is stationary and the card
-     scrolls inside its frame. */
+    content. Letting the page scroll instead would grow the card past the
+    bottom of the window, so the one edge that proves it is floating — the
+    panel showing beneath it — would only ever appear at the end of a long
+    page. This is also what Arc does: the sidebar is stationary and the card
+    scrolls inside its frame. */
   height: calc(100vh - (2 * var(--dash-arc-gap)));
   overflow-y: auto;
   border-radius: var(--dash-arc-radius);
   background: #fff;
   /* Clip page content to the rounded corners — full-bleed headers and tables
-     otherwise square them off at the top. */
+    otherwise square them off at the top. */
   overflow-x: hidden;
   box-shadow:
     0 0 0 0.5px rgba(0, 0, 0, 0.07),
@@ -254,7 +254,7 @@ html[data-appearance="arc"].dark [data-stx-content] {
 }
 
 /* An overlay scrollbar inside the card, so the rounded corner is not cut by a
-   full-width native gutter. */
+  full-width native gutter. */
 html[data-appearance="arc"] [data-stx-content] {
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
@@ -279,7 +279,7 @@ html[data-appearance="arc"].dark [data-stx-content]::-webkit-scrollbar-thumb {
 }
 
 /* On narrow viewports the sidebar is hidden entirely, so the card would float
-   on nothing. Return it to a flush pane. */
+  on nothing. Return it to a flush pane. */
 @media (max-width: 1023px) {
   html[data-appearance="arc"],
   html[data-appearance="arc"] body {
@@ -330,7 +330,7 @@ html[data-appearance="arc"].dark [data-sidebar-item]:hover {
 }
 
 /* Selection: a raised white card, in both window states. Matching the
-   component's own selector shape is what gives these the specificity to win. */
+  component's own selector shape is what gives these the specificity to win. */
 html[data-appearance="arc"] [data-sidebar-selection="accent"][data-window-key="true"] [data-sidebar-item][data-active="true"],
 html[data-appearance="arc"] [data-sidebar-selection="accent"][data-window-key="false"] [data-sidebar-item][data-active="true"],
 html[data-appearance="arc"] [data-sidebar-selection="accent"][data-window-key="true"] [data-sidebar-item][data-active="true"]:hover {
@@ -352,7 +352,7 @@ html[data-appearance="arc"].dark [data-sidebar-selection="accent"][data-window-k
 }
 
 /* The icon, count and chevron turn white on a macOS accent fill. On a white
-   card they must not — they keep their own tint, the same as an idle row. */
+  card they must not — they keep their own tint, the same as an idle row. */
 html[data-appearance="arc"] [data-sidebar-selection="accent"][data-window-key="true"] [data-sidebar-item][data-active="true"] [data-sidebar-icon],
 html[data-appearance="arc"] [data-sidebar-selection="accent"][data-window-key="true"] [data-sidebar-item][data-active="true"] [data-sidebar-chevron] {
   color: var(--stx-sidebar-icon, currentColor);
@@ -371,9 +371,9 @@ html[data-appearance="arc"] [data-sidebar-section] > div:first-child {
 }
 
 /* A viewer can hide navigation sections they never use. Kept as CSS on an
-   attribute rather than a DOM removal so the rows stay hydrated and a later
-   change re-shows them without a re-render — the same approach the role
-   filter above uses. */
+  attribute rather than a DOM removal so the rows stay hydrated and a later
+  change re-shows them without a re-render — the same approach the role
+  filter above uses. */
 [data-sidebar-section][data-viewer-hidden="true"] {
   display: none;
 }

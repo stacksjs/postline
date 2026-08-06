@@ -21,9 +21,14 @@
   <main class="grid place-items-center px-4 min-h-screen bg-bg" data-testid="login-page">
     <section class="grid gap-5 p-6 max-w-sm w-full bg-panel border border-line rounded-2xl shadow-sm">
       <header class="grid gap-2 justify-items-center text-center">
-        <span class="grid place-items-center h-11 w-11 font-bold text-lg text-on-accent bg-accent rounded-xl">P</span>
+        <!--
+          The nameplate initials between two rules — the same mark as the
+          favicon. Set in the serif rather than the blackletter face: at 11
+          units the display face is legible where Unifraktur is a blot.
+        -->
+        <span class="grid place-items-center px-3 py-1 font-bold text-ink text-lg tracking-widest border-ink border-y-2" aria-hidden="true">OT</span>
         <h1 class="m-0 font-bold text-[20px] text-ink" :text="heading()">Sign in to The Open Times</h1>
-        <p class="m-0 text-[13px] text-muted" :text="subtitle()">Your personal publishing workspace.</p>
+        <p class="m-0 text-[13px] text-muted" :text="subtitle()">The newsroom behind your paper.</p>
       </header>
 
       <form class="grid gap-3" @submit.prevent="onSubmit">

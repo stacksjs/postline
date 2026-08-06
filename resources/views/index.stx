@@ -26,7 +26,7 @@
         Publish it.<br class="sm:hidden"> Send it. Own it.
       </h1>
 
-      <p class="mx-auto mt-5 max-w-3xl text-center text-xl sm:text-2xl deck">
+      <p class="mt-5 mx-auto max-w-3xl text-center text-xl sm:text-2xl deck">
         Your publication, your newsletter and your paying subscribers, on software you run — with nobody standing between you and the people who read you.
       </p>
 
@@ -38,7 +38,7 @@
     <!-- The lede and the boxed insert, set the way a column and a well are -->
     <section class="grid gap-10 lg:gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] pb-14 pt-8">
       <div class="copy">
-        <div class="leading-relaxed text-body columns-print">
+        <div class="columns-print leading-relaxed text-body">
           <p class="m-0 dropcap">Every publishing platform you can sign up for makes the same trade: it hosts your words, and in return it holds your readers. The list is theirs, the payment relationship is theirs, and the terms are whatever they happen to be this quarter.</p>
           <p class="m-0 mt-4">The Open Times is the other arrangement. It is one program, on one machine you control, that renders the page, sends the email, takes the payment and files the announcement to every network you post to. One action does all four.</p>
           <p class="m-0 mt-4">There is no platform fee, because there is no platform — only your database, your mail provider, your Stripe account and your domain.</p>
@@ -58,7 +58,7 @@
         page it made, the mail it sent, and the wires it went out on. Boxed and
         captioned, because that is what a newspaper does with a picture.
       -->
-      <figure class="m-0 self-start">
+      <figure class="self-start m-0">
         <div class="bg-panel border-2 border-ink" role="img" aria-label="A story published to a custom domain, mailed to 4,182 subscribers and wired to six networks">
           <div class="flex gap-3 items-baseline justify-between px-4 py-2 bg-ink">
             <span class="text-on-accent folio">The Weekly Build</span>
@@ -102,7 +102,7 @@
     </ul>
     <div class="mx-auto px-6 max-w-[1400px]">
       <div class="flex flex-col gap-4 sm:flex-row sm:gap-10 sm:items-center py-5">
-        <p class="m-0 shrink-0 kicker">On the wire</p>
+        <p class="shrink-0 m-0 kicker">On the wire</p>
         <div class="overflow-hidden relative grow [mask-image:linear-gradient(90deg,transparent,#000_7%,#000_93%,transparent)]">
           <ul class="flex gap-12 items-center w-max marquee-track" aria-hidden="true">
             <ProviderChip icon="bluesky" name="Bluesky" />
@@ -200,7 +200,7 @@
       <div class="mx-auto max-w-2xl text-center reveal">
         <SectionLabel index="03" label="The exchange" />
         <h2 class="mt-3 leading-[1.02] text-4xl text-ink sm:text-5xl">Found by people who already read.</h2>
-        <p class="mx-auto mt-4 max-w-xl leading-relaxed text-body copy">Papers recommend each other. A reader who trusts one writer sees the handful that writer vouches for — ranked by subscriptions rather than by spend.</p>
+        <p class="mt-4 mx-auto max-w-xl leading-relaxed text-body copy">Papers recommend each other. A reader who trusts one writer sees the handful that writer vouches for — ranked by subscriptions rather than by spend.</p>
       </div>
 
       <ul class="grid gap-0 m-0 mt-10 mx-auto p-0 max-w-3xl list-none border-ink border-t-2 divide-line divide-y reveal">
@@ -241,7 +241,7 @@
   <!-- Story 05 · The stone: what is going out this week -->
   <section id="queue" class="mx-auto px-6 py-16 sm:py-20 max-w-[1400px]">
     <div class="grid gap-10 items-center lg:gap-14 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-      <figure class="order-2 m-0 lg:order-1 reveal">
+      <figure class="order-2 lg:order-1 m-0 reveal">
         <div class="bg-panel border-2 border-ink" role="img" aria-label="The schedule showing three queued stories, one currently going out">
           <div class="flex items-center justify-between px-4 py-2 bg-ink" aria-hidden="true">
             <span class="text-on-accent folio">The schedule</span>
@@ -277,7 +277,7 @@
         <p class="m-0 text-on-accent/70 kicker">Extra &middot; Own it</p>
         <h2 class="mt-4 leading-[0.98] text-5xl text-on-accent sm:text-7xl">Your list. Your revenue.<br>Your machine.</h2>
         <p class="mt-5 max-w-xl leading-relaxed text-lg text-on-accent/70">Subscribers, payments, stories and tokens all live in a database you run. A platform cannot change its terms on an audience it does not hold.</p>
-        <div class="inline-flex gap-3 items-center mt-8 px-4 h-12 text-sm border border-on-accent/25 font-typewriter">
+        <div class="inline-flex gap-3 items-center mt-8 px-4 h-12 font-typewriter text-sm border border-on-accent/25">
           <span class="text-on-accent/50" aria-hidden="true">$</span>
           <span class="text-on-accent">bunx opentimes</span>
         </div>
@@ -304,7 +304,7 @@
       <div class="mx-auto max-w-2xl reveal">
         <p class="m-0 kicker">Final edition</p>
         <h2 class="mt-4 leading-[0.98] text-5xl text-ink sm:text-7xl">Publish once.<br>Own everything.</h2>
-        <p class="mx-auto mt-5 max-w-xl leading-relaxed text-body copy">Stand up your own edition of The Open Times and run your paper on something nobody can take away from you.</p>
+        <p class="mt-5 mx-auto max-w-xl leading-relaxed text-body copy">Stand up your own edition of The Open Times and run your paper on something nobody can take away from you.</p>
         <div class="flex flex-wrap gap-3 justify-center mt-8">
           <a class="inline-flex items-center px-6 h-12 text-sm ink-button" href="/login" data-stx-link>Start your paper</a>
           <a class="inline-flex gap-2 items-center px-6 h-12 text-sm ink-button ink-button--ghost" href="https://github.com/stacksjs/opentimes">

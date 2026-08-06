@@ -33,7 +33,7 @@ const settingsActive = currentPath === '/accounts' || currentPath === '/settings
 <template>
   <div class="contents">
   <nav class="flex lg:hidden overflow-x-auto sticky top-0 z-50 gap-1.5 items-center px-3 py-2 bg-bg border-b border-line" aria-label="Primary" data-ot-mobile-nav>
-    <span class="grid place-items-center shrink-0 mr-1 h-8 w-8 font-bold text-[13px] text-on-accent bg-accent rounded-lg" aria-hidden="true">P</span>
+    <span class="grid place-items-center shrink-0 mr-1 px-1.5 h-8 font-bold text-[13px] text-ink tracking-widest border-ink border-y-2" aria-hidden="true">OT</span>
     @foreach (navLinks as link)
       <a
         href="{{ link.href }}"
@@ -87,7 +87,9 @@ const settingsActive = currentPath === '/accounts' || currentPath === '/settings
       data-no-window-drag
       aria-label="The Open Times composer"
     >
-      <span class="grid place-items-center h-9 w-9 font-bold text-on-accent text-sm bg-accent rounded-xl">P</span>
+      <!-- The nameplate initials between rules — the mark used by the favicon
+          and the sign-in page, so the three agree. -->
+      <span class="grid place-items-center px-1.5 h-9 font-bold text-ink text-sm tracking-widest border-ink border-y-2">OT</span>
       <span class="font-semibold text-[15px]" data-sidebar-expanded>The Open Times</span>
     </a>
 
