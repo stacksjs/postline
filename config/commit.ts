@@ -1,8 +1,12 @@
 import type { UserConfig } from 'cz-git'
-import { components, functions } from '@stacksjs/utils'
 import git from './git'
 
-const scopes = [...new Set([...git.scopes, ...components, ...functions])]
+// `components` and `functions` used to be spread in here from
+// '@stacksjs/utils'. That package exports neither — the scaffold has been
+// importing two names that do not exist, which resolved to undefined and would
+// have thrown on spread the first time anyone ran `buddy commit`. It was
+// invisible because config/ was outside the typecheck include.
+const scopes = [...new Set(git.scopes)]
 
 export default {
   rules: {

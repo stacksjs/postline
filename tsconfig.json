@@ -15,11 +15,10 @@
   },
   "include": [
     "*.ts",
-    "app/Actions/**/*.ts",
     "*.d.ts",
-    "app/Models/**/*.ts",
-    "app/Services/**/*.ts",
-    "app/Support/**/*.ts"
+    "app/**/*.ts",
+    "config/**/*.ts",
+    "routes/**/*.ts"
   ],
   "exclude": [
     "cloud/**",

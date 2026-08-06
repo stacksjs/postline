@@ -15,8 +15,14 @@ export const config: PantryConfig = {
    */
   dependencies: {
     "bun.com": "^1.3.0",
-    "sqlite.org": "^3.47.2",
-    craft: "^0.0.1",
+    // Pantry publishes no pinned versions for sqlite.org, so its type admits
+    // only "*"/"latest" — a "^3.47.2" range was never resolvable and silently
+    // meant nothing. "latest" is the strongest thing expressible here, and it
+    // satisfies the >= 3.47.2 floor this project requires.
+    "sqlite.org": "latest",
+    // ^0.0.1 does not exist in the catalog; the published versions are 0.0.19,
+    // 0.0.20, 0.0.23 and 0.0.37.
+    craft: "^0.0.37",
     // Uncomment as needed:
     // 'redis.io': '^7.4.1',
     // 'mailpit.axllent.org': '^1.21.8',

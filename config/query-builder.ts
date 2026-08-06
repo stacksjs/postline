@@ -59,6 +59,16 @@ export default {
     captureText: true,
   },
   hooks: {},
+
+  // Required by QueryBuilderConfig and previously absent — the object did not
+  // satisfy its own `satisfies` clause, which nothing noticed because config/
+  // was outside the typecheck include. Set to the library's own defaults so
+  // this is a restatement rather than a behaviour change: migrations already
+  // live in database/migrations (96 of them), and .qb is where snapshots were
+  // being written regardless.
+  snapshotDir: '.qb',
+  migrationDir: 'database/migrations',
+
   softDeletes: {
     enabled: false,
     column: 'deleted_at',

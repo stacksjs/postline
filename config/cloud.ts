@@ -720,10 +720,13 @@ export const tsCloud: TsCloudConfig = {
         APP_ENV: 'production',
         NODE_ENV: 'production',
         DB_DATABASE_PATH,
-        AI_PROVIDER: env.AI_PROVIDER || 'openai',
-        OPENAI_MODEL: env.OPENAI_MODEL || 'gpt-5.6-terra',
-        ...(env.OPENAI_API_KEY ? { OPENAI_API_KEY: env.OPENAI_API_KEY } : {}),
-        ...(env.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY } : {}),
+        // String(): the env proxy coerces values that look numeric or boolean,
+        // so these are typed string|number|boolean while a site's env map takes
+        // strings only.
+        AI_PROVIDER: String(env.AI_PROVIDER || 'openai'),
+        OPENAI_MODEL: String(env.OPENAI_MODEL || 'gpt-5.6-terra'),
+        ...(env.OPENAI_API_KEY ? { OPENAI_API_KEY: String(env.OPENAI_API_KEY) } : {}),
+        ...(env.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: String(env.ANTHROPIC_API_KEY) } : {}),
       },
       exclude: SQLITE_EXCLUDES,
     },
