@@ -3,6 +3,7 @@ import { db } from '@stacksjs/database'
 import { bluesky } from './BlueskyService'
 import { linkedin } from './LinkedInService'
 import { mastodon } from './MastodonService'
+import { postline } from './PostlineService'
 import { ensureAccount, now, uuid } from './support'
 import { twitter } from './TwitterService'
 
@@ -19,7 +20,7 @@ const database = db as any
 export const PURGE_CONFIRMATION = 'DELETE ALL POSTS'
 
 /** Providers whose API can delete a post the account authored. */
-export const PURGEABLE_PROVIDERS: SocialProvider[] = ['bluesky', 'twitter', 'mastodon', 'linkedin']
+export const PURGEABLE_PROVIDERS: SocialProvider[] = ['postline', 'bluesky', 'twitter', 'mastodon', 'linkedin']
 
 /**
  * Why the remaining providers can't take part, shown verbatim in the UI.
@@ -269,6 +270,7 @@ export class PurgeService {
     if (provider === 'twitter') return await twitter.purgeAdapter()
     if (provider === 'mastodon') return await mastodon.purgeAdapter()
     if (provider === 'linkedin') return await linkedin.purgeAdapter()
+    if (provider === 'postline') return await postline.purgeAdapter()
     throw new Error(`${provider} cannot delete posts through its API.`)
   }
 

@@ -12,7 +12,7 @@
  * Bluesky is not rolled back because our own feed had a problem.
  */
 
-import type { CrosspostTargetResult, PublishContent } from '../../Support/Social/types'
+import type { AuthoredPostPage, CrosspostTargetResult, ProviderPurgeAdapter, PublishContent, RemotePostRef } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { discover } from '../DiscoverService'
 import { publications } from '../PublicationService'
@@ -41,6 +41,62 @@ export class PostlineService {
       canPublish: true,
       characterLimit: CHARACTER_LIMIT,
       listed: publication.listed,
+    }
+  }
+
+  /**
+   * The purge surface for our own feed.
+   *
+   * Every other provider deletes through an API it does not control; here the
+   * rows are ours, so deleting is a local write. Modelled as an adapter anyway
+   * rather than special-cased, so the purge tool's preview, confirmation,
+   * per-provider counts and audit log all work on it unchanged.
+   */
+  async purgeAdapter(): Promise<ProviderPurgeAdapter> {
+    const publication = await publications.ensurePublication()
+
+    return {
+      provider: 'postline',
+      // Postline has no `social_identities` row: it is not an external account
+      // and there is no token to hold. The publication is the identity.
+      identityId: publication.id,
+      handle: publication.name,
+      listPage: async (): Promise<AuthoredPostPage> => {
+        const rows = await database
+          .selectFrom('discover_entries')
+          .selectAll()
+          .where('publication_id', '=', publication.id)
+          .where('status', '!=', 'removed')
+          .orderBy('published_at', 'desc')
+          .execute()
+
+        return {
+          // One page: the whole feed is local, so there is nothing to paginate
+          // against and a cursor would only invent a way to miss rows.
+          posts: rows.map((row: any) => ({
+            uri: `postline:${row.id}`,
+            cid: undefined,
+            text: String(row.body || ''),
+            createdAt: String(row.published_at || ''),
+          })),
+          cursor: undefined,
+        }
+      },
+      deletePost: async (ref: RemotePostRef): Promise<void> => {
+        const id = Number(String(ref.uri || '').replace(/^postline:/, ''))
+        if (!id) throw new Error('That is not a Postline entry.')
+
+        // Marked removed rather than deleted, matching how a hidden entry
+        // behaves: the post it came from still exists, and a feed row is
+        // cheaper to keep than a dangling reference is to debug.
+        await database.updateTable('discover_entries')
+          .set({ status: 'removed', updated_at: now() })
+          .where('id', '=', id)
+          .where('publication_id', '=', publication.id)
+          .execute()
+
+        await publications.refreshCounters(publication.id)
+      },
     }
   }
 
