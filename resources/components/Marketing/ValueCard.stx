@@ -13,8 +13,8 @@ const { icon, title, description } = withDefaults(defineProps<ValueCardProps>(),
 
 <template>
   <div class="p-6 sm:p-8 bg-bg">
-    <span class="grid place-items-center h-10 w-10 text-ink bg-panel border border-line rounded-xl i-hugeicons-{{ icon }}"></span>
-    <h3 class="mt-5 font-semibold text-ink">{{ title }}</h3>
+    <span class="grid place-items-center h-9 w-9 text-ink border border-ink i-hugeicons-{{ icon }}"></span>
+    <h3 class="mt-4 text-ink text-xl">{{ title }}</h3>
     <p class="mt-2 leading-relaxed text-body text-sm">{{ description }}</p>
   </div>
 </template>

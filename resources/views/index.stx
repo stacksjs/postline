@@ -1,86 +1,108 @@
 @extends('layouts/marketing')
 
-@section('title', 'The Open Times: publish, send and own your audience')
-@section('description', 'Run your publication, your newsletter and your paid subscriptions on software you own. Crossposts to every network. Open source, and nobody takes a cut.')
-@section('canonical', 'https://opentimes.stacksjs.com/')
-@section('ogImage', 'https://opentimes.stacksjs.com/images/og/home.png')
+@section('title', 'The Open Times — publish it, send it, own it')
+@section('description', 'An independent paper you actually own: the publication, the newsletter and the paid subscriptions all run on software you host. Crossposts to every network. Open source, and nobody takes a cut.')
+@section('canonical', 'https://theopentimes.org/')
+@section('ogImage', 'https://theopentimes.org/images/og/home.png')
 
 @section('content')
-  <div class="overflow-hidden relative min-h-[100dvh]">
 
-    <!-- Left hairline rail + mono index (desktop second-read moment) -->
-    <div class="hidden lg:flex absolute left-6 top-[132px] z-10 flex-col gap-3 items-center" aria-hidden="true">
-      <span class="font-mono text-[11px] text-muted">01</span>
-      <span class="h-24 w-px bg-line"></span>
-    </div>
+  <!--
+    THE FRONT PAGE
 
-    <!-- Hero -->
-    <section class="relative mx-auto px-6 lg:pl-20 max-w-[1400px]">
-      <div class="grid gap-12 items-center lg:gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] pb-16 pt-10 lg:pb-0 lg:pt-14 lg:min-h-[calc(100dvh-72px)]">
-        <!-- Left: copy -->
-        <div class="max-w-xl">
-          <p class="font-mono text-muted text-xs tracking-[0.2em] uppercase">Open source</p>
-          <h1 class="mt-5 font-semibold leading-[1.03] text-[2.75rem] text-ink tracking-tight sm:text-6xl">Publish it. Send it. Own it.</h1>
-          <p class="mt-6 max-w-md leading-relaxed text-body text-lg">Your publication, your newsletter and your paid subscribers, on software you run. Nobody takes a cut.</p>
-          <div class="flex flex-wrap gap-3 items-center mt-9">
-            <a class="inline-flex items-center px-5 h-12 font-medium text-on-accent bg-accent hover:bg-blue-700 rounded-xl shadow-sm transition-colors active:scale-[0.98]" href="/login" data-stx-link>Get started</a>
-            <a class="inline-flex gap-2 items-center px-5 h-12 font-medium text-ink hover:bg-panel-2 rounded-xl transition-colors" href="https://github.com/stacksjs/opentimes">
-              <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
-              View on GitHub
-            </a>
-          </div>
+    Laid out the way a broadsheet is rather than the way a landing page is: a
+    banner headline across the full measure, a lede running in columns beneath
+    it, and a boxed insert in the right-hand well. Everything below is another
+    story on the same sheet, separated by printed rules rather than by cards
+    floating over a background.
+  -->
+  <article class="mx-auto px-6 max-w-[1400px]">
+
+    <!-- Lead story -->
+    <section class="pt-10 sm:pt-14">
+      <p class="text-center kicker">Late edition &middot; Open source &middot; Volume one</p>
+
+      <h1 class="mt-4 font-black leading-[0.92] text-[13vw] text-center text-ink sm:text-7xl lg:text-[5.75rem]">
+        Publish it.<br class="sm:hidden"> Send it. Own it.
+      </h1>
+
+      <p class="mx-auto mt-5 max-w-3xl text-center text-xl sm:text-2xl deck">
+        Your publication, your newsletter and your paying subscribers, on software you run — with nobody standing between you and the people who read you.
+      </p>
+
+      <div class="mt-6 rule-thin"></div>
+      <p class="py-2 text-center byline">By the staff &middot; Filed from your own machine &middot; MIT licensed</p>
+      <div class="rule-thick"></div>
+    </section>
+
+    <!-- The lede and the boxed insert, set the way a column and a well are -->
+    <section class="grid gap-10 lg:gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] pb-14 pt-8">
+      <div class="copy">
+        <div class="leading-relaxed text-body columns-print">
+          <p class="m-0 dropcap">Every publishing platform you can sign up for makes the same trade: it hosts your words, and in return it holds your readers. The list is theirs, the payment relationship is theirs, and the terms are whatever they happen to be this quarter.</p>
+          <p class="m-0 mt-4">The Open Times is the other arrangement. It is one program, on one machine you control, that renders the page, sends the email, takes the payment and files the announcement to every network you post to. One action does all four.</p>
+          <p class="m-0 mt-4">There is no platform fee, because there is no platform — only your database, your mail provider, your Stripe account and your domain.</p>
         </div>
 
-        <!-- Right: a published post, sent and announced. One preview carries the
-            whole product: the page, the send, and the crosspost. -->
-        <div class="lg:justify-self-end lg:-mr-6 lg:translate-y-6">
-          <div class="max-w-[520px] bg-panel border border-line rounded-2xl shadow-[0_40px_90px_-30px_rgba(9,9,11,0.35)] lg:rotate-[1.4deg]" role="img" aria-label="A The Open Times post published to a custom domain, emailed to 4,182 subscribers and announced on six networks">
-            <div class="flex gap-1.5 items-center px-5 h-11 border-b border-line" aria-hidden="true">
-              <span class="h-2.5 w-2.5 bg-panel-3 rounded-full"></span>
-              <span class="h-2.5 w-2.5 bg-panel-3 rounded-full"></span>
-              <span class="h-2.5 w-2.5 bg-panel-3 rounded-full"></span>
-              <span class="ml-3 font-mono text-[11px] text-muted">theweeklybuild.dev</span>
-            </div>
-            <div class="p-5">
-              <p class="font-mono text-[11px] text-muted tracking-[0.16em] uppercase">The Weekly Build</p>
-              <p class="mt-3 font-semibold leading-snug text-ink text-xl">What shipping every Friday for a year actually cost me</p>
-              <p class="mt-2.5 leading-relaxed text-body text-sm">Fifty-one issues, two rewrites, and one week I nearly stopped. The honest version of the ledger.</p>
+        <div class="flex flex-wrap gap-3 items-center mt-8">
+          <a class="inline-flex items-center px-6 h-12 text-sm ink-button" href="/login" data-stx-link>Start your paper</a>
+          <a class="inline-flex gap-2 items-center px-6 h-12 text-sm ink-button ink-button--ghost" href="https://github.com/stacksjs/opentimes">
+            <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
+            Read the source
+          </a>
+        </div>
+      </div>
 
-              <div class="grid gap-3 mt-5 pt-4 border-line border-t">
-                <div class="flex gap-3 items-center">
-                  <span class="grid place-items-center shrink-0 h-7 w-7 text-accent bg-panel-2 rounded-lg i-hugeicons-mail-01" aria-hidden="true"></span>
-                  <span class="text-body text-sm">Sent to 4,182 subscribers</span>
-                </div>
-                <div class="flex gap-3 items-center">
-                  <span class="grid place-items-center shrink-0 h-7 w-7 text-accent bg-panel-2 rounded-lg i-hugeicons-share-08" aria-hidden="true"></span>
-                  <span class="flex flex-wrap gap-2 items-center text-body text-sm">
-                    Announced on
-                    <span class="inline-flex gap-1.5 items-center text-muted">
-                      <span class="h-4 w-4 i-simple-icons-bluesky" aria-hidden="true"></span>
-                      <span class="h-4 w-4 i-simple-icons-x" aria-hidden="true"></span>
-                      <span class="h-4 w-4 i-simple-icons-linkedin" aria-hidden="true"></span>
-                      <span class="h-4 w-4 i-simple-icons-instagram" aria-hidden="true"></span>
-                      <span class="h-4 w-4 i-simple-icons-threads" aria-hidden="true"></span>
-                      <span class="h-4 w-4 i-simple-icons-mastodon" aria-hidden="true"></span>
-                    </span>
+      <!--
+        The insert. A single published story carrying the whole product: the
+        page it made, the mail it sent, and the wires it went out on. Boxed and
+        captioned, because that is what a newspaper does with a picture.
+      -->
+      <figure class="m-0 self-start">
+        <div class="bg-panel border-2 border-ink" role="img" aria-label="A story published to a custom domain, mailed to 4,182 subscribers and wired to six networks">
+          <div class="flex gap-3 items-baseline justify-between px-4 py-2 bg-ink">
+            <span class="text-on-accent folio">The Weekly Build</span>
+            <span class="text-on-accent folio">theweeklybuild.dev</span>
+          </div>
+          <div class="p-5">
+            <p class="m-0 font-bold leading-tight text-2xl text-ink">What shipping every Friday for a year actually cost me</p>
+            <p class="m-0 mt-2.5 leading-relaxed text-body text-sm">Fifty-one issues, two rewrites, and one week I nearly stopped. The honest version of the ledger.</p>
+
+            <div class="grid gap-2.5 mt-5 pt-4 rule-thin">
+              <div class="flex gap-3 items-center">
+                <span class="shrink-0 h-4 w-4 text-accent i-hugeicons-mail-01" aria-hidden="true"></span>
+                <span class="text-body text-sm">Mailed to 4,182 subscribers</span>
+              </div>
+              <div class="flex gap-3 items-center">
+                <span class="shrink-0 h-4 w-4 text-accent i-hugeicons-share-08" aria-hidden="true"></span>
+                <span class="flex flex-wrap gap-2 items-center text-body text-sm">
+                  On the wire to
+                  <span class="inline-flex gap-1.5 items-center text-ink">
+                    <span class="h-4 w-4 i-simple-icons-bluesky" aria-hidden="true"></span>
+                    <span class="h-4 w-4 i-simple-icons-x" aria-hidden="true"></span>
+                    <span class="h-4 w-4 i-simple-icons-linkedin" aria-hidden="true"></span>
+                    <span class="h-4 w-4 i-simple-icons-instagram" aria-hidden="true"></span>
+                    <span class="h-4 w-4 i-simple-icons-threads" aria-hidden="true"></span>
+                    <span class="h-4 w-4 i-simple-icons-mastodon" aria-hidden="true"></span>
                   </span>
-                </div>
+                </span>
               </div>
             </div>
           </div>
         </div>
-      </div>
+        <figcaption class="mt-2 byline">One publish &mdash; the page, the send and six announcements.</figcaption>
+      </figure>
     </section>
-  </div>
+  </article>
 
-  <!-- 02 · Providers strip -->
-  <section class="relative bg-panel border-line border-y" aria-label="Supported networks">
+  <!-- The wire: the networks a story goes out on -->
+  <section class="bg-panel-2 border-ink border-y-2" aria-label="Supported networks">
     <ul class="sr-only">
       <li>Bluesky</li><li>X</li><li>LinkedIn</li><li>Instagram</li><li>Threads</li><li>Mastodon</li>
     </ul>
     <div class="mx-auto px-6 max-w-[1400px]">
-      <div class="flex flex-col gap-6 sm:flex-row sm:gap-12 sm:items-center py-9">
-        <p class="shrink-0 font-mono leading-relaxed text-muted text-xs tracking-[0.2em] uppercase">One post,<br class="hidden sm:block"> six networks</p>
+      <div class="flex flex-col gap-4 sm:flex-row sm:gap-10 sm:items-center py-5">
+        <p class="m-0 shrink-0 kicker">On the wire</p>
         <div class="overflow-hidden relative grow [mask-image:linear-gradient(90deg,transparent,#000_7%,#000_93%,transparent)]">
           <ul class="flex gap-12 items-center w-max marquee-track" aria-hidden="true">
             <ProviderChip icon="bluesky" name="Bluesky" />
@@ -101,14 +123,15 @@
     </div>
   </section>
 
-  <!-- 03 · Publish: the publication itself. Text left, list right. -->
-  <section id="publish" class="relative mx-auto px-6 py-20 sm:py-28 lg:py-32 max-w-[1400px]">
-    <div class="grid gap-12 lg:gap-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+  <!-- Story 02 · The publication -->
+  <section id="publish" class="mx-auto px-6 py-16 sm:py-20 max-w-[1400px]">
+    <div class="grid gap-10 lg:gap-14 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
       <div class="max-w-md reveal">
-        <SectionLabel index="02" label="Publish" />
-        <h2 class="mt-5 font-semibold leading-[1.05] text-3xl text-ink tracking-tight sm:text-5xl">A publication<br>you are not renting.</h2>
-        <p class="mt-5 leading-relaxed text-body text-lg">Long-form posts render at your own domain, on templates that are files in your project. The archive is a table you can query.</p>
-        <a class="inline-flex gap-2 items-center mt-7 font-medium text-accent text-sm group" href="/features/publications" data-stx-link>
+        <SectionLabel index="02" label="The publication" />
+        <h2 class="mt-3 leading-[1.02] text-4xl text-ink sm:text-5xl">A paper you are<br>not renting.</h2>
+        <div class="mt-4 rule-thin"></div>
+        <p class="mt-4 leading-relaxed text-body copy">Long-form stories render at your own domain, on templates that are files in your project. The archive is a table you can query, back up and move.</p>
+        <a class="inline-flex gap-2 items-center mt-6 font-semibold text-accent text-sm group" href="/features/publications" data-stx-link>
           How publications work
           <span class="h-4 w-4 transition-transform group-hover:translate-x-0.5 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>
@@ -117,24 +140,24 @@
       <!-- Three steps as a numbered ledger. Deliberately not cards: this is a
           sequence, and cards would flatten it into three equal things. -->
       <ol class="grid gap-0 m-0 p-0 list-none border-line border-t divide-line divide-y reveal">
-        <li class="grid gap-2 sm:gap-6 sm:grid-cols-[auto_minmax(0,1fr)] py-7">
+        <li class="grid gap-2 sm:gap-6 sm:grid-cols-[auto_minmax(0,1fr)] py-6">
           <span class="font-mono text-muted text-sm">01</span>
-          <div class="max-w-[52ch]">
-            <h3 class="m-0 font-semibold text-ink text-lg">Write the piece</h3>
-            <p class="m-0 mt-2 leading-relaxed text-body">The same composer handles a two-line post and a three-thousand-word essay. Long-form gets a title, a slug and an archive entry.</p>
+          <div class="max-w-[54ch]">
+            <h3 class="m-0 text-ink text-xl">Write the piece</h3>
+            <p class="m-0 mt-2 leading-relaxed text-body">The same composer handles a two-line note and a three-thousand-word essay. Long-form gets a title, a slug and an archive entry.</p>
           </div>
         </li>
-        <li class="grid gap-2 sm:gap-6 sm:grid-cols-[auto_minmax(0,1fr)] py-7">
+        <li class="grid gap-2 sm:gap-6 sm:grid-cols-[auto_minmax(0,1fr)] py-6">
           <span class="font-mono text-muted text-sm">02</span>
-          <div class="max-w-[52ch]">
-            <h3 class="m-0 font-semibold text-ink text-lg">Decide who reads it</h3>
-            <p class="m-0 mt-2 leading-relaxed text-body">Free for everyone, subscribers only, or paying subscribers only. It is a choice per post rather than a plan you commit to.</p>
+          <div class="max-w-[54ch]">
+            <h3 class="m-0 text-ink text-xl">Decide who reads it</h3>
+            <p class="m-0 mt-2 leading-relaxed text-body">Free for everyone, subscribers only, or paying subscribers only. A choice per story rather than a plan you commit to.</p>
           </div>
         </li>
-        <li class="grid gap-2 sm:gap-6 sm:grid-cols-[auto_minmax(0,1fr)] py-7">
+        <li class="grid gap-2 sm:gap-6 sm:grid-cols-[auto_minmax(0,1fr)] py-6">
           <span class="font-mono text-muted text-sm">03</span>
-          <div class="max-w-[52ch]">
-            <h3 class="m-0 font-semibold text-ink text-lg">Publish once</h3>
+          <div class="max-w-[54ch]">
+            <h3 class="m-0 text-ink text-xl">Put it to bed</h3>
             <p class="m-0 mt-2 leading-relaxed text-body">The page goes live, the email goes out, and the announcement goes to every network you post to. One action covers all three.</p>
           </div>
         </li>
@@ -142,29 +165,28 @@
     </div>
   </section>
 
-  <!-- 04 · Newsletter + money. Two cells of different weight, one tinted, so
-      the grid has rhythm rather than two matching boxes. -->
-  <section class="relative mx-auto pb-20 px-6 sm:pb-28 max-w-[1400px]">
-    <div class="grid overflow-hidden gap-px lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] bg-line border border-line rounded-2xl reveal">
-      <div class="grid content-between gap-10 p-8 sm:p-10 bg-panel">
-        <div class="max-w-[42ch]">
-          <span class="grid place-items-center h-11 w-11 text-accent bg-panel-2 border border-line rounded-xl i-hugeicons-mail-01" aria-hidden="true"></span>
-          <h2 class="mt-6 font-semibold leading-tight text-2xl text-ink tracking-tight sm:text-3xl">Publishing a post is sending it.</h2>
-          <p class="mt-4 leading-relaxed text-body">Mail goes out through your own provider, so deliverability, reputation and cost per email all stay yours. Export the list whenever you want.</p>
+  <!-- Story 03 · The mail and the money, as two facing panels of unequal weight -->
+  <section class="mx-auto pb-16 px-6 sm:pb-20 max-w-[1400px]">
+    <div class="grid gap-px lg:grid-cols-2 bg-ink border-2 border-ink reveal">
+      <div class="grid content-between gap-8 p-7 sm:p-9 bg-bg">
+        <div class="max-w-[44ch]">
+          <p class="m-0 kicker">The mail</p>
+          <h2 class="mt-3 leading-tight text-3xl text-ink">Publishing a story is sending it.</h2>
+          <p class="mt-3 leading-relaxed text-body copy">Mail goes out through your own provider, so deliverability, reputation and cost per email all stay yours. Export the list whenever you want — it was never held anywhere else.</p>
         </div>
-        <a class="inline-flex gap-2 items-center font-medium text-accent text-sm group" href="/features/newsletter" data-stx-link>
+        <a class="inline-flex gap-2 items-center font-semibold text-accent text-sm group" href="/features/newsletter" data-stx-link>
           How sending works
           <span class="h-4 w-4 transition-transform group-hover:translate-x-0.5 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>
       </div>
 
-      <div class="grid content-between gap-10 p-8 sm:p-10 text-white bg-[#0a0a0a]">
-        <div class="max-w-[42ch]">
-          <span class="grid place-items-center h-11 w-11 text-white bg-white/10 border border-white/10 rounded-xl i-hugeicons-dollar-circle" aria-hidden="true"></span>
-          <h2 class="mt-6 font-semibold leading-tight text-2xl tracking-tight sm:text-3xl">Charge for it. Keep all of it.</h2>
-          <p class="mt-4 leading-relaxed text-white/60">Readers pay into your Stripe account. The only fee is the one Stripe charges you directly, because there is nobody else in the transaction.</p>
+      <div class="grid content-between gap-8 p-7 sm:p-9 text-on-accent bg-ink">
+        <div class="max-w-[44ch]">
+          <p class="m-0 text-on-accent/70 kicker">The money</p>
+          <h2 class="mt-3 leading-tight text-3xl text-on-accent">Charge for it. Keep all of it.</h2>
+          <p class="mt-3 leading-relaxed text-on-accent/70">Readers pay into your Stripe account. The only fee is the one Stripe charges you directly, because there is nobody else in the transaction.</p>
         </div>
-        <a class="inline-flex gap-2 items-center font-medium text-sm text-white group" href="/features/paid-subscriptions" data-stx-link>
+        <a class="inline-flex gap-2 items-center font-semibold text-on-accent text-sm group" href="/features/paid-subscriptions" data-stx-link>
           How payments work
           <span class="h-4 w-4 transition-transform group-hover:translate-x-0.5 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>
@@ -172,119 +194,120 @@
     </div>
   </section>
 
-  <!-- 05 · Discover. Centered header over a divided index of publications:
-      a different layout family from every section above it. -->
-  <section id="discover" class="relative bg-panel border-line border-y">
-    <div class="mx-auto px-6 py-20 sm:py-28 max-w-[1400px]">
+  <!-- Story 04 · Discover, set as a classified index -->
+  <section id="discover" class="bg-panel-2 border-line border-y">
+    <div class="mx-auto px-6 py-16 sm:py-20 max-w-[1400px]">
       <div class="mx-auto max-w-2xl text-center reveal">
-        <SectionLabel index="03" label="Discover" />
-        <h2 class="mt-5 font-semibold leading-[1.05] text-3xl text-ink tracking-tight sm:text-5xl">Found by people who already read.</h2>
-        <p class="mt-5 leading-relaxed text-body text-lg">Publications recommend each other. A reader who trusts one writer sees the handful that writer vouches for, ranked by subscriptions rather than by spend.</p>
+        <SectionLabel index="03" label="The exchange" />
+        <h2 class="mt-3 leading-[1.02] text-4xl text-ink sm:text-5xl">Found by people who already read.</h2>
+        <p class="mx-auto mt-4 max-w-xl leading-relaxed text-body copy">Papers recommend each other. A reader who trusts one writer sees the handful that writer vouches for — ranked by subscriptions rather than by spend.</p>
       </div>
 
-      <ul class="grid gap-0 m-0 mt-14 mx-auto p-0 max-w-3xl list-none border-line border-t divide-line divide-y reveal">
-        <li class="flex flex-wrap gap-x-6 gap-y-2 items-baseline justify-between py-5">
-          <span class="grid gap-1">
-            <span class="font-semibold text-ink">The Weekly Build</span>
+      <ul class="grid gap-0 m-0 mt-10 mx-auto p-0 max-w-3xl list-none border-ink border-t-2 divide-line divide-y reveal">
+        <li class="flex flex-wrap gap-x-6 gap-y-1 items-baseline justify-between py-4">
+          <span class="grid gap-0.5">
+            <span class="font-bold text-ink text-lg">The Weekly Build</span>
             <span class="text-muted text-sm">Shipping notes from a solo founder, every Friday</span>
           </span>
-          <span class="font-mono text-muted text-xs">Marta Ihenacho</span>
+          <span class="byline">Marta Ihenacho</span>
         </li>
-        <li class="flex flex-wrap gap-x-6 gap-y-2 items-baseline justify-between py-5">
-          <span class="grid gap-1">
-            <span class="font-semibold text-ink">Margins</span>
+        <li class="flex flex-wrap gap-x-6 gap-y-1 items-baseline justify-between py-4">
+          <span class="grid gap-0.5">
+            <span class="font-bold text-ink text-lg">Margins</span>
             <span class="text-muted text-sm">What small software businesses actually earn</span>
           </span>
-          <span class="font-mono text-muted text-xs">Devansh Rau</span>
+          <span class="byline">Devansh Rau</span>
         </li>
-        <li class="flex flex-wrap gap-x-6 gap-y-2 items-baseline justify-between py-5">
-          <span class="grid gap-1">
-            <span class="font-semibold text-ink">Cold Open</span>
+        <li class="flex flex-wrap gap-x-6 gap-y-1 items-baseline justify-between py-4">
+          <span class="grid gap-0.5">
+            <span class="font-bold text-ink text-lg">Cold Open</span>
             <span class="text-muted text-sm">Long reads on the business of independent film</span>
           </span>
-          <span class="font-mono text-muted text-xs">Siobhán Carrick</span>
+          <span class="byline">Siobh&aacute;n Carrick</span>
         </li>
-        <li class="flex flex-wrap gap-x-6 gap-y-2 items-baseline justify-between py-5">
-          <span class="grid gap-1">
-            <span class="font-semibold text-ink">Second System</span>
+        <li class="flex flex-wrap gap-x-6 gap-y-1 items-baseline justify-between py-4">
+          <span class="grid gap-0.5">
+            <span class="font-bold text-ink text-lg">Second System</span>
             <span class="text-muted text-sm">Rewrites that worked, and the ones that did not</span>
           </span>
-          <span class="font-mono text-muted text-xs">Tomas Lindqvist</span>
+          <span class="byline">Tomas Lindqvist</span>
         </li>
       </ul>
 
-      <p class="mt-8 text-center text-muted text-sm">Your publication stays unlisted until you list it.</p>
+      <p class="mt-6 text-center byline">Your paper stays unlisted until you list it.</p>
     </div>
   </section>
 
-  <!-- 06 · The queue (product moment) -->
-  <section id="queue" class="relative mx-auto px-6 py-20 sm:py-28 lg:py-32 max-w-[1400px]">
-    <div class="grid gap-12 items-center lg:gap-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-      <!-- Faithful queue preview -->
-      <div class="order-2 lg:order-1 reveal">
-        <div class="overflow-hidden bg-panel border border-line rounded-2xl shadow-[0_40px_90px_-40px_rgba(9,9,11,0.3)]" role="img" aria-label="The Open Times queue showing three scheduled posts, one currently publishing">
-          <div class="flex items-center justify-between px-5 h-12 border-b border-line" aria-hidden="true">
-            <span class="font-mono text-[11px] text-muted">queue</span>
-            <span class="font-mono text-[11px] text-muted">this week</span>
+  <!-- Story 05 · The stone: what is going out this week -->
+  <section id="queue" class="mx-auto px-6 py-16 sm:py-20 max-w-[1400px]">
+    <div class="grid gap-10 items-center lg:gap-14 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+      <figure class="order-2 m-0 lg:order-1 reveal">
+        <div class="bg-panel border-2 border-ink" role="img" aria-label="The schedule showing three queued stories, one currently going out">
+          <div class="flex items-center justify-between px-4 py-2 bg-ink" aria-hidden="true">
+            <span class="text-on-accent folio">The schedule</span>
+            <span class="text-on-accent folio">This week</span>
           </div>
           <ul class="divide-line divide-y">
             <QueueRow slot="Mon 09:00" body="New issue: what shipping every Friday for a year cost me." icons="bluesky,x,mastodon" status="published" />
             <QueueRow slot="Wed 13:30" body="The paragraph everyone replied to, on its own." icons="linkedin,threads" status="publishing" />
-            <QueueRow slot="Fri 18:00" body="Paid subscribers get the full ledger this weekend." icons="instagram,x" status="scheduled" />
+            <QueueRow slot="Fri 18:00" body="Paying subscribers get the full ledger this weekend." icons="instagram,x" status="scheduled" />
           </ul>
         </div>
-      </div>
-      <!-- Caption -->
+        <figcaption class="mt-2 byline">Three slots, six networks, one draft each.</figcaption>
+      </figure>
+
       <div class="order-1 lg:order-2 max-w-md reveal">
-        <SectionLabel index="04" label="Distribute" />
-        <h2 class="mt-5 font-semibold leading-[1.05] text-3xl text-ink tracking-tight sm:text-5xl">Every network,<br>from one draft.</h2>
-        <p class="mt-5 leading-relaxed text-body text-lg">Announce the issue, queue the follow-ups, and let each network get wording that fits it. Publishing the piece is where the sequence starts.</p>
-        <ul class="mt-8 border-line border-t divide-line divide-y">
-          <li class="flex gap-3 items-center py-3.5"><span class="grid place-items-center shrink-0 h-6 w-6 font-mono text-[11px] text-muted bg-panel-2 border border-line rounded-md">1</span><span class="text-body text-sm">Six networks from one composer</span></li>
-          <li class="flex gap-3 items-center py-3.5"><span class="grid place-items-center shrink-0 h-6 w-6 font-mono text-[11px] text-muted bg-panel-2 border border-line rounded-md">2</span><span class="text-body text-sm">Per-network limits and previews</span></li>
-          <li class="flex gap-3 items-center py-3.5"><span class="grid place-items-center shrink-0 h-6 w-6 font-mono text-[11px] text-muted bg-panel-2 border border-line rounded-md">3</span><span class="text-body text-sm">Schedule ahead or publish now</span></li>
+        <SectionLabel index="04" label="Distribution" />
+        <h2 class="mt-3 leading-[1.02] text-4xl text-ink sm:text-5xl">Every network,<br>from one draft.</h2>
+        <div class="mt-4 rule-thin"></div>
+        <p class="mt-4 leading-relaxed text-body copy">Announce the issue, queue the follow-ups, and let each network get wording that fits it. Publishing the piece is where the sequence starts, not another chore after it.</p>
+        <ul class="mt-6 border-line border-t divide-line divide-y">
+          <li class="flex gap-3 items-center py-3"><span class="grid place-items-center shrink-0 h-6 w-6 text-ink border border-ink folio">1</span><span class="text-body text-sm">Six networks from one composer</span></li>
+          <li class="flex gap-3 items-center py-3"><span class="grid place-items-center shrink-0 h-6 w-6 text-ink border border-ink folio">2</span><span class="text-body text-sm">Per-network limits and previews</span></li>
+          <li class="flex gap-3 items-center py-3"><span class="grid place-items-center shrink-0 h-6 w-6 text-ink border border-ink folio">3</span><span class="text-body text-sm">Schedule ahead or put it out now</span></li>
         </ul>
       </div>
     </div>
   </section>
 
-  <!-- 07 · Own it (dark beat) -->
-  <section class="relative text-white bg-[#0a0a0a]" aria-label="Open source and owned">
-    <div class="mx-auto px-6 py-24 sm:py-32 max-w-[1400px]">
+  <!-- The EXTRA banner: the one reversed beat on the sheet -->
+  <section class="text-on-accent bg-ink" aria-label="Open source and owned">
+    <div class="mx-auto px-6 py-16 sm:py-24 max-w-[1400px]">
       <div class="max-w-3xl reveal">
-        <SectionLabel index="05" label="Own it" onDark />
-        <h2 class="mt-6 font-semibold leading-[1.05] text-4xl tracking-tight sm:text-6xl">Your list. Your revenue.<br>Your machine.</h2>
-        <p class="mt-6 max-w-xl leading-relaxed text-lg text-white/60">Subscribers, payments, posts and tokens all live in a database you run. A platform cannot change its terms on an audience it does not hold.</p>
-        <div class="inline-flex gap-3 items-center mt-9 px-4 h-12 font-mono text-sm bg-white/5 border border-white/10 rounded-xl">
-          <span class="text-accent" aria-hidden="true">$</span>
-          <span class="text-white/90">bunx opentimes</span>
+        <p class="m-0 text-on-accent/70 kicker">Extra &middot; Own it</p>
+        <h2 class="mt-4 leading-[0.98] text-5xl text-on-accent sm:text-7xl">Your list. Your revenue.<br>Your machine.</h2>
+        <p class="mt-5 max-w-xl leading-relaxed text-lg text-on-accent/70">Subscribers, payments, stories and tokens all live in a database you run. A platform cannot change its terms on an audience it does not hold.</p>
+        <div class="inline-flex gap-3 items-center mt-8 px-4 h-12 text-sm border border-on-accent/25 font-typewriter">
+          <span class="text-on-accent/50" aria-hidden="true">$</span>
+          <span class="text-on-accent">bunx opentimes</span>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- 08 · Open + built on Stacks -->
-  <section class="relative mx-auto px-6 py-20 sm:py-28 max-w-[1400px]">
+  <!-- The colophon -->
+  <section class="mx-auto px-6 py-16 sm:py-20 max-w-[1400px]">
     <div class="max-w-2xl reveal">
-      <SectionLabel index="06" label="Open" />
-      <h2 class="mt-6 font-semibold leading-tight text-3xl text-ink tracking-tight sm:text-5xl">Open source, and yours to change.</h2>
+      <SectionLabel index="05" label="Colophon" />
+      <h2 class="mt-3 leading-tight text-4xl text-ink sm:text-5xl">Open source, and yours to change.</h2>
     </div>
-    <div class="grid overflow-hidden gap-px sm:grid-cols-3 mt-12 bg-line border border-line rounded-2xl reveal">
-      <ValueCard icon="source-code" title="MIT licensed" description="Read every line, fork it, and ship your own. No black boxes." />
-      <ValueCard icon="package" title="Single binary" description="One Bun binary to run. No sprawling services to babysit." />
-      <ValueCard icon="layers-01" title="Built on Stacks" description="A full-stack TypeScript framework underneath, end to end." />
+    <div class="grid gap-px sm:grid-cols-3 mt-8 bg-ink border-2 border-ink reveal">
+      <ValueCard icon="source-code" title="MIT licensed" description="Read every line, fork it, and run your own. No black boxes and no vendor." />
+      <ValueCard icon="package" title="Single binary" description="One Bun binary to run. No sprawling services to babysit at two in the morning." />
+      <ValueCard icon="layers-01" title="Built on Stacks" description="A full-stack TypeScript framework underneath, end to end and all of it readable." />
     </div>
   </section>
 
-  <!-- 09 · Close -->
-  <section class="relative border-line border-t">
-    <div class="mx-auto px-6 py-24 sm:py-32 max-w-[1400px] text-center">
+  <!-- Put the paper to bed -->
+  <section class="border-ink border-t-2">
+    <div class="mx-auto px-6 py-16 sm:py-24 max-w-[1400px] text-center">
       <div class="mx-auto max-w-2xl reveal">
-        <h2 class="font-semibold leading-[1.05] text-4xl text-ink tracking-tight sm:text-6xl">Publish once. Own everything.</h2>
-        <p class="mt-5 leading-relaxed text-body text-lg">Stand up your own edition and run your publication from something nobody can take away.</p>
-        <div class="flex flex-wrap gap-3 justify-center mt-9">
-          <a class="inline-flex items-center px-5 h-12 font-medium text-on-accent bg-accent hover:bg-blue-700 rounded-xl shadow-sm transition-colors active:scale-[0.98]" href="/login" data-stx-link>Get started</a>
-          <a class="inline-flex gap-2 items-center px-5 h-12 font-medium text-ink hover:bg-panel-2 rounded-xl transition-colors" href="https://github.com/stacksjs/opentimes">
+        <p class="m-0 kicker">Final edition</p>
+        <h2 class="mt-4 leading-[0.98] text-5xl text-ink sm:text-7xl">Publish once.<br>Own everything.</h2>
+        <p class="mx-auto mt-5 max-w-xl leading-relaxed text-body copy">Stand up your own edition of The Open Times and run your paper on something nobody can take away from you.</p>
+        <div class="flex flex-wrap gap-3 justify-center mt-8">
+          <a class="inline-flex items-center px-6 h-12 text-sm ink-button" href="/login" data-stx-link>Start your paper</a>
+          <a class="inline-flex gap-2 items-center px-6 h-12 text-sm ink-button ink-button--ghost" href="https://github.com/stacksjs/opentimes">
             <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
             Star on GitHub
           </a>

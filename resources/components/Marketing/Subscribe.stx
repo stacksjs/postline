@@ -8,24 +8,29 @@
     client directives: directives are stripped from components rendered through
     a layout, which would leave the form inert with no visible sign of it.
   -->
-  <section class="border-line border-t" aria-labelledby="subscribe-heading" data-subscribe>
-    <div class="grid gap-8 lg:gap-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] mx-auto px-6 py-20 max-w-[1400px]">
+  <!--
+    The subscription box a paper prints at the foot of the sheet: ruled off,
+    headed like a coupon, and asking for one thing.
+  -->
+  <section class="bg-panel-2 border-ink border-y-2" aria-labelledby="subscribe-heading" data-subscribe>
+    <div class="grid gap-8 lg:gap-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] mx-auto px-6 py-14 max-w-[1400px]">
       <div class="max-w-[46ch]">
-        <h2 id="subscribe-heading" class="m-0 font-semibold leading-[1.1] text-3xl text-ink tracking-tight sm:text-4xl">
-          Hear when it ships
+        <p class="m-0 kicker">Subscription coupon</p>
+        <h2 id="subscribe-heading" class="m-0 mt-3 leading-[1.05] text-3xl text-ink sm:text-4xl">
+          Hear when the next edition ships
         </h2>
-        <p class="m-0 mt-4 leading-relaxed text-body">
-          Occasional notes on releases and what changed, sent with The Open Times. No drip sequence, and one click to leave.
+        <p class="m-0 mt-3 leading-relaxed text-body">
+          Occasional notes on releases and what changed — set and sent with The Open Times itself. No drip sequence, and one click to leave.
         </p>
       </div>
 
       <div class="lg:pt-2">
         <form class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]" data-subscribe-form novalidate>
           <div class="grid gap-1.5">
-            <label class="font-medium text-[13px] text-body" for="subscribe-email">Email address</label>
+            <label class="folio" for="subscribe-email">Email address</label>
             <input
               id="subscribe-email"
-              class="px-3.5 h-11 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-accent focus:ring-2 focus:ring-blue-100"
+              class="px-3.5 h-12 text-ink text-sm bg-panel border border-ink outline-none focus:ring-2 focus:ring-accent/30"
               type="email"
               name="email"
               autocomplete="email"
@@ -38,7 +43,7 @@
 
           <div class="flex sm:items-end">
             <button
-              class="inline-flex items-center justify-center px-5 h-11 w-full sm:w-auto font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl disabled:opacity-60 transition-colors"
+              class="inline-flex items-center justify-center px-6 h-12 w-full sm:w-auto text-sm disabled:opacity-60 ink-button"
               type="submit"
               data-subscribe-submit
             >
@@ -50,7 +55,7 @@
               submitting never shifts the section under the reader. -->
           <p
             id="subscribe-status"
-            class="sm:col-span-2 m-0 min-h-5 text-[13px] text-muted"
+            class="sm:col-span-2 m-0 min-h-5 byline"
             role="status"
             aria-live="polite"
             data-subscribe-status
@@ -70,10 +75,13 @@
       const submit = root.querySelector('[data-subscribe-submit]')
       const status = root.querySelector('[data-subscribe-status]')
 
+      // Rebuilt rather than toggled so the class list always matches the one on
+      // the server-rendered element — `byline` carries the face, and dropping it
+      // here would make the status line change typeface on first submit.
       const say = (text, tone) => {
         status.textContent = text
-        status.className = `sm:col-span-2 m-0 min-h-5 text-[13px] ${
-          tone === 'error' ? 'text-red-600' : tone === 'ok' ? 'text-accent' : 'text-muted'
+        status.className = `sm:col-span-2 m-0 min-h-5 byline ${
+          tone === 'error' ? 'text-accent' : tone === 'ok' ? 'text-ink' : 'text-muted'
         }`
       }
 

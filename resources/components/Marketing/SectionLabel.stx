@@ -17,7 +17,14 @@ const { index, label, onDark } = withDefaults(
 </script>
 
 <template>
-  <p class="font-mono text-xs tracking-[0.2em] uppercase {{ onDark ? 'text-white/50' : 'text-muted' }}">
-    {{ index }} / {{ label }}
+  <!--
+    A section head, set the way a newspaper sets one: a rule, then the section
+    number and name in condensed caps. The `kicker` class carries the face and
+    the letterspacing; `onDark` only has to override the colour.
+  -->
+  <p class="flex gap-3 items-center m-0 kicker {{ onDark ? 'text-on-accent/60' : '' }}">
+    <span class="tabular-nums">{{ index }}</span>
+    <span class="h-px w-6 {{ onDark ? 'bg-on-accent/40' : 'bg-accent' }}" aria-hidden="true"></span>
+    <span>{{ label }}</span>
   </p>
 </template>

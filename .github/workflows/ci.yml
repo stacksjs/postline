@@ -107,7 +107,15 @@ jobs:
         run: bun node_modules/@stacksjs/buddy/dist/cli.js deploy production --yes
       - name: Verify production routes
         run: |
-          curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 https://opentimes.stacksjs.com/login > /dev/null
-          curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 https://opentimes.stacksjs.com/api/v1/status | grep -q '"status":"ok"'
-          status=$(curl --silent --output /dev/null --write-out '%{http_code}' https://opentimes.stacksjs.com/campaigns)
+          # Verify the canonical host. opentimes.stacksjs.com is configured as a
+          # redirect to it, and curl does not follow redirects without -L, so
+          # checking the redirect host asserted against an empty body and failed
+          # a deploy that had in fact succeeded.
+          curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 https://theopentimes.org/login > /dev/null
+          curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 https://theopentimes.org/api/v1/status | grep -q '"status":"ok"'
+          # The realtime gateway route. A plain GET is not an upgrade request,
+          # so the broadcast server answers 400 — which is proof the route
+          # reaches it rather than 404ing at the gateway.
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' https://theopentimes.org/ws)" = '400'
+          status=$(curl --silent --output /dev/null --write-out '%{http_code}' https://theopentimes.org/campaigns)
           test "$status" = '200' || test "$status" = '302' || test "$status" = '303'

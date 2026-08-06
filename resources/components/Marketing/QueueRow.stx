@@ -23,19 +23,23 @@ const label = status.charAt(0).toUpperCase() + status.slice(1)
 
 <template>
   <li class="flex gap-4 items-center px-5 py-4">
-    <span class="shrink-0 w-11 font-mono text-muted text-xs">{{ slot }}</span>
+    <span class="shrink-0 w-16 text-muted folio">{{ slot }}</span>
     <p class="grow min-w-0 text-ink text-sm truncate">{{ body }}</p>
     <span class="hidden sm:flex gap-1.5 items-center shrink-0 text-muted" aria-hidden="true">
       @foreach (iconList as icon)
         <span class="h-4 w-4 i-simple-icons-{{ icon }}"></span>
       @endforeach
     </span>
+    <!--
+      The status stamp. Going-out-now is the only one that gets the press red;
+      everything else is set in ink, the way a printed schedule would be.
+    -->
     @if (isPublishing)
-      <span class="inline-flex gap-1.5 items-center shrink-0 px-2.5 h-6 font-medium text-[11px] text-blue-700 bg-blue-500/10 border border-blue-500/30 rounded-full">
-        <span class="h-1.5 w-1.5 bg-accent rounded-full"></span>{{ label }}
+      <span class="inline-flex gap-1.5 items-center shrink-0 px-2 h-6 text-on-accent bg-accent border border-accent folio">
+        <span class="h-1.5 w-1.5 bg-on-accent"></span>{{ label }}
       </span>
     @else
-      <span class="inline-flex items-center shrink-0 px-2.5 h-6 font-medium text-[11px] text-muted bg-panel-2 border border-line rounded-full">{{ label }}</span>
+      <span class="inline-flex items-center shrink-0 px-2 h-6 text-muted border border-line folio">{{ label }}</span>
     @endif
   </li>
 </template>

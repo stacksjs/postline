@@ -9,47 +9,52 @@ const year = new Date().getFullYear()
 </script>
 
 <template>
-  <footer class="border-line border-t" aria-labelledby="footer-heading">
+  <!--
+    The colophon: what a paper prints at the foot of the last page — who made
+    it, on what, and where to write in. Set in the smallest type on the sheet
+    and ruled off from the stories above it.
+  -->
+  <footer aria-labelledby="footer-heading">
     <h2 id="footer-heading" class="sr-only">Site</h2>
 
-    <div class="grid gap-10 lg:gap-12 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] mx-auto px-6 py-16 max-w-[1400px]">
+    <div class="grid gap-10 lg:gap-12 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] mx-auto px-6 py-14 max-w-[1400px]">
       <div class="max-w-[38ch]">
-        <a class="inline-flex gap-2.5 items-center font-semibold text-ink" href="/" aria-label="The Open Times home">
-          <span class="grid place-items-center h-8 w-8 font-bold text-[13px] text-on-accent bg-ink rounded-lg">P</span>
-          The Open Times
+        <a class="block text-ink" href="/" aria-label="The Open Times home">
+          <span class="text-3xl masthead">The Open Times</span>
         </a>
-        <p class="m-0 mt-4 leading-relaxed text-[13px] text-muted">
-          Open source publishing: your site, your newsletter, your paid subscribers, and a crosspost to every network. Runs on your machine, with your keys.
+        <p class="m-0 mt-4 leading-relaxed text-body text-sm">
+          Open-source publishing: your site, your newsletter, your paying subscribers, and one wire to every network. It runs on your machine, with your keys.
         </p>
+        <p class="m-0 mt-4 byline">Set in Unifraktur, Playfair Display &amp; Libre Baskerville</p>
       </div>
 
-      <nav class="grid content-start gap-3" aria-label="Features">
-        <p class="m-0 font-medium text-[13px] text-ink">Features</p>
+      <nav class="grid content-start gap-2.5" aria-label="Features">
+        <p class="m-0 pb-1.5 kicker rule-thin">Features</p>
         @foreach (features as feature)
-          <a class="text-[13px] text-muted hover:text-ink transition-colors" href="/features/{{ feature.slug }}" data-stx-link>{{ feature.nav }}</a>
+          <a class="text-[14px] text-body hover:text-accent transition-colors" href="/features/{{ feature.slug }}" data-stx-link>{{ feature.nav }}</a>
         @endforeach
       </nav>
 
-      <nav class="grid content-start gap-3" aria-label="Use cases">
-        <p class="m-0 font-medium text-[13px] text-ink">Use cases</p>
+      <nav class="grid content-start gap-2.5" aria-label="Use cases">
+        <p class="m-0 pb-1.5 kicker rule-thin">Desks</p>
         @foreach (useCases as useCase)
-          <a class="text-[13px] text-muted hover:text-ink transition-colors" href="/use-cases/{{ useCase.slug }}" data-stx-link>{{ useCase.nav }}</a>
+          <a class="text-[14px] text-body hover:text-accent transition-colors" href="/use-cases/{{ useCase.slug }}" data-stx-link>{{ useCase.nav }}</a>
         @endforeach
       </nav>
 
-      <nav class="grid content-start gap-3" aria-label="Project">
-        <p class="m-0 font-medium text-[13px] text-ink">Project</p>
-        <a class="text-[13px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/opentimes">Source</a>
-        <a class="text-[13px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/opentimes/releases">Releases</a>
-        <a class="text-[13px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/opentimes/issues">Issues</a>
-        <a class="text-[13px] text-muted hover:text-ink transition-colors" href="/login" data-stx-link>Sign in</a>
+      <nav class="grid content-start gap-2.5" aria-label="Project">
+        <p class="m-0 pb-1.5 kicker rule-thin">Press room</p>
+        <a class="text-[14px] text-body hover:text-accent transition-colors" href="https://github.com/stacksjs/opentimes">Source</a>
+        <a class="text-[14px] text-body hover:text-accent transition-colors" href="https://github.com/stacksjs/opentimes/releases">Editions</a>
+        <a class="text-[14px] text-body hover:text-accent transition-colors" href="https://github.com/stacksjs/opentimes/issues">Corrections</a>
+        <a class="text-[14px] text-body hover:text-accent transition-colors" href="/login" data-stx-link>Subscriber sign-in</a>
       </nav>
     </div>
 
-    <div class="border-line border-t">
-      <div class="flex flex-col gap-3 justify-between sm:flex-row sm:items-center mx-auto px-6 py-6 max-w-[1400px]">
-        <p class="m-0 text-[13px] text-muted">MIT licensed. Built on Stacks.</p>
-        <p class="m-0 text-[13px] text-muted">&copy; {{ year }} The Open Times</p>
+    <div class="border-ink border-t-2">
+      <div class="flex flex-col gap-2 justify-between sm:flex-row sm:items-center mx-auto px-6 py-5 max-w-[1400px]">
+        <p class="m-0 folio">MIT licensed &middot; Built on Stacks</p>
+        <p class="m-0 folio">&copy; {{ year }} The Open Times &middot; theopentimes.org</p>
       </div>
     </div>
   </footer>

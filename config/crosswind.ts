@@ -562,7 +562,7 @@ html.marketing .marquee-track { animation: marquee 32s linear infinite; }
   html.marketing { scroll-behavior: auto; }
   html.marketing .marquee-track { animation: none; }
 }
-'
+`
 
 /**
  * PRINT FURNITURE
@@ -579,7 +579,7 @@ html.marketing .marquee-track { animation: marquee 32s linear infinite; }
  * on source order (preflights are emitted BEFORE utilities, so a tie would
  * lose).
  */
-const PRINT: string = '
+const PRINT: string = `
 html.marketing :where(
   .rounded, .rounded-sm, .rounded-md, .rounded-lg, .rounded-xl,
   .rounded-2xl, .rounded-3xl, .rounded-full
@@ -663,10 +663,13 @@ html.marketing body {
 }
 
 /*
-  Drop cap on the lede. \'initial-letter\' is the correct property and browsers
-  that have it get proper optical sinking; the float fallback covers the rest.
-  Both are declared because the fallback alone sits a couple of pixels high in
-  browsers that support the real thing.
+  Drop cap on the lede.
+
+  Deliberately the float implementation and NOT 'initial-letter'. The latter is
+  the typographically correct property, but inside a multi-column container
+  Chrome reserves a line box the full height of the sunk letter and then leaves
+  it empty - the lede rendered with roughly 900px of blank between its first and
+  second lines. The float sinks the same three lines with no such interaction.
 */
 .dropcap::first-letter {
   font-family: var(--font-display);
@@ -674,16 +677,8 @@ html.marketing body {
   float: left;
   font-size: 3.4em;
   line-height: 0.82;
-  padding: 0.06em 0.1em 0 0;
+  padding: 0.06em 0.12em 0 0;
   color: var(--ink);
-}
-@supports (initial-letter: 3) {
-  .dropcap::first-letter {
-    float: none;
-    font-size: inherit;
-    padding: 0 0.08em 0 0;
-    initial-letter: 3;
-  }
 }
 
 /*
@@ -718,11 +713,16 @@ html.marketing body {
 
 /*
   Links inside running copy get the underline a printed paper cannot have but a
-  reader now expects; everything structural (nav, cards) opts out by carrying
-  its own class.
+  reader now expects.
+
+  Restricted to links inside a paragraph or list item. A bare '.copy a' scores
+  (0,2,1) and so beat '.ink-button' (0,1,0) on specificity — which painted the
+  hero's primary button ink-on-ink and underlined its label. Buttons live in
+  their own wrapper rather than in running text, so this bound excludes them by
+  structure rather than by an :not() list that would need maintaining.
 */
-html.marketing .copy a { color: var(--ink); text-decoration: underline; text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
-html.marketing .copy a:hover { color: var(--accent); }
+html.marketing .copy :is(p, li) a { color: var(--ink); text-decoration: underline; text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+html.marketing .copy :is(p, li) a:hover { color: var(--accent); }
 `
 
 export default {

@@ -11,8 +11,8 @@ const { icon, name } = withDefaults(defineProps<ProviderChipProps>(), {})
 </script>
 
 <template>
-  <li class="inline-flex gap-2.5 items-center text-muted">
+  <li class="inline-flex gap-2.5 items-center text-ink">
     <span class="h-5 w-5 i-simple-icons-{{ icon }}"></span>
-    <span class="font-medium text-sm">{{ name }}</span>
+    <span class="folio">{{ name }}</span>
   </li>
 </template>
