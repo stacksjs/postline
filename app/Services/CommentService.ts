@@ -12,7 +12,7 @@
 
 import type { DiscoverForm } from '../Support/Social/discover'
 import { db } from '@stacksjs/database'
-import { emit } from '@stacksjs/realtime'
+import { publish } from '../Support/Realtime/publisher'
 import { publications } from './PublicationService'
 import { now, uuid } from './Social/support'
 import { normalizeEmail, isEmail, subscribers } from './SubscriberService'
@@ -188,7 +188,7 @@ export class CommentService {
 
     // Only visible comments are announced. Broadcasting a held one would show
     // it to every reader on the page, which is the opposite of holding it.
-    if (status === 'visible') emit(commentChannel(sourceKey), 'CommentPosted', view)
+    if (status === 'visible') void publish(commentChannel(sourceKey), 'CommentPosted', view)
 
     return view
   }
@@ -214,7 +214,7 @@ export class CommentService {
     // possibly-undefined value to be returned as a comment.
     if (!view) throw new Error('That comment could not be read back after updating.')
 
-    emit(commentChannel(String(comment.source_key)), status === 'visible' ? 'CommentPosted' : 'CommentRemoved', view)
+    void publish(commentChannel(String(comment.source_key)), status === 'visible' ? 'CommentPosted' : 'CommentRemoved', view)
 
     return view
   }

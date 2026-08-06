@@ -15,15 +15,16 @@
  * that opted in to being indexed, so there is nothing here to authorize; a
  * private channel would imply a permission check that does not exist.
  *
- * Emission is deliberately fire-and-forget. `emit` warns and returns when no
- * broadcast server is running, which is the behaviour publishing needs: a
- * post must not fail because the websocket process is down. The entry is
- * already committed by the time any of this runs, so a dropped event costs a
- * reader one refresh, never a lost post.
+ * Emission is deliberately fire-and-forget, and goes through `publish` rather
+ * than `emit` directly: in production the web process and the WebSocket server
+ * are separate systemd services, so an in-process emit would reach nobody. See
+ * `publisher.ts` for that boundary. Either way the entry is already committed
+ * by the time this runs, so a dropped event costs a reader one refresh, never
+ * a lost post.
  */
 
 import type { DiscoverForm } from '../Social/discover'
-import { emit } from '@stacksjs/realtime'
+import { publish } from './publisher'
 
 /** Everything, for surfaces that show both feeds. */
 export const DISCOVER_CHANNEL = 'discover'
@@ -43,6 +44,8 @@ export type DiscoverEvent = 'EntryPublished' | 'EntryUpdated' | 'EntryRemoved'
  * cheaper than making every client subscribe to both and deduplicate.
  */
 export function broadcastDiscoverEntry(event: DiscoverEvent, entry: { id: number, form: DiscoverForm } & Record<string, unknown>): void {
-  emit(DISCOVER_CHANNEL, event, entry)
-  emit(discoverChannelFor(entry.form), event, entry)
+  // Not awaited: the entry is committed, and a reader waiting on a Redis round
+  // trip to see their own publish succeed would be the wrong trade.
+  void publish(DISCOVER_CHANNEL, event, entry)
+  void publish(discoverChannelFor(entry.form), event, entry)
 }

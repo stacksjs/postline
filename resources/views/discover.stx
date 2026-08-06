@@ -1,15 +1,15 @@
-@extends('layouts/postline')
+@extends('layouts/app')
 
-@section('title', 'Postline - Discover')
-@section('description', 'Read what other Postline publications are writing, in long form and short form.')
+@section('title', 'The Open Times - Discover')
+@section('description', 'Read what other The Open Times publications are writing, in long form and short form.')
 
 @section('content')
-  <section class="grid gap-4" data-postline-page="discover" data-testid="discover-page">
+  <section class="grid gap-4" data-ot-page="discover" data-testid="discover-page">
     <header class="flex flex-col gap-4 items-stretch justify-between md:flex-row md:items-center min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Discover</p>
         <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">What the network is publishing</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-muted">Essays and posts from listed Postline publications, ranked by readers rather than by spend.</p>
+        <p class="mb-0 mt-1.5 text-[13px] text-muted">Essays and posts from listed The Open Times publications, ranked by readers rather than by spend.</p>
       </div>
       <div class="flex flex-wrap gap-2 items-center">
         <span class="inline-flex gap-2 items-center px-3 h-9 text-xs bg-panel border border-line rounded-xl" :class="live() ? 'text-emerald-700' : 'text-muted'">
@@ -52,7 +52,7 @@
           <span class="grid place-items-center h-14 w-14 text-2xl text-blue-700 bg-blue-50 rounded-2xl i-hugeicons-compass" aria-hidden="true"></span>
           <div>
             <h2 class="m-0 font-bold text-base text-ink" :text="form() === 'long' ? 'No essays yet' : 'No posts yet'"></h2>
-            <p class="m-0 mt-1 max-w-md text-muted text-sm" :text="form() === 'long' ? 'Long-form entries appear here when a listed publication publishes to its blog.' : 'Short-form entries appear here when a listed publication posts to Postline from the composer.'"></p>
+            <p class="m-0 mt-1 max-w-md text-muted text-sm" :text="form() === 'long' ? 'Long-form entries appear here when a listed publication publishes to its blog.' : 'Short-form entries appear here when a listed publication posts to The Open Times from the composer.'"></p>
           </div>
         </div>
 
@@ -164,7 +164,7 @@
       if (!quiet) loading.set(true)
       errorMessage.set('')
       try {
-        const payload = await requestJson('/api/postline/discover')
+        const payload = await requestJson('/api/ot/discover')
         shortEntries.set(payload.data?.short || [])
         longEntries.set(payload.data?.long || [])
         publicationList.set(payload.data?.publications || [])
@@ -182,7 +182,7 @@
 
     const markRead = async (entryId: number) => {
       try {
-        await requestJson('/api/postline/discover/read', {
+        await requestJson('/api/ot/discover/read', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ entry_id: entryId }),
@@ -196,17 +196,17 @@
     const listPublication = async () => {
       listing.set(true)
       try {
-        await requestJson('/api/postline/publication', {
+        await requestJson('/api/ot/publication', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ listed: true }),
         })
         publicationListed.set(true)
         await loadFeeds({ quiet: true })
-        postlineToast?.show?.({ title: 'Publication listed', message: 'Your posts now appear in Discover.', tone: 'success', id: 'discover-list' })
+        opentimesToast?.show?.({ title: 'Publication listed', message: 'Your posts now appear in Discover.', tone: 'success', id: 'discover-list' })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not list your publication', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'discover-list' })
+        opentimesToast?.show?.({ title: 'Could not list your publication', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'discover-list' })
       }
       finally {
         listing.set(false)
@@ -244,8 +244,21 @@
      * a dropped connection.
      */
     const connect = () => {
-      const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      const url = `${scheme}://${window.location.hostname}:6001`
+      // Two shapes, because the two environments genuinely differ.
+      //
+      // In production the gateway proxies `/ws` through to the broadcast
+      // server on loopback, so the socket rides the site's own certificate.
+      // A page served over https cannot open a `ws:` connection at all, and
+      // port 6001 has no certificate of its own, so a direct-port URL is not
+      // an option there.
+      //
+      // In development there is no gateway, so the port is addressed directly.
+      // `/ws` is the upgrade path the broadcast server listens on; a bare host
+      // is answered with a 404 rather than a 101 and the socket never opens.
+      const secure = window.location.protocol === 'https:'
+      const url = secure
+        ? `wss://${window.location.host}/ws`
+        : `ws://${window.location.hostname}:6001/ws`
 
       try {
         socket = new WebSocket(url)
@@ -257,8 +270,12 @@
 
       socket.addEventListener('open', () => {
         live.set(true)
+        // `channel` sits at the top level of the frame, not under `data`.
+        // ts-broadcasting's SubscribeMessage reads message.channel directly, so
+        // a nested one is undefined and the server answers subscription_error
+        // rather than subscribing — silently, since the feed still polls.
         for (const channel of ['discover.short', 'discover.long'])
-          socket?.send(JSON.stringify({ event: 'subscribe', data: { channel } }))
+          socket?.send(JSON.stringify({ event: 'subscribe', channel }))
       })
 
       socket.addEventListener('message', (message) => {

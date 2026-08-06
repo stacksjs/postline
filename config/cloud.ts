@@ -631,7 +631,57 @@ export const tsCloud: TsCloudConfig = {
       // port explicitly: the framework default (3008) is already owned by a
       // *different* tenant on this shared box, and an unconfigured proxy would
       // post The Open Times' form submissions into that app instead.
-      env: { PORT_API: '3101', DB_DATABASE_PATH },
+      // BROADCAST_REDIS_ENABLED makes this process publish realtime events to
+      // Redis instead of to an in-process server it does not have. The
+      // broadcast service relays them to the sockets.
+      env: { PORT_API: '3101', DB_DATABASE_PATH, BROADCAST_REDIS_ENABLED: 'true' },
+      exclude: SQLITE_EXCLUDES,
+    },
+
+    /**
+     * The realtime broadcast server.
+     *
+     * A site rather than a bare process so ts-cloud owns its systemd unit,
+     * its restarts and its release directory, exactly like the two app
+     * processes. It carries the canonical domain with a `/ws` path, which is
+     * how rpx routes by host *and* path: `wss://<domain>/ws` reaches loopback
+     * :6001 while every other path on the same host still goes to the app.
+     *
+     * Fronting it through the gateway rather than opening 6001 publicly is not
+     * a preference. A page served over https cannot open a `ws:` connection at
+     * all, and port 6001 has no certificate of its own, so a direct-port
+     * socket is unreachable from the deployed site. Through rpx it inherits
+     * the site's certificate and needs no DNS record, no second cert and no
+     * CORS exemption.
+     *
+     * Redis is what joins this process to the app's. `emit` resolves a
+     * module-level server instance, so an in-process emit from the web service
+     * would reach nobody here; the app publishes to Redis and this relays to
+     * its sockets. Without the flag the two halves cannot see each other and
+     * every event is dropped silently.
+     */
+    broadcast: {
+      root: '.',
+      domain: domains.canonical,
+      path: '/ws',
+      start: 'bun app/Broadcast/server.ts',
+      port: 6001,
+      preStart: [
+        // Redis lives on the box rather than as a managed service: it carries
+        // realtime fan-out between two processes on this same host, so a
+        // network hop to a managed cluster would add latency and a failure
+        // mode for no benefit. Idempotent, and it binds loopback by default on
+        // Debian, which is the only interface that should reach it.
+        'command -v redis-server >/dev/null 2>&1 || (apt-get update -y && apt-get install -y redis-server)',
+        'systemctl enable --now redis-server',
+        'bun install --production',
+      ],
+      env: {
+        BROADCAST_HOST: '127.0.0.1',
+        BROADCAST_PORT: '6001',
+        BROADCAST_REDIS_ENABLED: 'true',
+        DB_DATABASE_PATH,
+      },
       exclude: SQLITE_EXCLUDES,
     },
 
