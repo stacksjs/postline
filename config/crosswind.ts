@@ -585,18 +585,29 @@ html.marketing .marquee-track { animation: marquee 32s linear infinite; }
  * column gutters, and the tooth of the paper itself.
  *
  * Rounded corners are zeroed across the front page. A newspaper is made by
- * cutting and folding a flat sheet, so nothing on it has a radius — and the
- * markup is full of 'rounded-2xl' from the previous identity. The ':where()'
- * keeps the selector's own weight at zero, so the whole rule scores (0,1,1)
- * from 'html.marketing' and beats a (0,1,0) utility on specificity rather than
- * on source order (preflights are emitted BEFORE utilities, so a tie would
- * lose).
+ * cutting and folding a flat sheet, so nothing on it has a radius — and thirty
+ * pages of markup still carry 'rounded-xl' and 'rounded-2xl' from the previous
+ * identity.
+ *
+ * WHY THIS ONE RULE IS !important
+ *
+ * Crosswind emits preflights inside '@layer cw-base' and the generated
+ * utilities UNLAYERED. Unlayered styles beat layered ones outright, before
+ * specificity is even consulted — so 'html.marketing :where(.rounded-xl)'
+ * (0,1,1) still lost to a plain '.rounded-xl' (0,1,0), and every button on the
+ * feature pages kept its 12px radius. '!important' is the only weight that
+ * crosses a layer boundary. It is confined to this single declaration; nothing
+ * else in this file needs it, because nothing else competes with a utility of
+ * the same property.
+ *
+ * The alternative — deleting the radius classes from every marketing template —
+ * is the cleaner fix and the one to make when those pages are next touched.
  */
 const PRINT: string = `
 html.marketing :where(
   .rounded, .rounded-sm, .rounded-md, .rounded-lg, .rounded-xl,
   .rounded-2xl, .rounded-3xl, .rounded-full
-) { border-radius: 0; }
+) { border-radius: 0 !important; }
 
 html.marketing :where(a, button):focus-visible { border-radius: 0; }
 

@@ -70,10 +70,10 @@
     const password = state('')
     const confirmPassword = state('')
 
-    const heading = derived(() => registering() ? 'Create your workspace' : 'Sign in to The Open Times')
+    const heading = derived(() => registering() ? 'Set up the newsroom' : 'Sign in to The Open Times')
     const subtitle = derived(() => registering()
-      ? 'One account owns this The Open Times instance.'
-      : 'Your personal publishing workspace.')
+      ? 'One account owns this edition.'
+      : 'The newsroom behind your paper.')
     const submitLabel = derived(() => registering() ? 'Create account' : 'Sign in')
     const toggleLabel = derived(() => registering()
       ? 'Already set up? Sign in instead'
