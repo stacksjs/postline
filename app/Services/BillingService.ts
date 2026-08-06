@@ -251,6 +251,10 @@ export class BillingService {
       name: input.name,
       source: 'site',
       sourceEntryId: input.sourceEntryId,
+      // Paying confirms the address far better than a link click, and a
+      // "confirm your subscription" mail arriving mid-checkout reads as a
+      // failed payment.
+      sendConfirmation: false,
     })
 
     const base = checkoutBaseUrl(input.returnUrl || env.APP_URL)

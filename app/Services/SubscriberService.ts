@@ -89,7 +89,18 @@ export class SubscriberService {
    * publication. Re-subscribing an unsubscribed address is allowed and resets
    * it to pending, so leaving is not permanent.
    */
-  async subscribe(input: { email: unknown, name?: unknown, source?: unknown, sourceEntryId?: unknown }): Promise<{ subscriber: SubscriberView, created: boolean, confirmationToken: string | null }> {
+  async subscribe(input: {
+    email: unknown
+    name?: unknown
+    source?: unknown
+    sourceEntryId?: unknown
+    /**
+     * Whether to mail the confirmation link. Checkout passes false: paying is
+     * a stronger opt-in than clicking a link, and asking somebody to confirm a
+     * subscription they just bought reads as a failed payment.
+     */
+    sendConfirmation?: boolean
+  }): Promise<{ subscriber: SubscriberView, created: boolean, confirmationToken: string | null }> {
     const email = normalizeEmail(input.email)
     if (!isEmail(email)) throw new Error('Enter a valid email address.')
 
@@ -111,6 +122,8 @@ export class SubscriberService {
         confirmation_token: confirmation,
         updated_at: now(),
       }).where('id', '=', existing.id).execute()
+
+      await this.mailConfirmation(input.sendConfirmation, email, confirmation)
 
       return {
         subscriber: subscriberRow(await this.findById(existing.id)),
@@ -148,6 +161,8 @@ export class SubscriberService {
       .selectAll()
       .where('uuid', '=', subscriberUuid)
       .executeTakeFirstOrThrow()
+
+    await this.mailConfirmation(input.sendConfirmation, email, confirmation)
 
     return { subscriber: subscriberRow(created), created: true, confirmationToken: confirmation }
   }
@@ -284,6 +299,27 @@ export class SubscriberService {
     if (audience === 'paid') query = query.where('plan', '=', 'paid')
 
     return (await query.execute()).map(subscriberRow)
+  }
+
+  /**
+   * Deliver the confirmation link.
+   *
+   * Never throws. The subscriber row is already committed by the time this
+   * runs, so a mail transport that is down or unconfigured must not turn a
+   * successful signup into an error the reader sees. The token stays on the
+   * row, so a resend is possible without a second signup.
+   */
+  private async mailConfirmation(wanted: boolean | undefined, email: string, token: string): Promise<void> {
+    if (wanted === false) return
+
+    try {
+      const publication = await publications.ensurePublication()
+      const { sendPublicationConfirmation } = await import('../Mail/PublicationConfirmation')
+      await sendPublicationConfirmation({ to: email, publicationName: publication.name, confirmationToken: token })
+    }
+    catch (error) {
+      console.warn(`[postline] subscriber saved but confirmation mail failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 
   async findById(id: number) {
