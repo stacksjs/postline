@@ -1,4 +1,5 @@
 import type { EmailConfig } from '@stacksjs/types'
+import { APEX, url as siteUrl } from '~/config/domains'
 import { env } from '@stacksjs/env'
 
 /**
@@ -7,14 +8,53 @@ import { env } from '@stacksjs/env'
  * This configuration defines all of your email options. Because Stacks is fully-typed, you
  * may hover any of the options below and the definitions will be provided. In case you
  * have any questions, feel free to reach out via Discord or GitHub Discussions.
+ *
+ * WHICH ZONE THE MAIL RECORDS LAND IN
+ *
+ * `domain` is not just a label — `buddy deploy` publishes this zone's MX, SPF,
+ * DKIM and DMARC records from it, and registers the tenant with the shared mail
+ * daemon under it.
+ *
+ * It used to be the scaffold's `stacksjs.com`, which this project does not own:
+ * every deploy printed "Mail DNS skipped: stacksjs.com is not administered by
+ * these Porkbun credentials" and dumped four records for someone to add by
+ * hand. Nobody did. The practical consequence was not a warning — production
+ * sends as `noreply@theopentimes.org`, and that domain had no SPF, no DKIM and
+ * no DMARC, so every confirmation email went out unauthenticated.
+ *
+ * Pinned to the apex from config/domains.ts rather than spelled out, so it
+ * cannot drift from the host the app actually serves.
+ *
+ * NOTE: mail DNS is the one part of the deploy that is single-provider. The
+ * address-record path resolves a provider per domain (it publishes Porkbun and
+ * Route53 zones in the same run); `reconcileMailDns` in @stacksjs/buddy reads
+ * PORKBUN_API_KEY directly and never consults that registry. The apex is a
+ * Porkbun zone, so this works — but a mail domain in Route53 would still be
+ * skipped. See the deploy notes in config/domains.ts.
  */
+
+/**
+ * Give a host an explicit scheme, and leave one that already has it alone.
+ * `.localhost` keeps http so a dev machine without a local certificate can
+ * still follow the links in a captured email.
+ */
+function normalizeOrigin(value: string | undefined): string {
+  const host = String(value ?? '').trim().replace(/\/+$/, '')
+  if (!host)
+    return ''
+  if (/^https?:\/\//.test(host))
+    return host
+
+  return `${host.endsWith('.localhost') ? 'http' : 'https'}://${host}`
+}
+
 export default {
   from: {
-    name: env.MAIL_FROM_NAME || 'Stacks',
-    address: env.MAIL_FROM_ADDRESS || `hello@${env.MAIL_DOMAIN || 'stacksjs.com'}`,
+    name: env.MAIL_FROM_NAME || 'The Open Times',
+    address: env.MAIL_FROM_ADDRESS || `hello@${env.MAIL_DOMAIN || APEX}`,
   },
 
-  domain: env.MAIL_DOMAIN || 'stacksjs.com',
+  domain: env.MAIL_DOMAIN || APEX,
 
   /**
    * Mailbox users for IMAP/SMTP access.
@@ -32,13 +72,23 @@ export default {
     'glenn',
   ],
 
-  url: env.APP_URL || 'https://stacksjs.com',
+  /**
+   * The origin templated into mail links (confirmation, unsubscribe).
+   *
+   * `APP_URL` is a bare host everywhere in this project — `theopentimes.org`,
+   * not `https://theopentimes.org` — while this field is concatenated with a
+   * path to build a link. Taking it raw produced `theopentimes.org/confirm/…`,
+   * which a mail client renders as relative text rather than a link. The
+   * scaffold's fallback had a scheme and the env value did not, so the bug only
+   * appeared once APP_URL was set, which is to say only in production.
+   */
+  url: normalizeOrigin(env.APP_URL) || siteUrl,
   charset: 'UTF-8',
 
   server: {
     enabled: true,
     scan: true, // scans for spam and viruses
-    subdomain: 'mail', // mail.stacksjs.com
+    subdomain: 'mail', // mail.theopentimes.org
 
     /**
      * Server mode:

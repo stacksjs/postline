@@ -119,3 +119,33 @@ jobs:
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' https://theopentimes.org/ws)" = '400'
           status=$(curl --silent --output /dev/null --write-out '%{http_code}' https://theopentimes.org/campaigns)
           test "$status" = '200' || test "$status" = '302' || test "$status" = '303'
+      - name: Verify the redirect hosts, across both DNS accounts
+        run: |
+          # These hosts span two providers: theot.* are Porkbun zones, the
+          # stacksjs.com hosts are records in a Route53 zone owned by a
+          # different cloud account. One `buddy deploy` publishes both, and
+          # this is the assertion that it kept doing so — a provider that
+          # silently stops being reconciled shows up here as a redirect that
+          # went missing, not as a support ticket months later.
+          #
+          # Asserted without -L on purpose: the redirect itself is what is
+          # under test, so following it would pass even if the host had started
+          # serving the site directly (which is exactly how the duplicate
+          # content on postline.stacksjs.com went unnoticed).
+          for host in \
+            www.theopentimes.org \
+            theot.org \
+            theot.app \
+            theot.blog \
+            opentimes.stacksjs.com \
+            postline.stacksjs.com
+          do
+            location=$(curl --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
+              --output /dev/null --write-out '%{http_code} %{redirect_url}' "https://$host/deep/link")
+            echo "  $host -> $location"
+            # 301 to the canonical host, with the path carried across.
+            case "$location" in
+              '301 https://theopentimes.org/deep/link') ;;
+              *) echo "::error::$host did not 301 to the canonical host with its path preserved (got: $location)"; exit 1 ;;
+            esac
+          done
