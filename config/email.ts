@@ -97,6 +97,21 @@ export default {
      */
     mode: (env.MAIL_SERVER_MODE || 'server') as 'serverless' | 'server',
 
+    /**
+     * Report-only, deliberately.
+     *
+     * theopentimes.org started sending in August 2026 and has no history to
+     * enforce against. The framework default is `p=quarantine`, which is right
+     * for an established sender and wrong here: a young domain that trips a
+     * single alignment problem starts losing subscriber confirmations to the
+     * spam folder, which is the exact failure this project already had once.
+     * Read the aggregate reports first, then tighten to quarantine.
+     */
+    dmarc: {
+      policy: 'none',
+      reportTo: `chris@${APEX}`,
+    },
+
     storage: {
       retentionDays: 90,
       archiveAfterDays: 30,

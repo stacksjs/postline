@@ -585,30 +585,20 @@ export const tsCloud: TsCloudConfig = {
     // },
 
     /**
-     * Mail DNS.
+     * Mail DNS is NOT declared here.
      *
-     * The deploy publishes MX, SPF, DKIM and DMARC for these domains, so a
-     * fresh environment sends deliverable mail without anyone typing DNS
-     * records by hand. Without them mail still leaves the server and still
-     * fails silently at the receiving end, which is the failure worth
-     * automating away.
+     * A `mail` block under `infrastructure` was added once in the belief that
+     * ts-cloud published MX/SPF/DKIM/DMARC from it. It does not: `CloudConfig`
+     * has no `mail` field, ts-cloud's only DKIM support is SES token CNAMEs,
+     * and `infrastructure` accepts unknown keys — so the block typechecked,
+     * read as authoritative, and did nothing. Every value in it was also
+     * already contradicted by the live zone (selector `default` where the
+     * server signs with `mail`, `mail.stacksjs.com` where the MX is
+     * `mail.theopentimes.org`, `p=none` where the record said `p=quarantine`).
      *
-     * The DKIM public key pairs with /opt/mail/dkim/<domain>.private on the
-     * mail host. Rotating the key means updating both, in that order.
+     * The records are published by `reconcileMailDns` in @stacksjs/buddy,
+     * driven by config/email.ts — that is the file to edit.
      */
-    mail: {
-      enabled: true,
-      host: 'mail.stacksjs.com',
-      domains: ['theopentimes.org'],
-      ip: '178.105.248.188',
-      dkimSelector: 'default',
-      dkimPublicKeys: {
-        'theopentimes.org': 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyRTyjAfcAVJwJx6KoSumm8f8z0Ouwz3p7HWnaqcYzDT2eE1LIYcejxRZBgPyUC2WuGAv2I2gkJ4yjryZLwScwZavEUnGK3IGwzXvDkUSaNIQqP+98snFC//1Y0K2oVJr0GSpesdiURX6nhPI2I6TWQL5h1CxRf+3mNra8R1qCqow9V4arMn6HNDY+BfPnnkHVs497neEacitnS7zDInOUj4NNChbhvvgaSx4F4Bwf98pxy9QR8QNZZo3cDN0vmAJBZ0HieTT8O8Zr3rL0UibDVOsVdBCaoWua7w7qrqiAJ1eviMRsx1SyYoylPKvKCo7R89QkKNuifkPCV2Sex6BTQIDAQAB',
-      },
-      // Report-only until the domain has a mail history worth enforcing on.
-      dmarcPolicy: 'none',
-      dmarcReportTo: 'chris@theopentimes.org',
-    },
 
     /**
      * Monitoring Configuration (optional)
