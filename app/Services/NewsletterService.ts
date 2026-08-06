@@ -15,6 +15,7 @@ import { db } from '@stacksjs/database'
 import { config } from '@stacksjs/config'
 import { env } from '@stacksjs/env'
 import { mail } from '@stacksjs/email'
+import { checkoutBaseUrl } from './BillingService'
 import { publications } from './PublicationService'
 import { now, uuid } from './Social/support'
 import { subscribers } from './SubscriberService'
@@ -251,7 +252,9 @@ export class NewsletterService {
       return { done: true, delivered: 0, failed: 0 }
     }
 
-    const base = String(env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '')
+    // Same absolute-URL requirement as checkout: APP_URL is a bare host here,
+    // and an unsubscribe link without a scheme is a dead link in a mail client.
+    const base = checkoutBaseUrl(env.APP_URL)
     let delivered = 0
     let failed = 0
     let lastError: string | null = null

@@ -68,6 +68,7 @@
     "@stacksjs/ai": "^0.70.255",
     "@stacksjs/socials": "^0.70.253",
     "stacks": "^0.70.255",
+    "stripe": "^22.4.0",
     "ts-medium-editor": "^0.1.6"
   },
   "devDependencies": {

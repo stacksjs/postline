@@ -49,7 +49,12 @@ export default new Action({
     let event: { type?: string, data?: { object?: any } }
     try {
       const payload = await macros.rawBody()
-      event = stripe.webhooks.constructEvent(payload, signature, secret) as any
+      // `constructEventAsync`, not `constructEvent`. Bun has no synchronous
+      // crypto provider for the Stripe SDK, so the sync call throws
+      // "SubtleCryptoProvider cannot be used in a synchronous context" on
+      // every delivery. The async variant uses SubtleCrypto and is the only
+      // one that works on this runtime.
+      event = await stripe.webhooks.constructEventAsync(payload, signature, secret) as any
     }
     catch (error) {
       // Deliberately terse. A verification failure should not tell an attacker

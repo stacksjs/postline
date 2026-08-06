@@ -65,6 +65,25 @@ export function billingConfigured(): boolean {
   return Boolean(String(env.STRIPE_SECRET_KEY || '').trim())
 }
 
+/**
+ * An absolute base URL Stripe will accept for redirects.
+ *
+ * `APP_URL` is a bare host in this app (`postline.localhost`,
+ * `postline.stacksjs.com`), and Stripe rejects a return URL without a scheme
+ * with `url_invalid`. Localhost gets http, everything else https, which is the
+ * only pair that is true in both directions: a local box has no certificate,
+ * and a public one should never be sent a plaintext redirect.
+ */
+export function checkoutBaseUrl(value: unknown, fallback = 'http://localhost:3000'): string {
+  const raw = String(value || '').trim().replace(/\/+$/, '')
+  if (!raw) return fallback
+  if (/^https?:\/\//i.test(raw)) return raw
+
+  const local = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(raw) || /\.localhost(?::\d+)?$/i.test(raw)
+
+  return `${local ? 'http' : 'https'}://${raw}`
+}
+
 function sqliteFromUnix(seconds: unknown): string | null {
   const value = Number(seconds)
   if (!value || Number.isNaN(value)) return null
@@ -234,7 +253,7 @@ export class BillingService {
       sourceEntryId: input.sourceEntryId,
     })
 
-    const base = String(input.returnUrl || env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '')
+    const base = checkoutBaseUrl(input.returnUrl || env.APP_URL)
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: String(tier.stripe_price_id), quantity: 1 }],

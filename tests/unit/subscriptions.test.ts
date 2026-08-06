@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { checkoutBaseUrl } from '../../app/Services/BillingService'
 import { isEmail, normalizeEmail } from '../../app/Services/SubscriberService'
 
 describe('subscriber email handling', () => {
@@ -19,5 +20,33 @@ describe('subscriber email handling', () => {
     expect(isEmail('not-an-email')).toBe(false)
     expect(isEmail('missing@domain')).toBe(false)
     expect(isEmail('two spaces@example.com')).toBe(false)
+  })
+})
+
+describe('checkout base url', () => {
+  test('a bare host gains a scheme, which is what Stripe requires', () => {
+    // Stripe rejects a scheme-less return URL with `url_invalid`, and APP_URL
+    // is a bare host in this app.
+    expect(checkoutBaseUrl('postline.stacksjs.com')).toBe('https://postline.stacksjs.com')
+  })
+
+  test('localhost gets http, since a local box has no certificate', () => {
+    expect(checkoutBaseUrl('postline.localhost')).toBe('http://postline.localhost')
+    expect(checkoutBaseUrl('localhost:3000')).toBe('http://localhost:3000')
+    expect(checkoutBaseUrl('127.0.0.1:3000')).toBe('http://127.0.0.1:3000')
+  })
+
+  test('an absolute url is left alone', () => {
+    expect(checkoutBaseUrl('https://example.com')).toBe('https://example.com')
+    expect(checkoutBaseUrl('http://example.com')).toBe('http://example.com')
+  })
+
+  test('trailing slashes are trimmed, so paths do not double up', () => {
+    expect(checkoutBaseUrl('https://example.com///')).toBe('https://example.com')
+  })
+
+  test('an empty value falls back rather than producing a broken url', () => {
+    expect(checkoutBaseUrl('')).toBe('http://localhost:3000')
+    expect(checkoutBaseUrl(undefined)).toBe('http://localhost:3000')
   })
 })
