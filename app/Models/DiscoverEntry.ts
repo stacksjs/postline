@@ -45,7 +45,7 @@ export default defineModel({
 
   attributes: {
     /**
-     * `short` is a composer post published to Postline as a network.
+     * `short` is a composer post published to The Open Times as a network.
      * `long` is an essay published to a listed publication.
      */
     form: {

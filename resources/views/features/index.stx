@@ -1,15 +1,15 @@
 @extends('layouts/marketing')
 
-@section('title', 'Features - Postline')
-@section('description', 'Everything Postline does, and how each part works.')
-@section('canonical', 'https://postline.stacksjs.com/features')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/feature-index.png')
+@section('title', 'Features - The Open Times')
+@section('description', 'Everything The Open Times does, and how each part works.')
+@section('canonical', 'https://opentimes.stacksjs.com/features')
+@section('ogImage', 'https://opentimes.stacksjs.com/images/og/feature-index.png')
 
 @section('content')
   <div class="mx-auto px-6 max-w-[1400px]">
     <header class="grid gap-5 pb-12 pt-16 lg:pt-20 max-w-2xl">
       <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">Features</h1>
-      <p class="m-0 leading-relaxed text-body text-lg">Everything Postline does, and how each part works.</p>
+      <p class="m-0 leading-relaxed text-body text-lg">Everything The Open Times does, and how each part works.</p>
     </header>
 
     <ul class="grid gap-0 m-0 p-0 pb-16 list-none border-line border-t divide-line divide-y">
@@ -48,7 +48,7 @@
           <span class="grid place-items-center h-10 w-10 text-ink bg-panel border border-line rounded-xl i-hugeicons-compass" aria-hidden="true"></span>
           <span class="grid gap-1.5">
             <span class="font-semibold text-ink text-lg">Discover</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Publications on the Postline network recommend each other, so new readers arrive through someone they already trust.</span>
+            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Publications on the Open Times network recommend each other, so new readers arrive through someone they already trust.</span>
           </span>
           <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>

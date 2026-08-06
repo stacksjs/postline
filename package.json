@@ -1,9 +1,9 @@
 {
-  "name": "postline",
+  "name": "opentimes",
   "type": "module",
   "version": "0.0.0",
   "private": true,
-  "description": "A modern, minimal social publishing application.",
+  "description": "The Open Times — an independent newspaper you own: publish, send and syndicate from one desk.",
   "author": "Chris Breuer <chris@stacksjs.org>",
   "contributors": [
     "Chris Breuer <chris@stacksjs.org>"

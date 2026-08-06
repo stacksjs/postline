@@ -318,7 +318,7 @@ export class SubscriberService {
       await sendPublicationConfirmation({ to: email, publicationName: publication.name, confirmationToken: token })
     }
     catch (error) {
-      console.warn(`[postline] subscriber saved but confirmation mail failed: ${error instanceof Error ? error.message : String(error)}`)
+      console.warn(`[opentimes] subscriber saved but confirmation mail failed: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 

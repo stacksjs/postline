@@ -2,7 +2,7 @@
  * The Discover feeds.
  *
  * Writes come from two places and both go through `record`: the short-form
- * crosspost target (`PostlineService`) and the long-form blog publish. Keeping
+ * crosspost target (`OpenTimesService`) and the long-form blog publish. Keeping
  * one write path is what lets ranking, deduplication, counter refresh and the
  * realtime broadcast happen once rather than twice, slightly differently.
  *

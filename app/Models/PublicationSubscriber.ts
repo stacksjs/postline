@@ -9,7 +9,7 @@ import { schema } from '@stacksjs/validation'
  * entirely. They are also the asset the product promises you own outright, so
  * they get their own table you can read, export and back up on its own.
  *
- * Paid readers carry Stripe ids rather than card data. Postline never sees a
+ * Paid readers carry Stripe ids rather than card data. The Open Times never sees a
  * card number: checkout happens on Stripe's page and the webhook tells us what
  * happened.
  *

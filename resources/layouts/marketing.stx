@@ -12,43 +12,50 @@
 
 @head
   <meta name="color-scheme" content="light">
-  <title>@yield('title', 'Postline: publish, send and own your audience')</title>
-  <meta name="description" content="@yield('description', 'Your publication, your newsletter and your paid subscribers, on software you own. Crossposts to every network. Open source, and nobody takes a cut.')">
+  <title>@yield('title', 'The Open Times — publish it, send it, own it')</title>
+  <meta name="description" content="@yield('description', 'An independent paper you actually own: the publication, the newsletter and the paid subscribers, on software you run. Crossposts to every network. Open source, and nobody takes a cut.')">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/images/postline-icon-180.png">
-  <link rel="canonical" href="@yield('canonical', 'https://postline.stacksjs.com/')">
-  <meta name="theme-color" content="#f4f4f2">
+  <link rel="apple-touch-icon" href="/images/opentimes-icon-180.png">
+  <link rel="canonical" href="@yield('canonical', 'https://theopentimes.org/')">
+  <meta name="theme-color" content="#f1ecdd">
 
   <!-- Open Graph / social. The card image is absolute: relative URLs are not
       resolved by crawlers, which is why summary_large_image previously
       rendered with no image at all. -->
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Postline">
-  <meta property="og:url" content="@yield('canonical', 'https://postline.stacksjs.com/')">
-  <meta property="og:title" content="@yield('title', 'Postline: publish, send and own your audience')">
-  <meta property="og:description" content="@yield('description', 'Your publication, your newsletter and your paid subscribers, on software you own. Open source, and nobody takes a cut.')">
-  <meta property="og:image" content="@yield('ogImage', 'https://postline.stacksjs.com/images/postline-og.png')">
+  <meta property="og:site_name" content="The Open Times">
+  <meta property="og:url" content="@yield('canonical', 'https://theopentimes.org/')">
+  <meta property="og:title" content="@yield('title', 'The Open Times — publish it, send it, own it')">
+  <meta property="og:description" content="@yield('description', 'An independent paper you actually own: the publication, the newsletter and the paid subscribers, on software you run. Open source, and nobody takes a cut.')">
+  <meta property="og:image" content="@yield('ogImage', 'https://theopentimes.org/images/opentimes-og.png')">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Postline: one publish sends the post, emails your subscribers, and announces it on every network.">
+  <meta property="og:image:alt" content="The Open Times: one publish sets the story, mails your subscribers, and wires it to every network.">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="@yield('title', 'Postline: publish, send and own your audience')">
-  <meta name="twitter:description" content="@yield('description', 'Your publication, your newsletter and your paid subscribers, on software you own. Open source, and nobody takes a cut.')">
-  <meta name="twitter:image" content="@yield('ogImage', 'https://postline.stacksjs.com/images/postline-og.png')">
+  <meta name="twitter:title" content="@yield('title', 'The Open Times — publish it, send it, own it')">
+  <meta name="twitter:description" content="@yield('description', 'An independent paper you actually own: the publication, the newsletter and the paid subscribers, on software you run. Open source, and nobody takes a cut.')">
+  <meta name="twitter:image" content="@yield('ogImage', 'https://theopentimes.org/images/opentimes-og.png')">
 
-  <!-- Geist (display) + Geist Mono (labels/code) -->
+  <!--
+    The press. UnifrakturMaguntia sets the nameplate, Playfair Display the
+    headlines, Libre Baskerville the running copy, Oswald the kickers and
+    folios — the four faces declared in config/crosswind.ts. Each is requested
+    at exactly the weights that file uses: the display face needs 700/900 and
+    an italic for decks, the body face its italic for pull quotes, the other
+    two a single weight each.
+  -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
 
 @endhead
 
-    <!-- Shared chrome: every marketing page gets the same nav, so the mega menu
-        is defined once here rather than repeated per page. -->
+    <!-- Shared chrome: every page of the paper carries the same nameplate, so
+        the masthead and its nav are defined once here rather than per page. -->
     <MegaMenu />
     @yield('content')
-    <!-- Shared chrome: subscribe then footer, on every marketing page, so a new
-        page picks both up without remembering to include them. -->
+    <!-- Shared chrome: the subscription box then the colophon, on every page,
+        so a new page picks both up without remembering to include them. -->
     <Subscribe />
     <SiteFooter />
     @stack('scripts')

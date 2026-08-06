@@ -1,10 +1,10 @@
-@extends('layouts/postline')
+@extends('layouts/app')
 
-@section('title', 'Postline - Inbox')
+@section('title', 'The Open Times - Inbox')
 @section('description', 'Read and answer direct messages from Bluesky, X, Mastodon, and Instagram in one place.')
 
 @section('content')
-  <section class="grid gap-4" data-postline-page="inbox" data-testid="inbox-page">
+  <section class="grid gap-4" data-ot-page="inbox" data-testid="inbox-page">
     <header class="flex flex-col gap-4 items-stretch justify-between md:flex-row md:items-center min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Direct Messages</p>
@@ -58,7 +58,7 @@
             <span class="grid place-items-center h-12 w-12 text-blue-700 text-xl bg-blue-50 rounded-2xl i-hugeicons-message-01" aria-hidden="true"></span>
             <div>
               <h3 class="m-0 font-bold text-ink text-sm" :text="connectedCount() ? 'No conversations yet' : 'Connect a network first'"></h3>
-              <p class="m-0 mt-1 text-muted text-xs" :text="connectedCount() ? 'Run a sync to pull your latest DMs into Postline.' : 'Connect Bluesky, X, Mastodon, or Instagram on Accounts to start reading DMs here.'"></p>
+              <p class="m-0 mt-1 text-muted text-xs" :text="connectedCount() ? 'Run a sync to pull your latest DMs into The Open Times.' : 'Connect Bluesky, X, Mastodon, or Instagram on Accounts to start reading DMs here.'"></p>
             </div>
           </div>
 
@@ -96,7 +96,7 @@
           <span class="grid place-items-center h-14 w-14 text-2xl text-blue-700 bg-blue-50 rounded-2xl i-hugeicons-message-01" aria-hidden="true"></span>
           <div>
             <h2 class="m-0 font-bold text-base text-ink">Pick a conversation</h2>
-            <p class="m-0 mt-1 max-w-md text-muted text-sm">Choose a thread on the left to read it and reply. Postline marks it read as soon as you open it.</p>
+            <p class="m-0 mt-1 max-w-md text-muted text-sm">Choose a thread on the left to read it and reply. The Open Times marks it read as soon as you open it.</p>
           </div>
         </div>
 
@@ -258,7 +258,7 @@
       errorMessage.set('')
       try {
         const query = new URLSearchParams({ status: statusFilter(), provider: providerFilter() })
-        const payload = await requestJson(`/api/postline/inbox?${query}`)
+        const payload = await requestJson(`/api/ot/inbox?${query}`)
         conversations.set(payload.data?.conversations || [])
         supported.set(payload.data?.providers?.supported || [])
         unavailable.set(payload.data?.providers?.unavailable || [])
@@ -284,7 +284,7 @@
       if (!quiet) threadLoading.set(true)
       try {
         const query = new URLSearchParams({ conversation_id: String(activeId()), mark_read: markRead ? '1' : '0' })
-        const payload = await requestJson(`/api/postline/inbox/thread?${query}`)
+        const payload = await requestJson(`/api/ot/inbox/thread?${query}`)
         messages.set(payload.data?.messages || [])
         activeCharacterLimit.set(Number(payload.data?.characterLimit || 1000))
         if (markRead) {
@@ -321,12 +321,12 @@
     const runSync = async () => {
       syncing.set(true)
       try {
-        const payload = await postJson('/api/postline/inbox/sync', { provider: providerFilter() })
+        const payload = await postJson('/api/ot/inbox/sync', { provider: providerFilter() })
         await loadConversations({ quiet: true })
         if (activeId()) await loadThread({ markRead: false, quiet: true })
         const failures = payload.data?.errors?.length || 0
         const suffix = failures ? ` ${failures} network${failures === 1 ? '' : 's'} need attention.` : ''
-        postlineToast?.show?.({
+        opentimesToast?.show?.({
           title: 'Inbox synced',
           message: `${payload.data?.messages || 0} new message${payload.data?.messages === 1 ? '' : 's'}.${suffix}`,
           tone: failures ? 'neutral' : 'success',
@@ -334,7 +334,7 @@
         })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Inbox sync failed', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-sync' })
+        opentimesToast?.show?.({ title: 'Inbox sync failed', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-sync' })
       }
       finally {
         syncing.set(false)
@@ -345,12 +345,12 @@
       if (!activeId()) return
       refreshing.set(true)
       try {
-        await postJson('/api/postline/inbox/sync', { conversation_id: activeId() })
+        await postJson('/api/ot/inbox/sync', { conversation_id: activeId() })
         await loadThread({ quiet: true })
         await loadConversations({ quiet: true })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not refresh thread', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-refresh' })
+        opentimesToast?.show?.({ title: 'Could not refresh thread', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-refresh' })
       }
       finally {
         refreshing.set(false)
@@ -363,13 +363,13 @@
       if (!body || !activeId()) return
       sending.set(true)
       try {
-        const payload = await postJson('/api/postline/inbox/reply', { conversation_id: activeId(), body })
+        const payload = await postJson('/api/ot/inbox/reply', { conversation_id: activeId(), body })
         if (payload.data?.message) messages.set([...messages(), payload.data.message])
         draftBody.set('')
         await loadConversations({ quiet: true })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Message not sent', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-reply' })
+        opentimesToast?.show?.({ title: 'Message not sent', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-reply' })
       }
       finally {
         sending.set(false)
@@ -384,11 +384,11 @@
 
     const markAllRead = async () => {
       try {
-        await postJson('/api/postline/inbox/read', { conversation_id: 0 })
+        await postJson('/api/ot/inbox/read', { conversation_id: 0 })
         conversations.set(conversations().map(item => ({ ...item, unreadCount: 0 })))
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not update the inbox', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-read' })
+        opentimesToast?.show?.({ title: 'Could not update the inbox', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-read' })
       }
     }
 
@@ -396,10 +396,10 @@
       if (!activeId()) return
       const nextStatus = statusFilter() === 'archived' ? 'open' : 'archived'
       try {
-        await postJson('/api/postline/inbox/archive', { conversation_id: activeId(), status: nextStatus })
+        await postJson('/api/ot/inbox/archive', { conversation_id: activeId(), status: nextStatus })
         closeConversation()
         await loadConversations()
-        postlineToast?.show?.({
+        opentimesToast?.show?.({
           title: nextStatus === 'archived' ? 'Conversation archived' : 'Conversation restored',
           message: nextStatus === 'archived' ? 'It stays searchable under Archived.' : 'It is back in your inbox.',
           tone: 'success',
@@ -407,7 +407,7 @@
         })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not update the conversation', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-archive' })
+        opentimesToast?.show?.({ title: 'Could not update the conversation', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-archive' })
       }
     }
 

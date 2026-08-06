@@ -29,7 +29,7 @@ const BODY = { r: 63, g: 63, b: 70 }
 const ACCENT = { r: 37, g: 99, b: 235 }
 const PAPER = { r: 244, g: 244, b: 242 }
 
-/** The Postline mark: a rounded black square with a white P, drawn to match the nav. */
+/** The The Open Times mark: a rounded black square with a white P, drawn to match the nav. */
 function drawMark(card: any, box: { x: number, y: number, size: number }): void {
   const { x, y, size } = box
   const data = card.data ?? card
@@ -83,13 +83,13 @@ const cards: Card[] = [
   {
     file: 'feature-index',
     eyebrow: 'Features',
-    title: 'Everything Postline does',
+    title: 'Everything The Open Times does',
     subtitle: fit('Publications, newsletter, payments, discover, crossposting.'),
   },
   {
     file: 'use-case-index',
     eyebrow: 'Use cases',
-    title: 'Who runs Postline',
+    title: 'Who runs The Open Times',
     subtitle: fit('Writers, paid newsletters, founders, advocates, agencies.'),
   },
   ...ALL_ENTRIES.map(entry => ({
@@ -107,7 +107,7 @@ for (const card of cards) {
     // Flat paper rather than a photograph: the site is light-locked, and a
     // stock image behind the type would fight the brand it is representing.
     backgroundColor: PAPER,
-    brand: 'Postline',
+    brand: 'The Open Times',
     eyebrow: card.eyebrow,
     title: card.title,
     subtitle: card.subtitle,

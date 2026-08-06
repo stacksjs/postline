@@ -15,7 +15,7 @@ const PROVIDERS: SocialProvider[] = [
   'linkedin',
   'threads',
   'blog',
-  'postline',
+  'opentimes',
 ]
 
 export type VariantMap = Partial<Record<SocialProvider, string>>

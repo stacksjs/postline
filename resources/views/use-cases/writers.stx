@@ -1,9 +1,9 @@
 @extends('layouts/marketing')
 
-@section('title', 'A publication you are not renting - Postline')
+@section('title', 'A publication you are not renting - The Open Times')
 @section('description', 'Publish essays to your own site, email them to your list, and promote each one across every network in one pass.')
-@section('canonical', 'https://postline.stacksjs.com/use-cases/writers')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-writers.png')
+@section('canonical', 'https://opentimes.stacksjs.com/use-cases/writers')
+@section('ogImage', 'https://opentimes.stacksjs.com/images/og/use-case-writers.png')
 
 @section('content')
   <article class="mx-auto px-6 max-w-[1400px]">
@@ -11,7 +11,7 @@
         and the single CTA carry it. -->
     <header class="grid gap-6 pb-14 pt-16 lg:pt-20 max-w-3xl">
       <nav class="flex gap-2 items-center text-[13px] text-muted" aria-label="Breadcrumb">
-        <a class="hover:text-ink transition-colors" href="/">Postline</a>
+        <a class="hover:text-ink transition-colors" href="/">The Open Times</a>
         <span aria-hidden="true">/</span>
         <span class="text-body">Use cases</span>
       </nav>
@@ -19,7 +19,7 @@
       <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">Writing independently means the publication, the mailing list and the promotion are all your problem. Splitting them across three products means every piece is published three times, by hand, badly.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <a class="inline-flex items-center px-5 h-11 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl transition-colors" href="/login" data-stx-link>Get started</a>
-        <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">Read the source</a>
+        <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/opentimes">Read the source</a>
       </div>
     </header>
 

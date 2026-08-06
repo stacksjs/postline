@@ -1,10 +1,10 @@
-@extends('layouts/postline')
+@extends('layouts/app')
 
-@section('title', 'Postline - Publication')
+@section('title', 'The Open Times - Publication')
 @section('description', 'Your publication, readers, paid tiers, sends, comments and imports in one place.')
 
 @section('content')
-  <section class="grid gap-4" data-postline-page="publication" data-testid="publication-page">
+  <section class="grid gap-4" data-ot-page="publication" data-testid="publication-page">
     <header class="flex flex-col gap-4 items-stretch justify-between md:flex-row md:items-center min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Publication</p>
@@ -212,11 +212,11 @@
         // One pass over every section, so switching tabs never waits on a
         // request. The whole payload is a few hundred rows at most.
         const [pub, subs, tierData, sendData, commentQueue] = await Promise.all([
-          requestJson('/api/postline/publication'),
-          requestJson(`/api/postline/subscribers?status=${encodeURIComponent(readerFilter())}`),
-          requestJson('/api/postline/tiers'),
-          requestJson('/api/postline/sends'),
-          requestJson('/api/postline/comments/queue'),
+          requestJson('/api/ot/publication'),
+          requestJson(`/api/ot/subscribers?status=${encodeURIComponent(readerFilter())}`),
+          requestJson('/api/ot/tiers'),
+          requestJson('/api/ot/sends'),
+          requestJson('/api/ot/comments/queue'),
         ])
 
         publication.set(pub.data?.publication || null)
@@ -242,17 +242,17 @@
       event.preventDefault()
       saving.set(true)
       try {
-        await postJson('/api/postline/tiers', {
+        await postJson('/api/ot/tiers', {
           name: tierName(),
           amount_cents: Number(tierAmount()),
           interval: tierInterval(),
         })
         tierName.set('')
         await loadAll()
-        postlineToast?.show?.({ title: 'Tier created', message: 'Readers can subscribe to it now.', tone: 'success', id: 'tier-save' })
+        opentimesToast?.show?.({ title: 'Tier created', message: 'Readers can subscribe to it now.', tone: 'success', id: 'tier-save' })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not create the tier', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'tier-save' })
+        opentimesToast?.show?.({ title: 'Could not create the tier', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'tier-save' })
       }
       finally {
         saving.set(false)
@@ -262,21 +262,21 @@
     const archiveTier = async (id: number) => {
       if (!window.confirm('Archive this tier? Existing subscribers keep their plan.')) return
       try {
-        await postJson('/api/postline/tiers/archive', { id })
+        await postJson('/api/ot/tiers/archive', { id })
         await loadAll()
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not archive the tier', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'tier-archive' })
+        opentimesToast?.show?.({ title: 'Could not archive the tier', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'tier-archive' })
       }
     }
 
     const moderate = async (id: number, status: string) => {
       try {
-        await postJson('/api/postline/comments/moderate', { id, status })
+        await postJson('/api/ot/comments/moderate', { id, status })
         queue.set(queue().filter(item => item.id !== id))
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not moderate that comment', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'comment-moderate' })
+        opentimesToast?.show?.({ title: 'Could not moderate that comment', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'comment-moderate' })
       }
     }
 
@@ -284,13 +284,13 @@
       importing.set(true)
       importReport.set(null)
       try {
-        const payload = await postJson('/api/postline/import/subscribers', { csv: importCsv() })
+        const payload = await postJson('/api/ot/import/subscribers', { csv: importCsv() })
         importReport.set(payload.data?.report || null)
         await loadAll()
-        postlineToast?.show?.({ title: 'Import finished', message: importSummary(), tone: 'success', id: 'import' })
+        opentimesToast?.show?.({ title: 'Import finished', message: importSummary(), tone: 'success', id: 'import' })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Import failed', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'import' })
+        opentimesToast?.show?.({ title: 'Import failed', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'import' })
       }
       finally {
         importing.set(false)

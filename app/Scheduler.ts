@@ -16,7 +16,7 @@ export default function () {
     .hourly()
     .setTimeZone('America/Los_Angeles')
 
-  // Publish scheduled Postline posts as they come due
+  // Publish scheduled The Open Times posts as they come due
   schedule
     .job('PublishScheduledPosts')
     .everyMinute()

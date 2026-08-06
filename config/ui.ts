@@ -12,7 +12,7 @@ import type { StxOptions as UiOptions } from '@stacksjs/stx'
  * `componentsDir` / `layoutsDir` / `partialsDir` with that root (config.js:409),
  * turning the three values below into `resources/resources/*` — directories that
  * do not exist. That is what shipped every production page with
- * `[Error loading component: ENOENT ... 'postline-sidebar']` in place of the
+ * `[Error loading component: ENOENT ... 'ot-sidebar']` in place of the
  * sidebar, no navigation at all, and the developer's absolute home path leaked
  * into the HTML. The dev server hid it by hardcoding its own componentsDir.
  *

@@ -6,7 +6,7 @@
 
 ## Problem
 
-Postline sends one body to every network. `CrosspostService.publishExisting`
+The Open Times sends one body to every network. `CrosspostService.publishExisting`
 (`:184`) loops providers and hands each the identical `post.body`. No variant
 support exists anywhere.
 

@@ -1,4 +1,4 @@
-const NATIVE_HEADER = 'x-postline-native'
+const NATIVE_HEADER = 'x-ot-native'
 const NATIVE_HEADER_VALUE = 'craft'
 
 type RequestHeaders = Pick<Headers, 'get'>

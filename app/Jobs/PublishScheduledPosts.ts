@@ -4,7 +4,7 @@ import { postQueue } from '../Services/Social/QueueService'
 
 export default new Job({
   name: 'PublishScheduledPosts',
-  description: 'Publish scheduled Postline posts whose time has come',
+  description: 'Publish scheduled The Open Times posts whose time has come',
   queue: 'default',
   tries: 1,
   backoff: 3,
@@ -13,7 +13,7 @@ export default new Job({
   handle: async () => {
     const { published, failed } = await postQueue.publishDue()
     if (published || failed)
-      console.log(`[postline] scheduled publish run: ${published} published, ${failed} failed`)
+      console.log(`[opentimes] scheduled publish run: ${published} published, ${failed} failed`)
     return { published, failed }
   },
 })

@@ -15,7 +15,7 @@
           Hear when it ships
         </h2>
         <p class="m-0 mt-4 leading-relaxed text-body">
-          Occasional notes on releases and what changed, sent with Postline. No drip sequence, and one click to leave.
+          Occasional notes on releases and what changed, sent with The Open Times. No drip sequence, and one click to leave.
         </p>
       </div>
 
@@ -96,7 +96,7 @@
         try {
           const body = new FormData()
           body.set('email', email)
-          body.set('source', 'postline-marketing')
+          body.set('source', 'opentimes-marketing')
 
           const response = await fetch('/api/subscribe', { method: 'POST', body })
           const payload = await response.json().catch(() => ({}))

@@ -2,7 +2,7 @@
  * Paid subscriptions.
  *
  * Money moves from the reader to the publication owner's own Stripe account.
- * There is no Postline account in the middle, which is the whole product
+ * There is no The Open Times account in the middle, which is the whole product
  * claim, and also why this uses the Stripe client from `@stacksjs/payments`
  * directly rather than the package's user-centric helpers: those bill an app's
  * `UserModel`, and a reader is not one.
@@ -68,8 +68,8 @@ export function billingConfigured(): boolean {
 /**
  * An absolute base URL Stripe will accept for redirects.
  *
- * `APP_URL` is a bare host in this app (`postline.localhost`,
- * `postline.stacksjs.com`), and Stripe rejects a return URL without a scheme
+ * `APP_URL` is a bare host in this app (`theopentimes.localhost`,
+ * `opentimes.stacksjs.com`), and Stripe rejects a return URL without a scheme
  * with `url_invalid`. Localhost gets http, everything else https, which is the
  * only pair that is true in both directions: a local box has no certificate,
  * and a public one should never be sent a plaintext redirect.

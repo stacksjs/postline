@@ -19,7 +19,7 @@ every driver:
 Supporting infrastructure, also already built:
 
 - `MediaServeAction.ts` + `routes/api.ts:29` — unauthenticated, traversal-guarded
-  `GET /postline/media?file=…` with UUID filenames and immutable cache headers.
+  `GET /opentimes/media?file=…` with UUID filenames and immutable cache headers.
 - `Support/Social/uploads.ts` — `buildMediaUrl()`, `publicMediaUrl()`,
   `persistTempMedia()` / `removeTempMedia()`.
 - `QueueService.ts:383` — attaches a public URL for scheduled posts.
@@ -59,13 +59,13 @@ Two design questions the issue raises are already answered in code:
 return Boolean(String(env.STORAGE_PUBLIC_URL || env.APP_URL || '').trim())
 ```
 
-`.env.example:4` ships `APP_URL=postline.localhost`. That is non-empty, so:
+`.env.example:4` ships `APP_URL=theopentimes.localhost`. That is non-empty, so:
 
 1. `persistTempMedia()` succeeds and writes the file.
-2. `publicMediaUrl()` returns `https://postline.localhost/postline/media?file=…`.
+2. `publicMediaUrl()` returns `https://theopentimes.localhost/opentimes/media?file=…`.
 3. `InstagramService`'s `!media?.url` guard **passes** — a URL exists.
-4. Postline hands that URL to the Meta Graph API.
-5. Meta tries to fetch `postline.localhost` **from its own servers** and fails.
+4. The Open Times hands that URL to the Meta Graph API.
+5. Meta tries to fetch `theopentimes.localhost` **from its own servers** and fails.
 6. The user gets an opaque Meta-side error about an inaccessible image.
 
 Instagram cannot post without an image, so on a default local install
@@ -150,9 +150,9 @@ providers depend on outbound reachability.
 
 | # | Test | Input | Expected | Priority |
 | --- | --- | --- | --- | --- |
-| 1 | rejects localhost forms | `postline.localhost`, `localhost:3000`, `127.0.0.1` | `false` | P0 |
+| 1 | rejects localhost forms | `theopentimes.localhost`, `localhost:3000`, `127.0.0.1` | `false` | P0 |
 | 2 | rejects private ranges | `10.0.0.5`, `192.168.1.9`, `172.16.0.1` | `false` | P0 |
-| 3 | rejects `.local` / `.internal` | `postline.local` | `false` | P0 |
+| 3 | rejects `.local` / `.internal` | `opentimes.local` | `false` | P0 |
 | 4 | accepts real public hosts | `https://posts.example.com` | `true` | P0 |
 | 5 | accepts scheme-less public host | `posts.example.com` | `true` | P0 |
 | 6 | Instagram error names the cause | localhost base + image | error mentions `STORAGE_PUBLIC_URL` | P0 |

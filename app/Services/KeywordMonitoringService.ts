@@ -99,7 +99,7 @@ function matchedKeywords(body: string, keywords: string[], mode: MatchMode): str
 async function fetchJson(url: URL, init: RequestInit = {}): Promise<any> {
   const headers = new Headers(init.headers)
   if (!headers.has('accept')) headers.set('accept', 'application/json')
-  if (!headers.has('user-agent')) headers.set('user-agent', 'Postline/0.1 (+https://github.com/stacksjs/postline)')
+  if (!headers.has('user-agent')) headers.set('user-agent', 'TheOpenTimes/0.1 (+https://github.com/stacksjs/opentimes)')
   const response = await fetch(url, { ...init, headers, signal: AbortSignal.timeout(12_000) })
   const text = await response.text()
   let payload: any = {}

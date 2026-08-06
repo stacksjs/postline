@@ -1,9 +1,9 @@
 @extends('layouts/marketing')
 
-@section('title', 'Postline: publish, send and own your audience')
+@section('title', 'The Open Times: publish, send and own your audience')
 @section('description', 'Run your publication, your newsletter and your paid subscriptions on software you own. Crossposts to every network. Open source, and nobody takes a cut.')
-@section('canonical', 'https://postline.stacksjs.com/')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/home.png')
+@section('canonical', 'https://opentimes.stacksjs.com/')
+@section('ogImage', 'https://opentimes.stacksjs.com/images/og/home.png')
 
 @section('content')
   <div class="overflow-hidden relative min-h-[100dvh]">
@@ -24,7 +24,7 @@
           <p class="mt-6 max-w-md leading-relaxed text-body text-lg">Your publication, your newsletter and your paid subscribers, on software you run. Nobody takes a cut.</p>
           <div class="flex flex-wrap gap-3 items-center mt-9">
             <a class="inline-flex items-center px-5 h-12 font-medium text-on-accent bg-accent hover:bg-blue-700 rounded-xl shadow-sm transition-colors active:scale-[0.98]" href="/login" data-stx-link>Get started</a>
-            <a class="inline-flex gap-2 items-center px-5 h-12 font-medium text-ink hover:bg-panel-2 rounded-xl transition-colors" href="https://github.com/stacksjs/postline">
+            <a class="inline-flex gap-2 items-center px-5 h-12 font-medium text-ink hover:bg-panel-2 rounded-xl transition-colors" href="https://github.com/stacksjs/opentimes">
               <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
               View on GitHub
             </a>
@@ -34,7 +34,7 @@
         <!-- Right: a published post, sent and announced. One preview carries the
             whole product: the page, the send, and the crosspost. -->
         <div class="lg:justify-self-end lg:-mr-6 lg:translate-y-6">
-          <div class="max-w-[520px] bg-panel border border-line rounded-2xl shadow-[0_40px_90px_-30px_rgba(9,9,11,0.35)] lg:rotate-[1.4deg]" role="img" aria-label="A Postline post published to a custom domain, emailed to 4,182 subscribers and announced on six networks">
+          <div class="max-w-[520px] bg-panel border border-line rounded-2xl shadow-[0_40px_90px_-30px_rgba(9,9,11,0.35)] lg:rotate-[1.4deg]" role="img" aria-label="A The Open Times post published to a custom domain, emailed to 4,182 subscribers and announced on six networks">
             <div class="flex gap-1.5 items-center px-5 h-11 border-b border-line" aria-hidden="true">
               <span class="h-2.5 w-2.5 bg-panel-3 rounded-full"></span>
               <span class="h-2.5 w-2.5 bg-panel-3 rounded-full"></span>
@@ -222,7 +222,7 @@
     <div class="grid gap-12 items-center lg:gap-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
       <!-- Faithful queue preview -->
       <div class="order-2 lg:order-1 reveal">
-        <div class="overflow-hidden bg-panel border border-line rounded-2xl shadow-[0_40px_90px_-40px_rgba(9,9,11,0.3)]" role="img" aria-label="Postline queue showing three scheduled posts, one currently publishing">
+        <div class="overflow-hidden bg-panel border border-line rounded-2xl shadow-[0_40px_90px_-40px_rgba(9,9,11,0.3)]" role="img" aria-label="The Open Times queue showing three scheduled posts, one currently publishing">
           <div class="flex items-center justify-between px-5 h-12 border-b border-line" aria-hidden="true">
             <span class="font-mono text-[11px] text-muted">queue</span>
             <span class="font-mono text-[11px] text-muted">this week</span>
@@ -257,7 +257,7 @@
         <p class="mt-6 max-w-xl leading-relaxed text-lg text-white/60">Subscribers, payments, posts and tokens all live in a database you run. A platform cannot change its terms on an audience it does not hold.</p>
         <div class="inline-flex gap-3 items-center mt-9 px-4 h-12 font-mono text-sm bg-white/5 border border-white/10 rounded-xl">
           <span class="text-accent" aria-hidden="true">$</span>
-          <span class="text-white/90">bunx postline</span>
+          <span class="text-white/90">bunx opentimes</span>
         </div>
       </div>
     </div>
@@ -281,10 +281,10 @@
     <div class="mx-auto px-6 py-24 sm:py-32 max-w-[1400px] text-center">
       <div class="mx-auto max-w-2xl reveal">
         <h2 class="font-semibold leading-[1.05] text-4xl text-ink tracking-tight sm:text-6xl">Publish once. Own everything.</h2>
-        <p class="mt-5 leading-relaxed text-body text-lg">Stand up your own Postline and run your publication from something nobody can take away.</p>
+        <p class="mt-5 leading-relaxed text-body text-lg">Stand up your own edition and run your publication from something nobody can take away.</p>
         <div class="flex flex-wrap gap-3 justify-center mt-9">
           <a class="inline-flex items-center px-5 h-12 font-medium text-on-accent bg-accent hover:bg-blue-700 rounded-xl shadow-sm transition-colors active:scale-[0.98]" href="/login" data-stx-link>Get started</a>
-          <a class="inline-flex gap-2 items-center px-5 h-12 font-medium text-ink hover:bg-panel-2 rounded-xl transition-colors" href="https://github.com/stacksjs/postline">
+          <a class="inline-flex gap-2 items-center px-5 h-12 font-medium text-ink hover:bg-panel-2 rounded-xl transition-colors" href="https://github.com/stacksjs/opentimes">
             <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
             Star on GitHub
           </a>

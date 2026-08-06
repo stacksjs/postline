@@ -5,100 +5,138 @@ import { FEATURES, USE_CASES } from '../../../app/Support/Marketing/catalog'
 
 const features = FEATURES
 const useCases = USE_CASES
+
+// The folio line. A real front page carries the date it was printed, so this is
+// today's — formatted the long way a paper sets it, in the paper's own locale
+// rather than the reader's, so the nameplate reads the same for everyone.
+const printedOn = new Date().toLocaleDateString('en-US', {
+  weekday: 'long',
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+})
 </script>
 
 <template>
-  <header class="sticky top-0 z-40 bg-bg/85 border-b border-line backdrop-blur-md">
-    <nav class="flex gap-4 items-center justify-between mx-auto px-6 h-[68px] max-w-[1400px]" aria-label="Primary">
-      <a class="inline-flex gap-2.5 items-center shrink-0 font-semibold text-ink" href="/" aria-label="Postline home">
-        <span class="grid place-items-center h-8 w-8 font-bold text-[13px] text-on-accent bg-ink rounded-lg">P</span>
-        Postline
-      </a>
-
-      <!-- Desktop nav. The panels are opened by hover AND focus-within, with no
-          script: a hover-only menu is unreachable by keyboard, and a
-          script-driven one would not work before hydration. -->
-      <div class="hidden lg:flex gap-1 items-center h-full">
-        <div class="flex items-center h-full menu-item">
-          <a
-            class="inline-flex gap-1.5 items-center px-3 h-9 text-body text-sm hover:bg-panel-2 rounded-lg transition-colors"
-            href="/features"
-            data-stx-link
-          >
-            Features
-            <span class="h-4 w-4 i-hugeicons-arrow-down-01 menu-chevron" aria-hidden="true"></span>
-          </a>
-
-          <div class="absolute inset-x-0 top-full bg-panel border-b border-line menu-panel">
-            <div class="grid gap-x-10 gap-y-6 md:grid-cols-3 mx-auto px-6 py-8 max-w-[1400px]">
-              @foreach (features as feature)
-                <a class="grid gap-1 -m-3 p-3 hover:bg-panel-2 rounded-xl transition-colors group" href="/features/{{ feature.slug }}" data-stx-link>
-                  <span class="inline-flex gap-2.5 items-center font-semibold text-[15px] text-ink">
-                    <span class="h-5 w-5 text-muted group-hover:text-accent i-hugeicons-{{ feature.icon }} transition-colors" aria-hidden="true"></span>
-                    {{ feature.nav }}
-                  </span>
-                  <span class="leading-relaxed text-[13px] text-muted">{{ feature.summary }}</span>
-                </a>
-              @endforeach
-            </div>
-          </div>
-        </div>
-
-        <div class="flex items-center h-full menu-item">
-          <a
-            class="inline-flex gap-1.5 items-center px-3 h-9 text-body text-sm hover:bg-panel-2 rounded-lg transition-colors"
-            href="/use-cases"
-            data-stx-link
-          >
-            Use cases
-            <span class="h-4 w-4 i-hugeicons-arrow-down-01 menu-chevron" aria-hidden="true"></span>
-          </a>
-
-          <div class="absolute inset-x-0 top-full bg-panel border-b border-line menu-panel">
-            <div class="grid gap-x-10 gap-y-6 md:grid-cols-3 mx-auto px-6 py-8 max-w-[1400px]">
-              @foreach (useCases as useCase)
-                <a class="grid gap-1 -m-3 p-3 hover:bg-panel-2 rounded-xl transition-colors group" href="/use-cases/{{ useCase.slug }}" data-stx-link>
-                  <span class="inline-flex gap-2.5 items-center font-semibold text-[15px] text-ink">
-                    <span class="h-5 w-5 text-muted group-hover:text-accent i-hugeicons-{{ useCase.icon }} transition-colors" aria-hidden="true"></span>
-                    {{ useCase.nav }}
-                  </span>
-                  <span class="leading-relaxed text-[13px] text-muted">{{ useCase.summary }}</span>
-                </a>
-              @endforeach
-            </div>
-          </div>
-        </div>
-
-        <a class="inline-flex items-center px-3 h-9 text-body text-sm hover:bg-panel-2 rounded-lg transition-colors" href="https://github.com/stacksjs/postline">GitHub</a>
+  <header>
+    <!--
+      The nameplate. Not sticky: a masthead is printed once at the top of the
+      sheet, and pinning it would be the one detail that gives the game away.
+      The section bar below it is what follows the reader down the page.
+    -->
+    <div class="mx-auto px-6 max-w-[1400px]">
+      <div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 pb-2 pt-3">
+        <p class="m-0 folio">Vol. I &middot; No. 1</p>
+        <p class="m-0 folio">{{ printedOn }}</p>
+        <p class="m-0 folio">Open source &middot; Price: free</p>
       </div>
 
-      <div class="flex gap-2 items-center shrink-0">
-        <a class="hidden sm:inline-flex items-center px-3 h-9 text-body text-sm hover:bg-panel-2 rounded-lg transition-colors" href="/login" data-stx-link>Sign in</a>
-        <a class="inline-flex items-center px-4 h-9 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-lg transition-colors" href="/login" data-stx-link>Get started</a>
+      <div class="rule-thin"></div>
+
+      <a class="block py-5 text-center text-ink" href="/" aria-label="The Open Times, home">
+        <span class="block masthead text-[13vw] leading-[0.9] sm:text-6xl md:text-7xl lg:text-[5.25rem]">The Open Times</span>
+      </a>
+
+      <div class="rule-double"></div>
+
+      <!--
+        The strapline strip a broadsheet prints between the nameplate and the
+        first story: what the paper is, in one line, in the smallest type on the
+        page.
+      -->
+      <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 pb-2 pt-2.5">
+        <p class="m-0 folio">Written here</p>
+        <span class="h-1 w-1 bg-muted" aria-hidden="true"></span>
+        <p class="m-0 folio">Mailed by you</p>
+        <span class="h-1 w-1 bg-muted" aria-hidden="true"></span>
+        <p class="m-0 folio">Wired to every network</p>
+      </div>
+    </div>
+
+    <!--
+      The section bar. This is the part that sticks: it is the paper's index,
+      and it is what a reader reaches for after the first screen.
+    -->
+    <nav class="sticky top-0 z-40 bg-bg/95 border-line border-y backdrop-blur-sm" aria-label="Primary">
+      <div class="flex gap-4 items-center justify-between mx-auto px-6 h-12 max-w-[1400px]">
+        <div class="hidden lg:flex items-center h-full">
+          <!-- The panels open on hover AND focus-within, with no script: a
+              hover-only menu is unreachable by keyboard, and a script-driven
+              one would not work before hydration. -->
+          <div class="flex items-center h-full menu-item">
+            <a class="inline-flex gap-1.5 items-center px-3 h-full folio hover:text-accent transition-colors" href="/features" data-stx-link>
+              Features
+              <span class="h-3.5 w-3.5 i-hugeicons-arrow-down-01 menu-chevron" aria-hidden="true"></span>
+            </a>
+
+            <div class="absolute inset-x-0 top-full bg-panel border-b-2 border-ink menu-panel">
+              <div class="grid gap-x-10 gap-y-6 md:grid-cols-3 mx-auto px-6 py-8 max-w-[1400px] divide-line md:divide-x">
+                @foreach (features as feature)
+                  <a class="grid gap-1 md:px-5 md:first:pl-0 group" href="/features/{{ feature.slug }}" data-stx-link>
+                    <span class="inline-flex gap-2.5 items-baseline font-semibold text-[17px] text-ink group-hover:text-accent transition-colors">
+                      <span class="h-4 w-4 shrink-0 self-center text-muted i-hugeicons-{{ feature.icon }}" aria-hidden="true"></span>
+                      {{ feature.nav }}
+                    </span>
+                    <span class="leading-relaxed text-[13px] text-muted">{{ feature.summary }}</span>
+                  </a>
+                @endforeach
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center h-full menu-item">
+            <a class="inline-flex gap-1.5 items-center px-3 h-full folio hover:text-accent transition-colors" href="/use-cases" data-stx-link>
+              Desks
+              <span class="h-3.5 w-3.5 i-hugeicons-arrow-down-01 menu-chevron" aria-hidden="true"></span>
+            </a>
+
+            <div class="absolute inset-x-0 top-full bg-panel border-b-2 border-ink menu-panel">
+              <div class="grid gap-x-10 gap-y-6 md:grid-cols-3 mx-auto px-6 py-8 max-w-[1400px] divide-line md:divide-x">
+                @foreach (useCases as useCase)
+                  <a class="grid gap-1 md:px-5 md:first:pl-0 group" href="/use-cases/{{ useCase.slug }}" data-stx-link>
+                    <span class="inline-flex gap-2.5 items-baseline font-semibold text-[17px] text-ink group-hover:text-accent transition-colors">
+                      <span class="h-4 w-4 shrink-0 self-center text-muted i-hugeicons-{{ useCase.icon }}" aria-hidden="true"></span>
+                      {{ useCase.nav }}
+                    </span>
+                    <span class="leading-relaxed text-[13px] text-muted">{{ useCase.summary }}</span>
+                  </a>
+                @endforeach
+              </div>
+            </div>
+          </div>
+
+          <a class="inline-flex items-center px-3 h-full folio hover:text-accent transition-colors" href="https://github.com/stacksjs/opentimes">Press room</a>
+        </div>
+
+        <p class="lg:hidden m-0 folio">The Open Times</p>
+
+        <div class="flex gap-4 items-center shrink-0">
+          <a class="hidden sm:inline-flex items-center folio hover:text-accent transition-colors" href="/login" data-stx-link>Subscriber sign-in</a>
+          <a class="inline-flex items-center px-4 h-8 text-[11px] ink-button" href="/login" data-stx-link>Start a paper</a>
+        </div>
       </div>
     </nav>
 
     <!-- Small screens get a native disclosure instead of a hover panel. -->
-    <details class="lg:hidden border-line border-t">
-      <summary class="flex items-center justify-between px-6 h-12 text-body text-sm cursor-pointer">
-        Browse
+    <details class="lg:hidden border-line border-b">
+      <summary class="flex items-center justify-between px-6 h-11 folio cursor-pointer">
+        Index
         <span class="h-4 w-4 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
       </summary>
       <div class="grid gap-5 pb-6 px-6">
         <div class="grid gap-2">
-          <p class="m-0 font-mono text-[11px] text-muted tracking-[0.18em] uppercase">Features</p>
+          <p class="m-0 kicker">Features</p>
           @foreach (features as feature)
-            <a class="text-[15px] text-body hover:text-ink transition-colors" href="/features/{{ feature.slug }}" data-stx-link>{{ feature.nav }}</a>
+            <a class="text-[15px] text-body hover:text-accent transition-colors" href="/features/{{ feature.slug }}" data-stx-link>{{ feature.nav }}</a>
           @endforeach
         </div>
         <div class="grid gap-2">
-          <p class="m-0 font-mono text-[11px] text-muted tracking-[0.18em] uppercase">Use cases</p>
+          <p class="m-0 kicker">Desks</p>
           @foreach (useCases as useCase)
-            <a class="text-[15px] text-body hover:text-ink transition-colors" href="/use-cases/{{ useCase.slug }}" data-stx-link>{{ useCase.nav }}</a>
+            <a class="text-[15px] text-body hover:text-accent transition-colors" href="/use-cases/{{ useCase.slug }}" data-stx-link>{{ useCase.nav }}</a>
           @endforeach
         </div>
       </div>
     </details>
   </header>
 </template>
-

@@ -28,7 +28,7 @@ describe('campaign planning helpers', () => {
     const campaign = {
       id: 1,
       uuid: 'campaign-1',
-      name: 'Postline Launch',
+      name: 'The Open Times Launch',
       objective: 'Plan useful launch content.',
       audience: 'Product teams',
       tone: 'clear' as const,
@@ -42,7 +42,7 @@ describe('campaign planning helpers', () => {
     const existing = [{
       id: 1,
       title: 'A useful lesson',
-      body: 'One thing we learned while building Postline Launch: start with the outcome, then remove every step that does not help people reach it.',
+      body: 'One thing we learned while building The Open Times Launch: start with the outcome, then remove every step that does not help people reach it.',
       providers: ['bluesky' as const],
       pillar: 'education' as const,
       status: 'idea' as const,
@@ -94,7 +94,7 @@ describe('campaign planning helpers', () => {
 describe('campaign AI assistant', () => {
   const baseInput = {
     campaign: {
-      name: 'Postline Launch',
+      name: 'The Open Times Launch',
       objective: 'Help teams plan a thoughtful launch.',
       audience: 'Product teams',
       tone: 'clear',

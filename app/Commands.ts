@@ -28,4 +28,15 @@ export type CommandRegistry = Record<string, string | CommandConfig>
  */
 export default {
   'inspire': 'Inspire',
+  // Moves the app between `theopentimes.org` and `opentimes.stacksjs.com` by
+  // writing DOMAIN_MODE into an env file. Registers `domain`, `domain:list` and
+  // `domain:use`; `dns` is the framework's own record-listing command and is
+  // deliberately left alone.
+  //
+  // Registered as a bare string, not `{ file, aliases }`: the registry's alias
+  // path calls `buddy.alias(...)`, which the installed CLI object does not
+  // implement (buddy 0.70.255, dist/cli.js:133) and which throws before the
+  // command is registered at all. Command-level aliases declared inside
+  // Domain.ts work fine.
+  'domain': 'Domain',
 } satisfies CommandRegistry

@@ -1,9 +1,9 @@
 @extends('layouts/default')
 
-@section('title', 'Postline - Sign in')
+@section('title', 'The Open Times - Sign in')
 
 @section('content')
-  @meta('description', 'Sign in to your Postline workspace.')
+  @meta('description', 'Sign in to your Open Times workspace.')
   <script>
     // Login uses a different layout, so it carries its own theme bootstrap.
     // Stays a plain pre-paint script on purpose: it must run before first paint,
@@ -22,7 +22,7 @@
     <section class="grid gap-5 p-6 max-w-sm w-full bg-panel border border-line rounded-2xl shadow-sm">
       <header class="grid gap-2 justify-items-center text-center">
         <span class="grid place-items-center h-11 w-11 font-bold text-lg text-on-accent bg-accent rounded-xl">P</span>
-        <h1 class="m-0 font-bold text-[20px] text-ink" :text="heading()">Sign in to Postline</h1>
+        <h1 class="m-0 font-bold text-[20px] text-ink" :text="heading()">Sign in to The Open Times</h1>
         <p class="m-0 text-[13px] text-muted" :text="subtitle()">Your personal publishing workspace.</p>
       </header>
 
@@ -65,9 +65,9 @@
     const password = state('')
     const confirmPassword = state('')
 
-    const heading = derived(() => registering() ? 'Create your workspace' : 'Sign in to Postline')
+    const heading = derived(() => registering() ? 'Create your workspace' : 'Sign in to The Open Times')
     const subtitle = derived(() => registering()
-      ? 'One account owns this Postline instance.'
+      ? 'One account owns this The Open Times instance.'
       : 'Your personal publishing workspace.')
     const submitLabel = derived(() => registering() ? 'Create account' : 'Sign in')
     const toggleLabel = derived(() => registering()

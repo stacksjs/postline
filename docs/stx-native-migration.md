@@ -201,7 +201,7 @@ committed in `544c453` made it worse rather than better.**
 |---|---|---|---|---|
 | index.stx | 1335 | 49 | 20 | 52 |
 | accounts.stx | 677 | 36 | 16 | 4 |
-| layouts/postline.stx | 507 | 17 | 15 | 13 |
+| layouts/app.stx | 507 | 17 | 15 | 13 |
 | queue.stx | 350 | 12 | 5 | 6 |
 | timeline.stx | 209 | 5 | 1 | 0 |
 | login.stx | 158 | 13 | 2 | 6 |
@@ -209,7 +209,7 @@ committed in `544c453` made it worse rather than better.**
 | analytics.stx | 89 | 0 | 0 | 0 |
 | welcome.stx | 220 | 0 | 0 | 0 |
 | layouts/marketing.stx | 97 | 0 | 0 | 0 |
-| components/PostlineSidebar.stx | 135 | 0 | 0 | 0 |
+| components/AppSidebar.stx | 135 | 0 | 0 | 0 |
 
 **No view in this repo uses a signal or a directive.** A grep for
 `script client`, `state(`, `@click`, `:show` and `x-attr` across
@@ -320,14 +320,14 @@ silently and a wrong assumption would be replicated across ~1900 lines.
 - [ ] Keep `saveDraft`/`localStorage` as plain script — category 2 above.
 
 ### Phase 4 — the rest, riskiest last
-- [ ] `queue.stx`, `login.stx`, `layouts/postline.stx`.
+- [ ] `queue.stx`, `login.stx`, `layouts/app.stx`.
 - [ ] `accounts.stx` **last**: it owns account connection and disconnection.
-- [ ] The theme block in `layouts/postline.stx` stays plain script — category 1,
+- [ ] The theme block in `layouts/app.stx` stays plain script — category 1,
       pre-paint.
 
 ### Non-goals
 - Converting `welcome.stx`, `analytics.stx`, `marketing.stx` or
-  `PostlineSidebar.stx` — already zero vanilla DOM.
+  `AppSidebar.stx` — already zero vanilla DOM.
 - Routing side effects and auth guards through signals — category 3.
 
 ## Filed upstream
@@ -336,7 +336,7 @@ silently and a wrong assumption would be replicated across ~1900 lines.
   `useColorMode` applies a class *or* an attribute but never both, and its
   persisted vocabulary is hard-coded to `light|dark|auto` so an app storing
   `'system'` gets that value silently overwritten. Both block replacing
-  Postline's theme block; until fixed, the two `document.documentElement` calls
+  The Open Times' theme block; until fixed, the two `document.documentElement` calls
   in `settings.stx` are justified and commented as such.
 
 No other gap found. Everything else this codebase does imperatively — focus,

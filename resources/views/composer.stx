@@ -1,10 +1,10 @@
-@extends('layouts/postline')
+@extends('layouts/app')
 
-@section('title', 'Postline - Composer')
+@section('title', 'The Open Times - Composer')
 
 @section('content')
   @meta('description', 'Write, schedule, publish, and review social posts from a clean personal workspace.')
-  <section class="grid gap-5" data-postline-page="composer" data-testid="composer-page">
+  <section class="grid gap-5" data-ot-page="composer" data-testid="composer-page">
     <!-- Crosswind safelist: utilities applied dynamically from the script below
         (provider toggles, active-post highlight, connection summary, char
         counter, per-network override rows) must appear in static markup so the
@@ -189,7 +189,7 @@
       const modeButtons = Array.from(root.querySelectorAll('[data-composer-mode]'))
       const linkPreviewCache = new Map()
       const urlPattern = /https?:\/\/[^\s<>"']+/i
-      const draftKey = 'postline:composer-draft:v1'
+      const draftKey = 'opentimes:composer-draft:v1'
       let activePost = root.querySelector('[data-composer-post]')
       let postCounter = root.querySelectorAll('[data-composer-post]').length
       let activeMode = modeButtons.find(button => button.classList.contains('bg-panel'))?.dataset.composerMode || 'single'
@@ -223,7 +223,7 @@
         // loads AFTER this inline script parses, so capturing it eagerly (as
         // this used to) left it undefined on every full page load — silently
         // dropping all feedback to the console.
-        const show = window.postlineToast?.show
+        const show = window.opentimesToast?.show
         if (show) {
           show({
             title: options.title,
@@ -234,10 +234,10 @@
           })
           return
         }
-        console.log(`[postline] ${message}`)
+        console.log(`[opentimes] ${message}`)
       }
 
-      const providerLabel = provider => window.postlineSocial?.providerLabel(provider) || provider
+      const providerLabel = provider => window.opentimesSocial?.providerLabel(provider) || provider
       const connectedProviders = () => providers().filter(provider => provider.canPublish)
       const selectedConnected = () => connectedProviders().filter(provider => selectedHas(provider.provider))
 
@@ -534,7 +534,7 @@
 
       const refreshConnection = async () => {
         try {
-          const list = await window.postlineSocial?.fetchProviders()
+          const list = await window.opentimesSocial?.fetchProviders()
           applyConnection(list || [])
         }
         catch (error) {
@@ -543,7 +543,7 @@
           // intrusive error toast. A 401 here (e.g. an expired session)
           // would otherwise spam a toast on every page load.
           applyConnection([])
-          console.warn('[postline] provider status failed:', error)
+          console.warn('[opentimes] provider status failed:', error)
         }
       }
 
@@ -723,7 +723,7 @@
 
         try {
           if (!linkPreviewCache.has(url)) {
-            const response = await fetch(`/api/postline/bluesky/link-preview?url=${encodeURIComponent(url)}`)
+            const response = await fetch(`/api/ot/bluesky/link-preview?url=${encodeURIComponent(url)}`)
             const payload = await response.json()
             if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not render link preview.')
             linkPreviewCache.set(url, payload.data)
@@ -875,7 +875,7 @@
 
       const loadEditPost = async (id) => {
         try {
-          const response = await fetch(`/api/postline/queue/item?id=${encodeURIComponent(id)}`)
+          const response = await fetch(`/api/ot/queue/item?id=${encodeURIComponent(id)}`)
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the post.')
           enterEditMode(payload.data)
@@ -921,7 +921,7 @@
 
         buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
         try {
-          const response = await fetch('/api/postline/queue/update', { method: 'POST', body: form })
+          const response = await fetch('/api/ot/queue/update', { method: 'POST', body: form })
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not update the post.')
           setStatus('Post updated.', 'success', { title: 'Updated' })
@@ -979,7 +979,7 @@
 
         buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
         try {
-          const response = await fetch('/api/postline/queue', { method: 'POST', body: form })
+          const response = await fetch('/api/ot/queue', { method: 'POST', body: form })
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save to the queue.')
 
@@ -1033,7 +1033,7 @@
       }
 
       const publishOne = async (post, targetProviders) => {
-        const social = window.postlineSocial
+        const social = window.opentimesSocial
         if (!social) throw new Error('Publishing is still loading. Try again in a moment.')
         const textarea = textareaFor(post)
         if (!textarea) throw new Error('Missing post body.')
@@ -1106,7 +1106,7 @@
           if (targets.length > 1) {
             // Threads go up in one request so the server can reply-chain the
             // segments on providers that support it (Bluesky).
-            const social = window.postlineSocial
+            const social = window.opentimesSocial
             if (!social) throw new Error('Publishing is still loading. Try again in a moment.')
             const first = targets[0]
             const external = (first?.dataset.externalUri && first.dataset.externalTitle)
@@ -1150,7 +1150,7 @@
           saveDraft()
           clearAttachment()
           if (composeTitle) composeTitle.value = ''
-          window.postlineToast?.dismiss?.('publish')
+          window.opentimesToast?.dismiss?.('publish')
           if (failures.length && successCount === 0) {
             setStatus(`Publish failed. ${failures.join('; ')}`, 'error', { title: 'Publish failed' })
           }
@@ -1168,7 +1168,7 @@
           }
         }
         catch (error) {
-          window.postlineToast?.dismiss?.('publish')
+          window.opentimesToast?.dismiss?.('publish')
           setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Publish failed' })
         }
         finally {
@@ -1316,7 +1316,7 @@
       updateCount()
       void updateLinkPreview(activePost)
       // Wait for the social module (a deferred `type=module` script) before the
-      // first provider fetch so window.postlineSocial is guaranteed to exist.
+      // first provider fetch so window.opentimesSocial is guaranteed to exist.
       // Load the edit post only after connection so provider toggles resolve.
       // /?schedule=YYYY-MM-DD (from the queue calendar) opens the schedule
       // input pre-set to 09:00 local on that day.

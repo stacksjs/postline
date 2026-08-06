@@ -1,10 +1,10 @@
-@extends('layouts/postline')
+@extends('layouts/app')
 
-@section('title', 'Postline - Blog')
-@section('description', 'Manage long-form posts published through Postline.')
+@section('title', 'The Open Times - Blog')
+@section('description', 'Manage long-form posts published through The Open Times.')
 
 @section('content')
-  <section class="grid gap-4" data-postline-page="blog" data-testid="blog-page">
+  <section class="grid gap-4" data-ot-page="blog" data-testid="blog-page">
     <header class="flex flex-col gap-4 items-stretch justify-between sm:flex-row sm:items-center min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Blog</p>
@@ -100,7 +100,7 @@
       loading.set(true)
       errorMessage.set('')
       try {
-        const response = await fetch('/api/postline/blog')
+        const response = await fetch('/api/ot/blog')
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load blog posts.')
         items.set(Array.isArray(payload.data?.items) ? payload.data.items : [])

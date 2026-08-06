@@ -1,7 +1,8 @@
 import type { AppConfig } from '@stacksjs/types'
+import { canonical, LOCAL_HOST } from '~/config/domains'
 import { env } from '@stacksjs/env'
 
-type PostlineAppConfig = AppConfig & { appPath: string, devLaunch: 'native' }
+type OpenTimesAppConfig = AppConfig & { appPath: string, devLaunch: 'native' }
 
 /**
  * **Application Configuration**
@@ -11,13 +12,18 @@ type PostlineAppConfig = AppConfig & { appPath: string, devLaunch: 'native' }
  * you have any questions, feel free to reach out via Discord or GitHub Discussions.
  */
 export default {
-  name: env.APP_NAME ?? 'Postline',
-  description: 'A clean personal workspace for writing, scheduling, publishing, and reading social timelines.',
+  name: env.APP_NAME ?? 'The Open Times',
+  description: 'An independent newspaper you own — write it, send it, syndicate it, and keep the list.',
   env: env.APP_ENV ?? 'local',
-  url: env.APP_URL ?? 'postline.localhost',
+  /**
+   * `APP_URL` is the dev host; deployed environments set it to the canonical
+   * domain. The fallback resolves through config/domains.ts rather than being
+   * spelled out, so `buddy domain:use` moves this too.
+   */
+  url: env.APP_URL ?? (env.APP_ENV === 'local' ? LOCAL_HOST : canonical),
   appPath: '/composer',
   devLaunch: 'native',
-  redirectUrls: ['postline.localhost', 'bsky.app'],
+  redirectUrls: [LOCAL_HOST, canonical, 'bsky.app'],
   debug: env.DEBUG ?? false,
   key: env.APP_KEY,
 
@@ -31,4 +37,4 @@ export default {
   locale: 'en',
   fallbackLocale: 'en',
   cipher: 'aes-256-cbc',
-} satisfies PostlineAppConfig
+} satisfies OpenTimesAppConfig

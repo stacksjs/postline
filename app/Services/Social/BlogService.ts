@@ -13,7 +13,7 @@ const database = db as any
 // /blog/<slug> — publishing a file there makes the post immediately live.
 const CONTENT_DIR = join(process.cwd(), 'content/blog')
 
-/** Postline's own blog has no external character ceiling worth enforcing. */
+/** The Open Times' own blog has no external character ceiling worth enforcing. */
 const BLOG_CHARACTER_LIMIT = 10000
 
 function slugify(value: string): string {
@@ -51,7 +51,7 @@ export class BlogService {
   async status(): Promise<{ provider: 'blog', handle: string, canPublish: boolean, characterLimit: number, configured: boolean }> {
     return {
       provider: 'blog',
-      handle: 'Postline Blog',
+      handle: 'The Open Times Blog',
       canPublish: true,
       characterLimit: BLOG_CHARACTER_LIMIT,
       configured: true,
@@ -101,7 +101,7 @@ export class BlogService {
         '---',
         `title: ${JSON.stringify(title)}`,
         `date: ${publishedAt.slice(0, 10)}`,
-        'author: Postline',
+        'author: The Open Times',
         '---',
         '',
         markdownBody,
@@ -151,7 +151,7 @@ export class BlogService {
         })
       }
       catch (error) {
-        console.warn(`[postline] blog post published but Discover entry failed: ${error instanceof Error ? error.message : String(error)}`)
+        console.warn(`[opentimes] blog post published but Discover entry failed: ${error instanceof Error ? error.message : String(error)}`)
       }
 
       // Publish is send. Queued rather than delivered here for the same reason
@@ -171,7 +171,7 @@ export class BlogService {
         })
       }
       catch (error) {
-        console.warn(`[postline] blog post published but newsletter queue failed: ${error instanceof Error ? error.message : String(error)}`)
+        console.warn(`[opentimes] blog post published but newsletter queue failed: ${error instanceof Error ? error.message : String(error)}`)
       }
 
       return { provider: 'blog', ok: true, url, uri: url, targetId: Number(target.id) }

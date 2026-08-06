@@ -11,7 +11,7 @@ describe('subscriber email handling', () => {
   test('plus-tags and dots are preserved, not normalised away', () => {
     // Some providers treat these as distinct addresses. Collapsing them would
     // let one reader unsubscribe another.
-    expect(normalizeEmail('a.reader+postline@example.com')).toBe('a.reader+postline@example.com')
+    expect(normalizeEmail('a.reader+opentimes@example.com')).toBe('a.reader+opentimes@example.com')
   })
 
   test('validation is permissive, since the confirmation mail is the real check', () => {
@@ -27,11 +27,11 @@ describe('checkout base url', () => {
   test('a bare host gains a scheme, which is what Stripe requires', () => {
     // Stripe rejects a scheme-less return URL with `url_invalid`, and APP_URL
     // is a bare host in this app.
-    expect(checkoutBaseUrl('postline.stacksjs.com')).toBe('https://postline.stacksjs.com')
+    expect(checkoutBaseUrl('opentimes.stacksjs.com')).toBe('https://opentimes.stacksjs.com')
   })
 
   test('localhost gets http, since a local box has no certificate', () => {
-    expect(checkoutBaseUrl('postline.localhost')).toBe('http://postline.localhost')
+    expect(checkoutBaseUrl('theopentimes.localhost')).toBe('http://theopentimes.localhost')
     expect(checkoutBaseUrl('localhost:3000')).toBe('http://localhost:3000')
     expect(checkoutBaseUrl('127.0.0.1:3000')).toBe('http://127.0.0.1:3000')
   })

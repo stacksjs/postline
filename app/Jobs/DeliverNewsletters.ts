@@ -14,7 +14,7 @@ export default new Job({
     try {
       const result = await newsletter.deliverPending()
       if (result.delivered || result.failed)
-        console.log(`[postline] newsletter: ${result.delivered} delivered, ${result.failed} failed across ${result.sends} send(s)`)
+        console.log(`[opentimes] newsletter: ${result.delivered} delivered, ${result.failed} failed across ${result.sends} send(s)`)
       return result
     }
     catch (error) {

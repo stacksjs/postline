@@ -34,10 +34,10 @@ export const FEATURES: MarketingEntry[] = [
     title: 'Your publication, on your domain',
     summary: 'Write long-form posts to a publication you own, at your own domain, with nothing sitting between you and the page.',
     icon: 'quill-write-02',
-    intro: 'A Postline publication is a real website. Posts render at your domain, the archive belongs to you, and no host decides what the page looks like or who is allowed to reach it.',
+    intro: 'A The Open Times publication is a real website. Posts render at your domain, the archive belongs to you, and no host decides what the page looks like or who is allowed to reach it.',
     sections: [
       { heading: 'Long-form and short-form in one place', body: 'The composer switches between a social post and a full essay. Long pieces get a title, a slug and an archive entry, and they go live on your site the moment you publish.' },
-      { heading: 'Your domain from the first post', body: 'Nothing is served from a platform subdomain, so the links you share today keep working if you move hosts, change tools, or stop using Postline entirely.' },
+      { heading: 'Your domain from the first post', body: 'Nothing is served from a platform subdomain, so the links you share today keep working if you move hosts, change tools, or stop using The Open Times entirely.' },
       { heading: 'Templates you can actually edit', body: 'The page templates are files in your project. Change the layout, the type and the colour, then redeploy. There is no theme marketplace and no approval step.' },
     ],
     points: [
@@ -52,7 +52,7 @@ export const FEATURES: MarketingEntry[] = [
     title: 'Every post, in every inbox',
     summary: 'Publishing a post emails it to your subscribers. The web page and the send are one action, not two tools.',
     icon: 'mail-01',
-    intro: 'The gap between publishing a piece and sending it is where most writing tools lose people. In Postline they are the same action: the post goes live on your site and lands in your subscribers\' inboxes at once.',
+    intro: 'The gap between publishing a piece and sending it is where most writing tools lose people. In The Open Times they are the same action: the post goes live on your site and lands in your subscribers\' inboxes at once.',
     sections: [
       { heading: 'Publish is send', body: 'Choosing who receives a post is part of writing it, not a second job in a different product. Send to everyone, to paying subscribers only, or to nobody and leave it on the web.' },
       { heading: 'Your sending, your reputation', body: 'Mail goes out through a provider you configure: SES, Postmark, Resend or plain SMTP. The deliverability, the sending reputation and the per-email cost all stay yours.' },
@@ -70,11 +70,11 @@ export const FEATURES: MarketingEntry[] = [
     title: 'Charge for it, keep all of it',
     summary: 'Turn on paid tiers, mark posts subscriber-only, and take payment straight into your own Stripe account.',
     icon: 'dollar-circle',
-    intro: 'Postline takes no percentage, because there is no Postline in the middle to take one. Readers pay into your Stripe account, and the subscriber list that comes with them sits in your database rather than on somebody else\'s dashboard.',
+    intro: 'The Open Times takes no percentage, because there is no The Open Times in the middle to take one. Readers pay into your Stripe account, and the subscriber list that comes with them sits in your database rather than on somebody else\'s dashboard.',
     sections: [
       { heading: 'No platform cut', body: 'Your Stripe keys, your payouts, your customers. The only fee is the one Stripe charges you directly, which is the same fee you would pay running checkout yourself.' },
       { heading: 'Free and paid in one publication', body: 'Any post can be free, paid, or free for a while and paid afterwards. Readers see a preview and a subscribe prompt rather than a dead end.' },
-      { heading: 'Leaving costs you nothing', body: 'Subscriptions live in your Stripe account, so moving away from Postline does not cancel a single one of them. There is no billing relationship to renegotiate.' },
+      { heading: 'Leaving costs you nothing', body: 'Subscriptions live in your Stripe account, so moving away from The Open Times does not cancel a single one of them. There is no billing relationship to renegotiate.' },
     ],
     points: [
       'Monthly, annual and founding tiers',
@@ -86,9 +86,9 @@ export const FEATURES: MarketingEntry[] = [
     slug: 'discover',
     nav: 'Discover',
     title: 'Readers who already read',
-    summary: 'Publications on the Postline network recommend each other, so new readers arrive through someone they already trust.',
+    summary: 'Publications on the Open Times network recommend each other, so new readers arrive through someone they already trust.',
     icon: 'compass',
-    intro: 'Writing independently is mostly the problem of being found at all. Discover is a shared index of Postline publications, ordered by what readers actually subscribe to rather than by who paid to appear in it.',
+    intro: 'Writing independently is mostly the problem of being found at all. Discover is a shared index of The Open Times publications, ordered by what readers actually subscribe to rather than by who paid to appear in it.',
     sections: [
       { heading: 'Recommendations, not advertising', body: 'Writers point at the publications they read. A reader who subscribes to one sees the handful their writer vouches for, which is how most people find anything worth reading anyway.' },
       { heading: 'Ranked by readers', body: 'Position comes from subscriptions and reading time. There is no promoted slot to buy, so a small publication with devoted readers outranks a large one nobody opens.' },
@@ -142,7 +142,7 @@ export const FEATURES: MarketingEntry[] = [
     title: 'One composer, six networks',
     summary: 'Announce what you publish everywhere at once, or post to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon on their own.',
     icon: 'share-08',
-    intro: 'A publication needs somewhere to send people from. Postline takes one draft, adapts it per network, and publishes to all of them in a single action, whether it is announcing an essay or just a post.',
+    intro: 'A publication needs somewhere to send people from. The Open Times takes one draft, adapts it per network, and publishes to all of them in a single action, whether it is announcing an essay or just a post.',
     sections: [
       { heading: 'Publish in one pass', body: 'Pick the networks you want, write the post, and send it. Each target is published independently, so one provider failing never blocks the rest.' },
       { heading: 'Failures stay visible', body: 'A rejected post is recorded against the network that rejected it, with the provider\'s own error text. Nothing fails silently and nothing is retried behind your back.' },
@@ -163,7 +163,7 @@ export const FEATURES: MarketingEntry[] = [
     sections: [
       { heading: 'Your timezone, not the server\'s', body: 'Each post carries the timezone it was written in, so a 9am slot stays 9am regardless of where the instance runs.' },
       { heading: 'Publish now when plans change', body: 'Anything in the queue can be sent immediately without rewriting it. The scheduled entry becomes a published one, keeping its history.' },
-      { heading: 'What the queue needs', body: 'A scheduled post fires when Postline is running. On a laptop that means while the app is open; put it on a small always-on box and the queue keeps publishing overnight.' },
+      { heading: 'What the queue needs', body: 'A scheduled post fires when The Open Times is running. On a laptop that means while the app is open; put it on a small always-on box and the queue keeps publishing overnight.' },
     ],
     points: [
       'Drafts, scheduled, publishing and failed in one list',
@@ -194,7 +194,7 @@ export const FEATURES: MarketingEntry[] = [
     title: 'What actually landed',
     summary: 'Subscriber growth, revenue and per-network engagement against the posts that caused them, in one view.',
     icon: 'chart-line-data-01',
-    intro: 'Most publishing tools show you opens and most social tools show you likes, and neither answers the only question worth asking: which piece of writing brought people in. Postline keeps both sets of numbers against the same post.',
+    intro: 'Most publishing tools show you opens and most social tools show you likes, and neither answers the only question worth asking: which piece of writing brought people in. The Open Times keeps both sets of numbers against the same post.',
     sections: [
       { heading: 'The post that won the subscriber', body: 'Signups and upgrades are attributed to the post a reader arrived on, so a piece that quietly converts is visible next to the one that merely got attention.' },
       { heading: 'Counts, attached to your posts', body: 'Social metrics are stored per published target, so a post that went to three networks keeps three separate sets of numbers rather than one blended total.' },
@@ -212,10 +212,10 @@ export const FEATURES: MarketingEntry[] = [
     title: 'Take it all back down',
     summary: 'Delete every post from a connected account, on the networks whose APIs allow it, with a preview first.',
     icon: 'delete-02',
-    intro: 'Leaving a network, or clearing an old account, normally means deleting posts one at a time. Postline removes them in bulk, and makes you look at exactly what will go before anything does.',
+    intro: 'Leaving a network, or clearing an old account, normally means deleting posts one at a time. The Open Times removes them in bulk, and makes you look at exactly what will go before anything does.',
     sections: [
       { heading: 'Preview before anything is deleted', body: 'A dry run reports the exact count per network and a sample of what matched. The delete button stays locked until you have previewed the selection you are about to act on.' },
-      { heading: 'Scoped to what you choose', body: 'Delete only the posts Postline published, or the account\'s entire history where the network lets you enumerate it. Providers that cannot delete are reported as skipped with the reason.' },
+      { heading: 'Scoped to what you choose', body: 'Delete only the posts The Open Times published, or the account\'s entire history where the network lets you enumerate it. Providers that cannot delete are reported as skipped with the reason.' },
     ],
     points: [
       'Dry-run preview with per-network counts',
@@ -229,7 +229,7 @@ export const FEATURES: MarketingEntry[] = [
     title: 'Nobody holds your list',
     summary: 'Your posts, your subscribers, your revenue and your access tokens all live in a database you run. There is no vendor in the middle.',
     icon: 'key-01',
-    intro: 'Every hosted publishing service holds the two things that matter: the relationship with your readers and permission to post as you. Postline is the same software with both of those in a database you control.',
+    intro: 'Every hosted publishing service holds the two things that matter: the relationship with your readers and permission to post as you. The Open Times is the same software with both of those in a database you control.',
     sections: [
       { heading: 'The audience is not rented', body: 'Subscribers, payments and posts are rows you can query, back up and export. A platform cannot change its terms on a list it does not have.' },
       { heading: 'Tokens stay where you put them', body: 'OAuth tokens and app passwords are encrypted with a key your instance generates. Nobody else has a copy, because there is nobody else.' },
@@ -320,7 +320,7 @@ export const USE_CASES: MarketingEntry[] = [
     title: 'Release notes that travel',
     summary: 'Announce releases across networks from a tool you can read, fork and audit before it touches your accounts.',
     icon: 'source-code',
-    intro: 'Giving a closed service permission to post as you is a bigger ask than it looks. Postline is MIT licensed and runs on your own machine, so you can read exactly what it does before it gets that permission.',
+    intro: 'Giving a closed service permission to post as you is a bigger ask than it looks. The Open Times is MIT licensed and runs on your own machine, so you can read exactly what it does before it gets that permission.',
     sections: [
       { heading: 'Announce a release once', body: 'Version announcements go to every network in one action, so shipping a release does not turn into a marketing chore.' },
       { heading: 'Software you can inspect', body: 'The whole codebase is readable and MIT licensed. If it does not do what you need, the fix is a pull request rather than a support ticket.' },

@@ -3,7 +3,7 @@ import { db } from '@stacksjs/database'
 import { bluesky } from './BlueskyService'
 import { linkedin } from './LinkedInService'
 import { mastodon } from './MastodonService'
-import { postline } from './PostlineService'
+import { opentimes } from './OpenTimesService'
 import { ensureAccount, now, uuid } from './support'
 import { twitter } from './TwitterService'
 
@@ -11,7 +11,7 @@ const database = db as any
 
 /**
  * Bulk deletion of an account's posts. This is the most destructive thing
- * Postline can do — remote posts cannot be restored once deleted — so every
+ * The Open Times can do — remote posts cannot be restored once deleted — so every
  * run is gated on an exact confirmation phrase, is previewable first, is
  * capped, and is written to `purge_runs` whether it previews or executes.
  */
@@ -20,7 +20,7 @@ const database = db as any
 export const PURGE_CONFIRMATION = 'DELETE ALL POSTS'
 
 /** Providers whose API can delete a post the account authored. */
-export const PURGEABLE_PROVIDERS: SocialProvider[] = ['postline', 'bluesky', 'twitter', 'mastodon', 'linkedin']
+export const PURGEABLE_PROVIDERS: SocialProvider[] = ['opentimes', 'bluesky', 'twitter', 'mastodon', 'linkedin']
 
 /**
  * Why the remaining providers can't take part, shown verbatim in the UI.
@@ -270,11 +270,11 @@ export class PurgeService {
     if (provider === 'twitter') return await twitter.purgeAdapter()
     if (provider === 'mastodon') return await mastodon.purgeAdapter()
     if (provider === 'linkedin') return await linkedin.purgeAdapter()
-    if (provider === 'postline') return await postline.purgeAdapter()
+    if (provider === 'opentimes') return await opentimes.purgeAdapter()
     throw new Error(`${provider} cannot delete posts through its API.`)
   }
 
-  /** Posts Postline itself published to this provider. */
+  /** Posts The Open Times itself published to this provider. */
   private async collectTracked(provider: SocialProvider, identityId: number): Promise<PurgeCandidate[]> {
     const targets = await database
       .selectFrom('post_targets')
@@ -297,7 +297,7 @@ export class PurgeService {
 
   /**
    * Everything the account ever posted, walked page by page. Also maps each
-   * remote post back to a Postline target row where one exists, so local
+   * remote post back to an Open Times target row where one exists, so local
    * cleanup stays accurate.
    */
   private async collectRemote(adapter: ProviderPurgeAdapter, result: PurgeProviderResult): Promise<PurgeCandidate[]> {

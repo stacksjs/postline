@@ -13,7 +13,7 @@ export default new Job({
   handle: async () => {
     try {
       const { synced } = await bluesky.syncMetrics()
-      if (synced) console.log(`[postline] engagement sync: ${synced} targets refreshed`)
+      if (synced) console.log(`[opentimes] engagement sync: ${synced} targets refreshed`)
       return { synced }
     }
     catch (error) {

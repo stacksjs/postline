@@ -1,6 +1,7 @@
 import type { CloudConfig } from '@stacksjs/types'
 import type { CloudConfig as TsCloudConfig } from '@stacksjs/ts-cloud'
 import { servers } from '~/cloud/servers'
+import * as domains from '~/config/domains'
 import { env } from '@stacksjs/env'
 
 /**
@@ -28,9 +29,20 @@ import { env } from '@stacksjs/env'
  * Both sites point at this one absolute path. `sharedPaths` would also survive
  * deploys, but only per-site: `main` and `api` deploy to separate directories
  * and would each get their own copy of a database they are supposed to share.
+ *
+ * REBRAND NOTE: this path used to be `/var/lib/postline/postline.sqlite`. It is
+ * outside the release tree precisely so a deploy cannot replace it — which also
+ * means a deploy cannot MOVE it. Any box that already ran the old name needs
+ * the file relocated once, by hand, before the next deploy:
+ *
+ *   mv /var/lib/postline /var/lib/opentimes
+ *   mv /var/lib/opentimes/postline.sqlite /var/lib/opentimes/opentimes.sqlite
+ *
+ * Skipping that does not error: `buddy migrate` would create an empty database
+ * at the new path and the app would come up looking freshly installed.
  */
-const DATA_DIR = '/var/lib/postline'
-const DB_DATABASE_PATH = `${DATA_DIR}/postline.sqlite`
+const DATA_DIR = '/var/lib/opentimes'
+const DB_DATABASE_PATH = `${DATA_DIR}/opentimes.sqlite`
 
 /**
  * The release tarball is packed from the working tree, not from git — so
@@ -46,15 +58,15 @@ export const tsCloud: TsCloudConfig = {
    * Project configuration
    */
   project: {
-    name: 'postline',
-    slug: 'postline',
+    name: 'opentimes',
+    slug: 'opentimes',
     region: 'us-east-1',
   },
 
   stateDir: 'storage/cloud',
 
   /**
-   * Postline is a tenant of the shared `stacks` Hetzner box, not the owner of
+   * The Open Times is a tenant of the shared `stacks` Hetzner box, not the owner of
    * its own server.
    *
    * `attachTo` is what makes that true rather than aspirational: it stops this
@@ -62,7 +74,7 @@ export const tsCloud: TsCloudConfig = {
    * host also serves stacksjs.com, mail, PostgreSQL and ten other tenants, and
    * its Hetzner firewall is reconciled from whichever config claims ownership
    * — so deploying without this would silently rewrite the shared firewall
-   * from Postline's (much smaller) port list and drop public mail.
+   * from The Open Times' (much smaller) port list and drop public mail.
    */
   cloud: {
     provider: 'hetzner',
@@ -305,11 +317,19 @@ export const tsCloud: TsCloudConfig = {
     ssl: {
       enabled: true,
       provider: 'acm', // 'acm' | 'letsencrypt'
-      domains: env.SSL_DOMAINS?.split(',') || ['stacksjs.com', 'www.stacksjs.com'],
+      /**
+       * Every host we answer on needs a certificate — including the ones that
+       * only redirect, because a browser validates TLS *before* it ever sees
+       * the 301. This used to read `env.SSL_DOMAINS?.split(',') ||
+       * ['stacksjs.com', 'www.stacksjs.com']`: the env var was never set, so it
+       * requested a certificate for a domain belonging to a different tenant
+       * and none at all for this app's own.
+       */
+      domains: [...domains.all],
       redirectHttp: true,
       // Let's Encrypt configuration (used when provider: 'letsencrypt' or loadBalancer.enabled: false)
       letsEncrypt: {
-        email: env.LETSENCRYPT_EMAIL || 'admin@stacksjs.com',
+        email: env.LETSENCRYPT_EMAIL || `admin@${domains.APEX}`,
         staging: false, // Set to true for testing
         autoRenew: true,
       },
@@ -317,9 +337,14 @@ export const tsCloud: TsCloudConfig = {
 
     /**
      * DNS Configuration
+     *
+     * `domain` is the canonical host, so the zone this resolves against follows
+     * `DOMAIN_MODE` with everything else. The Route53 hosted zone only covers
+     * stacksjs.com — the apex and the short domains are served by Porkbun,
+     * which ts-cloud discovers from the environment (see config/dns.ts).
      */
     dns: {
-      domain: env.APP_DOMAIN || 'stacksjs.com',
+      domain: domains.canonical,
       hostedZoneId: env.AWS_HOSTED_ZONE_ID || 'Z01455702Q7952O6RCY37', // Route53 hosted zone ID
     },
 
@@ -580,13 +605,14 @@ export const tsCloud: TsCloudConfig = {
    * For multi-site deployments
    */
   sites: {
-    // Served on its own subdomain rather than a path on stacksjs.com, so it
-    // never competes with the apex app's `/` route in the gateway's
-    // longest-prefix routing.
+    // The canonical host — `theopentimes.org`, or `opentimes.stacksjs.com` when
+    // DOMAIN_MODE=subdomain. Either way it is a host of its own rather than a
+    // path on stacksjs.com, so it never competes with the apex app's `/` route
+    // in the gateway's longest-prefix routing.
     main: {
       root: '.',
       path: '/',
-      domain: env.APP_DOMAIN || 'postline.stacksjs.com',
+      domain: domains.canonical,
       // The installed buddy ships this entry prebuilt. Stacks itself compiles
       // an equivalent from `core/buddy/src/serve-entry.ts` during deploy, but a
       // consumer app has no framework source to build from — it has the package.
@@ -604,12 +630,12 @@ export const tsCloud: TsCloudConfig = {
       // The page server reverse-proxies `/api/**` to the API process. Name that
       // port explicitly: the framework default (3008) is already owned by a
       // *different* tenant on this shared box, and an unconfigured proxy would
-      // post Postline's form submissions into that app instead.
+      // post The Open Times' form submissions into that app instead.
       env: { PORT_API: '3101', DB_DATABASE_PATH },
       exclude: SQLITE_EXCLUDES,
     },
 
-    // Postline's own API process, bound to loopback and reached only through
+    // The Open Times' own API process, bound to loopback and reached only through
     // the main site's `/api/**` proxy — so it needs no domain of its own.
     // Unlike the framework repo, a consumer app has no framework source to
     // compile an entry from: the installed package ships one prebuilt.
@@ -635,6 +661,19 @@ export const tsCloud: TsCloudConfig = {
       },
       exclude: SQLITE_EXCLUDES,
     },
+
+    /**
+     * Every other host we own — the short domains, the `www.` form, and
+     * whichever of the apex/subdomain pair is not currently canonical. Each is
+     * a gateway-only virtual host that 301s to the canonical URL with its path
+     * intact; none of them deploys a release or runs a process.
+     *
+     * Spread last so that if a redirect entry ever collided with `main` or
+     * `api` the collision would be visible here rather than silently shadowing
+     * a real site. It cannot collide today: `redirectSites()` derives its keys
+     * from the domain list and skips the canonical host by construction.
+     */
+    ...domains.redirectSites(),
   },
 }
 

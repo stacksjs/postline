@@ -1,10 +1,10 @@
 @extends('layouts/marketing')
 
-@section('title', 'Read - Postline')
-@section('description', 'A post published with Postline.')
+@section('title', 'Read - The Open Times')
+@section('description', 'A post published with The Open Times.')
 
 @section('content')
-  <article class="mx-auto px-6 max-w-[46rem]" data-postline-page="read" data-testid="read-page">
+  <article class="mx-auto px-6 max-w-[46rem]" data-ot-page="read" data-testid="read-page">
     <div class="grid gap-3 pb-10 pt-16" x-show="loading()">
       <span class="h-6 w-6 text-muted animate-spin i-hugeicons-loading-03" aria-hidden="true"></span>
       <p class="m-0 text-muted">Loading…</p>
@@ -155,7 +155,7 @@
     const commentTone = state('ok')
 
     /** Remembered so a paying reader is not asked on every post. */
-    const READER_KEY = 'postline.reader.email'
+    const READER_KEY = 'opentimes.reader.email'
 
     const publicationName = derived(() => post()?.publication?.name || 'This publication')
     const tagline = derived(() => post()?.publication?.tagline || '')
@@ -187,7 +187,7 @@
         if (wanted) query.set('slug', wanted)
         if (readerEmail()) query.set('reader', readerEmail())
 
-        const payload = await requestJson(`/api/postline/public/posts?${query}`)
+        const payload = await requestJson(`/api/ot/public/posts?${query}`)
         if (!wanted) {
           posts.set(payload.data?.posts || [])
           post.set(null)
@@ -207,7 +207,7 @@
 
     const loadThread = async (wanted: string) => {
       try {
-        const payload = await requestJson(`/api/postline/comments?source_key=${encodeURIComponent(`blog:${wanted}`)}`)
+        const payload = await requestJson(`/api/ot/comments?source_key=${encodeURIComponent(`blog:${wanted}`)}`)
         thread.set(payload.data?.comments || [])
       }
       catch {
@@ -221,7 +221,7 @@
         window.localStorage?.setItem(READER_KEY, readerEmail().trim())
         await load()
         if (post()?.locked)
-          postlineToast?.show?.({ title: 'Not unlocked', message: 'We could not find an active paid subscription for that address.', tone: 'error', id: 'unlock' })
+          opentimesToast?.show?.({ title: 'Not unlocked', message: 'We could not find an active paid subscription for that address.', tone: 'error', id: 'unlock' })
       }
       finally {
         unlocking.set(false)
@@ -231,12 +231,12 @@
     const checkout = async (tierId: number) => {
       const email = (readerEmail() || subscribeEmail()).trim()
       if (!email) {
-        postlineToast?.show?.({ title: 'Email needed', message: 'Enter your email address first.', tone: 'error', id: 'checkout' })
+        opentimesToast?.show?.({ title: 'Email needed', message: 'Enter your email address first.', tone: 'error', id: 'checkout' })
         return
       }
 
       try {
-        const payload = await requestJson('/api/postline/checkout', {
+        const payload = await requestJson('/api/ot/checkout', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ tier_id: tierId, email }),
@@ -245,7 +245,7 @@
         if (payload.data?.url) window.location.href = payload.data.url
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not start checkout', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'checkout' })
+        opentimesToast?.show?.({ title: 'Could not start checkout', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'checkout' })
       }
     }
 
@@ -254,7 +254,7 @@
       subscribing.set(true)
       subscribeMessage.set('')
       try {
-        const payload = await requestJson('/api/postline/subscribe', {
+        const payload = await requestJson('/api/ot/subscribe', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ email: subscribeEmail(), source: 'site' }),
@@ -277,7 +277,7 @@
       posting.set(true)
       commentMessage.set('')
       try {
-        const payload = await requestJson('/api/postline/comments', {
+        const payload = await requestJson('/api/ot/comments', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({

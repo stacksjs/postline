@@ -45,7 +45,7 @@ function randomState(): string {
 export class TwitterService {
   private driver = new TwitterDriver()
   // OAuth CSRF token + PKCE verifier stashed between the auth redirect and the
-  // callback. Postline runs single-user, so module memory is an adequate store.
+  // callback. The Open Times runs single-user, so module memory is an adequate store.
   private pendingState: string | null = null
   private pendingVerifier: string | null = null
 
@@ -264,7 +264,7 @@ export class TwitterService {
   async dmIdentity(): Promise<{ accessToken: string, userId: string, handle: string }> {
     const identity = await this.requireIdentity()
     if (!identity.external_id)
-      throw new Error('Reconnect X on the Accounts page — Postline needs your user id to tell your own replies apart.')
+      throw new Error('Reconnect X on the Accounts page — The Open Times needs your user id to tell your own replies apart.')
 
     return {
       accessToken: String(identity.access_token),

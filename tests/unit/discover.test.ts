@@ -92,18 +92,18 @@ describe('discover excerpts', () => {
   })
 })
 
-describe('postline as a publishing target', () => {
+describe('opentimes as a publishing target', () => {
   test('it is a registered crosspost provider like any other network', () => {
     const providers = crosspostProviders()
-    expect(providers).toContain('postline')
+    expect(providers).toContain('opentimes')
     expect(providers).toContain('bluesky')
     // Ours is first, which is the order the composer selects by default.
-    expect(providers[0]).toBe('postline')
+    expect(providers[0]).toBe('opentimes')
   })
 
   test('per-network variants can target it, so it is not a second-class provider', () => {
-    expect(sanitizeVariants({ postline: 'A version for our own feed' }))
-      .toEqual({ postline: 'A version for our own feed' })
+    expect(sanitizeVariants({ opentimes: 'A version for our own feed' }))
+      .toEqual({ opentimes: 'A version for our own feed' })
   })
 })
 

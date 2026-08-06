@@ -1,5 +1,5 @@
 /**
- * Postline's direct-message contract.
+ * The Open Times' direct-message contract.
  *
  * DMs are deliberately modelled apart from the publishing surface in
  * `types.ts`. Publishing is one-way and fan-out — one body, many networks.
@@ -15,7 +15,7 @@
 
 import type { SocialProvider } from './types'
 
-/** Networks Postline can currently read and answer DMs on. */
+/** Networks The Open Times can currently read and answer DMs on. */
 export const DM_PROVIDERS = ['bluesky', 'twitter', 'mastodon', 'instagram'] as const
 
 export type DmProvider = typeof DM_PROVIDERS[number]
@@ -24,12 +24,12 @@ export type DmProvider = typeof DM_PROVIDERS[number]
  * Why the remaining connected networks are not in `DM_PROVIDERS`.
  *
  * Surfaced verbatim in the inbox so a missing network reads as a known
- * limitation with a cause, rather than as something Postline forgot.
+ * limitation with a cause, rather than as something The Open Times forgot.
  */
 export const DM_UNAVAILABLE: Partial<Record<SocialProvider, string>> = {
   threads: 'Threads has no public messaging API — its inbox is app-only.',
   linkedin: 'LinkedIn messaging is limited to partner-approved apps.',
-  facebook: 'Facebook Page messaging needs the pages_messaging permission, which Postline does not request yet.',
+  facebook: 'Facebook Page messaging needs the pages_messaging permission, which The Open Times does not request yet.',
   tiktok: 'TikTok has no public messaging API.',
 }
 
@@ -37,7 +37,7 @@ export function isDmProvider(value: unknown): value is DmProvider {
   return DM_PROVIDERS.includes(String(value) as DmProvider)
 }
 
-/** The other side of a conversation. Postline itself is never listed. */
+/** The other side of a conversation. The Open Times itself is never listed. */
 export interface DmParticipant {
   /** Provider-side id — a DID, numeric user id, or account id. */
   remoteId: string
@@ -50,7 +50,7 @@ export interface DmParticipant {
 export interface DmConversationCandidate {
   remoteId: string
   participants: DmParticipant[]
-  /** Provider-reported unread count; Postline keeps its own when absent. */
+  /** Provider-reported unread count; The Open Times keeps its own when absent. */
   unreadCount: number
   lastMessageAt?: string | null
   lastMessageText?: string | null
@@ -89,7 +89,7 @@ export interface DmTransport {
   /** Send a reply into an existing conversation and return what was created. */
   sendMessage: (conversationRemoteId: string, body: string) => Promise<DmMessageCandidate>
   /**
-   * Clear the unread flag on the network too, so reading a thread in Postline
+   * Clear the unread flag on the network too, so reading a thread in The Open Times
    * does not leave it bold in the official client. Optional — X has no such
    * endpoint.
    */

@@ -107,7 +107,7 @@ jobs:
         run: bun node_modules/@stacksjs/buddy/dist/cli.js deploy production --yes
       - name: Verify production routes
         run: |
-          curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 https://postline.stacksjs.com/login > /dev/null
-          curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 https://postline.stacksjs.com/api/v1/status | grep -q '"status":"ok"'
-          status=$(curl --silent --output /dev/null --write-out '%{http_code}' https://postline.stacksjs.com/campaigns)
+          curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 https://opentimes.stacksjs.com/login > /dev/null
+          curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 https://opentimes.stacksjs.com/api/v1/status | grep -q '"status":"ok"'
+          status=$(curl --silent --output /dev/null --write-out '%{http_code}' https://opentimes.stacksjs.com/campaigns)
           test "$status" = '200' || test "$status" = '302' || test "$status" = '303'

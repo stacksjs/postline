@@ -1,6 +1,6 @@
-# Postline Landing Page — Build Plan
+# The Open Times Landing Page — Build Plan
 
-A public landing page for Postline (self-hosted social crossposting). Its job: convince a developer / indie-hacker to self-host it. Built with **stx + Crosswind + Iconify + composables** — no external UI or motion libraries.
+A public landing page for The Open Times (self-hosted social crossposting). Its job: convince a developer / indie-hacker to self-host it. Built with **stx + Crosswind + Iconify + composables** — no external UI or motion libraries.
 
 > Source of the design direction: `stacks-design-taste` (read) + this doc. Implementation happens here, phase by phase.
 
@@ -13,7 +13,7 @@ A public landing page for Postline (self-hosted social crossposting). Its job: c
 - **Type:** Geist (grotesk display) + Geist Mono (labels/code). Tight tracking, hard scale contrast, `font-display: swap`.
 - **Spine:** "your posting instrument, self-hosted." Precision-tool mood.
 - **Motion:** CSS + composables only — `useIntersectionObserver` scroll-reveal, CTA hover, ONE logo marquee. `prefers-reduced-motion` honored. Never framer-motion / gsap.
-- **Assets:** real screenshots of Postline's own UI (composer, queue) — never fake `<div>` dashboards.
+- **Assets:** real screenshots of The Open Times' own UI (composer, queue) — never fake `<div>` dashboards.
 - **Copy:** short, concrete, no slop ("elevate/seamless/next-gen" banned). **Zero em-dashes** (design-taste hard rule).
 
 ## Section flow (6)
@@ -73,6 +73,6 @@ Each phase is independently reviewable. ✅ = done, ▶ = in progress, ☐ = tod
 
 ## Constraints / honesty
 
-- **No browser verification in this session** (Postline's dev server isn't running here). Everything is lint + typecheck verified; you do the visual pass.
+- **No browser verification in this session** (The Open Times' dev server isn't running here). Everything is lint + typecheck verified; you do the visual pass.
 - No external UI/motion libraries. Icons via Iconify `i-*` classes. Zero em-dashes in page copy.
 - Rides the Crosswind semantic tokens so the landing is theme-consistent for free.

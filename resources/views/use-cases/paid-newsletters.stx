@@ -1,9 +1,9 @@
 @extends('layouts/marketing')
 
-@section('title', 'Keep the whole subscription - Postline')
+@section('title', 'Keep the whole subscription - The Open Times')
 @section('description', 'Run a paid publication where the platform fee is zero, because there is no platform between you and your readers.')
-@section('canonical', 'https://postline.stacksjs.com/use-cases/paid-newsletters')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-paid-newsletters.png')
+@section('canonical', 'https://opentimes.stacksjs.com/use-cases/paid-newsletters')
+@section('ogImage', 'https://opentimes.stacksjs.com/images/og/use-case-paid-newsletters.png')
 
 @section('content')
   <article class="mx-auto px-6 max-w-[1400px]">
@@ -11,7 +11,7 @@
         and the single CTA carry it. -->
     <header class="grid gap-6 pb-14 pt-16 lg:pt-20 max-w-3xl">
       <nav class="flex gap-2 items-center text-[13px] text-muted" aria-label="Breadcrumb">
-        <a class="hover:text-ink transition-colors" href="/">Postline</a>
+        <a class="hover:text-ink transition-colors" href="/">The Open Times</a>
         <span aria-hidden="true">/</span>
         <span class="text-body">Use cases</span>
       </nav>
@@ -19,7 +19,7 @@
       <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">A ten percent platform fee on a paid newsletter is a rent you pay forever on a relationship you built. Running the software yourself removes the fee and the intermediary at the same time.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <a class="inline-flex items-center px-5 h-11 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl transition-colors" href="/login" data-stx-link>Get started</a>
-        <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">Read the source</a>
+        <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/opentimes">Read the source</a>
       </div>
     </header>
 

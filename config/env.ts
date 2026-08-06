@@ -73,6 +73,41 @@ export default {
     default: 3000,
   },
 
+  // The host the app is reachable at. Local dev uses the `.localhost` form;
+  // deployed environments set it to the canonical domain.
+  APP_URL: {
+    validation: schema.string(),
+    default: 'theopentimes.localhost',
+  },
+
+  // Which of the two hosting shapes config/domains.ts should resolve:
+  // 'domain' -> theopentimes.org, 'subdomain' -> opentimes.stacksjs.com.
+  // Written by `buddy domain:use`; read by config/domains.ts and nothing else.
+  DOMAIN_MODE: {
+    validation: schema.enum(['domain', 'subdomain']),
+    default: 'domain',
+  },
+
+  // Hard override for the canonical host, for a staging or preview box that is
+  // neither declared mode. Empty in normal use — DOMAIN_MODE decides.
+  APP_DOMAIN: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  // Porkbun API credentials. Porkbun registers and serves DNS for
+  // theopentimes.org and the theot.* short domains; ts-cloud discovers the
+  // provider from these two variables alone.
+  PORKBUN_API_KEY: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  PORKBUN_SECRET_KEY: {
+    validation: schema.string(),
+    default: '',
+  },
+
   APP_MAINTENANCE: {
     validation: schema.boolean(),
     default: false,
@@ -118,7 +153,7 @@ export default {
   // replaced — and silently emptied — by the next deploy.
   DB_DATABASE_PATH: {
     validation: schema.string(),
-    default: 'database/postline.sqlite',
+    default: 'database/opentimes.sqlite',
   },
 
   DB_HOST: {

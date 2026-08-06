@@ -14,7 +14,7 @@ import type { MarketingEntry } from '../app/Support/Marketing/catalog'
 import { FEATURES, USE_CASES } from '../app/Support/Marketing/catalog'
 
 const root = join(import.meta.dir, '..')
-const SITE = 'https://postline.stacksjs.com'
+const SITE = 'https://opentimes.stacksjs.com'
 
 /** Escape for a single-quoted stx `@section` argument. */
 function q(value: string): string {
@@ -28,7 +28,7 @@ function page(entry: MarketingEntry, kind: 'feature' | 'use-case', siblings: Mar
 
   return `@extends('layouts/marketing')
 
-@section('title', '${q(entry.title)} - Postline')
+@section('title', '${q(entry.title)} - The Open Times')
 @section('description', '${q(entry.summary)}')
 @section('canonical', '${SITE}${base}/${entry.slug}')
 @section('ogImage', '${SITE}/images/og/${kind}-${entry.slug}.png')
@@ -39,7 +39,7 @@ function page(entry: MarketingEntry, kind: 'feature' | 'use-case', siblings: Mar
         and the single CTA carry it. -->
     <header class="grid gap-6 pb-14 pt-16 lg:pt-20 max-w-3xl">
       <nav class="flex gap-2 items-center text-[13px] text-muted" aria-label="Breadcrumb">
-        <a class="hover:text-ink transition-colors" href="/">Postline</a>
+        <a class="hover:text-ink transition-colors" href="/">The Open Times</a>
         <span aria-hidden="true">/</span>
         <span class="text-body">${label}</span>
       </nav>
@@ -47,7 +47,7 @@ function page(entry: MarketingEntry, kind: 'feature' | 'use-case', siblings: Mar
       <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">${entry.intro}</p>
       <div class="flex flex-wrap gap-3 items-center">
         <a class="inline-flex items-center px-5 h-11 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl transition-colors" href="/login" data-stx-link>Get started</a>
-        <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">Read the source</a>
+        <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/opentimes">Read the source</a>
       </div>
     </header>
 
@@ -95,12 +95,12 @@ function indexPage(kind: 'feature' | 'use-case', entries: MarketingEntry[]): str
   const base = kind === 'feature' ? '/features' : '/use-cases'
   const label = kind === 'feature' ? 'Features' : 'Use cases'
   const blurb = kind === 'feature'
-    ? 'Everything Postline does, and how each part works.'
-    : 'Who runs Postline, and what they use it for.'
+    ? 'Everything The Open Times does, and how each part works.'
+    : 'Who runs The Open Times, and what they use it for.'
 
   return `@extends('layouts/marketing')
 
-@section('title', '${label} - Postline')
+@section('title', '${label} - The Open Times')
 @section('description', '${q(blurb)}')
 @section('canonical', '${SITE}${base}')
 @section('ogImage', '${SITE}/images/og/${kind}-index.png')

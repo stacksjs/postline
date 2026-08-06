@@ -37,7 +37,7 @@ database/stacks_testing.sqlite
 database/stacks.sqlite
 # Local dev database. It was tracked once, which shipped real local data in
 # every release tarball — and production never even read it.
-database/postline.sqlite
+database/opentimes.sqlite
 database/*.sqlite-wal
 database/*.sqlite-shm
 
@@ -86,4 +86,4 @@ storage/cloud/
 # kill -9'd run) out of commits.
 .tmp-upgrade/
 .claude/scheduled_tasks.lock
-storage/app/postline-media/
+storage/app/opentimes-media/

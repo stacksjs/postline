@@ -24,7 +24,7 @@ export interface PublicationConfirmationOptions {
 
 export async function sendPublicationConfirmation(options: PublicationConfirmationOptions): Promise<void> {
   const base = checkoutBaseUrl(env.APP_URL)
-  const confirmUrl = `${base}/api/postline/subscribe/confirm?token=${encodeURIComponent(options.confirmationToken)}`
+  const confirmUrl = `${base}/api/ot/subscribe/confirm?token=${encodeURIComponent(options.confirmationToken)}`
   const subject = `Confirm your subscription to ${options.publicationName}`
 
   const text = [

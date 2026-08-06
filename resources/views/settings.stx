@@ -1,15 +1,15 @@
-@extends('layouts/postline')
+@extends('layouts/app')
 
-@section('title', 'Postline - Settings')
+@section('title', 'The Open Times - Settings')
 
 @section('content')
-  @meta('description', 'Configure Postline publishing defaults.')
-  <section class="grid gap-5" data-postline-page="settings" data-testid="settings-page">
+  @meta('description', 'Configure The Open Times publishing defaults.')
+  <section class="grid gap-5" data-ot-page="settings" data-testid="settings-page">
     <header class="grid gap-4 items-center sm:grid-cols-[minmax(0,1fr)_auto] min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Settings</p>
         <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Publishing</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-muted">Configure how Postline looks, publishes, and connects.</p>
+        <p class="mb-0 mt-1.5 text-[13px] text-muted">Configure how The Open Times looks, publishes, and connects.</p>
       </div>
       <button class="inline-flex items-center justify-center px-4 h-9 w-fit font-bold text-ink text-sm bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" @click="signOut">Sign out</button>
     </header>
@@ -101,11 +101,11 @@
      * Applies the preference to the root html element.
      *
      * stx ships `useColorMode`, which is what this should be, but it cannot
-     * express what Postline needs on two counts (see stacksjs/stx issue):
+     * express what The Open Times needs on two counts (see stacksjs/stx issue):
      *   1. `applyDOM` sets EITHER `darkClass` OR `attribute`, never both, and
      *      the app needs `html.dark` (every dark: utility and the CSS-var
      *      overrides key off it) together with `data-theme`.
-     *   2. It persists only 'light' | 'dark' | 'auto'. Postline stores
+     *   2. It persists only 'light' | 'dark' | 'auto'. The Open Times stores
      *      'system', which `readPersisted` rejects — adopting it would rewrite
      *      the key to 'auto' and silently break the layout's pre-paint block,
      *      which matches on 'system'.
@@ -149,7 +149,7 @@
         if (themePref() === 'system') applyTheme('system')
       }, { target: matchMedia('(prefers-color-scheme: dark)') })
 
-      void postlineBluesky?.fetchStatus().then((data) => {
+      void opentimesBluesky?.fetchStatus().then((data) => {
         if (data?.characterLimit) charLimit.set(data.characterLimit)
         blueskySummary.set(data.canPublish
           ? `@${data.handle} is connected and ready to publish.`

@@ -1,10 +1,10 @@
-@extends('layouts/postline')
+@extends('layouts/app')
 
-@section('title', 'Postline - Settings - Channels')
+@section('title', 'The Open Times - Settings - Channels')
 
 @section('content')
-  @meta('description', 'Connect and manage publishing channels in Postline settings.')
-  <section class="grid gap-4" data-postline-page="accounts" data-testid="accounts-page">
+  @meta('description', 'Connect and manage publishing channels in The Open Times settings.')
+  <section class="grid gap-4" data-ot-page="accounts" data-testid="accounts-page">
     <!-- Crosswind safelist: connection status-pill colors are set dynamically
         via JS, so list them in static markup for the CSS scanner. -->
     <div class="hidden text-amber-800 text-emerald-700 text-muted bg-amber-50 bg-emerald-50 border-amber-200 border-emerald-200 border-line" aria-hidden="true"></div>
@@ -109,7 +109,7 @@
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="blog">
           <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl i-hugeicons-quill-write-02" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full">Ready</span></div>
             <h2 class="mb-0 mt-4 font-bold text-[15px]">Blog</h2>
-            <p class="my-1.5 text-[13px] text-body">Built into Postline</p>
+            <p class="my-1.5 text-[13px] text-body">Built into The Open Times</p>
             <p class="m-0 text-muted text-xs">Publish long-form posts to your site without another account.</p>
           </div>
           <a class="inline-flex items-center justify-center h-9 font-bold text-ink text-xs bg-panel-2 hover:bg-white border border-line rounded-xl" href="/blog" data-stx-link>Open Blog</a>
@@ -143,13 +143,13 @@
       </summary>
 
       <div class="grid gap-4 p-4 border-red-200 border-t">
-        <div class="flex gap-2 items-center p-3 text-red-800 text-xs bg-red-50 border border-red-200 rounded-xl"><span class="shrink-0 h-4 w-4 i-hugeicons-alert-02" aria-hidden="true"></span><span>Deletion is permanent. Postline always shows a preview and requires an exact confirmation phrase first.</span></div>
+        <div class="flex gap-2 items-center p-3 text-red-800 text-xs bg-red-50 border border-red-200 rounded-xl"><span class="shrink-0 h-4 w-4 i-hugeicons-alert-02" aria-hidden="true"></span><span>Deletion is permanent. The Open Times always shows a preview and requires an exact confirmation phrase first.</span></div>
         <fieldset class="grid gap-2 m-0 p-0 border-0">
           <legend class="mb-1 p-0 font-bold text-muted text-xs">What to delete</legend>
           <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
             <input class="mt-0.5" type="radio" name="purge-scope" value="tracked" checked data-purge-scope>
             <span>
-              <span class="block font-bold text-[13px] text-ink">Posts Postline published</span>
+              <span class="block font-bold text-[13px] text-ink">Posts The Open Times published</span>
               <span class="block mt-0.5 text-muted text-xs">Only posts sent from this workspace. Anything you posted elsewhere stays.</span>
             </span>
           </label>
@@ -157,7 +157,7 @@
             <input class="mt-0.5" type="radio" name="purge-scope" value="all" data-purge-scope>
             <span>
               <span class="block font-bold text-[13px] text-ink">Everything on the account</span>
-              <span class="block mt-0.5 text-muted text-xs">Every post the account ever made, including posts created outside Postline.</span>
+              <span class="block mt-0.5 text-muted text-xs">Every post the account ever made, including posts created outside The Open Times.</span>
             </span>
           </label>
         </fieldset>
@@ -178,7 +178,7 @@
               <input type="checkbox" value="linkedin" checked data-purge-provider> LinkedIn
             </label>
           </div>
-          <p class="m-0 text-muted text-xs">LinkedIn can delete the posts Postline published; listing its full history needs a partner permission most apps don't hold. Instagram and Threads can't delete posts at all through their APIs — remove those in their own apps.</p>
+          <p class="m-0 text-muted text-xs">LinkedIn can delete the posts The Open Times published; listing its full history needs a partner permission most apps don't hold. Instagram and Threads can't delete posts at all through their APIs — remove those in their own apps.</p>
         </fieldset>
 
         <div class="flex flex-wrap gap-3 items-center">
@@ -224,7 +224,7 @@
         // Resolve the toast helper at call time — it's a deferred module that
         // loads after this inline script parses, so an eager capture is
         // undefined on a full page load (e.g. the OAuth redirect back here).
-        const show = window.postlineToast?.show
+        const show = window.opentimesToast?.show
         if (show) show({ message, tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info', title: options.title })
         else console.log(message)
       }
@@ -236,7 +236,7 @@
         if (handle) handle.textContent = label
         if (detail) {
           detail.textContent = connected
-            ? 'Ready to publish and sync timeline from Postline.'
+            ? 'Ready to publish and sync timeline from The Open Times.'
             : data?.handle
               ? 'Saved handle found. Add a valid app password to publish.'
               : 'Add an app password to publish and sync your timeline.'
@@ -256,14 +256,14 @@
 
       const refreshStatus = async () => {
         try {
-          const data = await window.postlineBluesky?.fetchStatus()
+          const data = await window.opentimesBluesky?.fetchStatus()
           renderStatus(data)
         }
         catch (error) {
           // Inline status ("Setup" / "Not connected") communicates the failure;
           // no toast on load so an expired session can't spam one each visit.
           renderStatus(null)
-          console.warn('[postline] bluesky status failed:', error)
+          console.warn('[opentimes] bluesky status failed:', error)
         }
       }
 
@@ -273,7 +273,7 @@
         notify('Connecting to Bluesky…', 'info', { title: 'Channels' })
 
         try {
-          const response = await fetch('/api/postline/bluesky/connect', {
+          const response = await fetch('/api/ot/bluesky/connect', {
             method: 'POST',
             body: new FormData(form),
           })
@@ -306,7 +306,7 @@
         }
         if (linkedinDetail) {
           linkedinDetail.textContent = connected
-            ? 'Ready to crosspost member shares from Postline.'
+            ? 'Ready to crosspost member shares from The Open Times.'
             : data?.oauthConfigured
               ? 'Connect with LinkedIn to crosspost member shares.'
               : data?.configuredFromEnv
@@ -333,7 +333,7 @@
 
       const refreshLinkedIn = async () => {
         try {
-          const data = await window.postlineLinkedin?.fetchStatus()
+          const data = await window.opentimesLinkedin?.fetchStatus()
           renderLinkedIn(data)
         }
         catch (error) {
@@ -344,14 +344,14 @@
 
       linkedinConnect?.addEventListener('click', () => {
         notify('Redirecting to LinkedIn…', 'info', { title: 'LinkedIn' })
-        navigate('/api/postline/linkedin/auth', true)
+        navigate('/api/ot/linkedin/auth', true)
       })
 
       linkedinConnectEnv?.addEventListener('click', async () => {
         linkedinConnectEnv.setAttribute('disabled', 'disabled')
         notify('Connecting LinkedIn from .env…', 'info', { title: 'LinkedIn' })
         try {
-          const response = await fetch('/api/postline/linkedin/connect', { method: 'POST' })
+          const response = await fetch('/api/ot/linkedin/connect', { method: 'POST' })
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'LinkedIn connect failed.')
           await refreshLinkedIn()
@@ -415,7 +415,7 @@
         }
         if (twitterDetail) {
           twitterDetail.textContent = connected
-            ? 'Ready to crosspost tweets from Postline.'
+            ? 'Ready to crosspost tweets from The Open Times.'
             : data?.oauthConfigured
               ? 'Connect X to crosspost tweets. Posting needs a paid X API tier.'
               : data?.configuredFromEnv
@@ -442,7 +442,7 @@
 
       const refreshTwitter = async () => {
         try {
-          const response = await fetch('/api/postline/twitter/status')
+          const response = await fetch('/api/ot/twitter/status')
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load X/Twitter status.')
           renderTwitter(payload.data)
@@ -455,14 +455,14 @@
 
       twitterConnect?.addEventListener('click', () => {
         notify('Redirecting to X…', 'info', { title: 'X/Twitter' })
-        navigate('/api/postline/twitter/auth', true)
+        navigate('/api/ot/twitter/auth', true)
       })
 
       twitterConnectEnv?.addEventListener('click', async () => {
         twitterConnectEnv.setAttribute('disabled', 'disabled')
         notify('Connecting X from .env…', 'info', { title: 'X/Twitter' })
         try {
-          const response = await fetch('/api/postline/twitter/connect', { method: 'POST' })
+          const response = await fetch('/api/ot/twitter/connect', { method: 'POST' })
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'X connect failed.')
           await refreshTwitter()
@@ -527,7 +527,7 @@
 
       const refreshInstagram = async () => {
         try {
-          const data = await window.postlineInstagram?.fetchStatus()
+          const data = await window.opentimesInstagram?.fetchStatus()
           renderInstagram(data)
         }
         catch (error) {
@@ -538,14 +538,14 @@
 
       instagramConnect?.addEventListener('click', () => {
         notify('Redirecting to Instagram…', 'info', { title: 'Instagram' })
-        navigate('/api/postline/instagram/auth', true)
+        navigate('/api/ot/instagram/auth', true)
       })
 
       instagramConnectEnv?.addEventListener('click', async () => {
         instagramConnectEnv.setAttribute('disabled', 'disabled')
         notify('Connecting Instagram from .env…', 'info', { title: 'Instagram' })
         try {
-          const response = await fetch('/api/postline/instagram/connect', { method: 'POST' })
+          const response = await fetch('/api/ot/instagram/connect', { method: 'POST' })
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Instagram connect failed.')
           await refreshInstagram()
@@ -583,7 +583,7 @@
         }
         if (threadsDetail) {
           threadsDetail.textContent = connected
-            ? 'Ready to crosspost from Postline.'
+            ? 'Ready to crosspost from The Open Times.'
             : data?.oauthConfigured
               ? 'Connect a Threads account to crosspost.'
               : data?.configuredFromEnv
@@ -610,7 +610,7 @@
 
       const refreshThreads = async () => {
         try {
-          const data = await window.postlineThreads?.fetchStatus()
+          const data = await window.opentimesThreads?.fetchStatus()
           renderThreads(data)
         }
         catch (error) {
@@ -621,14 +621,14 @@
 
       threadsConnect?.addEventListener('click', () => {
         notify('Redirecting to Threads…', 'info', { title: 'Threads' })
-        navigate('/api/postline/threads/auth', true)
+        navigate('/api/ot/threads/auth', true)
       })
 
       threadsConnectEnv?.addEventListener('click', async () => {
         threadsConnectEnv.setAttribute('disabled', 'disabled')
         notify('Connecting Threads from .env…', 'info', { title: 'Threads' })
         try {
-          const response = await fetch('/api/postline/threads/connect', { method: 'POST' })
+          const response = await fetch('/api/ot/threads/connect', { method: 'POST' })
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Threads connect failed.')
           await refreshThreads()
@@ -666,7 +666,7 @@
         if (mastodonInstance && data?.instance) mastodonInstance.value = data.instance
         if (mastodonDetail) {
           mastodonDetail.textContent = connected
-            ? 'Ready to crosspost from Postline.'
+            ? 'Ready to crosspost from The Open Times.'
             : data?.configuredFromEnv
               ? 'Token found in .env. Connect to start crossposting.'
               : 'Connect any Mastodon instance with an access token to crosspost.'
@@ -686,7 +686,7 @@
 
       const refreshMastodon = async () => {
         try {
-          const response = await fetch('/api/postline/mastodon/status')
+          const response = await fetch('/api/ot/mastodon/status')
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load Mastodon status.')
           renderMastodon(payload.data)
@@ -702,7 +702,7 @@
         mastodonSubmit?.setAttribute('disabled', 'disabled')
         notify('Connecting to Mastodon…', 'info', { title: 'Mastodon' })
         try {
-          const response = await fetch('/api/postline/mastodon/connect', { method: 'POST', body: new FormData(mastodonForm) })
+          const response = await fetch('/api/ot/mastodon/connect', { method: 'POST', body: new FormData(mastodonForm) })
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Mastodon connect failed.')
           if (mastodonToken) mastodonToken.value = ''
@@ -787,7 +787,7 @@
         if (purgeSummary) purgeSummary.textContent = 'Counting…'
         try {
           const query = new URLSearchParams({ scope: purgeScope(), providers: providers.join(',') })
-          const response = await fetch(`/api/postline/purge/preview?${query.toString()}`)
+          const response = await fetch(`/api/ot/purge/preview?${query.toString()}`)
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Preview failed.')
 
@@ -808,7 +808,7 @@
 
       purgeRun?.addEventListener('click', async () => {
         const scope = purgeScope()
-        const label = scope === 'all' ? 'every post on the selected accounts' : 'every post Postline published'
+        const label = scope === 'all' ? 'every post on the selected accounts' : 'every post The Open Times published'
         // Last stop before an irreversible action.
         if (!window.confirm(`Permanently delete ${label}? This cannot be undone.`)) return
 
@@ -820,7 +820,7 @@
           body.set('providers', purgeProviders().join(','))
           body.set('confirmation', purgeConfirmation?.value || '')
 
-          const response = await fetch('/api/postline/purge', { method: 'POST', body })
+          const response = await fetch('/api/ot/purge', { method: 'POST', body })
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Deletion failed.')
 
@@ -845,7 +845,7 @@
       syncPurgeButton()
 
       // Gate the initial status fetch on DOMContentLoaded so the deferred
-      // postline-bluesky module has loaded — otherwise a connected account
+      // opentimes-bluesky module has loaded — otherwise a connected account
       // renders "Not connected" on a full page load. (Mirrors the other
       // providers.)
       const startBluesky = () => void refreshStatus()

@@ -1,10 +1,10 @@
-@extends('layouts/postline')
+@extends('layouts/app')
 
-@section('title', 'Postline - Queue')
+@section('title', 'The Open Times - Queue')
 
 @section('content')
-  @meta('description', 'Review scheduled and drafted social posts in Postline.')
-  <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
+  @meta('description', 'Review scheduled and drafted social posts in The Open Times.')
+  <section class="grid gap-5" data-ot-page="queue" data-testid="queue-page">
     <header class="flex flex-wrap gap-4 items-center justify-between min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Queue</p>
@@ -117,7 +117,7 @@
 
   <script client>
     /**
-     * Wire shapes for `/api/postline/queue/*`, declared where they are used.
+     * Wire shapes for `/api/ot/queue/*`, declared where they are used.
      *
      * These describe what the BROWSER receives, which is a flattened projection
      * of `app/Support/Social/types.ts` — deliberately separate, because the wire
@@ -176,10 +176,10 @@
     const busyId = state(0)
     const calMonthStart = state(monthStart(new Date()))
 
-    // A fresh key, not the legacy 'postline.queue.view': useLocalStorage
+    // A fresh key, not the legacy 'opentimes.queue.view': useLocalStorage
     // JSON.parses whatever is already stored, and the old value was a bare
     // string ("list"), which would throw and take the whole script down.
-    const view = useLocalStorage('postline.queue.view.v2', 'list')
+    const view = useLocalStorage('opentimes.queue.view.v2', 'list')
 
     function monthStart(date: Date): Date {
       return new Date(date.getFullYear(), date.getMonth(), 1)
@@ -202,7 +202,7 @@
       return date.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
     }
 
-    const providerLabel = (provider: string): string => postlineSocial?.providerLabel(provider) || provider
+    const providerLabel = (provider: string): string => opentimesSocial?.providerLabel(provider) || provider
 
     const liveUrlFor = (uri: string | null | undefined): string => {
       const value = String(uri || '')
@@ -316,7 +316,7 @@
 
     const refresh = async () => {
       try {
-        const response = await fetch('/api/postline/queue')
+        const response = await fetch('/api/ot/queue')
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the queue.')
         items.set(payload.data.items || [])
@@ -327,7 +327,7 @@
         // failing fetch (e.g. an expired session) can't spam or stack.
         items.set([])
         loadError.set(error instanceof Error ? error.message : String(error))
-        console.warn('[postline] queue load failed:', error)
+        console.warn('[opentimes] queue load failed:', error)
       }
       finally {
         loaded.set(true)
@@ -347,10 +347,10 @@
       busyId.set(id)
       try {
         await post(path, id)
-        postlineToast?.show?.({ title: success.title, message: success.message, tone: 'success' })
+        opentimesToast?.show?.({ title: success.title, message: success.message, tone: 'success' })
       }
       catch (error) {
-        postlineToast?.show?.({
+        opentimesToast?.show?.({
           title: failure,
           message: error instanceof Error ? error.message : String(error),
           tone: 'error',
@@ -364,7 +364,7 @@
 
     const publishItem = (id: number): void => void runAction(
       id,
-      '/api/postline/queue/publish-now',
+      '/api/ot/queue/publish-now',
       { title: 'Published', message: 'Post published.' },
       'Publish failed',
     )
@@ -373,7 +373,7 @@
       if (!confirm('Delete this post? This cannot be undone.')) return
       void runAction(
         id,
-        '/api/postline/queue/delete',
+        '/api/ot/queue/delete',
         { title: 'Removed', message: 'Post removed from the queue.' },
         'Delete failed',
       )

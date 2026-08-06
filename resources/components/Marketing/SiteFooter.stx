@@ -14,9 +14,9 @@ const year = new Date().getFullYear()
 
     <div class="grid gap-10 lg:gap-12 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] mx-auto px-6 py-16 max-w-[1400px]">
       <div class="max-w-[38ch]">
-        <a class="inline-flex gap-2.5 items-center font-semibold text-ink" href="/" aria-label="Postline home">
+        <a class="inline-flex gap-2.5 items-center font-semibold text-ink" href="/" aria-label="The Open Times home">
           <span class="grid place-items-center h-8 w-8 font-bold text-[13px] text-on-accent bg-ink rounded-lg">P</span>
-          Postline
+          The Open Times
         </a>
         <p class="m-0 mt-4 leading-relaxed text-[13px] text-muted">
           Open source publishing: your site, your newsletter, your paid subscribers, and a crosspost to every network. Runs on your machine, with your keys.
@@ -39,9 +39,9 @@ const year = new Date().getFullYear()
 
       <nav class="grid content-start gap-3" aria-label="Project">
         <p class="m-0 font-medium text-[13px] text-ink">Project</p>
-        <a class="text-[13px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline">Source</a>
-        <a class="text-[13px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline/releases">Releases</a>
-        <a class="text-[13px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline/issues">Issues</a>
+        <a class="text-[13px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/opentimes">Source</a>
+        <a class="text-[13px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/opentimes/releases">Releases</a>
+        <a class="text-[13px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/opentimes/issues">Issues</a>
         <a class="text-[13px] text-muted hover:text-ink transition-colors" href="/login" data-stx-link>Sign in</a>
       </nav>
     </div>
@@ -49,7 +49,7 @@ const year = new Date().getFullYear()
     <div class="border-line border-t">
       <div class="flex flex-col gap-3 justify-between sm:flex-row sm:items-center mx-auto px-6 py-6 max-w-[1400px]">
         <p class="m-0 text-[13px] text-muted">MIT licensed. Built on Stacks.</p>
-        <p class="m-0 text-[13px] text-muted">&copy; {{ year }} Postline</p>
+        <p class="m-0 text-[13px] text-muted">&copy; {{ year }} The Open Times</p>
       </div>
     </div>
   </footer>

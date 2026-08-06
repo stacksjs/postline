@@ -14,7 +14,7 @@ export default new Job({
     try {
       const result = await keywordMonitoring.scan()
       if (result.created)
-        console.log(`[postline] listening scan: ${result.created} new mentions across ${result.scanned} rules`)
+        console.log(`[opentimes] listening scan: ${result.created} new mentions across ${result.scanned} rules`)
       return result
     }
     catch (error) {

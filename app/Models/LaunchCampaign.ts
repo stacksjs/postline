@@ -3,7 +3,7 @@ import { schema } from '@stacksjs/validation'
 
 /**
  * A social launch plan. Kept separate from Stacks' email-oriented Campaign
- * model so Postline can evolve its planning workflow without coupling it to
+ * model so The Open Times can evolve its planning workflow without coupling it to
  * newsletter delivery.
  */
 export default defineModel({

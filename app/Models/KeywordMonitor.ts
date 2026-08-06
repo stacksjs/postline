@@ -36,7 +36,7 @@ export default defineModel({
       required: true,
       fillable: true,
       validation: { rule: schema.json().required() },
-      factory: () => JSON.stringify(['Postline', 'Stacks']),
+      factory: () => JSON.stringify(['The Open Times', 'Stacks']),
     },
     providers: {
       required: true,

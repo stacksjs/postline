@@ -9,7 +9,7 @@
  * 2. There is a 24-hour rule. Outside 24 hours of the user's last message,
  *    Instagram rejects the reply. That is a product rule rather than a bug, so
  *    it is translated into an explanation instead of a raw Graph error.
- * 3. It needs `instagram_manage_messages`, which Postline only started asking
+ * 3. It needs `instagram_manage_messages`, which The Open Times only started asking
  *    for when this landed. An account connected before then authenticates
  *    fine and then fails on the first DM call — hence the reconnect hint.
  */
@@ -68,7 +68,7 @@ export function describeGraphError(payload: any, status: number): string {
   if (code === 190 || status === 401)
     return 'Your Instagram connection expired. Reconnect it on the Accounts page.'
   if (code === 200 || code === 3 || status === 403)
-    return 'This Instagram connection is missing DM permission. Reconnect it on Accounts so Postline can request instagram_manage_messages.'
+    return 'This Instagram connection is missing DM permission. Reconnect it on Accounts so The Open Times can request instagram_manage_messages.'
   if (code === 4 || code === 613)
     return 'Instagram rate limit reached — try again in a few minutes.'
 
@@ -208,7 +208,7 @@ export class InstagramDmTransport implements DmTransport {
   /**
    * The person on the other end of a conversation.
    *
-   * Writes are addressed to an IGSID, but Postline's transport contract is
+   * Writes are addressed to an IGSID, but The Open Times' transport contract is
    * conversation-keyed, so this resolves one to the other. A group thread has
    * no single recipient, which the Messenger API cannot express either — so it
    * is rejected here rather than silently answering only the first member.
@@ -223,7 +223,7 @@ export class InstagramDmTransport implements DmTransport {
       .map(participantFrom)
 
     if (!recipient) throw new Error('That Instagram conversation has no one to reply to.')
-    if (rest.length) throw new Error('Instagram group conversations cannot be answered from Postline yet.')
+    if (rest.length) throw new Error('Instagram group conversations cannot be answered from The Open Times yet.')
 
     return recipient
   }

@@ -11,16 +11,16 @@ import { postPurge, PURGE_CONFIRMATION, PURGEABLE_PROVIDERS } from '../../app/Se
 
 describe('purge safeguards', () => {
   test('only providers whose API can delete are purgeable', () => {
-    expect(PURGEABLE_PROVIDERS).toEqual(['postline', 'bluesky', 'twitter', 'mastodon', 'linkedin'])
+    expect(PURGEABLE_PROVIDERS).toEqual(['opentimes', 'bluesky', 'twitter', 'mastodon', 'linkedin'])
     // Neither can delete a feed post through its API at all.
     expect(PURGEABLE_PROVIDERS).not.toContain('instagram')
     expect(PURGEABLE_PROVIDERS).not.toContain('threads')
   })
 
   test('our own feed is purgeable, since the rows are ours to delete', () => {
-    // Postline is the one target with no external API in the way. Leaving it
+    // The Open Times is the one target with no external API in the way. Leaving it
     // out made "take it all back down" untrue for the network we run.
-    expect(PURGEABLE_PROVIDERS).toContain('postline')
+    expect(PURGEABLE_PROVIDERS).toContain('opentimes')
     // The blog stays out: those posts are managed from the blog itself, and
     // deleting an essay is not the same decision as clearing a feed.
     expect(PURGEABLE_PROVIDERS).not.toContain('blog')

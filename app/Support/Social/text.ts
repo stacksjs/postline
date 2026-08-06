@@ -1,5 +1,5 @@
 /**
- * Text helpers shared by the parts of Postline that read posts back out of a
+ * Text helpers shared by the parts of The Open Times that read posts back out of a
  * network rather than writing them into one.
  */
 

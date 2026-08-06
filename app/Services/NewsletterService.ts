@@ -261,7 +261,7 @@ export class NewsletterService {
 
     for (const recipient of batch) {
       const row = await subscribers.findByEmail(recipient.email)
-      const unsubscribeUrl = `${base}/api/postline/subscribe/unsubscribe?token=${encodeURIComponent(String(row?.unsubscribe_token || ''))}`
+      const unsubscribeUrl = `${base}/api/ot/subscribe/unsubscribe?token=${encodeURIComponent(String(row?.unsubscribe_token || ''))}`
       const url = send.url ? (String(send.url).startsWith('http') ? String(send.url) : `${base}${send.url}`) : null
 
       try {

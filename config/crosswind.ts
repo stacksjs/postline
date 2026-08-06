@@ -2,7 +2,7 @@ import type { CrosswindOptions } from '@cwcss/crosswind'
 import { defaultConfig } from '@cwcss/crosswind'
 
 /**
- * Crosswind config — the single source of truth for Postline's design tokens
+ * Crosswind config — the single source of truth for The Open Times' design tokens
  * and for every rule a utility class cannot express.
  *
  * WHY EVERYTHING LIVES HERE
@@ -15,7 +15,7 @@ import { defaultConfig } from '@cwcss/crosswind'
  *     `[data-crosswind]` on navigation, but the ENTRY page's server-rendered
  *     block carries no `data-stx-page` and is never removed. Two pages that
  *     each shipped a `:root` block therefore ended up with both live at once,
- *     fighting. Postline had exactly that: the app layout declared
+ *     fighting. The Open Times had exactly that: the app layout declared
  *     `--bg: #f3f3f1` and the marketing layout `--bg: #f4f4f2`.
  *  3. Tokens declared per-file drift. There were four blocks across four files.
  *
@@ -40,59 +40,95 @@ import { defaultConfig } from '@cwcss/crosswind'
  * `theme.extend.colors` only — a top-level `theme.colors` is silently ignored.
  */
 
-/** App surfaces, light. The default for every page that is not the landing. */
+/**
+ * THE OPEN TIMES — an old-newspaper identity, expressed as tokens.
+ *
+ * The palette is a print palette, not a screen one: paper stock, ink, and one
+ * spot colour. Nothing here is a neutral grey — every surface is warm, because
+ * newsprint is. The greys that remain (`--muted`) are ink at partial coverage,
+ * which is what a halftone actually looks like.
+ *
+ * `--accent` is the press red used for a masthead flash or an EXTRA banner. It
+ * is deliberately the only chromatic value in the whole system: a second hue
+ * would read as a website with a newspaper theme rather than as a newspaper.
+ */
+
+/** Newsprint, day edition. The default for every page that is not the front page. */
 const APP_LIGHT: string = `
   color-scheme: light;
-  background: #f3f3f1;
-  --bg: #f3f3f1;
-  --panel: #ffffff;
-  --panel-2: #fafafa;
-  --panel-3: #f4f4f5;
-  --line: #e4e4e7;
-  --ink: #0a0a0a;
-  --body: #3f3f46;
-  --muted: #71717a;
-  --accent: #0a0a0a;
-  --on-accent: #ffffff;
+  background: #f4f0e4;
+  --bg: #f4f0e4;
+  --panel: #fbf8ef;
+  --panel-2: #ece6d6;
+  --panel-3: #e2dbc7;
+  --line: #cec5ae;
+  --ink: #17130f;
+  --body: #3a332a;
+  --muted: #7b7263;
+  --accent: #9c2118;
+  --on-accent: #fbf8ef;
 `
 
-/** App surfaces, dark. */
+/** The night edition — ink-heavy stock, paper-coloured type. */
 const APP_DARK: string = `
   color-scheme: dark;
-  background: #0a0a0c;
-  --bg: #0a0a0c;
-  --panel: #18181b;
-  --panel-2: #1c1c1f;
-  --panel-3: #26262a;
-  --line: #2a2a2e;
-  --ink: #f4f4f5;
-  --body: #d4d4d8;
-  --muted: #a1a1aa;
-  --accent: #f4f4f5;
-  --on-accent: #0a0a0c;
+  background: #14110d;
+  --bg: #14110d;
+  --panel: #1d1914;
+  --panel-2: #241f19;
+  --panel-3: #2d2720;
+  --line: #3a332a;
+  --ink: #f2ece0;
+  --body: #d8d0c0;
+  --muted: #9b9284;
+  --accent: #d9614f;
+  --on-accent: #14110d;
 `
 
 /**
- * Marketing surfaces. The landing page is deliberately LIGHT-locked and carries
- * its own accent (blue) and slightly warmer surfaces, so these are a scoped
- * override rather than a second competing `:root`. The marketing layout opts in
- * with `class="marketing"` on the root element.
+ * The front page. LIGHT-locked — a newspaper does not have a dark mode — and
+ * on slightly older, greyer stock than the workspace, so the two surfaces read
+ * as "the printed paper" and "the newsroom" rather than as one flat theme.
+ * The marketing layout opts in with `class="marketing"` on the root element.
  */
 const MARKETING: string = `
   color-scheme: light;
-  --bg: #f4f4f2;
-  --panel: #ffffff;
-  --panel-2: #ececeb;
-  --panel-3: #e6e6e4;
-  --line: #e4e4e7;
-  --ink: #0a0a0a;
-  --body: #3f3f46;
-  --muted: #71717a;
-  --accent: #2563eb;
-  --on-accent: #ffffff;
+  --bg: #f1ecdd;
+  --panel: #f8f4e9;
+  --panel-2: #e7e0cd;
+  --panel-3: #ddd4bd;
+  --line: #c6bca3;
+  --ink: #12100c;
+  --body: #332d24;
+  --muted: #756c5c;
+  --accent: #9c2118;
+  --on-accent: #f8f4e9;
+`
+
+/**
+ * The four faces of the paper, declared once at `:root` so the workspace and
+ * the front page draw from the same set.
+ *
+ * - masthead   blackletter, the nameplate and nothing else. It is unreadable at
+ *              small sizes by design; anything under ~28px must not use it.
+ * - display    a high-contrast Didone for headlines and decks.
+ * - body       a book serif — this is the face that carries actual reading.
+ * - label      condensed gothic for kickers, folios, bylines and UI chrome.
+ * - typewriter for the two places that quote a shell command.
+ *
+ * Each stack ends in a real fallback rather than `sans-serif`, so a blocked
+ * webfont degrades to something with the same posture instead of to Helvetica.
+ */
+const FACES: string = `
+  --font-masthead: 'UnifrakturMaguntia', 'Playfair Display', Georgia, serif;
+  --font-display: 'Playfair Display', 'Times New Roman', Georgia, serif;
+  --font-body: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
+  --font-label: 'Oswald', 'Arial Narrow', ui-sans-serif, sans-serif;
+  --font-typewriter: 'Courier New', ui-monospace, monospace;
 `
 
 const TOKENS: string = `
+:root { ${FACES} }
 :root { ${APP_LIGHT} }
 html.dark { ${APP_DARK} }
 html.marketing { ${MARKETING} }
@@ -144,15 +180,15 @@ const DARK_OVERRIDES: string = `
 .dark input::placeholder, .dark textarea::placeholder { color: #71717a; }
 .dark code { background-color: #26262a; color: #e4e4e7; }
 
-.dark [data-postline-content-shell],
-.dark [data-postline-workspace],
-.dark [data-postline-sidebar] { background-color: #0a0a0c; }
-.dark [data-postline-workspace] {
+.dark [data-ot-content-shell],
+.dark [data-ot-workspace],
+.dark [data-ot-sidebar] { background-color: #0a0a0c; }
+.dark [data-ot-workspace] {
   border-color: #2a2a2e;
   box-shadow: -10px 0 36px rgba(0, 0, 0, 0.4);
 }
-.dark [data-postline-sidebar] { background-color: rgba(24, 24, 27, 0.5); }
-.dark [data-postline-sidebar] > .absolute { opacity: 0.35; }
+.dark [data-ot-sidebar] { background-color: rgba(24, 24, 27, 0.5); }
+.dark [data-ot-sidebar] > .absolute { opacity: 0.35; }
 
 .dark .bg-\\[\\#e8e8e6\\]\\/90 { background-color: rgba(63, 63, 70, 0.6); }
 .dark .bg-white\\/95 { background-color: rgba(39, 39, 42, 0.95); }
@@ -174,14 +210,14 @@ const DARK_OVERRIDES: string = `
 
 /** App shell: sidebar collapse animation, native-window chrome, focus rings. */
 const APP_SHELL: string = `
-@property --postline-sidebar-width {
+@property --ot-sidebar-width {
   syntax: '<length>';
   inherits: true;
   initial-value: 286px;
 }
 
-[data-postline-shell] {
-  transition-property: --postline-sidebar-width;
+[data-ot-shell] {
+  transition-property: --ot-sidebar-width;
   transition-duration: 220ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -191,30 +227,30 @@ html.has-native-sidebar body {
   background: transparent !important;
 }
 
-html.has-native-sidebar [data-postline-sidebar] {
+html.has-native-sidebar [data-ot-sidebar] {
   background-color: rgba(246, 246, 244, 0.18) !important;
   -webkit-backdrop-filter: blur(24px) saturate(1.08);
   backdrop-filter: blur(24px) saturate(1.08);
 }
 
-html.postline-sidebar-collapsed [data-postline-content-shell],
-html.has-native-sidebar [data-postline-content-shell],
-html.has-native-sidebar [data-postline-workspace] {
+html.ot-sidebar-collapsed [data-ot-content-shell],
+html.has-native-sidebar [data-ot-content-shell],
+html.has-native-sidebar [data-ot-workspace] {
   background: #f3f3f1 !important;
 }
 
-html.postline-sidebar-collapsed [data-postline-workspace] {
+html.ot-sidebar-collapsed [data-ot-workspace] {
   border-top-left-radius: 0 !important;
   border-left-color: transparent !important;
   box-shadow: none !important;
 }
 
-html.postline-sidebar-collapsed [data-postline-sidebar] {
+html.ot-sidebar-collapsed [data-ot-sidebar] {
   overflow: visible;
   pointer-events: none;
 }
 
-html.postline-sidebar-collapsed [data-shell-controls-row] {
+html.ot-sidebar-collapsed [data-shell-controls-row] {
   display: none !important;
 }
 
@@ -227,7 +263,7 @@ html.postline-sidebar-collapsed [data-shell-controls-row] {
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-html.postline-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fab] {
+html.ot-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fab] {
   opacity: 1;
   transform: translate3d(0, 0, 0) scale(1);
   pointer-events: auto;
@@ -236,72 +272,72 @@ html.postline-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fa
 @media (max-width: 1023px) {
   [data-sidebar-expand-fab] { display: none; }
 
-  [data-postline-mobile-nav] {
+  [data-ot-mobile-nav] {
     scrollbar-width: none;
     -ms-overflow-style: none;
     -webkit-mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 28px), transparent);
     mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 28px), transparent);
   }
 
-  [data-postline-mobile-nav]::-webkit-scrollbar { display: none; }
+  [data-ot-mobile-nav]::-webkit-scrollbar { display: none; }
 }
 
-[data-postline-app] :is(a, button, [role='button']):focus-visible {
+[data-ot-app] :is(a, button, [role='button']):focus-visible {
   outline: 2px solid rgb(82 82 91 / 0.6);
   outline-offset: 2px;
 }
 
-html.dark.has-native-sidebar [data-postline-content-shell],
-html.dark.has-native-sidebar [data-postline-workspace] {
+html.dark.has-native-sidebar [data-ot-content-shell],
+html.dark.has-native-sidebar [data-ot-workspace] {
   background: #0a0a0c !important;
 }
 `
 
 /** Shared product UI rhythm: one radius scale, one surface language, and compact pages. */
 const APP_UI: string = `
-[data-postline-router] { width: 100%; }
+[data-ot-router] { width: 100%; }
 
-[data-postline-page] {
+[data-ot-page] {
   width: min(100%, 96rem);
   margin-inline: auto;
 }
 
-[data-postline-page] > header:first-child {
+[data-ot-page] > header:first-child {
   min-height: 72px;
   padding: 5px 2px 7px;
 }
 
-[data-postline-page] > header:first-child h1 {
+[data-ot-page] > header:first-child h1 {
   letter-spacing: -0.025em;
   line-height: 1.15;
 }
 
-[data-postline-page] .rounded-2xl { border-radius: 14px; }
-[data-postline-page] .rounded-xl { border-radius: 10px; }
-[data-postline-page] .rounded-lg { border-radius: 8px; }
+[data-ot-page] .rounded-2xl { border-radius: 14px; }
+[data-ot-page] .rounded-xl { border-radius: 10px; }
+[data-ot-page] .rounded-lg { border-radius: 8px; }
 
-[data-postline-page] .shadow-sm {
+[data-ot-page] .shadow-sm {
   box-shadow: 0 1px 2px rgb(24 24 27 / 0.035), 0 8px 24px rgb(24 24 27 / 0.025);
 }
 
-[data-postline-page] :is(a, button, summary) {
+[data-ot-page] :is(a, button, summary) {
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-[data-postline-page] :is(button, summary):active,
-[data-postline-page] a:active { transform: translateY(1px); }
+[data-ot-page] :is(button, summary):active,
+[data-ot-page] a:active { transform: translateY(1px); }
 
-[data-postline-page] :is(input, textarea, select) { border-radius: 10px; }
+[data-ot-page] :is(input, textarea, select) { border-radius: 10px; }
 
 .dark .bg-white { background-color: var(--panel); }
 .dark .hover\:bg-white:hover { background-color: var(--panel-3); }
 
 @media (max-width: 640px) {
-  [data-postline-router] { padding: 12px; }
-  [data-postline-page] { gap: 12px; }
-  [data-postline-page] > header:first-child { min-height: auto; padding: 2px 1px 5px; }
-  [data-postline-page] > header:first-child h1 { font-size: 21px; }
+  [data-ot-router] { padding: 12px; }
+  [data-ot-page] { gap: 12px; }
+  [data-ot-page] > header:first-child { min-height: auto; padding: 2px 1px 5px; }
+  [data-ot-page] > header:first-child h1 { font-size: 21px; }
 }
 `
 
@@ -461,13 +497,37 @@ html.marketing .menu-item:focus-within .menu-chevron {
  */
 const MARKETING_BASE: string = `
 html.marketing {
-  font-family: Geist, ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-body);
+  font-size: 17px;
   scroll-behavior: smooth;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
 
-html.marketing .font-mono { font-family: Geist Mono, ui-monospace, monospace; }
+/*
+  Every heading on the front page is set in the display face. Done here rather
+  than by adding a 'font-display' class to forty headings, and scoped to
+  html.marketing so the workspace keeps its own type ramp.
+*/
+html.marketing :where(h1, h2, h3, h4) {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+
+/*
+  The markup labels kickers, indices and section eyebrows with 'font-mono'.
+  Rather than rewrite every one of them, the class is redefined as what a
+  newspaper puts in that slot: condensed gothic, small, letterspaced. The two
+  places that want a genuine typewriter face ask for '.font-typewriter'.
+*/
+html.marketing .font-mono {
+  font-family: var(--font-label);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+}
+
+html.marketing .font-typewriter { font-family: var(--font-typewriter); letter-spacing: 0; }
 
 html.marketing body { background-color: var(--bg); color: var(--ink); }
 
@@ -502,6 +562,167 @@ html.marketing .marquee-track { animation: marquee 32s linear infinite; }
   html.marketing { scroll-behavior: auto; }
   html.marketing .marquee-track { animation: none; }
 }
+'
+
+/**
+ * PRINT FURNITURE
+ *
+ * The pieces of a newspaper that have no equivalent in a utility framework: the
+ * nameplate, the rules that separate a folio from a story, the drop cap, the
+ * column gutters, and the tooth of the paper itself.
+ *
+ * Rounded corners are zeroed across the front page. A newspaper is made by
+ * cutting and folding a flat sheet, so nothing on it has a radius — and the
+ * markup is full of 'rounded-2xl' from the previous identity. The ':where()'
+ * keeps the selector's own weight at zero, so the whole rule scores (0,1,1)
+ * from 'html.marketing' and beats a (0,1,0) utility on specificity rather than
+ * on source order (preflights are emitted BEFORE utilities, so a tie would
+ * lose).
+ */
+const PRINT: string = '
+html.marketing :where(
+  .rounded, .rounded-sm, .rounded-md, .rounded-lg, .rounded-xl,
+  .rounded-2xl, .rounded-3xl, .rounded-full
+) { border-radius: 0; }
+
+html.marketing :where(a, button):focus-visible { border-radius: 0; }
+
+/*
+  The tooth of the stock. Two offset dot grids at very low alpha read as
+  halftone at 100% zoom and as texture when you lean in — enough to stop the
+  background being a flat fill, cheap enough to be a gradient rather than an
+  image request.
+*/
+html.marketing body {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgb(23 19 15 / 0.045) 1px, transparent 0),
+    radial-gradient(circle at 3px 4px, rgb(23 19 15 / 0.025) 1px, transparent 0);
+  background-size: 6px 6px, 7px 7px;
+  background-attachment: fixed;
+}
+
+/* The nameplate. Blackletter, tight, and never below 28px — see FACES. */
+.masthead {
+  font-family: var(--font-masthead);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 0.94;
+}
+
+/*
+  The rules. A newspaper separates blocks with printed lines of specific
+  weights, not with shadows or panels: a hairline inside a story, a thick rule
+  under the nameplate, a double rule around the dateline strip.
+*/
+.rule-thin { border-top: 1px solid var(--line); }
+.rule-thick { border-top: 3px solid var(--ink); }
+.rule-double {
+  border-top: 1px solid var(--ink);
+  box-shadow: 0 3px 0 -1px var(--ink);
+}
+
+/*
+  The folio strip: volume, date, edition. All-caps condensed at small size,
+  which is exactly what it is on a real front page.
+*/
+.folio {
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--body);
+}
+
+/* A kicker sits above a headline and names the section. */
+.kicker {
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* The deck is the italic sub-headline under a lede. */
+.deck {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--body);
+}
+
+/* The byline rule: a hairline above a small-caps attribution line. */
+.byline {
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/*
+  Drop cap on the lede. \'initial-letter\' is the correct property and browsers
+  that have it get proper optical sinking; the float fallback covers the rest.
+  Both are declared because the fallback alone sits a couple of pixels high in
+  browsers that support the real thing.
+*/
+.dropcap::first-letter {
+  font-family: var(--font-display);
+  font-weight: 700;
+  float: left;
+  font-size: 3.4em;
+  line-height: 0.82;
+  padding: 0.06em 0.1em 0 0;
+  color: var(--ink);
+}
+@supports (initial-letter: 3) {
+  .dropcap::first-letter {
+    float: none;
+    font-size: inherit;
+    padding: 0 0.08em 0 0;
+    initial-letter: 3;
+  }
+}
+
+/*
+  Text columns with a printed gutter rule between them, the way a broadsheet
+  sets running copy. Single column below \'md\' — two 40-character columns on a
+  phone would be unreadable.
+*/
+.columns-print { column-gap: 2.25rem; column-rule: 1px solid var(--line); }
+@media (min-width: 768px) { .columns-print { column-count: 2; } }
+@media (min-width: 1280px) { .columns-print-3 { column-count: 3; } }
+.columns-print > :first-child { margin-top: 0; }
+
+/*
+  Ink-block button: solid, square, letterspaced caps. The hover state lifts the
+  ink slightly rather than changing hue, because the palette has exactly one
+  chromatic value and it is spoken for.
+*/
+.ink-button {
+  font-family: var(--font-label);
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--bg);
+  border: 1px solid var(--ink);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.ink-button:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+
+.ink-button--ghost { background: transparent; color: var(--ink); }
+.ink-button--ghost:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/*
+  Links inside running copy get the underline a printed paper cannot have but a
+  reader now expects; everything structural (nav, cards) opts out by carrying
+  its own class.
+*/
+html.marketing .copy a { color: var(--ink); text-decoration: underline; text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+html.marketing .copy a:hover { color: var(--accent); }
 `
 
 export default {
@@ -551,6 +772,10 @@ export default {
     { getCSS: (): string => SETTINGS_STATUS },
     { getCSS: (): string => COMPOSER_CHIPS },
     { getCSS: (): string => MARKETING_BASE },
+    // After MARKETING_BASE: the radius reset and the copy-link rules are meant
+    // to override what that block establishes, and equal-specificity rules are
+    // resolved by source order.
+    { getCSS: (): string => PRINT },
     { getCSS: (): string => MEGA_MENU },
   ],
 } satisfies CrosswindOptions

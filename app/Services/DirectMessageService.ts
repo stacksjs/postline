@@ -1,8 +1,8 @@
 /**
  * The DM inbox.
  *
- * Postline's other social surfaces are write-mostly: you compose, it publishes.
- * DMs are the opposite — the network owns the conversation and Postline keeps a
+ * The Open Times' other social surfaces are write-mostly: you compose, it publishes.
+ * DMs are the opposite — the network owns the conversation and The Open Times keeps a
  * local mirror of it so the inbox stays readable when a network is slow, rate
  * limited, or disconnected, and so unread state survives a page reload.
  *
@@ -86,8 +86,8 @@ export class DirectMessageService {
   /**
    * Which networks the inbox can use right now, and why the others cannot.
    *
-   * Split three ways on purpose: a network Postline supports but you have not
-   * connected is a different problem from one Postline cannot support at all,
+   * Split three ways on purpose: a network The Open Times supports but you have not
+   * connected is a different problem from one The Open Times cannot support at all,
    * and the inbox should not present them identically.
    */
   async providers() {
@@ -259,7 +259,7 @@ export class DirectMessageService {
    * Clear unread state locally, and on the network when it has a notion of it.
    *
    * The remote half is best-effort: failing to clear a badge in the official
-   * app is not a reason to leave the thread bold in Postline.
+   * app is not a reason to leave the thread bold in The Open Times.
    */
   async markRead(conversationId = 0): Promise<number> {
     let query = database.updateTable('dm_conversations').set({ unread_count: 0, updated_at: now() }).where('unread_count', '>', 0)
@@ -310,7 +310,7 @@ export class DirectMessageService {
    *
    * `unread_count` is only ever raised by a provider-reported value, never
    * lowered: X reports none at all, and letting a zero from one network stomp
-   * a count Postline is tracking locally would silently mark threads read.
+   * a count The Open Times is tracking locally would silently mark threads read.
    */
   private async upsertConversation(provider: DmProvider, candidate: {
     remoteId: string

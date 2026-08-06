@@ -41,14 +41,14 @@ describe('mediaContentType', () => {
 describe('buildMediaUrl', () => {
   test('builds a media URL from an https base', () => {
     expect(buildMediaUrl('https://posts.example.com', 'a.jpg'))
-      .toBe('https://posts.example.com/postline/media?file=a.jpg')
+      .toBe('https://posts.example.com/opentimes/media?file=a.jpg')
   })
 
   test('adds https:// when the base has no scheme, and strips trailing slashes', () => {
     expect(buildMediaUrl('posts.example.com', 'a.jpg'))
-      .toBe('https://posts.example.com/postline/media?file=a.jpg')
+      .toBe('https://posts.example.com/opentimes/media?file=a.jpg')
     expect(buildMediaUrl('https://posts.example.com//', 'a.jpg'))
-      .toBe('https://posts.example.com/postline/media?file=a.jpg')
+      .toBe('https://posts.example.com/opentimes/media?file=a.jpg')
   })
 
   test('returns null when the base is empty', () => {

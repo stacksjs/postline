@@ -1,10 +1,10 @@
-@extends('layouts/postline')
+@extends('layouts/app')
 
-@section('title', 'Postline - Campaigns')
-@section('description', 'Plan multi-week social launches, draft campaign posts with AI, and send them into the Postline queue.')
+@section('title', 'The Open Times - Campaigns')
+@section('description', 'Plan multi-week social launches, draft campaign posts with AI, and send them into the Open Times queue.')
 
 @section('content')
-  <section class="grid gap-4 campaigns-page" data-postline-page="campaigns" data-testid="campaigns-page">
+  <section class="grid gap-4 campaigns-page" data-ot-page="campaigns" data-testid="campaigns-page">
     <header class="flex flex-wrap gap-3 items-center justify-between min-h-11">
       <div class="min-w-0">
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Campaign Builder</p>
@@ -50,7 +50,7 @@
       <span class="campaign-empty__mark i-hugeicons-flowchart-01" aria-hidden="true"></span>
       <p>Campaigns turn a launch brief into a sequence of useful posts.</p>
       <h2>Start with the story, not the schedule.</h2>
-      <p class="campaign-empty__copy">Set the goal and launch window. Postline will give you a six-week planning board you can fill by hand or draft with AI.</p>
+      <p class="campaign-empty__copy">Set the goal and launch window. The Open Times will give you a six-week planning board you can fill by hand or draft with AI.</p>
       <button class="inline-flex gap-2 items-center justify-center px-5 h-10 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" type="button" @click="openCampaignForm()">
         <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
         Create a campaign
@@ -202,7 +202,7 @@
             <span class="i-hugeicons-ai-beautify" aria-hidden="true"></span>
             <span :text="busyAction() === 'generate' ? 'Building your plan...' : posts().length ? 'Ask for another sequence' : 'Build campaign plan'"></span>
           </button>
-          <p class="campaign-ai-note" x-show="lastPlanMode()" :text="lastPlanMode() === 'ai' ? 'Generated with Stacks AI and your configured provider.' : 'Generated with Postline\'s local planning engine.'"></p>
+          <p class="campaign-ai-note" x-show="lastPlanMode()" :text="lastPlanMode() === 'ai' ? 'Generated with Stacks AI and your configured provider.' : 'Generated with The Open Times\'s local planning engine.'"></p>
 
           <div class="campaign-panel__actions" x-show="posts().length">
             <button type="button" @click="openCampaignForm(campaign())">Edit brief</button>
@@ -283,7 +283,7 @@
     </div>
   </section>
 
-  <link rel="stylesheet" href="/assets/styles/postline-campaigns.css">
+  <link rel="stylesheet" href="/assets/styles/campaigns.css">
 
   <script client>
     const campaignsList = state([])
@@ -292,7 +292,7 @@
     const loading = state(true)
     const busyAction = state('')
     const panelMode = state('planner')
-    const view = useLocalStorage('postline.campaigns.view', 'calendar')
+    const view = useLocalStorage('opentimes.campaigns.view', 'calendar')
     const connectedProviders = state([])
     const providersLoaded = state(false)
     const plannerProviders = state([])
@@ -393,7 +393,7 @@
     }
 
     function providerLabel(provider) {
-      return postlineSocial?.providerLabel(provider) || `${provider.charAt(0).toUpperCase()}${provider.slice(1)}`
+      return opentimesSocial?.providerLabel(provider) || `${provider.charAt(0).toUpperCase()}${provider.slice(1)}`
     }
 
     function providerInitial(provider) {
@@ -473,7 +473,7 @@
       loading.set(true)
       try {
         const query = selectedId ? `?id=${encodeURIComponent(selectedId)}` : ''
-        const data = await api(`/api/postline/campaigns${query}`, {}, 'GET')
+        const data = await api(`/api/ot/campaigns${query}`, {}, 'GET')
         campaignsList.set(data.campaigns || [])
         campaign.set(data.selected?.campaign || null)
         posts.set(data.selected?.posts || [])
@@ -489,7 +489,7 @@
 
     async function loadProviders() {
       try {
-        const all = await postlineSocial.fetchProviders()
+        const all = await opentimesSocial.fetchProviders()
         const connected = all.filter(item => item.connected && item.canPublish)
         connectedProviders.set(connected)
         plannerProviders.set(connected.map(item => item.provider))
@@ -504,7 +504,7 @@
 
     async function loadAIStatus() {
       try {
-        const status = await api('/api/postline/campaigns/ai/status', {}, 'GET')
+        const status = await api('/api/ot/campaigns/ai/status', {}, 'GET')
         aiStatus.set(status)
       }
       catch {
@@ -603,7 +603,7 @@
       event.preventDefault()
       busyAction.set('campaign')
       try {
-        const data = await api('/api/postline/campaigns', {
+        const data = await api('/api/ot/campaigns', {
           id: campaignDraftId() || undefined,
           name: campaignName(),
           objective: campaignObjective(),
@@ -640,7 +640,7 @@
       if (queuedPostId()) return
       busyAction.set('post')
       try {
-        await api('/api/postline/campaigns/post', {
+        await api('/api/ot/campaigns/post', {
           campaign_id: campaign().id,
           id: postDraftId() || undefined,
           title: postTitle(),
@@ -666,7 +666,7 @@
       if (!postDraftId() || queuedPostId()) return
       busyAction.set('delete')
       try {
-        await api('/api/postline/campaigns/post/delete', { campaign_id: campaign().id, id: postDraftId() })
+        await api('/api/ot/campaigns/post/delete', { campaign_id: campaign().id, id: postDraftId() })
         await loadCampaigns(campaign().id)
         panelMode.set('planner')
         showNotice('Post removed', 'The rest of the campaign is unchanged.')
@@ -685,7 +685,7 @@
       const requestText = direction().trim() || assistantSuggestions.find(item => item.id === assistantStrategy())?.prompt || 'Build a balanced campaign plan.'
       assistantMessages.set([...assistantMessages(), { role: 'user', text: requestText, meta: '' }])
       try {
-        const data = await api('/api/postline/campaigns/generate', {
+        const data = await api('/api/ot/campaigns/generate', {
           campaign_id: campaign().id,
           count: generationCount(),
           providers: plannerProviders(),
@@ -728,7 +728,7 @@
       if (!campaign() || !unqueuedCount()) return
       busyAction.set('activate')
       try {
-        const data = await api('/api/postline/campaigns/activate', { campaign_id: campaign().id })
+        const data = await api('/api/ot/campaigns/activate', { campaign_id: campaign().id })
         await loadCampaigns(campaign().id)
         const detail = data.errors.length ? `${data.queued} scheduled. ${data.errors.length} need attention.` : `${data.queued} posts are now in Queue.`
         showNotice(data.errors.length ? 'Campaign partly scheduled' : 'Campaign scheduled', detail, data.errors.length ? 'error' : 'success')
@@ -770,7 +770,7 @@
       const next = `${day} ${item.scheduledAt.slice(11, 19) || '09:00:00'}`
       posts.set(posts().map(candidate => candidate.id === id ? { ...candidate, scheduledAt: next } : candidate))
       try {
-        await api('/api/postline/campaigns/post/move', { campaign_id: campaign().id, id, scheduled_at: next })
+        await api('/api/ot/campaigns/post/move', { campaign_id: campaign().id, id, scheduled_at: next })
         showNotice('Post moved', `${item.title} is now planned for ${shortDate(next)}.`)
       }
       catch (error) {

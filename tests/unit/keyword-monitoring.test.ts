@@ -3,11 +3,11 @@ import { normalizeKeywords, normalizeListeningProviders } from '../../app/Servic
 
 describe('keyword monitoring helpers', () => {
   test('normalizes and deduplicates comma-separated keywords', () => {
-    expect(normalizeKeywords(' Postline, stacks.js, Postline, x ')).toEqual(['Postline', 'stacks.js'])
+    expect(normalizeKeywords(' The Open Times, stacks.js, The Open Times, x ')).toEqual(['The Open Times', 'stacks.js'])
   })
 
   test('accepts JSON and array keyword payloads', () => {
-    expect(normalizeKeywords('["Postline", "Campaign Builder"]')).toEqual(['Postline', 'Campaign Builder'])
+    expect(normalizeKeywords('["The Open Times", "Campaign Builder"]')).toEqual(['The Open Times', 'Campaign Builder'])
     expect(normalizeKeywords(['mentions', 'launch week'])).toEqual(['mentions', 'launch week'])
   })
 

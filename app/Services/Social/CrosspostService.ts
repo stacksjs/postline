@@ -7,7 +7,7 @@ import { bluesky } from './BlueskyService'
 import { instagram } from './InstagramService'
 import { linkedin } from './LinkedInService'
 import { mastodon } from './MastodonService'
-import { postline } from './PostlineService'
+import { opentimes } from './OpenTimesService'
 import { threads } from './ThreadsService'
 import { twitter } from './TwitterService'
 import { ensureAccount, now, uuid } from './support'
@@ -22,7 +22,7 @@ interface ProviderPublisher {
 const publishers: Partial<Record<SocialProvider, ProviderPublisher>> = {
   // Ours first: it is the one target that is always connected, so listing it
   // first is also the order the composer renders its checkboxes in.
-  postline,
+  opentimes,
   bluesky,
   twitter,
   linkedin,

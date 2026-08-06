@@ -68,7 +68,7 @@ async function request<T>(accessToken: string, path: string, init: RequestInit =
 
   if (!response.ok) {
     if (response.status === 403) {
-      throw new Error('X rejected the DM request. Reconnect X on Accounts so Postline can request the dm.read and dm.write scopes.')
+      throw new Error('X rejected the DM request. Reconnect X on Accounts so The Open Times can request the dm.read and dm.write scopes.')
     }
     throw new Error(payload?.detail || payload?.title || payload?.errors?.[0]?.message || `X returned HTTP ${response.status}.`)
   }
@@ -122,7 +122,7 @@ export function groupIntoConversations(events: DmMessageCandidate[], limit: numb
         participants: event.direction === 'incoming'
           ? [{ remoteId: event.authorRemoteId, handle: event.authorHandle, name: event.authorName }]
           : [],
-        // X reports no unread state, so Postline tracks it locally.
+        // X reports no unread state, so The Open Times tracks it locally.
         unreadCount: 0,
         lastMessageAt: event.sentAt,
         lastMessageText: event.body,

@@ -4,7 +4,7 @@ import process from 'node:process'
 import { env } from '@stacksjs/env'
 
 /** Uploaded images for queued posts live here until publish. */
-export const MEDIA_DIR = join(process.cwd(), 'storage/app/postline-media')
+export const MEDIA_DIR = join(process.cwd(), 'storage/app/opentimes-media')
 
 /**
  * Read an uploaded image regardless of shape: the router's multipart
@@ -64,7 +64,7 @@ export function buildMediaUrl(base: string, filename: string): string | null {
 
   const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
   const normalized = withScheme.replace(/\/+$/, '')
-  return `${normalized}/postline/media?file=${encodeURIComponent(filename)}`
+  return `${normalized}/opentimes/media?file=${encodeURIComponent(filename)}`
 }
 
 /**

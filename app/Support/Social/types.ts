@@ -1,5 +1,5 @@
 /**
- * Postline's social types.
+ * The Open Times' social types.
  *
  * Eight of these used to be hand-copied from `@stacksjs/socials`, byte for
  * byte, and were drifting silently - `PublishPostInput` had already forked. The
@@ -33,7 +33,7 @@ export type {
 /**
  * One timeline post.
  *
- * Core names this `TimelineItem` as of stacksjs/stacks#2207, but Postline
+ * Core names this `TimelineItem` as of stacksjs/stacks#2207, but The Open Times
  * installs `@stacksjs/socials` from the registry, so it cannot re-export the
  * name until a release carries it. Derived from `TimelineResult` in the
  * meantime, which is the same type by construction - swap this for a
@@ -42,11 +42,11 @@ export type {
 export type TimelineItem = import('@stacksjs/socials').TimelineResult['items'][number]
 
 /**
- * Core's publishing providers plus Postline's own two.
+ * Core's publishing providers plus The Open Times' own two.
  *
  * `blog` is the long-form target: publishing to it writes a post on your own
- * publication. `postline` is the short-form one: it puts the post in the
- * Discover feed other Postline readers browse.
+ * publication. `opentimes` is the short-form one: it puts the post in the
+ * Discover feed other The Open Times readers browse.
  *
  * Both are deliberately modelled as providers rather than as a separate
  * concept. A network you publish to is a network you publish to, and making
@@ -55,7 +55,7 @@ export type TimelineItem = import('@stacksjs/socials').TimelineResult['items'][n
  * the union extends rather than replaces, and a provider added upstream still
  * arrives here for free.
  */
-export type SocialProvider = SocialPublishingProvider | 'blog' | 'postline'
+export type SocialProvider = SocialPublishingProvider | 'blog' | 'opentimes'
 
 /**
  * Kept local, but only just: core's `PublishPostInput` is a strict superset.
@@ -164,7 +164,7 @@ export interface ProviderPurgeAdapter {
 }
 
 /**
- * Postline's driver contract. Core's `SocialPublishingDriver` is the same
+ * The Open Times' driver contract. Core's `SocialPublishingDriver` is the same
  * shape minus the two Bluesky session hooks and with core's narrower provider
  * union, so this stays local until session handling moves upstream.
  */

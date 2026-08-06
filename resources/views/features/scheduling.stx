@@ -1,9 +1,9 @@
 @extends('layouts/marketing')
 
-@section('title', 'Queue it now, publish it later - Postline')
+@section('title', 'Queue it now, publish it later - The Open Times')
 @section('description', 'Schedule posts ahead in your own timezone and let the queue publish them, or send immediately.')
-@section('canonical', 'https://postline.stacksjs.com/features/scheduling')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/feature-scheduling.png')
+@section('canonical', 'https://opentimes.stacksjs.com/features/scheduling')
+@section('ogImage', 'https://opentimes.stacksjs.com/images/og/feature-scheduling.png')
 
 @section('content')
   <article class="mx-auto px-6 max-w-[1400px]">
@@ -11,7 +11,7 @@
         and the single CTA carry it. -->
     <header class="grid gap-6 pb-14 pt-16 lg:pt-20 max-w-3xl">
       <nav class="flex gap-2 items-center text-[13px] text-muted" aria-label="Breadcrumb">
-        <a class="hover:text-ink transition-colors" href="/">Postline</a>
+        <a class="hover:text-ink transition-colors" href="/">The Open Times</a>
         <span aria-hidden="true">/</span>
         <span class="text-body">Features</span>
       </nav>
@@ -19,7 +19,7 @@
       <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">The queue is a plain list of what is going out and when. Drafts, scheduled posts, and failures all live in the same view, so there is one place to look before a launch.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <a class="inline-flex items-center px-5 h-11 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl transition-colors" href="/login" data-stx-link>Get started</a>
-        <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">Read the source</a>
+        <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/opentimes">Read the source</a>
       </div>
     </header>
 
@@ -37,7 +37,7 @@
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">What the queue needs</h2>
-          <p class="m-0 leading-relaxed text-body">A scheduled post fires when Postline is running. On a laptop that means while the app is open; put it on a small always-on box and the queue keeps publishing overnight.</p>
+          <p class="m-0 leading-relaxed text-body">A scheduled post fires when The Open Times is running. On a laptop that means while the app is open; put it on a small always-on box and the queue keeps publishing overnight.</p>
         </div>
       </div>
 

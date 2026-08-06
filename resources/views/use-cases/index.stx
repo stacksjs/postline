@@ -1,15 +1,15 @@
 @extends('layouts/marketing')
 
-@section('title', 'Use cases - Postline')
-@section('description', 'Who runs Postline, and what they use it for.')
-@section('canonical', 'https://postline.stacksjs.com/use-cases')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-index.png')
+@section('title', 'Use cases - The Open Times')
+@section('description', 'Who runs The Open Times, and what they use it for.')
+@section('canonical', 'https://opentimes.stacksjs.com/use-cases')
+@section('ogImage', 'https://opentimes.stacksjs.com/images/og/use-case-index.png')
 
 @section('content')
   <div class="mx-auto px-6 max-w-[1400px]">
     <header class="grid gap-5 pb-12 pt-16 lg:pt-20 max-w-2xl">
       <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">Use cases</h1>
-      <p class="m-0 leading-relaxed text-body text-lg">Who runs Postline, and what they use it for.</p>
+      <p class="m-0 leading-relaxed text-body text-lg">Who runs The Open Times, and what they use it for.</p>
     </header>
 
     <ul class="grid gap-0 m-0 p-0 pb-16 list-none border-line border-t divide-line divide-y">

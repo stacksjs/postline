@@ -35,7 +35,7 @@ export function uuid(): string {
 }
 
 /**
- * Postline is currently single-account. Return the existing account id, or
+ * The Open Times is currently single-account. Return the existing account id, or
  * create the default workspace on first use. Shared by every social service
  * so a crosspost groups all of its targets under one account/post.
  */
@@ -52,7 +52,7 @@ export async function ensureAccount(): Promise<number> {
   await database.insertInto('accounts').values({
     uuid: accountUuid,
     name: 'Chris Breuer',
-    workspace_name: 'Postline',
+    workspace_name: 'The Open Times',
     timezone: 'America/Los_Angeles',
     default_audience: 'public',
     created_at: now(),

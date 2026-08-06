@@ -1,10 +1,10 @@
-@extends('layouts/postline')
+@extends('layouts/app')
 
-@section('title', 'Postline - Timeline')
+@section('title', 'The Open Times - Timeline')
 
 @section('content')
-  @meta('description', 'Read connected social timelines from Postline.')
-  <section class="grid gap-4" data-postline-page="timeline" data-testid="timeline-page">
+  @meta('description', 'Read connected social timelines from The Open Times.')
+  <section class="grid gap-4" data-ot-page="timeline" data-testid="timeline-page">
     <header class="flex flex-col gap-4 items-stretch justify-between sm:flex-row sm:items-center min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Timeline</p>
@@ -20,69 +20,69 @@
       </div>
     </header>
 
-    <div class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm postline-feed" aria-label="Bluesky timeline">
-      <div class="postline-feed__header">
+    <div class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm ot-feed" aria-label="Bluesky timeline">
+      <div class="ot-feed__header">
         <div>
           <strong class="font-bold text-sm text-zinc-900">Following</strong>
           <p class="m-0 mt-0.5 text-muted text-xs" :text="metaText()">Loading feed…</p>
         </div>
         <span class="px-2.5 py-1 font-bold text-[11px] text-blue-700 bg-blue-50 border border-blue-200 rounded-full">Bluesky</span>
       </div>
-      <div class="postline-feed__list">
+      <div class="ot-feed__list">
         <!-- x-show lives on a wrapper, never on the x-for element itself:
             bindFor returns as soon as it sees the loop attribute, so an x-show
             sharing that element is silently never bound. -->
         <div x-show="busy()">
-          <div class="postline-feed__skeleton" x-for="row in skeletonRows()">
-            <div class="postline-feed__skeleton-row">
-              <div class="postline-feed__skeleton-avatar"></div>
-              <div class="postline-feed__skeleton-lines">
-                <div class="postline-feed__skeleton-line postline-feed__skeleton-line--short"></div>
-                <div class="postline-feed__skeleton-line postline-feed__skeleton-line--medium"></div>
-                <div class="postline-feed__skeleton-line postline-feed__skeleton-line--long"></div>
+          <div class="ot-feed__skeleton" x-for="row in skeletonRows()">
+            <div class="ot-feed__skeleton-row">
+              <div class="ot-feed__skeleton-avatar"></div>
+              <div class="ot-feed__skeleton-lines">
+                <div class="ot-feed__skeleton-line ot-feed__skeleton-line--short"></div>
+                <div class="ot-feed__skeleton-line ot-feed__skeleton-line--medium"></div>
+                <div class="ot-feed__skeleton-line ot-feed__skeleton-line--long"></div>
               </div>
             </div>
           </div>
         </div>
 
-        <p class="postline-feed__empty" x-show="feedError()" :text="feedError()"></p>
-        <p class="postline-feed__empty" x-show="showEmpty()">No posts in your feed yet. Publish from the composer or refresh again.</p>
+        <p class="ot-feed__empty" x-show="feedError()" :text="feedError()"></p>
+        <p class="ot-feed__empty" x-show="showEmpty()">No posts in your feed yet. Publish from the composer or refresh again.</p>
 
-        <article class="postline-feed-post" x-for="item in items()">
-          <div class="postline-feed-post__layout">
+        <article class="ot-feed-post" x-for="item in items()">
+          <div class="ot-feed-post__layout">
             <!-- @bind:style, not :style — the latter routes to bindStyle, which
                 expects an object; this is a raw custom-property declaration. -->
-            <a class="postline-feed-post__avatar" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer" @bind:style="item.gradient" :aria-label="item.name">
+            <a class="ot-feed-post__avatar" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer" @bind:style="item.gradient" :aria-label="item.name">
               <img x-if="item.avatar" :src="item.avatar" alt="" loading="lazy" referrerpolicy="no-referrer">
               <span x-else>{{ item.initials }}</span>
             </a>
-            <div class="postline-feed-post__main">
-              <div class="postline-feed-post__meta">
-                <div class="postline-feed-post__identity">
-                  <div class="postline-feed-post__name-row">
-                    <a class="postline-feed-post__name" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer">{{ item.name }}</a>
-                    <a class="postline-feed-post__handle" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer">@{{ item.handle }}</a>
-                    <span class="postline-feed-post__dot">·</span>
-                    <time class="postline-feed-post__time" :datetime="item.postedAt">{{ item.relativeTime }}</time>
+            <div class="ot-feed-post__main">
+              <div class="ot-feed-post__meta">
+                <div class="ot-feed-post__identity">
+                  <div class="ot-feed-post__name-row">
+                    <a class="ot-feed-post__name" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer">{{ item.name }}</a>
+                    <a class="ot-feed-post__handle" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer">@{{ item.handle }}</a>
+                    <span class="ot-feed-post__dot">·</span>
+                    <time class="ot-feed-post__time" :datetime="item.postedAt">{{ item.relativeTime }}</time>
                   </div>
-                  <span class="postline-feed-post__provider">Bluesky</span>
+                  <span class="ot-feed-post__provider">Bluesky</span>
                 </div>
-                <a class="postline-feed-post__open" :href="item.url" target="_blank" rel="noopener noreferrer" aria-label="Open post on Bluesky" title="Open on Bluesky">
+                <a class="ot-feed-post__open" :href="item.url" target="_blank" rel="noopener noreferrer" aria-label="Open post on Bluesky" title="Open on Bluesky">
                   <span class="h-4 w-4 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span>
                 </a>
               </div>
               <!-- x-html, not interpolation: the body carries anchor markup for
                   any URLs it contains. linkifyBody HTML-escapes the text
                   BEFORE inserting anchors, so nothing user-authored is trusted. -->
-              <p class="postline-feed-post__body" x-html="item.bodyHtml"></p>
-              <div class="postline-feed-post__actions">
-                <a class="postline-feed-post__stat" :href="item.url" target="_blank" rel="noopener noreferrer">
+              <p class="ot-feed-post__body" x-html="item.bodyHtml"></p>
+              <div class="ot-feed-post__actions">
+                <a class="ot-feed-post__stat" :href="item.url" target="_blank" rel="noopener noreferrer">
                   <span class="h-4 w-4 i-hugeicons-comment-02" aria-hidden="true"></span><span>{{ item.replies }}</span>
                 </a>
-                <span class="postline-feed-post__stat">
+                <span class="ot-feed-post__stat">
                   <span class="h-4 w-4 i-hugeicons-repeat" aria-hidden="true"></span><span>{{ item.reposts }}</span>
                 </span>
-                <span class="postline-feed-post__stat">
+                <span class="ot-feed-post__stat">
                   <span class="h-4 w-4 i-hugeicons-favourite" aria-hidden="true"></span><span>{{ item.likes }}</span>
                 </span>
               </div>
@@ -95,7 +95,7 @@
 
   <script client>
     /**
-     * Wire shapes for `/api/postline/timeline`, declared where they are used.
+     * Wire shapes for `/api/ot/timeline`, declared where they are used.
      *
      * These describe what the BROWSER receives, which is a flattened projection
      * of `app/Support/Social/types.ts` — deliberately separate, because the wire
@@ -175,7 +175,7 @@
       for (let i = 0; i < handle.length; i++) hash = handle.charCodeAt(i) + ((hash << 5) - hash)
       const hues = [215, 168, 280, 32, 340, 128, 48, 12]
       const hue = hues[Math.abs(hash) % hues.length]
-      return `--postline-avatar-a:hsl(${hue} 72% 58%);--postline-avatar-b:hsl(${hue} 68% 42%)`
+      return `--opentimes-avatar-a:hsl(${hue} 72% 58%);--opentimes-avatar-b:hsl(${hue} 68% 42%)`
     }
 
     const initialsFor = (handle: string, name?: string | null): string => {
@@ -198,7 +198,7 @@
 
     const linkifyBody = (text: string): string => escapeHtml(text).replace(
       /(https?:\/\/[^\s<]+)/g,
-      '<a class="postline-feed-post__link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
+      '<a class="ot-feed-post__link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
     )
 
     /**
@@ -237,7 +237,7 @@
       metaText.set('Syncing…')
 
       try {
-        const response = await fetch('/api/postline/bluesky/timeline?limit=30')
+        const response = await fetch('/api/ot/bluesky/timeline?limit=30')
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky timeline sync failed.')
 
@@ -245,7 +245,7 @@
         items.set(rows)
         metaText.set(`${rows.length} post${rows.length === 1 ? '' : 's'}`)
         if (manual) {
-          postlineToast?.show?.({
+          opentimesToast?.show?.({
             title: 'Timeline',
             message: `Loaded ${rows.length} posts.`,
             tone: 'success',
@@ -259,7 +259,7 @@
         feedError.set(message)
         metaText.set('Could not load feed')
         if (manual)
-          postlineToast?.show?.({ title: 'Timeline', message, tone: 'error', id: 'timeline-load' })
+          opentimesToast?.show?.({ title: 'Timeline', message, tone: 'error', id: 'timeline-load' })
       }
       finally {
         busy.set(false)

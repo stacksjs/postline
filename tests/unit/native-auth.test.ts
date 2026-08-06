@@ -9,14 +9,14 @@ describe('native app authentication', () => {
   it('allows a Craft request on a loopback host during development', () => {
     expect(allowsNativeAppWithoutLogin(headers({
       host: 'localhost:3008',
-      'x-postline-native': 'craft',
+      'x-ot-native': 'craft',
     }), 'development')).toBe(true)
   })
 
   it('allows a Craft request with a loopback origin during development', () => {
     expect(allowsNativeAppWithoutLogin(headers({
       origin: 'http://localhost:3002',
-      'x-postline-native': 'craft',
+      'x-ot-native': 'craft',
     }), 'local')).toBe(true)
   })
 
@@ -28,15 +28,15 @@ describe('native app authentication', () => {
 
   it('rejects a native marker from a remote host', () => {
     expect(allowsNativeAppWithoutLogin(headers({
-      host: 'postline.example.com',
-      'x-postline-native': 'craft',
+      host: 'opentimes.example.com',
+      'x-ot-native': 'craft',
     }), 'development')).toBe(false)
   })
 
   it('never bypasses authentication in production', () => {
     expect(allowsNativeAppWithoutLogin(headers({
       host: 'localhost:3008',
-      'x-postline-native': 'craft',
+      'x-ot-native': 'craft',
     }), 'production')).toBe(false)
   })
 })

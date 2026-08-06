@@ -1,10 +1,10 @@
-@extends('layouts/postline')
+@extends('layouts/app')
 
-@section('title', 'Postline - Listening')
+@section('title', 'The Open Times - Listening')
 @section('description', 'Watch brand and product keywords across social networks and collect new mentions.')
 
 @section('content')
-  <section class="grid gap-4" data-postline-page="listening" data-testid="listening-page">
+  <section class="grid gap-4" data-ot-page="listening" data-testid="listening-page">
     <header class="flex flex-col gap-4 items-stretch justify-between md:flex-row md:items-center min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Social Listening</p>
@@ -44,7 +44,7 @@
           </header>
           <form class="grid gap-3" @submit="saveMonitor($event)">
             <label class="grid gap-1.5"><span class="font-bold text-body text-xs">Name</span><input class="px-3 h-9 text-ink text-sm bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40" required maxlength="120" placeholder="Brand mentions" x-model="draftName"></label>
-            <label class="grid gap-1.5"><span class="font-bold text-body text-xs">Keywords</span><textarea class="px-3 py-2 min-h-24 text-ink text-sm bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40 resize-y" required placeholder="Postline, stacks.js, launch tool" x-model="draftKeywords"></textarea><small class="text-[11px] text-muted">Up to 20 keywords. Matching is case-insensitive.</small></label>
+            <label class="grid gap-1.5"><span class="font-bold text-body text-xs">Keywords</span><textarea class="px-3 py-2 min-h-24 text-ink text-sm bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40 resize-y" required placeholder="The Open Times, stacks.js, launch tool" x-model="draftKeywords"></textarea><small class="text-[11px] text-muted">Up to 20 keywords. Matching is case-insensitive.</small></label>
             <label class="grid gap-1.5"><span class="font-bold text-body text-xs">Trigger when</span><select class="px-3 h-9 text-ink text-sm bg-bg border border-line outline-none rounded-xl" x-model="draftMatchMode"><option value="any">Any keyword appears</option><option value="all">All keywords appear</option><option value="phrase">The exact phrase appears</option></select></label>
             <fieldset class="grid gap-2 m-0 p-0 border-0"><legend class="mb-1 font-bold text-body text-xs">Networks</legend><div class="grid gap-2 grid-cols-3"><button class="px-2 h-9 font-bold text-[11px] border rounded-xl transition-colors" type="button" x-for="provider in providerOptions" :class="draftProviders().includes(provider.id) ? 'text-ink bg-panel-2 border-zinc-400' : 'text-muted bg-bg border-line'" @click="toggleProvider(provider.id)" :text="provider.label"></button></div></fieldset>
             <label class="flex gap-3 items-center p-3 bg-panel-2 border border-line rounded-xl"><input type="checkbox" :checked="draftStatus() === 'active'" @change="draftStatus.set($event.target.checked ? 'active' : 'paused')"><span><strong class="block text-ink text-xs">Watch automatically</strong><small class="block mt-0.5 text-[11px] text-muted">The scheduler checks active rules every five minutes.</small></span></label>
@@ -81,7 +81,7 @@
         </div>
         <div class="grid gap-3 place-items-center px-6 py-20 text-center" x-show="showEmpty()">
           <span class="grid place-items-center h-14 w-14 text-2xl text-violet-700 bg-violet-50 rounded-2xl i-hugeicons-radar-02" aria-hidden="true"></span>
-          <div><h2 class="m-0 font-bold text-base text-ink" :text="monitors().length ? 'No mentions found yet' : 'Create your first listening rule'">Create your first listening rule</h2><p class="m-0 mt-1 max-w-md text-muted text-sm" :text="monitors().length ? 'Run a scan now. New matching posts will be saved here and highlighted as unread.' : 'Choose the terms and networks you care about. Postline will keep checking them for you.'"></p></div>
+          <div><h2 class="m-0 font-bold text-base text-ink" :text="monitors().length ? 'No mentions found yet' : 'Create your first listening rule'">Create your first listening rule</h2><p class="m-0 mt-1 max-w-md text-muted text-sm" :text="monitors().length ? 'Run a scan now. New matching posts will be saved here and highlighted as unread.' : 'Choose the terms and networks you care about. The Open Times will keep checking them for you.'"></p></div>
         </div>
 
         <div class="divide-line divide-y" x-show="!loading() && filteredMentions().length">
@@ -190,7 +190,7 @@
       if (!fresh.length) return
       const first = fresh[0]
       new Notification(fresh.length === 1 ? `New ${providerLabel(first.provider)} mention` : `${fresh.length} new social mentions`, {
-        body: fresh.length === 1 ? first.body.slice(0, 180) : 'Open Postline Listening to review the new matches.',
+        body: fresh.length === 1 ? first.body.slice(0, 180) : 'Open The Open Times Listening to review the new matches.',
       })
     }
 
@@ -199,7 +199,7 @@
       errorMessage.set('')
       const previousIds = new Set(mentions().map(item => item.id))
       try {
-        const payload = await requestJson('/api/postline/listening')
+        const payload = await requestJson('/api/ot/listening')
         const monitorRows = Array.isArray(payload.data?.monitors) ? payload.data.monitors : []
         const mentionRows = Array.isArray(payload.data?.mentions) ? payload.data.mentions : []
         monitors.set(monitorRows)
@@ -242,17 +242,17 @@
       event.preventDefault()
       saving.set(true)
       try {
-        await requestJson('/api/postline/listening', {
+        await requestJson('/api/ot/listening', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ id: draftId(), name: draftName(), keywords: draftKeywords().split(',').map(item => item.trim()).filter(Boolean), providers: draftProviders(), match_mode: draftMatchMode(), status: draftStatus() }),
         })
-        postlineToast?.show?.({ title: 'Listening rule saved', message: 'Postline will watch these keywords automatically.', tone: 'success', id: 'listening-save' })
+        opentimesToast?.show?.({ title: 'Listening rule saved', message: 'The Open Times will watch these keywords automatically.', tone: 'success', id: 'listening-save' })
         resetForm()
         await loadData()
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not save rule', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-save' })
+        opentimesToast?.show?.({ title: 'Could not save rule', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-save' })
       }
       finally {
         saving.set(false)
@@ -262,28 +262,28 @@
     const deleteMonitor = async () => {
       if (!draftId() || !window.confirm('Delete this listening rule and its saved mentions?')) return
       try {
-        await requestJson('/api/postline/listening/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: draftId() }) })
+        await requestJson('/api/ot/listening/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: draftId() }) })
         resetForm()
         filterMonitorId.set(0)
         await loadData()
-        postlineToast?.show?.({ title: 'Listening rule deleted', message: 'The watch and its saved mentions were removed.', tone: 'success', id: 'listening-delete' })
+        opentimesToast?.show?.({ title: 'Listening rule deleted', message: 'The watch and its saved mentions were removed.', tone: 'success', id: 'listening-delete' })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not delete rule', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-delete' })
+        opentimesToast?.show?.({ title: 'Could not delete rule', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-delete' })
       }
     }
 
     const runScan = async () => {
       scanning.set(true)
       try {
-        const payload = await requestJson('/api/postline/listening/scan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ monitor_id: filterMonitorId() || 0 }) })
+        const payload = await requestJson('/api/ot/listening/scan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ monitor_id: filterMonitorId() || 0 }) })
         await loadData({ quiet: true })
         const skipped = payload.data?.errors?.length || 0
         const suffix = skipped ? ` ${skipped} network${skipped === 1 ? '' : 's'} need attention.` : ''
-        postlineToast?.show?.({ title: 'Listening scan complete', message: `${payload.data?.created || 0} new mention${payload.data?.created === 1 ? '' : 's'} saved.${suffix}`, tone: skipped ? 'neutral' : 'success', id: 'listening-scan' })
+        opentimesToast?.show?.({ title: 'Listening scan complete', message: `${payload.data?.created || 0} new mention${payload.data?.created === 1 ? '' : 's'} saved.${suffix}`, tone: skipped ? 'neutral' : 'success', id: 'listening-scan' })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Listening scan failed', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-scan' })
+        opentimesToast?.show?.({ title: 'Listening scan failed', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-scan' })
       }
       finally {
         scanning.set(false)
@@ -293,7 +293,7 @@
     const markRead = async (id: number) => {
       mentions.set(mentions().map(item => item.id === id ? { ...item, status: 'read' } : item))
       try {
-        await requestJson('/api/postline/listening/read', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
+        await requestJson('/api/ot/listening/read', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
       }
       catch {
         await loadData({ quiet: true })
@@ -302,11 +302,11 @@
 
     const markAllRead = async () => {
       try {
-        await requestJson('/api/postline/listening/read', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ monitor_id: filterMonitorId() || 0 }) })
+        await requestJson('/api/ot/listening/read', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ monitor_id: filterMonitorId() || 0 }) })
         mentions.set(mentions().map(item => !filterMonitorId() || item.monitorId === filterMonitorId() ? { ...item, status: 'read' } : item))
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not update mentions', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-read' })
+        opentimesToast?.show?.({ title: 'Could not update mentions', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-read' })
       }
     }
 
@@ -314,7 +314,7 @@
       if (typeof Notification === 'undefined' || Notification.permission === 'denied') return
       notificationPermission.set(await Notification.requestPermission())
       if (notificationPermission() === 'granted')
-        postlineToast?.show?.({ title: 'Desktop alerts enabled', message: 'Postline can alert you when a polling refresh finds new mentions.', tone: 'success', id: 'listening-notifications' })
+        opentimesToast?.show?.({ title: 'Desktop alerts enabled', message: 'The Open Times can alert you when a polling refresh finds new mentions.', tone: 'success', id: 'listening-notifications' })
     }
 
     onMount(() => {

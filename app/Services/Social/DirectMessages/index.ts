@@ -2,7 +2,7 @@
  * DM transport registry.
  *
  * Mirrors `DriverRegistry` for the publishing side: one place that knows which
- * networks Postline can hold a conversation on, so the service layer never
+ * networks The Open Times can hold a conversation on, so the service layer never
  * names a provider directly.
  */
 
@@ -21,7 +21,7 @@ const transports: Record<DmProvider, DmTransport> = {
 
 export function getDmTransport(provider: DmProvider): DmTransport {
   const transport = transports[provider]
-  if (!transport) throw new Error(`Postline cannot read DMs on "${provider}" yet.`)
+  if (!transport) throw new Error(`The Open Times cannot read DMs on "${provider}" yet.`)
 
   return transport
 }

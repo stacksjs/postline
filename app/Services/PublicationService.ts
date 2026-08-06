@@ -1,5 +1,5 @@
 /**
- * The account's publication: its identity on the Postline network.
+ * The account's publication: its identity on the Open Times network.
  *
  * Every Discover entry belongs to one of these, so `ensurePublication` is
  * called on the publish path rather than only from settings. A writer who

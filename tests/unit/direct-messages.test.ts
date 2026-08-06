@@ -40,7 +40,7 @@ describe('dm provider registry', () => {
 describe('x conversation grouping', () => {
   test('the newest event sets the preview and the rest only add participants', () => {
     const conversations = groupIntoConversations([
-      event({ remoteId: '3', body: 'latest', direction: 'outgoing', authorRemoteId: 'me', authorHandle: 'postline', sentAt: '2026-08-05T12:00:00Z' }),
+      event({ remoteId: '3', body: 'latest', direction: 'outgoing', authorRemoteId: 'me', authorHandle: 'opentimes', sentAt: '2026-08-05T12:00:00Z' }),
       event({ remoteId: '2', body: 'middle' }),
       event({ remoteId: '1', body: 'oldest' }),
     ], 10)

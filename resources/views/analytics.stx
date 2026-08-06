@@ -1,10 +1,10 @@
-@extends('layouts/postline')
+@extends('layouts/app')
 
-@section('title', 'Postline - Analytics')
+@section('title', 'The Open Times - Analytics')
 
 @section('content')
-  @meta('description', 'Review lightweight publishing analytics in Postline.')
-  <section class="grid gap-5" data-postline-page="analytics" data-testid="analytics-page">
+  @meta('description', 'Review lightweight publishing analytics in The Open Times.')
+  <section class="grid gap-5" data-ot-page="analytics" data-testid="analytics-page">
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Analytics</p>

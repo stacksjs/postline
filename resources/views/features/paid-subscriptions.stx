@@ -1,9 +1,9 @@
 @extends('layouts/marketing')
 
-@section('title', 'Charge for it, keep all of it - Postline')
+@section('title', 'Charge for it, keep all of it - The Open Times')
 @section('description', 'Turn on paid tiers, mark posts subscriber-only, and take payment straight into your own Stripe account.')
-@section('canonical', 'https://postline.stacksjs.com/features/paid-subscriptions')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/feature-paid-subscriptions.png')
+@section('canonical', 'https://opentimes.stacksjs.com/features/paid-subscriptions')
+@section('ogImage', 'https://opentimes.stacksjs.com/images/og/feature-paid-subscriptions.png')
 
 @section('content')
   <article class="mx-auto px-6 max-w-[1400px]">
@@ -11,15 +11,15 @@
         and the single CTA carry it. -->
     <header class="grid gap-6 pb-14 pt-16 lg:pt-20 max-w-3xl">
       <nav class="flex gap-2 items-center text-[13px] text-muted" aria-label="Breadcrumb">
-        <a class="hover:text-ink transition-colors" href="/">Postline</a>
+        <a class="hover:text-ink transition-colors" href="/">The Open Times</a>
         <span aria-hidden="true">/</span>
         <span class="text-body">Features</span>
       </nav>
       <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">Charge for it, keep all of it</h1>
-      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">Postline takes no percentage, because there is no Postline in the middle to take one. Readers pay into your Stripe account, and the subscriber list that comes with them sits in your database rather than on somebody else's dashboard.</p>
+      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">The Open Times takes no percentage, because there is no The Open Times in the middle to take one. Readers pay into your Stripe account, and the subscriber list that comes with them sits in your database rather than on somebody else's dashboard.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <a class="inline-flex items-center px-5 h-11 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl transition-colors" href="/login" data-stx-link>Get started</a>
-        <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">Read the source</a>
+        <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/opentimes">Read the source</a>
       </div>
     </header>
 
@@ -37,7 +37,7 @@
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Leaving costs you nothing</h2>
-          <p class="m-0 leading-relaxed text-body">Subscriptions live in your Stripe account, so moving away from Postline does not cancel a single one of them. There is no billing relationship to renegotiate.</p>
+          <p class="m-0 leading-relaxed text-body">Subscriptions live in your Stripe account, so moving away from The Open Times does not cancel a single one of them. There is no billing relationship to renegotiate.</p>
         </div>
       </div>
 
@@ -85,7 +85,7 @@
           <a class="flex gap-4 items-center justify-between py-5 group" href="/features/discover" data-stx-link>
             <span class="grid gap-1">
               <span class="font-semibold text-[15px] text-ink">Discover</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Publications on the Postline network recommend each other, so new readers arrive through someone they already trust.</span>
+              <span class="max-w-[60ch] text-[13px] text-muted">Publications on the Open Times network recommend each other, so new readers arrive through someone they already trust.</span>
             </span>
             <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
           </a>

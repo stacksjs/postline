@@ -47,7 +47,7 @@ function randomState(): string {
 export class LinkedInService {
   private driver: LinkedInDriver
   // OAuth CSRF token stashed between the auth redirect and the callback.
-  // Postline runs single-user, so module memory is an adequate store.
+  // The Open Times runs single-user, so module memory is an adequate store.
   private pendingState: string | null = null
 
   constructor() {
