@@ -1,0 +1,313 @@
+@extends('layouts/marketing')
+
+@section('title', 'Read - Postline')
+@section('description', 'A post published with Postline.')
+
+@section('content')
+  <article class="mx-auto px-6 max-w-[46rem]" data-postline-page="read" data-testid="read-page">
+    <div class="grid gap-3 pb-10 pt-16" x-show="loading()">
+      <span class="h-6 w-6 text-muted animate-spin i-hugeicons-loading-03" aria-hidden="true"></span>
+      <p class="m-0 text-muted">Loading…</p>
+    </div>
+
+    <div class="grid gap-3 pb-10 pt-16" x-show="notFound()">
+      <h1 class="m-0 font-semibold text-3xl text-ink tracking-tight">Nothing here</h1>
+      <p class="m-0 text-body">That post does not exist, or it has been taken down.</p>
+      <a class="font-medium text-accent" href="/read" data-stx-link>Browse the archive</a>
+    </div>
+
+    <!-- Index -->
+    <div class="grid gap-8 pb-16 pt-16" x-show="!loading() && !slug()">
+      <header class="grid gap-3">
+        <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight" :text="publicationName()">Archive</h1>
+        <p class="m-0 text-body text-lg" x-show="tagline()" :text="tagline()"></p>
+      </header>
+      <ul class="grid gap-0 m-0 p-0 list-none border-line border-t divide-line divide-y">
+        <li x-for="item in posts()">
+          <a class="grid gap-1.5 py-6 group" :href="`/read?slug=${item.slug}`" data-stx-link>
+            <span class="flex flex-wrap gap-2 items-center">
+              <strong class="font-semibold text-ink text-lg group-hover:underline" :text="item.title"></strong>
+              <span class="px-2 py-0.5 font-bold text-[10px] text-amber-700 bg-amber-50 rounded-full" x-show="item.access === 'paid'">Paid</span>
+            </span>
+            <span class="text-muted text-sm" :text="item.excerpt"></span>
+            <time class="text-[13px] text-muted" :datetime="item.publishedAt" :text="dateLabel(item.publishedAt)"></time>
+          </a>
+        </li>
+      </ul>
+      <p class="m-0 py-10 text-center text-muted" x-show="!posts().length">Nothing published yet.</p>
+    </div>
+
+    <!-- One post -->
+    <div class="contents" x-show="!loading() && post()">
+      <header class="grid gap-4 pb-10 pt-16">
+        <p class="m-0 font-mono text-muted text-xs tracking-[0.16em] uppercase" :text="publicationName()"></p>
+        <h1 class="m-0 font-semibold leading-[1.1] text-4xl text-ink tracking-tight" :text="post()?.title"></h1>
+        <div class="flex flex-wrap gap-3 items-center text-[13px] text-muted">
+          <span x-show="post()?.publication?.authorName" :text="post()?.publication?.authorName"></span>
+          <time :datetime="post()?.publishedAt" :text="dateLabel(post()?.publishedAt)"></time>
+          <span x-show="post()?.commentCount" :text="`${post()?.commentCount} comments`"></span>
+        </div>
+      </header>
+
+      <div class="grid gap-5 pb-10 pt-10 border-line border-t">
+        <p class="m-0 leading-relaxed text-body text-lg whitespace-pre-line" :text="post()?.body"></p>
+      </div>
+
+      <!-- Paywall. The body above is genuinely the preview: the rest never
+          reached the browser, so this is a wall rather than a curtain. -->
+      <section class="grid gap-4 mb-12 p-6 bg-panel border border-line rounded-2xl" x-show="post()?.locked" aria-label="Continue reading">
+        <div>
+          <h2 class="m-0 font-semibold text-ink text-xl tracking-tight">Keep reading with a subscription</h2>
+          <p class="m-0 mt-2 text-body">This post is for paying subscribers. Already one? Enter the email you subscribed with.</p>
+        </div>
+
+        <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <input class="px-3.5 h-11 text-ink text-sm bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40" type="email" autocomplete="email" placeholder="you@example.com" x-model="readerEmail">
+          <button class="inline-flex items-center justify-center px-5 h-11 font-medium text-ink text-sm bg-panel-2 hover:bg-white border border-line rounded-xl disabled:opacity-50" type="button" :disabled="unlocking() || !readerEmail().trim()" @click="unlock" :text="unlocking() ? 'Checking…' : 'I am a subscriber'">I am a subscriber</button>
+        </div>
+
+        <div class="grid gap-2" x-show="post()?.tiers?.length">
+          <p class="m-0 font-medium text-[13px] text-ink">Or subscribe now</p>
+          <div class="grid gap-2 sm:grid-cols-2">
+            <button class="grid gap-0.5 p-4 text-left bg-bg hover:bg-panel-2 border border-line rounded-xl transition-colors" type="button" x-for="tier in (post()?.tiers || [])" @click="checkout(tier.id)">
+              <strong class="text-[13px] text-ink" :text="tier.name"></strong>
+              <span class="text-muted text-sm" :text="`${money(tier.amountCents)} / ${tier.interval}`"></span>
+            </button>
+          </div>
+        </div>
+
+        <p class="m-0 text-[13px] text-muted" x-show="!post()?.tiers?.length">This publication is not taking payments yet.</p>
+      </section>
+
+      <!-- Free subscribe. Shown on every post, because the point of a free post
+          is to win a reader. -->
+      <section class="grid gap-3 mb-12 p-6 bg-panel border border-line rounded-2xl" x-show="!post()?.locked" aria-label="Subscribe">
+        <div>
+          <h2 class="m-0 font-semibold text-ink text-lg tracking-tight" :text="`Get the next one from ${publicationName()}`"></h2>
+          <p class="m-0 mt-1.5 text-body text-sm">New posts, in your inbox. One click to leave, any time.</p>
+        </div>
+        <form class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]" @submit="subscribe($event)">
+          <input class="px-3.5 h-11 text-ink text-sm bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40" type="email" autocomplete="email" required placeholder="you@example.com" x-model="subscribeEmail">
+          <button class="inline-flex items-center justify-center px-5 h-11 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl disabled:opacity-50" type="submit" :disabled="subscribing()" :text="subscribing() ? 'Subscribing…' : 'Subscribe'">Subscribe</button>
+        </form>
+        <p class="m-0 text-[13px]" :class="subscribeTone() === 'error' ? 'text-red-600' : 'text-emerald-700'" x-show="subscribeMessage()" :text="subscribeMessage()"></p>
+      </section>
+
+      <!-- Comments -->
+      <section class="grid gap-5 pb-20 pt-10 border-line border-t" x-show="!post()?.locked" aria-label="Comments">
+        <h2 class="m-0 font-semibold text-ink text-xl tracking-tight" :text="`${commentTotal()} comments`">Comments</h2>
+
+        <div class="grid gap-5" x-show="thread().length">
+          <div class="grid gap-2" x-for="comment in thread()">
+            <div class="flex flex-wrap gap-2 items-center">
+              <strong class="text-[14px] text-ink" :text="comment.authorName"></strong>
+              <span class="px-2 py-0.5 font-bold text-[10px] text-emerald-700 bg-emerald-50 rounded-full" x-show="comment.supporter">Supporter</span>
+              <time class="text-muted text-xs" :datetime="comment.createdAt" :text="dateLabel(comment.createdAt)"></time>
+            </div>
+            <p class="m-0 leading-relaxed text-body whitespace-pre-line" :text="comment.body"></p>
+            <div class="grid gap-3 mt-1 pl-5 border-l border-line" x-show="comment.replies?.length">
+              <div class="grid gap-1.5" x-for="reply in (comment.replies || [])">
+                <div class="flex flex-wrap gap-2 items-center">
+                  <strong class="text-[13px] text-ink" :text="reply.authorName"></strong>
+                  <span class="px-2 py-0.5 font-bold text-[10px] text-emerald-700 bg-emerald-50 rounded-full" x-show="reply.supporter">Supporter</span>
+                </div>
+                <p class="m-0 leading-relaxed text-[15px] text-body whitespace-pre-line" :text="reply.body"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p class="m-0 text-muted" x-show="!thread().length">Nothing yet. Say the first thing.</p>
+
+        <form class="grid gap-2.5 p-5 bg-panel border border-line rounded-2xl" @submit="postComment($event)">
+          <div class="grid gap-2 sm:grid-cols-2">
+            <input class="px-3.5 h-11 text-ink text-sm bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40" required placeholder="Your name" x-model="commentName">
+            <input class="px-3.5 h-11 text-ink text-sm bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40" type="email" required placeholder="you@example.com" x-model="commentEmail">
+          </div>
+          <textarea class="px-3.5 py-3 min-h-28 text-ink text-sm bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40 resize-y" required maxlength="5000" placeholder="Say something" x-model="commentBody"></textarea>
+          <div class="flex flex-wrap gap-3 items-center justify-between">
+            <span class="text-[13px]" :class="commentTone() === 'error' ? 'text-red-600' : 'text-muted'" :text="commentMessage()"></span>
+            <button class="inline-flex items-center justify-center px-5 h-10 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl disabled:opacity-50" type="submit" :disabled="posting()" :text="posting() ? 'Posting…' : 'Post comment'">Post comment</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </article>
+
+  <script client>
+    const slug = state('')
+    const post = state(null)
+    const posts = state([])
+    const thread = state([])
+    const loading = state(true)
+    const notFound = state(false)
+    const unlocking = state(false)
+    const subscribing = state(false)
+    const posting = state(false)
+    const readerEmail = state('')
+    const subscribeEmail = state('')
+    const subscribeMessage = state('')
+    const subscribeTone = state('ok')
+    const commentName = state('')
+    const commentEmail = state('')
+    const commentBody = state('')
+    const commentMessage = state('')
+    const commentTone = state('ok')
+
+    /** Remembered so a paying reader is not asked on every post. */
+    const READER_KEY = 'postline.reader.email'
+
+    const publicationName = derived(() => post()?.publication?.name || 'This publication')
+    const tagline = derived(() => post()?.publication?.tagline || '')
+    const commentTotal = derived(() => thread().reduce((total, item) => total + 1 + (item.replies?.length || 0), 0))
+
+    const money = (cents: number): string => `$${((Number(cents) || 0) / 100).toFixed(2)}`
+    const dateLabel = (value: string | null | undefined): string => {
+      const date = new Date(String(value || '').replace(' ', 'T') + (String(value || '').includes('Z') ? '' : 'Z'))
+      if (Number.isNaN(date.getTime())) return ''
+      return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+    }
+
+    const requestJson = async (url: string, options: RequestInit = {}) => {
+      const response = await fetch(url, options)
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Request failed.')
+      return payload
+    }
+
+    const load = async () => {
+      loading.set(true)
+      notFound.set(false)
+      try {
+        const params = new URLSearchParams(window.location.search)
+        const wanted = String(params.get('slug') || '')
+        slug.set(wanted)
+
+        const query = new URLSearchParams()
+        if (wanted) query.set('slug', wanted)
+        if (readerEmail()) query.set('reader', readerEmail())
+
+        const payload = await requestJson(`/api/postline/public/posts?${query}`)
+        if (!wanted) {
+          posts.set(payload.data?.posts || [])
+          post.set(null)
+        }
+        else {
+          post.set(payload.data?.post || null)
+          if (!post()?.locked) await loadThread(wanted)
+        }
+      }
+      catch (error) {
+        if (slug()) notFound.set(true)
+      }
+      finally {
+        loading.set(false)
+      }
+    }
+
+    const loadThread = async (wanted: string) => {
+      try {
+        const payload = await requestJson(`/api/postline/comments?source_key=${encodeURIComponent(`blog:${wanted}`)}`)
+        thread.set(payload.data?.comments || [])
+      }
+      catch {
+        thread.set([])
+      }
+    }
+
+    const unlock = async () => {
+      unlocking.set(true)
+      try {
+        window.localStorage?.setItem(READER_KEY, readerEmail().trim())
+        await load()
+        if (post()?.locked)
+          postlineToast?.show?.({ title: 'Not unlocked', message: 'We could not find an active paid subscription for that address.', tone: 'error', id: 'unlock' })
+      }
+      finally {
+        unlocking.set(false)
+      }
+    }
+
+    const checkout = async (tierId: number) => {
+      const email = (readerEmail() || subscribeEmail()).trim()
+      if (!email) {
+        postlineToast?.show?.({ title: 'Email needed', message: 'Enter your email address first.', tone: 'error', id: 'checkout' })
+        return
+      }
+
+      try {
+        const payload = await requestJson('/api/postline/checkout', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ tier_id: tierId, email }),
+        })
+        window.localStorage?.setItem(READER_KEY, email)
+        if (payload.data?.url) window.location.href = payload.data.url
+      }
+      catch (error) {
+        postlineToast?.show?.({ title: 'Could not start checkout', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'checkout' })
+      }
+    }
+
+    const subscribe = async (event: SubmitEvent) => {
+      event.preventDefault()
+      subscribing.set(true)
+      subscribeMessage.set('')
+      try {
+        const payload = await requestJson('/api/postline/subscribe', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ email: subscribeEmail(), source: 'site' }),
+        })
+        subscribeTone.set('ok')
+        subscribeMessage.set(payload.data?.message || 'Check your inbox to confirm.')
+        subscribeEmail.set('')
+      }
+      catch (error) {
+        subscribeTone.set('error')
+        subscribeMessage.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        subscribing.set(false)
+      }
+    }
+
+    const postComment = async (event: SubmitEvent) => {
+      event.preventDefault()
+      posting.set(true)
+      commentMessage.set('')
+      try {
+        const payload = await requestJson('/api/postline/comments', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            source_key: `blog:${slug()}`,
+            body: commentBody(),
+            author_name: commentName(),
+            author_email: commentEmail(),
+          }),
+        })
+
+        commentBody.set('')
+        commentTone.set('ok')
+        // Held comments say so rather than appearing to post and vanishing.
+        commentMessage.set(payload.data?.held
+          ? 'Thanks. Your first comment goes to the author for review.'
+          : 'Posted.')
+        if (!payload.data?.held) await loadThread(slug())
+      }
+      catch (error) {
+        commentTone.set('error')
+        commentMessage.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        posting.set(false)
+      }
+    }
+
+    onMount(() => {
+      readerEmail.set(window.localStorage?.getItem(READER_KEY) || '')
+      void load()
+    })
+  </script>
+@endsection

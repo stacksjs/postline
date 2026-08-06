@@ -533,6 +533,28 @@
             "isUnique": true,
             "isNullable": true,
             "hasDefault": false
+          },
+          {
+            "name": "access",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "free",
+            "enumValues": [
+              "free",
+              "paid"
+            ]
+          },
+          {
+            "name": "preview_chars",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": 600
           }
         ],
         "indexes": [
@@ -12049,7 +12071,7 @@
       }
     ]
   },
-  "hash": "b9383b8be5fada3a8c00087470bc9eaacd47d89487b7dea18201c84b8f8f85b5",
+  "hash": "1aef9dc65b26c3fd29f0fe3f8986ceab89b3bdbb80fb68a18469f4463e4ede51",
   "dialect": "sqlite",
-  "updatedAt": "2026-08-05T23:47:27.541Z"
+  "updatedAt": "2026-08-06T00:01:54.152Z"
 }

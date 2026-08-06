@@ -114,6 +114,11 @@ export class BlogService {
         slug,
         body,
         excerpt: body.slice(0, 280),
+        // One decision drives both halves: a piece sent to paying readers is
+        // the same piece paying readers can read on the site. Splitting them
+        // would let a post be mailed to payers and then sit open on the web.
+        access: content?.audience === 'paid' ? 'paid' : 'free',
+        preview_chars: 600,
         status: 'published',
         published_at: publishedAt,
         post_id: post.id,

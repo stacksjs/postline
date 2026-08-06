@@ -55,6 +55,34 @@ export default defineModel({
       validation: { rule: schema.enum(['draft', 'published', 'archived']).required() },
       factory: () => 'published',
     },
+    /**
+     * Who can read the whole thing.
+     *
+     * `paid` shows everyone the opening and asks the rest to subscribe, which
+     * is the per-post decision the pricing page promises rather than a plan
+     * committed to up front. Separate from `status`: a published post and a
+     * paywalled one are different questions.
+     */
+    access: {
+      required: true,
+      fillable: true,
+      default: 'free',
+      validation: { rule: schema.enum(['free', 'paid']).required() },
+      factory: () => 'free',
+    },
+    /**
+     * How much of a paywalled post is shown before the prompt.
+     *
+     * Stored per post because the right cut is editorial: some pieces give
+     * away two paragraphs, some give away one line.
+     */
+    previewChars: {
+      required: true,
+      fillable: true,
+      default: 600,
+      validation: { rule: schema.number().min(0).required() },
+      factory: () => 600,
+    },
     publishedAt: {
       required: false,
       fillable: true,

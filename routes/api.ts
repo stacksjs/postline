@@ -112,6 +112,11 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/tiers', 'Actions/Postline/TierSaveAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
   route.post('/tiers/archive', 'Actions/Postline/TierArchiveAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
   route.get('/subscribers', 'Actions/Postline/SubscribersListAction').middleware('auth').skipCsrf()
+  // The public reading surface. Unauthenticated because that is the point of a
+  // publication; the paywall is enforced in the service, so a locked post
+  // returns its preview rather than its body.
+  route.get('/public/posts', 'Actions/Postline/PublicPostAction').skipCsrf().rateLimit(240, 'minute')
+
   // Import. Writes a lot of rows from one call, so it is throttled tightly.
   route.post('/import/subscribers', 'Actions/Postline/ImportSubscribersAction').middleware('auth').skipCsrf().rateLimit(10, 'hour')
   route.post('/import/posts', 'Actions/Postline/ImportPostsAction').middleware('auth').skipCsrf().rateLimit(10, 'hour')
