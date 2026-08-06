@@ -53,8 +53,23 @@ export const SUBDOMAIN = 'opentimes.stacksjs.com'
  */
 export const LOCAL_HOST = 'theopentimes.localhost'
 
+/**
+ * Hosts from the previous identity.
+ *
+ * `postline.stacksjs.com` served this app for months and is in inbound links,
+ * bookmarks and at least one OAuth app's redirect list. Declaring it here turns
+ * it into a 301 like every other non-canonical host.
+ *
+ * It is not merely cosmetic. The gateway keeps routing a hostname it has a rule
+ * for, and after the rename that rule still pointed at port 3100 — which the
+ * new app now owns. The legacy host was therefore serving the full site under
+ * the old name: duplicate content on a second hostname, which is worse than
+ * either a redirect or a 404.
+ */
+export const LEGACY_HOSTS: readonly string[] = ['postline.stacksjs.com']
+
 /** Every host this project owns, canonical or not, in preference order. */
-export const OWNED: readonly string[] = [APEX, ...SHORT_DOMAINS, SUBDOMAIN]
+export const OWNED: readonly string[] = [APEX, ...SHORT_DOMAINS, SUBDOMAIN, ...LEGACY_HOSTS]
 
 export interface ResolvedDomains {
   mode: DomainMode

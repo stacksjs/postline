@@ -5,7 +5,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import process from 'node:process'
 import { encryptEnv, parse, resolveEnvFile } from '@stacksjs/env'
 import { ExitCode } from '@stacksjs/types'
-import { APEX, LOCAL_HOST, resolveDomains, SHORT_DOMAINS, SUBDOMAIN } from '~/config/domains'
+import { APEX, LEGACY_HOSTS, LOCAL_HOST, resolveDomains, SHORT_DOMAINS, SUBDOMAIN } from '~/config/domains'
 
 /**
  * `buddy domain` — move the app between hosting shapes without hand-editing
@@ -170,6 +170,8 @@ export default function (cli: CLI) {
       for (const domain of SHORT_DOMAINS)
         console.log(`  ${domain.padEnd(28)} short form${canonical === domain ? ' · canonical' : ''}`)
       console.log(`  ${SUBDOMAIN.padEnd(28)} shared-box tenant${canonical === SUBDOMAIN ? ' · canonical' : ''}`)
+      for (const domain of LEGACY_HOSTS)
+        console.log(`  ${domain.padEnd(28)} legacy · redirect only`)
       console.log(`  ${LOCAL_HOST.padEnd(28)} development only`)
       console.log('')
       console.log(`  ${redirects.length} of them redirect to https://${canonical}`)
