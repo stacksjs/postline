@@ -99,6 +99,10 @@
                 </button>
               </header>
               <textarea class="min-h-36 w-full leading-relaxed text-[18px] text-ink placeholder:text-zinc-400 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" placeholder="What do you want to share?" data-bluesky-text></textarea>
+              <!-- Long-form rich text mounts here and writes Markdown back into
+                  the textarea above, which stays the source of truth. Hidden
+                  until the blog is a target. -->
+              <div class="hidden" data-richtext-host></div>
               <div class="hidden overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview></div>
             </article>
           </div>
