@@ -52,6 +52,26 @@ const DB_DATABASE_PATH = `${DATA_DIR}/opentimes.sqlite`
  */
 const SQLITE_EXCLUDES = ['*.sqlite', '*.sqlite-shm', '*.sqlite-wal']
 
+/**
+ * The encrypted env file, and the key that would open it, both stay home.
+ *
+ * `.env.production` was shipping in every release, where nothing can read it:
+ * `.env.keys` is not on the server and no `DOTENV_PRIVATE_KEY_PRODUCTION` is set
+ * for the deployed processes. The env layer loads it anyway, fails to decrypt
+ * all 49 values, and warns that "defaults apply" — which is untrue and sent this
+ * investigation down a long detour. The deploy has already decrypted those
+ * values and written them, in plaintext, to the shared `.env` that loads
+ * immediately after, so every one of them resolves correctly either way.
+ *
+ * Excluding it removes the false warning and leaves one fewer copy of the
+ * secrets on the box. `.env.keys` is listed too — it does not appear to ship
+ * today, but the tarball is packed from the working tree where it does exist,
+ * and a private key is not something to leave to inference.
+ */
+const ENV_EXCLUDES = ['.env.production', '.env.keys']
+
+const RELEASE_EXCLUDES = [...SQLITE_EXCLUDES, ...ENV_EXCLUDES]
+
 // ts-cloud configuration for deployment
 export const tsCloud: TsCloudConfig = {
   /**
@@ -651,7 +671,7 @@ export const tsCloud: TsCloudConfig = {
       // Redis instead of to an in-process server it does not have. The
       // broadcast service relays them to the sockets.
       env: { PORT_API: '3101', DB_DATABASE_PATH, BROADCAST_REDIS_ENABLED: 'true' },
-      exclude: SQLITE_EXCLUDES,
+      exclude: RELEASE_EXCLUDES,
     },
 
     /**
@@ -698,7 +718,7 @@ export const tsCloud: TsCloudConfig = {
         BROADCAST_REDIS_ENABLED: 'true',
         DB_DATABASE_PATH,
       },
-      exclude: SQLITE_EXCLUDES,
+      exclude: RELEASE_EXCLUDES,
     },
 
     // The Open Times' own API process, bound to loopback and reached only through
@@ -728,7 +748,7 @@ export const tsCloud: TsCloudConfig = {
         ...(env.OPENAI_API_KEY ? { OPENAI_API_KEY: String(env.OPENAI_API_KEY) } : {}),
         ...(env.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: String(env.ANTHROPIC_API_KEY) } : {}),
       },
-      exclude: SQLITE_EXCLUDES,
+      exclude: RELEASE_EXCLUDES,
     },
 
     /**
