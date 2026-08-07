@@ -53,9 +53,9 @@
     "release:major": "./buddy release --bump major",
     "changelog": "./buddy changelog",
     "generate": "./buddy generate",
-    "typecheck": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false",
-    "typecheck:app": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false",
-    "types:check": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false",
+    "typecheck": "bun scripts/typecheck.ts",
+    "typecheck:app": "bun scripts/typecheck.ts",
+    "types:check": "bun scripts/typecheck.ts",
     "types:fix": "./buddy types:fix",
     "test": "./buddy test",
     "test:ui": "./buddy test:ui",
@@ -77,7 +77,8 @@
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.121",
     "@iconify-json/simple-icons": "^1.2.92",
-    "better-dx": "^0.2.22"
+    "better-dx": "^0.2.22",
+    "typescript": "^7.0.2"
   },
   "workspaces": [
     "storage/framework",
