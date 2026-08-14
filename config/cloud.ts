@@ -685,7 +685,24 @@ export const tsCloud: TsCloudConfig = {
         // it survives deploys; create it before migrating into it.
         `mkdir -p ${DATA_DIR}`,
         'bun install --production',
-        './buddy migrate',
+        /*
+         * `--force` is here for one deploy only. REVERT IT once this lands.
+         *
+         * Deploys have been blocked since the schema grew two drops —
+         * `categorizable_models` and `taggable_models`, both empty in
+         * production — and migrate rightly refuses destructive changes with
+         * nobody to ask. Dropping them by hand on the box did not clear it:
+         * the diff is computed from the model snapshot rather than the live
+         * database, so it still plans the drops against a schema that no
+         * longer has them.
+         *
+         * The flag is what the framework offers for exactly this, and the two
+         * tables carry no rows, but leaving it on would mean every future
+         * deploy silently applies whatever destructive change happens to be
+         * pending. That guard is worth keeping, so this comes straight back
+         * out in the next commit.
+         */
+        './buddy migrate --force',
       ],
       // The page server reverse-proxies `/api/**` to the API process. Name that
       // port explicitly: the framework default (3008) is already owned by a
