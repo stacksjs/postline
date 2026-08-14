@@ -69,6 +69,7 @@
     "@stacksjs/payments": "0.70.294",
     "@stacksjs/realtime": "0.70.294",
     "@stacksjs/socials": "^0.70.294",
+    "@stacksjs/ts-cloud": "^0.7.120",
     "stacks": "^0.70.294",
     "stripe": "^22.4.0",
     "ts-broadcasting": "0.0.9",
@@ -92,5 +93,8 @@
       }
     },
     "commit-msg": "bun x gitlint --edit .git/COMMIT_EDITMSG"
+  },
+  "overrides": {
+    "@stacksjs/ts-cloud": "^0.7.120"
   }
 }

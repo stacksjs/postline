@@ -656,6 +656,30 @@ export const tsCloud: TsCloudConfig = {
       // Distinct from the apex app's :3000 — both processes share this box and
       // the gateway proxies each subdomain to its own loopback port.
       port: 3100,
+      /*
+       * This site's share of a shared box, and deliberately the loosest of the
+       * three.
+       *
+       * A fresh process serves this app in about 200 MB. It does not stay
+       * there: rendering a page whose components carry `<script server>` blocks
+       * leaks roughly 5 MB per request under the stx this release resolves, so
+       * `/` — the only view here built from components — walks the process
+       * upwards all day. It reached 3.2 GB in about twenty hours and took the
+       * whole host down with it, every other tenant included.
+       *
+       * So these are sized against the leak rather than against the workload.
+       * 512M would be right for what this app actually needs and would restart
+       * it every few hours until the leak is gone, which trades one outage for
+       * a steady drip of dropped requests. `memoryMax` is the part that matters
+       * meanwhile: the kernel OOM-kills inside this cgroup alone and
+       * `Restart=always` brings it back, so the cost of the leak is charged to
+       * this app instead of to the machine.
+       *
+       * Tighten to 512M/768M once the stx fix lands and RSS is flat under load
+       * — the ceiling should be sized to the workload, not to a defect.
+       */
+      memoryHigh: '2G',
+      memoryMax: '2560M',
       preStart: [
         // The database lives outside the release tree (see DB_DATABASE_PATH) so
         // it survives deploys; create it before migrating into it.
@@ -702,6 +726,15 @@ export const tsCloud: TsCloudConfig = {
       path: '/ws',
       start: 'bun app/Broadcast/server.ts',
       port: 6001,
+      /*
+       * Relaying Redis messages to sockets is the whole job, so this one is
+       * small and stays small: measured at 16-21 MB across a week of uptime.
+       * 192M is roughly ten times that — enough that a burst of connections is
+       * never the thing that trips it, low enough that a runaway is caught
+       * while it is still cheap.
+       */
+      memoryHigh: '192M',
+      memoryMax: '256M',
       preStart: [
         // Redis lives on the box rather than as a managed service: it carries
         // realtime fan-out between two processes on this same host, so a
@@ -729,6 +762,14 @@ export const tsCloud: TsCloudConfig = {
       root: '.',
       start: 'bun node_modules/@stacksjs/actions/dist/serve/api.js',
       port: 3101,
+      /*
+       * The API serves JSON off the same database and holds flat at 39-66 MB
+       * over a week — it renders no views, so it never touches the component
+       * path that makes `main` above grow. 384M leaves generous room for a
+       * heavier request without leaving room for an unbounded one.
+       */
+      memoryHigh: '384M',
+      memoryMax: '512M',
       preStart: [
         `mkdir -p ${DATA_DIR}`,
         'bun install --production',
