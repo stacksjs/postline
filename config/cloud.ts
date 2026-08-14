@@ -685,24 +685,12 @@ export const tsCloud: TsCloudConfig = {
         // it survives deploys; create it before migrating into it.
         `mkdir -p ${DATA_DIR}`,
         'bun install --production',
-        /*
-         * `--force` is here for one deploy only. REVERT IT once this lands.
-         *
-         * Deploys have been blocked since the schema grew two drops —
-         * `categorizable_models` and `taggable_models`, both empty in
-         * production — and migrate rightly refuses destructive changes with
-         * nobody to ask. Dropping them by hand on the box did not clear it:
-         * the diff is computed from the model snapshot rather than the live
-         * database, so it still plans the drops against a schema that no
-         * longer has them.
-         *
-         * The flag is what the framework offers for exactly this, and the two
-         * tables carry no rows, but leaving it on would mean every future
-         * deploy silently applies whatever destructive change happens to be
-         * pending. That guard is worth keeping, so this comes straight back
-         * out in the next commit.
-         */
-        './buddy migrate --force',
+        // Deliberately not `--force`. The pending drop of `categorizable_models`
+        // and `taggable_models` needed it once, on 2026-08-14, and it was
+        // reverted the moment that deploy landed: a deploy that applies
+        // whatever destructive change happens to be pending, with nobody
+        // watching, is worse than a deploy that stops and says so.
+        './buddy migrate',
       ],
       // The page server reverse-proxies `/api/**` to the API process. Name that
       // port explicitly: the framework default (3008) is already owned by a
@@ -745,13 +733,17 @@ export const tsCloud: TsCloudConfig = {
       port: 6001,
       /*
        * Relaying Redis messages to sockets is the whole job, so this one is
-       * small and stays small: measured at 16-21 MB across a week of uptime.
-       * 192M is roughly ten times that — enough that a burst of connections is
-       * never the thing that trips it, low enough that a runaway is caught
-       * while it is still cheap.
+       * small and stays flat — but flat at 125 MB, not at the 16-21 MB the
+       * previous release idled on. Whatever the runtime now pulls in at boot,
+       * it costs six times what it used to, and a limit sized to the old
+       * number would have started OOM-killing this process on sight.
+       *
+       * So: measured on the running release, then roughly tripled. Enough that
+       * a burst of connections is never the thing that trips it, low enough
+       * that a runaway is caught while it is still cheap.
        */
-      memoryHigh: '192M',
-      memoryMax: '256M',
+      memoryHigh: '384M',
+      memoryMax: '512M',
       preStart: [
         // Redis lives on the box rather than as a managed service: it carries
         // realtime fan-out between two processes on this same host, so a
@@ -780,13 +772,16 @@ export const tsCloud: TsCloudConfig = {
       start: 'bun node_modules/@stacksjs/actions/dist/serve/api.js',
       port: 3101,
       /*
-       * The API serves JSON off the same database and holds flat at 39-66 MB
-       * over a week — it renders no views, so it never touches the component
-       * path that makes `main` above grow. 384M leaves generous room for a
-       * heavier request without leaving room for an unbounded one.
+       * The API serves JSON off the same database and holds flat — it renders
+       * no views, so it never touches the component path that makes `main`
+       * above grow. It sits at 141 MB on the current release, up from 39-66 MB
+       * on the previous one, the same boot-cost jump `broadcast` saw.
+       *
+       * 512M leaves generous room for a heavier request without leaving room
+       * for an unbounded one.
        */
-      memoryHigh: '384M',
-      memoryMax: '512M',
+      memoryHigh: '512M',
+      memoryMax: '768M',
       preStart: [
         `mkdir -p ${DATA_DIR}`,
         'bun install --production',
