@@ -657,29 +657,27 @@ export const tsCloud: TsCloudConfig = {
       // the gateway proxies each subdomain to its own loopback port.
       port: 3100,
       /*
-       * This site's share of a shared box, and deliberately the loosest of the
-       * three.
+       * Sized to the workload, now that it is allowed to be.
        *
-       * A fresh process serves this app in about 200 MB. It does not stay
-       * there: rendering a page whose components carry `<script server>` blocks
-       * leaks roughly 5 MB per request under the stx this release resolves, so
-       * `/` — the only view here built from components — walks the process
-       * upwards all day. It reached 3.2 GB in about twenty hours and took the
-       * whole host down with it, every other tenant included.
+       * This site rendered `/` at about 5 MB of leaked memory per request:
+       * every component carrying a `<script server>` block built its own
+       * Bun.Transpiler, each holding a native arena the JS heap never
+       * accounted for. It reached 3.2 GB in twenty hours and took the host
+       * down with it, every other tenant included. The ceiling was 2G/2560M
+       * because a leak, not a workload, was setting it.
        *
-       * So these are sized against the leak rather than against the workload.
-       * 512M would be right for what this app actually needs and would restart
-       * it every few hours until the leak is gone, which trades one outage for
-       * a steady drip of dropped requests. `memoryMax` is the part that matters
-       * meanwhile: the kernel OOM-kills inside this cgroup alone and
-       * `Restart=always` brings it back, so the cost of the leak is charged to
-       * this app instead of to the machine.
+       * stx 0.2.181 pools those transpilers — 0 built per request, down from
+       * ~150 — and RSS now oscillates in a band instead of climbing: 253-276
+       * MB across 200 consecutive requests to that same page. A process that
+       * serves this app fresh in ~200 MB can therefore live inside 512M, with
+       * 768M as the hard stop.
        *
-       * Tighten to 512M/768M once the stx fix lands and RSS is flat under load
-       * — the ceiling should be sized to the workload, not to a defect.
+       * If this ever OOMs, do not raise it without looking. Restart=always
+       * will keep the site up while you find out what changed, and a ceiling
+       * that moves whenever it is touched stops being a ceiling.
        */
-      memoryHigh: '2G',
-      memoryMax: '2560M',
+      memoryHigh: '512M',
+      memoryMax: '768M',
       preStart: [
         // The database lives outside the release tree (see DB_DATABASE_PATH) so
         // it survives deploys; create it before migrating into it.
