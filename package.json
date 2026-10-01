@@ -72,7 +72,7 @@
     "@stacksjs/stx": "^0.2.181",
     "@stacksjs/ts-cloud": "^0.7.124",
     "stacks": "^0.70.294",
-    "stripe": "^22.4.0",
+    "stripe": "^23.0.0",
     "ts-broadcasting": "0.0.9",
     "ts-medium-editor": "^0.1.6"
   },
