@@ -1,6 +1,19 @@
 import type { AiConfig } from '@stacksjs/types'
 
 /**
+ * Which driver answers when AI_PROVIDER is not set: whichever one has a key.
+ * Defaulting to OpenAI regardless meant that adding only ANTHROPIC_API_KEY
+ * still left the campaign planner on its local templates.
+ */
+type AiProvider = 'anthropic' | 'openai' | 'ollama' | 'bedrock'
+
+function defaultProvider(): AiProvider {
+  if (Bun.env.AI_PROVIDER) return Bun.env.AI_PROVIDER as AiProvider
+  if (Bun.env.ANTHROPIC_API_KEY) return 'anthropic'
+  return 'openai'
+}
+
+/**
  * **AI Configuration**
  *
  * This configuration defines all of your AI options. Because Stacks is fully-typed, you
@@ -8,7 +21,7 @@ import type { AiConfig } from '@stacksjs/types'
  * have any questions, feel free to reach out via Discord or GitHub Discussions.
  */
 export default {
-  default: Bun.env.AI_PROVIDER || 'openai',
+  default: defaultProvider(),
 
   drivers: {
     openai: {
@@ -17,7 +30,7 @@ export default {
       baseUrl: Bun.env.OPENAI_BASE_URL,
     },
     anthropic: {
-      model: Bun.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
+      model: Bun.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5',
       maxTokens: 6000,
     },
     ollama: {

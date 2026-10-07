@@ -611,6 +611,9 @@
           tone: campaignTone(),
           start_date: campaignStartDate(),
           end_date: campaignEndDate(),
+          // Post times are typed as local wall-clock time; the server converts
+          // them to UTC in this zone when the campaign is scheduled.
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         })
         await loadCampaigns(data.campaign.id)
         panelMode.set('planner')

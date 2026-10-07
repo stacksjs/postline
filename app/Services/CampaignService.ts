@@ -9,6 +9,10 @@ import { ensureAccount, now, uuid } from './Social/support'
 const database = db as any
 
 export const CAMPAIGN_PROVIDERS: SocialProvider[] = [
+  // The Open Times' own feed. The planner preselects every connected network
+  // and this one is always connected, so leaving it out here dropped it from
+  // every plan, and a plan for it alone failed with "Select at least one".
+  'opentimes',
   'bluesky',
   'twitter',
   'mastodon',
@@ -107,6 +111,46 @@ export function normalizeProviders(values: unknown): SocialProvider[] {
   const list = Array.isArray(values) ? values : String(values || '').split(',')
   const allowed = new Set<string>(CAMPAIGN_PROVIDERS)
   return [...new Set(list.map(value => String(value).trim().toLowerCase()).filter(value => allowed.has(value)))] as SocialProvider[]
+}
+
+/**
+ * A campaign post's time is wall-clock in the campaign's timezone (it is what
+ * the planner's date-time inputs show); the publishing queue runs on UTC. This
+ * converts one to the other, DST included. An unknown zone is treated as UTC.
+ */
+export function zonedTimestampToUtc(timestamp: string, timeZone: string): string {
+  const match = timestamp.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})(?::(\d{2}))?$/)
+  if (!match) throw new Error('Post time must include a date and time.')
+  const [, year, month, day, hour, minute, second] = match.map(Number)
+  const wallClock = Date.UTC(year!, month! - 1, day!, hour!, minute!, second || 0)
+
+  let format: Intl.DateTimeFormat
+  try {
+    format = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+  }
+  catch {
+    return timestamp
+  }
+
+  // How far the zone is from UTC at a given instant.
+  const offsetAt = (instant: number): number => {
+    const parts = Object.fromEntries(format.formatToParts(new Date(instant)).map(part => [part.type, part.value]))
+    return Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), Number(parts.second)) - instant
+  }
+
+  // Twice: the first guess can land on the other side of a DST change.
+  let utc = wallClock - offsetAt(wallClock)
+  utc = wallClock - offsetAt(utc)
+  return new Date(utc).toISOString().slice(0, 19).replace('T', ' ')
 }
 
 export function scheduleFromOffset(startDate: string, offsetDays: number, time = '09:00'): string {
@@ -227,7 +271,7 @@ export function buildCampaignFallbackPlan(
 }
 
 export function campaignBodyLimit(providers: SocialProvider[]): number {
-  const limits: Partial<Record<SocialProvider, number>> = { twitter: 280, bluesky: 300, mastodon: 500, threads: 500, instagram: 2200, linkedin: 3000, blog: 4000 }
+  const limits: Partial<Record<SocialProvider, number>> = { opentimes: 4000, twitter: 280, bluesky: 300, mastodon: 500, threads: 500, instagram: 2200, linkedin: 3000, blog: 4000 }
   if (!providers.length) return 4000
   return Math.min(...providers.map(provider => limits[provider] || 4000))
 }
@@ -477,7 +521,7 @@ export class CampaignService {
   }
 
   async activate(id: number): Promise<{ queued: number, skipped: number, errors: string[] }> {
-    const { posts } = await this.get(id)
+    const { campaign, posts } = await this.get(id)
     let queued = 0
     let skipped = 0
     const errors: string[] = []
@@ -488,7 +532,7 @@ export class CampaignService {
         continue
       }
       try {
-        const schedule = sqliteTimestamp(item.scheduledAt)
+        const schedule = zonedTimestampToUtc(sqliteTimestamp(item.scheduledAt), campaign.timezone)
         if (schedule <= now()) throw new Error('time is in the past')
         const result = await postQueue.save({ text: item.body, title: item.title, providers: item.providers, scheduledAt: schedule })
         await database.updateTable('campaign_posts').set({ post_id: result.postId, status: 'queued', updated_at: now() }).where('id', '=', item.id).execute()

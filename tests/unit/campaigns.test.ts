@@ -1,7 +1,7 @@
 import type { ConfiguredAIClient } from '@stacksjs/ai'
 import { describe, expect, test } from 'bun:test'
 import { CampaignAIService } from '../../app/Services/CampaignAIService'
-import { buildCampaignFallbackPlan, campaignBodyLimit, fitCampaignBody, normalizeProviders, scheduleFromOffset } from '../../app/Services/CampaignService'
+import { buildCampaignFallbackPlan, campaignBodyLimit, fitCampaignBody, normalizeProviders, scheduleFromOffset, zonedTimestampToUtc } from '../../app/Services/CampaignService'
 
 describe('campaign planning helpers', () => {
   test('normalizes, deduplicates, and filters campaign providers', () => {
@@ -160,5 +160,32 @@ describe('campaign AI assistant', () => {
     expect(requestedSchema?.properties?.posts?.minItems).toBe(3)
     expect(requestedSchema?.properties?.posts?.items?.properties?.body?.maxLength).toBe(300)
     expect(JSON.stringify(requestedMessages)).not.toContain('Ignore previous instructions')
+  })
+})
+
+describe('campaign scheduling time zones', () => {
+  test('wall-clock campaign times are queued in UTC for the campaign zone', () => {
+    // 09:00 in Los Angeles is 16:00 UTC in summer (PDT) and 17:00 in winter (PST).
+    expect(zonedTimestampToUtc('2026-07-01 09:00:00', 'America/Los_Angeles')).toBe('2026-07-01 16:00:00')
+    expect(zonedTimestampToUtc('2026-12-01 09:00:00', 'America/Los_Angeles')).toBe('2026-12-01 17:00:00')
+    expect(zonedTimestampToUtc('2026-07-01 09:00:00', 'Europe/Berlin')).toBe('2026-07-01 07:00:00')
+    expect(zonedTimestampToUtc('2026-07-01 09:00:00', 'UTC')).toBe('2026-07-01 09:00:00')
+  })
+
+  test('the day of a DST change resolves to the right side of it', () => {
+    // 2026-03-08 is the spring-forward day in the US; noon is already PDT.
+    expect(zonedTimestampToUtc('2026-03-08 12:00:00', 'America/New_York')).toBe('2026-03-08 16:00:00')
+    expect(zonedTimestampToUtc('2026-03-07 12:00:00', 'America/New_York')).toBe('2026-03-07 17:00:00')
+  })
+
+  test('an unknown zone leaves the time as UTC rather than failing the schedule', () => {
+    expect(zonedTimestampToUtc('2026-07-01 09:00:00', 'Mars/Olympus_Mons')).toBe('2026-07-01 09:00:00')
+  })
+})
+
+describe('campaign channels', () => {
+  test('The Open Times feed is a valid campaign channel', () => {
+    // It is always connected and preselected, so dropping it broke single-channel plans.
+    expect(normalizeProviders(['opentimes', 'bluesky', 'myspace'])).toEqual(['opentimes', 'bluesky'])
   })
 })

@@ -73,7 +73,7 @@ const strategyDirections: Record<CampaignAIStrategy, string> = {
 }
 
 function requestedBodyLimit(providers: string[]): number {
-  const limits: Record<string, number> = { twitter: 280, bluesky: 300, mastodon: 500, threads: 500, instagram: 2200, linkedin: 3000, blog: 4000 }
+  const limits: Record<string, number> = { opentimes: 4000, twitter: 280, bluesky: 300, mastodon: 500, threads: 500, instagram: 2200, linkedin: 3000, blog: 4000 }
   return Math.min(...providers.map(provider => limits[provider] || 4000))
 }
 
@@ -98,7 +98,9 @@ function planSchema(count: number, providers: string[]): Record<string, unknown>
             pillar: { type: 'string', enum: ['teaser', 'story', 'education', 'proof', 'launch', 'follow-up'] },
             offsetDays: { type: 'integer', minimum: 0, maximum: 365 },
             time: { type: 'string', minLength: 5, maxLength: 5 },
-            providers: { type: 'array', minItems: 1, items: { type: 'string', enum: ['bluesky', 'twitter', 'mastodon', 'instagram', 'linkedin', 'threads', 'blog'] } },
+            // Only the channels this plan is for: the model cannot route a post
+            // to a network the user did not select.
+            providers: { type: 'array', minItems: 1, items: { type: 'string', enum: [...new Set(providers)] } },
           },
         },
       },
