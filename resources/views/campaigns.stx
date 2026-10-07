@@ -490,7 +490,10 @@
     async function loadProviders() {
       try {
         const all = await opentimesSocial.fetchProviders()
-        const connected = all.filter(item => item.connected && item.canPublish)
+        // Same rule as the composer: anything that can publish. The Open Times
+        // feed and the blog report canPublish without a `connected` flag, so
+        // requiring both left a fresh workspace with nothing to plan for.
+        const connected = all.filter(item => item.canPublish && item.connected !== false)
         connectedProviders.set(connected)
         plannerProviders.set(connected.map(item => item.provider))
       }
