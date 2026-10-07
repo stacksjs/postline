@@ -76,6 +76,11 @@ storage/framework/runtime/
 storage/framework/stx/
 storage/cloud/
 
+# Desktop build output: `buddy build:desktop` (launcher + Craft runtime) and
+# `buddy build:dmg`. Released through GitHub Releases, never committed.
+storage/framework/desktop-dist/
+storage/framework/desktop-dmg/
+
 # Persisted by `buddy update` to remember whether the project is following the
 # `stable` or `canary` channel. Local preference only — the channel choice
 # doesn't need to be shared across team members or CI.

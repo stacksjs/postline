@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6f1e3"/>
+      <stop offset="1" stop-color="#e9e2cd"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#paper)"/>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="185" fill="none" stroke="#17130f" stroke-opacity="0.12" stroke-width="2"/>
+  <rect x="220" y="282" width="584" height="34" fill="#17130f"/>
+  <rect x="220" y="330" width="584" height="8" fill="#17130f"/>
+  <rect x="220" y="686" width="584" height="8" fill="#17130f"/>
+  <rect x="220" y="708" width="584" height="34" fill="#17130f"/>
+  <text x="512" y="638" font-family="Georgia, 'Times New Roman', serif" font-size="330" font-weight="700" fill="#17130f" text-anchor="middle" letter-spacing="10">OT</text>
+</svg>

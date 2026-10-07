@@ -1,206 +1,133 @@
-name: Releaser
+name: Release
+
+# `bun run release:patch` (likewise :minor / :major) bumps package.json, writes
+# the changelog, commits, tags vX.Y.Z and pushes the tag. That tag lands here:
+# build the macOS desktop app, package it as a DMG, zip it, and attach it to
+# the GitHub release for the tag.
+#
+# This file used to be a copy of the Stacks *framework's* releaser — publishing
+# npm packages and a Homebrew formula this app does not have — so every tag
+# failed before building anything.
+#
+# Mac App Store delivery is its own, manually dispatched workflow
+# (apple-app-store.yml); it needs Apple signing material this one does not.
 
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to (re)build and attach the DMG to, e.g. v0.0.3
+        required: true
+        type: string
 
 permissions:
   contents: write
-  packages: write
-  id-token: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  BUN_VERSION: '1.4.2'
+  # Prebuilt Craft runtime, pinned by release and checksum. Building it from
+  # source would pin a Zig *dev* toolchain, which ziglang.org prunes as soon as
+  # master moves on. v0.0.118 is the first release with --persistent-storage
+  # and --no-web-chrome-controls, which app/Desktop/launcher.ts passes.
+  CRAFT_VERSION: v0.0.118
+  CRAFT_SHA256_ARM64: bba1ff388afc70e734b6ac955c52dbd1c90da723a3f458c311d3aec592fb0bec
 
 jobs:
-  npm:
-    name: npm
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ env.VERSION }}
+  desktop:
+    name: Desktop DMG (macOS arm64)
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      APP_NAME: The Open Times
+      DESKTOP_APP_NAME: The Open Times
+      DESKTOP_BUNDLE_ID: ${{ vars.APPLE_BUNDLE_ID || 'org.theopentimes.desktop' }}
+      # The page the window opens: the signed-in workspace on the deployed site.
+      DESKTOP_URL: ${{ vars.DESKTOP_URL || 'https://theopentimes.org/composer' }}
+      # Optional Developer ID signing + notarization, picked up by build:dmg
+      # when set. Unset, the DMG is unsigned and Gatekeeper asks on first open.
+      DESKTOP_SIGNING_IDENTITY: ${{ vars.DESKTOP_SIGNING_IDENTITY }}
+      DESKTOP_NOTARY_PROFILE: ${{ vars.DESKTOP_NOTARY_PROFILE }}
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Use Cached node_modules
-        uses: actions/cache@v5
-        with:
-          path: node_modules
-          key: node-modules-${{ hashFiles('**/bun.lock') }}
-          restore-keys: |
-            node-modules-
-
-      - name: Install Dependencies
-        run: bun install
-
-      - name: Publish Framework
-        run: ./storage/framework/scripts/publish
+      - name: Resolve tag and version
+        id: version
         env:
-          BUN_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
-
-      - name: Publish Dummy Libraries
-        run: bun --filter='./storage/framework' run publish:dummy-libs
-        env:
-          BUN_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
-
-      - name: Publish VS Code Extension
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          cd storage/framework/defaults/ide/vscode
-          bun install
-          bunx --bun vsce publish
-          cd ../../../../
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          set -euo pipefail
+          case "$TAG" in v*) ;; *) echo "Not a release tag: $TAG" >&2; exit 1 ;; esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Extract tag version
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
-      - name: Create GitHub Release
-        uses: stacksjs/action-releaser@v1.2.9
+      - uses: actions/checkout@v6
         with:
-          files: |
-            storage/framework/core/buddy/bin/buddy-linux-x64.zip
-            storage/framework/core/buddy/bin/buddy-linux-arm64.zip
-            storage/framework/core/buddy/bin/buddy-windows-x64.zip
-            storage/framework/core/buddy/bin/buddy-darwin-x64.zip
-            storage/framework/core/buddy/bin/buddy-darwin-arm64.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ steps.version.outputs.tag }}
 
-  homebrew:
-    needs: npm
-    runs-on: macos-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
         with:
-          fetch-depth: 0
+          bun-version: ${{ env.BUN_VERSION }}
 
-      - name: Debug Tag
-        run: |
-          echo "Tag: ${GITHUB_REF#refs/tags/}"
-          echo "Version from previous job: ${{ needs.npm.outputs.version }}"
+      - run: bun install --frozen-lockfile
 
-      - name: Generate GitHub App Token
-        id: generate-token
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ secrets.GH_APP_ID }}
-          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-
-      - name: Setup GitHub CLI with PAT
-        run: |
-          echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
-
-      - name: Ensure Homebrew Tap Repository Exists
+      - name: Fetch pinned Craft runtime
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh repo view stacksjs/homebrew-tap &>/dev/null; then
-            echo "Creating homebrew-tap repository..."
-            gh repo create stacksjs/homebrew-tap --public --description "Homebrew tap for Stacks packages"
-          else
-            echo "homebrew-tap repository already exists"
-          fi
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/craft"
+          gh release download "$CRAFT_VERSION" -R craft-native/craft -p craft-darwin-arm64.zip -D "$RUNNER_TEMP/craft"
+          echo "$CRAFT_SHA256_ARM64  $RUNNER_TEMP/craft/craft-darwin-arm64.zip" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/craft/craft-darwin-arm64.zip" -d "$RUNNER_TEMP/craft"
+          test "$(lipo -archs "$RUNNER_TEMP/craft/craft")" = arm64
+          echo "CRAFT_BIN=$RUNNER_TEMP/craft/craft" >> "$GITHUB_ENV"
 
-      - name: Authenticate GitHub CLI with App Token
-        run: echo "${{ steps.generate-token.outputs.token }}" | gh auth login --with-token
+      - name: Build desktop app
+        run: bun node_modules/@stacksjs/buddy/dist/cli.js build:desktop
 
-      - name: Wait for Release Assets
+      - name: Package DMG
+        env:
+          DESKTOP_APP_VERSION: ${{ steps.version.outputs.version }}
+        run: bun node_modules/@stacksjs/buddy/dist/cli.js build:dmg
+
+      - name: Zip DMG
+        id: zip
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          echo "Waiting for release assets to be available..."
+          set -euo pipefail
+          cd storage/framework/desktop-dmg
+          dmg="$DESKTOP_APP_NAME-$VERSION.dmg"
+          test -f "$dmg"
+          zip="The-Open-Times-$VERSION-macos-arm64.dmg.zip"
+          ditto -c -k --keepParent "$dmg" "$zip"
+          shasum -a 256 "$zip" > "$zip.sha256"
+          echo "zip=storage/framework/desktop-dmg/$zip" >> "$GITHUB_OUTPUT"
 
-          # Wait for assets to be available (max 10 minutes)
-          TIMEOUT=600
-          START_TIME=$(date +%s)
-
-          while [ $(( $(date +%s) - START_TIME )) -lt $TIMEOUT ]; do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://github.com/stacksjs/stacks/releases/download/$VERSION/buddy-darwin-arm64)
-            echo "HTTP response code: $HTTP_CODE"
-
-            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
-              echo "Assets are available!"
-              break
+      - name: Publish to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          ZIP: ${{ steps.zip.outputs.zip }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            # The release commit put this version's section at the top of the
+            # changelog; use it as the notes, or let GitHub write them.
+            awk -v v="v$VERSION" '
+              /^## / { if (found) exit; if ($0 ~ v "([^0-9.]|$)") { found = 1; next } }
+              found { print }
+            ' CHANGELOG.md > "$RUNNER_TEMP/notes.md" || true
+            if [ -s "$RUNNER_TEMP/notes.md" ]; then
+              gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+            else
+              gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
             fi
-
-            echo "Assets not ready yet, waiting 10 seconds..."
-            sleep 10
-          done
-
-          if [ $(( $(date +%s) - START_TIME )) -ge $TIMEOUT ]; then
-            echo "Timed out waiting for assets, proceeding anyway..."
           fi
-
-          # Force continue even if we couldn't detect the file
-          # Sometimes GitHub's API can be inconsistent
-          echo "Continuing with asset download..."
-
-      - name: Download Binaries Directly
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          mkdir -p .github/temp
-          cd .github/temp
-
-          # Try direct download with retries
-          download_with_retry() {
-            local url=$1
-            local output=$2
-            local max_retries=5
-            local retry=0
-
-            while [ $retry -lt $max_retries ]; do
-              echo "Downloading $url (attempt $(($retry + 1))/$max_retries)"
-              if curl -L -s -f "$url" -o "$output"; then
-                echo "Downloaded $output successfully"
-                return 0
-              fi
-              echo "Download failed, retrying in 5 seconds..."
-              retry=$((retry + 1))
-              sleep 5
-            done
-
-            echo "Failed to download $url after $max_retries attempts"
-            return 1
-          }
-
-          download_with_retry "https://github.com/stacksjs/stacks/releases/download/$VERSION/buddy-darwin-arm64" "buddy-darwin-arm64"
-          download_with_retry "https://github.com/stacksjs/stacks/releases/download/$VERSION/buddy-darwin-x64" "buddy-darwin-x64"
-          download_with_retry "https://github.com/stacksjs/stacks/releases/download/$VERSION/buddy-linux-arm64" "buddy-linux-arm64"
-          download_with_retry "https://github.com/stacksjs/stacks/releases/download/$VERSION/buddy-linux-x64" "buddy-linux-x64"
-
-          cd ../..
-
-      - name: Update Homebrew Formula
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          bash .github/scripts/update-homebrew-formula.sh $VERSION
-
-      - name: Push to Homebrew Tap Repository
-        run: |
-          # Clone the tap repo using GitHub App token
-          git clone https://x-access-token:${{ steps.generate-token.outputs.token }}@github.com/stacksjs/homebrew-tap.git
-
-          # Set up Git config
-          cd homebrew-tap
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Copy the formula to the tap repo
-          mkdir -p Formula
-          cp ../.github/homebrew/stacks.rb Formula/
-
-          # Check if there are changes to commit
-          if git status --porcelain | grep -q .; then
-            # Push the changes to the tap repo
-            git add Formula/stacks.rb
-            git commit -m "chore: update stacks formula to ${GITHUB_REF#refs/tags/}"
-            git push
-            echo "Successfully updated homebrew formula!"
-          else
-            echo "No changes to commit"
-          fi
+          gh release upload "$TAG" "$ZIP" "$ZIP.sha256" --clobber

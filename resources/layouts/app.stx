@@ -6,12 +6,20 @@
     // and this covers `/` (which can't be a protected prefix without
     // also matching /login). The API rejects unauthenticated calls
     // regardless — this is UX, not the security boundary.
+    //
+    // The desktop shell skips it only against a loopback dev server, the one
+    // place the API lets it in without a token (app/Support/Auth/native.ts).
+    // The packaged app opens the deployed site, where the API wants a login
+    // like any browser: skipping the guard there left a signed-out window on
+    // "Loading accounts…" with every call answering 401.
     ;(() => {
       const isNativeApp = window.craft?.__craft_bridge_loaded === true
         || !!window.craft?.window
         || !!window.webkit?.messageHandlers?.craft
+      const host = window.location.hostname
+      const isLoopback = host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host.endsWith('.localhost')
 
-      if (!isNativeApp && !/(?:^|;\s*)auth-token=/.test(document.cookie))
+      if (!(isNativeApp && isLoopback) && !/(?:^|;\s*)auth-token=/.test(document.cookie))
         window.location.replace('/login')
     })()
   </script>
