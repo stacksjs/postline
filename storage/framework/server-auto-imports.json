@@ -8,6 +8,7 @@
     "AuctionItem": true,
     "Auth": true,
     "Author": true,
+    "AutoDeletePosts": true,
     "Automation": true,
     "AutomationRun": true,
     "Bid": true,

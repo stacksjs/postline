@@ -142,6 +142,7 @@ declare global {
   const PageRevision: typeof import('../defaults/app/Models/Content/PageRevision')['default']
   const Redirect: typeof import('../defaults/app/Models/Content/Redirect')['default']
   const Websocket: typeof import('../defaults/app/Models/realtime/Websocket')['default']
+  const AutoDeletePosts: typeof import('../../../app/Jobs/AutoDeletePosts')['default']
   const DeliverNewsletters: typeof import('../../../app/Jobs/DeliverNewsletters')['default']
   const Inspire: typeof import('../../../app/Jobs/Inspire')['default']
   const PublishScheduledPosts: typeof import('../../../app/Jobs/PublishScheduledPosts')['default']

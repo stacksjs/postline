@@ -262,7 +262,9 @@ export class PurgeService {
     }
     catch (error) {
       result.skippedReason = messageOf(error)
-      await this.recordRun(result, context, 'skipped')
+      // A network that was never connected is not news to a daily schedule;
+      // writing it down every day would bury the runs that did something.
+      if (context.trigger !== 'schedule') await this.recordRun(result, context, 'skipped')
       return result
     }
 
