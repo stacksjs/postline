@@ -757,6 +757,10 @@ export const tsCloud: TsCloudConfig = {
         BROADCAST_PORT: '6001',
         BROADCAST_REDIS_ENABLED: 'true',
         DB_DATABASE_PATH,
+        // rpx only routes `/ws` here, so this never proxies a request, but
+        // since 0.75 the deploy refuses any page site on the API's domain that
+        // could not reach the API, and this one shares `main`'s domain.
+        PORT_API: '3101',
       },
       exclude: RELEASE_EXCLUDES,
     },
@@ -794,7 +798,9 @@ export const tsCloud: TsCloudConfig = {
         // String(): the env proxy coerces values that look numeric or boolean,
         // so these are typed string|number|boolean while a site's env map takes
         // strings only.
-        AI_PROVIDER: String(env.AI_PROVIDER || 'openai'),
+        // Only when chosen explicitly: unset, config/ai.ts picks whichever
+        // provider has a key, so an ANTHROPIC_API_KEY alone is enough.
+        ...(env.AI_PROVIDER ? { AI_PROVIDER: String(env.AI_PROVIDER) } : {}),
         OPENAI_MODEL: String(env.OPENAI_MODEL || 'gpt-5.6-terra'),
         ...(env.OPENAI_API_KEY ? { OPENAI_API_KEY: String(env.OPENAI_API_KEY) } : {}),
         ...(env.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: String(env.ANTHROPIC_API_KEY) } : {}),
