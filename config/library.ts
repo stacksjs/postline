@@ -15,7 +15,10 @@ export default {
   author: 'Chris Breuer',
   contributors: ['Chris Breuer <chris@stacksjs.com>'],
   defaultLanguage: 'en',
-  releaseable: true,
+  // The Open Times is an app, not a library: a release ships the desktop app
+  // (release.yml), not the scaffold packages below. Leaving this on made
+  // `bun run release:patch` try to build them as npm packages, and fail.
+  releaseable: false,
 
   webComponents: {
     name: 'hello-world-elements',
