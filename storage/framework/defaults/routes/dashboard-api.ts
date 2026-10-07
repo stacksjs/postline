@@ -16,6 +16,7 @@
  * unauthenticated.
  */
 
+import { isLocalDeployment } from '@stacksjs/env'
 import { route } from '@stacksjs/router'
 
 // The `/api/dashboard/*` surface is unauthenticated by design for the local
@@ -25,8 +26,15 @@ import { route } from '@stacksjs/router'
 // (assign-any-role-to-any-user = privilege escalation) and the model-row dump
 // (arbitrary DB read) — must be gated server-side. In a local/dev/test env the
 // guard is a no-op so the dev dashboard keeps working without a token.
-const APP_ENV = (process.env.APP_ENV ?? process.env.NODE_ENV ?? '').toLowerCase()
-const IS_LOCAL_ENV = APP_ENV === '' || APP_ENV === 'local' || APP_ENV === 'development' || APP_ENV === 'dev' || APP_ENV === 'test' || APP_ENV === 'testing'
+//
+// The gate is the deployment, not the environment NAME. `.env.example` ships
+// `APP_ENV=development`, so every app that never edited that line called
+// itself development in production - and this gate then attached no
+// middleware at all to the 300-plus routes below, including the ones that
+// read and rewrite the project's `.env`, write the deploy script, sync RBAC
+// roles and dump arbitrary model rows. `@stacksjs/auth`'s cookie policy hit
+// the same shape in stacksjs/stacks#2275 and moved to the URL; this follows.
+const IS_LOCAL_ENV = isLocalDeployment()
 
 // Apply auth + admin-role middleware to a sensitive route outside local envs.
 // Returns the route builder so calls read as `guard(route.post(...))`.
@@ -161,6 +169,9 @@ route.group({ prefix: '/api/dashboard', apiResponse: true }, () => {
   guard(route.delete('/commerce/print-logs/{id}', 'Actions/Commerce/ReceiptDestroyAction'))
   guard(route.get('/deployments', 'Actions/Dashboard/Deployments/GetDeployments'))
   guard(route.post('/deployments', 'Actions/Dashboard/Deployments/CreateDeployment'))
+  guard(route.post('/deployments/preview', 'Actions/Dashboard/Deployments/PreviewDeployment'))
+  guard(route.post('/deployments/rollback/preview', 'Actions/Dashboard/Deployments/PreviewDeploymentRollback'))
+  guard(route.post('/deployments/rollback', 'Actions/Dashboard/Deployments/CreateDeploymentRollback'))
   guard(route.get('/deployments/count', 'Actions/Dashboard/Deployments/GetDeploymentCount'))
   guard(route.get('/deployments/recent', 'Actions/Dashboard/Deployments/GetRecentDeployments'))
   guard(route.get('/deployments/avg-time', 'Actions/Dashboard/Deployments/GetAverageDeploymentTime'))
@@ -168,6 +179,26 @@ route.group({ prefix: '/api/dashboard', apiResponse: true }, () => {
   guard(route.put('/deployments/script', 'Actions/Dashboard/Deployments/UpdateDeployScript'))
   guard(route.get('/deployments/terminal', 'Actions/Dashboard/Deployments/GetDeploymentLiveTerminalOutput'))
   guard(route.get('/deployments/{id}', 'Actions/Dashboard/Deployments/GetDeployment'))
+  guard(route.get('/operations/scheduler', 'Actions/Dashboard/Operations/SchedulerIndexAction'))
+  guard(route.post('/operations/scheduler/{name}/run', 'Actions/Dashboard/Operations/SchedulerRunAction'))
+  guard(route.patch('/operations/scheduler/{name}', 'Actions/Dashboard/Operations/SchedulerToggleAction'))
+  guard(route.get('/operations/recovery', 'Actions/Dashboard/Operations/RecoveryIndexAction'))
+  guard(route.post('/operations/recovery/destinations', 'Actions/Dashboard/Operations/RecoveryDestinationStoreAction'))
+  guard(route.post('/operations/recovery/destinations/{id}/test', 'Actions/Dashboard/Operations/RecoveryDestinationTestAction'))
+  guard(route.post('/operations/recovery/policies', 'Actions/Dashboard/Operations/RecoveryPolicyStoreAction'))
+  guard(route.post('/operations/recovery/policies/{id}/run', 'Actions/Dashboard/Operations/RecoveryRunAction'))
+  guard(route.post('/operations/recovery/points/{id}/verify', 'Actions/Dashboard/Operations/RecoveryVerifyAction'))
+  guard(route.post('/operations/recovery/points/{id}/restore', 'Actions/Dashboard/Operations/RecoveryRestoreAction'))
+  guard(route.patch('/operations/recovery/points/{id}/protection', 'Actions/Dashboard/Operations/RecoveryProtectAction'))
+  guard(route.post('/operations/recovery/retention', 'Actions/Dashboard/Operations/RecoveryRetentionAction'))
+  guard(route.get('/operations/migrations', 'Actions/Dashboard/Operations/MigrationIndexAction'))
+  guard(route.post('/operations/migrations/apply', 'Actions/Dashboard/Operations/MigrationApplyAction'))
+  guard(route.post('/operations/migrations/reconcile', 'Actions/Dashboard/Operations/MigrationReconcileAction'))
+  guard(route.get('/operations/changes', 'Actions/Dashboard/Operations/ChangeIndexAction'))
+  guard(route.post('/operations/changes/releases/{id}/decision', 'Actions/Dashboard/Operations/ChangeApprovalAction'))
+  guard(route.get('/operations/incidents', 'Actions/Dashboard/Operations/IncidentIndexAction'))
+  guard(route.patch('/operations/incidents/{id}', 'Actions/Dashboard/Operations/IncidentUpdateAction'))
+  guard(route.get('/operations/audit', 'Actions/Dashboard/Operations/AuditIndexAction'))
   guard(route.get('/data/activity', 'Actions/Dashboard/Data/ActivityIndexAction'))
   guard(route.get('/data/users', 'Actions/Dashboard/Data/UserIndexAction'))
   guard(route.get('/data/teams', 'Actions/Dashboard/Data/TeamIndexAction'))
@@ -222,7 +253,42 @@ route.group({ prefix: '/api/dashboard', apiResponse: true }, () => {
   guard(route.get('/files', 'Actions/Dashboard/Content/FileIndexAction'))
   guard(route.post('/files/directories', 'Actions/Dashboard/Content/FileDirectoryStoreAction'))
   guard(route.post('/files/uploads', 'Actions/Dashboard/Content/FileUploadAction'))
+  guard(route.patch('/files', 'Actions/Dashboard/Content/FileRenameAction'))
+  guard(route.put('/files/visibility', 'Actions/Dashboard/Content/FileVisibilityAction'))
+  // Favourites and tags are the metadata layer, not a storage operation: a disk
+  // has nowhere to record either, so both write `storage_items` and the listing
+  // above joins them back on (stacksjs/stacks#2577).
+  guard(route.put('/files/favorite', 'Actions/Dashboard/Content/FileFavoriteAction'))
+  guard(route.put('/files/tags', 'Actions/Dashboard/Content/FileTagsAction'))
+  // Re-running the background processing (stacksjs/stacks#2578). Not optional:
+  // the first version of any of these produces output somebody wants
+  // regenerated - a better ladder, a model that has improved, an optimization
+  // that ran before a preset changed.
+  guard(route.post('/files/reprocess', 'Actions/Dashboard/Content/FileReprocessAction'))
+  guard(route.post('/files/duplicates', 'Actions/Dashboard/Content/FileDuplicateAction'))
   guard(route.delete('/files', 'Actions/Dashboard/Content/FileDestroyAction'))
+
+  /*
+   * Remote commands (stacksjs/stacks#960).
+   *
+   * Deliberately NOT behind `guard()`. That helper drops auth entirely when
+   * `APP_ENV` is local, development or test - which is a reasonable trade for
+   * operational telemetry on a developer machine, and an unauthenticated
+   * command runner for this. `authenticatedGuard` keeps `auth` in every
+   * environment, the same treatment billing gets and for the same reason.
+   *
+   * Authorization proper is the `run-remote-command` gate, checked per host and
+   * per command inside the action. Being authenticated is not being allowed.
+   */
+  authenticatedGuard(route.get('/remote/commands', 'Actions/Dashboard/Remote/RemoteCommandIndexAction'))
+  authenticatedGuard(route.post('/remote/run', 'Actions/Dashboard/Remote/RemoteCommandRunAction'))
+  // Interactive terminals into hosts that opt in with `terminal: true`,
+  // authorized by the `open-remote-terminal` gate. Same guard, same reason.
+  authenticatedGuard(route.post('/remote/terminals', 'Actions/Dashboard/Remote/RemoteTerminalOpenAction'))
+  authenticatedGuard(route.get('/remote/terminals/{id}/stream', 'Actions/Dashboard/Remote/RemoteTerminalStreamAction'))
+  authenticatedGuard(route.post('/remote/terminals/{id}/input', 'Actions/Dashboard/Remote/RemoteTerminalInputAction'))
+  authenticatedGuard(route.post('/remote/terminals/{id}/resize', 'Actions/Dashboard/Remote/RemoteTerminalResizeAction'))
+  authenticatedGuard(route.delete('/remote/terminals/{id}', 'Actions/Dashboard/Remote/RemoteTerminalCloseAction'))
 
   guard(route.get('/ci/status', 'Actions/Dashboard/Ci/StatusAction'))
   // CI drilldown (stacksjs/stacks#1848): per-repo run history + per-run
@@ -264,28 +330,15 @@ route.group({ prefix: '/api/dashboard', apiResponse: true }, () => {
   // requests — see the action for the soft-fallback shape.
   route.get('/auth/me', 'Actions/Dashboard/Auth/MeAction')
 
-  // Kanban surface (stacksjs/stacks#1846). Phase 1: read-only.
-  //
-  // Phase 2 lands write endpoints under the same prefix:
-  //   POST   /kanban/boards           — store
-  //   PATCH  /kanban/boards/{id}      — update
-  //   DELETE /kanban/boards/{id}      — destroy
-  //   POST   /kanban/boards/reorder   — bulk position update
-  //   POST   /kanban/columns          — store
-  //   PATCH  /kanban/columns/{id}     — update
-  //   POST   /kanban/columns/reorder  — bulk position update
-  //   POST   /kanban/cards            — store
-  //   PATCH  /kanban/cards/{id}       — update (incl. column move)
-  //   POST   /kanban/cards/reorder    — bulk position update
-  //
+  // Kanban reads and mutations share the guarded dashboard surface.
   // Kanban data is local-only without authentication. Outside local
   // environments every read and write uses the same auth + admin guard as
   // the other operational dashboard surfaces.
-  // Reads (Phase 1)
+  // Reads
   guard(route.get('/kanban/boards', 'Actions/Dashboard/Kanban/BoardsIndexAction'))
   guard(route.get('/kanban/boards/{id}', 'Actions/Dashboard/Kanban/BoardShowAction'))
 
-  // Writes (Phase 2). The reorder endpoints are POST not PATCH because
+  // Writes. The reorder endpoints are POST not PATCH because
   // their semantics — "here's the full new state of this slice of the
   // board" — match the resource-replacement intent better than PATCH's
   // "apply this delta" verb. They also accept a body shape that PATCH
@@ -305,7 +358,7 @@ route.group({ prefix: '/api/dashboard', apiResponse: true }, () => {
   guard(route.delete('/kanban/cards/{id}', 'Actions/Dashboard/Kanban/CardDestroyAction'))
   guard(route.post('/kanban/cards/reorder', 'Actions/Dashboard/Kanban/CardsReorderAction'))
 
-  // Phase 3 — card detail + labels + assignees + comments.
+  // Card detail, labels, assignees, and comments.
   //
   // The card-show endpoint is the only "single card with everything"
   // read; the boards/{id} response already embeds labels + assignees
@@ -325,10 +378,10 @@ route.group({ prefix: '/api/dashboard', apiResponse: true }, () => {
   guard(route.post('/kanban/cards/{id}/labels', 'Actions/Dashboard/Kanban/CardLabelsSyncAction'))
   guard(route.post('/kanban/cards/{id}/assignees', 'Actions/Dashboard/Kanban/CardAssigneesSyncAction'))
 
-  // Comments. Append-only thread: store + destroy, no edit yet — the
-  // history-preservation argument outweighs the "fix a typo" argument
-  // until someone explicitly asks for editing.
+  // Card-scoped comment thread. Writes stay under the dashboard guard while
+  // the CardComment model also exposes its conventional generated API.
   guard(route.post('/kanban/cards/{id}/comments', 'Actions/Dashboard/Kanban/CardCommentStoreAction'))
+  guard(route.patch('/kanban/comments/{id}', 'Actions/Dashboard/Kanban/CardCommentUpdateAction'))
   guard(route.delete('/kanban/comments/{id}', 'Actions/Dashboard/Kanban/CardCommentDestroyAction'))
 
   // Lightweight user list for the assignee picker. Distinct from the
@@ -341,7 +394,7 @@ route.group({ prefix: '/api/dashboard', apiResponse: true }, () => {
   // guard so production totals are never protected by client-side role checks.
   guard(route.get('/commerce/stats', 'Actions/Dashboard/Commerce/CommerceDashboardAction'))
 
-  // Delivery operations overview. Guarded because route and driver data is
+  // Delivery operations overview. Guarded because route and courier data is
   // operational information even though the underlying models expose their
   // own generated useApi endpoints.
   guard(route.get('/commerce/delivery', 'Actions/Dashboard/Commerce/CommerceDeliveryAction'))
@@ -373,11 +426,11 @@ route.group({ prefix: '/api/dashboard', apiResponse: true }, () => {
   guard(route.patch('/commerce/delivery-routes/{id}', 'Actions/Commerce/Shipping/DeliveryRouteUpdateAction'))
   guard(route.delete('/commerce/delivery-routes/{id}', 'Actions/Commerce/Shipping/DeliveryRouteDestroyAction'))
 
-  guard(route.get('/commerce/drivers', 'Actions/Dashboard/Commerce/DriverIndexAction'))
-  guard(route.get('/commerce/drivers/{id}', 'Actions/Commerce/Shipping/DriverShowAction'))
-  guard(route.post('/commerce/drivers', 'Actions/Commerce/Shipping/DriverStoreAction'))
-  guard(route.patch('/commerce/drivers/{id}', 'Actions/Commerce/Shipping/DriverUpdateAction'))
-  guard(route.delete('/commerce/drivers/{id}', 'Actions/Commerce/Shipping/DriverDestroyAction'))
+  guard(route.get('/commerce/couriers', 'Actions/Dashboard/Commerce/CourierIndexAction'))
+  guard(route.get('/commerce/couriers/{id}', 'Actions/Commerce/Shipping/CourierShowAction'))
+  guard(route.post('/commerce/couriers', 'Actions/Commerce/Shipping/CourierStoreAction'))
+  guard(route.patch('/commerce/couriers/{id}', 'Actions/Commerce/Shipping/CourierUpdateAction'))
+  guard(route.delete('/commerce/couriers/{id}', 'Actions/Commerce/Shipping/CourierDestroyAction'))
 
   guard(route.get('/commerce/digital-deliveries', 'Actions/Dashboard/Commerce/DigitalDeliveryIndexAction'))
   guard(route.get('/commerce/digital-deliveries/{id}', 'Actions/Commerce/Shipping/DigitalDeliveryShowAction'))
@@ -403,6 +456,11 @@ route.group({ prefix: '/api/dashboard', apiResponse: true }, () => {
   guard(route.post('/marketing/campaigns/{id}/send', 'Actions/Dashboard/Marketing/CampaignSendAction'))
   guard(route.post('/marketing/campaigns/{id}/schedule', 'Actions/Dashboard/Marketing/CampaignScheduleAction'))
   guard(route.post('/marketing/campaigns/{id}/cancel', 'Actions/Dashboard/Marketing/CampaignCancelAction'))
+  // Abandoned carts: the audience a shop already has, and the campaign that
+  // goes after it. The campaign it writes is an ordinary Campaign row, so it
+  // shows up on /marketing/campaigns and sends through the same pipeline.
+  guard(route.get('/marketing/abandoned-carts', 'Actions/Dashboard/Marketing/AbandonedCartIndexAction'))
+  guard(route.post('/marketing/abandoned-carts/campaign', 'Actions/Dashboard/Marketing/AbandonedCartCampaignAction'))
   guard(route.get('/marketing/social-posts', 'Actions/Dashboard/Marketing/SocialPostIndexAction'))
   guard(route.post('/marketing/social-posts', 'Actions/Dashboard/Marketing/SocialPostStoreAction'))
   guard(route.patch('/marketing/social-posts/{id}', 'Actions/Dashboard/Marketing/SocialPostUpdateAction'))
@@ -466,6 +524,7 @@ route.group({ prefix: '/api/dashboard', apiResponse: true }, () => {
   // the per-mailbox inbox.json index. Both are guarded outside local/dev
   // because they touch real mailbox state and PII.
   guard(route.get('/email/inbox', 'Actions/Dashboard/Email/InboxIndexAction'))
+  guard(route.get('/email/inbox/{id}/attachments/{attachmentId}', 'Actions/Dashboard/Email/InboxAttachmentDownloadAction'))
   guard(route.get('/email/inbox/{id}', 'Actions/Dashboard/Email/InboxShowAction'))
   guard(route.get('/email/stats', 'Actions/Dashboard/Email/InboxStatsAction'))
   guard(route.get('/email/activity', 'Actions/Dashboard/Email/InboxActivityAction'))

@@ -1,6 +1,7 @@
-import { Action } from '@stacksjs/actions'
-import { db } from '@stacksjs/database'
-import { kanbanError } from './kanban-response'
+import type { RequestInstance } from '@stacksjs/types'
+import { Action } from '@stacksjs/actions/runtime'
+import { db, getDatabaseDialect, sqlHelpers } from '@stacksjs/database/runtime'
+import { kanbanActionError, kanbanError } from './kanban-response'
 
 interface ColumnReorder {
   columnId: number
@@ -31,7 +32,7 @@ interface ReorderInput {
 }
 
 /**
- * `POST /api/dashboard/kanban/cards/reorder` (stacksjs/stacks#1846 Phase 2).
+ * `POST /api/dashboard/kanban/cards/reorder`.
  *
  * The drag-and-drop hot path. Rewrites card positions and column
  * assignments across one or more columns of a single board in a single
@@ -47,8 +48,8 @@ export default new Action({
   description: 'Bulk-rewrite cards.{column_id, position} across one or more columns of the same board.',
   method: 'POST',
   apiResponse: true,
-  async handle(request) {
-    const body = (request as any).jsonBody as ReorderInput | undefined ?? {}
+  async handle(request: RequestInstance<ReorderInput>) {
+    const body = request.all()
 
     if (!Array.isArray(body.columns) || body.columns.length === 0) {
       return kanbanError('`columns` must be a non-empty array.', 400)
@@ -85,8 +86,11 @@ export default new Action({
 
     try {
       // Verify all columns belong to the same board.
+      // Postgres numbers its parameters, so every IN list below is numbered
+      // rather than repeating `?` (stacksjs/stacks#2846).
+      const { param } = sqlHelpers(getDatabaseDialect())
       const columnIds = reorders.map(r => r.columnId)
-      const colPlaceholders = columnIds.map(() => '?').join(',')
+      const colPlaceholders = columnIds.map((_, index) => param(index + 1)).join(',')
       const colRows = await db.unsafe(
         `SELECT id, board_id FROM board_columns WHERE id IN (${colPlaceholders})`,
         columnIds,
@@ -98,15 +102,15 @@ export default new Action({
       if (boardIds.size > 1) {
         return kanbanError('All columns in a reorder request must belong to the same board.', 400)
       }
-      const boardId = colRows[0].board_id
+      const boardId = colRows[0]?.board_id
 
       // Verify all cards belong to that board (prevents a malformed
       // page from moving cards in from a sibling board).
       if (allCardIds.size > 0) {
         const cardIdList = Array.from(allCardIds)
-        const cardPlaceholders = cardIdList.map(() => '?').join(',')
+        const cardPlaceholders = cardIdList.map((_, index) => param(index + 1)).join(',')
         const cardRows = await db.unsafe(
-          `SELECT id FROM cards WHERE id IN (${cardPlaceholders}) AND board_id = ?`,
+          `SELECT id FROM cards WHERE id IN (${cardPlaceholders}) AND board_id = ${param(cardIdList.length + 1)}`,
           [...cardIdList, boardId],
         ).execute() as Array<{ id: number }>
         if (cardRows.length !== cardIdList.length) {
@@ -134,8 +138,7 @@ export default new Action({
       return { moved: allCardIds.size, boardId }
     }
     catch (err) {
-      console.error('[dashboard/kanban] CardsReorderAction failed:', err)
-      return kanbanError(err instanceof Error ? err.message : 'unknown error', 500)
+      return kanbanActionError(err, 'CardsReorderAction')
     }
   },
 })

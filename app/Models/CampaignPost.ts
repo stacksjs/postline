@@ -35,7 +35,7 @@ export default defineModel({
       required: true,
       fillable: true,
       validation: { rule: schema.string().required().min(1).max(4000) },
-      factory: faker => faker.lorem.sentences({ min: 1, max: 3 }),
+      factory: faker => faker.lorem.sentences(faker.number.int({ min: 1, max: 3 })),
     },
     providers: {
       required: true,

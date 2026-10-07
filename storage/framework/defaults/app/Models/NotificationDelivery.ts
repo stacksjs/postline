@@ -1,5 +1,5 @@
 import { defineModel } from '@stacksjs/orm'
-import { schema } from '@stacksjs/validation'
+import { schema } from '@stacksjs/validation/runtime'
 
 export default defineModel({
   name: 'NotificationDelivery',
@@ -8,6 +8,7 @@ export default defineModel({
   autoIncrement: true,
 
   traits: {
+    gdpr: { subject: 'user_id', erasure: 'delete', basis: 'contract', purpose: 'Notification delivery log' },
     useTimestamps: true,
     useSearch: {
       displayable: ['id', 'channel', 'recipient', 'subject', 'status', 'sentAt'],
@@ -32,6 +33,7 @@ export default defineModel({
     },
 
     channel: {
+      type: 'string',
       required: true,
       fillable: true,
       validation: {
@@ -40,6 +42,7 @@ export default defineModel({
     },
 
     recipient: {
+      personal: true,
       required: true,
       fillable: true,
       validation: {
@@ -48,6 +51,7 @@ export default defineModel({
     },
 
     subject: {
+      personal: true,
       required: false,
       fillable: true,
       validation: {
@@ -56,6 +60,7 @@ export default defineModel({
     },
 
     body: {
+      personal: true,
       required: true,
       fillable: true,
       validation: {
@@ -64,6 +69,7 @@ export default defineModel({
     },
 
     status: {
+      type: 'string',
       required: true,
       fillable: true,
       default: 'pending',
@@ -81,6 +87,7 @@ export default defineModel({
     },
 
     metadata: {
+      type: 'text',
       required: false,
       fillable: true,
       validation: {

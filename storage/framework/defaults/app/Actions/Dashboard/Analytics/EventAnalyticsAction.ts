@@ -1,7 +1,8 @@
 import type { RequestInstance } from '@stacksjs/types'
-import { Action } from '@stacksjs/actions'
+import { Action } from '@stacksjs/actions/runtime'
 import { AnalyticsEvent } from '@stacksjs/orm'
 import { response } from '@stacksjs/router'
+import { dashboardOperationalError } from '../dashboard-response'
 import {
   analyticsCurrency,
   analyticsIdentifier,
@@ -50,9 +51,7 @@ export default new Action({
       )
     }
     catch (error) {
-      return response.json({
-        message: error instanceof Error ? error.message : 'Event analytics records could not be read.',
-      }, 503)
+      return dashboardOperationalError(error, 'Event analytics records could not be read.', 'EventAnalyticsAction')
     }
   },
 })

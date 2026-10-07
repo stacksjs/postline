@@ -1,13 +1,14 @@
-import { Action } from '@stacksjs/actions'
-import { db } from '@stacksjs/database'
-import { kanbanError } from './kanban-response'
+import type { RequestInstance } from '@stacksjs/types'
+import { Action } from '@stacksjs/actions/runtime'
+import { db, getDatabaseDialect, sqlHelpers } from '@stacksjs/database/runtime'
+import { kanbanActionError, kanbanError } from './kanban-response'
 
 interface SyncInput {
   labelIds?: unknown
 }
 
 /**
- * `POST /api/dashboard/kanban/cards/:id/labels` (stacksjs/stacks#1846 Phase 3).
+ * `POST /api/dashboard/kanban/cards/:id/labels`.
  *
  * Replaces the set of labels attached to a card. Sync semantics —
  * pass the new full list of label ids, the action diffs against
@@ -26,13 +27,12 @@ export default new Action({
   description: 'Replaces the set of labels attached to a card.',
   method: 'POST',
   apiResponse: true,
-  async handle(request) {
-    const rawId = (request as any)?.params?.id ?? (request as any)?.param?.('id') ?? null
-    const cardId = Number(rawId)
+  async handle(request: RequestInstance<SyncInput>) {
+    const cardId = Number(request.getParam('id'))
     if (!Number.isFinite(cardId) || cardId <= 0)
       return kanbanError('Invalid card id', 400)
 
-    const body = (request as any).jsonBody as SyncInput | undefined ?? {}
+    const body = request.all()
     if (!Array.isArray(body.labelIds))
       return kanbanError('`labelIds` must be an array of label ids (possibly empty).', 400)
 
@@ -47,8 +47,11 @@ export default new Action({
 
     try {
       // Resolve the card → board so we can validate label scope.
+      // Postgres numbers its parameters, so the `?` these carried bound
+      // nothing there (stacksjs/stacks#2846).
+      const { param } = sqlHelpers(getDatabaseDialect())
       const cardRows = await db.unsafe(
-        'SELECT id, board_id FROM cards WHERE id = ? LIMIT 1',
+        `SELECT id, board_id FROM cards WHERE id = ${param(1)} LIMIT 1`,
         [cardId],
       ).execute() as Array<{ id: number, board_id: number }>
       const card = cardRows?.[0]
@@ -56,11 +59,12 @@ export default new Action({
         return kanbanError('Card not found.', 404)
 
       // Every label must belong to the same board (labels are
-      // board-scoped per Phase 1's `labels.board_id` design).
+      // board-scoped through `labels.board_id`).
       if (uniqueLabelIds.length > 0) {
-        const placeholders = uniqueLabelIds.map(() => '?').join(',')
+        // The IN list is numbered alongside the trailing board id.
+        const placeholders = uniqueLabelIds.map((_, index) => param(index + 1)).join(',')
         const labelRows = await db.unsafe(
-          `SELECT id FROM labels WHERE id IN (${placeholders}) AND board_id = ?`,
+          `SELECT id FROM labels WHERE id IN (${placeholders}) AND board_id = ${param(uniqueLabelIds.length + 1)}`,
           [...uniqueLabelIds, card.board_id],
         ).execute() as Array<{ id: number }>
         if (labelRows.length !== uniqueLabelIds.length)
@@ -83,7 +87,7 @@ export default new Action({
       // confirm its in-flight state matches what the server stored.
       let labels: Array<{ id: number, name: string, color: string }> = []
       if (uniqueLabelIds.length > 0) {
-        const placeholders = uniqueLabelIds.map(() => '?').join(',')
+        const placeholders = uniqueLabelIds.map((_, index) => param(index + 1)).join(',')
         labels = await db.unsafe(
           `SELECT id, name, color FROM labels WHERE id IN (${placeholders}) ORDER BY name ASC`,
           uniqueLabelIds,
@@ -92,8 +96,7 @@ export default new Action({
       return { cardId, labels }
     }
     catch (err) {
-      console.error('[dashboard/kanban] CardLabelsSyncAction failed:', err)
-      return kanbanError(err instanceof Error ? err.message : 'unknown error', 500)
+      return kanbanActionError(err, 'CardLabelsSyncAction')
     }
   },
 })

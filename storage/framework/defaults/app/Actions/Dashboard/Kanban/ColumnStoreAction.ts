@@ -1,7 +1,8 @@
-import { Action } from '@stacksjs/actions'
-import { db } from '@stacksjs/database'
+import type { RequestInstance } from '@stacksjs/types'
+import { Action } from '@stacksjs/actions/runtime'
+import { db, getDatabaseDialect, sqlHelpers } from '@stacksjs/database/runtime'
 import { Board, BoardColumn } from '@stacksjs/orm'
-import { kanbanError } from './kanban-response'
+import { kanbanActionError, kanbanError } from './kanban-response'
 
 interface ColumnInput {
   boardId?: unknown
@@ -11,7 +12,7 @@ interface ColumnInput {
 }
 
 /**
- * `POST /api/dashboard/kanban/columns` (stacksjs/stacks#1846 Phase 2).
+ * `POST /api/dashboard/kanban/columns`.
  *
  * Appends a new column to the end of the target board. Validates that
  * `boardId` points at a real board so a typo doesn't silently create
@@ -22,8 +23,8 @@ export default new Action({
   description: 'Creates a new column on a board.',
   method: 'POST',
   apiResponse: true,
-  async handle(request) {
-    const body = (request as any).jsonBody as ColumnInput | undefined ?? {}
+  async handle(request: RequestInstance<ColumnInput>) {
+    const body = request.all()
 
     const boardId = Number(body.boardId)
     if (!Number.isFinite(boardId) || boardId <= 0) {
@@ -46,8 +47,9 @@ export default new Action({
         return kanbanError('Board not found.', 404)
       }
 
+      const { param } = sqlHelpers(getDatabaseDialect())
       const maxRow = await db.unsafe(
-        'SELECT COALESCE(MAX(position), -1) AS m FROM board_columns WHERE board_id = ?',
+        `SELECT COALESCE(MAX(position), -1) AS m FROM board_columns WHERE board_id = ${param(1)}`,
         [boardId],
       ).execute() as Array<{ m: number }>
       const nextPosition = (Number(maxRow?.[0]?.m ?? -1) + 1) || 0
@@ -74,8 +76,7 @@ export default new Action({
       }
     }
     catch (err) {
-      console.error('[dashboard/kanban] ColumnStoreAction failed:', err)
-      return kanbanError(err instanceof Error ? err.message : 'unknown error', 500)
+      return kanbanActionError(err, 'ColumnStoreAction')
     }
   },
 })

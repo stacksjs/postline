@@ -268,4 +268,164 @@ export default {
     validation: schema.string(),
     default: '',
   },
+
+  // Process timezone used to stamp scheduled posts. Empty falls back to America/Los_Angeles.
+  TZ: {
+    validation: schema.string(),
+    default: '',
+  },
+
+
+  // Which AI driver config/ai.ts selects (openai, anthropic, ollama, bedrock).
+  AI_PROVIDER: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  ANTHROPIC_API_KEY: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  OPENAI_API_KEY: {
+    validation: schema.string(),
+    default: '',
+  },
+
+
+  // Stripe webhook signing secret, checked by StripeWebhookAction.
+  STRIPE_WEBHOOK_SECRET: {
+    validation: schema.string(),
+    default: '',
+  },
+
+
+
+  // Social network credentials. Each is the env-level fallback for a single
+  // account; accounts connected from the UI keep their own tokens in the
+  // database, which is how more than one account per network is supported.
+  BLUESKY_IDENTIFIER: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  BLUESKY_APP_PASSWORD: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  MASTODON_INSTANCE_URL: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  MASTODON_ACCESS_TOKEN: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  TWITTER_ACCESS_TOKEN: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  LINKEDIN_CLIENT_ID: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  LINKEDIN_CLIENT_SECRET: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  LINKEDIN_REDIRECT_URL: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  LINKEDIN_API_VERSION: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  LINKEDIN_ACCESS_TOKEN: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  LINKEDIN_AUTHOR_URN: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  INSTAGRAM_CLIENT_ID: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  INSTAGRAM_CLIENT_SECRET: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  INSTAGRAM_REDIRECT_URL: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  INSTAGRAM_GRAPH_VERSION: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  INSTAGRAM_ACCESS_TOKEN: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  INSTAGRAM_USER_ID: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  INSTAGRAM_USERNAME: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  THREADS_CLIENT_ID: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  THREADS_CLIENT_SECRET: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  THREADS_REDIRECT_URL: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  THREADS_GRAPH_VERSION: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  THREADS_ACCESS_TOKEN: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  THREADS_USER_ID: {
+    validation: schema.string(),
+    default: '',
+  },
+
+  THREADS_USERNAME: {
+    validation: schema.string(),
+    default: '',
+  },
 } satisfies EnvConfig

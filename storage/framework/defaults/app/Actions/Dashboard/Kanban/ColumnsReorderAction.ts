@@ -1,6 +1,7 @@
-import { Action } from '@stacksjs/actions'
-import { db } from '@stacksjs/database'
-import { kanbanError } from './kanban-response'
+import type { RequestInstance } from '@stacksjs/types'
+import { Action } from '@stacksjs/actions/runtime'
+import { db, getDatabaseDialect, sqlHelpers } from '@stacksjs/database/runtime'
+import { kanbanActionError, kanbanError } from './kanban-response'
 
 interface ReorderInput {
   boardId?: unknown
@@ -8,7 +9,7 @@ interface ReorderInput {
 }
 
 /**
- * `POST /api/dashboard/kanban/columns/reorder` (stacksjs/stacks#1846 Phase 2).
+ * `POST /api/dashboard/kanban/columns/reorder`.
  *
  * Bulk rewrite column positions for a board. The submitted `order`
  * is an array of column ids in their new display order; index becomes
@@ -27,8 +28,8 @@ export default new Action({
   description: 'Bulk-rewrite `position` on a board\'s columns.',
   method: 'POST',
   apiResponse: true,
-  async handle(request) {
-    const body = (request as any).jsonBody as ReorderInput | undefined ?? {}
+  async handle(request: RequestInstance<ReorderInput>) {
+    const body = request.all()
 
     const boardId = Number(body.boardId)
     if (!Number.isFinite(boardId) || boardId <= 0) {
@@ -52,9 +53,13 @@ export default new Action({
     try {
       // Verify every column actually belongs to the named board.
       // Single round-trip via a count of rows that match both criteria.
-      const placeholders = ids.map(() => '?').join(',')
+      // Postgres numbers its parameters, so the IN list has to be numbered
+      // alongside the trailing board id rather than repeating `?`
+      // (stacksjs/stacks#2846).
+      const { param } = sqlHelpers(getDatabaseDialect())
+      const placeholders = ids.map((_, index) => param(index + 1)).join(',')
       const matchRows = await db.unsafe(
-        `SELECT COUNT(*) AS c FROM board_columns WHERE id IN (${placeholders}) AND board_id = ?`,
+        `SELECT COUNT(*) AS c FROM board_columns WHERE id IN (${placeholders}) AND board_id = ${param(ids.length + 1)}`,
         [...ids, boardId],
       ).execute() as Array<{ c: number }>
       const matched = Number(matchRows?.[0]?.c ?? 0)
@@ -74,8 +79,7 @@ export default new Action({
       return { reordered: ids.length }
     }
     catch (err) {
-      console.error('[dashboard/kanban] ColumnsReorderAction failed:', err)
-      return kanbanError(err instanceof Error ? err.message : 'unknown error', 500)
+      return kanbanActionError(err, 'ColumnsReorderAction')
     }
   },
 })

@@ -1,12 +1,9 @@
 <script client>
-  // Kanban — Boards index (stacksjs/stacks#1846, Phase 1).
-  //
   // Lists every non-archived board with a card-count badge. Clicking a
-  // board navigates to `/kanban/[id]` — Phase 2 ships the actual
-  // drag-and-drop board view at that URL.
+  // board navigates to its complete drag-and-drop view.
   //
   // Follows #1838 conventions: no <script server>, no vanilla DOM
-  // reads, all state via the store. Role gate via useRole() — the
+  // reads, all state via the store. Role gate via useRole() - the
   // surface is dev-mode-only (admins + devs see it, clients don't).
   import { useRole } from '~/storage/framework/defaults/views/dashboard/composables/useRole'
   import { kanbanStore } from '~/storage/framework/defaults/views/dashboard/stores/kanban'
@@ -102,18 +99,19 @@
     }
   }
 
-  function colorSwatchClass(c) {
-    return ({
+  function colorSwatchClass(c: string) {
+    const swatches: Record<string, string> = {
       violet: 'bg-violet-500',
       blue: 'bg-blue-500',
       emerald: 'bg-emerald-500',
       amber: 'bg-amber-500',
       rose: 'bg-rose-500',
       slate: 'bg-slate-500',
-    })[c] || 'bg-violet-500'
+    }
+    return swatches[c] || 'bg-violet-500'
   }
 
-  function colorButtonClass(c) {
+  function colorButtonClass(c: string) {
     const base = `w-6 h-6 rounded-full ${colorSwatchClass(c)} cursor-pointer transition-all `
     return draftColor() === c
       ? base + 'ring-2 ring-offset-2 ring-violet-500 dark:ring-offset-zinc-950'
@@ -123,18 +121,19 @@
   // Color → tailwind class. Free-form string in the model, mapped here
   // so the UI stays stable when a new hue is added without an explicit
   // mapping (falls back to violet).
-  function accentClass(color) {
-    return ({
+  function accentClass(color: string) {
+    const swatches: Record<string, string> = {
       violet: 'bg-violet-500',
       blue: 'bg-blue-500',
       emerald: 'bg-emerald-500',
       amber: 'bg-amber-500',
       rose: 'bg-rose-500',
       slate: 'bg-slate-500',
-    })[color] || 'bg-violet-500'
+    }
+    return swatches[color] || 'bg-violet-500'
   }
 
-  function cardCountText(n) {
+  function cardCountText(n: number) {
     if (n === 0) return 'No cards'
     if (n === 1) return '1 card'
     return n + ' cards'
@@ -175,7 +174,7 @@
       <p class="mt-2 text-xs text-zinc-500">Most common: migrations haven't run yet. Try <code>./buddy migrate</code>.</p>
     </div>
 
-    <!-- Empty state — DB reachable but no boards yet -->
+    <!-- Empty state - DB reachable but no boards yet -->
     <div :if="!loading && !error && !hasBoards" class="px-6 py-12 text-center border border-dashed border-zinc-300 rounded-lg dark:border-zinc-700">
       <span class="block mb-3 mx-auto h-10 w-10 text-zinc-400 i-hugeicons-layout-3-column"></span>
       <p class="font-medium text-sm text-zinc-700 dark:text-zinc-300">No boards yet</p>

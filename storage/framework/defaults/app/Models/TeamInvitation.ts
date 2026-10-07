@@ -1,5 +1,5 @@
 import { defineModel } from '@stacksjs/orm'
-import { schema } from '@stacksjs/validation'
+import { schema } from '@stacksjs/validation/runtime'
 
 /**
  * A single-use invitation to join a team.
@@ -21,6 +21,11 @@ export default defineModel({
       unique: true,
     },
     {
+      name: 'team_invitations_pending_key_unique',
+      columns: ['pending_key'],
+      unique: true,
+    },
+    {
       name: 'team_invitations_team_email_status_index',
       columns: ['team_id', 'email', 'status'],
     },
@@ -29,6 +34,7 @@ export default defineModel({
   belongsTo: ['Team'],
 
   traits: {
+    gdpr: { subject: { email: 'email' }, erasure: 'delete', basis: 'contract', purpose: 'Team invitations' },
     useUuid: true,
     useTimestamps: true,
     useSeeder: { count: 0 },
@@ -41,7 +47,7 @@ export default defineModel({
     useApi: {
       uri: 'team-invitations',
       routes: ['index', 'show', 'destroy'],
-      middleware: ['auth'],
+      middleware: ['auth', 'team'],
     },
   },
 
@@ -55,6 +61,7 @@ export default defineModel({
     },
 
     email: {
+      personal: true,
       required: true,
       fillable: true,
       validation: {
@@ -76,6 +83,14 @@ export default defineModel({
       hidden: true,
       validation: {
         rule: schema.string().required().max(64),
+      },
+    },
+
+    pendingKey: {
+      required: false,
+      hidden: true,
+      validation: {
+        rule: schema.string().max(384),
       },
     },
 

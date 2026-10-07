@@ -13,6 +13,14 @@
       "@/*": ["./resources/*"]
     }
   },
+  // Framework type augmentations live under storage/framework/types, which the
+  // exclude below otherwise hides. env.d.ts is what types `env.X` from the
+  // schema in config/env.ts; model-events.d.ts derives the `user:created`
+  // style events app/Events.ts listens for.
+  "files": [
+    "storage/framework/types/env.d.ts",
+    "storage/framework/types/model-events.d.ts"
+  ],
   "include": [
     "*.ts",
     "*.d.ts",

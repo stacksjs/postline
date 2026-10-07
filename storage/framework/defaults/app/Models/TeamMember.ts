@@ -1,5 +1,5 @@
 import { defineModel } from '@stacksjs/orm'
-import { schema } from '@stacksjs/validation'
+import { schema } from '@stacksjs/validation/runtime'
 
 /**
  * A user's membership in one team.
@@ -30,6 +30,7 @@ export default defineModel({
   belongsTo: ['Team', 'User'],
 
   traits: {
+    gdpr: { erasure: 'delete', basis: 'contract', purpose: 'Team membership' },
     useUuid: true,
     useTimestamps: true,
     useSeeder: { count: 0 },
@@ -42,7 +43,7 @@ export default defineModel({
     useApi: {
       uri: 'team-members',
       routes: ['index', 'store', 'show', 'update', 'destroy'],
-      middleware: ['auth'],
+      middleware: ['auth', 'team'],
     },
   },
 

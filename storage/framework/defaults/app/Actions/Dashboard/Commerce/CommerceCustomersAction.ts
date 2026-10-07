@@ -1,7 +1,7 @@
-import { Action } from '@stacksjs/actions'
+import { Action } from '@stacksjs/actions/runtime'
 import { config } from '@stacksjs/config'
 import { Customer } from '@stacksjs/orm'
-import { response } from '@stacksjs/router'
+import { dashboardOperationalError } from '../dashboard-response'
 import {
   normalizeCommerceCustomerCurrency,
   normalizeCommerceCustomerRecord,
@@ -21,13 +21,11 @@ export default new Action({
       return {
         records,
         summary: summarizeCommerceCustomers(records),
-        currency: normalizeCommerceCustomerCurrency((config as any).commerce?.currency),
+        currency: normalizeCommerceCustomerCurrency(config.commerce?.currency),
       }
     }
     catch (error) {
-      return response.json({
-        message: error instanceof Error ? error.message : 'Customer records could not be read.',
-      }, 503)
+      return dashboardOperationalError(error, 'Customer records could not be read.', 'CommerceCustomersAction')
     }
   },
 })

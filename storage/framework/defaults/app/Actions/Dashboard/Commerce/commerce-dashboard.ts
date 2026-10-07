@@ -1,3 +1,4 @@
+import { formatCurrency, minorToMajor } from '@stacksjs/commerce/money'
 import {
   commerceCurrency,
   commerceIdentifier,
@@ -45,6 +46,7 @@ export interface CommerceDashboardStat {
 
 export interface CommerceDashboardChartSeries {
   labels: string[]
+  /** Major units per bucket (19.99, not 1999): chart axes are read by people. */
   revenue: Array<{ currency: string, data: number[] }>
   orders: number[]
 }
@@ -198,7 +200,9 @@ function rangeWindow(range: CommerceDashboardRange, now: Date, rows: CommerceDas
     .map(row => timestamp(row.createdAt))
     .filter(Number.isFinite)
     .sort((left, right) => left - right)[0]
-  const start = Number.isFinite(earliest) ? new Date(earliest) : startOfUtcMonth(now)
+  // `earliest` is `number | undefined` (the array may be empty), and
+  // `Number.isFinite` does not narrow it for `new Date(...)`.
+  const start = earliest !== undefined && Number.isFinite(earliest) ? new Date(earliest) : startOfUtcMonth(now)
   const elapsedDays = Math.max(0, (now.getTime() - start.getTime()) / DAY_MS)
   return {
     start,
@@ -237,26 +241,20 @@ function percentChange(current: number, previous: number): string {
   return `${sign}${percentage.toFixed(1)}%`
 }
 
+/** Order amounts are integer minor units (stacksjs/stacks#2851). */
 function formatMoney(amount: number, code: string): string {
-  try {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: code,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
-  catch {
-    return `${code} ${amount.toFixed(2)}`
-  }
+  return formatCurrency(amount, code, 'en-US')
 }
 
 function formatCurrencyTotals(totals: Map<string, number>): { value: string, detail: string } {
   const entries = [...totals.entries()].sort((left, right) => right[1] - left[1])
   if (entries.length === 0)
     return { value: formatMoney(0, 'USD'), detail: 'No recorded revenue' }
-  if (entries.length === 1)
-    return { value: formatMoney(entries[0][1], entries[0][0]), detail: entries[0][0] }
+  // Destructured rather than indexed: a `length === 1` check does not narrow
+  // `entries[0]` for the compiler, and every index below would need a guard.
+  const [only] = entries
+  if (entries.length === 1 && only)
+    return { value: formatMoney(only[1], only[0]), detail: only[0] }
   return {
     value: `${entries.length} currencies`,
     detail: entries.map(([code, amount]) => formatMoney(amount, code)).join(' | '),
@@ -269,10 +267,11 @@ function formatCurrencyAverages(totals: Map<string, { amount: number, orders: nu
     .sort((left, right) => right[1].amount - left[1].amount)
   if (entries.length === 0)
     return { value: formatMoney(0, 'USD'), detail: 'No recorded orders' }
-  if (entries.length === 1)
+  const [only] = entries
+  if (entries.length === 1 && only)
     return {
-      value: formatMoney(entries[0][1].amount / entries[0][1].orders, entries[0][0]),
-      detail: entries[0][0],
+      value: formatMoney(only[1].amount / only[1].orders, only[0]),
+      detail: only[0],
     }
   return {
     value: 'Mixed currencies',
@@ -329,7 +328,10 @@ function buildBuckets(start: Date, end: Date, bucket: RangeWindow['bucket']): Bu
 function singleCurrencyChange(current: Map<string, number>, previous: Map<string, number>): string {
   if (current.size !== 1)
     return ''
-  const [[code, amount]] = [...current.entries()]
+  const [entry] = [...current.entries()]
+  if (!entry)
+    return ''
+  const [code, amount] = entry
   return percentChange(amount, previous.get(code) || 0)
 }
 
@@ -409,12 +411,14 @@ export function buildCommerceDashboard(
     const index = bucketIndexes.get(bucketKey(createdAt, window.bucket))
     if (index === undefined)
       continue
-    orderSeries[index]++
+    // `index` came out of a Map lookup, so the compiler treats these slots as
+    // possibly missing even though the arrays are pre-filled to bucket length.
+    orderSeries[index] = (orderSeries[index] ?? 0) + 1
     if (isCancelled(order.status))
       continue
     const code = currency(order.currency)
     const values = revenueSeries.get(code) || Array.from({ length: buckets.length }, () => 0)
-    values[index] += order.totalAmount
+    values[index] = (values[index] ?? 0) + order.totalAmount
     revenueSeries.set(code, values)
   }
 
@@ -494,7 +498,7 @@ export function buildCommerceDashboard(
       labels: buckets.map(bucket => bucket.label),
       revenue: [...revenueSeries.entries()]
         .sort(([left], [right]) => left.localeCompare(right))
-        .map(([code, data]) => ({ currency: code, data })),
+        .map(([code, data]) => ({ currency: code, data: data.map(amount => minorToMajor(amount, code)) })),
       orders: orderSeries,
     },
     topProducts: [...productTotals.entries()]
