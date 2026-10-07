@@ -52,6 +52,14 @@ export default function () {
     .everyFiveMinutes()
     .withoutOverlapping(5)
 
+  // Delete posts older than the retention period, when it is switched on in
+  // Settings. Daily: the setting is in days, and each run pages through every
+  // connected account's history, which the networks rate-limit.
+  schedule
+    .job('AutoDeletePosts')
+    .daily()
+    .withoutOverlapping(120)
+
   // Run a custom action every five minutes
   // schedule.action('CleanupTempFiles').everyFiveMinutes()
 

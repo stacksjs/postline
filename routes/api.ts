@@ -161,4 +161,8 @@ route.group({ prefix: '/ot' }, () => {
   // limited — the preview generously, the destructive run tightly.
   route.get('/purge/preview', 'Actions/OpenTimes/PurgePreviewAction').middleware('auth').skipCsrf().rateLimit(20, 'minute')
   route.post('/purge', 'Actions/OpenTimes/PurgeRunAction').middleware('auth').skipCsrf().rateLimit(3, 'hour')
+  // Automatic deletion of posts older than N days (Settings). The daily
+  // AutoDeletePosts job does the deleting; these only read and save the rule.
+  route.get('/settings/retention', 'Actions/OpenTimes/RetentionGetAction').middleware('auth').skipCsrf()
+  route.post('/settings/retention', 'Actions/OpenTimes/RetentionSaveAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
 })

@@ -47,6 +47,13 @@ const DELETE_DELAY_MS = 250
 /** Most per-post errors kept in the audit row; the count is always exact. */
 const MAX_RECORDED_ERRORS = 25
 
+/**
+ * Most remote posts an age-limited run will page through looking for old
+ * ones. Feeds list newest first, so reaching the posts past the cutoff can
+ * mean walking past many recent ones that are kept.
+ */
+const MAX_SCANNED_PER_RUN = 20000
+
 export type PurgeScope = 'tracked' | 'all'
 
 export interface PurgeInput {
@@ -54,7 +61,15 @@ export interface PurgeInput {
   scope?: PurgeScope
   confirmation?: string
   dryRun?: boolean
+  /**
+   * Only posts published more than this many days ago. A post whose age
+   * cannot be established is kept, never assumed old.
+   */
+  olderThanDays?: number
 }
+
+/** What started a run, recorded on its audit rows. */
+export type PurgeTrigger = 'manual' | 'schedule'
 
 export interface PurgeProviderResult {
   provider: SocialProvider
@@ -75,11 +90,23 @@ export interface PurgeProviderResult {
 export interface PurgeResult {
   scope: PurgeScope
   dryRun: boolean
+  olderThanDays: number | null
+  /** ISO time posts must predate to match, when olderThanDays is set. */
+  cutoff: string | null
   confirmation: string
   matched: number
   deleted: number
   failed: number
   providers: PurgeProviderResult[]
+}
+
+/** Everything about a run that each provider pass needs. */
+interface RunContext {
+  scope: PurgeScope
+  dryRun: boolean
+  cutoff: Date | null
+  olderThanDays: number | null
+  trigger: PurgeTrigger
 }
 
 /** One post queued for deletion, with the local rows it maps back to. */
@@ -94,6 +121,33 @@ interface PurgeCandidate {
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * Parse the timestamps this code meets: ISO strings from provider APIs, and
+ * SQLite's `YYYY-MM-DD HH:MM:SS`, which `now()` writes in UTC without saying so.
+ */
+export function parseTimestamp(value: unknown): Date | null {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value
+  if (typeof value !== 'string' || !value.trim()) return null
+  const text = value.trim()
+  const sqlite = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(text)
+  const date = new Date(sqlite ? `${text.replace(' ', 'T')}Z` : text)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+/** The instant a post must predate to be `olderThanDays` old. */
+export function cutoffFor(olderThanDays: number | undefined, from = new Date()): Date | null {
+  if (olderThanDays === undefined || olderThanDays === null) return null
+  const days = Number(olderThanDays)
+  if (!Number.isFinite(days) || days < 1) throw new Error('Age limit must be at least one day.')
+  return new Date(from.getTime() - Math.floor(days) * 24 * 60 * 60 * 1000)
+}
+
+/** True only for a candidate dated before the cutoff; undated ones are kept. */
+export function isOlderThan(postedAt: string | undefined, cutoff: Date): boolean {
+  const date = parseTimestamp(postedAt)
+  return date !== null && date.getTime() < cutoff.getTime()
 }
 
 function sleep(ms: number): Promise<void> {
@@ -128,18 +182,39 @@ export class PurgeService {
     return await this.run({ ...input, dryRun: false })
   }
 
-  private async run(input: PurgeInput & { dryRun: boolean }): Promise<PurgeResult> {
+  /**
+   * The retention sweep: delete posts older than `olderThanDays`, without the
+   * typed phrase. The owner gave that consent once, when they turned automatic
+   * deletion on in Settings (RetentionService), and an age limit is mandatory
+   * here so a schedule can never become a full wipe.
+   */
+  async purgeOlderThan(input: PurgeInput & { olderThanDays: number }): Promise<PurgeResult> {
+    if (!(Number(input.olderThanDays) >= 1)) throw new Error('Automatic deletion needs an age limit of at least one day.')
+    return await this.run({ ...input, dryRun: false, trigger: 'schedule' })
+  }
+
+  private async run(input: PurgeInput & { dryRun: boolean, trigger?: PurgeTrigger }): Promise<PurgeResult> {
     const scope: PurgeScope = input.scope === 'all' ? 'all' : 'tracked'
     const providers = this.resolveProviders(input.providers)
+    const cutoff = cutoffFor(input.olderThanDays)
+    const context: RunContext = {
+      scope,
+      dryRun: input.dryRun,
+      cutoff,
+      olderThanDays: cutoff ? Math.floor(Number(input.olderThanDays)) : null,
+      trigger: input.trigger || 'manual',
+    }
     const results: PurgeProviderResult[] = []
 
     for (const provider of providers) {
-      results.push(await this.runProvider(provider, scope, input.dryRun))
+      results.push(await this.runProvider(provider, context))
     }
 
     return {
       scope,
       dryRun: input.dryRun,
+      olderThanDays: context.olderThanDays,
+      cutoff: cutoff ? cutoff.toISOString() : null,
       confirmation: PURGE_CONFIRMATION,
       matched: results.reduce((total, result) => total + result.matched, 0),
       deleted: results.reduce((total, result) => total + result.deleted, 0),
@@ -159,7 +234,8 @@ export class PurgeService {
     return [...new Set(requested)]
   }
 
-  private async runProvider(provider: SocialProvider, scope: PurgeScope, dryRun: boolean): Promise<PurgeProviderResult> {
+  private async runProvider(provider: SocialProvider, context: RunContext): Promise<PurgeProviderResult> {
+    const { scope, dryRun, cutoff } = context
     const result: PurgeProviderResult = {
       provider,
       handle: null,
@@ -176,7 +252,7 @@ export class PurgeService {
 
     if (!result.supported) {
       result.skippedReason = UNSUPPORTED_REASONS[provider] || `${provider} cannot delete posts through its API.`
-      await this.recordRun(result, scope, dryRun, 'skipped')
+      await this.recordRun(result, context, 'skipped')
       return result
     }
 
@@ -186,7 +262,7 @@ export class PurgeService {
     }
     catch (error) {
       result.skippedReason = messageOf(error)
-      await this.recordRun(result, scope, dryRun, 'skipped')
+      await this.recordRun(result, context, 'skipped')
       return result
     }
 
@@ -196,8 +272,9 @@ export class PurgeService {
     let candidates: PurgeCandidate[]
     try {
       candidates = scope === 'all'
-        ? await this.collectRemote(adapter, result)
+        ? await this.collectRemote(adapter, result, cutoff)
         : await this.collectTracked(provider, adapter.identityId)
+      if (cutoff) candidates = candidates.filter(candidate => isOlderThan(candidate.postedAt, cutoff))
     }
     catch (error) {
       // A provider that can delete but not enumerate lands here in `all` scope.
@@ -206,7 +283,7 @@ export class PurgeService {
       const message = messageOf(error)
       result.skippedReason = message
       result.errors.push(message)
-      await this.recordRun(result, scope, dryRun, 'skipped', message)
+      await this.recordRun(result, context, 'skipped', message)
       return result
     }
 
@@ -223,7 +300,7 @@ export class PurgeService {
     }))
 
     if (dryRun) {
-      await this.recordRun(result, scope, dryRun, 'previewed')
+      await this.recordRun(result, context, 'previewed')
       return result
     }
 
@@ -249,8 +326,9 @@ export class PurgeService {
 
     // In `all` scope the local targets are gone remotely by definition, so
     // sweep every one of this provider's targets — not just the ones this run
-    // happened to match — but only when nothing failed.
-    if (scope === 'all' && result.failed === 0) {
+    // happened to match — but only when nothing failed. An age-limited run
+    // deliberately left the newer posts up, so it keeps their rows too.
+    if (scope === 'all' && !cutoff && result.failed === 0) {
       const remaining = await this.collectTracked(provider, adapter.identityId)
       for (const target of remaining) {
         if (target.targetId) deletedTargetIds.push(target.targetId)
@@ -261,7 +339,7 @@ export class PurgeService {
     result.localRemoved = await this.removeLocal(deletedTargetIds, affectedPostIds, adapter.identityId, candidates)
 
     const status = result.failed === 0 ? 'completed' : result.deleted > 0 ? 'partial' : 'failed'
-    await this.recordRun(result, scope, dryRun, status)
+    await this.recordRun(result, context, status)
     return result
   }
 
@@ -274,25 +352,38 @@ export class PurgeService {
     throw new Error(`${provider} cannot delete posts through its API.`)
   }
 
-  /** Posts The Open Times itself published to this provider. */
+  /**
+   * Posts The Open Times itself published to this provider, dated by the
+   * post's `published_at`, or failing that by when the target row was last
+   * written (which is when it was marked published).
+   */
   private async collectTracked(provider: SocialProvider, identityId: number): Promise<PurgeCandidate[]> {
-    const targets = await database
+    const targets = (await database
       .selectFrom('post_targets')
-      .select(['id', 'post_id', 'remote_uri', 'remote_cid'])
+      .select(['id', 'post_id', 'remote_uri', 'remote_cid', 'updated_at'])
       .where('provider', '=', provider)
       .where('social_identity_id', '=', identityId)
       .where('status', '=', 'published')
       .orderBy('id', 'desc')
-      .execute()
-
-    return (targets as any[])
+      .execute() as any[])
       .filter(target => target.remote_uri || target.remote_cid)
-      .map(target => ({
-        uri: String(target.remote_uri || target.remote_cid),
-        cid: target.remote_cid ? String(target.remote_cid) : undefined,
-        targetId: Number(target.id),
-        postId: target.post_id ? Number(target.post_id) : undefined,
-      }))
+
+    const publishedAt = new Map<number, string>()
+    const postIds = [...new Set(targets.map(target => Number(target.post_id)).filter(id => id > 0))]
+    for (const ids of chunk(postIds, 200)) {
+      const posts = await database.selectFrom('posts').select(['id', 'published_at']).where('id', 'in', ids).execute()
+      for (const post of posts as any[]) {
+        if (post.published_at) publishedAt.set(Number(post.id), String(post.published_at))
+      }
+    }
+
+    return targets.map(target => ({
+      uri: String(target.remote_uri || target.remote_cid),
+      cid: target.remote_cid ? String(target.remote_cid) : undefined,
+      postedAt: publishedAt.get(Number(target.post_id)) || (target.updated_at ? String(target.updated_at) : undefined),
+      targetId: Number(target.id),
+      postId: target.post_id ? Number(target.post_id) : undefined,
+    }))
   }
 
   /**
@@ -300,7 +391,7 @@ export class PurgeService {
    * remote post back to an Open Times target row where one exists, so local
    * cleanup stays accurate.
    */
-  private async collectRemote(adapter: ProviderPurgeAdapter, result: PurgeProviderResult): Promise<PurgeCandidate[]> {
+  private async collectRemote(adapter: ProviderPurgeAdapter, result: PurgeProviderResult, cutoff: Date | null = null): Promise<PurgeCandidate[]> {
     const tracked = await this.collectTracked(adapter.provider, adapter.identityId)
     const byUri = new Map<string, PurgeCandidate>()
     for (const candidate of tracked) {
@@ -313,8 +404,9 @@ export class PurgeService {
     let cursor: string | undefined
 
     // Bounded by the cap plus one page, so a provider that keeps handing back
-    // a cursor can never spin forever.
-    while (collected.length <= MAX_DELETIONS_PER_RUN) {
+    // a cursor can never spin forever. With an age limit only old posts count
+    // toward the cap, so the scan itself is bounded separately.
+    while (collected.length <= MAX_DELETIONS_PER_RUN && seen.size < MAX_SCANNED_PER_RUN) {
       const page: { cursor?: string, posts: AuthoredPost[] } = await adapter.listPage(cursor)
       const fresh = page.posts.filter(post => post.uri && !seen.has(post.uri))
       if (!fresh.length) break
@@ -322,11 +414,15 @@ export class PurgeService {
       for (const post of fresh) {
         seen.add(post.uri)
         const local = byUri.get(post.uri) || (post.cid ? byUri.get(post.cid) : undefined)
+        // Some adapters name the field createdAt; fall back to the local
+        // publish time for posts this app made.
+        const postedAt = post.postedAt || (post as { createdAt?: string }).createdAt || local?.postedAt
+        if (cutoff && !isOlderThan(postedAt, cutoff)) continue
         collected.push({
           uri: post.uri,
           cid: post.cid,
           text: post.text,
-          postedAt: post.postedAt,
+          postedAt,
           targetId: local?.targetId,
           postId: local?.postId,
         })
@@ -394,11 +490,11 @@ export class PurgeService {
   /** Write the audit row. Never throws — a logging failure must not mask a purge. */
   private async recordRun(
     result: PurgeProviderResult,
-    scope: PurgeScope,
-    dryRun: boolean,
+    context: RunContext,
     status: 'previewed' | 'completed' | 'partial' | 'failed' | 'skipped',
     failureReason?: string,
   ): Promise<void> {
+    const { scope, dryRun } = context
     try {
       const accountId = await ensureAccount()
       const timestamp = now()
@@ -414,6 +510,8 @@ export class PurgeService {
         deleted_count: result.deleted,
         failed_count: result.failed,
         details: JSON.stringify({
+          trigger: context.trigger,
+          olderThanDays: context.olderThanDays,
           truncated: result.truncated,
           localRemoved: result.localRemoved,
           sample: result.sample,

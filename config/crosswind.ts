@@ -444,6 +444,18 @@ html.dark [data-bluesky-pill][data-state="ready"] {
 html.dark [data-bluesky-pill][data-state="setup"] {
   border-color: rgb(120 53 15); background: rgb(120 53 15 / 0.3); color: rgb(252 211 77);
 }
+[data-retention-pill] { border-color: var(--line); color: var(--muted); }
+[data-retention-pill][data-state="on"] {
+  border-color: rgb(254 202 202); background: rgb(254 242 242); color: rgb(185 28 28);
+}
+html.dark [data-retention-pill][data-state="on"] {
+  border-color: rgb(127 29 29); background: rgb(127 29 29 / 0.3); color: rgb(252 165 165);
+}
+[data-retention-message] { color: var(--muted); }
+[data-retention-message][data-tone="success"] { color: rgb(4 120 87); }
+[data-retention-message][data-tone="error"] { color: rgb(185 28 28); }
+html.dark [data-retention-message][data-tone="success"] { color: rgb(110 231 183); }
+html.dark [data-retention-message][data-tone="error"] { color: rgb(252 165 165); }
 `
 
 /**

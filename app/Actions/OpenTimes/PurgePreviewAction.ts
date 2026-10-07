@@ -11,6 +11,12 @@ function parseProviders(value: unknown): SocialProvider[] | undefined {
   return raw.split(',').map(part => part.trim()).filter(Boolean) as SocialProvider[]
 }
 
+/** `older_than_days=7` → 7; blank means no age limit. */
+function parseOlderThanDays(value: unknown): number | undefined {
+  const raw = String(value ?? '').trim()
+  return raw ? Number(raw) : undefined
+}
+
 export default new Action({
   name: 'The Open Times Purge Preview',
   description: 'Count what a bulk post deletion would remove, without deleting anything.',
@@ -23,6 +29,7 @@ export default new Action({
       const result = await postPurge.preview({
         scope,
         providers: parseProviders(request.get('providers')),
+        olderThanDays: parseOlderThanDays(request.get('older_than_days')),
       })
 
       return response.json({

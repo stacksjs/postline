@@ -10,6 +10,12 @@ function parseProviders(value: unknown): SocialProvider[] | undefined {
   return raw.split(',').map(part => part.trim()).filter(Boolean) as SocialProvider[]
 }
 
+/** `older_than_days=7` → 7; blank means no age limit. */
+function parseOlderThanDays(value: unknown): number | undefined {
+  const raw = String(value ?? '').trim()
+  return raw ? Number(raw) : undefined
+}
+
 /**
  * Permanently delete posts from the connected social accounts. Irreversible —
  * the caller must send the exact confirmation phrase, and `dry_run=1` still
@@ -24,14 +30,16 @@ export default new Action({
   async handle(request: RequestInstance) {
     const scope = String(request.get('scope') || 'tracked') === 'all' ? 'all' : 'tracked'
     const providers = parseProviders(request.get('providers'))
+    const olderThanDays = parseOlderThanDays(request.get('older_than_days'))
     const dryRun = ['1', 'true', 'yes'].includes(String(request.get('dry_run') || '').toLowerCase())
 
     try {
       const result = dryRun
-        ? await postPurge.preview({ scope, providers })
+        ? await postPurge.preview({ scope, providers, olderThanDays })
         : await postPurge.purge({
             scope,
             providers,
+            olderThanDays,
             confirmation: String(request.get('confirmation') || ''),
           })
 

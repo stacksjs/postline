@@ -67,6 +67,75 @@
           <span class="font-bold text-emerald-700">On</span>
         </label>
       </article>
+
+      <!--
+        Retention. Saved on the workspace (accounts row) and applied once a day
+        by the AutoDeletePosts job through the same purge engine as the manual
+        tool under Channels, so it has the same caps and audit trail.
+      -->
+      <article class="grid gap-4 lg:col-span-2 p-4 bg-panel border border-line rounded-2xl shadow-sm" data-retention-card>
+        <header class="flex gap-3 items-center justify-between pb-3 border-b border-line">
+          <div>
+            <strong class="text-[13px]">Automatic deletion</strong>
+            <p class="mb-0 mt-1 text-muted text-xs">Delete posts once they are older than a set number of days. Checked daily.</p>
+          </div>
+          <span class="px-2.5 py-1 font-bold text-[11px] border rounded-full" data-retention-pill :data-state="savedEnabled() ? 'on' : 'off'" :text="statusPill()">Off</span>
+        </header>
+
+        <label class="flex gap-3 items-center text-[13px] text-ink cursor-pointer">
+          <input class="h-4 w-4" type="checkbox" x-model="autoEnabled" :disabled="!retentionLoaded()" data-retention-enabled>
+          <span class="font-bold">Delete my posts automatically</span>
+        </label>
+
+        <label class="flex flex-wrap gap-2 items-center text-[13px] text-body">
+          <span>Delete posts older than</span>
+          <input class="px-3 h-9 w-20 text-ink text-sm text-right bg-panel border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40" type="number" min="1" max="3650" step="1" x-model.number="autoDays" aria-label="Days to keep posts" data-retention-days>
+          <span>days</span>
+        </label>
+
+        <fieldset class="grid gap-2 m-0 p-0 border-0">
+          <legend class="mb-1 p-0 font-bold text-muted text-xs">Which posts</legend>
+          <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
+            <input class="mt-0.5" type="radio" name="retention-scope" value="all" x-model="autoScope">
+            <span>
+              <span class="block font-bold text-[13px] text-ink">Everything on the account</span>
+              <span class="block mt-0.5 text-muted text-xs">Every post past the cutoff, including ones made outside The Open Times.</span>
+            </span>
+          </label>
+          <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
+            <input class="mt-0.5" type="radio" name="retention-scope" value="tracked" x-model="autoScope">
+            <span>
+              <span class="block font-bold text-[13px] text-ink">Only posts The Open Times published</span>
+              <span class="block mt-0.5 text-muted text-xs">Anything you posted elsewhere stays.</span>
+            </span>
+          </label>
+        </fieldset>
+
+        <fieldset class="grid gap-2 m-0 p-0 border-0">
+          <legend class="mb-1 p-0 font-bold text-muted text-xs">Networks</legend>
+          <div class="flex flex-wrap gap-3">
+            <label class="inline-flex gap-2 items-center text-[13px]"><input type="checkbox" value="bluesky" x-model="autoProviders"> Bluesky</label>
+            <label class="inline-flex gap-2 items-center text-[13px]"><input type="checkbox" value="twitter" x-model="autoProviders"> X (Twitter)</label>
+            <label class="inline-flex gap-2 items-center text-[13px]"><input type="checkbox" value="mastodon" x-model="autoProviders"> Mastodon</label>
+            <label class="inline-flex gap-2 items-center text-[13px]"><input type="checkbox" value="linkedin" x-model="autoProviders"> LinkedIn</label>
+            <label class="inline-flex gap-2 items-center text-[13px]"><input type="checkbox" value="opentimes" x-model="autoProviders"> Your publication's Discover posts</label>
+          </div>
+          <p class="m-0 text-muted text-xs">Every connected account on a ticked network is included. Instagram and Threads can't delete posts through their APIs. A post whose date can't be read is always kept.</p>
+        </fieldset>
+
+        <label class="flex gap-2.5 items-start p-3 text-red-800 text-xs bg-red-50 border border-red-200 rounded-xl cursor-pointer" x-show="needsAcknowledgement()">
+          <input class="mt-0.5" type="checkbox" x-model="acknowledged" data-retention-ack>
+          <span>I understand matching posts are permanently deleted from the networks every day, and cannot be restored.</span>
+        </label>
+
+        <div class="flex flex-wrap gap-3 items-center">
+          <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="!canSave()" @click="saveRetention" data-retention-save>Save</button>
+          <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-ink text-sm bg-panel hover:bg-panel-3 border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="previewing() || !retentionLoaded()" @click="previewRetention" data-retention-preview>Preview what would be deleted now</button>
+        </div>
+
+        <p class="m-0 text-[13px]" :data-tone="retentionTone()" x-show="retentionMessage()" :text="retentionMessage()" role="status" aria-live="polite" data-retention-message></p>
+        <p class="m-0 text-muted text-xs" x-show="lastRunText()" :text="lastRunText()" data-retention-last-run></p>
+      </article>
     </section>
   </section>
 
@@ -141,7 +210,152 @@
       location.assign('/login')
     }
 
+    // --- Automatic deletion ---------------------------------------------
+    interface RetentionSettings {
+      enabled: boolean
+      days: number
+      providers: string[]
+      scope: 'all' | 'tracked'
+    }
+
+    interface RetentionLastRun {
+      at: string
+      matched: number
+      deleted: number
+      failed: number
+    }
+
+    const retentionLoaded = state(false)
+    const savedEnabled = state(false)
+    const savedDays = state(7)
+    const autoEnabled = state(false)
+    const autoDays = state(7)
+    const autoScope = state<'all' | 'tracked'>('all')
+    const autoProviders = state<string[]>([])
+    const acknowledged = state(false)
+    const saving = state(false)
+    const previewing = state(false)
+    const retentionMessage = state('')
+    const retentionTone = state('')
+    const lastRunText = state('')
+
+    const statusPill = derived(() => savedEnabled() ? `On · ${savedDays()} days` : 'Off')
+    // Consent is asked for once, when switching on, not on every later edit.
+    const needsAcknowledgement = derived(() => autoEnabled() && !savedEnabled())
+    const daysValid = derived(() => Number.isInteger(autoDays()) && autoDays() >= 1 && autoDays() <= 3650)
+    const canSave = derived(() => retentionLoaded()
+      && !saving()
+      && daysValid()
+      && (!autoEnabled() || autoProviders().length > 0)
+      && (!needsAcknowledgement() || acknowledged()))
+
+    const say = (message: string, tone: '' | 'success' | 'error' = ''): void => {
+      retentionMessage.set(message)
+      retentionTone.set(tone)
+    }
+
+    const describeLastRun = (run: RetentionLastRun | null): string => {
+      if (!run) return ''
+      const when = new Date(`${run.at.replace(' ', 'T')}Z`)
+      const at = Number.isNaN(when.getTime()) ? run.at : when.toLocaleString()
+      return `Last automatic run ${at}: ${run.deleted} deleted${run.failed ? `, ${run.failed} failed` : ''}.`
+    }
+
+    const applyRetention = (settings: RetentionSettings, defaults: string[], lastRun: RetentionLastRun | null): void => {
+      savedEnabled.set(settings.enabled)
+      savedDays.set(settings.days)
+      autoEnabled.set(settings.enabled)
+      autoDays.set(settings.days)
+      autoScope.set(settings.scope)
+      autoProviders.set(settings.providers.length ? settings.providers : defaults)
+      acknowledged.set(false)
+      lastRunText.set(describeLastRun(lastRun))
+    }
+
+    let defaultProviders: string[] = ['bluesky', 'twitter', 'mastodon', 'linkedin']
+
+    const loadRetention = async (): Promise<void> => {
+      try {
+        const response = await fetch('/api/ot/settings/retention')
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the deletion settings.')
+        defaultProviders = payload.data.defaultProviders || defaultProviders
+        applyRetention(payload.data.settings, defaultProviders, payload.data.lastRun)
+        retentionLoaded.set(true)
+      }
+      catch (error) {
+        say(error instanceof Error ? error.message : String(error), 'error')
+      }
+    }
+
+    const saveRetention = async (): Promise<void> => {
+      if (!canSave()) return
+      saving.set(true)
+      try {
+        const body = new FormData()
+        body.set('enabled', autoEnabled() ? '1' : '0')
+        body.set('days', String(autoDays()))
+        body.set('scope', autoScope())
+        body.set('providers', autoProviders().join(','))
+        if (acknowledged()) body.set('acknowledged', '1')
+
+        const response = await fetch('/api/ot/settings/retention', { method: 'POST', body })
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save.')
+
+        applyRetention(payload.data.settings, defaultProviders, payload.data.lastRun)
+        say(payload.data.settings.enabled
+          ? `Saved. Posts older than ${payload.data.settings.days} days will be deleted daily.`
+          : 'Saved. Automatic deletion is off.', 'success')
+      }
+      catch (error) {
+        say(error instanceof Error ? error.message : String(error), 'error')
+      }
+      finally {
+        saving.set(false)
+      }
+    }
+
+    /** Count what a run right now would delete, through the purge preview. */
+    const previewRetention = async (): Promise<void> => {
+      if (!daysValid()) {
+        say('Enter a number of days between 1 and 3650.', 'error')
+        return
+      }
+      if (!autoProviders().length) {
+        say('Pick at least one network.', 'error')
+        return
+      }
+
+      previewing.set(true)
+      say('Counting…')
+      try {
+        const query = new URLSearchParams({
+          scope: autoScope(),
+          providers: autoProviders().join(','),
+          older_than_days: String(autoDays()),
+        })
+        const response = await fetch(`/api/ot/purge/preview?${query.toString()}`)
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Preview failed.')
+
+        const parts = (payload.data.providers || [])
+          .filter((row: { connected: boolean }) => row.connected)
+          .map((row: { provider: string, handle: string | null, matched: number, skippedReason?: string }) =>
+            row.skippedReason ? `${row.handle || row.provider}: ${row.skippedReason}` : `${row.handle || row.provider}: ${row.matched}`)
+        say(`${payload.data.matched} post${payload.data.matched === 1 ? ' is' : 's are'} older than ${autoDays()} days right now${parts.length ? ` (${parts.join(' · ')})` : ''}. Nothing was deleted.`)
+      }
+      catch (error) {
+        say(error instanceof Error ? error.message : String(error), 'error')
+      }
+      finally {
+        previewing.set(false)
+      }
+    }
+
     onMount(() => {
+      void loadRetention()
+
       // Keep 'system' live if the OS theme flips while the page is open.
       // useEventListener unsubscribes on destroy; a raw addEventListener here
       // would outlive the SPA swap.
