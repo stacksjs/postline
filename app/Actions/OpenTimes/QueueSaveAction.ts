@@ -1,9 +1,9 @@
-import type { SocialProvider } from '../../Support/Social/types'
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { crosspostProviders } from '../../Services/Social/CrosspostService'
 import { postQueue } from '../../Services/Social/QueueService'
+import { parseTargets, targetKey } from '../../Support/Social/targets'
 import { readUploadedImage } from '../../Support/Social/uploads'
 import { parseVariantsField } from '../../Support/Social/variants'
 
@@ -15,11 +15,9 @@ export default new Action({
   async handle(request: RequestInstance) {
     const text = String(request.get('text') || request.get('body') || '').trim()
 
-    const available = new Set<string>(crosspostProviders())
-    const providers = String(request.get('providers') || request.get('provider') || '')
-      .split(',')
-      .map(value => value.trim().toLowerCase())
-      .filter(value => available.has(value)) as SocialProvider[]
+    // Network names (`bluesky`) and/or account targets (`bluesky:12`).
+    const providers = parseTargets(String(request.get('providers') || request.get('provider') || ''), crosspostProviders())
+      .map(targetKey)
 
     const scheduledAt = String(request.get('scheduled_at') || '').trim() || null
     const title = String(request.get('title') || '').trim() || null

@@ -11,7 +11,7 @@ import { twitter } from '../../Services/Social/TwitterService'
 
 export default new Action({
   name: 'The Open Times Providers Status',
-  description: 'Return the connection state for every crosspost provider.',
+  description: 'Return the connection state for every crosspost provider and its accounts.',
   method: 'GET',
 
   async handle() {
@@ -29,7 +29,12 @@ export default new Action({
         blog.status(),
       ])
 
-      return response.json({ ok: true, data: { providers } })
+      // Each network entry keeps its single-account fields (the default
+      // account) and carries `accounts` with every connected one; the flat
+      // list is for callers that render per account rather than per network.
+      const accounts = providers.flatMap(status => 'accounts' in status ? status.accounts : [])
+
+      return response.json({ ok: true, data: { providers, accounts } })
     }
     catch (error) {
       return response.json({

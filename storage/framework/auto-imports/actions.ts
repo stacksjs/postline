@@ -6,6 +6,8 @@
 // would make every compilation that touches a name resolve every module.
 export const actions = {
   'Actions/NotifyUser': '../../../app/Actions/NotifyUser.ts',
+  'Actions/OpenTimes/AccountDisconnectAction': '../../../app/Actions/OpenTimes/AccountDisconnectAction.ts',
+  'Actions/OpenTimes/AccountListAction': '../../../app/Actions/OpenTimes/AccountListAction.ts',
   'Actions/OpenTimes/AnalyticsAction': '../../../app/Actions/OpenTimes/AnalyticsAction.ts',
   'Actions/OpenTimes/BlogListAction': '../../../app/Actions/OpenTimes/BlogListAction.ts',
   'Actions/OpenTimes/BlueskyConnectAction': '../../../app/Actions/OpenTimes/BlueskyConnectAction.ts',
@@ -70,6 +72,8 @@ export const actions = {
   'Actions/OpenTimes/RecommendationDeleteAction': '../../../app/Actions/OpenTimes/RecommendationDeleteAction.ts',
   'Actions/OpenTimes/RecommendationSaveAction': '../../../app/Actions/OpenTimes/RecommendationSaveAction.ts',
   'Actions/OpenTimes/RegisterFirstUserAction': '../../../app/Actions/OpenTimes/RegisterFirstUserAction.ts',
+  'Actions/OpenTimes/RetentionGetAction': '../../../app/Actions/OpenTimes/RetentionGetAction.ts',
+  'Actions/OpenTimes/RetentionSaveAction': '../../../app/Actions/OpenTimes/RetentionSaveAction.ts',
   'Actions/OpenTimes/SendQueueAction': '../../../app/Actions/OpenTimes/SendQueueAction.ts',
   'Actions/OpenTimes/SendsListAction': '../../../app/Actions/OpenTimes/SendsListAction.ts',
   'Actions/OpenTimes/StripeWebhookAction': '../../../app/Actions/OpenTimes/StripeWebhookAction.ts',

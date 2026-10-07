@@ -1,6 +1,8 @@
+import type { PublishTarget } from '../../Support/Social/targets'
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import { parseTarget, resolveTargets, targetKey } from '../../Support/Social/targets'
 import { resolveVariantBody } from '../../Support/Social/variants'
 import { blog } from './BlogService'
 import { bluesky } from './BlueskyService'
@@ -14,9 +16,19 @@ import { ensureAccount, now, uuid } from './support'
 
 const database = db as any
 
-interface ProviderPublisher {
-  publishToPost: (post: { id: number, body: string }, content?: PublishContent) => Promise<CrosspostTargetResult>
+export interface ProviderPublisher {
+  /**
+   * Publish through one account. `identityId` names a `social_identities` row;
+   * omitted, the network's default account. Our own targets (blog, The Open
+   * Times) have no accounts and ignore it.
+   */
+  publishToPost: (post: { id: number, body: string }, content?: PublishContent, identityId?: number | null) => Promise<CrosspostTargetResult>
+  /** The account a bare network target means right now, or null if none is connected. */
+  defaultIdentityId?: () => Promise<number | null>
 }
+
+/** A target as callers may hand it over: a bare network name, a spec string, or parsed. */
+export type TargetInput = SocialProvider | PublishTarget | string
 
 // Each provider owns its own connection/token handling behind `publishToPost`.
 const publishers: Partial<Record<SocialProvider, ProviderPublisher>> = {
@@ -38,20 +50,50 @@ export function crosspostProviders(): SocialProvider[] {
 
 export class CrosspostService {
   /**
-   * Publish one piece of content to several providers at once. A single
-   * `posts` row is created and each provider gets its own `post_targets` row.
-   * Per-provider failures are isolated — one platform erroring never aborts
-   * the others.
+   * The publisher registry is injectable so tests can drive target resolution,
+   * de-duplication and per-account thread chains without touching a network.
+   */
+  constructor(private registry: Partial<Record<SocialProvider, ProviderPublisher>> = publishers) {}
+
+  /**
+   * Normalise whatever the caller passed into concrete, de-duplicated targets.
+   *
+   * Bare network names are pinned to that network's default account here, at
+   * publish time, rather than when a post was queued — and then de-duplicated
+   * again, so `bluesky` alongside `bluesky:12` (12 being the default) posts
+   * once, while `bluesky:12` alongside `bluesky:13` posts twice. That second
+   * case is the point: de-dup is per account, never per network.
+   */
+  async resolve(targets: readonly TargetInput[]): Promise<PublishTarget[]> {
+    const parsed = targets
+      .map(target => parseTarget(target, Object.keys(this.registry)))
+      .filter((target): target is PublishTarget => Boolean(target))
+
+    const defaults: Partial<Record<SocialProvider, number | null>> = {}
+    for (const target of parsed) {
+      if (target.identityId || target.provider in defaults) continue
+      const lookup = this.registry[target.provider]?.defaultIdentityId
+      defaults[target.provider] = lookup ? await lookup().catch(() => null) : null
+    }
+
+    return resolveTargets(parsed, defaults)
+  }
+
+  /**
+   * Publish one piece of content to several targets at once. A single
+   * `posts` row is created and each target gets its own `post_targets` row.
+   * Per-target failures are isolated — one platform (or one account) erroring
+   * never aborts the others.
    */
   async publish(
     text: string,
-    providers: SocialProvider[],
+    targets: readonly TargetInput[],
     content?: PublishContent,
   ): Promise<{ postId: number, results: CrosspostTargetResult[] }> {
     const body = text.trim()
     if (!body) throw new Error('Post text is required.')
 
-    const selected = providers.filter(provider => publishers[provider])
+    const selected = await this.resolve(targets)
     if (selected.length === 0) {
       throw new Error('Select at least one connected provider to publish.')
     }
@@ -99,13 +141,13 @@ export class CrosspostService {
    */
   async publishThread(
     texts: string[],
-    providers: SocialProvider[],
+    targets: readonly TargetInput[],
     content?: PublishContent,
   ): Promise<{ postIds: number[], results: CrosspostTargetResult[] }> {
     const segments = texts.map(text => text.trim()).filter(Boolean)
     if (segments.length === 0) throw new Error('Post text is required.')
 
-    const selected = providers.filter(provider => publishers[provider])
+    const selected = await this.resolve(targets)
     if (selected.length === 0) {
       throw new Error('Select at least one connected provider to publish.')
     }
@@ -114,9 +156,10 @@ export class CrosspostService {
     const threadKey = uuid()
     const postIds: number[] = []
     const results: CrosspostTargetResult[] = []
-    // Per-provider chain refs; only populated for providers whose results
-    // carry a cid (Bluesky).
-    const chains = new Map<SocialProvider, { root: { uri: string, cid: string }, parent: { uri: string, cid: string } }>()
+    // Chain refs per target, not per provider: two Bluesky accounts each get
+    // their own thread, and segment 2 on one must never reply to segment 1 on
+    // the other. Only populated for results that carry a cid (Bluesky).
+    const chains = new Map<string, { root: { uri: string, cid: string }, parent: { uri: string, cid: string } }>()
 
     for (const [index, body] of segments.entries()) {
       const postUuid = uuid()
@@ -143,9 +186,9 @@ export class CrosspostService {
       postIds.push(Number(post.id))
 
       const segmentResults: CrosspostTargetResult[] = []
-      for (const provider of selected) {
-        const publisher = publishers[provider]!
-        const chain = chains.get(provider)
+      for (const target of selected) {
+        const key = targetKey(target)
+        const chain = chains.get(key)
         // Link previews/media only make sense on the first segment.
         //
         // Variants are deliberately stripped: it is ambiguous whether an
@@ -156,12 +199,12 @@ export class CrosspostService {
           ? content ? { ...content, variants: undefined } : undefined
           : chain ? { reply: chain } : undefined
 
-        const result = await publisher.publishToPost({ id: Number(post.id), body }, segmentContent)
+        const result = await this.publishTarget(target, { id: Number(post.id), body }, segmentContent)
         segmentResults.push(result)
 
         if (result.ok && result.uri && result.cid) {
-          const existing = chains.get(provider)
-          chains.set(provider, {
+          const existing = chains.get(key)
+          chains.set(key, {
             root: existing?.root || { uri: result.uri, cid: result.cid },
             parent: { uri: result.uri, cid: result.cid },
           })
@@ -182,23 +225,49 @@ export class CrosspostService {
   }
 
   /**
-   * Publish an existing `posts` row to the given providers. Used by the
+   * Publish an existing `posts` row to the given targets. Used by the
    * fresh-publish path above and by the queue when a scheduled or drafted
    * post is (re)published.
+   *
+   * Variants stay per network: two Bluesky accounts publish the same Bluesky
+   * override, because the override exists for the network's limits, not for
+   * the account.
    */
   async publishExisting(
     post: { id: number, body: string },
-    providers: SocialProvider[],
+    targets: readonly TargetInput[],
     content?: PublishContent,
   ): Promise<CrosspostTargetResult[]> {
     const results: CrosspostTargetResult[] = []
-    for (const provider of providers) {
-      const publisher = publishers[provider]
-      if (!publisher) continue
-      const body = resolveVariantBody(post.body, provider, content)
-      results.push(await publisher.publishToPost({ id: post.id, body }, content))
+    for (const target of await this.resolve(targets)) {
+      const body = resolveVariantBody(post.body, target.provider, content)
+      results.push(await this.publishTarget(target, { id: post.id, body }, content))
     }
     return results
+  }
+
+  /**
+   * One target, one result — labelled with the account it was meant for even
+   * when the publisher failed before resolving one, so callers can match each
+   * result back to the target that produced it.
+   */
+  private async publishTarget(
+    target: PublishTarget,
+    post: { id: number, body: string },
+    content?: PublishContent,
+  ): Promise<CrosspostTargetResult> {
+    const publisher = this.registry[target.provider]
+    if (!publisher) {
+      return { provider: target.provider, ok: false, error: 'This network is not available.', target: targetKey(target) }
+    }
+
+    const result = await publisher.publishToPost(post, content, target.identityId)
+    const identityId = result.identityId ?? target.identityId ?? undefined
+    return {
+      ...result,
+      ...(identityId ? { identityId } : {}),
+      target: targetKey({ provider: result.provider, identityId: identityId ?? null }),
+    }
   }
 }
 

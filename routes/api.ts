@@ -83,6 +83,11 @@ route.group({ prefix: '/ot/mastodon' }, () => {
 
 route.group({ prefix: '/ot' }, () => {
   route.get('/providers', 'Actions/OpenTimes/ProvidersStatusAction').middleware('auth').skipCsrf()
+  // Connected accounts across networks (several per network allowed).
+  // Disconnecting drops the tokens but keeps the row, so post history stays
+  // attributed; throttled like the other single-row writes.
+  route.get('/accounts', 'Actions/OpenTimes/AccountListAction').middleware('auth').skipCsrf()
+  route.post('/accounts/disconnect', 'Actions/OpenTimes/AccountDisconnectAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
   route.post('/publish', 'Actions/OpenTimes/CrosspostPublishAction').middleware('auth').skipCsrf()
   route.get('/analytics', 'Actions/OpenTimes/AnalyticsAction').middleware('auth').skipCsrf()
   route.get('/blog', 'Actions/OpenTimes/BlogListAction').middleware('auth').skipCsrf()

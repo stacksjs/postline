@@ -1,7 +1,11 @@
+import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
+import { PendingOAuthStates, randomOAuthState } from '../../Support/Social/oauth-state'
 import { TwitterApiError, TwitterDriver } from './Drivers/TwitterDriver'
+import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { ensureAccount, expiresAt, isExpiringSoon, now, uuid } from './support'
 
 const database = db as any
@@ -36,18 +40,11 @@ interface TwitterConfig {
   scopes: string[]
 }
 
-function randomState(): string {
-  const bytes = new Uint8Array(24)
-  crypto.getRandomValues(bytes)
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
 export class TwitterService {
   private driver = new TwitterDriver()
-  // OAuth CSRF token + PKCE verifier stashed between the auth redirect and the
-  // callback. The Open Times runs single-user, so module memory is an adequate store.
-  private pendingState: string | null = null
-  private pendingVerifier: string | null = null
+  // OAuth CSRF state -> PKCE verifier, between the auth redirect and the
+  // callback. Keyed by state so two accounts can be connected concurrently.
+  private pending = new PendingOAuthStates<{ codeVerifier: string }>()
 
   private config(): TwitterConfig {
     return {
@@ -59,14 +56,20 @@ export class TwitterService {
     }
   }
 
+  /**
+   * The network card's state: top-level fields describe the default account
+   * (unchanged for existing callers), `accounts` lists every connected one.
+   */
   async status() {
-    const identity = await this.findIdentity()
+    const rows = await listIdentityRows<SocialIdentityRow>('twitter')
+    const identity = pickDefaultIdentity(rows)
     const cfg = this.config()
     const connected = identity?.auth_status === 'connected' && Boolean(identity.access_token)
 
     return {
       connected,
       provider: 'twitter',
+      id: identity ? Number(identity.id) : null,
       handle: identity?.handle || null,
       displayName: identity?.display_name || null,
       did: identity?.external_id || null,
@@ -75,23 +78,45 @@ export class TwitterService {
       canPublish: connected,
       configuredFromEnv: Boolean(cfg.accessToken),
       oauthConfigured: Boolean(cfg.clientId && cfg.redirectUrl),
+      accounts: rows.map(row => toPublicAccount(row, { isDefault: Number(row.id) === Number(identity?.id) })),
     }
   }
 
-  /** Build the X consent URL (with PKCE) and remember the CSRF state + verifier. */
+  async listAccounts(): Promise<PublicAccount[]> {
+    return (await this.status()).accounts
+  }
+
+  /** The account a bare `twitter` target publishes through, without connecting anything. */
+  async defaultIdentityId(): Promise<number | null> {
+    const identity = await findIdentityRow<SocialIdentityRow>('twitter')
+    return isUsableIdentity(identity) ? Number(identity!.id) : null
+  }
+
+  /** Disconnect one account: tokens dropped, row kept for its posts' history. */
+  async disconnect(identityId: number): Promise<PublicAccount> {
+    return toPublicAccount(await revokeIdentityRow('twitter', identityId))
+  }
+
+  /**
+   * Build the X consent URL (with PKCE) and remember the CSRF state + verifier.
+   *
+   * X signs in whichever account the browser is logged into, so connecting a
+   * second account means switching accounts on x.com first; the callback then
+   * adds it alongside the first rather than replacing it.
+   */
   async getAuthUrl(): Promise<string> {
     const cfg = this.config()
     if (!cfg.clientId) throw new Error('Set TWITTER_CLIENT_ID to connect X/Twitter.')
     if (!cfg.redirectUrl) throw new Error('Set TWITTER_REDIRECT_URL to connect X/Twitter.')
 
-    this.pendingState = randomState()
+    const state = randomOAuthState()
     const { url, codeVerifier } = await this.driver.createAuthorization({
       clientId: cfg.clientId,
       redirectUrl: cfg.redirectUrl,
       scopes: cfg.scopes,
-      state: this.pendingState,
+      state,
     })
-    this.pendingVerifier = codeVerifier
+    this.pending.issue({ codeVerifier }, state)
     return url
   }
 
@@ -99,13 +124,14 @@ export class TwitterService {
   async handleCallback(code: string, state: string) {
     const cfg = this.config()
     if (!code) throw new Error('X/Twitter did not return an authorization code.')
-    if (this.pendingState && state !== this.pendingState) {
+    const pending = this.pending.take(state)
+    // Strict either way: without the verifier minted for this exact state the
+    // code exchange cannot succeed, so there is no lenient path to keep.
+    if (!pending.found && !pending.noneOutstanding) {
       throw new Error('X/Twitter OAuth state mismatch. Please start the connection again.')
     }
-    const codeVerifier = this.pendingVerifier
+    const codeVerifier = pending.value?.codeVerifier
     if (!codeVerifier) throw new Error('Missing PKCE verifier — please start the X/Twitter connection again.')
-    this.pendingState = null
-    this.pendingVerifier = null
 
     const token = await this.driver.exchangeCode({
       clientId: cfg.clientId,
@@ -127,8 +153,12 @@ export class TwitterService {
     return this.publicIdentity(identity)
   }
 
-  /** Connect using a pre-obtained token from the environment. */
-  async connectFromEnv() {
+  /**
+   * Connect using a pre-obtained token from the environment. `revive: false`
+   * is the implicit path (a publish falling back to `.env`), which must not
+   * bring back an account the user disconnected.
+   */
+  async connectFromEnv(options: { revive?: boolean } = {}) {
     const cfg = this.config()
     if (!cfg.accessToken) {
       throw new Error('Set TWITTER_ACCESS_TOKEN (or connect via OAuth) before using X/Twitter.')
@@ -140,7 +170,7 @@ export class TwitterService {
       userId: profile.id,
       username: profile.username,
       name: profile.name,
-    })
+    }, { revive: options.revive ?? true })
     return this.publicIdentity(identity)
   }
 
@@ -152,22 +182,25 @@ export class TwitterService {
   async publishToPost(
     post: { id: number, body: string },
     content?: PublishContent,
+    identityId?: number | null,
   ): Promise<CrosspostTargetResult> {
     const driver = await this.ensureDriver()
 
     let identity: SocialIdentityRow
     try {
-      identity = await this.requireIdentity()
+      identity = await this.requireIdentity(identityId)
     }
     catch (error) {
-      return { provider: 'twitter', ok: false, error: messageOf(error) }
+      return { provider: 'twitter', ok: false, error: messageOf(error), identityId: identityId || undefined }
     }
+    const account = { identityId: Number(identity.id), handle: identity.handle }
 
     if (post.body.length > this.driver.characterLimit) {
       return {
         provider: 'twitter',
         ok: false,
         error: `Twitter posts must be ${this.driver.characterLimit} characters or fewer.`,
+        ...account,
       }
     }
 
@@ -216,12 +249,13 @@ export class TwitterService {
         uri: published.uri,
         cid: published.cid,
         targetId: Number(target.id),
+        ...account,
       }
     }
     catch (error) {
       const message = messageOf(error)
       if (error instanceof TwitterApiError && error.isAuthError) {
-        await this.markExpired(identity.id)
+        await markIdentityExpired(identity.id)
       }
       await database.updateTable('post_targets').set({
         status: 'failed',
@@ -229,7 +263,7 @@ export class TwitterService {
         updated_at: now(),
       }).where('id', '=', target.id).execute()
 
-      return { provider: 'twitter', ok: false, error: message, targetId: Number(target.id) }
+      return { provider: 'twitter', ok: false, error: message, targetId: Number(target.id), ...account }
     }
   }
 
@@ -237,9 +271,12 @@ export class TwitterService {
    * The purge surface for X. The identity (and any token refresh) is resolved
    * once up front — X access tokens outlive a single purge run, and refreshing
    * per request would rotate the refresh token on every delete.
+   *
+   * Pass an identity id to purge one specific account; without one this is the
+   * default account, as before.
    */
-  async purgeAdapter(): Promise<ProviderPurgeAdapter> {
-    const identity = await this.requireIdentity()
+  async purgeAdapter(identityId?: number | null): Promise<ProviderPurgeAdapter> {
+    const identity = await this.requireIdentity(identityId)
     const credentials = {
       handle: identity.handle,
       // `did` carries the numeric X user id the timeline endpoint keys on.
@@ -261,28 +298,37 @@ export class TwitterService {
    * publishing gets. `userId` is what decides whether a `dm_event` was sent by
    * us or to us, so it is required rather than optional here.
    */
-  async dmIdentity(): Promise<{ accessToken: string, userId: string, handle: string }> {
-    const identity = await this.requireIdentity()
+  async dmIdentity(identityId?: number | null): Promise<{ identityId: number, accessToken: string, userId: string, handle: string }> {
+    const identity = await this.requireIdentity(identityId)
     if (!identity.external_id)
       throw new Error('Reconnect X on the Accounts page — The Open Times needs your user id to tell your own replies apart.')
 
     return {
+      identityId: Number(identity.id),
       accessToken: String(identity.access_token),
       userId: String(identity.external_id),
       handle: identity.handle,
     }
   }
 
-  private async requireIdentity(): Promise<SocialIdentityRow> {
-    const existing = await this.findIdentity()
-    if (existing?.access_token && existing.auth_status === 'connected') {
-      return await this.refreshIfExpiring(existing)
+  /**
+   * The account to act as. A named account must be usable as-is; without a
+   * name this is the default account, falling back to the `.env` token.
+   */
+  private async requireIdentity(identityId?: number | null): Promise<SocialIdentityRow> {
+    if (identityId) {
+      const chosen = await findIdentityRow<SocialIdentityRow>('twitter', identityId)
+      if (isUsableIdentity(chosen)) return await this.refreshIfExpiring(chosen!)
+      throw unavailableAccountError('X', chosen)
     }
 
+    const existing = await findIdentityRow<SocialIdentityRow>('twitter')
+    if (isUsableIdentity(existing)) return await this.refreshIfExpiring(existing!)
+
     if (this.config().accessToken) {
-      await this.connectFromEnv()
-      const connected = await this.findIdentity()
-      if (connected?.access_token) return connected
+      const connected = await this.connectFromEnv({ revive: false })
+      const identity = connected.id ? await findIdentityRow<SocialIdentityRow>('twitter', connected.id) : undefined
+      if (identity?.access_token) return identity
     }
 
     throw new Error('Connect X/Twitter before publishing.')
@@ -323,22 +369,18 @@ export class TwitterService {
     }
   }
 
-  private async findIdentity(): Promise<SocialIdentityRow | undefined> {
-    return await database
-      .selectFrom('social_identities')
-      .selectAll()
-      .where('provider', '=', 'twitter')
-      .orderBy('updated_at', 'desc')
-      .executeTakeFirst()
-  }
-
-  private async saveSession(input: { accessToken: string, refreshToken?: string, expiresIn?: number, userId: string, username: string, name?: string }): Promise<SocialIdentityRow> {
+  /**
+   * Save tokens against the account they belong to, keyed on the X user id:
+   * reconnecting an account refreshes its row, a different account is added.
+   */
+  private async saveSession(
+    input: { accessToken: string, refreshToken?: string, expiresIn?: number, userId: string, username: string, name?: string },
+    options: { revive?: boolean } = {},
+  ): Promise<SocialIdentityRow> {
     const accountId = await ensureAccount()
     const driver = await this.ensureDriver()
-    const existing = await this.findIdentity()
-    const savedAt = now()
 
-    const values = {
+    return await upsertIdentityRow<SocialIdentityRow>('twitter', { externalId: input.userId, handle: input.username }, {
       handle: input.username,
       display_name: input.name || input.username,
       provider: 'twitter',
@@ -349,28 +391,7 @@ export class TwitterService {
       token_expires_at: expiresAt(input.expiresIn),
       account_id: accountId,
       social_driver_id: driver.id,
-      updated_at: savedAt,
-    }
-
-    if (existing) {
-      await database.updateTable('social_identities').set(values).where('id', '=', existing.id).execute()
-    }
-    else {
-      await database.insertInto('social_identities').values({
-        uuid: uuid(),
-        ...values,
-        created_at: savedAt,
-      }).execute()
-    }
-
-    return await this.findIdentity() as SocialIdentityRow
-  }
-
-  private async markExpired(id: number): Promise<void> {
-    await database.updateTable('social_identities').set({
-      auth_status: 'expired',
-      updated_at: now(),
-    }).where('id', '=', id).execute()
+    }, { revive: options.revive, label: 'This X' })
   }
 
   private async ensureDriver(): Promise<SocialDriverRow> {
@@ -420,6 +441,7 @@ export class TwitterService {
       return {
         connected: false,
         provider: 'twitter',
+        id: null,
         handle: null,
         displayName: null,
         did: null,
@@ -431,6 +453,7 @@ export class TwitterService {
     return {
       connected,
       provider: 'twitter',
+      id: Number(row.id),
       handle: row.handle,
       displayName: row.display_name || null,
       did: row.external_id || null,

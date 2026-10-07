@@ -1,7 +1,11 @@
+import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
+import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { ThreadsApiError, ThreadsDriver } from './Drivers/ThreadsDriver'
+import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { ensureAccount, expiresAt, isExpiringSoon, now, uuid } from './support'
 
 const database = db as any
@@ -39,15 +43,11 @@ interface ThreadsConfig {
   scopes: string[]
 }
 
-function randomState(): string {
-  const bytes = new Uint8Array(24)
-  crypto.getRandomValues(bytes)
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
 export class ThreadsService {
   private driver: ThreadsDriver
-  private pendingState: string | null = null
+  // OAuth CSRF states between the auth redirect and the callback, keyed by
+  // state so two accounts can be connected concurrently.
+  private pending = new PendingOAuthStates()
 
   constructor() {
     this.driver = new ThreadsDriver({ graphVersion: this.config().graphVersion })
@@ -66,14 +66,20 @@ export class ThreadsService {
     }
   }
 
+  /**
+   * The network card's state: top-level fields describe the default account
+   * (unchanged for existing callers), `accounts` lists every connected one.
+   */
   async status() {
-    const identity = await this.findIdentity()
+    const rows = await listIdentityRows<SocialIdentityRow>('threads')
+    const identity = pickDefaultIdentity(rows)
     const cfg = this.config()
     const connected = identity?.auth_status === 'connected' && Boolean(identity.access_token)
 
     return {
       connected,
       provider: 'threads',
+      id: identity ? Number(identity.id) : null,
       handle: identity?.handle || null,
       displayName: identity?.display_name || null,
       did: identity?.external_id || null,
@@ -83,7 +89,23 @@ export class ThreadsService {
       requiresMedia: false,
       configuredFromEnv: Boolean(cfg.accessToken && cfg.userId),
       oauthConfigured: Boolean(cfg.clientId && cfg.clientSecret && cfg.redirectUrl),
+      accounts: rows.map(row => toPublicAccount(row, { isDefault: Number(row.id) === Number(identity?.id) })),
     }
+  }
+
+  async listAccounts(): Promise<PublicAccount[]> {
+    return (await this.status()).accounts
+  }
+
+  /** The account a bare `threads` target publishes through, without connecting anything. */
+  async defaultIdentityId(): Promise<number | null> {
+    const identity = await findIdentityRow<SocialIdentityRow>('threads')
+    return isUsableIdentity(identity) ? Number(identity!.id) : null
+  }
+
+  /** Disconnect one account: tokens dropped, row kept for its posts' history. */
+  async disconnect(identityId: number): Promise<PublicAccount> {
+    return toPublicAccount(await revokeIdentityRow('threads', identityId))
   }
 
   getAuthUrl(): string {
@@ -95,22 +117,23 @@ export class ThreadsService {
       throw new Error('Set THREADS_REDIRECT_URL to connect Threads.')
     }
 
-    this.pendingState = randomState()
     return this.driver.getAuthUrl({
       clientId: cfg.clientId,
       redirectUrl: cfg.redirectUrl,
       scopes: cfg.scopes,
-      state: this.pendingState,
+      state: this.pending.issue(true),
     })
   }
 
   async handleCallback(code: string, state: string) {
     const cfg = this.config()
     if (!code) throw new Error('Threads did not return an authorization code.')
-    if (this.pendingState && state !== this.pendingState) {
+    // Lenient only when no flow is outstanding at all (a restart mid-consent),
+    // which is the leniency the single-slot version had.
+    const pending = this.pending.take(state)
+    if (!pending.found && !pending.noneOutstanding) {
       throw new Error('Threads OAuth state mismatch. Please start the connection again.')
     }
-    this.pendingState = null
 
     const token = await this.driver.exchangeCode({
       clientId: cfg.clientId,
@@ -142,7 +165,12 @@ export class ThreadsService {
     return this.publicIdentity(identity)
   }
 
-  async connectFromEnv() {
+  /**
+   * Connect using a pre-obtained token from the environment. `revive: false`
+   * is the implicit path (a publish falling back to `.env`), which must not
+   * bring back an account the user disconnected.
+   */
+  async connectFromEnv(options: { revive?: boolean } = {}) {
     const cfg = this.config()
     if (!cfg.accessToken) {
       throw new Error('Set THREADS_ACCESS_TOKEN (or connect via OAuth) before using Threads.')
@@ -158,7 +186,7 @@ export class ThreadsService {
       accessToken = account.accessToken
     }
 
-    const identity = await this.saveSession({ accessToken, threadsUserId, username })
+    const identity = await this.saveSession({ accessToken, threadsUserId, username }, { revive: options.revive ?? true })
     return this.publicIdentity(identity)
   }
 
@@ -170,22 +198,25 @@ export class ThreadsService {
   async publishToPost(
     post: { id: number, body: string },
     content?: PublishContent,
+    identityId?: number | null,
   ): Promise<CrosspostTargetResult> {
     const driver = await this.ensureDriver()
 
     let identity: SocialIdentityRow
     try {
-      identity = await this.requireIdentity()
+      identity = await this.requireIdentity(identityId)
     }
     catch (error) {
-      return { provider: 'threads', ok: false, error: messageOf(error) }
+      return { provider: 'threads', ok: false, error: messageOf(error), identityId: identityId || undefined }
     }
+    const account = { identityId: Number(identity.id), handle: identity.handle }
 
     if (post.body.length > this.driver.characterLimit) {
       return {
         provider: 'threads',
         ok: false,
         error: `Threads posts must be ${this.driver.characterLimit} characters or fewer.`,
+        ...account,
       }
     }
 
@@ -231,12 +262,13 @@ export class ThreadsService {
         url: published.url,
         uri: published.uri,
         targetId: Number(target.id),
+        ...account,
       }
     }
     catch (error) {
       const message = messageOf(error)
       if (error instanceof ThreadsApiError && error.isAuthError) {
-        await this.markExpired(identity.id)
+        await markIdentityExpired(identity.id)
       }
       await database.updateTable('post_targets').set({
         status: 'failed',
@@ -244,20 +276,28 @@ export class ThreadsService {
         updated_at: now(),
       }).where('id', '=', target.id).execute()
 
-      return { provider: 'threads', ok: false, error: message, targetId: Number(target.id) }
+      return { provider: 'threads', ok: false, error: message, targetId: Number(target.id), ...account }
     }
   }
 
-  private async requireIdentity(): Promise<SocialIdentityRow> {
-    const existing = await this.findIdentity()
-    if (existing?.access_token && existing.auth_status === 'connected') {
-      return await this.refreshIfExpiring(existing)
+  /**
+   * The account to act as. A named account must be usable as-is; without a
+   * name this is the default account, falling back to the `.env` token.
+   */
+  private async requireIdentity(identityId?: number | null): Promise<SocialIdentityRow> {
+    if (identityId) {
+      const chosen = await findIdentityRow<SocialIdentityRow>('threads', identityId)
+      if (isUsableIdentity(chosen)) return await this.refreshIfExpiring(chosen!)
+      throw unavailableAccountError('Threads', chosen)
     }
 
+    const existing = await findIdentityRow<SocialIdentityRow>('threads')
+    if (isUsableIdentity(existing)) return await this.refreshIfExpiring(existing!)
+
     if (this.config().accessToken) {
-      await this.connectFromEnv()
-      const connected = await this.findIdentity()
-      if (connected?.access_token) return connected
+      const connected = await this.connectFromEnv({ revive: false })
+      const identity = connected.id ? await findIdentityRow<SocialIdentityRow>('threads', connected.id) : undefined
+      if (identity?.access_token) return identity
     }
 
     throw new Error('Connect Threads before publishing.')
@@ -289,23 +329,19 @@ export class ThreadsService {
     }
   }
 
-  private async findIdentity(): Promise<SocialIdentityRow | undefined> {
-    return await database
-      .selectFrom('social_identities')
-      .selectAll()
-      .where('provider', '=', 'threads')
-      .orderBy('updated_at', 'desc')
-      .executeTakeFirst()
-  }
-
-  private async saveSession(input: { accessToken: string, threadsUserId: string, username?: string, expiresIn?: number }): Promise<SocialIdentityRow> {
+  /**
+   * Save tokens against the account they belong to, keyed on the Threads user
+   * id: reconnecting an account refreshes its row, a different one is added.
+   */
+  private async saveSession(
+    input: { accessToken: string, threadsUserId: string, username?: string, expiresIn?: number },
+    options: { revive?: boolean } = {},
+  ): Promise<SocialIdentityRow> {
     const accountId = await ensureAccount()
     const driver = await this.ensureDriver()
-    const existing = await this.findIdentity()
-    const savedAt = now()
     const handle = (input.username || input.threadsUserId).trim()
 
-    const values = {
+    return await upsertIdentityRow<SocialIdentityRow>('threads', { externalId: input.threadsUserId, handle }, {
       handle,
       display_name: input.username || null,
       provider: 'threads',
@@ -316,28 +352,7 @@ export class ThreadsService {
       token_expires_at: expiresAt(input.expiresIn),
       account_id: accountId,
       social_driver_id: driver.id,
-      updated_at: savedAt,
-    }
-
-    if (existing) {
-      await database.updateTable('social_identities').set(values).where('id', '=', existing.id).execute()
-    }
-    else {
-      await database.insertInto('social_identities').values({
-        uuid: uuid(),
-        ...values,
-        created_at: savedAt,
-      }).execute()
-    }
-
-    return await this.findIdentity() as SocialIdentityRow
-  }
-
-  private async markExpired(id: number): Promise<void> {
-    await database.updateTable('social_identities').set({
-      auth_status: 'expired',
-      updated_at: now(),
-    }).where('id', '=', id).execute()
+    }, { revive: options.revive, label: 'This Threads' })
   }
 
   private async ensureDriver(): Promise<SocialDriverRow> {
@@ -387,6 +402,7 @@ export class ThreadsService {
       return {
         connected: false,
         provider: 'threads',
+        id: null,
         handle: null,
         displayName: null,
         did: null,
@@ -398,6 +414,7 @@ export class ThreadsService {
     return {
       connected,
       provider: 'threads',
+      id: Number(row.id),
       handle: row.handle,
       displayName: row.display_name || null,
       did: row.external_id || null,

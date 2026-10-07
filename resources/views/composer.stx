@@ -14,6 +14,9 @@
         hidden to out-rank them would leave a visible empty block if the
         generated stylesheet ever ordered them the other way. -->
     <div class="grid gap-2 mt-2 p-2 p-3 min-h-20 min-h-7 leading-relaxed text-amber-700 text-emerald-800 text-ink text-muted text-muted text-on-accent text-red-700 text-sm text-zinc-400 bg-accent bg-emerald-400 bg-emerald-50 bg-emerald-500 bg-panel bg-panel-2 bg-panel-3 bg-red-500 bg-zinc-300 hover:bg-white border-blue-300 border-emerald-200 border-line border-neutral-950 outline-none rounded-lg rounded-xl shadow-sm cursor-not-allowed resize-none" style="display:none" aria-hidden="true"></div>
+    <!-- Network icons on per-account chips come from row.icon at runtime; listed
+        here so the Crosswind scanner emits them. -->
+    <div class="i-hugeicons-news i-hugeicons-quill-write-02 i-hugeicons-share-08 i-simple-icons-bluesky i-simple-icons-instagram i-simple-icons-linkedin i-simple-icons-mastodon i-simple-icons-threads i-simple-icons-x" style="display:none" aria-hidden="true"></div>
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Composer</p>
@@ -43,10 +46,12 @@
         </header>
 
         <div class="grid gap-1 p-4">
-          <!-- Chips render from the providerRows() signal. Their selected /
-              disabled / over-limit states ride on data-attributes and are styled
-              in config/crosswind.ts, because a class string composed in the
-              browser is invisible to the Crosswind extractor. -->
+          <!-- Chips render from the providerRows() signal: one per network, or
+              one per account (icon + handle) for a network with several
+              connected. Their selected / disabled / over-limit states ride on
+              data-attributes and are styled in config/crosswind.ts, because a
+              class string composed in the browser is invisible to the
+              Crosswind extractor. -->
           <div class="flex flex-wrap gap-2 mb-3" role="group" aria-label="Crosspost targets">
             <!-- Object-form :class, rather than an inline display rule plus
                 x-show. The string form of :class MERGES with the static class
@@ -60,15 +65,16 @@
               class="inline-flex gap-1.5 items-center px-2.5 min-h-8 font-bold text-xs border rounded-xl transition-colors"
               type="button"
               x-for="row in providerRows()"
-              :data-provider-toggle="row.provider"
+              :data-provider-toggle="row.key"
               :data-selected="row.selected"
               :data-over="row.over"
               :disabled="!row.connected"
               :title="row.title"
               :aria-pressed="row.selected"
-              @click="toggleProvider(row.provider)"
+              @click="toggleProvider(row.key)"
             >
               <span class="h-2 w-2 rounded-full" data-provider-dot aria-hidden="true"></span>
+              <span class="shrink-0 h-3.5 w-3.5" :class="row.icon || 'hidden'" aria-hidden="true"></span>
               <span :text="row.label"></span>
             </button>
           </div>
@@ -146,6 +152,17 @@
   </section>
 
   <script client>
+    // What the template reads lives at the top level: stx binds `x-for`,
+    // `:class` and `@click` to top-level declarations, so the chips stayed on
+    // "Loading accounts…" while their signals were declared inside the IIFE
+    // below. That IIFE still computes them (they depend on its DOM helpers)
+    // and mirrors the results into these with effect().
+    const providerRows = state([])
+    const providersPending = state(true)
+    const providersEmpty = state(false)
+    const composerHandlers = { toggleProvider: null }
+    const toggleProvider = key => composerHandlers.toggleProvider?.(key)
+
     ;(() => {
       const root = document.querySelector('[data-testid="composer-page"]')
       if (!root) return
@@ -200,14 +217,16 @@
       // Signals, not plain values: the provider chips render from these through
       // x-for, so every mutation repaints with no hand-written render pass.
       // `selected` is an array rather than a Set because a Set mutates in place
-      // and would never trip the signal.
+      // and would never trip the signal. It holds target keys — `bluesky:12`
+      // for an account, `blog` for our own targets — not network names, so two
+      // accounts on one network can be picked independently.
       const providers = state([])
       const selectedList = state([])
       const providersLoaded = state(false)
 
-      const selectedHas = (provider) => selectedList().includes(provider)
-      const selectedAdd = (provider) => { if (!selectedHas(provider)) selectedList.set([...selectedList(), provider]) }
-      const selectedDelete = (provider) => selectedList.set(selectedList().filter(entry => entry !== provider))
+      const selectedHas = (key) => selectedList().includes(key)
+      const selectedAdd = (key) => { if (!selectedHas(key)) selectedList.set([...selectedList(), key]) }
+      const selectedDelete = (key) => selectedList.set(selectedList().filter(entry => entry !== key))
       const selectedClear = () => selectedList.set([])
 
       // Edit mode: /?edit=<id> loads a queued post into the composer.
@@ -238,8 +257,59 @@
       }
 
       const providerLabel = provider => window.opentimesSocial?.providerLabel(provider) || provider
-      const connectedProviders = () => providers().filter(provider => provider.canPublish)
-      const selectedConnected = () => connectedProviders().filter(provider => selectedHas(provider.provider))
+      const formatHandle = (provider, handle) => window.opentimesSocial?.formatHandle(provider, handle) || handle || ''
+      const targetLabel = (provider, handle) => window.opentimesSocial?.targetLabel(provider, handle) || providerLabel(provider)
+
+      /**
+       * Publish targets, flattened from the network statuses.
+       *
+       * A network with one connected account (or none) stays one target and one
+       * chip, exactly as before accounts were plural — keyed to that account so
+       * the server publishes through it. A network with several becomes one
+       * target per account. Each target keeps its network's fields (limit,
+       * provider) so the counter, the limit checks and the per-network text
+       * all keep working unchanged.
+       */
+      const publishTargets = derived(() => providers().flatMap((status) => {
+        const live = (status.accounts || []).filter(account => account.connected)
+        if (live.length <= 1) {
+          const account = live[0]
+          return [{
+            ...status,
+            key: account ? `${status.provider}:${account.id}` : status.provider,
+            account: account || null,
+            multi: false,
+          }]
+        }
+        return live.map(account => ({
+          ...status,
+          key: `${status.provider}:${account.id}`,
+          canPublish: account.canPublish,
+          handle: account.handle,
+          account,
+          multi: true,
+        }))
+      }))
+      const connectedProviders = () => publishTargets().filter(target => target.canPublish)
+      const selectedConnected = () => connectedProviders().filter(target => selectedHas(target.key))
+      /** One selected target per network — what per-network overrides are keyed on. */
+      const selectedNetworks = () => selectedConnected().filter((target, index, list) =>
+        list.findIndex(other => other.provider === target.provider) === index)
+      const isNetworkSelected = provider => selectedConnected().some(target => target.provider === provider)
+
+      /**
+       * The chip key a stored target spec maps to. An account spec maps to its
+       * own chip; a bare network (a campaign post, or one saved before accounts
+       * were plural) maps to that network's default account.
+       */
+      const keyForSpec = (spec) => {
+        const value = String(spec || '')
+        const exact = publishTargets().find(target => target.key === value)
+        if (exact) return exact.key
+        const provider = value.split(':')[0]
+        const candidates = publishTargets().filter(target => target.provider === provider)
+        return (candidates.find(target => target.account?.isDefault) || candidates[0])?.key || null
+      }
 
       // The tightest limit among selected targets. Used for the counter's
       // denominator only — it is never enforced on the textarea, because
@@ -258,6 +328,9 @@
        */
       const overLimitProviders = () => selectedConnected()
         .filter(provider => provider.characterLimit && bodyFor(provider.provider).length > provider.characterLimit)
+      /** Over-limit targets named once per network, for the counter's message. */
+      const overLimitNetworks = () => overLimitProviders().filter((target, index, list) =>
+        list.findIndex(other => other.provider === target.provider) === index)
 
       /**
        * Everything one provider chip renders, as plain data.
@@ -271,34 +344,41 @@
        * The over-limit flag is folded in here too, replacing a pass that used to
        * walk the rendered chips and toggle dot classes by hand.
        */
-      const providerRows = derived(() => {
-        const overKeys = new Set(overLimitProviders().map(entry => entry.provider))
-        return providers().map((status) => {
-          const connected = Boolean(status.canPublish)
-          const isSelected = connected && selectedHas(status.provider)
-          const label = providerLabel(status.provider)
-          const over = isSelected && overKeys.has(status.provider)
+      const providerRowsView = derived(() => {
+        const overKeys = new Set(overLimitProviders().map(entry => entry.key))
+        return publishTargets().map((target) => {
+          const connected = Boolean(target.canPublish)
+          const isSelected = connected && selectedHas(target.key)
+          const network = providerLabel(target.provider)
+          // A per-account chip reads as icon + handle; the network name moves
+          // to the tooltip so a row of three Bluesky chips stays scannable.
+          const label = target.multi ? formatHandle(target.provider, target.account?.handle) : network
+          const full = target.multi ? targetLabel(target.provider, target.account?.handle) : network
+          const over = isSelected && overKeys.has(target.key)
           return {
-            provider: status.provider,
+            key: target.key,
+            provider: target.provider,
+            icon: target.multi ? window.opentimesSocial?.providerIcon(target.provider) || '' : '',
             label,
             connected,
             selected: isSelected,
             over,
             title: !connected
-              ? `Connect ${label} in Settings → Channels to crosspost here.`
+              ? `Connect ${network} in Settings → Channels to crosspost here.`
               : over
-                ? `Too long for ${label} — this target would be rejected.`
-                : '',
+                ? `Too long for ${network} — this target would be rejected.`
+                : target.multi ? full : '',
           }
         })
       })
 
-      const providersPending = derived(() => !providersLoaded())
-      const providersEmpty = derived(() => providersLoaded() && providers().length === 0)
+      effect(() => providerRows.set(providerRowsView()))
+      effect(() => providersPending.set(!providersLoaded()))
+      effect(() => providersEmpty.set(providersLoaded() && providers().length === 0))
 
-      const toggleProvider = (provider) => {
-        if (selectedHas(provider)) selectedDelete(provider)
-        else selectedAdd(provider)
+      composerHandlers.toggleProvider = (key) => {
+        if (selectedHas(key)) selectedDelete(key)
+        else selectedAdd(key)
         updatePublishability()
       }
 
@@ -323,6 +403,7 @@
       const variantsPayload = () => {
         const payload = {}
         if (!variantsAvailable()) return payload
+        // Overrides are per network: two Bluesky accounts share the Bluesky one.
         variants.forEach((entry, provider) => {
           if (entry.text.trim()) payload[provider] = entry.text
         })
@@ -405,7 +486,7 @@
        * either the shared body or an override never rebuilds the panel.
        */
       const updateVariantMeta = () => {
-        selectedConnected().forEach((status) => {
+        selectedNetworks().forEach((status) => {
           const provider = status.provider
           const limit = status.characterLimit || 0
           const entry = variants.get(provider)
@@ -448,7 +529,7 @@
        */
       const refreshVariantRow = (provider) => {
         const existing = variantPanel?.querySelector(`[data-variant-row="${provider}"]`)
-        const status = selectedConnected().find(item => item.provider === provider)
+        const status = selectedNetworks().find(item => item.provider === provider)
         if (!existing || !status) {
           renderVariantPanel()
           return
@@ -462,7 +543,7 @@
 
       const renderVariantPanel = () => {
         if (!variantSection || !variantPanel) return
-        const targets = selectedConnected()
+        const networks = selectedNetworks()
         const available = variantsAvailable()
         variantSection.classList.toggle('hidden', !available)
         if (!available) variantsOpen = false
@@ -476,7 +557,7 @@
           return
         }
 
-        variantPanel.replaceChildren(...targets.map(variantRow))
+        variantPanel.replaceChildren(...networks.map(variantRow))
         updateVariantMeta()
       }
 
@@ -484,8 +565,11 @@
         const connected = connectedProviders()
         const ready = connected.length > 0
         if (connectionLabel) {
+          // Named per network; a network with several accounts says how many.
+          const counts = new Map()
+          connected.forEach(target => counts.set(target.provider, (counts.get(target.provider) || 0) + 1))
           connectionLabel.textContent = ready
-            ? `${connected.map(provider => providerLabel(provider.provider)).join(', ')} ready`
+            ? `${[...counts].map(([provider, total]) => total > 1 ? `${providerLabel(provider)} (${total})` : providerLabel(provider)).join(', ')} ready`
             : 'Connect an account'
         }
         connection?.classList.toggle('border-emerald-200', ready)
@@ -503,11 +587,11 @@
         })
         // The image field is only meaningful for Instagram, which rejects
         // text-only posts.
-        const needsImage = selectedHas('instagram') && connectedProviders().some(provider => provider.provider === 'instagram')
+        const needsImage = isNetworkSelected('instagram')
         composeImageRow?.classList.toggle('hidden', !needsImage)
         composeImageRow?.classList.toggle('flex', needsImage)
         // Long-form title field appears whenever the blog is a target.
-        const wantsTitle = selectedHas('blog') && connectedProviders().some(provider => provider.provider === 'blog')
+        const wantsTitle = isNetworkSelected('blog')
         composeTitle?.classList.toggle('hidden', !wantsTitle)
         composeTitle?.classList.toggle('block', wantsTitle)
         renderVariantPanel()
@@ -517,11 +601,16 @@
       const applyConnection = (list) => {
         providers.set(Array.isArray(list) ? list : [])
         providersLoaded.set(true)
-        const connectedKeys = connectedProviders().map(provider => provider.provider)
-        // Default to every connected provider; otherwise drop any selected
-        // provider that is no longer connected.
+        const connectedKeys = connectedProviders().map(target => target.key)
+        // Default to every connected network — through its default account
+        // only. A second account on a network is opt-in per post: posting the
+        // same words from two of your own accounts should be a choice, never
+        // what happens because nobody unticked a chip. Otherwise drop any
+        // selected target that is no longer connected.
         if (selectedList().length === 0) {
-          connectedKeys.forEach(key => selectedAdd(key))
+          connectedProviders()
+            .filter(target => !target.multi || target.account?.isDefault)
+            .forEach(target => selectedAdd(target.key))
         }
         else {
           ;[...selectedList()].forEach((key) => {
@@ -669,7 +758,7 @@
         // Over-limit names the networks rather than the number, because with
         // mixed targets "over" is only true for some of them.
         count.textContent = over.length
-          ? `${length} characters - too long for ${over.map(provider => providerLabel(provider.provider)).join(', ')}`
+          ? `${length} characters - too long for ${overLimitNetworks().map(provider => providerLabel(provider.provider)).join(', ')}`
           : `${length} / ${limit} characters - ${posts} post${posts === 1 ? '' : 's'}`
         // The span truncates, and the network names are at the end — keep the
         // full message reachable when several targets are over at once.
@@ -840,9 +929,14 @@
             variants.set(provider, { text, shared: item.text || '' })
         })
 
-        // Providers: select exactly the post's set (intersected with connected).
+        // Targets: select exactly the post's accounts (intersected with what is
+        // still connected). `targets` holds specs; older payloads only had
+        // network names, which map to each network's default account.
         selectedClear()
-        for (const provider of item.providers || []) selectedAdd(provider)
+        for (const spec of item.targets || item.providers || []) {
+          const key = keyForSpec(spec)
+          if (key) selectedAdd(key)
+        }
         updatePublishability()
 
         // Schedule.
@@ -892,7 +986,7 @@
           activeTextarea()?.focus()
           return
         }
-        const targetProviders = selectedConnected().map(provider => provider.provider)
+        const targetProviders = selectedConnected().map(target => target.key)
         if (targetProviders.length === 0) {
           setStatus('Select a connected account.', 'error', { title: 'Not connected' })
           return
@@ -949,7 +1043,7 @@
           activeTextarea()?.focus()
           return
         }
-        const targetProviders = selectedConnected().map(provider => provider.provider)
+        const targetProviders = selectedConnected().map(target => target.key)
         if (targetProviders.length === 0) {
           setStatus('Select a connected account before saving to the queue.', 'error', { title: 'Not connected' })
           return
@@ -1062,7 +1156,7 @@
           return
         }
 
-        const targetProviders = selectedConnected().map(provider => provider.provider)
+        const targetProviders = selectedConnected().map(target => target.key)
         if (targetProviders.length === 0) {
           setStatus('Select a connected account in Settings → Channels before publishing.', 'error', { title: 'Not connected' })
           return
@@ -1078,7 +1172,9 @@
           return
         }
 
-        const providerNames = targetProviders.map(providerLabel).join(', ')
+        const providerNames = selectedConnected()
+          .map(target => target.multi ? targetLabel(target.provider, target.account?.handle) : providerLabel(target.provider))
+          .join(', ')
         buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
         if (publishLabel) publishLabel.textContent = 'Publishing…'
         setStatus(
@@ -1098,7 +1194,7 @@
                 if (result.url) lastUrl = result.url
               }
               else {
-                failures.push(`${providerLabel(result.provider)}: ${result.error || 'failed'}`)
+                failures.push(`${targetLabel(result.provider, result.handle)}: ${result.error || 'failed'}`)
               }
             }
           }

@@ -1,17 +1,61 @@
+import type { PublishTarget } from '../../Support/Social/targets'
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
 import type { VariantMap } from '../../Support/Social/variants'
 import { mkdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import { dedupeTargets, isAccountProvider, parseTargets, targetKey, targetProviders } from '../../Support/Social/targets'
 import { MEDIA_DIR, publicMediaUrl } from '../../Support/Social/uploads'
 import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/variants'
 import { crosspost, crosspostProviders } from './CrosspostService'
+import { findIdentityRow, unavailableAccountError } from './identities'
 import { ensureAccount, now, uuid } from './support'
 
 const database = db as any
 
-/** Serialized into posts.content — everything beyond the text itself. */
+/**
+ * The `posts` column that holds `StoredContent`.
+ *
+ * This used to be `posts.content`, added by a hand-written migration
+ * (0000000031). The Post model never declared it, so when the schema was
+ * regenerated from the models the column was not recreated: on any database
+ * built from the current migrations, every queue save failed with "table posts
+ * has no column named content" — drafts, schedules and campaign activation
+ * alike.
+ *
+ * The model is not this service's to change, so the column is resolved at
+ * runtime instead: `content` where it still exists (a database created before
+ * the regeneration, whose queued posts already have their extras there), and
+ * otherwise `notes` — the one free-form text column the model does declare,
+ * and one nothing else in the app reads or writes. Declaring `content` on the
+ * Post model is the proper fix; once it is, this picks it up with no change.
+ */
+let storedContentColumn: Promise<'content' | 'notes'> | null = null
+
+async function contentColumn(): Promise<'content' | 'notes'> {
+  storedContentColumn ??= database
+    .selectFrom('posts')
+    .select(['content'])
+    .limit(1)
+    .execute()
+    .then(() => 'content' as const)
+    .catch((error: unknown) => {
+      // Only a missing column settles the answer. Anything else (a locked
+      // database, say) must not pin the wrong column for the process lifetime.
+      if (/no such column|has no column|unknown column|does not exist/i.test(String(error))) return 'notes' as const
+      storedContentColumn = null
+      throw error
+    })
+  return await storedContentColumn!
+}
+
+/** The stored-content value of a `posts` row read with `selectAll()`. */
+async function storedContentOf(post: any): Promise<unknown> {
+  return post?.[await contentColumn()]
+}
+
+/** Serialized into the stored-content column — everything beyond the text itself. */
 interface StoredContent {
   /** Only set when the composer provided an explicit title. */
   title?: string
@@ -42,6 +86,12 @@ const ACTIONABLE = new Set(['draft', 'scheduled', 'failed'])
 
 export interface QueueTargetView {
   provider: SocialProvider
+  /** The account it goes (or went) out through; null means the network default. */
+  identityId: number | null
+  /** That account's handle, for telling two accounts on one network apart. */
+  handle: string | null
+  /** The target spec (`bluesky:12`, or `blog`). */
+  target: string
   status: string
   remoteUri: string | null
   failureReason: string | null
@@ -62,7 +112,12 @@ export interface QueueItemView {
 
 export interface SaveQueueInput {
   text: string
-  providers: SocialProvider[]
+  /**
+   * Where it goes: network names (`bluesky`, the network's default account at
+   * publish time) and/or account target specs (`bluesky:12`). Campaigns pass
+   * bare network names; the composer passes specs.
+   */
+  providers: readonly string[]
   /** Explicit title for long-form targets (blog). */
   title?: string | null
   /** UTC `YYYY-MM-DD HH:MM:SS`; omitted → saved as a draft. */
@@ -89,7 +144,10 @@ export interface QueueEditView {
   title: string | null
   status: string
   scheduledAt: string | null
+  /** The distinct networks, for callers that only care which networks. */
   providers: SocialProvider[]
+  /** The exact targets, as specs, so an edit preselects the same accounts. */
+  targets: string[]
   external: { uri: string, title: string, description?: string } | null
   image: { kind: 'file' | 'url', url: string | null } | null
   /** Per-provider overrides, so an edit round-trips them instead of dropping them. */
@@ -101,18 +159,16 @@ export class QueueService {
    * Persist a post without publishing it. With `scheduledAt` the post is
    * queued (`scheduled`) and picked up by the PublishScheduledPosts job when
    * due; without it the post is stored as a `draft`. One placeholder
-   * `post_targets` row per provider records where the post should go — the
-   * real result rows replace them at publish time.
+   * `post_targets` row per target records where the post should go — network
+   * and, when one was chosen, account — and the real result rows replace them
+   * at publish time.
    */
   async save(input: SaveQueueInput): Promise<{ postId: number, status: 'draft' | 'scheduled', scheduledAt: string | null }> {
     const body = input.text.trim()
     if (!body)
       throw new Error('Post text is required.')
 
-    const available = new Set<string>(crosspostProviders())
-    const providers = input.providers.filter(provider => available.has(provider))
-    if (providers.length === 0)
-      throw new Error('Select at least one connected provider.')
+    const targets = await this.validTargets(input.providers)
 
     const scheduledAt = input.scheduledAt?.trim() || null
     if (scheduledAt) {
@@ -148,7 +204,7 @@ export class QueueService {
       title: input.title?.trim() || body.slice(0, 80),
       body,
       status,
-      content: Object.keys(stored).length ? JSON.stringify(stored) : null,
+      [await contentColumn()]: Object.keys(stored).length ? JSON.stringify(stored) : null,
       scheduled_at: scheduledAt,
       timezone: env.TZ || 'America/Los_Angeles',
       source: 'composer',
@@ -163,17 +219,7 @@ export class QueueService {
       .where('uuid', '=', postUuid)
       .executeTakeFirstOrThrow()
 
-    for (const provider of providers) {
-      await database.insertInto('post_targets').values({
-        uuid: uuid(),
-        provider,
-        status,
-        scheduled_at: scheduledAt,
-        post_id: post.id,
-        created_at: createdAt,
-        updated_at: createdAt,
-      }).execute()
-    }
+    await this.writePlaceholders(Number(post.id), targets, status, scheduledAt, createdAt)
 
     return { postId: Number(post.id), status, scheduledAt }
   }
@@ -197,25 +243,43 @@ export class QueueService {
       .where('post_id', 'in', posts.map((post: any) => post.id))
       .execute()
 
-    return posts.map((post: any): QueueItemView => ({
-      id: Number(post.id),
-      title: post.title || null,
-      body: String(post.body || ''),
-      status: String(post.status),
-      scheduledAt: post.scheduled_at || null,
-      publishedAt: post.published_at || null,
-      createdAt: String(post.created_at),
-      hasImage: Boolean(parseStoredContent(post.content)?.media?.length),
-      hasLink: Boolean(parseStoredContent(post.content)?.external),
-      providers: targets
-        .filter((target: any) => Number(target.post_id) === Number(post.id))
-        .map((target: any): QueueTargetView => ({
-          provider: target.provider,
-          status: String(target.status),
-          remoteUri: target.remote_uri || null,
-          failureReason: target.failure_reason || null,
-        })),
-    }))
+    // Handles for the accounts these targets name — disconnected ones included,
+    // since a published post still went out through them.
+    const identityIds = [...new Set(targets.map((target: any) => Number(target.social_identity_id)).filter(Boolean))]
+    const identities = identityIds.length
+      ? await database.selectFrom('social_identities').select(['id', 'handle']).where('id', 'in', identityIds).execute()
+      : []
+    const handles = new Map<number, string>(identities.map((row: any) => [Number(row.id), String(row.handle)]))
+
+    const column = await contentColumn()
+    return posts.map((post: any): QueueItemView => {
+      const stored = parseStoredContent(post[column])
+      return {
+        id: Number(post.id),
+        title: post.title || null,
+        body: String(post.body || ''),
+        status: String(post.status),
+        scheduledAt: post.scheduled_at || null,
+        publishedAt: post.published_at || null,
+        createdAt: String(post.created_at),
+        hasImage: Boolean(stored?.media?.length),
+        hasLink: Boolean(stored?.external),
+        providers: targets
+          .filter((target: any) => Number(target.post_id) === Number(post.id))
+          .map((target: any): QueueTargetView => {
+            const identityId = Number(target.social_identity_id) || null
+            return {
+              provider: target.provider,
+              identityId,
+              handle: identityId ? handles.get(identityId) || null : null,
+              target: targetKey({ provider: target.provider, identityId }),
+              status: String(target.status),
+              remoteUri: target.remote_uri || null,
+              failureReason: target.failure_reason || null,
+            }
+          }),
+      }
+    })
   }
 
   /** Delete a draft, scheduled, or failed post along with its targets. */
@@ -233,12 +297,13 @@ export class QueueService {
    */
   async get(id: number): Promise<QueueEditView> {
     const post = await this.findActionable(id)
-    const stored = parseStoredContent(post.content)
-    const targets = await database
+    const stored = parseStoredContent(await storedContentOf(post))
+    const rows = await database
       .selectFrom('post_targets')
-      .select(['provider'])
+      .select(['provider', 'social_identity_id'])
       .where('post_id', '=', post.id)
       .execute()
+    const targets = targetsOf(rows)
 
     const media = stored?.media?.[0]
     return {
@@ -247,7 +312,8 @@ export class QueueService {
       title: stored?.title || null,
       status: String(post.status),
       scheduledAt: post.scheduled_at || null,
-      providers: [...new Set(targets.map((t: any) => t.provider))] as SocialProvider[],
+      providers: targetProviders(targets),
+      targets: targets.map(targetKey),
       external: stored?.external || null,
       image: media ? { kind: media.path ? 'file' : 'url', url: media.url || null } : null,
       variants: sanitizeVariants(stored?.variants) || null,
@@ -258,7 +324,7 @@ export class QueueService {
    * Update a draft/scheduled/failed post in place: text, title, providers,
    * schedule, link card, and image. `image` semantics — undefined keeps the
    * existing media, null removes it, an object replaces it. Placeholder
-   * targets are rebuilt to match the new provider set.
+   * targets are rebuilt to match the new target set.
    */
   async update(id: number, input: UpdateQueueInput): Promise<{ postId: number, status: 'draft' | 'scheduled' }> {
     const post = await this.findActionable(id)
@@ -267,10 +333,7 @@ export class QueueService {
     if (!body)
       throw new Error('Post text is required.')
 
-    const available = new Set<string>(crosspostProviders())
-    const providers = input.providers.filter(provider => available.has(provider))
-    if (providers.length === 0)
-      throw new Error('Select at least one connected provider.')
+    const targets = await this.validTargets(input.providers)
 
     const scheduledAt = input.scheduledAt?.trim() || null
     if (scheduledAt) {
@@ -281,7 +344,8 @@ export class QueueService {
     }
 
     const status = scheduledAt ? 'scheduled' as const : 'draft' as const
-    const existing = parseStoredContent(post.content)
+    const column = await contentColumn()
+    const existing = parseStoredContent(post[column])
     const stored: StoredContent = {}
     if (input.title?.trim()) stored.title = input.title.trim()
     if (input.external?.uri && input.external.title) stored.external = input.external
@@ -313,26 +377,62 @@ export class QueueService {
       title: input.title?.trim() || body.slice(0, 80),
       body,
       status,
-      content: Object.keys(stored).length ? JSON.stringify(stored) : null,
+      [column]: Object.keys(stored).length ? JSON.stringify(stored) : null,
       scheduled_at: scheduledAt,
       updated_at: updatedAt,
     }).where('id', '=', post.id).execute()
 
-    // Rebuild placeholder targets to match the new provider set.
+    // Rebuild placeholder targets to match the new target set.
     await database.deleteFrom('post_targets').where('post_id', '=', post.id).execute()
-    for (const provider of providers) {
-      await database.insertInto('post_targets').values({
-        uuid: uuid(),
-        provider,
-        status,
-        scheduled_at: scheduledAt,
-        post_id: post.id,
-        created_at: updatedAt,
-        updated_at: updatedAt,
-      }).execute()
-    }
+    await this.writePlaceholders(Number(post.id), targets, status, scheduledAt, updatedAt)
 
     return { postId: Number(post.id), status }
+  }
+
+  /**
+   * Narrow submitted targets to ones that can be queued: known networks, and
+   * accounts that exist on that network and are still connected.
+   *
+   * A disconnected account is refused here rather than at publish time so the
+   * user hears about it while they are still looking at the post — a schedule
+   * that silently fails next Tuesday is the worse outcome. An account that only
+   * needs reconnecting is accepted: there is time to fix it before it is due.
+   */
+  private async validTargets(raw: readonly string[]): Promise<PublishTarget[]> {
+    const targets = parseTargets([...raw], crosspostProviders())
+    if (targets.length === 0)
+      throw new Error('Select at least one connected provider.')
+
+    for (const target of targets) {
+      if (!target.identityId) continue
+      const row = await findIdentityRow(target.provider, target.identityId)
+      if (!row || row.auth_status === 'revoked')
+        throw unavailableAccountError(providerName(target.provider), row)
+    }
+
+    return targets
+  }
+
+  /** One placeholder `post_targets` row per target, carrying its account. */
+  private async writePlaceholders(
+    postId: number,
+    targets: readonly PublishTarget[],
+    status: 'draft' | 'scheduled',
+    scheduledAt: string | null,
+    at: string,
+  ): Promise<void> {
+    for (const target of targets) {
+      await database.insertInto('post_targets').values({
+        uuid: uuid(),
+        provider: target.provider,
+        social_identity_id: target.identityId,
+        status,
+        scheduled_at: scheduledAt,
+        post_id: postId,
+        created_at: at,
+        updated_at: at,
+      }).execute()
+    }
   }
 
   /** Publish a draft/scheduled/failed post immediately. */
@@ -346,8 +446,10 @@ export class QueueService {
       .where('status', 'in', ['draft', 'scheduled', 'failed'])
       .execute()
 
-    const providers = [...new Set(placeholders.map((target: any) => target.provider))] as SocialProvider[]
-    if (providers.length === 0)
+    // De-duplicated per account, not per network: two Bluesky accounts on one
+    // post are two targets and both publish.
+    const targets = targetsOf(placeholders)
+    if (targets.length === 0)
       throw new Error('This post has no pending targets to publish.')
 
     await database.updateTable('posts').set({
@@ -364,7 +466,7 @@ export class QueueService {
 
     const results = await crosspost.publishExisting(
       { id: Number(post.id), body: String(post.body) },
-      providers,
+      targets,
       await this.hydrateContent(post),
     )
 
@@ -375,18 +477,20 @@ export class QueueService {
     // body is checked first in every service — write no result row. Their
     // placeholder is already gone, so without this the target would vanish from
     // the queue entirely: no row, no failure reason, and the post still marked
-    // published because some other network succeeded.
+    // published because some other network succeeded. Matched per account, so
+    // one Bluesky account's row does not hide another's missing one.
     const written = await database
       .selectFrom('post_targets')
-      .select(['provider'])
+      .select(['provider', 'social_identity_id'])
       .where('post_id', '=', post.id)
       .execute()
-    const recorded = new Set(written.map((row: any) => row.provider))
+    const recorded = new Set(written.map((row: any) => recordKey(row.provider, row.social_identity_id)))
     for (const result of results) {
-      if (recorded.has(result.provider)) continue
+      if (recorded.has(recordKey(result.provider, result.identityId))) continue
       await database.insertInto('post_targets').values({
         uuid: uuid(),
         provider: result.provider,
+        social_identity_id: result.identityId || null,
         status: 'failed',
         failure_reason: result.error || 'Publishing failed.',
         post_id: post.id,
@@ -408,7 +512,7 @@ export class QueueService {
 
   /** Rebuild PublishContent from a queued post's stored content JSON. */
   private async hydrateContent(post: any): Promise<PublishContent | undefined> {
-    const stored = parseStoredContent(post.content)
+    const stored = parseStoredContent(await storedContentOf(post))
     if (!stored) return undefined
 
     const content: PublishContent = {}
@@ -451,7 +555,7 @@ export class QueueService {
   }
 
   private async removeStoredMedia(post: any): Promise<void> {
-    const stored = parseStoredContent(post.content)
+    const stored = parseStoredContent(await storedContentOf(post))
     for (const item of stored?.media || []) {
       if (!item.path) continue
       await unlink(join(MEDIA_DIR, item.path)).catch(() => {})
@@ -501,6 +605,30 @@ export class QueueService {
 
     return post
   }
+}
+
+/** Targets from `post_targets` rows, de-duplicated per account. */
+function targetsOf(rows: Array<{ provider: SocialProvider, social_identity_id?: number | null }>): PublishTarget[] {
+  return dedupeTargets(rows.map(row => ({
+    provider: row.provider,
+    identityId: isAccountProvider(row.provider) ? Number(row.social_identity_id) || null : null,
+  })))
+}
+
+function recordKey(provider: string, identityId: number | null | undefined): string {
+  return `${provider}:${Number(identityId) || ''}`
+}
+
+function providerName(provider: SocialProvider): string {
+  const names: Partial<Record<SocialProvider, string>> = {
+    bluesky: 'Bluesky',
+    twitter: 'X',
+    mastodon: 'Mastodon',
+    linkedin: 'LinkedIn',
+    instagram: 'Instagram',
+    threads: 'Threads',
+  }
+  return names[provider] || provider
 }
 
 export const postQueue = new QueueService()

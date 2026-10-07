@@ -128,6 +128,8 @@
      */
     interface QueueApiTarget {
       provider: string
+      /** The account's handle, when the target names one. */
+      handle?: string | null
       failureReason?: string | null
       remoteUri?: string | null
     }
@@ -204,6 +206,18 @@
 
     const providerLabel = (provider: string): string => opentimesSocial?.providerLabel(provider) || provider
 
+    /**
+     * A row's channels. A network appears once per account, so when one post
+     * goes to two accounts on the same network each is named by its handle —
+     * "Bluesky, Bluesky" would not say which went where.
+     */
+    const channelLabels = (targets: QueueApiTarget[]): string[] => targets.map((target) => {
+      const shared = targets.filter(other => other.provider === target.provider).length > 1
+      return shared && target.handle
+        ? opentimesSocial?.targetLabel(target.provider, target.handle) || `${providerLabel(target.provider)} ${target.handle}`
+        : providerLabel(target.provider)
+    })
+
     const liveUrlFor = (uri: string | null | undefined): string => {
       const value = String(uri || '')
       if (value.startsWith('/')) return value
@@ -222,7 +236,7 @@
           ? `Published · ${formatTime(item.publishedAt || item.createdAt)}`
           : `${item.status[0].toUpperCase()}${item.status.slice(1)} · ${formatTime(item.createdAt)}`
       const extras = [item.hasImage ? 'image' : '', item.hasLink ? 'link card' : ''].filter(Boolean).join(' · ')
-      const channels = (item.providers.map(target => providerLabel(target.provider)).join(', ') || 'No channel')
+      const channels = (channelLabels(item.providers).join(', ') || 'No channel')
         + (extras ? ` · ${extras}` : '')
       return {
         id: item.id,

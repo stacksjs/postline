@@ -1,7 +1,11 @@
+import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
+import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { InstagramApiError, InstagramDriver } from './Drivers/InstagramDriver'
+import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { ensureAccount, expiresAt, now, uuid } from './support'
 
 const database = db as any
@@ -39,15 +43,11 @@ interface InstagramConfig {
   scopes: string[]
 }
 
-function randomState(): string {
-  const bytes = new Uint8Array(24)
-  crypto.getRandomValues(bytes)
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
 export class InstagramService {
   private driver: InstagramDriver
-  private pendingState: string | null = null
+  // OAuth CSRF states between the auth redirect and the callback, keyed by
+  // state so two accounts can be connected concurrently.
+  private pending = new PendingOAuthStates()
 
   constructor() {
     this.driver = new InstagramDriver({ graphVersion: this.config().graphVersion })
@@ -77,14 +77,20 @@ export class InstagramService {
     }
   }
 
+  /**
+   * The network card's state: top-level fields describe the default account
+   * (unchanged for existing callers), `accounts` lists every connected one.
+   */
   async status() {
-    const identity = await this.findIdentity()
+    const rows = await listIdentityRows<SocialIdentityRow>('instagram')
+    const identity = pickDefaultIdentity(rows)
     const cfg = this.config()
     const connected = identity?.auth_status === 'connected' && Boolean(identity.access_token)
 
     return {
       connected,
       provider: 'instagram',
+      id: identity ? Number(identity.id) : null,
       handle: identity?.handle || null,
       displayName: identity?.display_name || null,
       did: identity?.external_id || null,
@@ -94,7 +100,23 @@ export class InstagramService {
       requiresMedia: true,
       configuredFromEnv: Boolean(cfg.accessToken && cfg.userId),
       oauthConfigured: Boolean(cfg.clientId && cfg.clientSecret && cfg.redirectUrl),
+      accounts: rows.map(row => toPublicAccount(row, { isDefault: Number(row.id) === Number(identity?.id) })),
     }
+  }
+
+  async listAccounts(): Promise<PublicAccount[]> {
+    return (await this.status()).accounts
+  }
+
+  /** The account a bare `instagram` target publishes through, without connecting anything. */
+  async defaultIdentityId(): Promise<number | null> {
+    const identity = await findIdentityRow<SocialIdentityRow>('instagram')
+    return isUsableIdentity(identity) ? Number(identity!.id) : null
+  }
+
+  /** Disconnect one account: tokens dropped, row kept for its posts' history. */
+  async disconnect(identityId: number): Promise<PublicAccount> {
+    return toPublicAccount(await revokeIdentityRow('instagram', identityId))
   }
 
   getAuthUrl(): string {
@@ -106,22 +128,23 @@ export class InstagramService {
       throw new Error('Set INSTAGRAM_REDIRECT_URL to connect Instagram.')
     }
 
-    this.pendingState = randomState()
     return this.driver.getAuthUrl({
       clientId: cfg.clientId,
       redirectUrl: cfg.redirectUrl,
       scopes: cfg.scopes,
-      state: this.pendingState,
+      state: this.pending.issue(true),
     })
   }
 
   async handleCallback(code: string, state: string) {
     const cfg = this.config()
     if (!code) throw new Error('Facebook did not return an authorization code.')
-    if (this.pendingState && state !== this.pendingState) {
+    // Lenient only when no flow is outstanding at all (a restart mid-consent),
+    // which is the leniency the single-slot version had.
+    const pending = this.pending.take(state)
+    if (!pending.found && !pending.noneOutstanding) {
       throw new Error('Instagram OAuth state mismatch. Please start the connection again.')
     }
-    this.pendingState = null
 
     const token = await this.driver.exchangeCode({
       clientId: cfg.clientId,
@@ -153,7 +176,12 @@ export class InstagramService {
     return this.publicIdentity(identity)
   }
 
-  async connectFromEnv() {
+  /**
+   * Connect using a pre-obtained token from the environment. `revive: false`
+   * is the implicit path (a publish falling back to `.env`), which must not
+   * bring back an account the user disconnected.
+   */
+  async connectFromEnv(options: { revive?: boolean } = {}) {
     const cfg = this.config()
     if (!cfg.accessToken) {
       throw new Error('Set INSTAGRAM_ACCESS_TOKEN (or connect via OAuth) before using Instagram.')
@@ -169,7 +197,7 @@ export class InstagramService {
       pageAccessToken = account.pageAccessToken
     }
 
-    const identity = await this.saveSession({ accessToken: pageAccessToken, igUserId, username })
+    const identity = await this.saveSession({ accessToken: pageAccessToken, igUserId, username }, { revive: options.revive ?? true })
     return this.publicIdentity(identity)
   }
 
@@ -181,6 +209,7 @@ export class InstagramService {
   async publishToPost(
     post: { id: number, body: string },
     content?: PublishContent,
+    identityId?: number | null,
   ): Promise<CrosspostTargetResult> {
     const media = content?.media?.[0]
     if (!media?.url) {
@@ -191,17 +220,19 @@ export class InstagramService {
 
     let identity: SocialIdentityRow
     try {
-      identity = await this.requireIdentity()
+      identity = await this.requireIdentity(identityId)
     }
     catch (error) {
-      return { provider: 'instagram', ok: false, error: messageOf(error) }
+      return { provider: 'instagram', ok: false, error: messageOf(error), identityId: identityId || undefined }
     }
+    const account = { identityId: Number(identity.id), handle: identity.handle }
 
     if (post.body.length > this.driver.characterLimit) {
       return {
         provider: 'instagram',
         ok: false,
         error: `Instagram captions must be ${this.driver.characterLimit} characters or fewer.`,
+        ...account,
       }
     }
 
@@ -247,12 +278,13 @@ export class InstagramService {
         url: published.url,
         uri: published.uri,
         targetId: Number(target.id),
+        ...account,
       }
     }
     catch (error) {
       const message = messageOf(error)
       if (error instanceof InstagramApiError && error.isAuthError) {
-        await this.markExpired(identity.id)
+        await markIdentityExpired(identity.id)
       }
       await database.updateTable('post_targets').set({
         status: 'failed',
@@ -260,7 +292,7 @@ export class InstagramService {
         updated_at: now(),
       }).where('id', '=', target.id).execute()
 
-      return { provider: 'instagram', ok: false, error: message, targetId: Number(target.id) }
+      return { provider: 'instagram', ok: false, error: message, targetId: Number(target.id), ...account }
     }
   }
 
@@ -269,12 +301,13 @@ export class InstagramService {
    * messaging call is addressed to and the participant id that marks a message
    * as ours, so it is required rather than optional here.
    */
-  async dmIdentity(): Promise<{ accessToken: string, igUserId: string, handle: string, graphVersion: string }> {
-    const identity = await this.requireIdentity()
+  async dmIdentity(identityId?: number | null): Promise<{ identityId: number, accessToken: string, igUserId: string, handle: string, graphVersion: string }> {
+    const identity = await this.requireIdentity(identityId)
     if (!identity.external_id)
       throw new Error('Reconnect Instagram on the Accounts page — The Open Times needs your Instagram account id to read DMs.')
 
     return {
+      identityId: Number(identity.id),
       accessToken: String(identity.access_token),
       igUserId: String(identity.external_id),
       handle: identity.handle,
@@ -282,36 +315,42 @@ export class InstagramService {
     }
   }
 
-  private async requireIdentity(): Promise<SocialIdentityRow> {
-    const existing = await this.findIdentity()
-    if (existing?.access_token && existing.auth_status === 'connected') return existing
+  /**
+   * The account to act as. A named account must be usable as-is; without a
+   * name this is the default account, falling back to the `.env` token.
+   */
+  private async requireIdentity(identityId?: number | null): Promise<SocialIdentityRow> {
+    if (identityId) {
+      const chosen = await findIdentityRow<SocialIdentityRow>('instagram', identityId)
+      if (isUsableIdentity(chosen)) return chosen!
+      throw unavailableAccountError('Instagram', chosen)
+    }
+
+    const existing = await findIdentityRow<SocialIdentityRow>('instagram')
+    if (isUsableIdentity(existing)) return existing!
 
     if (this.config().accessToken) {
-      await this.connectFromEnv()
-      const connected = await this.findIdentity()
-      if (connected?.access_token) return connected
+      const connected = await this.connectFromEnv({ revive: false })
+      const identity = connected.id ? await findIdentityRow<SocialIdentityRow>('instagram', connected.id) : undefined
+      if (identity?.access_token) return identity
     }
 
     throw new Error('Connect Instagram before publishing.')
   }
 
-  private async findIdentity(): Promise<SocialIdentityRow | undefined> {
-    return await database
-      .selectFrom('social_identities')
-      .selectAll()
-      .where('provider', '=', 'instagram')
-      .orderBy('updated_at', 'desc')
-      .executeTakeFirst()
-  }
-
-  private async saveSession(input: { accessToken: string, igUserId: string, username?: string, expiresIn?: number }): Promise<SocialIdentityRow> {
+  /**
+   * Save tokens against the account they belong to, keyed on the Instagram user
+   * id: reconnecting an account refreshes its row, a different one is added.
+   */
+  private async saveSession(
+    input: { accessToken: string, igUserId: string, username?: string, expiresIn?: number },
+    options: { revive?: boolean } = {},
+  ): Promise<SocialIdentityRow> {
     const accountId = await ensureAccount()
     const driver = await this.ensureDriver()
-    const existing = await this.findIdentity()
-    const savedAt = now()
     const handle = (input.username || input.igUserId).trim()
 
-    const values = {
+    return await upsertIdentityRow<SocialIdentityRow>('instagram', { externalId: input.igUserId, handle }, {
       handle,
       display_name: input.username || null,
       provider: 'instagram',
@@ -322,28 +361,7 @@ export class InstagramService {
       token_expires_at: expiresAt(input.expiresIn),
       account_id: accountId,
       social_driver_id: driver.id,
-      updated_at: savedAt,
-    }
-
-    if (existing) {
-      await database.updateTable('social_identities').set(values).where('id', '=', existing.id).execute()
-    }
-    else {
-      await database.insertInto('social_identities').values({
-        uuid: uuid(),
-        ...values,
-        created_at: savedAt,
-      }).execute()
-    }
-
-    return await this.findIdentity() as SocialIdentityRow
-  }
-
-  private async markExpired(id: number): Promise<void> {
-    await database.updateTable('social_identities').set({
-      auth_status: 'expired',
-      updated_at: now(),
-    }).where('id', '=', id).execute()
+    }, { revive: options.revive, label: 'This Instagram' })
   }
 
   private async ensureDriver(): Promise<SocialDriverRow> {
@@ -393,6 +411,7 @@ export class InstagramService {
       return {
         connected: false,
         provider: 'instagram',
+        id: null,
         handle: null,
         displayName: null,
         did: null,
@@ -404,6 +423,7 @@ export class InstagramService {
     return {
       connected,
       provider: 'instagram',
+      id: Number(row.id),
       handle: row.handle,
       displayName: row.display_name || null,
       did: row.external_id || null,

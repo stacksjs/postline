@@ -1,8 +1,8 @@
-import type { SocialProvider } from '../../Support/Social/types'
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { crosspost, crosspostProviders } from '../../Services/Social/CrosspostService'
+import { parseTargets } from '../../Support/Social/targets'
 import { persistTempMedia, readUploadedImage, removeTempMedia } from '../../Support/Social/uploads'
 import { parseVariantsField } from '../../Support/Social/variants'
 
@@ -15,11 +15,9 @@ export default new Action({
     const text = String(request.get('text') || request.get('body') || '').trim()
     const title = String(request.get('title') || '').trim() || undefined
 
-    const available = new Set<string>(crosspostProviders())
-    const providers = String(request.get('providers') || request.get('provider') || '')
-      .split(',')
-      .map(value => value.trim().toLowerCase())
-      .filter(value => available.has(value)) as SocialProvider[]
+    // Network names (`bluesky`) and/or account targets (`bluesky:12`); two
+    // accounts on one network are two targets.
+    const providers = parseTargets(String(request.get('providers') || request.get('provider') || ''), crosspostProviders())
 
     const externalUri = String(request.get('external_uri') || '').trim()
     const externalTitle = String(request.get('external_title') || '').trim()

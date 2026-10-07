@@ -138,7 +138,7 @@ export interface PublishContent {
   variants?: Partial<Record<SocialProvider, string>>
 }
 
-/** Outcome of publishing one post to a single provider during a crosspost. */
+/** Outcome of publishing one post to a single target during a crosspost. */
 export interface CrosspostTargetResult {
   provider: SocialProvider
   ok: boolean
@@ -147,6 +147,16 @@ export interface CrosspostTargetResult {
   cid?: string
   targetId?: number
   error?: string
+  /**
+   * The `social_identities` row it went out through, when the network has
+   * accounts. With several accounts on one network, `provider` alone no longer
+   * says which result is which.
+   */
+  identityId?: number
+  /** That account's handle, so a failure can say which account it was. */
+  handle?: string
+  /** The target spec this result answers (`bluesky:12`, or `blog`). */
+  target?: string
 }
 
 /**

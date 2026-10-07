@@ -10,9 +10,11 @@ export default new Action({
 
   async handle(request: RequestInstance) {
     const limit = Number(request.get('limit') || 30)
+    // Optional: which connected account's timeline. Omitted, the default one.
+    const identityId = Number(request.get('identity_id') || 0) || null
 
     try {
-      const data = await bluesky.syncTimeline(limit)
+      const data = await bluesky.syncTimeline(limit, identityId)
       return response.json({ ok: true, data })
     }
     catch (error) {

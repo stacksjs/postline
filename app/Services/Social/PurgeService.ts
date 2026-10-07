@@ -100,6 +100,20 @@ export interface PurgeResult {
   providers: PurgeProviderResult[]
 }
 
+/** One connected account a pass runs against. */
+interface PurgeAccount {
+  id: number
+  isDefault: boolean
+}
+
+/** Services that can list several accounts per network. */
+const ACCOUNT_SERVICES: Partial<Record<SocialProvider, { listAccounts: () => Promise<Array<{ id: number, connected: boolean, isDefault: boolean }>> }>> = {
+  bluesky,
+  twitter,
+  mastodon,
+  linkedin,
+}
+
 /** Everything about a run that each provider pass needs. */
 interface RunContext {
   scope: PurgeScope
@@ -206,8 +220,18 @@ export class PurgeService {
     }
     const results: PurgeProviderResult[] = []
 
+    // One pass per connected account, so a network with two accounts is
+    // purged on both. A network with none still gets one pass, which records
+    // why it was skipped.
     for (const provider of providers) {
-      results.push(await this.runProvider(provider, context))
+      const accounts = await this.accountsFor(provider)
+      if (!accounts.length) {
+        results.push(await this.runProvider(provider, context))
+        continue
+      }
+      for (const account of accounts) {
+        results.push(await this.runProvider(provider, context, account))
+      }
     }
 
     return {
@@ -234,7 +258,22 @@ export class PurgeService {
     return [...new Set(requested)]
   }
 
-  private async runProvider(provider: SocialProvider, context: RunContext): Promise<PurgeProviderResult> {
+  /** Connected accounts on a network, default first; empty when it has none or no accounts at all. */
+  private async accountsFor(provider: SocialProvider): Promise<PurgeAccount[]> {
+    const service = ACCOUNT_SERVICES[provider]
+    if (!service) return []
+    try {
+      const accounts = (await service.listAccounts()).filter(account => account.connected)
+      return accounts
+        .sort((left, right) => Number(right.isDefault) - Number(left.isDefault))
+        .map(account => ({ id: account.id, isDefault: account.isDefault }))
+    }
+    catch {
+      return []
+    }
+  }
+
+  private async runProvider(provider: SocialProvider, context: RunContext, account?: PurgeAccount): Promise<PurgeProviderResult> {
     const { scope, dryRun, cutoff } = context
     const result: PurgeProviderResult = {
       provider,
@@ -258,7 +297,7 @@ export class PurgeService {
 
     let adapter: ProviderPurgeAdapter
     try {
-      adapter = await this.adapterFor(provider)
+      adapter = await this.adapterFor(provider, account?.id)
     }
     catch (error) {
       result.skippedReason = messageOf(error)
@@ -275,7 +314,7 @@ export class PurgeService {
     try {
       candidates = scope === 'all'
         ? await this.collectRemote(adapter, result, cutoff)
-        : await this.collectTracked(provider, adapter.identityId)
+        : await this.collectTracked(provider, adapter.identityId, account?.isDefault ?? true)
       if (cutoff) candidates = candidates.filter(candidate => isOlderThan(candidate.postedAt, cutoff))
     }
     catch (error) {
@@ -331,7 +370,7 @@ export class PurgeService {
     // happened to match — but only when nothing failed. An age-limited run
     // deliberately left the newer posts up, so it keeps their rows too.
     if (scope === 'all' && !cutoff && result.failed === 0) {
-      const remaining = await this.collectTracked(provider, adapter.identityId)
+      const remaining = await this.collectTracked(provider, adapter.identityId, account?.isDefault ?? true)
       for (const target of remaining) {
         if (target.targetId) deletedTargetIds.push(target.targetId)
         if (target.postId) affectedPostIds.add(target.postId)
@@ -345,11 +384,11 @@ export class PurgeService {
     return result
   }
 
-  private async adapterFor(provider: SocialProvider): Promise<ProviderPurgeAdapter> {
-    if (provider === 'bluesky') return await bluesky.purgeAdapter()
-    if (provider === 'twitter') return await twitter.purgeAdapter()
-    if (provider === 'mastodon') return await mastodon.purgeAdapter()
-    if (provider === 'linkedin') return await linkedin.purgeAdapter()
+  private async adapterFor(provider: SocialProvider, identityId?: number): Promise<ProviderPurgeAdapter> {
+    if (provider === 'bluesky') return await bluesky.purgeAdapter(identityId)
+    if (provider === 'twitter') return await twitter.purgeAdapter(identityId)
+    if (provider === 'mastodon') return await mastodon.purgeAdapter(identityId)
+    if (provider === 'linkedin') return await linkedin.purgeAdapter(identityId)
     if (provider === 'opentimes') return await opentimes.purgeAdapter()
     throw new Error(`${provider} cannot delete posts through its API.`)
   }
@@ -359,15 +398,18 @@ export class PurgeService {
    * post's `published_at`, or failing that by when the target row was last
    * written (which is when it was marked published).
    */
-  private async collectTracked(provider: SocialProvider, identityId: number): Promise<PurgeCandidate[]> {
+  private async collectTracked(provider: SocialProvider, identityId: number, includeUnassigned = false): Promise<PurgeCandidate[]> {
+    // A target with no account recorded predates accounts being plural; it
+    // was published through the network's default account, so that one owns it.
     const targets = (await database
       .selectFrom('post_targets')
-      .select(['id', 'post_id', 'remote_uri', 'remote_cid', 'updated_at'])
+      .select(['id', 'post_id', 'remote_uri', 'remote_cid', 'updated_at', 'social_identity_id'])
       .where('provider', '=', provider)
-      .where('social_identity_id', '=', identityId)
       .where('status', '=', 'published')
       .orderBy('id', 'desc')
       .execute() as any[])
+      .filter(target => Number(target.social_identity_id) === Number(identityId)
+        || (includeUnassigned && (target.social_identity_id === null || target.social_identity_id === undefined)))
       .filter(target => target.remote_uri || target.remote_cid)
 
     const publishedAt = new Map<number, string>()
@@ -394,7 +436,7 @@ export class PurgeService {
    * cleanup stays accurate.
    */
   private async collectRemote(adapter: ProviderPurgeAdapter, result: PurgeProviderResult, cutoff: Date | null = null): Promise<PurgeCandidate[]> {
-    const tracked = await this.collectTracked(adapter.provider, adapter.identityId)
+    const tracked = await this.collectTracked(adapter.provider, adapter.identityId, true)
     const byUri = new Map<string, PurgeCandidate>()
     for (const candidate of tracked) {
       byUri.set(candidate.uri, candidate)

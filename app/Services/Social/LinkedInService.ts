@@ -1,7 +1,11 @@
+import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
+import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { LinkedInApiError, LinkedInDriver } from './Drivers/LinkedInDriver'
+import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { ensureAccount, expiresAt, isExpiringSoon, now, uuid } from './support'
 
 const database = db as any
@@ -38,17 +42,11 @@ interface LinkedInConfig {
   scopes: string[]
 }
 
-function randomState(): string {
-  const bytes = new Uint8Array(24)
-  crypto.getRandomValues(bytes)
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
 export class LinkedInService {
   private driver: LinkedInDriver
-  // OAuth CSRF token stashed between the auth redirect and the callback.
-  // The Open Times runs single-user, so module memory is an adequate store.
-  private pendingState: string | null = null
+  // OAuth CSRF states between the auth redirect and the callback, keyed by
+  // state so two accounts can be connected concurrently.
+  private pending = new PendingOAuthStates()
 
   constructor() {
     this.driver = new LinkedInDriver({ apiVersion: this.config().apiVersion })
@@ -66,14 +64,20 @@ export class LinkedInService {
     }
   }
 
+  /**
+   * The network card's state: top-level fields describe the default account
+   * (unchanged for existing callers), `accounts` lists every connected one.
+   */
   async status() {
-    const identity = await this.findIdentity()
+    const rows = await listIdentityRows<SocialIdentityRow>('linkedin')
+    const identity = pickDefaultIdentity(rows)
     const cfg = this.config()
     const connected = identity?.auth_status === 'connected' && Boolean(identity.access_token)
 
     return {
       connected,
       provider: 'linkedin',
+      id: identity ? Number(identity.id) : null,
       handle: identity?.handle || null,
       displayName: identity?.display_name || null,
       did: identity?.external_id || null,
@@ -82,7 +86,23 @@ export class LinkedInService {
       canPublish: connected,
       configuredFromEnv: Boolean(cfg.accessToken),
       oauthConfigured: Boolean(cfg.clientId && cfg.clientSecret && cfg.redirectUrl),
+      accounts: rows.map(row => toPublicAccount(row, { isDefault: Number(row.id) === Number(identity?.id) })),
     }
+  }
+
+  async listAccounts(): Promise<PublicAccount[]> {
+    return (await this.status()).accounts
+  }
+
+  /** The account a bare `linkedin` target publishes through, without connecting anything. */
+  async defaultIdentityId(): Promise<number | null> {
+    const identity = await findIdentityRow<SocialIdentityRow>('linkedin')
+    return isUsableIdentity(identity) ? Number(identity!.id) : null
+  }
+
+  /** Disconnect one account: tokens dropped, row kept for its posts' history. */
+  async disconnect(identityId: number): Promise<PublicAccount> {
+    return toPublicAccount(await revokeIdentityRow('linkedin', identityId))
   }
 
   /** Build the LinkedIn consent URL and remember the CSRF state. */
@@ -95,12 +115,11 @@ export class LinkedInService {
       throw new Error('Set LINKEDIN_REDIRECT_URL to connect with LinkedIn.')
     }
 
-    this.pendingState = randomState()
     return this.driver.getAuthUrl({
       clientId: cfg.clientId,
       redirectUrl: cfg.redirectUrl,
       scopes: cfg.scopes,
-      state: this.pendingState,
+      state: this.pending.issue(true),
     })
   }
 
@@ -108,10 +127,12 @@ export class LinkedInService {
   async handleCallback(code: string, state: string) {
     const cfg = this.config()
     if (!code) throw new Error('LinkedIn did not return an authorization code.')
-    if (this.pendingState && state !== this.pendingState) {
+    // Lenient only when no flow is outstanding at all (a restart mid-consent),
+    // which is the leniency the single-slot version had.
+    const pending = this.pending.take(state)
+    if (!pending.found && !pending.noneOutstanding) {
       throw new Error('LinkedIn OAuth state mismatch. Please start the connection again.')
     }
-    this.pendingState = null
 
     const token = await this.driver.exchangeCode({
       clientId: cfg.clientId,
@@ -134,8 +155,12 @@ export class LinkedInService {
     return this.publicIdentity(identity)
   }
 
-  /** Connect using a pre-obtained token from the environment. */
-  async connectFromEnv() {
+  /**
+   * Connect using a pre-obtained token from the environment. `revive: false`
+   * is the implicit path (a publish falling back to `.env`), which must not
+   * bring back an account the user disconnected.
+   */
+  async connectFromEnv(options: { revive?: boolean } = {}) {
     const cfg = this.config()
     if (!cfg.accessToken) {
       throw new Error('Set LINKEDIN_ACCESS_TOKEN (or connect via OAuth) before using LinkedIn.')
@@ -149,7 +174,7 @@ export class LinkedInService {
       name = profile.name
     }
 
-    const identity = await this.saveSession({ accessToken: cfg.accessToken, authorUrn, name })
+    const identity = await this.saveSession({ accessToken: cfg.accessToken, authorUrn, name }, { revive: options.revive ?? true })
     return this.publicIdentity(identity)
   }
 
@@ -161,22 +186,25 @@ export class LinkedInService {
   async publishToPost(
     post: { id: number, body: string },
     content?: PublishContent,
+    identityId?: number | null,
   ): Promise<CrosspostTargetResult> {
     const driver = await this.ensureDriver()
 
     let identity: SocialIdentityRow
     try {
-      identity = await this.requireIdentity()
+      identity = await this.requireIdentity(identityId)
     }
     catch (error) {
-      return { provider: 'linkedin', ok: false, error: messageOf(error) }
+      return { provider: 'linkedin', ok: false, error: messageOf(error), identityId: identityId || undefined }
     }
+    const account = { identityId: Number(identity.id), handle: identity.handle }
 
     if (post.body.length > this.driver.characterLimit) {
       return {
         provider: 'linkedin',
         ok: false,
         error: `LinkedIn posts must be ${this.driver.characterLimit} characters or fewer.`,
+        ...account,
       }
     }
 
@@ -223,12 +251,13 @@ export class LinkedInService {
         url: published.url,
         uri: published.uri,
         targetId: Number(target.id),
+        ...account,
       }
     }
     catch (error) {
       const message = messageOf(error)
       if (error instanceof LinkedInApiError && error.isAuthError) {
-        await this.markExpired(identity.id)
+        await markIdentityExpired(identity.id)
       }
       await database.updateTable('post_targets').set({
         status: 'failed',
@@ -236,7 +265,7 @@ export class LinkedInService {
         updated_at: now(),
       }).where('id', '=', target.id).execute()
 
-      return { provider: 'linkedin', ok: false, error: message, targetId: Number(target.id) }
+      return { provider: 'linkedin', ok: false, error: message, targetId: Number(target.id), ...account }
     }
   }
 
@@ -245,9 +274,12 @@ export class LinkedInService {
    * `remote_uri`. Enumerating the account's full history additionally needs
    * `r_member_social`, which publishing-only apps don't hold — the driver
    * turns that rejection into an actionable message.
+   *
+   * Pass an identity id to purge one specific account; without one this is the
+   * default account, as before.
    */
-  async purgeAdapter(): Promise<ProviderPurgeAdapter> {
-    const identity = await this.requireIdentity()
+  async purgeAdapter(identityId?: number | null): Promise<ProviderPurgeAdapter> {
+    const identity = await this.requireIdentity(identityId)
     const credentials = {
       handle: identity.handle,
       // `external_id` carries the member URN (urn:li:person:{sub}).
@@ -264,17 +296,25 @@ export class LinkedInService {
     }
   }
 
-  private async requireIdentity(): Promise<SocialIdentityRow> {
-    const existing = await this.findIdentity()
-    if (existing?.access_token && existing.auth_status === 'connected') {
-      return await this.refreshIfExpiring(existing)
+  /**
+   * The account to act as. A named account must be usable as-is; without a
+   * name this is the default account, falling back to the `.env` token.
+   */
+  private async requireIdentity(identityId?: number | null): Promise<SocialIdentityRow> {
+    if (identityId) {
+      const chosen = await findIdentityRow<SocialIdentityRow>('linkedin', identityId)
+      if (isUsableIdentity(chosen)) return await this.refreshIfExpiring(chosen!)
+      throw unavailableAccountError('LinkedIn', chosen)
     }
+
+    const existing = await findIdentityRow<SocialIdentityRow>('linkedin')
+    if (isUsableIdentity(existing)) return await this.refreshIfExpiring(existing!)
 
     // Fall back to an env-configured token if one is available.
     if (this.config().accessToken) {
-      await this.connectFromEnv()
-      const connected = await this.findIdentity()
-      if (connected?.access_token) return connected
+      const connected = await this.connectFromEnv({ revive: false })
+      const identity = connected.id ? await findIdentityRow<SocialIdentityRow>('linkedin', connected.id) : undefined
+      if (identity?.access_token) return identity
     }
 
     throw new Error('Connect LinkedIn before publishing.')
@@ -315,23 +355,20 @@ export class LinkedInService {
     }
   }
 
-  private async findIdentity(): Promise<SocialIdentityRow | undefined> {
-    return await database
-      .selectFrom('social_identities')
-      .selectAll()
-      .where('provider', '=', 'linkedin')
-      .orderBy('updated_at', 'desc')
-      .executeTakeFirst()
-  }
-
-  private async saveSession(input: { accessToken: string, authorUrn: string, name?: string, refreshToken?: string, expiresIn?: number }): Promise<SocialIdentityRow> {
+  /**
+   * Save tokens against the account they belong to, keyed on the member URN.
+   * The handle here is a display name, so it is never used to match — two
+   * people called the same thing are still two accounts.
+   */
+  private async saveSession(
+    input: { accessToken: string, authorUrn: string, name?: string, refreshToken?: string, expiresIn?: number },
+    options: { revive?: boolean } = {},
+  ): Promise<SocialIdentityRow> {
     const accountId = await ensureAccount()
     const driver = await this.ensureDriver()
-    const existing = await this.findIdentity()
-    const savedAt = now()
     const handle = (input.name || input.authorUrn.replace('urn:li:person:', '')).trim()
 
-    const values = {
+    return await upsertIdentityRow<SocialIdentityRow>('linkedin', { externalId: input.authorUrn }, {
       handle,
       display_name: input.name || null,
       provider: 'linkedin',
@@ -342,28 +379,7 @@ export class LinkedInService {
       token_expires_at: expiresAt(input.expiresIn),
       account_id: accountId,
       social_driver_id: driver.id,
-      updated_at: savedAt,
-    }
-
-    if (existing) {
-      await database.updateTable('social_identities').set(values).where('id', '=', existing.id).execute()
-    }
-    else {
-      await database.insertInto('social_identities').values({
-        uuid: uuid(),
-        ...values,
-        created_at: savedAt,
-      }).execute()
-    }
-
-    return await this.findIdentity() as SocialIdentityRow
-  }
-
-  private async markExpired(id: number): Promise<void> {
-    await database.updateTable('social_identities').set({
-      auth_status: 'expired',
-      updated_at: now(),
-    }).where('id', '=', id).execute()
+    }, { revive: options.revive, label: 'This LinkedIn' })
   }
 
   private async ensureDriver(): Promise<SocialDriverRow> {
@@ -413,6 +429,7 @@ export class LinkedInService {
       return {
         connected: false,
         provider: 'linkedin',
+        id: null,
         handle: null,
         displayName: null,
         did: null,
@@ -424,6 +441,7 @@ export class LinkedInService {
     return {
       connected,
       provider: 'linkedin',
+      id: Number(row.id),
       handle: row.handle,
       displayName: row.display_name || null,
       did: row.external_id || null,

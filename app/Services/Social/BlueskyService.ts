@@ -1,8 +1,11 @@
 import type { BlueskySession, CrosspostTargetResult, ProviderPurgeAdapter, PublishContent, PublishedPost, SocialIdentityCredentials, TimelineResult } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import type { PublicAccount } from '../../Support/Social/accounts'
+import { pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
 import { describeBlueskyError } from '../../Support/Social/bluesky-errors'
 import { BlueskyApiError, BlueskyDriver } from './Drivers/BlueskyDriver'
+import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 
 const database = db as any
 
@@ -44,6 +47,7 @@ function publicIdentity(row: SocialIdentityRow | undefined) {
     return {
       connected: false,
       provider: 'bluesky',
+      id: null,
       handle: null,
       displayName: null,
       did: null,
@@ -56,6 +60,7 @@ function publicIdentity(row: SocialIdentityRow | undefined) {
   return {
     connected,
     provider: 'bluesky',
+    id: Number(row.id),
     handle: row.handle,
     displayName: row.display_name || null,
     did: row.external_id || null,
@@ -63,11 +68,26 @@ function publicIdentity(row: SocialIdentityRow | undefined) {
   }
 }
 
+/**
+ * An account Bluesky can publish with. Looser than the other networks: an
+ * expired access JWT is fine as long as a token is on file, because
+ * `withFreshSession` refreshes it mid-request.
+ */
+function hasSession(row: SocialIdentityRow): boolean {
+  return row.auth_status !== 'revoked' && Boolean(row.access_token)
+}
+
 export class BlueskyService {
   private driver = new BlueskyDriver()
 
+  /**
+   * The network card's state. The top-level fields describe the default
+   * account, exactly as they did when Bluesky held one account, so existing
+   * callers keep working; `accounts` lists every connected one.
+   */
   async status() {
-    const identity = await this.findIdentity()
+    const rows = await listIdentityRows<SocialIdentityRow>('bluesky')
+    const identity = pickDefaultIdentity(rows)
     const driver = await this.ensureDriver()
 
     return {
@@ -75,28 +95,54 @@ export class BlueskyService {
       characterLimit: driver.character_limit,
       canPublish: Boolean(identity?.access_token) && identity?.auth_status === 'connected',
       configuredFromEnv: Boolean(env.BLUESKY_IDENTIFIER && env.BLUESKY_APP_PASSWORD),
+      accounts: this.toAccounts(rows, identity),
     }
   }
 
-  async connect(identifier: string, password: string) {
+  /** Every connected (not disconnected) Bluesky account, default first-class. */
+  async listAccounts(): Promise<PublicAccount[]> {
+    const rows = await listIdentityRows<SocialIdentityRow>('bluesky')
+    return this.toAccounts(rows, pickDefaultIdentity(rows))
+  }
+
+  /** The account a bare `bluesky` target publishes through, without connecting anything. */
+  async defaultIdentityId(): Promise<number | null> {
+    const identity = await findIdentityRow<SocialIdentityRow>('bluesky')
+    return identity && hasSession(identity) ? Number(identity.id) : null
+  }
+
+  /**
+   * Log in and save the account. A handle that is already connected has its
+   * session refreshed; any other handle is added alongside the existing ones.
+   */
+  async connect(identifier: string, password: string, options: { revive?: boolean } = {}) {
     const driver = await this.ensureDriver()
     const session = await this.driver.createSession({
       identifier: normalizeHandle(identifier),
       password,
     })
 
-    const identity = await this.saveSession(session, driver)
+    const identity = await this.saveSession(session, driver, { revive: options.revive ?? true })
     return publicIdentity(identity)
   }
 
-  async connectFromEnv() {
+  async connectFromEnv(options: { revive?: boolean } = {}) {
     const identifier = String(env.BLUESKY_IDENTIFIER || '').trim()
     const password = String(env.BLUESKY_APP_PASSWORD || '').trim()
     if (!identifier || !password) {
       throw new Error('Set BLUESKY_IDENTIFIER and BLUESKY_APP_PASSWORD before using Bluesky.')
     }
 
-    return await this.connect(identifier, password)
+    return await this.connect(identifier, password, options)
+  }
+
+  /**
+   * Disconnect one account. Its tokens are dropped and it disappears from
+   * every list and default lookup; the row stays so its published posts keep
+   * their attribution (and a later purge can still find them).
+   */
+  async disconnect(identityId: number): Promise<PublicAccount> {
+    return toPublicAccount(await revokeIdentityRow('bluesky', identityId))
   }
 
   async publishNow(
@@ -164,22 +210,25 @@ export class BlueskyService {
   async publishToPost(
     post: { id: number, body: string },
     content?: PublishContent,
+    identityId?: number | null,
   ): Promise<CrosspostTargetResult> {
     const driver = await this.ensureDriver()
 
     let identity: SocialIdentityRow
     try {
-      identity = await this.requireIdentity()
+      identity = await this.requireIdentity(identityId)
     }
     catch (error) {
-      return { provider: 'bluesky', ok: false, error: error instanceof Error ? error.message : String(error) }
+      return { provider: 'bluesky', ok: false, error: error instanceof Error ? error.message : String(error), identityId: identityId || undefined }
     }
+    const account = { identityId: Number(identity.id), handle: identity.handle }
 
     if (post.body.length > this.driver.characterLimit) {
       return {
         provider: 'bluesky',
         ok: false,
         error: `Bluesky posts must be ${this.driver.characterLimit} characters or fewer.`,
+        ...account,
       }
     }
 
@@ -259,6 +308,7 @@ export class BlueskyService {
         uri: published.uri,
         cid: published.cid,
         targetId: Number(target.id),
+        ...account,
       }
     }
     catch (error) {
@@ -270,7 +320,7 @@ export class BlueskyService {
         updated_at: failedAt,
       }).where('id', '=', target.id).execute()
 
-      return { provider: 'bluesky', ok: false, error: message, targetId: Number(target.id) }
+      return { provider: 'bluesky', ok: false, error: message, targetId: Number(target.id), ...account }
     }
   }
 
@@ -278,34 +328,70 @@ export class BlueskyService {
    * Refresh engagement counts (likes/reposts/replies) for recently
    * published Bluesky targets into `post_targets.metrics`. Batched 25
    * URIs per API call; missing posts (deleted upstream) are skipped.
+   *
+   * Each target is read through the account that published it, so one
+   * account's dead session only stalls its own posts. Targets from before
+   * accounts were tracked (no `social_identity_id`), or from an account since
+   * disconnected, go through the default account — post metrics are public, so
+   * any live session can read them.
    */
   async syncMetrics(limit = 100): Promise<{ synced: number }> {
-    const identity = await this.requireIdentity()
+    let identities = (await listIdentityRows<SocialIdentityRow>('bluesky')).filter(hasSession)
+    if (identities.length === 0) identities = [await this.requireIdentity()]
+    const fallback = pickDefaultIdentity(identities, hasSession) || identities[0]!
     await this.ensureDriver()
 
     const targets = await database
       .selectFrom('post_targets')
-      .select(['id', 'remote_uri'])
+      .select(['id', 'remote_uri', 'social_identity_id'])
       .where('provider', '=', 'bluesky')
       .where('status', '=', 'published')
       .where('remote_uri', 'like', 'at://%')
       .orderBy('id', 'desc')
-      .limit(limit)
+      .limit(limit * identities.length)
       .execute()
 
     if (targets.length === 0) return { synced: 0 }
 
+    const byIdentity = new Map<number, { identity: SocialIdentityRow, targets: any[] }>()
+    for (const target of targets) {
+      const owner = identities.find(identity => Number(identity.id) === Number(target.social_identity_id)) || fallback
+      const group = byIdentity.get(Number(owner.id)) || { identity: owner, targets: [] }
+      group.targets.push(target)
+      byIdentity.set(Number(owner.id), group)
+    }
+
+    let synced = 0
+    let firstError: unknown
+    let anySucceeded = false
+    for (const { identity, targets: owned } of byIdentity.values()) {
+      try {
+        synced += await this.syncMetricsFor(identity, owned.slice(0, limit))
+        anySucceeded = true
+      }
+      catch (error) {
+        firstError ??= error
+      }
+    }
+
+    // One expired account must not hide the others' progress, but if nothing
+    // synced at all the caller (the job, the metrics action) should hear why.
+    if (!anySucceeded && firstError) throw firstError
+    return { synced }
+  }
+
+  private async syncMetricsFor(identity: SocialIdentityRow, targets: any[]): Promise<number> {
+    let current = identity
     let synced = 0
     for (let offset = 0; offset < targets.length; offset += 25) {
       const chunk = targets.slice(offset, offset + 25)
-      const metrics = await this.withFreshSession(identity, freshIdentity =>
+      const metrics = await this.withFreshSession(current, freshIdentity =>
         this.driver.postMetrics({
           handle: freshIdentity.handle,
           did: freshIdentity.external_id || undefined,
           accessToken: freshIdentity.access_token || undefined,
           refreshToken: freshIdentity.refresh_token || undefined,
-        }, chunk.map((target: any) => String(target.remote_uri))),
-      )
+        }, chunk.map((target: any) => String(target.remote_uri))), (refreshed) => { current = refreshed })
 
       const byUri = new Map(metrics.map(item => [item.uri, item]))
       for (const target of chunk) {
@@ -323,11 +409,12 @@ export class BlueskyService {
       }
     }
 
-    return { synced }
+    return synced
   }
 
-  async syncTimeline(limit = 30): Promise<TimelineResult & { saved: number }> {
-    const identity = await this.requireIdentity()
+  /** Pull one account's home timeline (the default account when none is named). */
+  async syncTimeline(limit = 30, identityId?: number | null): Promise<TimelineResult & { saved: number }> {
+    const identity = await this.requireIdentity(identityId)
     const driver = await this.ensureDriver()
     const timeline = await this.withFreshSession(identity, freshIdentity =>
       this.driver.timeline({
@@ -381,9 +468,12 @@ export class BlueskyService {
    * The purge surface for Bluesky. Every call runs through `withFreshSession`
    * so a long-running purge survives the ~2h access-JWT lifetime, and the
    * refreshed identity is carried forward instead of re-refreshed each time.
+   *
+   * Pass an identity id to purge one specific account; without one this is the
+   * default account, as before.
    */
-  async purgeAdapter(): Promise<ProviderPurgeAdapter> {
-    let current = await this.requireIdentity()
+  async purgeAdapter(identityId?: number | null): Promise<ProviderPurgeAdapter> {
+    let current = await this.requireIdentity(identityId)
     const credentials = (identity: SocialIdentityRow) => ({
       handle: identity.handle,
       did: identity.external_id || undefined,
@@ -411,8 +501,11 @@ export class BlueskyService {
    * already has. Rather than give it a second copy of connect/refresh/expire,
    * this exposes the existing one.
    */
-  async withSession<T>(callback: (credentials: SocialIdentityCredentials) => Promise<T>): Promise<T> {
-    const identity = await this.requireIdentity()
+  async withSession<T>(
+    callback: (credentials: SocialIdentityCredentials) => Promise<T>,
+    identityId?: number | null,
+  ): Promise<T> {
+    const identity = await this.requireIdentity(identityId)
 
     return await this.withFreshSession(identity, current => callback({
       handle: current.handle,
@@ -441,46 +534,57 @@ export class BlueskyService {
       try {
         const session = await this.driver.refreshSession(identity.refresh_token)
         const driver = await this.ensureDriver()
-        refreshed = await this.saveSession(session, driver)
+        // `revive: false`: a refresh racing a disconnect must not undo it.
+        refreshed = await this.saveSession(session, driver, { revive: false })
       }
       catch {
-        await database.updateTable('social_identities')
-          .set({ auth_status: 'expired', updated_at: now() })
-          .where('id', '=', identity.id)
-          .execute()
-        throw new Error('Bluesky session expired — reconnect your account on the Accounts page.')
+        await markIdentityExpired(identity.id)
+        throw new Error(`Bluesky session for @${identity.handle} expired — reconnect it on the Accounts page.`)
       }
       onRefresh?.(refreshed)
       return await callback(refreshed)
     }
   }
 
-  private async requireIdentity(): Promise<SocialIdentityRow> {
-    const existing = await this.findIdentity()
-    if (existing?.access_token) return existing
+  /**
+   * The account to act as. A named account must be usable as-is — publishing
+   * through a different one than the user picked would be worse than failing.
+   * Without a name this is the default account, falling back to the
+   * `.env` credentials exactly as it did before accounts were plural.
+   */
+  private async requireIdentity(identityId?: number | null): Promise<SocialIdentityRow> {
+    if (identityId) {
+      const chosen = await findIdentityRow<SocialIdentityRow>('bluesky', identityId)
+      if (chosen && hasSession(chosen)) return chosen
+      throw unavailableAccountError('Bluesky', chosen)
+    }
 
-    await this.connectFromEnv()
-    const connected = await this.findIdentity()
-    if (connected?.access_token) return connected
+    const existing = await findIdentityRow<SocialIdentityRow>('bluesky')
+    if (existing && hasSession(existing)) return existing
+
+    // Implicit, so it must not resurrect an account the user disconnected.
+    const connected = await this.connectFromEnv({ revive: false })
+    const identity = connected.id ? await findIdentityRow<SocialIdentityRow>('bluesky', connected.id) : undefined
+    if (identity && hasSession(identity)) return identity
 
     throw new Error('Connect Bluesky before publishing.')
   }
 
-  private async findIdentity(): Promise<SocialIdentityRow | undefined> {
-    return await database
-      .selectFrom('social_identities')
-      .selectAll()
-      .where('provider', '=', 'bluesky')
-      .orderBy('updated_at', 'desc')
-      .executeTakeFirst()
-  }
-
-  private async saveSession(session: BlueskySession, driver: SocialDriverRow): Promise<SocialIdentityRow> {
+  /**
+   * Save a session against the account it belongs to. Keyed on the DID, which
+   * survives handle changes; the handle only matches legacy rows saved without
+   * one. A different DID is a different account and gets its own row.
+   */
+  private async saveSession(
+    session: BlueskySession,
+    driver: SocialDriverRow,
+    options: { revive?: boolean } = {},
+  ): Promise<SocialIdentityRow> {
     const accountId = await this.ensureAccount()
-    const existing = await this.findIdentity()
-    const savedAt = now()
-    const values = {
-      handle: normalizeHandle(session.handle),
+    const handle = normalizeHandle(session.handle)
+
+    return await upsertIdentityRow<SocialIdentityRow>('bluesky', { externalId: session.did, handle }, {
+      handle,
       display_name: session.displayName || null,
       provider: 'bluesky',
       external_id: session.did,
@@ -489,21 +593,11 @@ export class BlueskyService {
       refresh_token: session.refreshJwt,
       account_id: accountId,
       social_driver_id: driver.id,
-      updated_at: savedAt,
-    }
+    }, { revive: options.revive, label: 'This Bluesky' })
+  }
 
-    if (existing) {
-      await database.updateTable('social_identities').set(values).where('id', '=', existing.id).execute()
-    }
-    else {
-      await database.insertInto('social_identities').values({
-        uuid: uuid(),
-        ...values,
-        created_at: savedAt,
-      }).execute()
-    }
-
-    return await this.findIdentity() as SocialIdentityRow
+  private toAccounts(rows: SocialIdentityRow[], fallback: SocialIdentityRow | undefined): PublicAccount[] {
+    return rows.map(row => toPublicAccount(row, { isDefault: Number(row.id) === Number(fallback?.id) }))
   }
 
   private async ensureDriver(): Promise<SocialDriverRow> {
