@@ -81,6 +81,11 @@ const config: PickierOptions = {
     '**/cache/**',
     '**/storage/framework/cache/**',
     '**/storage/framework/auto-imports/**',
+    // Vendored framework defaults: `buddy upgrade` replaces this tree wholesale
+    // from @stacksjs/defaults, so a finding here is upstream's to fix and a
+    // local edit would be overwritten. 0.75.87 shipped four unused-parameter
+    // errors in it, which failed CI's lint job on an otherwise clean app.
+    '**/storage/framework/defaults/**',
     '**/storage/framework/frontend-dist/**',
     '**/storage/framework/server/storage/**',
     '**/.bunpress/**',
