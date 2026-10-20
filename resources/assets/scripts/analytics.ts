@@ -244,9 +244,20 @@ function fillStats(payload: AnalyticsPayload): void {
   // The mount observer refires on any DOM change; fill once per page mount
   // or the fill's own mutations retrigger it in a microtask loop.
   if (!page || page.dataset.analyticsFilled === 'true') return
+
+  // `payload.data` reaches here through an `as` cast, so nothing has checked
+  // its shape at runtime. A response missing `stats` used to throw an uncaught
+  // TypeError on the first read — and because the fill-once latch was set
+  // above this line, the page stayed marked filled and could never recover.
+  // The fetch's own catch never saw it either, because it happens after the
+  // promise resolves. Latch after the guard so a later attempt can succeed.
+  const stats = payload?.stats
+  if (!stats) {
+    showAnalyticsError('Analytics data was incomplete.')
+    return
+  }
   page.dataset.analyticsFilled = 'true'
 
-  const { stats } = payload
   const delta = stats.postsThisWeek - stats.postsLastWeek
   const set = (selector: string, value: string): void => {
     const element = page.querySelector(selector)
@@ -272,8 +283,8 @@ function fillStats(payload: AnalyticsPayload): void {
 
   const mix = page.querySelector('[data-analytics-channel-mix]')
   if (mix) {
-    mix.innerHTML = payload.channelMix.length
-      ? payload.channelMix.map(channel => `
+    mix.innerHTML = (payload.channelMix ?? []).length
+      ? (payload.channelMix ?? []).map(channel => `
           <div class="grid gap-1.5">
             <div class="flex items-center justify-between text-xs">
               <span class="font-bold">${providerNames[channel.provider] || channel.provider}</span>
@@ -289,8 +300,8 @@ function fillStats(payload: AnalyticsPayload): void {
 
   const windows = page.querySelector('[data-analytics-windows]')
   if (windows) {
-    windows.innerHTML = payload.windows.length
-      ? payload.windows.map(window_ => `
+    windows.innerHTML = (payload.windows ?? []).length
+      ? (payload.windows ?? []).map(window_ => `
           <div class="flex items-center justify-between">
             <span>${window_.count} post${window_.count === 1 ? '' : 's'}</span>
             <span class="font-bold text-neutral-950">${formatHour(window_.hour)}</span>
