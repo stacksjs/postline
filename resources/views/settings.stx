@@ -144,16 +144,16 @@
     /**
      * The stored theme preference.
      *
-     * `'system'`, not `'auto'` — the layout's pre-paint bootstrap matches on
-     * `'system'`, and `useColorMode` cannot be used here because it only reads
-     * localStorage after hydration begins (stacksjs/stx#1794) and writes a
-     * hard-coded `light|dark|auto` vocabulary (stacksjs/stx#1788).
+     * `'system'`, not `'auto'` — `app.colorMode` in config/ui.ts sets
+     * `autoValue: 'system'`, so the boot script reads and writes this app's
+     * existing vocabulary and no saved preference is rewritten.
      */
     type ThemePreference = 'light' | 'dark' | 'system'
 
-    const readStoredTheme = () => {
+    const readStoredTheme = (): ThemePreference => {
+      const boot = window.__STX_COLOR_MODE__
       try {
-        return localStorage.getItem('theme') || 'system'
+        return (localStorage.getItem(boot?.storageKey ?? 'theme') ?? 'system') as ThemePreference
       }
       catch {
         return 'system'
@@ -169,28 +169,40 @@
     /**
      * Applies the preference to the root html element.
      *
-     * stx ships `useColorMode`, which is what this should be, but it cannot
-     * express what The Open Times needs on two counts (see stacksjs/stx issue):
-     *   1. `applyDOM` sets EITHER `darkClass` OR `attribute`, never both, and
-     *      the app needs `html.dark` (every dark: utility and the CSS-var
-     *      overrides key off it) together with `data-theme`.
-     *   2. It persists only 'light' | 'dark' | 'auto'. The Open Times stores
-     *      'system', which `readPersisted` rejects — adopting it would rewrite
-     *      the key to 'auto' and silently break the layout's pre-paint block,
-     *      which matches on 'system'.
-     * Revisit once either is addressed.
+     * The pre-paint stamp itself now lives in `app.colorMode` (config/ui.ts),
+     * which is why neither this view nor any layout carries a bootstrap any
+     * more. But that boot script runs ONCE and exposes no re-apply hook — it
+     * publishes `window.__STX_COLOR_MODE__` as plain config plus the resolved
+     * `mode`, with no `sync()` and no `prefers-color-scheme` listener. So a
+     * runtime switch still has to stamp, exactly as before.
+     *
+     * What changed is where the names come from: `darkClass` and `attribute`
+     * are read off the published config rather than written out again here, so
+     * this can no longer drift from config/ui.ts. The literals are only the
+     * fallback for the window before the boot script has run.
+     *
+     * Both reasons this view hand-rolled the whole thing are closed:
+     * stacksjs/stx#1788 (class and attribute together, and `autoValue` keeps
+     * this app's 'system' spelling instead of rewriting it to 'auto') and
+     * stacksjs/stx#1794 (there is a pre-paint story now).
      */
     const applyTheme = (pref: ThemePreference): void => {
+      const boot = window.__STX_COLOR_MODE__
       const dark = pref === 'dark'
         || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
-      document.documentElement.classList.toggle('dark', dark)
-      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+      const root = document.documentElement
+      const darkClass = boot?.darkClass ?? 'dark'
+      const attribute = boot?.attribute ?? 'data-theme'
+      if (darkClass)
+        root.classList.toggle(darkClass, dark)
+      if (attribute)
+        root.setAttribute(attribute, dark ? 'dark' : 'light')
     }
 
     const setTheme = (pref: ThemePreference): void => {
       themePref.set(pref)
       try {
-        localStorage.setItem('theme', pref)
+        localStorage.setItem(window.__STX_COLOR_MODE__?.storageKey ?? 'theme', pref)
       }
       catch {}
       applyTheme(pref)

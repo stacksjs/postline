@@ -52,9 +52,61 @@ export default {
   // page, ahead of the real description.
   skipDefaultSeoTags: true,
 
-  // Surface prohibited DOM access in client scripts. Left as warn-only:
-  // `failOnViolation` stays false until the existing violations are cleared,
-  // then flip it so regressions throw at render time.
+  app: {
+    /**
+     * The pre-paint theme stamp, owned by the framework rather than copied into
+     * every layout. `injectColorModeBootScript` places this at the very top of
+     * `<head>`, above any stylesheet — CSS blocks JS, so a `<link>` above it
+     * would delay the one script whose whole job is to beat first paint.
+     *
+     * These five values are exactly what the four hand-rolled copies did:
+     * read `theme`, treat `system` as "follow the OS", then set `data-theme` to
+     * the RESOLVED `dark`/`light` and toggle the `dark` class. Both axes are
+     * load-bearing and that is why this could not be adopted before — every
+     * `dark:` utility and the CSS-var overrides key off the class, while the
+     * design tokens key off the attribute.
+     *
+     * Both blockers the old comments cite are closed and shipped:
+     *   - stacksjs/stx#1788 — applyDOM set EITHER darkClass OR attribute, and
+     *     persisted only light|dark|auto. `stamp()` now sets both, and
+     *     `autoValue: 'system'` keeps this app's existing stored vocabulary, so
+     *     nobody's saved preference is rewritten.
+     *   - stacksjs/stx#1794 — useColorMode had no pre-paint story. This boot
+     *     script IS the pre-paint story.
+     *
+     * Scope, so nobody expects more than it does: the generated script stamps
+     * ONCE, before paint, and publishes `window.__STX_COLOR_MODE__` with the
+     * resolved mode and this config. It installs no `prefers-color-scheme`
+     * listener and exposes no re-apply hook, so a live OS theme change is not
+     * picked up until the next load — same as the hand-rolled copies it
+     * replaces, so no behaviour is lost. The runtime switcher in
+     * settings.stx still stamps on click; it now reads `darkClass` and
+     * `attribute` off the published config so the two cannot drift.
+     *
+     * `initialMode: 'system'` is normalised to `'auto'` inside the generated
+     * config, while `autoValue: 'system'` controls what is read from and
+     * written to storage — which is what keeps existing saved preferences
+     * working.
+     */
+    colorMode: {
+      storageKey: 'theme',
+      initialMode: 'system',
+      autoValue: 'system',
+      darkClass: 'dark',
+      attribute: 'data-theme',
+    },
+  },
+
+  // Surface prohibited DOM access in client scripts. Left as warn-only.
+  // `failOnViolation` MUST stay false until stacksjs/stx#2097 ships: `true`
+  // does not harden this gate, it hides it. validateClientScript throws a
+  // plain Error, which processDirectives catches at process.js:417 — that line
+  // rethrows only StxValidationError, a class the package never constructs —
+  // so the violation lands in createFallbackContent. Measured on 0.2.605: one
+  // prohibited call took a marketing page from 38329 bytes to 9396, no <h1>,
+  // no footer, the body replaced by an error string leaking source paths, at
+  // HTTP 200, with nothing in the server log. With `false` the same violation
+  // prints a warning and the page renders.
   strict: {
     enabled: true,
     failOnViolation: false,

@@ -52,16 +52,14 @@
     })()
   </script>
   <script>
-    // Theme bootstrap — runs before paint to avoid a flash. Stored
-    // preference is 'light' | 'dark' | 'system' (default system).
+    // Sidebar bootstrap — runs before paint so the shell does not jump from
+    // expanded to collapsed on the first frame. The theme half of this block
+    // moved to `app.colorMode` in config/ui.ts; what is left has no config
+    // equivalent, because --ot-sidebar-width lands on document.documentElement,
+    // outside every component's markup.
     ;(() => {
       const root = document.documentElement
       try {
-        const stored = window.localStorage?.getItem('theme') || 'system'
-        const dark = stored === 'dark' || (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-        root.classList.toggle('dark', dark)
-        root.setAttribute('data-theme', dark ? 'dark' : 'light')
-
         const sidebarCollapsed = window.localStorage?.getItem('ot.sidebar.collapsed') === 'true'
         root.classList.toggle('ot-sidebar-collapsed', sidebarCollapsed)
         root.dataset.stxSidebarCollapsed = sidebarCollapsed ? 'true' : 'false'

@@ -4,20 +4,10 @@
 
 @section('content')
   @meta('description', 'Sign in to your Open Times workspace.')
-  <script>
-    // Login uses a different layout, so it carries its own theme bootstrap.
-    // Stays a plain pre-paint script on purpose: it must run before first paint,
-    // and a hydrated directive would flash the wrong theme. See
-    // stacksjs/stx#1788 for why useColorMode cannot express this yet.
-    ;(() => {
-      try {
-        const s = localStorage.getItem('theme') || 'system'
-        const d = s === 'dark' || (s === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-        document.documentElement.classList.toggle('dark', d)
-        document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light')
-      } catch {}
-    })()
-  </script>
+  {{-- The theme bootstrap that used to live here is now `app.colorMode` in
+      config/ui.ts, so this page gets the same pre-paint stamp as every layout
+      without carrying its own copy. stacksjs/stx#1788, the reason it was
+      hand-rolled, is closed. --}}
   <main class="grid place-items-center px-4 min-h-screen bg-bg" data-testid="login-page">
     <section class="grid gap-5 p-6 max-w-sm w-full bg-panel border border-line rounded-2xl shadow-sm">
       <header class="grid gap-2 justify-items-center text-center">
