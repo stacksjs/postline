@@ -186,7 +186,10 @@
               <input class="px-3 h-9 text-ink text-xs bg-white border border-line outline-none rounded-xl focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" name="instance" placeholder="mastodon.social" autocomplete="url" aria-label="Mastodon instance" data-mastodon-instance required>
               <input class="px-3 h-9 text-ink text-xs bg-white border border-line outline-none rounded-xl focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" name="access_token" type="password" placeholder="Access token" autocomplete="off" aria-label="Mastodon access token" data-mastodon-token required>
               <button class="inline-flex items-center justify-center px-3 h-9 w-full font-bold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" data-mastodon-connect-submit>Connect Mastodon</button>
-              <p class="m-0 text-[11px] text-muted">Create a token in your instance settings with status and media write access. A token for another account, on any instance, adds it alongside.</p>
+              {{-- read:accounts is not optional: connecting verifies the token
+                  against /api/v1/accounts/verify_credentials before it is saved,
+                  so a write-only token fails at connect, not at publish. --}}
+              <p class="m-0 text-[11px] text-muted">Create a token in your instance settings with the read:accounts, write:statuses and write:media scopes. A token for another account, on any instance, adds it alongside.</p>
             </form>
           </details>
         </article>
