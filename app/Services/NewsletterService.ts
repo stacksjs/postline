@@ -265,7 +265,14 @@ export class NewsletterService {
       const url = send.url ? (String(send.url).startsWith('http') ? String(send.url) : `${base}${send.url}`) : null
 
       try {
-        const result = await mail.send({
+        // sendOrFail, not send: `send()` reports a failure by RETURN VALUE
+        // (`{ success: false }`) and resolves, so the catch below never fires
+        // and every failure counts as a delivery. `sendOrFail()` throws an
+        // EmailDeliveryError instead, which is what this loop is written
+        // around — and it is what the framework's own Mailable uses.
+        // Both are typed Promise<EmailResult>, so nothing but this comment
+        // distinguishes them at the call site (stacksjs/stacks#2930).
+        await mail.sendOrFail({
           to: [recipient.email],
           from: fromAddress(publication.name),
           subject: String(send.subject),
@@ -278,24 +285,6 @@ export class NewsletterService {
             'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
           },
         } as any)
-
-        // A failed send does NOT throw. The driver base class reports failure
-        // by RETURN VALUE — handleError() logs and returns
-        // `{ success: false, message }`, while handleSuccess() returns
-        // `{ success: true, messageId }`. Relying on the catch below alone
-        // counted every failure as a delivery: an edition whose SMTP
-        // connection was refused was recorded `status=sent, delivered=1,
-        // failed=0, last_error=(empty)`, so a publication would believe
-        // subscribers received something they never got.
-        //
-        // Checking `!== false` rather than `=== true` on purpose: a driver
-        // that returns nothing at all has not reported a failure, and the
-        // throw path still covers the ones that raise.
-        if (result && typeof result === 'object' && (result as { success?: boolean }).success === false) {
-          failed += 1
-          lastError = String((result as { message?: string }).message || 'The mail driver reported a failure.')
-          continue
-        }
 
         delivered += 1
       }
