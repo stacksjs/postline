@@ -84,6 +84,10 @@
     const storeTokenAndEnter = (token: string, expiresIn?: number | string | null): void => {
       const maxAge = Number(expiresIn) > 0 ? Number(expiresIn) : 60 * 60 * 24 * 30
       useCookie('auth-token', { maxAge }).set(token)
+      // navigate() is the wrong call here, not merely the discouraged one: an
+      // SPA transition keeps the shell that booted without a session, so the
+      // new token would never reach it. The hard load IS the mechanism.
+      // stx-strict-ignore-next-line location.assign
       location.assign('/composer')
     }
 

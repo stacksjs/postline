@@ -16,11 +16,20 @@
       const isNativeApp = window.craft?.__craft_bridge_loaded === true
         || !!window.craft?.window
         || !!window.webkit?.messageHandlers?.craft
+      // Pre-paint and pre-runtime: useRoute() and useCookie() do not exist
+      // yet, and waiting for them would paint the protected page first, which
+      // is the one thing this guard exists to prevent.
+      // stx-strict-ignore-next-line window.location
       const host = window.location.hostname
       const isLoopback = host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host.endsWith('.localhost')
 
-      if (!(isNativeApp && isLoopback) && !/(?:^|;\s*)auth-token=/.test(document.cookie))
+      // stx-strict-ignore-next-line document.cookie
+      if (!(isNativeApp && isLoopback) && !/(?:^|;\s*)auth-token=/.test(document.cookie)) {
+        // replace(), not assign(), so Back does not return to a page the
+        // viewer was just bounced off.
+        // stx-strict-ignore-next-line location.replace window.location
         window.location.replace('/login')
+      }
     })()
   </script>
   <script>
@@ -31,6 +40,9 @@
     // per-call plumbing. The frontend proxy forwards the header to the API.
     ;(() => {
       const nativeFetch = window.fetch.bind(window)
+      // The page gate stores the token in a cookie and this wrapper installs
+      // before any runtime exists, so useCookie() is not available to read it.
+      // stx-strict-ignore-next-line document.cookie
       const readToken = () => document.cookie.match(/(?:^|;\s*)auth-token=([^;]+)/)?.[1]
       const isNativeApp = () => window.craft?.__craft_bridge_loaded === true
         || !!window.craft?.window
@@ -38,6 +50,9 @@
       window.fetch = (input, init = {}) => {
         try {
           const url = typeof input === 'string' ? input : input?.url || ''
+          // Reading the origin to classify a URL, not navigating — useRoute()
+          // answers a different question.
+          // stx-strict-ignore-next-line window.location
           const sameOriginApi = url.startsWith('/api/') || url.startsWith(`${window.location.origin}/api/`)
           const token = readToken()
           if (sameOriginApi && (token || isNativeApp())) {
@@ -60,6 +75,10 @@
     ;(() => {
       const root = document.documentElement
       try {
+        // Pre-paint and pre-runtime: useLocalStorage() does not exist yet, and
+        // reading this after hydration would paint the shell expanded and then
+        // snap it shut.
+        // stx-strict-ignore-next-line window.localStorage
         const sidebarCollapsed = window.localStorage?.getItem('ot.sidebar.collapsed') === 'true'
         root.classList.toggle('ot-sidebar-collapsed', sidebarCollapsed)
         root.dataset.stxSidebarCollapsed = sidebarCollapsed ? 'true' : 'false'
@@ -341,10 +360,20 @@
         bindKeyboardShortcuts()
         bindIdempotentNavigation()
         syncNativeShell()
+        // useEventListener() binds for the lifetime of a scope and tears down
+        // with it. These five are the opposite: they ARE the app shell's
+        // re-binding mechanism across SPA navigations, so they have to outlive
+        // every scope on the page. Each bind* is idempotent through a
+        // dataset.bound guard, which is what makes re-firing on stx:load safe.
+        // stx-strict-ignore-next-line window.addEventListener
         window.addEventListener('stx:load', bindShellHistory)
+        // stx-strict-ignore-next-line window.addEventListener
         window.addEventListener('stx:load', bindSidebarCollapse)
+        // stx-strict-ignore-next-line window.addEventListener
         window.addEventListener('stx:load', bindWindowDragRegions)
+        // stx-strict-ignore-next-line window.addEventListener
         window.addEventListener('stx:load', syncNativeShell)
+        // stx-strict-ignore-next-line window.addEventListener
         window.addEventListener('craft:ready', syncNativeShell)
       })()
     </script>

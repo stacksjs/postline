@@ -219,6 +219,10 @@
      */
     const signOut = () => {
       authToken.set('')
+      // Dropping in-memory state IS the sign-out. navigate() preserves it, so
+      // the previous account's data would sit in the signals behind the login
+      // screen.
+      // stx-strict-ignore-next-line location.assign
       location.assign('/login')
     }
 
