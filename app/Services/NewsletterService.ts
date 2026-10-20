@@ -265,7 +265,7 @@ export class NewsletterService {
       const url = send.url ? (String(send.url).startsWith('http') ? String(send.url) : `${base}${send.url}`) : null
 
       try {
-        await mail.send({
+        const result = await mail.send({
           to: [recipient.email],
           from: fromAddress(publication.name),
           subject: String(send.subject),
@@ -278,6 +278,25 @@ export class NewsletterService {
             'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
           },
         } as any)
+
+        // A failed send does NOT throw. The driver base class reports failure
+        // by RETURN VALUE — handleError() logs and returns
+        // `{ success: false, message }`, while handleSuccess() returns
+        // `{ success: true, messageId }`. Relying on the catch below alone
+        // counted every failure as a delivery: an edition whose SMTP
+        // connection was refused was recorded `status=sent, delivered=1,
+        // failed=0, last_error=(empty)`, so a publication would believe
+        // subscribers received something they never got.
+        //
+        // Checking `!== false` rather than `=== true` on purpose: a driver
+        // that returns nothing at all has not reported a failure, and the
+        // throw path still covers the ones that raise.
+        if (result && typeof result === 'object' && (result as { success?: boolean }).success === false) {
+          failed += 1
+          lastError = String((result as { message?: string }).message || 'The mail driver reported a failure.')
+          continue
+        }
+
         delivered += 1
       }
       catch (error) {
@@ -290,11 +309,20 @@ export class NewsletterService {
     const nextFailed = Number(send.failed_count || 0) + failed
     const complete = nextDelivered + nextFailed >= recipients.length
 
+    // `sent` means "every recipient was delivered to", not merely "we finished
+    // trying". A send where nothing got through is `failed` — otherwise the
+    // sends list shows a confident "sent" against zero deliveries, which is
+    // the same false reassurance the result check above removes. A partial
+    // send stays `sent`; delivered_count and failed_count carry the detail.
+    const status = complete
+      ? (nextDelivered === 0 && nextFailed > 0 ? 'failed' : 'sent')
+      : 'sending'
+
     await database.updateTable('publication_sends').set({
       delivered_count: nextDelivered,
       failed_count: nextFailed,
       recipient_count: recipients.length,
-      status: complete ? 'sent' : 'sending',
+      status,
       sent_at: complete ? now() : null,
       last_error: lastError ? lastError.slice(0, 2000) : send.last_error,
       updated_at: now(),
