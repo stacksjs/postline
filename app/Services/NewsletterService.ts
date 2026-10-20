@@ -49,6 +49,7 @@ export interface SendView {
   recipientCount: number
   deliveredCount: number
   failedCount: number
+  skippedCount: number
   lastError: string | null
   sentAt: string | null
   createdAt: string | null
@@ -63,6 +64,7 @@ export function sendRow(row: any): SendView {
     recipientCount: Number(row.recipient_count || 0),
     deliveredCount: Number(row.delivered_count || 0),
     failedCount: Number(row.failed_count || 0),
+    skippedCount: Number(row.skipped_count || 0),
     lastError: row.last_error || null,
     sentAt: row.sent_at || null,
     createdAt: row.created_at || null,
@@ -238,7 +240,9 @@ export class NewsletterService {
       }).where('id', '=', sendId).execute()
     }
 
-    const processed = Number(send.delivered_count || 0) + Number(send.failed_count || 0)
+    const processed = Number(send.delivered_count || 0)
+      + Number(send.failed_count || 0)
+      + Number(send.skipped_count || 0)
     const batch = recipients.slice(processed, processed + BATCH_SIZE)
 
     if (!batch.length) {
@@ -257,6 +261,7 @@ export class NewsletterService {
     const base = checkoutBaseUrl(env.APP_URL)
     let delivered = 0
     let failed = 0
+    let skipped = 0
     let lastError: string | null = null
 
     for (const recipient of batch) {
@@ -289,6 +294,18 @@ export class NewsletterService {
         delivered += 1
       }
       catch (error) {
+        // A suppressed address is not a failed delivery — it is one we chose
+        // not to mail. The email layer short-circuits before the driver and
+        // returns `{ success: false, message: 'suppressed:<type>', provider:
+        // 'suppression' }`, which sendOrFail wraps in an EmailDeliveryError.
+        // Reading `provider` rather than matching the message, so a reworded
+        // message cannot quietly turn exclusions back into failures.
+        const result = (error as { result?: { provider?: string } })?.result
+        if (result?.provider === 'suppression') {
+          skipped += 1
+          continue
+        }
+
         failed += 1
         lastError = error instanceof Error ? error.message : String(error)
       }
@@ -296,13 +313,16 @@ export class NewsletterService {
 
     const nextDelivered = Number(send.delivered_count || 0) + delivered
     const nextFailed = Number(send.failed_count || 0) + failed
-    const complete = nextDelivered + nextFailed >= recipients.length
+    const nextSkipped = Number(send.skipped_count || 0) + skipped
+    const complete = nextDelivered + nextFailed + nextSkipped >= recipients.length
 
-    // `sent` means "every recipient was delivered to", not merely "we finished
-    // trying". A send where nothing got through is `failed` — otherwise the
-    // sends list shows a confident "sent" against zero deliveries, which is
-    // the same false reassurance the result check above removes. A partial
-    // send stays `sent`; delivered_count and failed_count carry the detail.
+    // `sent` means "we are done and nothing went wrong", not merely "we
+    // finished trying". A send where every attempt errored is `failed` —
+    // otherwise the sends list shows a confident "sent" against zero
+    // deliveries. Skipped recipients are excluded from that judgement on
+    // purpose: a send to a list that happens to be entirely suppressed did
+    // not fail, it had nobody to go to, and marking it `failed` would send
+    // someone hunting for a problem that does not exist.
     const status = complete
       ? (nextDelivered === 0 && nextFailed > 0 ? 'failed' : 'sent')
       : 'sending'
@@ -310,6 +330,7 @@ export class NewsletterService {
     await database.updateTable('publication_sends').set({
       delivered_count: nextDelivered,
       failed_count: nextFailed,
+      skipped_count: nextSkipped,
       recipient_count: recipients.length,
       status,
       sent_at: complete ? now() : null,

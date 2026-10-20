@@ -1,0 +1,12 @@
+-- A suppressed recipient is not a delivery failure.
+--
+-- The suppression list is a deliberate exclusion: a bounced, complained-at or
+-- unsubscribed address is one we chose not to mail. Counting it in
+-- failed_count made a healthy send look broken — a publication with a normal
+-- bounce list would show a growing failure count and, once every remaining
+-- recipient was suppressed, a send marked `failed` with nothing actually wrong.
+--
+-- The count is tracked rather than ignored because the batching offset is
+-- derived from it: deliverBatch resumes at delivered + failed + skipped, so a
+-- skipped recipient that incremented nothing would be retried forever.
+ALTER TABLE "publication_sends" ADD COLUMN "skipped_count" INTEGER not null default 0;
