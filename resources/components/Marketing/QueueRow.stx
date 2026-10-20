@@ -30,10 +30,10 @@ const label = status.charAt(0).toUpperCase() + status.slice(1)
         <span class="h-4 w-4 i-simple-icons-{{ icon }}"></span>
       @endforeach
     </span>
-    <!--
+    {{--
       The status stamp. Going-out-now is the only one that gets the press red;
       everything else is set in ink, the way a printed schedule would be.
-    -->
+    --}}
     @if (isPublishing)
       <span class="inline-flex gap-1.5 items-center shrink-0 px-2 h-6 text-on-accent bg-accent border border-accent folio">
         <span class="h-1.5 w-1.5 bg-on-accent"></span>{{ label }}

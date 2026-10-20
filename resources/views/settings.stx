@@ -26,9 +26,9 @@
             <strong class="text-[13px]">Appearance</strong>
             <p class="mb-0 mt-1 text-muted text-xs">Light, dark, or match your system.</p>
           </div>
-          <!-- Active state binds to a data attribute rather than :class: the
+          {{-- Active state binds to a data attribute rather than :class: the
               binding removes the attribute on false, the styling lives in CSS
-              below, and no dynamically-applied class means nothing to safelist. -->
+              below, and no dynamically-applied class means nothing to safelist. --}}
           <div class="grid grid-cols-3 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Theme">
             <button class="px-3 py-1.5 min-w-16 font-bold text-xs rounded-lg transition-colors" type="button" data-theme-option :data-active="themePref() === 'light'" @click="setTheme('light')">Light</button>
             <button class="px-3 py-1.5 min-w-16 font-bold text-xs rounded-lg transition-colors" type="button" data-theme-option :data-active="themePref() === 'dark'" @click="setTheme('dark')">Dark</button>
@@ -68,11 +68,11 @@
         </label>
       </article>
 
-      <!--
+      {{--
         Retention. Saved on the workspace (accounts row) and applied once a day
         by the AutoDeletePosts job through the same purge engine as the manual
         tool under Channels, so it has the same caps and audit trail.
-      -->
+      --}}
       <article class="grid gap-4 lg:col-span-2 p-4 bg-panel border border-line rounded-2xl shadow-sm" data-retention-card>
         <header class="flex gap-3 items-center justify-between pb-3 border-b border-line">
           <div>

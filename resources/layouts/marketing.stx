@@ -19,9 +19,9 @@
   <link rel="canonical" href="@yield('canonical', 'https://theopentimes.org/')">
   <meta name="theme-color" content="#f1ecdd">
 
-  <!-- Open Graph / social. The card image is absolute: relative URLs are not
+  {{-- Open Graph / social. The card image is absolute: relative URLs are not
       resolved by crawlers, which is why summary_large_image previously
-      rendered with no image at all. -->
+      rendered with no image at all. --}}
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="The Open Times">
   <meta property="og:url" content="@yield('canonical', 'https://theopentimes.org/')">
@@ -36,26 +36,36 @@
   <meta name="twitter:description" content="@yield('description', 'An independent paper you actually own: the publication, the newsletter and the paid subscribers, on software you run. Open source, and nobody takes a cut.')">
   <meta name="twitter:image" content="@yield('ogImage', 'https://theopentimes.org/images/opentimes-og.png')">
 
-  <!--
+  {{--
     The press. UnifrakturMaguntia sets the nameplate, Playfair Display the
     headlines, Libre Baskerville the running copy, Oswald the kickers and
     folios — the four faces declared in config/crosswind.ts. Each is requested
     at exactly the weights that file uses: the display face needs 700/900 and
     an italic for decks, the body face its italic for pull quotes, the other
     two a single weight each.
-  -->
+  --}}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
 
 @endhead
 
-    <!-- Shared chrome: every page of the paper carries the same nameplate, so
-        the masthead and its nav are defined once here rather than per page. -->
+    {{-- Shared chrome: every page of the paper carries the same nameplate, so
+        the masthead and its nav are defined once here rather than per page. --}}
     <MegaMenu />
-    @yield('content')
-    <!-- Shared chrome: the subscription box then the colophon, on every page,
-        so a new page picks both up without remembering to include them. -->
+    {{-- The router's swap container. `__stxRouterConfig.container` is `main`, so
+        without this element the router finds nothing to swap into and every
+        navigation across the marketing pages falls back to `location.href` — a
+        full page load, with no console error. stx does warn, once per route, in
+        the dev server log: "No SPA swap container matching "main" in /…".
+        Deliberately class-free: a class here is inherited by every page the
+        router swaps in, which is how a layout silently restyles pages it never
+        rendered. --}}
+    <main>
+      @yield('content')
+    </main>
+    {{-- Shared chrome: the subscription box then the colophon, on every page,
+        so a new page picks both up without remembering to include them. --}}
     <Subscribe />
     <SiteFooter />
     @stack('scripts')

@@ -7,7 +7,7 @@
 
 @section('content')
 
-  <!--
+  {{--
     THE FRONT PAGE
 
     Laid out the way a broadsheet is rather than the way a landing page is: a
@@ -15,10 +15,10 @@
     it, and a boxed insert in the right-hand well. Everything below is another
     story on the same sheet, separated by printed rules rather than by cards
     floating over a background.
-  -->
+  --}}
   <article class="mx-auto px-6 max-w-[1400px]">
 
-    <!-- Lead story -->
+    {{-- Lead story --}}
     <section class="pt-10 sm:pt-14">
       <p class="text-center kicker">Late edition &middot; Open source &middot; Volume one</p>
 
@@ -35,7 +35,7 @@
       <div class="rule-thick"></div>
     </section>
 
-    <!-- The lede and the boxed insert, set the way a column and a well are -->
+    {{-- The lede and the boxed insert, set the way a column and a well are --}}
     <section class="grid gap-10 lg:gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] pb-14 pt-8">
       <div class="copy">
         <div class="columns-print leading-relaxed text-body">
@@ -53,11 +53,11 @@
         </div>
       </div>
 
-      <!--
+      {{--
         The insert. A single published story carrying the whole product: the
         page it made, the mail it sent, and the wires it went out on. Boxed and
         captioned, because that is what a newspaper does with a picture.
-      -->
+      --}}
       <figure class="self-start m-0">
         <div class="bg-panel border-2 border-ink" role="img" aria-label="A story published to a custom domain, mailed to 4,182 subscribers and wired to six networks">
           <div class="flex gap-3 items-baseline justify-between px-4 py-2 bg-ink">
@@ -95,7 +95,7 @@
     </section>
   </article>
 
-  <!-- The wire: the networks a story goes out on -->
+  {{-- The wire: the networks a story goes out on --}}
   <section class="bg-panel-2 border-ink border-y-2" aria-label="Supported networks">
     <ul class="sr-only">
       <li>Bluesky</li><li>X</li><li>LinkedIn</li><li>Instagram</li><li>Threads</li><li>Mastodon</li>
@@ -123,7 +123,7 @@
     </div>
   </section>
 
-  <!-- Story 02 · The publication -->
+  {{-- Story 02 · The publication --}}
   <section id="publish" class="mx-auto px-6 py-16 sm:py-20 max-w-[1400px]">
     <div class="grid gap-10 lg:gap-14 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
       <div class="max-w-md reveal">
@@ -137,8 +137,8 @@
         </a>
       </div>
 
-      <!-- Three steps as a numbered ledger. Deliberately not cards: this is a
-          sequence, and cards would flatten it into three equal things. -->
+      {{-- Three steps as a numbered ledger. Deliberately not cards: this is a
+          sequence, and cards would flatten it into three equal things. --}}
       <ol class="grid gap-0 m-0 p-0 list-none border-line border-t divide-line divide-y reveal">
         <li class="grid gap-2 sm:gap-6 sm:grid-cols-[auto_minmax(0,1fr)] py-6">
           <span class="font-mono text-muted text-sm">01</span>
@@ -165,7 +165,7 @@
     </div>
   </section>
 
-  <!-- Story 03 · The mail and the money, as two facing panels of unequal weight -->
+  {{-- Story 03 · The mail and the money, as two facing panels of unequal weight --}}
   <section class="mx-auto pb-16 px-6 sm:pb-20 max-w-[1400px]">
     <div class="grid gap-px lg:grid-cols-2 bg-ink border-2 border-ink reveal">
       <div class="grid content-between gap-8 p-7 sm:p-9 bg-bg">
@@ -194,7 +194,7 @@
     </div>
   </section>
 
-  <!-- Story 04 · Discover, set as a classified index -->
+  {{-- Story 04 · Discover, set as a classified index --}}
   <section id="discover" class="bg-panel-2 border-line border-y">
     <div class="mx-auto px-6 py-16 sm:py-20 max-w-[1400px]">
       <div class="mx-auto max-w-2xl text-center reveal">
@@ -238,7 +238,7 @@
     </div>
   </section>
 
-  <!-- Story 05 · The stone: what is going out this week -->
+  {{-- Story 05 · The stone: what is going out this week --}}
   <section id="queue" class="mx-auto px-6 py-16 sm:py-20 max-w-[1400px]">
     <div class="grid gap-10 items-center lg:gap-14 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
       <figure class="order-2 lg:order-1 m-0 reveal">
@@ -270,7 +270,7 @@
     </div>
   </section>
 
-  <!-- The EXTRA banner: the one reversed beat on the sheet -->
+  {{-- The EXTRA banner: the one reversed beat on the sheet --}}
   <section class="text-on-accent bg-ink" aria-label="Open source and owned">
     <div class="mx-auto px-6 py-16 sm:py-24 max-w-[1400px]">
       <div class="max-w-3xl reveal">
@@ -285,7 +285,7 @@
     </div>
   </section>
 
-  <!-- The colophon -->
+  {{-- The colophon --}}
   <section class="mx-auto px-6 py-16 sm:py-20 max-w-[1400px]">
     <div class="max-w-2xl reveal">
       <SectionLabel index="05" label="Colophon" />
@@ -298,7 +298,7 @@
     </div>
   </section>
 
-  <!-- Put the paper to bed -->
+  {{-- Put the paper to bed --}}
   <section class="border-ink border-t-2">
     <div class="mx-auto px-6 py-16 sm:py-24 max-w-[1400px] text-center">
       <div class="mx-auto max-w-2xl reveal">

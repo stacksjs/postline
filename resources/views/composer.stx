@@ -5,17 +5,17 @@
 @section('content')
   @meta('description', 'Write, schedule, publish, and review social posts from a clean personal workspace.')
   <section class="grid gap-5" data-ot-page="composer" data-testid="composer-page">
-    <!-- Crosswind safelist: utilities applied dynamically from the script below
+    {{-- Crosswind safelist: utilities applied dynamically from the script below
         (provider toggles, active-post highlight, connection summary, char
         counter, per-network override rows) must appear in static markup so the
         CSS scanner emits them.
         display:none is inline, not a hidden class: this list now carries
         layout utilities of its own (grid, min-h-20, p-3), and relying on
         hidden to out-rank them would leave a visible empty block if the
-        generated stylesheet ever ordered them the other way. -->
+        generated stylesheet ever ordered them the other way. --}}
     <div class="grid gap-2 mt-2 p-2 p-3 min-h-20 min-h-7 leading-relaxed text-amber-700 text-emerald-800 text-ink text-muted text-muted text-on-accent text-red-700 text-sm text-zinc-400 bg-accent bg-emerald-400 bg-emerald-50 bg-emerald-500 bg-panel bg-panel-2 bg-panel-3 bg-red-500 bg-zinc-300 hover:bg-white border-blue-300 border-emerald-200 border-line border-neutral-950 outline-none rounded-lg rounded-xl shadow-sm cursor-not-allowed resize-none" style="display:none" aria-hidden="true"></div>
-    <!-- Network icons on per-account chips come from row.icon at runtime; listed
-        here so the Crosswind scanner emits them. -->
+    {{-- Network icons on per-account chips come from row.icon at runtime; listed
+        here so the Crosswind scanner emits them. --}}
     <div class="i-hugeicons-news i-hugeicons-quill-write-02 i-hugeicons-share-08 i-simple-icons-bluesky i-simple-icons-instagram i-simple-icons-linkedin i-simple-icons-mastodon i-simple-icons-threads i-simple-icons-x" style="display:none" aria-hidden="true"></div>
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
@@ -46,19 +46,19 @@
         </header>
 
         <div class="grid gap-1 p-4">
-          <!-- Chips render from the providerRows() signal: one per network, or
+          {{-- Chips render from the providerRows() signal: one per network, or
               one per account (icon + handle) for a network with several
               connected. Their selected / disabled / over-limit states ride on
               data-attributes and are styled in config/crosswind.ts, because a
               class string composed in the browser is invisible to the
-              Crosswind extractor. -->
+              Crosswind extractor. --}}
           <div class="flex flex-wrap gap-2 mb-3" role="group" aria-label="Crosspost targets">
-            <!-- Object-form :class, rather than an inline display rule plus
+            {{-- Object-form :class, rather than an inline display rule plus
                 x-show. The string form of :class MERGES with the static class
                 list, so a static hidden class would never come back off; the
                 object form goes through classList.add/remove instead. Its keys
                 are single-quoted literals, so the Crosswind extractor still
-                sees them, and the static class is the pre-hydration state. -->
+                sees them, and the static class is the pre-hydration state. --}}
             <span class="flex items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 border border-line rounded-xl" :class="{ 'hidden': !providersPending() }">Loading accounts…</span>
             <a class="hidden inline-flex items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-xl transition-colors" :class="{ 'hidden': !providersEmpty() }" href="/accounts" data-stx-link>No accounts yet. Connect one →</a>
             <button
@@ -78,9 +78,9 @@
               <span :text="row.label"></span>
             </button>
           </div>
-          <!-- Per-network overrides. Rows are built by the script, one per
+          {{-- Per-network overrides. Rows are built by the script, one per
               selected target. Hidden in thread mode: the server publishes a
-              thread's shared segments, so an override there would be a lie. -->
+              thread's shared segments, so an override there would be a lie. --}}
           <div class="hidden mb-3" data-variant-section>
             <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-bold text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-lg transition-colors" type="button" data-variant-toggle aria-expanded="false">
               <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
@@ -105,9 +105,9 @@
                 </button>
               </header>
               <textarea class="min-h-36 w-full leading-relaxed text-[18px] text-ink placeholder:text-zinc-400 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" placeholder="What do you want to share?" data-bluesky-text></textarea>
-              <!-- Long-form rich text mounts here and writes Markdown back into
+              {{-- Long-form rich text mounts here and writes Markdown back into
                   the textarea above, which stays the source of truth. Hidden
-                  until the blog is a target. -->
+                  until the blog is a target. --}}
               <div class="hidden" data-richtext-host></div>
               <div class="hidden overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview></div>
             </article>

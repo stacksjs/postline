@@ -42,7 +42,7 @@
 
     <p class="m-0 px-4 py-3 text-red-700 text-sm bg-red-50 border border-red-100 rounded-xl" x-show="errorMessage()" :text="errorMessage()"></p>
 
-    <!-- Readers -->
+    {{-- Readers --}}
     <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" x-show="tab() === 'readers'" aria-label="Readers">
       <header class="flex flex-wrap gap-3 items-center justify-between px-4 py-3 border-b border-line">
         <h2 class="m-0 font-bold text-ink text-sm">Readers</h2>
@@ -68,7 +68,7 @@
       </div>
     </section>
 
-    <!-- Tiers -->
+    {{-- Tiers --}}
     <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]" x-show="tab() === 'tiers'" aria-label="Paid tiers">
       <div class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm">
         <header class="px-4 py-3 border-b border-line">
@@ -99,7 +99,7 @@
       </form>
     </section>
 
-    <!-- Sends -->
+    {{-- Sends --}}
     <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" x-show="tab() === 'sends'" aria-label="Newsletter sends">
       <header class="px-4 py-3 border-b border-line">
         <h2 class="m-0 font-bold text-ink text-sm">Sends</h2>
@@ -122,7 +122,7 @@
       </div>
     </section>
 
-    <!-- Comments -->
+    {{-- Comments --}}
     <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" x-show="tab() === 'comments'" aria-label="Comment moderation">
       <header class="px-4 py-3 border-b border-line">
         <h2 class="m-0 font-bold text-ink text-sm">Held for review</h2>
@@ -144,7 +144,7 @@
       </div>
     </section>
 
-    <!-- Import -->
+    {{-- Import --}}
     <section class="grid gap-3 p-4 bg-panel border border-line rounded-2xl shadow-sm" x-show="tab() === 'import'" aria-label="Import">
       <div>
         <h2 class="m-0 font-bold text-ink text-sm">Import readers</h2>

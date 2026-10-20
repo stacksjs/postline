@@ -21,21 +21,21 @@
   <main class="grid place-items-center px-4 min-h-screen bg-bg" data-testid="login-page">
     <section class="grid gap-5 p-6 max-w-sm w-full bg-panel border border-line rounded-2xl shadow-sm">
       <header class="grid gap-2 justify-items-center text-center">
-        <!--
+        {{--
           The nameplate initials between two rules — the same mark as the
           favicon. Set in the serif rather than the blackletter face: at 11
           units the display face is legible where Unifraktur is a blot.
-        -->
+        --}}
         <span class="grid place-items-center px-3 py-1 font-bold text-ink text-lg tracking-widest border-ink border-y-2" aria-hidden="true">OT</span>
         <h1 class="m-0 font-bold text-[20px] text-ink" :text="heading()">Sign in to The Open Times</h1>
         <p class="m-0 text-[13px] text-muted" :text="subtitle()">The newsroom behind your paper.</p>
       </header>
 
       <form class="grid gap-3" @submit.prevent="onSubmit">
-        <!-- Inline display:none is the pre-hydration state. bindShow treats an
+        {{-- Inline display:none is the pre-hydration state. bindShow treats an
             initial 'none' as "no original display", so showing the row clears
             the inline style and the grid class takes over — no flash, and no
-            fighting between a hidden class and x-show. -->
+            fighting between a hidden class and x-show. --}}
         <label class="grid gap-1.5" style="display:none" x-show="registering()">
           <span class="font-bold text-muted text-xs">Name</span>
           <input class="px-3 h-10 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="name" autocomplete="name" placeholder="Your name" x-model="accountName" :required="registering()">

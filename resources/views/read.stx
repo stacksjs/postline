@@ -16,7 +16,7 @@
       <a class="font-medium text-accent" href="/read" data-stx-link>Browse the archive</a>
     </div>
 
-    <!-- Index -->
+    {{-- Index --}}
     <div class="grid gap-8 pb-16 pt-16" x-show="!loading() && !slug()">
       <header class="grid gap-3">
         <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight" :text="publicationName()">Archive</h1>
@@ -37,7 +37,7 @@
       <p class="m-0 py-10 text-center text-muted" x-show="!posts().length">Nothing published yet.</p>
     </div>
 
-    <!-- One post -->
+    {{-- One post --}}
     <div class="contents" x-show="!loading() && post()">
       <header class="grid gap-4 pb-10 pt-16">
         <p class="m-0 font-mono text-muted text-xs tracking-[0.16em] uppercase" :text="publicationName()"></p>
@@ -53,8 +53,8 @@
         <p class="m-0 leading-relaxed text-body text-lg whitespace-pre-line" :text="post()?.body"></p>
       </div>
 
-      <!-- Paywall. The body above is genuinely the preview: the rest never
-          reached the browser, so this is a wall rather than a curtain. -->
+      {{-- Paywall. The body above is genuinely the preview: the rest never
+          reached the browser, so this is a wall rather than a curtain. --}}
       <section class="grid gap-4 mb-12 p-6 bg-panel border border-line rounded-2xl" x-show="post()?.locked" aria-label="Continue reading">
         <div>
           <h2 class="m-0 font-semibold text-ink text-xl tracking-tight">Keep reading with a subscription</h2>
@@ -79,8 +79,8 @@
         <p class="m-0 text-[13px] text-muted" x-show="!post()?.tiers?.length">This publication is not taking payments yet.</p>
       </section>
 
-      <!-- Free subscribe. Shown on every post, because the point of a free post
-          is to win a reader. -->
+      {{-- Free subscribe. Shown on every post, because the point of a free post
+          is to win a reader. --}}
       <section class="grid gap-3 mb-12 p-6 bg-panel border border-line rounded-2xl" x-show="!post()?.locked" aria-label="Subscribe">
         <div>
           <h2 class="m-0 font-semibold text-ink text-lg tracking-tight" :text="`Get the next one from ${publicationName()}`"></h2>
@@ -93,7 +93,7 @@
         <p class="m-0 text-[13px]" :class="subscribeTone() === 'error' ? 'text-red-600' : 'text-emerald-700'" x-show="subscribeMessage()" :text="subscribeMessage()"></p>
       </section>
 
-      <!-- Comments -->
+      {{-- Comments --}}
       <section class="grid gap-5 pb-20 pt-10 border-line border-t" x-show="!post()?.locked" aria-label="Comments">
         <h2 class="m-0 font-semibold text-ink text-xl tracking-tight" :text="`${commentTotal()} comments`">Comments</h2>
 

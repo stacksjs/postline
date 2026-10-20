@@ -29,9 +29,9 @@
         <span class="px-2.5 py-1 font-bold text-[11px] text-blue-700 bg-blue-50 border border-blue-200 rounded-full">Bluesky</span>
       </div>
       <div class="ot-feed__list">
-        <!-- x-show lives on a wrapper, never on the x-for element itself:
+        {{-- x-show lives on a wrapper, never on the x-for element itself:
             bindFor returns as soon as it sees the loop attribute, so an x-show
-            sharing that element is silently never bound. -->
+            sharing that element is silently never bound. --}}
         <div x-show="busy()">
           <div class="ot-feed__skeleton" x-for="row in skeletonRows()">
             <div class="ot-feed__skeleton-row">
@@ -50,8 +50,8 @@
 
         <article class="ot-feed-post" x-for="item in items()">
           <div class="ot-feed-post__layout">
-            <!-- @bind:style, not :style — the latter routes to bindStyle, which
-                expects an object; this is a raw custom-property declaration. -->
+            {{-- @bind:style, not :style — the latter routes to bindStyle, which
+                expects an object; this is a raw custom-property declaration. --}}
             <a class="ot-feed-post__avatar" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer" @bind:style="item.gradient" :aria-label="item.name">
               <img x-if="item.avatar" :src="item.avatar" alt="" loading="lazy" referrerpolicy="no-referrer">
               <span x-else>{{ item.initials }}</span>
@@ -71,9 +71,9 @@
                   <span class="h-4 w-4 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span>
                 </a>
               </div>
-              <!-- x-html, not interpolation: the body carries anchor markup for
+              {{-- x-html, not interpolation: the body carries anchor markup for
                   any URLs it contains. linkifyBody HTML-escapes the text
-                  BEFORE inserting anchors, so nothing user-authored is trusted. -->
+                  BEFORE inserting anchors, so nothing user-authored is trusted. --}}
               <p class="ot-feed-post__body" x-html="item.bodyHtml"></p>
               <div class="ot-feed-post__actions">
                 <a class="ot-feed-post__stat" :href="item.url" target="_blank" rel="noopener noreferrer">

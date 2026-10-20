@@ -19,11 +19,11 @@ const printedOn = new Date().toLocaleDateString('en-US', {
 
 <template>
   <header>
-    <!--
+    {{--
       The nameplate. Not sticky: a masthead is printed once at the top of the
       sheet, and pinning it would be the one detail that gives the game away.
       The section bar below it is what follows the reader down the page.
-    -->
+    --}}
     <div class="mx-auto px-6 max-w-[1400px]">
       <div class="flex flex-wrap gap-x-6 gap-y-1 items-baseline justify-between pb-2 pt-3">
         <p class="m-0 folio">Vol. I &middot; No. 1</p>
@@ -33,17 +33,17 @@ const printedOn = new Date().toLocaleDateString('en-US', {
 
       <div class="rule-thin"></div>
 
-      <a class="block py-5 text-center text-ink" href="/" aria-label="The Open Times, home">
+      <a class="block py-5 text-center text-ink" href="/" aria-label="The Open Times, home" data-stx-link>
         <span class="block leading-[0.9] text-[13vw] sm:text-6xl md:text-7xl lg:text-[5.25rem] masthead">The Open Times</span>
       </a>
 
       <div class="rule-double"></div>
 
-      <!--
+      {{--
         The strapline strip a broadsheet prints between the nameplate and the
         first story: what the paper is, in one line, in the smallest type on the
         page.
-      -->
+      --}}
       <div class="flex flex-wrap gap-x-5 gap-y-1 items-center justify-center pb-2 pt-2.5">
         <p class="m-0 folio">Written here</p>
         <span class="h-1 w-1 bg-muted" aria-hidden="true"></span>
@@ -53,16 +53,16 @@ const printedOn = new Date().toLocaleDateString('en-US', {
       </div>
     </div>
 
-    <!--
+    {{--
       The section bar. This is the part that sticks: it is the paper's index,
       and it is what a reader reaches for after the first screen.
-    -->
+    --}}
     <nav class="sticky top-0 z-40 bg-bg/95 border-line border-y backdrop-blur-sm" aria-label="Primary">
       <div class="flex gap-4 items-center justify-between mx-auto px-6 h-12 max-w-[1400px]">
         <div class="hidden lg:flex items-center h-full">
-          <!-- The panels open on hover AND focus-within, with no script: a
+          {{-- The panels open on hover AND focus-within, with no script: a
               hover-only menu is unreachable by keyboard, and a script-driven
-              one would not work before hydration. -->
+              one would not work before hydration. --}}
           <div class="flex items-center h-full menu-item">
             <a class="inline-flex gap-1.5 items-center px-3 h-full hover:text-accent transition-colors folio" href="/features" data-stx-link>
               Features
@@ -117,7 +117,7 @@ const printedOn = new Date().toLocaleDateString('en-US', {
       </div>
     </nav>
 
-    <!-- Small screens get a native disclosure instead of a hover panel. -->
+    {{-- Small screens get a native disclosure instead of a hover panel. --}}
     <details class="lg:hidden border-b border-line">
       <summary class="flex items-center justify-between px-6 h-11 cursor-pointer folio">
         Index

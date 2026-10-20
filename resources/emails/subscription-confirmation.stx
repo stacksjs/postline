@@ -21,14 +21,14 @@ const year = props.year || new Date().getFullYear()
       <td style="padding: 40px 20px;">
         <table role="presentation" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto;">
 
-          <!-- Logo -->
+          {{-- Logo --}}
           <tr>
             <td style="text-align: center; padding-bottom: 32px;">
               <h1 style="color: #ececec; font-size: 28px; font-weight: 600; margin: 0;">{{ appName }}</h1>
             </td>
           </tr>
 
-          <!-- Main Content -->
+          {{-- Main Content --}}
           <tr>
             <td style="background-color: #1a1a1a; border-radius: 12px; padding: 40px;">
 
@@ -42,7 +42,7 @@ const year = props.year || new Date().getFullYear()
                 {{ appName }} is a rapid application development framework that helps you build type-safe web apps, APIs, and cloud infrastructure with ease.
               </p>
 
-              <!-- CTA Button -->
+              {{-- CTA Button --}}
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 24px;">
                 <tr>
                   <td>
@@ -53,14 +53,14 @@ const year = props.year || new Date().getFullYear()
                 </tr>
               </table>
 
-              <!-- Divider -->
+              {{-- Divider --}}
               <table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; margin: 8px 0 24px;">
                 <tr>
                   <td style="border-top: 1px solid #2a2a2a;"></td>
                 </tr>
               </table>
 
-              <!-- Links -->
+              {{-- Links --}}
               <table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%;">
                 <tr>
                   <td style="color: #666; font-size: 13px;">
@@ -76,7 +76,7 @@ const year = props.year || new Date().getFullYear()
             </td>
           </tr>
 
-          <!-- Footer -->
+          {{-- Footer --}}
           <tr>
             <td style="text-align: center; padding-top: 32px;">
               <p style="color: #555; font-size: 13px; margin: 0 0 8px;">

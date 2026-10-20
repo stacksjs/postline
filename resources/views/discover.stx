@@ -23,8 +23,8 @@
       </div>
     </header>
 
-    <!-- Listing state. The one thing a writer has to act on, so it sits above
-        the feeds rather than inside settings only. -->
+    {{-- Listing state. The one thing a writer has to act on, so it sits above
+        the feeds rather than inside settings only. --}}
     <div class="flex flex-wrap gap-3 items-center justify-between p-4 border rounded-2xl" x-show="!publicationListed()" :class="'bg-amber-50 border-amber-200'">
       <div class="min-w-0">
         <strong class="block text-[13px] text-ink">Your publication is unlisted</strong>

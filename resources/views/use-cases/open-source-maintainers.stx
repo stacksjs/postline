@@ -7,11 +7,11 @@
 
 @section('content')
   <article class="mx-auto px-6 max-w-[1400px]">
-    <!-- Hero. Left-aligned, asset-free: this is a detail page, so the headline
-        and the single CTA carry it. -->
+    {{-- Hero. Left-aligned, asset-free: this is a detail page, so the headline
+        and the single CTA carry it. --}}
     <header class="grid gap-6 pb-14 pt-16 lg:pt-20 max-w-3xl">
       <nav class="flex gap-2 items-center text-[13px] text-muted" aria-label="Breadcrumb">
-        <a class="hover:text-ink transition-colors" href="/">The Open Times</a>
+        <a class="hover:text-ink transition-colors" href="/" data-stx-link>The Open Times</a>
         <span aria-hidden="true">/</span>
         <span class="text-body">Use cases</span>
       </nav>
@@ -23,8 +23,8 @@
       </div>
     </header>
 
-    <!-- Body. Two stacked prose blocks, not a card grid: this is reading
-        material, and cards would add chrome without adding hierarchy. -->
+    {{-- Body. Two stacked prose blocks, not a card grid: this is reading
+        material, and cards would add chrome without adding hierarchy. --}}
     <section class="grid gap-10 lg:gap-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] py-14 border-line border-t">
       <div class="grid gap-10">
         <div class="grid gap-3 max-w-[62ch]">
@@ -55,7 +55,7 @@
       </aside>
     </section>
 
-    <!-- Related. A plain divided list rather than three equal cards. -->
+    {{-- Related. A plain divided list rather than three equal cards. --}}
     <section class="py-14 border-line border-t">
       <h2 class="m-0 font-semibold text-ink text-xl tracking-tight">More use cases</h2>
       <ul class="grid gap-0 m-0 mt-6 p-0 list-none divide-line divide-y">

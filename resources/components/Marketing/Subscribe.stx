@@ -1,5 +1,5 @@
 <template>
-  <!--
+  {{--
     Email capture, posting to the framework's SubscriberEmailAction. That action
     already owns the hard parts: per-IP rate limiting, dedupe against the
     subscribers unique index, and the confirmation mail. This is the form.
@@ -7,11 +7,11 @@
     Behaviour is bound from an inline script by data attribute rather than stx
     client directives: directives are stripped from components rendered through
     a layout, which would leave the form inert with no visible sign of it.
-  -->
-  <!--
+  --}}
+  {{--
     The subscription box a paper prints at the foot of the sheet: ruled off,
     headed like a coupon, and asking for one thing.
-  -->
+  --}}
   <section class="bg-panel-2 border-ink border-y-2" aria-labelledby="subscribe-heading" data-subscribe>
     <div class="grid gap-8 lg:gap-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] mx-auto px-6 py-14 max-w-[1400px]">
       <div class="max-w-[46ch]">
@@ -51,8 +51,8 @@
             </button>
           </div>
 
-          <!-- Reserved line: the message lands in space already occupied, so
-              submitting never shifts the section under the reader. -->
+          {{-- Reserved line: the message lands in space already occupied, so
+              submitting never shifts the section under the reader. --}}
           <p
             id="subscribe-status"
             class="sm:col-span-2 m-0 min-h-5 byline"

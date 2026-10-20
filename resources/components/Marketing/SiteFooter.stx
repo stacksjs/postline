@@ -9,17 +9,17 @@ const year = new Date().getFullYear()
 </script>
 
 <template>
-  <!--
+  {{--
     The colophon: what a paper prints at the foot of the last page — who made
     it, on what, and where to write in. Set in the smallest type on the sheet
     and ruled off from the stories above it.
-  -->
+  --}}
   <footer aria-labelledby="footer-heading">
     <h2 id="footer-heading" class="sr-only">Site</h2>
 
     <div class="grid gap-10 lg:gap-12 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] mx-auto px-6 py-14 max-w-[1400px]">
       <div class="max-w-[38ch]">
-        <a class="block text-ink" href="/" aria-label="The Open Times home">
+        <a class="block text-ink" href="/" aria-label="The Open Times home" data-stx-link>
           <span class="text-3xl masthead">The Open Times</span>
         </a>
         <p class="m-0 mt-4 leading-relaxed text-body text-sm">

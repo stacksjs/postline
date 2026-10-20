@@ -87,8 +87,8 @@ const settingsActive = currentPath === '/accounts' || currentPath === '/settings
       data-no-window-drag
       aria-label="The Open Times composer"
     >
-      <!-- The nameplate initials between rules — the mark used by the favicon
-          and the sign-in page, so the three agree. -->
+      {{-- The nameplate initials between rules — the mark used by the favicon
+          and the sign-in page, so the three agree. --}}
       <span class="grid place-items-center px-1.5 h-9 font-bold text-ink text-sm tracking-widest border-ink border-y-2">OT</span>
       <span class="font-semibold text-[15px]" data-sidebar-expanded>The Open Times</span>
     </a>
