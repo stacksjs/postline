@@ -19,6 +19,13 @@ route.post('/login', 'Actions/Auth/LoginAction').skipCsrf().rateLimit(5, 'minute
 // Single-user workspace: /register only works until the first account
 // exists (overrides the open framework default).
 route.post('/register', 'Actions/OpenTimes/RegisterFirstUserAction').skipCsrf().rateLimit(3, 'minute')
+// Sign-out needs a server round trip, for the same reason sign-in does: the
+// session lives in an httpOnly cookie, so the browser cannot end it on its own.
+// The framework action revokes the token AND clears the cookie — doing only the
+// second would leave a copied cookie usable for the token's full 30 days, which
+// would make "sign out" mean "hide the key". Unauthenticated on purpose: a
+// logout carrying a dead cookie should still clear it rather than answer 401.
+route.post('/logout', 'Actions/Auth/LogoutAction').skipCsrf()
 
 // Marketing email capture. The framework action owns rate limiting, dedupe and
 // the confirmation mail; this just exposes it. Unauthenticated by necessity, so

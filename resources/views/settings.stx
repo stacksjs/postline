@@ -210,18 +210,40 @@
 
     // Signal-backed cookie: setting it to '' emits max-age=0, and it adds
     // Secure automatically over https, which the hand-rolled string did not.
-    const authToken = useCookie('auth-token')
+    // This is the marker the app shell's pre-paint guard reads, not the session
+    // itself — the session is an httpOnly cookie and only the server can end
+    // it, which is what /api/logout is for.
+    const signedInMarker = useCookie('ot-signed-in')
 
     /**
-     * Navigation side effect: renders nothing. Deliberately a hard navigation
-     * rather than stx `navigate()` — signing out should drop all in-memory
-     * state, which an SPA transition would preserve.
+     * Sign out.
+     *
+     * The round trip IS the sign-out, not a courtesy. `useCookie('auth-token')`
+     * used to stand in for it, and a write to an httpOnly cookie name is
+     * discarded by the browser — so the session was neither revoked nor
+     * cleared, the token stayed valid for its remaining 30 days, and the
+     * "signed out" browser still held a working cookie (#45). /api/logout
+     * revokes the token server-side AND clears the cookie; both are needed,
+     * because revoking alone leaves the browser sending a dead cookie, and
+     * clearing alone leaves a copied one usable until it expires.
+     *
+     * The marker is dropped and the navigation happens whatever the request
+     * does: a sign-out that cannot reach the server should still leave this
+     * browser, and with the marker gone the guard will not let the shell
+     * render again.
+     *
+     * Deliberately a hard navigation rather than stx `navigate()` — signing out
+     * should drop all in-memory state, which an SPA transition would preserve.
      */
-    const signOut = () => {
-      authToken.set('')
-      // Dropping in-memory state IS the sign-out. navigate() preserves it, so
-      // the previous account's data would sit in the signals behind the login
-      // screen.
+    const signOut = async (): Promise<void> => {
+      try {
+        await fetch('/api/logout', { method: 'POST' })
+      }
+      catch {}
+      signedInMarker.set('')
+      // Dropping in-memory state IS the rest of the sign-out. navigate()
+      // preserves it, so the previous account's data would sit in the signals
+      // behind the login screen.
       // stx-strict-ignore-next-line location.assign
       location.assign('/login')
     }

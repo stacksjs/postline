@@ -23,8 +23,15 @@
       const host = window.location.hostname
       const isLoopback = host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host.endsWith('.localhost')
 
+      // The marker login.stx leaves behind, NOT the session itself. The session
+      // is an httpOnly cookie, so `document.cookie` cannot see it, and the test
+      // this line used to make — `auth-token=` — was therefore true for
+      // everyone, signed in or not. That bounced every browser sign-in straight
+      // back to /login (#45). The marker carries no token and is not a
+      // credential: the API decides what a request may do, and the wrapper
+      // below drops the marker the moment the API says the session is over.
       // stx-strict-ignore-next-line document.cookie
-      if (!(isNativeApp && isLoopback) && !/(?:^|;\s*)auth-token=/.test(document.cookie)) {
+      if (!(isNativeApp && isLoopback) && !/(?:^|;\s*)ot-signed-in=1\b/.test(document.cookie)) {
         // replace(), not assign(), so Back does not return to a page the
         // viewer was just bounced off.
         // stx-strict-ignore-next-line location.replace window.location
@@ -33,36 +40,66 @@
     })()
   </script>
   <script>
-    // Cookie → bearer bridge (app-owned so framework upgrades can't clobber
-    // it). bun-router's Auth middleware reads the Authorization header, but
-    // the page gate stores the token in the auth-token cookie — attach it to
-    // same-origin /api/ fetches so every page script authenticates without
-    // per-call plumbing. The frontend proxy forwards the header to the API.
+    // Fetch wrapper for same-origin /api/ calls (app-owned so framework
+    // upgrades can't clobber it).
+    //
+    // This used to be a cookie → bearer bridge, reading the session out of
+    // `document.cookie` and attaching it as an Authorization header. It could
+    // never have worked: the session cookie is httpOnly, so `readToken()`
+    // returned undefined on every call and every /api/ request went out
+    // unauthenticated (#45). The cookie is now honoured by the API directly
+    // (app/Middleware/Auth.ts), and the browser attaches it to same-origin
+    // requests by itself, so there is nothing left to bridge.
+    //
+    // Two jobs remain. Tell the API when the caller is the native shell, and
+    // notice when the API says the session is over — the marker the guard above
+    // reads is set by the login page and could otherwise outlive the session it
+    // stands for.
     ;(() => {
       const nativeFetch = window.fetch.bind(window)
-      // The page gate stores the token in a cookie and this wrapper installs
-      // before any runtime exists, so useCookie() is not available to read it.
-      // stx-strict-ignore-next-line document.cookie
-      const readToken = () => document.cookie.match(/(?:^|;\s*)auth-token=([^;]+)/)?.[1]
       const isNativeApp = () => window.craft?.__craft_bridge_loaded === true
         || !!window.craft?.window
         || !!window.webkit?.messageHandlers?.craft
+
+      let leaving = false
+      const sessionEnded = () => {
+        if (leaving) return
+        leaving = true
+        // Clearable here, unlike the session cookie, precisely because the
+        // marker is this app's own non-httpOnly flag. max-age=0 deletes it.
+        // This wrapper installs before any runtime exists, so useCookie() is
+        // not available yet.
+        // stx-strict-ignore-next-line document.cookie
+        document.cookie = 'ot-signed-in=; path=/; max-age=0; SameSite=Lax'
+        // stx-strict-ignore-next-line location.replace window.location
+        window.location.replace('/login')
+      }
+
+      // The API is the authority on the session, so its answer is what ends
+      // one. Only /api/ responses are inspected: a 401 from some third-party
+      // URL the page happens to fetch says nothing about this session.
+      const watchForSignOut = (promise, isApi) => isApi
+        ? promise.then((response) => {
+            if (response.status === 401) sessionEnded()
+            return response
+          })
+        : promise
+
       window.fetch = (input, init = {}) => {
+        let sameOriginApi = false
         try {
           const url = typeof input === 'string' ? input : input?.url || ''
           // Reading the origin to classify a URL, not navigating — useRoute()
           // answers a different question.
           // stx-strict-ignore-next-line window.location
-          const sameOriginApi = url.startsWith('/api/') || url.startsWith(`${window.location.origin}/api/`)
-          const token = readToken()
-          if (sameOriginApi && (token || isNativeApp())) {
+          sameOriginApi = url.startsWith('/api/') || url.startsWith(`${window.location.origin}/api/`)
+          if (sameOriginApi && isNativeApp()) {
             const headers = new Headers(init.headers || (typeof input !== 'string' ? input.headers : undefined))
-            if (token && !headers.has('authorization')) headers.set('authorization', `Bearer ${decodeURIComponent(token)}`)
-            if (isNativeApp()) headers.set('x-ot-native', 'craft')
-            return nativeFetch(input, { ...init, headers })
+            headers.set('x-ot-native', 'craft')
+            return watchForSignOut(nativeFetch(input, { ...init, headers }), true)
           }
         } catch {}
-        return nativeFetch(input, init)
+        return watchForSignOut(nativeFetch(input, init), sameOriginApi)
       }
     })()
   </script>

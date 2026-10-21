@@ -36,11 +36,11 @@
         </label>
         <label class="grid gap-1.5">
           <span class="font-bold text-muted text-xs">Password</span>
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required minlength="6" x-model="password">
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required :minlength="registering() ? 8 : 1" x-model="password">
         </label>
         <label class="grid gap-1.5" style="display:none" x-show="registering()">
           <span class="font-bold text-muted text-xs">Confirm password</span>
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password_confirmation" type="password" autocomplete="new-password" placeholder="••••••••" minlength="6" x-model="confirmPassword" :required="registering()">
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password_confirmation" type="password" autocomplete="new-password" placeholder="••••••••" minlength="8" x-model="confirmPassword" :required="registering()">
         </label>
         <p class="m-0 text-red-700 text-xs" style="display:none" x-show="errorMessage()" :text="errorMessage()"></p>
         <button class="inline-flex items-center justify-center px-4 h-10 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="busy()" :text="submitLabel()">Sign in</button>
@@ -75,18 +75,32 @@
     }
 
     /**
-     * Persist the session and enter the app.
+     * Enter the app.
+     *
+     * The session itself is already established by the time this runs: the
+     * login response carried it as the httpOnly `auth-token` cookie, the
+     * browser stored it, and the API reads it off every /api/ request
+     * (app/Middleware/Auth.ts). This function cannot create a session and
+     * never could — JavaScript can neither read nor write an httpOnly cookie,
+     * so the `useCookie('auth-token').set(token)` that used to live here was a
+     * silent no-op, and every sign-in bounced straight back to this page (#45).
+     *
+     * What it does leave behind is a marker the pre-paint guard in
+     * layouts/app.stx can actually see. It carries no token — only the fact
+     * that a session was established — and it is given the session's own
+     * lifetime so the two lapse together. The API stays the authority: a marker
+     * that somehow outlives its session is cleared by the first 401 the app
+     * shell sees.
      *
      * A hard navigation rather than stx `navigate()`: the app shell reads auth
      * state at boot, so a fresh document is what makes the new session take
-     * effect everywhere.
+     * effect everywhere. navigate() is the wrong call here, not merely the
+     * discouraged one — an SPA transition keeps the shell that booted without a
+     * session. The hard load IS the mechanism.
      */
-    const storeTokenAndEnter = (token: string, expiresIn?: number | string | null): void => {
+    const enterApp = (expiresIn?: number | string | null): void => {
       const maxAge = Number(expiresIn) > 0 ? Number(expiresIn) : 60 * 60 * 24 * 30
-      useCookie('auth-token', { maxAge }).set(token)
-      // navigate() is the wrong call here, not merely the discouraged one: an
-      // SPA transition keeps the shell that booted without a session, so the
-      // new token would never reach it. The hard load IS the mechanism.
+      useCookie('ot-signed-in', { maxAge }).set('1')
       // stx-strict-ignore-next-line location.assign
       location.assign('/composer')
     }
@@ -116,7 +130,7 @@
           if (!response.ok || payload.ok === false)
             throw new Error(payload.error || 'Could not create the account.')
           const token = payload.data?.access_token
-          if (token) storeTokenAndEnter(token)
+          if (token) enterApp(payload.data?.expires_in)
           else registering.set(false)
           return
         }
@@ -124,7 +138,7 @@
         const token = payload.access_token || payload.token
         if (!response.ok || !token)
           throw new Error(payload.error || payload.message || 'Incorrect email or password.')
-        storeTokenAndEnter(token, payload.expires_in)
+        enterApp(payload.expires_in)
       }
       catch (error) {
         errorMessage.set(error instanceof Error ? error.message : String(error))
