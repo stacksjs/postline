@@ -139,7 +139,7 @@
           <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 rounded-xl i-simple-icons-x" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-twitter-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-bold text-[15px]">X</h2>
             <p class="my-1.5 text-[13px] text-body" data-twitter-channel-handle>Not connected</p>
-            <p class="m-0 text-muted text-xs" data-twitter-channel-detail>Connect X to crosspost tweets. Posting needs a paid X API tier.</p>
+            <p class="m-0 text-muted text-xs" data-twitter-channel-detail>Connect X to crosspost tweets. X bills per post, and a post with a link costs far more.</p>
             {{-- Every connected X account, from the twitterAccounts() signal. --}}
             <ul class="grid hidden gap-1.5 m-0 mt-3 p-0 list-none" :class="{ 'hidden': twitterAccounts().length === 0 }" data-account-list="twitter">
               <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in twitterAccounts()">
@@ -566,7 +566,7 @@
           twitterDetail.textContent = connected
             ? 'Ready to crosspost. To add another account, switch to it on x.com first.'
             : data?.oauthConfigured
-              ? 'Connect X to crosspost tweets. Posting needs a paid X API tier.'
+              ? 'Connect X to crosspost tweets. X bills per post, and a post with a link costs far more.'
               : data?.configuredFromEnv
                 ? 'Token found in .env. Connect to start crossposting.'
                 : 'Add X (Twitter) API keys to .env, then connect.'
