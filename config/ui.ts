@@ -61,10 +61,19 @@ export default {
      *
      * These five values are exactly what the four hand-rolled copies did:
      * read `theme`, treat `system` as "follow the OS", then set `data-theme` to
-     * the RESOLVED `dark`/`light` and toggle the `dark` class. Both axes are
-     * load-bearing and that is why this could not be adopted before — every
-     * `dark:` utility and the CSS-var overrides key off the class, while the
-     * design tokens key off the attribute.
+     * the RESOLVED `dark`/`light` and toggle the `dark` class.
+     *
+     * Only the class is load-bearing, though both are set. Every `dark:`
+     * utility and every CSS-var override in config/crosswind.ts is scoped
+     * `html.dark`; nothing in the generated sheet reads `data-theme`, whose
+     * only selectors are `[data-theme-option]` — the theme pills in
+     * resources/views/settings.stx. An earlier version of this note had it the
+     * other way round and said the design tokens key off the attribute.
+     *
+     * The attribute is kept because it is cheap, conventional, and what a page
+     * would reach for first. But dropping `darkClass` as a simplification
+     * would leave `data-theme="dark"` on `<html>`, no class, and the entire
+     * dark palette silently inert.
      *
      * Both blockers the old comments cite are closed and shipped:
      *   - stacksjs/stx#1788 — applyDOM set EITHER darkClass OR attribute, and
