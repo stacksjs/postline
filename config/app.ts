@@ -2,8 +2,6 @@ import type { AppConfig } from '@stacksjs/types'
 import { canonical, LOCAL_HOST } from '~/config/domains'
 import { env } from '@stacksjs/env'
 
-type OpenTimesAppConfig = AppConfig & { appPath: string, devLaunch: 'native' }
-
 /**
  * **Application Configuration**
  *
@@ -21,8 +19,6 @@ export default {
    * spelled out, so `buddy domain:use` moves this too.
    */
   url: env.APP_URL ?? (env.APP_ENV === 'local' ? LOCAL_HOST : canonical),
-  appPath: '/composer',
-  devLaunch: 'native',
   redirectUrls: [LOCAL_HOST, canonical, 'bsky.app'],
   debug: env.DEBUG ?? false,
   key: env.APP_KEY,
@@ -37,4 +33,4 @@ export default {
   locale: 'en',
   fallbackLocale: 'en',
   cipher: 'aes-256-cbc',
-} satisfies OpenTimesAppConfig
+} satisfies AppConfig

@@ -29,6 +29,33 @@ interface DesktopManifest {
   darkMode?: boolean
 }
 
+/**
+ * Where the window opens. `build:desktop` resolves the manifest URL as
+ * `DESKTOP_URL || APP_URL` and has no notion of an app path, so a manifest
+ * carrying only an origin opens `/` — the public marketing page, in a window
+ * whose chrome the marketing layout is not drawn for. `config/app.ts` used to
+ * declare an `appPath` for this and nothing ever read it.
+ *
+ * Setting DESKTOP_URL fixes one machine; `.env` is untracked, so everyone else
+ * still gets the landing page. Defaulting here fixes every build, and an
+ * explicit path in DESKTOP_URL still wins.
+ */
+const WORKSPACE_PATH = '/composer'
+
+function windowUrl(raw: string): string {
+  try {
+    const url = new URL(raw)
+    if (url.pathname === '/' && !url.search && !url.hash)
+      url.pathname = WORKSPACE_PATH
+    return url.toString()
+  }
+  catch {
+    // Not parseable as a URL: hand it to Craft unchanged and let it complain,
+    // rather than silently rewriting something we did not understand.
+    return raw
+  }
+}
+
 const executableDir = dirname(process.execPath)
 
 // Inside a .app bundle the manifest lives in Contents/Resources; in the raw
@@ -46,8 +73,14 @@ const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as DesktopManife
 
 const args = [
   runtimePath,
-  manifest.url,
+  windowUrl(manifest.url),
   '--title',
+  manifest.title,
+  // Without this macOS names the menu bar, and the About/Hide/Quit items in
+  // it, after the executable — so the app shipped calling itself
+  // "craft-runtime". --title only sets the window's own title bar, which this
+  // app hides anyway.
+  '--app-name',
   manifest.title,
   '--width',
   String(manifest.width),
