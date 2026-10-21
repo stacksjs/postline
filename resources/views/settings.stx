@@ -41,9 +41,9 @@
         <header class="flex gap-3 items-center justify-between pb-3 border-b border-line">
           <div>
             <strong class="text-[13px]">Publishing channels</strong>
-            <p class="mb-0 mt-1 text-muted text-xs" :text="blueskySummary()">Checking…</p>
+            <p class="mb-0 mt-1 text-muted text-xs" :text="channelSummary()">Checking…</p>
           </div>
-          <span class="px-2.5 py-1 font-bold text-[11px] border rounded-full" data-bluesky-pill :data-state="blueskyState()" :text="blueskyPill()">Checking</span>
+          <span class="px-2.5 py-1 font-bold text-[11px] border rounded-full" data-channels-pill :data-state="channelState()" :text="channelPill()">Checking</span>
         </header>
         <p class="m-0 leading-relaxed text-[13px] text-body">Connect Bluesky, LinkedIn, Instagram, Threads, X, and Mastodon from the Channels section. Credentials stay in your workspace.</p>
         <a class="inline-flex items-center justify-center px-4 h-9 w-fit font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" href="/accounts" data-stx-link>Manage channels</a>
@@ -52,11 +52,11 @@
       <article class="grid gap-3 p-4 bg-panel border border-line rounded-2xl shadow-sm">
         <header class="flex gap-3 items-center justify-between pb-3 border-b border-line">
           <strong class="text-[13px]">Composer</strong>
-          <span class="text-muted text-xs">Bluesky</span>
+          <span class="text-muted text-xs" :text="charLimitSource()">—</span>
         </header>
         <label class="flex gap-4 items-center justify-between text-[13px] text-body">
           <span>Character limit</span>
-          <span class="font-bold text-ink" :text="charLimit()">300</span>
+          <span class="font-bold text-ink" :text="charLimitText()">—</span>
         </label>
         <label class="flex gap-4 items-center justify-between text-[13px] text-body">
           <span>Default mode</span>
@@ -161,10 +161,11 @@
     }
 
     const themePref = state(readStoredTheme())
-    const blueskySummary = state('Checking…')
-    const blueskyPill = state('Checking')
-    const blueskyState = state('')
-    const charLimit = state(300)
+    const channelSummary = state('Checking…')
+    const channelPill = state('Checking')
+    const channelState = state('')
+    const charLimitText = state('—')
+    const charLimitSource = state('—')
 
     /**
      * Applies the preference to the root html element.
@@ -401,20 +402,68 @@
         if (themePref() === 'system') applyTheme('system')
       }, { target: matchMedia('(prefers-color-scheme: dark)') })
 
-      void opentimesBluesky?.fetchStatus().then((data) => {
-        if (data?.characterLimit) charLimit.set(data.characterLimit)
-        blueskySummary.set(data.canPublish
-          ? `@${data.handle} is connected and ready to publish.`
-          : data.handle
-            ? `@${data.handle} needs an app password before publishing.`
-            : 'No Bluesky account connected yet.')
-        blueskyPill.set(data.canPublish ? 'Ready' : 'Setup')
-        blueskyState.set(data.canPublish ? 'ready' : 'setup')
-      }).catch(() => {
-        blueskySummary.set('Could not load Bluesky status.')
-        blueskyPill.set('Unknown')
-        blueskyState.set('setup')
-      })
+      /**
+       * Summarise every channel, not whichever one was built first.
+       *
+       * This panel is titled "Publishing channels" and reported on Bluesky
+       * alone, with the word "Bluesky" hardcoded into the Composer card beside
+       * it and an unattributed 300-character limit. With nothing connected it
+       * said "No Bluesky account connected yet." while the composer greyed out
+       * every network — two panels disagreeing, and Bluesky looking like a
+       * special case rather than one of several.
+       *
+       * `blog` and `opentimes` are filtered out: both are this workspace's own
+       * targets, always available, and neither is an account anyone connects.
+       * Counting them would report channels ready that the Channels page
+       * cannot show.
+       */
+      const social = window.opentimesSocial
+      if (!social) {
+        channelSummary.set('Could not load channel status.')
+        channelPill.set('Unknown')
+        channelState.set('setup')
+      }
+      else {
+        const label = social.providerLabel
+        void social.fetchProviders().then((all) => {
+          const channels = all.filter(entry => entry.provider !== 'blog' && entry.provider !== 'opentimes')
+          const ready = channels.filter(entry => entry.canPublish)
+          // Connected but not publishable: a token that lapsed, or a row whose
+          // credential never arrived. Worth separating from "nothing here
+          // yet", because the fix is a different one.
+          const pending = channels.filter(entry => !entry.canPublish && entry.handle)
+
+          channelSummary.set(
+            ready.length > 0
+              ? `${ready.length} of ${channels.length} ready: ${ready.map(entry => label(entry.provider)).join(', ')}.`
+              : pending.length > 0
+                ? `${pending.length} of ${channels.length} connected, none able to publish yet.`
+                : 'No channels connected yet.',
+          )
+          channelPill.set(ready.length > 0 ? `${ready.length}/${channels.length}` : 'Setup')
+          channelState.set(ready.length > 0 ? 'ready' : 'setup')
+
+          // The binding limit is the tightest among the channels that can
+          // actually publish: with Bluesky on, 300 constrains the post however
+          // much room X would allow. Naming the network it came from is the
+          // point — an unattributed number reads as a global setting rather
+          // than one network's rule.
+          const limited = ready.filter(entry => entry.characterLimit > 0)
+          if (limited.length > 0) {
+            const tightest = limited.reduce((a, b) => (b.characterLimit < a.characterLimit ? b : a))
+            charLimitText.set(String(tightest.characterLimit))
+            charLimitSource.set(label(tightest.provider))
+          }
+          else {
+            charLimitText.set('—')
+            charLimitSource.set('No channels connected')
+          }
+        }).catch(() => {
+          channelSummary.set('Could not load channel status.')
+          channelPill.set('Unknown')
+          channelState.set('setup')
+        })
+      }
     })
   </script>
 @endsection
