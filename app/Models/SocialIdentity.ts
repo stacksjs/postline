@@ -51,7 +51,18 @@ export default defineModel({
       fillable: true,
       default: 'connected',
       validation: { rule: schema.enum(['connected', 'expired', 'revoked', 'missing']).required() },
-      factory: faker => faker.helpers.arrayElement(['connected', 'connected', 'missing']),
+      // Always 'missing'. A seeded identity has no token — `accessToken`
+      // below factories to null — so 'connected' described a connection that
+      // could not publish, refresh or be signed out of. The Accounts page
+      // offered three Bluesky handles nobody owns, and Settings asked for an
+      // app password for one of them, which is indistinguishable from a real
+      // account whose token has lapsed.
+      //
+      // The rows themselves stay: TimelineItem and PostTarget both belongsTo
+      // this model and seed 30 and 18 rows against it, so the demo timeline
+      // and post history need identities to hang off. They just no longer
+      // claim to be usable.
+      factory: () => 'missing',
     },
     accessToken: {
       required: false,
