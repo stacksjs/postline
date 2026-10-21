@@ -196,3 +196,25 @@ describe('resolveStoredVariants', () => {
     expect(resolveStoredVariants(undefined, '{"threads":"kept"}')).toEqual({ threads: 'kept' })
   })
 })
+
+describe('providers without a driver', () => {
+  test('a variant for facebook or tiktok is dropped, not stored', () => {
+    // Both are in the `SocialProvider` union because the framework's
+    // `SocialPublishingProvider` carries them, and neither has a driver here.
+    const parsed = parseVariantsField(JSON.stringify({ bluesky: 'kept', facebook: 'dropped', tiktok: 'dropped' }))
+    expect(parsed.ok).toBe(true)
+    expect(parsed.ok && parsed.variants).toEqual({ bluesky: 'kept' })
+  })
+
+  test('sanitizeVariants is the boundary that drops them', () => {
+    // `resolveVariantBody` is a plain lookup by design — it trusts what it is
+    // given. Untrusted input is narrowed on the way in, so that is where a
+    // driverless provider has to be rejected.
+    expect(sanitizeVariants({ bluesky: 'kept', facebook: 'dropped', tiktok: 'dropped' })).toEqual({ bluesky: 'kept' })
+  })
+
+  test('a map of nothing but driverless providers sanitizes away entirely', () => {
+    // Same answer as "no variants at all", which is what it now means.
+    expect(sanitizeVariants({ facebook: 'a', tiktok: 'b' })).toBeUndefined()
+  })
+})

@@ -27,7 +27,12 @@ export default defineModel({
       validation: {
         rule: schema.enum(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin', 'threads']).required(),
       },
-      factory: faker => faker.helpers.arrayElement(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin', 'threads']),
+      // Only the providers that have a driver. The validation above still
+      // accepts the framework's whole list, but seeding a `facebook` or
+      // `tiktok` row invented a connection the app has no way to publish
+      // through — nothing maps those to a driver, so the row was a decoy in
+      // every listing that read it.
+      factory: faker => faker.helpers.arrayElement(['bluesky', 'twitter', 'mastodon', 'instagram', 'linkedin', 'threads']),
     },
     displayName: {
       required: true,

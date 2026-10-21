@@ -4,14 +4,18 @@ import type { PublishContent, SocialProvider } from './types'
  * Every provider a variant may target. Kept as a runtime list (the
  * `SocialProvider` union is compile-time only) so untrusted input — a request
  * field or a stored JSON blob — can be filtered down to known keys.
+ *
+ * `facebook` and `tiktok` are deliberately absent, though the `SocialProvider`
+ * union carries them: they come from the framework's
+ * `SocialPublishingProvider`, and this app has no driver for either. Accepting
+ * an override for a network that cannot be published to only stores text that
+ * nothing will ever read.
  */
 const PROVIDERS: SocialProvider[] = [
   'bluesky',
   'twitter',
   'mastodon',
-  'facebook',
   'instagram',
-  'tiktok',
   'linkedin',
   'threads',
   'blog',
