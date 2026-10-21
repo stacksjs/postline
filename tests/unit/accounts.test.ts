@@ -13,8 +13,11 @@ import { dedupeTargets, parseTarget, parseTargets, resolveTargets, targetKey, ta
  * - a target names a network or one account on it, and de-dup is per account;
  * - a fresh login refreshes the row for the same account and adds a row for a
  *   different one (the decision `saveSession` makes through `matchIdentity`);
- * - publishing fans out to every selected account, with thread chains and
- *   results kept per account.
+ * - publishing fans out to every selected account, with results kept per
+ *   account.
+ *
+ * The thread chaining those results feed is pinned in threads.test.ts, not
+ * here: it lives in `publishThread`, which writes a `posts` row per segment.
  */
 
 const AVAILABLE = ['opentimes', 'bluesky', 'twitter', 'linkedin', 'instagram', 'threads', 'mastodon', 'blog']

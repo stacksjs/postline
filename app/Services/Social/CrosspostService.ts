@@ -1,8 +1,10 @@
 import type { PublishTarget } from '../../Support/Social/targets'
+import type { ThreadChain } from '../../Support/Social/threads'
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { parseTarget, resolveTargets, targetKey } from '../../Support/Social/targets'
+import { advanceChain, threadSegmentContent } from '../../Support/Social/threads'
 import { resolveVariantBody } from '../../Support/Social/variants'
 import { blog } from './BlogService'
 import { bluesky } from './BlueskyService'
@@ -159,7 +161,7 @@ export class CrosspostService {
     // Chain refs per target, not per provider: two Bluesky accounts each get
     // their own thread, and segment 2 on one must never reply to segment 1 on
     // the other. Only populated for results that carry a cid (Bluesky).
-    const chains = new Map<string, { root: { uri: string, cid: string }, parent: { uri: string, cid: string } }>()
+    const chains = new Map<string, ThreadChain>()
 
     for (const [index, body] of segments.entries()) {
       const postUuid = uuid()
@@ -189,26 +191,18 @@ export class CrosspostService {
       for (const target of selected) {
         const key = targetKey(target)
         const chain = chains.get(key)
-        // Link previews/media only make sense on the first segment.
-        //
-        // Variants are deliberately stripped: it is ambiguous whether an
-        // override should replace the first segment or the whole chain, so a
-        // thread always publishes its shared segments. Dropping the field here
-        // makes that a decision rather than an accident of drivers ignoring it.
-        const segmentContent: PublishContent | undefined = index === 0
-          ? content ? { ...content, variants: undefined } : undefined
-          : chain ? { reply: chain } : undefined
 
-        const result = await this.publishTarget(target, { id: Number(post.id), body }, segmentContent)
+        const result = await this.publishTarget(
+          target,
+          { id: Number(post.id), body },
+          threadSegmentContent(index, content, chain),
+        )
         segmentResults.push(result)
 
-        if (result.ok && result.uri && result.cid) {
-          const existing = chains.get(key)
-          chains.set(key, {
-            root: existing?.root || { uri: result.uri, cid: result.cid },
-            parent: { uri: result.uri, cid: result.cid },
-          })
-        }
+        // A provider that returns no cid cannot be replied to, so its chain
+        // stays undefined and its segments publish independently.
+        const advanced = advanceChain(chain, result)
+        if (advanced) chains.set(key, advanced)
       }
 
       results.push(...segmentResults)
