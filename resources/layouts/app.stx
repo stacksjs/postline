@@ -259,21 +259,21 @@
           const collapsed = window.localStorage?.getItem('ot.sidebar.collapsed') === 'true'
 
           if (isNativeShell()) {
-            if (window.__craftWebChromeControls === true) {
-              row.style.display = 'none'
-              sidebar.style.paddingTop = '68px'
-              return
-            }
-
+            // Craft draws a sidebar toggle and history arrows beside the window
+            // buttons itself, and the window server places them — which is why
+            // they line up on the traffic lights' axis and our replicas never
+            // did. Drawing our own over them would double every control.
+            //
+            // This used to be gated on `window.__craftWebChromeControls`, which
+            // Craft removed: "Nothing ever read them, and what they claimed was
+            // false." The check could never be true, so the hand-drawn branch
+            // below ran in the native shell and spent its time guessing at
+            // offsets the host already publishes.
             document.querySelectorAll('[data-native-shell-control]').forEach(element => {
-              element.classList.remove('hidden')
-              element.style.display = ''
+              element.classList.add('hidden')
+              element.style.display = 'none'
             })
-            row.style.position = 'fixed'
-            row.style.top = '16px'
-            row.style.left = '88px'
-            row.style.right = 'auto'
-            row.style.zIndex = '80'
+            row.style.display = 'none'
             sidebar.style.paddingTop = '68px'
             return
           }

@@ -93,9 +93,10 @@ const args = [
   '--web-sidebar-width',
   '286',
   '--persistent-storage',
-  // The layout draws its own sidebar toggle and history arrows beside the
-  // window buttons (data-native-shell-control); Craft's would be a second set.
-  '--no-web-chrome-controls',
+  // Craft's own sidebar toggle and history arrows, drawn beside the window
+  // buttons. This used to pass --no-web-chrome-controls so the layout could
+  // draw its own instead; the window server places Craft's, which is why they
+  // land on the traffic lights' axis and the replicas never did.
   '--no-devtools',
 ]
 

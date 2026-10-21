@@ -876,8 +876,9 @@
         // Availability depends on the post count, so it has to be recomputed
         // here: a second post makes this a thread, where overrides never apply.
         renderVariantPanel()
+        // No toast: the new editor appears and takes focus, so saying so is
+        // narrating what the user can already see.
         if (options.focus !== false) textareaFor(post)?.focus()
-        if (options.announce !== false) setStatus(`Added post ${allPosts().length}.`, 'success')
         if (options.save !== false) saveDraft()
         return post
       }
@@ -891,7 +892,7 @@
         renamePosts()
         selectPost(next || root.querySelector('[data-composer-post]'), { skipSave: true })
         renderVariantPanel()
-        setStatus(`Removed post. ${allPosts().length} remaining.`, 'success')
+        // No toast: the row vanishes under the pointer that removed it.
         saveDraft()
       }
 
@@ -1119,10 +1120,13 @@
           button.classList.toggle('text-muted', !active)
         })
         if (nextMode === 'thread' && allPosts().length === 1 && !options.skipThreadPost) {
-          addPost({ announce: false, focus: false, save: false })
+          addPost({ focus: false, save: false })
         }
         updatePublishLabel()
-        if (!options.silent) setStatus(`${nextMode[0].toUpperCase()}${nextMode.slice(1)} mode selected.`, 'success')
+        // No toast: the segmented control above already shows which mode is
+        // active, and it changed under the pointer that asked for it. Success
+        // toasts run for 8s, so trying the three modes in turn left all three
+        // stacked over the composer at once.
         if (!options.skipSave) saveDraft()
       }
 
@@ -1338,7 +1342,16 @@
       previewButton?.addEventListener('click', () => {
         const text = activeTextarea()?.value.trim()
         void updateLinkPreview()
-        setStatus(text ? `Preview: ${text}` : 'Nothing to preview yet.', text ? 'success' : 'error')
+        // This used to toast the entire post body back at its author under the
+        // word "Preview:", which is neither a preview nor news to the person
+        // who typed it. What the button does is refresh the link card, and
+        // that shows up in the card.
+        //
+        // The empty case keeps its message, because there the button genuinely
+        // does nothing and silence would read as broken — `updateLinkPreview`
+        // only touches a link card, so plain text with no URL has no effect at
+        // all. That is a missing feature the toast was covering for.
+        if (!text) setStatus('Nothing to preview yet.', 'error')
       })
       refreshButton?.addEventListener('click', async () => {
         refreshButton.setAttribute('disabled', 'disabled')
@@ -1406,7 +1419,7 @@
         useEventListener('beforeunload', saveDraft, { target: window })
         restoreDraft()
       }
-      setMode(activeMode, { silent: true, skipSave: true, skipThreadPost: true })
+      setMode(activeMode, { skipSave: true, skipThreadPost: true })
       renamePosts()
       selectPost(allPosts()[savedActiveIndex] || activePost, { skipSave: true })
       updateCount()
