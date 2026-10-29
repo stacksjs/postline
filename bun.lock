@@ -12,7 +12,7 @@
         "@stacksjs/stx": "^0.2.388",
         "@stacksjs/ts-cloud": "^0.16.44",
         "stacks": "^0.75.87",
-        "stripe": "^22.4.0",
+        "stripe": "^23.1.0",
         "ts-broadcasting": "0.0.9",
         "ts-medium-editor": "^0.1.6",
       },
@@ -442,7 +442,7 @@
 
     "stacks-framework": ["stacks-framework@workspace:storage/framework"],
 
-    "stripe": ["stripe@22.4.0", "", { "peerDependencies": { "@types/node": ">=18" }, "optionalPeers": ["@types/node"] }, "sha512-LVJ+tcSYeqOSnXr3i+Kz2tZ7y0crLLdP2uwD/4wccrmEVyn0g/Heo0pF7as7rxS/sOjJzrb1lxgZY0Y0Dx1pSA=="],
+    "stripe": ["stripe@23.1.0", "", { "peerDependencies": { "@types/node": ">=20" }, "optionalPeers": ["@types/node"] }, "sha512-fVUfMSfTPoukfoV//MUKAx2+YxyKmYaYtnAL9VkfnHfaPNQylFdWZMD+zgUFerI8rjbaiER8Vzj2XEUQ2AhAsQ=="],
 
     "stx-router": ["stx-router@0.2.388", "", {}, "sha512-1/1y7BYMypLVbiPt3mOtqBF6IU3rSdGyEdejV5YK7lF33Bj2Sgh78DsQ84zl5FVxKnUnUB1ulXjcD1DdfHtllA=="],
 
