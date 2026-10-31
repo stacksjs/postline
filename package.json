@@ -65,21 +65,21 @@
     "stx": "./buddy"
   },
   "dependencies": {
-    "@stacksjs/ai": "^0.75.87",
-    "@stacksjs/payments": "0.75.87",
-    "@stacksjs/realtime": "0.75.87",
-    "@stacksjs/socials": "^0.75.87",
-    "@stacksjs/stx": "^0.2.388",
-    "@stacksjs/ts-cloud": "^0.16.44",
-    "stacks": "^0.75.87",
+    "@stacksjs/ai": "^0.75.401",
+    "@stacksjs/payments": "0.75.401",
+    "@stacksjs/realtime": "0.75.401",
+    "@stacksjs/socials": "^0.75.401",
+    "@stacksjs/stx": "^0.2.778",
+    "@stacksjs/ts-cloud": "^0.16.91",
+    "stacks": "^0.75.401",
     "stripe": "^22.4.0",
-    "ts-broadcasting": "0.0.9",
-    "ts-medium-editor": "^0.1.6"
+    "ts-broadcasting": "0.0.11",
+    "ts-medium-editor": "^0.2.0"
   },
   "devDependencies": {
-    "@iconify-json/lucide": "^1.2.121",
-    "@iconify-json/simple-icons": "^1.2.92",
-    "better-dx": "^0.2.22",
+    "@iconify-json/lucide": "^1.2.150",
+    "@iconify-json/simple-icons": "^1.2.101",
+    "better-dx": "^0.2.38",
     "typescript": "^7.0.2"
   },
   "workspaces": [
