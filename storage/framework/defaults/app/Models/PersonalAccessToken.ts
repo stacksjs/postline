@@ -153,5 +153,71 @@ export default defineModel({
         rule: schema.string().max(45),
       },
     },
+
+    /*
+     * The rest are columns `ensureAuthTables()` creates and `@stacksjs/auth`
+     * writes. Declared so the generated row type is the table's real shape:
+     * without them a typed `insertInto('oauth_access_tokens')` rejects columns
+     * the table has. All guarded - none is a caller's to set.
+     */
+
+    /** Legacy owner column, written as a copy of `tokenable_id`. */
+    /**
+     * The legacy owner column, a copy of `tokenableId` kept for installs that
+     * predate the pair. `ensureAuthTables()` gives it no constraint, since a
+     * token can belong to an author as well as a user, so it is not a foreign
+     * key. Without saying so, convention inferred `users.id` from the name and
+     * a fresh app's first `buddy doctor` failed on it.
+     */
+    userId: {
+      order: 10,
+      guarded: true,
+      foreignKey: false,
+      validation: {
+        rule: schema.number(),
+      },
+    },
+
+    oauthClientId: {
+      order: 11,
+      guarded: true,
+      validation: {
+        rule: schema.number(),
+      },
+    },
+
+    oauthGrantId: {
+      order: 12,
+      guarded: true,
+      validation: {
+        rule: schema.string().max(32),
+      },
+    },
+
+    resources: {
+      order: 13,
+      type: 'text',
+      guarded: true,
+      validation: {
+        rule: schema.string(),
+      },
+    },
+
+    audiences: {
+      order: 14,
+      type: 'text',
+      guarded: true,
+      validation: {
+        rule: schema.string(),
+      },
+    },
+
+    workspaceId: {
+      order: 15,
+      guarded: true,
+      validation: {
+        rule: schema.string().max(255),
+      },
+    },
   },
 } as const)

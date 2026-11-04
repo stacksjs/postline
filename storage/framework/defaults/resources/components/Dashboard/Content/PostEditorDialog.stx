@@ -28,7 +28,11 @@ interface PostDraft {
 }
 
 const open = useReactiveProp('open', false)
-const post = useReactiveProp('post', null as PostRecord | null)
+// Named `editing`, not `post`, while still reading the `post` prop.
+// A bare `post` in a `{{ … }}` interpolation is resolved server-side
+// against module and global scope, where it finds the dashboard API
+// client's own `post()` and calls it mid-render (stacksjs/stacks#2944).
+const editing = useReactiveProp('post', null as PostRecord | null)
 const categories = useReactiveProp('categories', [] as OptionRecord[])
 const tags = useReactiveProp('tags', [] as OptionRecord[])
 const authors = useReactiveProp('authors', [] as AuthorRecord[])
@@ -43,13 +47,13 @@ const authorId = state('')
 const featured = state(false)
 const categoryIds = state<string[]>([])
 const tagIds = state<string[]>([])
-const emit = defineEmits()
+const emit = defineEmits(['close', 'submit'])
 let wasOpen = false
 
 effect(() => {
   const isOpen = open()
   if (isOpen && !wasOpen) {
-    const record = post()
+    const record = editing()
     title.set(record?.title || '')
     excerpt.set(record?.excerpt || '')
     content.set(record?.content || '')
@@ -93,7 +97,7 @@ function submit(): void {
 
 <Modal
   :isOpen="open()"
-  :title="post() ? 'Edit post' : 'New post'"
+  :title="editing() ? 'Edit post' : 'New post'"
   description="Content, ownership, and taxonomies are persisted together."
   size="xl"
   :closable="!busy()"
@@ -132,12 +136,12 @@ function submit(): void {
     <label>
       <span class="font-medium text-gray-700 text-sm dark:text-neutral-200">Excerpt</span>
       <textarea x-model="excerpt" name="excerpt" rows="3" maxlength="500" placeholder="Optional, at least 10 characters when provided" class="mt-1 px-3 py-2 w-full text-gray-900 text-sm dark:text-white bg-white dark:bg-neutral-900 border border-gray-300 rounded-md dark:border-neutral-700"></textarea>
-      <span class="block mt-1 text-gray-400 text-xs">{{ excerpt().length }}/500</span>
+      <span class="block mt-1 text-gray-500 text-xs dark:text-gray-400">{{ excerpt().length }}/500</span>
     </label>
     <label>
       <span class="font-medium text-gray-700 text-sm dark:text-neutral-200">Content</span>
       <textarea x-model="content" name="content" required minlength="10" maxlength="100000" rows="10" class="mt-1 px-3 py-2 w-full font-mono text-gray-900 text-sm dark:text-white bg-white dark:bg-neutral-900 border border-gray-300 rounded-md dark:border-neutral-700"></textarea>
-      <span class="block mt-1 text-gray-400 text-xs">{{ content().length }}/100000</span>
+      <span class="block mt-1 text-gray-500 text-xs dark:text-gray-400">{{ content().length }}/100000</span>
     </label>
     <div class="grid gap-4 lg:grid-cols-2">
       <fieldset class="p-4 border border-gray-200 rounded-lg dark:border-neutral-700">
@@ -169,7 +173,7 @@ function submit(): void {
     <div class="flex gap-2 justify-end w-full">
       <Button :disabled="busy()" variant="secondary" @click="close">Cancel</Button>
       <Button type="submit" form="post-editor-form" :disabled="!valid()" :loading="busy()">
-        {{ post() ? 'Save changes' : 'Create post' }}
+        {{ editing() ? 'Save changes' : 'Create post' }}
       </Button>
     </div>
   </template>

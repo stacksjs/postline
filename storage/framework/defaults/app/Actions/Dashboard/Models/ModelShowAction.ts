@@ -1,7 +1,8 @@
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions/runtime'
 import { response as routerResponse } from '@stacksjs/router'
-import { loadModelIfExists, safeGet } from '../../../../resources/functions/dashboard/data'
+import { safeGet } from '../../../../resources/functions/dashboard/data'
+import { resolveDashboardModel } from '../../../../resources/functions/dashboard/model-access'
 import { dashboardOperationalError } from '../dashboard-response'
 import { isValidModelSlug, type ModelCreateField, type ModelWriteCapabilities, modelCreateFields, modelSchemaColumns, modelWritableColumns, modelWriteCapabilities, slugToPascal } from './model-write'
 
@@ -117,6 +118,22 @@ function typeForColumn(column: string, values: unknown[]): ColumnMeta['type'] {
   return inferType(values)
 }
 
+/**
+ * The columns a global search matches with LIKE: the ones the page is told
+ * are text, by the same rule.
+ *
+ * It used to take every column whose sampled value was a string. PostgreSQL
+ * answers BIGINT as a string, so `id` and every `*_id` qualified, and the
+ * search failed with `operator does not exist: bigint ~~ unknown` on any
+ * table with a row in it: `/models/team?q=PrimeSoft` answered 503.
+ */
+export function searchColumnsFor(columns: Iterable<string>, sample: unknown): string[] {
+  return [...columns].filter((column) => {
+    const value = safeGet(sample, column, null)
+    return typeof value === 'string' && typeForColumn(column, [value]) === 'text'
+  })
+}
+
 function queryValue(request: RequestInstance, key: string, fallback = ''): string {
   const value = request.get<unknown>(key, fallback)
   if (Array.isArray(value))
@@ -157,15 +174,6 @@ export function parseFilters(raw: string | null): Record<string, string> {
     out[key] = String(value)
   }
   return out
-}
-
-function resolveOrmModel(modelName: string): any {
-  const injected = (globalThis as Record<string, any>)[modelName]
-  // The ORM injects Proxies that answer `undefined` for every property
-  // until their deferred load lands, so probe for a real query method
-  // rather than trusting the name to be bound.
-  if (injected && typeof injected.where === 'function') return injected
-  return null
 }
 
 export default new Action({
@@ -221,7 +229,7 @@ export default new Action({
 
     let Model: any
     try {
-      Model = resolveOrmModel(modelName) ?? await loadModelIfExists(modelName)
+      Model = await resolveDashboardModel(modelName)
     }
     catch (error) {
       return dashboardOperationalError(error, `${modelName} could not be loaded.`, 'ModelShowAction.resolve')
@@ -252,7 +260,7 @@ export default new Action({
         ? requestedSort
         : (allowed.has('id') ? 'id' : (response.columns[0] ?? ''))
       response.sort = sort
-      const searchColumns = [...allowed].filter(c => typeof safeGet(first, c, null) === 'string')
+      const searchColumns = searchColumnsFor(allowed, first)
 
       const build = () => {
         let chain = Model.query() as any

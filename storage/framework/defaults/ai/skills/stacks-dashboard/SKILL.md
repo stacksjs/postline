@@ -1,6 +1,6 @@
 ---
 name: stacks-dashboard
-description: Use when building or customizing the Stacks admin dashboard, including dashboard pages, model management views, analytics widgets, commerce dashboards, content management, settings panels, deployment monitoring, job/queue management, or the 408 built-in dashboard components. Covers the dashboard system at storage/framework/defaults/.
+description: Use when building or customizing the Stacks admin dashboard, including dashboard pages, model management views, analytics widgets, commerce dashboards, content management, settings panels, deployment monitoring, job/queue management, or the 414 built-in dashboard components. Covers the dashboard system at storage/framework/defaults/.
 license: MIT
 compatibility: Bun >= 1.3.0, TypeScript
 allowed-tools: Read Edit Write Bash Grep Glob
@@ -8,7 +8,7 @@ allowed-tools: Read Edit Write Bash Grep Glob
 
 # Stacks Dashboard
 
-The Stacks admin dashboard provides a full-featured admin panel with 100+ route views, 408 components, and a multi-section layout.
+The Stacks admin dashboard provides a full-featured admin panel with 100+ route views, 414 components, and a multi-section layout.
 
 ## Key Paths
 - Dashboard components: `storage/framework/defaults/resources/components/Dashboard/`
@@ -20,6 +20,14 @@ The Stacks admin dashboard provides a full-featured admin panel with 100+ route 
 - Configuration: `config/ui.ts`
 
 ## Dashboard Sections
+
+Enable/install the dashboard feature before expecting its default route bundle
+and owned application scaffolds. Keep custom page/component overrides under
+`resources/` and custom Actions under `app/` at their matching relative paths.
+The sidebar registry determines navigation; a page existing on disk does not
+add a sidebar entry or authorize its data Action. Feature sections can be
+disabled independently in configuration. Pair new model views with
+`stacks-models`, `stacks-actions`, and the route registry actually mounted.
 
 Dashboard route views are mounted at the dashboard server root. Do not prefix
 page links with `/dashboard`. The `/api/dashboard/*` prefix is reserved for
@@ -311,6 +319,48 @@ review and must not be silently recorded.
 - `/kanban` - model-backed board management
 - `/ci`, `/buddy` - CI and Buddy workflows
 
+## Who may reach a dashboard surface
+
+Two axes, declared in different places.
+
+**Route groups** are gated in `config/dashboard.ts`, keyed by the group's path
+prefix:
+
+```ts
+access: {
+  '/api/commerce': ['admin', 'superadmin'],
+  '/dashboard/commerce': ['admin', 'superadmin'],
+  '/cms': ['admin', 'editor'],
+}
+```
+
+Each entry appends `role:<the list>` after that group's `auth`, so any one of
+the named roles admits. Every group ships `auth` and nothing more, so an
+omitted group stays reachable by any signed-in user; naming it is the only way
+to tighten it, since `defaults/routes/dashboard.ts` is framework-owned
+(stacksjs/stacks#2883). Keyed by prefix, so gating `/api/commerce` does not
+gate `/dashboard/commerce`: name both when you mean both. The prefixes are a
+typed union, so a typo is a compile error rather than a gate that is quietly
+absent.
+
+**A model's own generated API** is gated on the model, not here: either
+`dashboard: { roles: ['admin'] }`, which gates the sidebar row and every
+generated route together, or `useApi.middleware` for per-ability control. See
+`stacks-models`.
+
+**The sidebar** filters itself. A row carrying roles (from a model's
+`dashboard.roles` or a `nav` item's `roles`) is hidden client-side from viewers
+holding none of them, permissively for unauthenticated viewers so the local dev
+dashboard stays usable (#1843). That is presentation: it hides the link, not
+the endpoint, so it is never the gate on its own.
+
+**SSR pages** take the same middleware names as an API route, because the page
+servers build their registry from `app/Middleware.ts`:
+
+```stx
+definePageMeta({ middleware: ['auth', 'role:admin'] })
+```
+
 ## Dashboard Components (250+)
 
 ### Layout Components
@@ -440,11 +490,28 @@ Port: 3002 (configured in `config/ports.ts` as `admin`)
 ### Render performance
 
 The dashboard dev action opts into STX's dependency-aware rendered HTML cache
-with `renderCache: true`, `renderCacheVary: 'source'`, and four prewarm workers.
+with `renderCache: true`, `renderCacheVary: 'source'`, and no prewarming.
 This is correct because static dashboard routes render source-derived shells
-and load live records through `dashboardApi()` after hydration. Keep the
-project and framework `resources/functions` roots in `watchDirs` so a
-composable edit invalidates its client bundle.
+and load live records through `dashboardApi()` after hydration. A page's first
+visit costs its own render (about a second); later visits come from the cache.
+Prewarming rendered every route on the serving thread, and pages took 3-28s
+while it ran (stacksjs/stacks#2964), so it stays off.
+
+`renderCachePersist: true` keeps those renders in `storage/framework/stx/render-cache/`,
+so a restart serves pages already rendered instead of rendering them again
+(stacksjs/stacks#3035). A kept page is used only while nothing it was rendered
+from has changed: its templates, every watched file, the lockfiles, `.env`
+files and stx config. Watched roots therefore matter twice. Keep in `watchDirs`:
+
+- the project and framework `resources/functions` roots, so a composable edit
+  invalidates its client bundle;
+- `config/` and `storage/framework/runtime/dashboard/`, which hold what the
+  layout builds the sidebar from (`config/dashboard.ts` and the models
+  manifest). Without them a restart after a config edit serves the old sidebar.
+
+Anything else a dashboard server script reads at render time belongs in
+`watchDirs` too. The models manifest is written only when its content changes,
+so a restart alone does not discard the kept pages.
 
 Do not add request-specific server output to a source-cached static dashboard
 route. If a route must render cookies, identity, query-dependent data, or
@@ -591,7 +658,7 @@ or a fake success response.
 
 ## Gotchas
 - Dashboard runs on port 3002 by default (separate from frontend on 3000)
-- Dashboard components use STX templating with crosswind CSS
+- Dashboard components use STX templating with ts-css utilities
 - Dashboard routes are registered from `storage/framework/defaults/routes/`, not from a generated type file
 - Settings panels read/write from the corresponding `config/*.ts` files
 - Models with `useApi` get generated REST actions and routes, not bespoke dashboard views
@@ -602,3 +669,18 @@ or a fake success response.
 - Preserve the existing sidebar information architecture and styling when redesigning page content
 - Use `dashboard-modal-layer` for every fixed dashboard dialog or drawer
 - The live terminal component polls real deployment output and pauses while the document is hidden
+
+## Generic model exposure
+
+Set `dashboard: { access: false }` on a model to exclude it server-side from
+the generic model catalog and its totals, legacy highlighted model counts,
+User/Subscriber count Actions, global model search, and generic model-browser
+read/store/update/destroy Actions. Direct model-browser requests return 404
+before row queries. Omission preserves existing exposure.
+
+`dashboard.enabled: false` only hides a sidebar row and still permits generic
+model access. `access` does not disable direct ORM calls, named domain Actions,
+or separate routes generated by `useApi`. Configure `security.api.models` or
+`STACKS_MODEL_APIS`, middleware, ownership and policies for those APIs. The
+new boundary does not provide row ownership or permission checks for models
+that remain exposed.

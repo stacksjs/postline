@@ -12,6 +12,8 @@ export default defineModel({
   ownership: siteOwnership(),
 
   traits: {
+    // So a fresh seed fills its dashboard page (stacksjs/stacks#3000).
+    useSeeder: { count: 10 },
     useUuid: true,
     useTimestamps: true,
     useSearch: {
@@ -214,7 +216,7 @@ export default defineModel({
       validation: {
         rule: schema.enum(['published', 'draft', 'archived']),
         message: {
-          oneOf: 'Status must be either published, draft, or archived',
+          enum: 'Status must be either published, draft, or archived',
         },
       },
       factory: faker => faker.helpers.arrayElement(['published', 'draft', 'archived']),

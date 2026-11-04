@@ -31,7 +31,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  BUN_VERSION: '1.4.2'
+  BUN_VERSION: '1.4.4'
   # Prebuilt Craft runtime, pinned by release and checksum. Building it from
   # source would pin a Zig *dev* toolchain, which ziglang.org prunes as soon as
   # master moves on. v0.0.118 is the first release with --persistent-storage

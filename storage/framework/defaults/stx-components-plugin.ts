@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 /**
@@ -8,14 +7,12 @@ import { join } from 'node:path'
  * dashboard uses it for the macOS-style web sidebar.
  *
  * The library ships its .stx sources in the package, so the installed
- * copy is used when present. A local stx checkout wins during framework
- * development (same convention as the Craft SDK resolution in
- * `core/actions/src/dev/dashboard.ts`), and `STX_COMPONENTS_DIR` can
- * point anywhere explicitly.
+ * copy must match the package whose controllers the app imports. Merely
+ * having a development checkout on this machine must never replace those
+ * templates. `STX_COMPONENTS_DIR` selects a source directory explicitly.
  */
 const candidates = [
   process.env.STX_COMPONENTS_DIR,
-  join(homedir(), 'Code/Tools/stx/packages/components/src/ui'),
   join(process.cwd(), 'node_modules/@stacksjs/components/src/ui'),
 ].filter((dir): dir is string => Boolean(dir))
 
@@ -58,9 +55,16 @@ export default {
    * defines `<Button />`, and cannot quietly replace the framework's.
    */
   components: [
-    library,
     // Relative to this file, which is what stx resolves plugin entries against.
     'resources/components',
+    // `library` is a package root too, and it used to sit above the line
+    // before this one - so for 16 names present in both trees the package
+    // answered, which is the exact thing the paragraph above says cannot
+    // happen. `<EmptyState>` was the visible one: the framework's takes an
+    // Iconify class, the package's takes raw SVG and prints it through
+    // `{!! icon !!}`, so ten dashboard components rendered the class name as
+    // text inside a grey circle. See stacksjs/stacks#2927.
+    library,
     ...packageDirs(),
   ],
 }

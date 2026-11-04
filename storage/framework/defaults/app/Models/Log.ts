@@ -49,9 +49,11 @@ export default defineModel({
       order: 1,
       fillable: true,
       validation: {
-        rule: schema.number().required(),
+        // Milliseconds since the epoch, so a bigint column, as on Websocket.time
+        // (stacksjs/stacks#2996).
+        rule: schema.unix().required(),
         message: {
-          date: 'Timestamp must be a valid date',
+          unix: 'Timestamp must be a valid Unix timestamp',
         },
       },
       factory: faker => faker.date.recent().getTime(),

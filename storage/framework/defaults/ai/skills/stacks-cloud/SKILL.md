@@ -8,7 +8,7 @@ allowed-tools: Read Edit Write Bash Grep Glob
 
 # Stacks Cloud & Deployment
 
-Cloud infrastructure for Stacks, across three deploy targets, all driven through
+Cloud infrastructure for Stacks, across provider-specific deploy targets, all driven through
 `@stacksjs/ts-cloud`.
 
 ## Targets
@@ -137,7 +137,9 @@ hostname. LAN HTTPS comes from a certificate authority on the box itself (rpx `l
 Let's Encrypt. To publish: routable address, ports 80 and 443 forwarded, a site with a domain, and
 `ssh.publicIp` set. `TS_CLOUD_SSH_PUBLISH_DNS=1` forces publishing on, `0` forces it off.
 
-**Shared boxes.** Both targets support `cloud.attachTo: '<owner slug>'`. An attached project skips
+**Shared boxes.** Set `tsCloud.cloud.attachTo` to
+`process.env.CLOUD_ATTACH_TO || undefined` in the named `tsCloud` export and
+supply the owner's slug through the protected deploy environment. An attached project skips
 provisioning and deploys only its own sites. Each project owns `/etc/rpx/sites.d/<slug>.json` and
 replaces it wholesale, so `project.slug` must be unique on the box, and the config must declare
 every domain that fragment currently serves or the deploy stops.
@@ -204,7 +206,7 @@ export default [
     instance: 't3.micro',
     disk: 20,                  // GB
     os: 'ubuntu-20-lts-x86_64',
-    bun: '1.1.26',
+    bun: '1.3.0', // use the project's required/installed release
     database: { type: 'sqlite', name: 'stacks' }
   },
   // ... more servers
@@ -247,26 +249,28 @@ buddy domains:remove <domain>         # remove domain
 
 ## config/cloud.ts
 
-```typescript
-{
+~~~ts
+import type { CloudConfig } from '@stacksjs/types'
+import type { CloudConfig as TsCloudConfig } from '@stacksjs/ts-cloud'
+
+export const tsCloud: TsCloudConfig = {
   project: { name: 'my-app', slug: 'my-app', region: 'us-east-1' },
-  mode: 'server',             // 'server' | 'serverless'
-  environments: {
-    production: { domain: 'app.com', region: 'us-east-1' },
-    staging: { domain: 'staging.app.com' }
-  },
-  infrastructure: {
-    compute: { type: 't3.micro', spot: false },
-    loadBalancer: { enabled: true, type: 'application' },
-    ssl: { enabled: true },
-    dns: { provider: 'route53' },
-    storage: { buckets: [] },
-    cdn: { enabled: true },
-    cache: { enabled: false },
-    queue: { enabled: false }
-  }
+  cloud: { provider: 'hetzner' },
+  mode: 'server',
 }
-```
+
+const config: CloudConfig = {}
+export default config
+~~~
+
+Keep the tenant roster in `STACKS_CLOUD_TENANTS` or the private sources described
+in `stacks-env`. A declared `tenants` array remains available for private forks.
+
+Extend the named tsCloud object using its typed sites, environments and
+infrastructure options. The default Stacks wrapper holds surrounding settings
+such as tenant isolation. Provider configuration does not belong at an invented
+flat provider property. Preserve each site's gateway domains/path declarations
+when changing shared-box config.
 
 ## Infrastructure Stack (storage/framework/cloud/)
 
@@ -301,3 +305,21 @@ Stack naming: `{slugified-app-name}-cloud`
 - Environment mapping: `local` → `development`, others preserved
 - Deploy hooks run before/after deployment for custom logic
 - The cloud package has its own `package.json` with framework dependencies
+
+
+## Configuration and provider evidence
+
+The named `tsCloud` export in `config/cloud.ts` owns the provider and
+infrastructure options; the default export is Stacks' surrounding cloud config.
+The short infrastructure examples above show concepts, not a substitute for the
+installed TsCloudConfig type. Refer to that file and the provider's implementation
+before copying a server definition, mode or storage schema.
+
+Fly.io is another native deploy branch (Docker registry image and leased Machines),
+documented in `stacks-deploy`. The capability matrix at
+`core/config/src/capabilities.ts` only retains experimental Hetzner/SSH
+deploy contracts. Provider availability is separate from live conformance and
+rollback evidence; no registry entry should be invented to make the table look
+complete. Serverless resources, realtime topology and application queue drivers
+each have their own runtime contract. Provisioned infrastructure does not
+automatically wire the corresponding application adapter.

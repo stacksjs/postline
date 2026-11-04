@@ -19,7 +19,7 @@
     "url": "https://github.com/stacksjs/stacks/issues"
   },
   "scripts": {
-    "build:reset": "rm -rf node_modules pantry.lock && bun install && ./buddy generate:types && ./buddy lint:fix",
+    "build:reset": "rm -rf node_modules && bun install && ./buddy generate:types && ./buddy lint:fix",
     "buddy": "./buddy",
     "stacks": "./buddy",
     "setup": "./bootstrap",
@@ -53,9 +53,9 @@
     "release:major": "./buddy release --bump major",
     "changelog": "./buddy changelog",
     "generate": "./buddy generate",
-    "typecheck": "sh scripts/typecheck.sh",
-    "typecheck:app": "sh scripts/typecheck.sh",
-    "types:check": "sh scripts/typecheck.sh",
+    "typecheck": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false",
+    "typecheck:app": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false",
+    "types:check": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false",
     "types:fix": "./buddy types:fix",
     "test": "./buddy test",
     "test:ui": "./buddy test:ui",
@@ -65,13 +65,13 @@
     "stx": "./buddy"
   },
   "dependencies": {
-    "@stacksjs/ai": "^0.75.87",
-    "@stacksjs/payments": "0.75.87",
-    "@stacksjs/realtime": "0.75.87",
-    "@stacksjs/socials": "^0.75.87",
-    "@stacksjs/stx": "^0.2.388",
+    "@stacksjs/ai": "^0.75.463",
+    "@stacksjs/payments": "0.75.463",
+    "@stacksjs/realtime": "0.75.463",
+    "@stacksjs/socials": "^0.75.463",
+    "@stacksjs/stx": "^0.2.798",
     "@stacksjs/ts-cloud": "^0.16.44",
-    "stacks": "^0.75.87",
+    "stacks": "^0.75.463",
     "stripe": "^22.4.0",
     "ts-broadcasting": "0.0.9",
     "ts-medium-editor": "^0.1.6"
@@ -97,6 +97,6 @@
   },
   "overrides": {
     "@stacksjs/ts-cloud": "^0.16.44",
-    "@stacksjs/stx": "^0.2.388"
+    "@stacksjs/stx": "^0.2.798"
   }
 }

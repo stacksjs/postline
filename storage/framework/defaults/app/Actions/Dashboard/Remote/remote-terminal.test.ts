@@ -1,13 +1,14 @@
 import type { UserModel } from '@stacksjs/orm'
 import type { RemoteHost } from './remote-commands'
 import type { TerminalAuditSink, TerminalEvent, TerminalProcess, TerminalSessionOptions } from './remote-terminal'
-import { describe, expect, it } from 'bun:test'
-import { existsSync, readdirSync } from 'node:fs'
+import { describe, expect, it, jest } from 'bun:test'
+import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { dirname } from 'node:path'
 import { sshTerminalArgv } from './remote-commands'
 import { TerminalSessions } from './remote-terminal'
 import { createPtySpawner } from './ssh-runner'
-import { encodeTerminalEvent, terminalEventStream } from './terminal-sessions'
+import { encodeTerminalEvent, terminalEventStream, terminalSessions } from './terminal-sessions'
 
 /**
  * Interactive terminal sessions (stacksjs/stacks#960). Every rule is asserted
@@ -236,16 +237,28 @@ describe('a session does not outlive its purpose', () => {
   })
 
   it('input keeps it alive; the max duration ends it regardless', async () => {
-    const { manager, fakes, audit } = sessions({ idleTimeoutMs: 40, maxDurationMs: 120, detachGraceMs: 10_000 })
-    const { id } = await manager.open({ user: alice, hosts, hostKey: 'app', authorizer: allowAll, cols: 80, rows: 24 })
-    for (let i = 0; i < 4; i++) {
-      await Bun.sleep(25)
-      await manager.input(id, alice, 'x')
+    // The clock is driven, not slept on: the deadlines under test run on the
+    // same clock a sleep waits on, so under load a sleep overshot them (#2978).
+    jest.useFakeTimers()
+    try {
+      const { manager, fakes, audit } = sessions({ idleTimeoutMs: 40, maxDurationMs: 120, detachGraceMs: 10_000 })
+      const { id } = await manager.open({ user: alice, hosts, hostKey: 'app', authorizer: allowAll, cols: 80, rows: 24 })
+      for (let i = 0; i < 4; i++) {
+        jest.advanceTimersByTime(25)
+        await manager.input(id, alice, 'x')
+      }
+      const ending = take(manager.watch(id, alice), 1)
+      // 119ms in: more than twice the idle timeout, kept open by the input.
+      jest.advanceTimersByTime(19)
+      expect(fakes[0]!.killed).toBe(false)
+      jest.advanceTimersByTime(1)
+      expect(fakes[0]!.killed).toBe(true)
+      expect((await ending).map(text)).toEqual(['<max-duration>'])
+      expect(audit.log.at(-1)).toStartWith('closed max-duration')
     }
-    expect(fakes[0]!.killed).toBe(false)
-    await Bun.sleep(60)
-    expect(fakes[0]!.killed).toBe(true)
-    expect(audit.log.at(-1)).toStartWith('closed max-duration')
+    finally {
+      jest.useRealTimers()
+    }
   })
 
   it('ends when nobody attaches, and a grace period after the last viewer leaves', async () => {
@@ -271,6 +284,40 @@ describe('a session does not outlive its purpose', () => {
     await manager.close(id, alice)
     await expect(manager.close(id, alice)).rejects.toThrow('No such terminal session')
     expect(audit.log.slice(1)).toEqual(['input rm -rf /tmp/build', 'closed closed in=17 out=0'])
+  })
+
+  it('shuts down only once every process has exited, so nothing it made outlives it', async () => {
+    // The real spawner removes its temp directory when the process exits; a
+    // shutdown that returned on the kill raced the process exiting (#2978).
+    let exit!: (code: number) => void
+    const { manager } = sessions({
+      spawn: () => ({ write: () => {}, resize: () => {}, kill: () => {}, exited: new Promise<number>((resolve) => { exit = resolve }) }),
+    })
+    await manager.open({ user: alice, hosts, hostKey: 'app', authorizer: allowAll, cols: 80, rows: 24 })
+
+    const closing = manager.closeAll().then(() => 'closed')
+    expect(await Promise.race([closing, Bun.sleep(20).then(() => 'waiting')])).toBe('waiting')
+    exit(-1)
+    expect(await closing).toBe('closed')
+  })
+
+  it('is closed by the server stopping, through the router\'s shutdown hooks (#3034)', async () => {
+    const registered = (globalThis as Record<symbol, { hooks: Array<{ name: string, run: () => unknown }> }>)[Symbol.for('@stacksjs/router:shutdown-hooks')]
+    const hook = registered?.hooks.find(entry => entry.name === 'terminal sessions')
+    expect(hook).toBeDefined()
+
+    // The app's own sessions, not a copy: the hook has to reach the manager
+    // the terminal actions open sessions on.
+    const closeAll = terminalSessions.closeAll
+    let closed = 0
+    terminalSessions.closeAll = async () => { closed += 1 }
+    try {
+      await hook!.run()
+    }
+    finally {
+      terminalSessions.closeAll = closeAll
+    }
+    expect(closed).toBe(1)
   })
 })
 
@@ -304,7 +351,6 @@ describe('the PTY spawner', () => {
   })
 
   it('carries output, input and a window resize through a real PTY, and cleans up', async () => {
-    const before = readdirSync(tmpdir()).filter(name => name.startsWith('stacks-terminal-')).length
     let knownHosts = ''
     const spawn = createPtySpawner((_host, path) => {
       knownHosts = path
@@ -315,7 +361,10 @@ describe('the PTY spawner', () => {
     const process = await spawn(shellHost, { cols: 100, rows: 30 }, (bytes) => { output += new TextDecoder().decode(bytes) })
     expect(existsSync(knownHosts)).toBe(true)
 
-    await Bun.sleep(150)
+    // Resize once the shell has reported the size it started at, not after a
+    // guess at how long that takes.
+    for (let i = 0; i < 200 && !output.includes('30 100'); i++)
+      await Bun.sleep(10)
     process.resize(132, 40)
     process.write('hello\r')
     expect(await process.exited).toBe(0)
@@ -324,8 +373,9 @@ describe('the PTY spawner', () => {
     expect(output).toContain('30 100')
     expect(output).toContain('40 132')
     expect(output).toContain('got:hello')
-    expect(existsSync(knownHosts)).toBe(false)
-    expect(readdirSync(tmpdir()).filter(name => name.startsWith('stacks-terminal-')).length).toBe(before)
+    // The directory this spawn created, not a count of the shared temp
+    // directory, which other processes change underneath the test (#2978).
+    expect(existsSync(dirname(knownHosts))).toBe(false)
   })
 })
 

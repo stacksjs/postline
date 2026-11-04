@@ -43,7 +43,7 @@ permissions:
   contents: write
 
 env:
-  BUN_VERSION: '1.4.2'
+  BUN_VERSION: '1.4.4'
   # Same pinned runtime as release.yml, both slices for a universal binary.
   CRAFT_VERSION: v0.0.118
   CRAFT_SHA256_ARM64: bba1ff388afc70e734b6ac955c52dbd1c90da723a3f458c311d3aec592fb0bec

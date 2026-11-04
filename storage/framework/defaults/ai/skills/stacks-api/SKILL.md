@@ -222,17 +222,20 @@ response.json({ message: 'OK' })
 response.json(data, { status: 200, headers: { 'X-Custom': 'value' }, pretty: true })
 
 // Status shortcuts
-response.created({ id: 1 })              // 201
+response.success(data, 'Saved')          // 200, { success: true, data, message }
+response.created({ id: 1 })              // 201, { success: true, data }
 response.noContent()                      // 204
-response.badRequest({ error: 'Bad' })     // 400
-response.unauthorized()                   // 401 (default: { error: 'Unauthorized' })
-response.forbidden()                      // 403 (default: { error: 'Forbidden' })
-response.notFound()                       // 404 (default: { error: 'Not Found' })
-response.error()                          // 500 (default: { error: 'Internal Server Error' })
+response.badRequest('Bad', errors?)       // 400
+response.unauthorized()                   // 401
+response.forbidden()                      // 403
+response.notFound()                       // 404
+response.validationError(errors)          // 422
+response.error('Conflict', 409)           // (message, status = 400, errors?)
+response.serverError()                    // 500
 
 // Other content types
-response.text('Hello', { status: 200 })
-response.html('<h1>Hello</h1>')
+response.text('Hello', 200)
+response.view('<h1>Hello</h1>')           // HTML; there is no response.html()
 response.redirect('/new-url', 302)        // 301 | 302 | 303 | 307 | 308
 ```
 
@@ -800,10 +803,11 @@ Models with `traits.useApi` automatically get CRUD routes via ORM actions:
 | DELETE | `/api/{model}/{id}` | Generated destroy | 204 |
 
 Which `useApi` models get these routes is `security.api.models` in
-`config/security.ts` (`'all'` by default, `'own'`, `'none'`, or a list of model
-names that may include `'own'`), overridden by `STACKS_MODEL_APIS`. `'all'`
-includes the ~80 framework models, so an app that does not use commerce or
-CMS should set `'own'`. The OpenAPI schemas follow the same selection.
+`config/security.ts` (`'own'` by default, `'all'`, `'none'`, or a list of model
+names that may include `'own'`), overridden by `STACKS_MODEL_APIS`. The ~80
+framework models publish nothing by default (#2954); an app that uses one
+names it, `['own', 'Product']`, or sets `'all'`. The OpenAPI schemas follow
+the same selection.
 
 Generated store and update handlers accept declared `fillable` attributes and
 the foreign-key attributes derived from `belongsTo`. For example,
@@ -838,3 +842,12 @@ the foreign-key attributes derived from `belongsTo`. For example,
 - CORS headers (`Access-Control-Allow-Origin: http://localhost:5173`) are only added in development mode for error responses
 - Body parsing happens once per request (tracked via `_bodyParsed` flag) -- JSON, URL-encoded, and multipart/form-data are all supported
 - `response.json()` catches circular reference errors and returns `{ error: 'Response data could not be serialized' }` instead of throwing
+
+## Sharing an authorized operation across transports
+
+`defineApiOperation({ authorize, handle })` from `@stacksjs/api/operation` returns
+an immutable operation with `execute(context)`. Every execution awaits authorize
+before invoking handle. Authenticate the context at each transport boundary;
+keep scope and resource-ownership checks in the operation and its domain helpers.
+This lets HTTP routes, native MCP tools and jobs share behavior without an HTTP
+loopback or a second implementation of the same business rules.
