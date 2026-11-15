@@ -1,5 +1,5 @@
 <script server>
-// Driven by the same catalog as the mega menu, so the footer cannot fall out of
+// Driven by the same catalog as the header, so the footer cannot fall out of
 // step with the nav when a page is added.
 import { FEATURES, USE_CASES } from '../../../app/Support/Marketing/catalog'
 
@@ -9,52 +9,50 @@ const year = new Date().getFullYear()
 </script>
 
 <template>
-  {{--
-    The colophon: what a paper prints at the foot of the last page — who made
-    it, on what, and where to write in. Set in the smallest type on the sheet
-    and ruled off from the stories above it.
-  --}}
-  <footer aria-labelledby="footer-heading">
+  <footer class="border-line border-t" aria-labelledby="footer-heading">
     <h2 id="footer-heading" class="sr-only">Site</h2>
 
-    <div class="grid gap-10 lg:gap-12 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] mx-auto px-6 py-14 max-w-[1400px]">
-      <div class="max-w-[38ch]">
-        <a class="block text-ink" href="/" aria-label="The Open Times home" data-stx-link>
-          <span class="text-3xl masthead">The Open Times</span>
+    <div class="grid gap-10 lg:gap-12 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))] mx-auto px-5 py-14 sm:px-8 max-w-[1200px]">
+      <div class="max-w-[36ch]">
+        <a class="flex gap-2.5 items-center text-ink" href="/" aria-label="Postline home" data-stx-link>
+          <span class="grid place-items-center h-7 w-7 bg-ink rounded-lg" aria-hidden="true">
+            <span class="h-2 w-2 bg-brand rounded-full"></span>
+          </span>
+          <span class="font-semibold text-[17px] tracking-tight">Postline</span>
         </a>
-        <p class="m-0 mt-4 leading-relaxed text-body text-sm">
-          Open-source publishing: your site, your newsletter, your paying subscribers, and one wire to every network. It runs on your machine, with your keys.
+        <p class="m-0 mt-4 leading-relaxed text-[14px] text-body">
+          Write once, publish to every network. Open source, and it runs with your keys on your machine.
         </p>
-        <p class="m-0 mt-4 byline">Set in Unifraktur, Playfair Display &amp; Libre Baskerville</p>
       </div>
 
       <nav class="grid content-start gap-2.5" aria-label="Features">
-        <p class="m-0 pb-1.5 kicker rule-thin">Features</p>
+        <p class="m-0 pb-1 font-medium text-[13px] text-ink">Features</p>
         @foreach (features as feature)
-          <a class="text-[14px] text-body hover:text-accent transition-colors" href="/features/{{ feature.slug }}" data-stx-link>{{ feature.nav }}</a>
+          <a class="text-[14px] text-muted hover:text-ink transition-colors" href="/features/{{ feature.slug }}" data-stx-link>{{ feature.nav }}</a>
         @endforeach
       </nav>
 
       <nav class="grid content-start gap-2.5" aria-label="Use cases">
-        <p class="m-0 pb-1.5 kicker rule-thin">Desks</p>
+        <p class="m-0 pb-1 font-medium text-[13px] text-ink">Use cases</p>
         @foreach (useCases as useCase)
-          <a class="text-[14px] text-body hover:text-accent transition-colors" href="/use-cases/{{ useCase.slug }}" data-stx-link>{{ useCase.nav }}</a>
+          <a class="text-[14px] text-muted hover:text-ink transition-colors" href="/use-cases/{{ useCase.slug }}" data-stx-link>{{ useCase.nav }}</a>
         @endforeach
       </nav>
 
       <nav class="grid content-start gap-2.5" aria-label="Project">
-        <p class="m-0 pb-1.5 kicker rule-thin">Press room</p>
-        <a class="text-[14px] text-body hover:text-accent transition-colors" href="https://github.com/stacksjs/opentimes">Source</a>
-        <a class="text-[14px] text-body hover:text-accent transition-colors" href="https://github.com/stacksjs/opentimes/releases">Editions</a>
-        <a class="text-[14px] text-body hover:text-accent transition-colors" href="https://github.com/stacksjs/opentimes/issues">Corrections</a>
-        <a class="text-[14px] text-body hover:text-accent transition-colors" href="/login" data-stx-link>Subscriber sign-in</a>
+        <p class="m-0 pb-1 font-medium text-[13px] text-ink">Project</p>
+        <a class="text-[14px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline">Source on GitHub</a>
+        <a class="text-[14px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline/releases">Releases</a>
+        <a class="text-[14px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline/issues">Report an issue</a>
+        <a class="text-[14px] text-muted hover:text-ink transition-colors" href="https://theopentimes.org">The Open Times</a>
+        <a class="text-[14px] text-muted hover:text-ink transition-colors" href="/login" data-stx-link>Sign in</a>
       </nav>
     </div>
 
-    <div class="border-ink border-t-2">
-      <div class="flex flex-col gap-2 justify-between sm:flex-row sm:items-center mx-auto px-6 py-5 max-w-[1400px]">
-        <p class="m-0 folio">MIT licensed &middot; Built on Stacks</p>
-        <p class="m-0 folio">&copy; {{ year }} The Open Times &middot; theopentimes.org</p>
+    <div class="border-line border-t">
+      <div class="flex flex-wrap gap-x-6 gap-y-2 items-center justify-between mx-auto px-5 py-6 sm:px-8 max-w-[1200px] text-[13px] text-muted">
+        <p class="m-0">&copy; {{ year }} Postline. MIT licensed.</p>
+        <p class="m-0">Built with <a class="text-body underline underline-offset-4 hover:text-ink" href="https://stacksjs.com">Stacks</a>.</p>
       </div>
     </div>
   </footer>

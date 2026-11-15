@@ -41,90 +41,77 @@ import { defaultConfig } from '@cwcss/crosswind'
  */
 
 /**
- * POSTLINE — a warm, print-inspired identity, expressed as tokens.
+ * POSTLINE — the identity, expressed as tokens.
  *
- * The palette is a print palette, not a screen one: paper stock, ink, and one
- * spot colour. Nothing here is a neutral grey — every surface is warm, because
- * newsprint is. The greys that remain (`--muted`) are ink at partial coverage,
- * which is what a halftone actually looks like.
+ * Neutral surfaces, near-black ink, and a primary button that is ink in the
+ * light theme and paper in the dark one. The interface is chrome around other
+ * people's content (posts, avatars, link cards, charts), so the palette stays
+ * out of its way: nothing here competes with a network's own colours.
  *
- * `--accent` is the press red used for a masthead flash or an EXTRA banner. It
- * is deliberately the only chromatic value in the whole system: a second hue
- * would read as a website with a newspaper theme rather than as a newspaper.
+ * `--brand` is the one chromatic value, a signal orange. It marks what is live
+ * or new (a status dot, a highlighted word, a focus ring) and is never a
+ * surface or a button fill, so it keeps meaning something.
  */
 
-/** Newsprint, day edition. The default for every page that is not the front page. */
+/** Light theme. The default. */
 const APP_LIGHT: string = `
   color-scheme: light;
-  background: #f4f0e4;
-  --bg: #f4f0e4;
-  --panel: #fbf8ef;
-  --panel-2: #ece6d6;
-  --panel-3: #e2dbc7;
-  --line: #cec5ae;
-  --ink: #17130f;
-  --body: #3a332a;
-  --muted: #7b7263;
-  --accent: #9c2118;
-  --on-accent: #fbf8ef;
+  background: #fafafa;
+  --bg: #fafafa;
+  --panel: #ffffff;
+  --panel-2: #f4f4f5;
+  --panel-3: #ececef;
+  --line: #e4e4e7;
+  --ink: #0a0a0b;
+  --body: #3f3f46;
+  --muted: #71717a;
+  --accent: #0a0a0b;
+  --on-accent: #fafafa;
+  --brand: #f0441e;
 `
 
-/** The night edition — ink-heavy stock, paper-coloured type. */
+/** Dark theme: the same roles, inverted. */
 const APP_DARK: string = `
   color-scheme: dark;
-  background: #14110d;
-  --bg: #14110d;
-  --panel: #1d1914;
-  --panel-2: #241f19;
-  --panel-3: #2d2720;
-  --line: #3a332a;
-  --ink: #f2ece0;
-  --body: #d8d0c0;
-  --muted: #9b9284;
-  --accent: #d9614f;
-  --on-accent: #14110d;
+  background: #0b0b0d;
+  --bg: #0b0b0d;
+  --panel: #131316;
+  --panel-2: #1a1a1e;
+  --panel-3: #232329;
+  --line: #2a2a30;
+  --ink: #f4f4f5;
+  --body: #d4d4d8;
+  --muted: #a1a1aa;
+  --accent: #f4f4f5;
+  --on-accent: #0b0b0d;
+  --brand: #ff6a45;
 `
 
 /**
- * The front page. LIGHT-locked — a newspaper does not have a dark mode — and
- * on slightly older, greyer stock than the workspace, so the two surfaces read
- * as "the printed paper" and "the newsroom" rather than as one flat theme.
- * The marketing layout opts in with `class="marketing"` on the root element.
+ * The marketing site is light-locked: its product shots and illustrations are
+ * drawn for a light page. It opts in with `class="marketing"` on the root
+ * element and takes the light tokens whatever theme the workspace remembers.
  */
-const MARKETING: string = `
-  color-scheme: light;
-  --bg: #f1ecdd;
-  --panel: #f8f4e9;
-  --panel-2: #e7e0cd;
-  --panel-3: #ddd4bd;
-  --line: #c6bca3;
-  --ink: #12100c;
-  --body: #332d24;
-  --muted: #756c5c;
-  --accent: #9c2118;
-  --on-accent: #f8f4e9;
-`
+const MARKETING: string = APP_LIGHT
 
 /**
- * The four faces of the paper, declared once at `:root` so the workspace and
- * the front page draw from the same set.
+ * Two faces, declared once at `:root`.
  *
- * - masthead   blackletter, the nameplate and nothing else. It is unreadable at
- *              small sizes by design; anything under ~28px must not use it.
- * - display    a high-contrast Didone for headlines and decks.
- * - body       a book serif — this is the face that carries actual reading.
- * - label      condensed gothic for kickers, folios, bylines and UI chrome.
- * - typewriter for the two places that quote a shell command.
+ * - sans  Geist, for everything that is read: headings, copy, controls.
+ * - mono  Geist Mono, for what is typed or counted: shell commands, shortcut
+ *         keys, eyebrows and numerals that should line up.
  *
- * Each stack ends in a real fallback rather than `sans-serif`, so a blocked
- * webfont degrades to something with the same posture instead of to Helvetica.
+ * `--font-display`, `--font-body` and `--font-label` are the roles the markup
+ * and the rules below ask for. They resolve to those two faces, so a role can
+ * be given a face of its own later without touching a template.
  */
 const FACES: string = `
-  --font-masthead: 'UnifrakturMaguntia', 'Playfair Display', Georgia, serif;
-  --font-display: 'Playfair Display', 'Times New Roman', Georgia, serif;
-  --font-body: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
-  --font-label: 'Oswald', 'Arial Narrow', ui-sans-serif, sans-serif;
-  --font-typewriter: 'Courier New', ui-monospace, monospace;
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-display: var(--font-sans);
+  --font-body: var(--font-sans);
+  --font-label: var(--font-mono);
+  --font-typewriter: var(--font-mono);
 `
 
 const TOKENS: string = `
@@ -142,17 +129,36 @@ html.dark body { color: var(--ink); }
  * shadows generated utilities by hand because the markup still uses raw palette
  * classes (`bg-blue-50`, `text-red-700`) instead of semantic status tokens. The
  * fix is to add success/warning/danger/info surface, border and text tokens
- * above and rewrite the markup to use them — a change across queue, index,
- * accounts and analytics, deferred so this pass stays reviewable.
+ * above and rewrite the markup to use them.
  *
- * These survive on specificity (`.dark .bg-blue-50` is 0,2,0 against the
- * utility's 0,1,0), not on source order, so moving them here is safe.
+ * WHY EVERY DECLARATION HERE IS !important
+ *
+ * Crosswind emits preflights inside `@layer cw-base` and the generated
+ * utilities unlayered, and an unlayered rule beats a layered one before
+ * specificity is consulted. So `.dark .bg-blue-50` (0,2,0, layered) lost to a
+ * plain `.bg-blue-50` (0,1,0, unlayered), and this whole block did nothing:
+ * the dark theme kept a light sidebar, white pills and pastel tiles.
+ * `!important` is the only weight that crosses a layer boundary. It is added
+ * to the block as a whole by `overriding()` below, not written per line, so a
+ * rule added here cannot forget it.
  */
-const DARK_OVERRIDES: string = `
+/** Mark every declaration in a block of CSS `!important`. */
+function overriding(css: string): string {
+  return css
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/([^;{}]+:[^;{}]+?)\s*(?:!important)?\s*;/g, '$1 !important;')
+}
+
+const DARK_OVERRIDES: string = overriding(`
 .dark .bg-blue-50 { background-color: #172554; }
 .dark .bg-emerald-50 { background-color: #052e2b; }
 .dark .bg-amber-50 { background-color: #3a2a08; }
 .dark .bg-red-50 { background-color: #3a1414; }
+.dark .bg-violet-50 { background-color: #251a47; }
+.dark .bg-indigo-50 { background-color: #1e1b4b; }
+.dark .bg-pink-50 { background-color: #3a1230; }
+.dark .bg-white { background-color: var(--panel-3); }
+.dark .bg-zinc-300 { background-color: #52525b; }
 
 .dark .bg-zinc-50\\/80, .dark .bg-zinc-50\\/48 { background-color: #1c1c1f; }
 .dark .bg-zinc-50\\/40 { background-color: rgba(255, 255, 255, 0.02); }
@@ -167,6 +173,12 @@ const DARK_OVERRIDES: string = `
 .dark .text-emerald-700, .dark .text-emerald-800 { color: #6ee7b7; }
 .dark .text-amber-800, .dark .text-amber-700 { color: #fcd34d; }
 .dark .text-red-700 { color: #fca5a5; }
+.dark .text-red-600 { color: #fca5a5; }
+.dark .text-violet-700 { color: #c4b5fd; }
+.dark .text-indigo-600 { color: #a5b4fc; }
+.dark .text-pink-600 { color: #f9a8d4; }
+.dark .text-blue-600 { color: #93c5fd; }
+.dark .text-zinc-500\\/80 { color: #a1a1aa; }
 
 .dark .hover\\:bg-white:hover { background-color: #26262a; }
 .dark .hover\\:bg-zinc-50:hover { background-color: #26262a; }
@@ -187,7 +199,7 @@ const DARK_OVERRIDES: string = `
   border-color: #2a2a2e;
   box-shadow: -10px 0 36px rgba(0, 0, 0, 0.4);
 }
-.dark [data-postline-sidebar] { background-color: rgba(24, 24, 27, 0.5); }
+.dark [data-postline-sidebar] { background-color: #0f0f12; }
 .dark [data-postline-sidebar] > .absolute { opacity: 0.35; }
 
 .dark .bg-\\[\\#e8e8e6\\]\\/90 { background-color: rgba(63, 63, 70, 0.6); }
@@ -206,7 +218,7 @@ const DARK_OVERRIDES: string = `
 .dark [data-analytics-chart] text[fill="#18181b"] { fill: #e4e4e7; }
 .dark [data-analytics-chart] rect[fill="#fff"] { fill: #26262a; stroke: #3f3f46; }
 .dark [data-analytics-chart] .bg-zinc-100 { background-color: #26262a; }
-`
+`)
 
 /** App shell: sidebar collapse animation, native-window chrome, focus rings. */
 const APP_SHELL: string = `
@@ -307,20 +319,14 @@ const APP_UI: string = `
   padding: 5px 2px 7px;
 }
 
-/*
-  Page headings in the workspace are set in the paper's display face, so the
-  newsroom is recognisably the same publication as the front page. Body copy and
-  controls stay in the UI sans: this surface is read in short bursts at small
-  sizes, where a book serif costs legibility for atmosphere.
-*/
 [data-postline-page] > header:first-child h1 {
   font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   line-height: 1.15;
 }
 
-/* Section eyebrows and meta rows across the workspace, matching the front page. */
+/* Section eyebrows and meta rows across the workspace. */
 [data-postline-page] .kicker,
 [data-postline-page] .folio,
 [data-postline-page] .byline { font-family: var(--font-label); }
@@ -343,8 +349,6 @@ const APP_UI: string = `
 
 [data-postline-page] :is(input, textarea, select) { border-radius: 10px; }
 
-.dark .bg-white { background-color: var(--panel); }
-.dark .hover\:bg-white:hover { background-color: var(--panel-3); }
 
 @media (max-width: 640px) {
   [data-postline-router] { padding: 12px; }
@@ -465,113 +469,90 @@ html.dark [data-retention-message][data-tone="error"] { color: rgb(252 165 165);
 `
 
 /**
- * Marketing mega-menu.
+ * The marketing site.
  *
- * Genuinely unreachable by a utility: descendant hover/focus-within states plus
- * a delayed `visibility` transition, which is what lets the panel fade OUT
- * rather than vanish. Scoped to html.marketing because MegaMenu.stx is used by
- * the marketing layout only.
- *
- * The comment that used to sit inside the `.menu-panel` block has been lifted
- * out: a comment inside a rule block is parsed as part of the declaration that
- * follows it, and both get dropped — which would have silently removed this
- * transition and made the panel snap.
- */
-const MEGA_MENU: string = `
-html.marketing .menu-item { position: static; }
-
-html.marketing .menu-panel {
-  position: absolute;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-6px);
-  transition:
-    opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
-    visibility 0s linear 0.18s;
-}
-
-html.marketing .menu-item:hover .menu-panel,
-html.marketing .menu-item:focus-within .menu-panel {
-  opacity: 1;
-  visibility: visible;
-  transform: none;
-  transition-delay: 0s;
-}
-
-html.marketing .menu-chevron {
-  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-html.marketing .menu-item:hover .menu-chevron,
-html.marketing .menu-item:focus-within .menu-chevron {
-  transform: rotate(180deg);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html.marketing .menu-panel,
-  html.marketing .menu-chevron {
-    transition: none;
-    transform: none;
-  }
-}
-`
-
-/**
- * Marketing base rules and scroll-driven reveals.
- *
- * Scoped under `html.marketing` so the landing page's typography and smooth
- * scrolling never leak into the app shell. Animation is CSS scroll-driven —
- * Stacks ships no animation library, and the `opacity: 0` base is gated behind
- * `@supports` so browsers without `animation-timeline` (and reduced-motion
- * users) always render content visible.
+ * Scoped under `html.marketing` so none of it reaches the workspace, which
+ * shares this stylesheet. Only what a utility class cannot say lives here:
+ * the type ramp, the page backdrop, motion, and the few composed pieces
+ * (eyebrow, grid backdrop, product frame) that would otherwise be a dozen
+ * utilities repeated on thirty elements.
  */
 const MARKETING_BASE: string = `
 html.marketing {
   font-family: var(--font-body);
-  font-size: 17px;
   scroll-behavior: smooth;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
 
-/*
-  Every heading on the front page is set in the display face. Done here rather
-  than by adding a 'font-display' class to forty headings, and scoped to
-  html.marketing so the workspace keeps its own type ramp.
-*/
-html.marketing :where(h1, h2, h3, h4) {
-  font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: -0.005em;
-}
-
-/*
-  The markup labels kickers, indices and section eyebrows with 'font-mono'.
-  Rather than rewrite every one of them, the class is redefined as what a
-  newspaper puts in that slot: condensed gothic, small, letterspaced. The two
-  places that want a genuine typewriter face ask for '.font-typewriter'.
-*/
-html.marketing .font-mono {
-  font-family: var(--font-label);
-  font-weight: 500;
-  letter-spacing: 0.14em;
-}
-
-html.marketing .font-typewriter { font-family: var(--font-typewriter); letter-spacing: 0; }
-
 html.marketing body { background-color: var(--bg); color: var(--ink); }
 
-html.marketing ::selection { background: var(--accent); color: var(--on-accent); }
+html.marketing :where(h1, h2, h3, h4) {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
 
-html.marketing :where(a, button):focus-visible {
-  outline: 2px solid var(--accent);
+html.marketing :where(p) { text-wrap: pretty; }
+
+html.marketing .font-mono { font-family: var(--font-mono); }
+
+html.marketing ::selection { background: var(--ink); color: var(--bg); }
+
+html.marketing :where(a, button, summary):focus-visible {
+  outline: 2px solid var(--brand);
   outline-offset: 3px;
-  border-radius: 4px;
+  border-radius: 8px;
+}
+
+/* A section eyebrow: small, mono, with the brand dot that says "this is live". */
+html.marketing .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+html.marketing .eyebrow::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--brand);
+}
+
+html.marketing .text-brand { color: var(--brand); }
+html.marketing .bg-brand { background-color: var(--brand); }
+
+/*
+  The hero backdrop: a hairline grid that fades out toward the fold, so the
+  first screen has structure without a picture to download.
+*/
+html.marketing .grid-backdrop {
+  background-image:
+    linear-gradient(to right, rgb(10 10 11 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(10 10 11 / 0.05) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 35%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 35%, transparent 100%);
+}
+
+/* The frame around a product shot: a window, lifted off the page. */
+html.marketing .product-frame {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.8) inset,
+    0 1px 2px rgb(10 10 11 / 0.04),
+    0 24px 60px -20px rgb(10 10 11 / 0.18);
 }
 
 @keyframes reveal-up {
-  from { opacity: 0; transform: translateY(24px); }
+  from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @supports (animation-timeline: view()) {
@@ -580,191 +561,31 @@ html.marketing :where(a, button):focus-visible {
       opacity: 0;
       animation: reveal-up linear both;
       animation-timeline: view();
-      animation-range: entry 0% cover 28%;
+      animation-range: entry 0% cover 24%;
     }
   }
 }
 
-/* Providers marquee — track holds two identical halves; -50% loops seamlessly. */
+/* Networks marquee: the track holds two identical halves, so -50% loops seamlessly. */
 @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-html.marketing .marquee-track { animation: marquee 32s linear infinite; }
+html.marketing .marquee-track { animation: marquee 36s linear infinite; }
+html.marketing .marquee-mask {
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+}
+
+/* The pulse on a "live" dot. */
+@keyframes live-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(240 68 30 / 0.45); }
+  100% { box-shadow: 0 0 0 8px rgb(240 68 30 / 0); }
+}
+html.marketing .live-dot { animation: live-pulse 1.8s ease-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   html.marketing { scroll-behavior: auto; }
-  html.marketing .marquee-track { animation: none; }
+  html.marketing .marquee-track,
+  html.marketing .live-dot { animation: none; }
 }
-`
-
-/**
- * PRINT FURNITURE
- *
- * The pieces of a newspaper that have no equivalent in a utility framework: the
- * nameplate, the rules that separate a folio from a story, the drop cap, the
- * column gutters, and the tooth of the paper itself.
- *
- * Rounded corners are zeroed across the front page. A newspaper is made by
- * cutting and folding a flat sheet, so nothing on it has a radius — and thirty
- * pages of markup still carry 'rounded-xl' and 'rounded-2xl' from the previous
- * identity.
- *
- * WHY THIS ONE RULE IS !important
- *
- * Crosswind emits preflights inside '@layer cw-base' and the generated
- * utilities UNLAYERED. Unlayered styles beat layered ones outright, before
- * specificity is even consulted — so 'html.marketing :where(.rounded-xl)'
- * (0,1,1) still lost to a plain '.rounded-xl' (0,1,0), and every button on the
- * feature pages kept its 12px radius. '!important' is the only weight that
- * crosses a layer boundary. It is confined to this single declaration; nothing
- * else in this file needs it, because nothing else competes with a utility of
- * the same property.
- *
- * The alternative — deleting the radius classes from every marketing template —
- * is the cleaner fix and the one to make when those pages are next touched.
- */
-const PRINT: string = `
-html.marketing :where(
-  .rounded, .rounded-sm, .rounded-md, .rounded-lg, .rounded-xl,
-  .rounded-2xl, .rounded-3xl, .rounded-full
-) { border-radius: 0 !important; }
-
-html.marketing :where(a, button):focus-visible { border-radius: 0; }
-
-/*
-  The tooth of the stock. Two offset dot grids at very low alpha read as
-  halftone at 100% zoom and as texture when you lean in — enough to stop the
-  background being a flat fill, cheap enough to be a gradient rather than an
-  image request.
-*/
-html.marketing body {
-  background-image:
-    radial-gradient(circle at 1px 1px, rgb(23 19 15 / 0.045) 1px, transparent 0),
-    radial-gradient(circle at 3px 4px, rgb(23 19 15 / 0.025) 1px, transparent 0);
-  background-size: 6px 6px, 7px 7px;
-  background-attachment: fixed;
-}
-
-/* The nameplate. Blackletter, tight, and never below 28px — see FACES. */
-.masthead {
-  font-family: var(--font-masthead);
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  line-height: 0.94;
-}
-
-/*
-  The rules. A newspaper separates blocks with printed lines of specific
-  weights, not with shadows or panels: a hairline inside a story, a thick rule
-  under the nameplate, a double rule around the dateline strip.
-*/
-.rule-thin { border-top: 1px solid var(--line); }
-.rule-thick { border-top: 3px solid var(--ink); }
-.rule-double {
-  border-top: 1px solid var(--ink);
-  box-shadow: 0 3px 0 -1px var(--ink);
-}
-
-/*
-  The folio strip: volume, date, edition. All-caps condensed at small size,
-  which is exactly what it is on a real front page.
-*/
-.folio {
-  font-family: var(--font-label);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--body);
-}
-
-/* A kicker sits above a headline and names the section. */
-.kicker {
-  font-family: var(--font-label);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-
-/* The deck is the italic sub-headline under a lede. */
-.deck {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-weight: 400;
-  color: var(--body);
-}
-
-/* The byline rule: a hairline above a small-caps attribution line. */
-.byline {
-  font-family: var(--font-label);
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-/*
-  Drop cap on the lede.
-
-  Deliberately the float implementation and NOT 'initial-letter'. The latter is
-  the typographically correct property, but inside a multi-column container
-  Chrome reserves a line box the full height of the sunk letter and then leaves
-  it empty - the lede rendered with roughly 900px of blank between its first and
-  second lines. The float sinks the same three lines with no such interaction.
-*/
-.dropcap::first-letter {
-  font-family: var(--font-display);
-  font-weight: 700;
-  float: left;
-  font-size: 3.4em;
-  line-height: 0.82;
-  padding: 0.06em 0.12em 0 0;
-  color: var(--ink);
-}
-
-/*
-  Text columns with a printed gutter rule between them, the way a broadsheet
-  sets running copy. Single column below \'md\' — two 40-character columns on a
-  phone would be unreadable.
-*/
-.columns-print { column-gap: 2.25rem; column-rule: 1px solid var(--line); }
-@media (min-width: 768px) { .columns-print { column-count: 2; } }
-@media (min-width: 1280px) { .columns-print-3 { column-count: 3; } }
-.columns-print > :first-child { margin-top: 0; }
-
-/*
-  Ink-block button: solid, square, letterspaced caps. The hover state lifts the
-  ink slightly rather than changing hue, because the palette has exactly one
-  chromatic value and it is spoken for.
-*/
-.ink-button {
-  font-family: var(--font-label);
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  background: var(--ink);
-  color: var(--bg);
-  border: 1px solid var(--ink);
-  transition: background-color 150ms ease, color 150ms ease;
-}
-.ink-button:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-
-.ink-button--ghost { background: transparent; color: var(--ink); }
-.ink-button--ghost:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-
-/*
-  Links inside running copy get the underline a printed paper cannot have but a
-  reader now expects.
-
-  Restricted to links inside a paragraph or list item. A bare '.copy a' scores
-  (0,2,1) and so beat '.ink-button' (0,1,0) on specificity — which painted the
-  hero's primary button ink-on-ink and underlined its label. Buttons live in
-  their own wrapper rather than in running text, so this bound excludes them by
-  structure rather than by an :not() list that would need maintaining.
-*/
-html.marketing .copy :is(p, li) a { color: var(--ink); text-decoration: underline; text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
-html.marketing .copy :is(p, li) a:hover { color: var(--accent); }
 `
 
 export default {
@@ -814,10 +635,5 @@ export default {
     { getCSS: (): string => SETTINGS_STATUS },
     { getCSS: (): string => COMPOSER_CHIPS },
     { getCSS: (): string => MARKETING_BASE },
-    // After MARKETING_BASE: the radius reset and the copy-link rules are meant
-    // to override what that block establishes, and equal-specificity rules are
-    // resolved by source order.
-    { getCSS: (): string => PRINT },
-    { getCSS: (): string => MEGA_MENU },
   ],
 } satisfies CrosswindOptions

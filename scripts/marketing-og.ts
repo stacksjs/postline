@@ -1,14 +1,14 @@
 /**
  * Render one Open Graph card per marketing page with ts-images.
  *
- * The cards are generated rather than designed by hand so eleven pages cannot
+ * The cards are generated rather than designed by hand so the pages cannot
  * drift apart, and so a new catalog entry gets a matching card for free. Type
  * is Geist, the same face the pages use, so a shared link looks like the site
  * it points at.
  *
  *   bun scripts/marketing-og.ts
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { generateSocialCard, loadFont } from 'ts-images'
@@ -22,14 +22,14 @@ const fontsDir = join(root, 'resources/assets/fonts/geist')
 const titleFont = loadFont(new Uint8Array(readFileSync(join(fontsDir, 'Geist-600.ttf'))))
 const bodyFont = loadFont(new Uint8Array(readFileSync(join(fontsDir, 'Geist-400.ttf'))))
 
-// The marketing surface tokens from resources/layouts/marketing.stx, so the
+// The light tokens from config/crosswind.ts, so the
 // cards and the pages are the same palette rather than two near-misses.
 const INK = { r: 10, g: 10, b: 10 }
 const BODY = { r: 63, g: 63, b: 70 }
-const ACCENT = { r: 37, g: 99, b: 235 }
-const PAPER = { r: 244, g: 244, b: 242 }
+const ACCENT = { r: 240, g: 68, b: 30 }
+const PAPER = { r: 250, g: 250, b: 250 }
 
-/** The The Open Times mark: a rounded black square with a white P, drawn to match the nav. */
+/** The Postline mark: an ink tile with the signal dot at its centre, drawn to match the nav. */
 function drawMark(card: any, box: { x: number, y: number, size: number }): void {
   const { x, y, size } = box
   const data = card.data ?? card
@@ -48,6 +48,22 @@ function drawMark(card: any, box: { x: number, y: number, size: number }): void 
       data[i] = INK.r
       data[i + 1] = INK.g
       data[i + 2] = INK.b
+      data[i + 3] = 255
+    }
+  }
+
+  // The signal dot.
+  const centre = (size - 1) / 2
+  const dot = size * 0.16
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      if ((px - centre) ** 2 + (py - centre) ** 2 > dot * dot)
+        continue
+
+      const i = ((y + py) * width + (x + px)) * 4
+      data[i] = ACCENT.r
+      data[i + 1] = ACCENT.g
+      data[i + 2] = ACCENT.b
       data[i + 3] = 255
     }
   }
@@ -77,20 +93,20 @@ const cards: Card[] = [
   {
     file: 'home',
     eyebrow: 'Open source',
-    title: 'Publish it. Send it. Own it.',
-    subtitle: fit('Your publication, your newsletter, your paid subscribers.'),
+    title: 'Write it once. Publish it everywhere.',
+    subtitle: fit('One draft, six networks, and your keys on your machine.'),
   },
   {
     file: 'feature-index',
     eyebrow: 'Features',
-    title: 'Everything The Open Times does',
-    subtitle: fit('Publications, newsletter, payments, discover, crossposting.'),
+    title: 'What Postline does',
+    subtitle: fit('Crossposting, scheduling, campaigns, inbox, analytics.'),
   },
   {
     file: 'use-case-index',
     eyebrow: 'Use cases',
-    title: 'Who runs The Open Times',
-    subtitle: fit('Writers, paid newsletters, founders, advocates, agencies.'),
+    title: 'Who Postline is for',
+    subtitle: fit('Founders, advocates, maintainers, agencies, publications.'),
   },
   ...ALL_ENTRIES.map(entry => ({
     file: `${entry.kind}-${entry.slug}`,
@@ -107,7 +123,7 @@ for (const card of cards) {
     // Flat paper rather than a photograph: the site is light-locked, and a
     // stock image behind the type would fight the brand it is representing.
     backgroundColor: PAPER,
-    brand: 'The Open Times',
+    brand: 'Postline',
     eyebrow: card.eyebrow,
     title: card.title,
     subtitle: card.subtitle,

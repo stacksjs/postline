@@ -16,7 +16,7 @@
           favicon. Set in the serif rather than the blackletter face: at 11
           units the display face is legible where Unifraktur is a blot.
         --}}
-        <span class="grid place-items-center px-3 py-1 font-bold text-ink text-lg tracking-widest border-ink border-y-2" aria-hidden="true">P</span>
+        <span class="grid place-items-center shrink-0 h-10 w-10 bg-ink rounded-xl" aria-hidden="true"><span class="h-3 w-3 bg-[var(--brand)] rounded-full"></span></span>
         <h1 class="m-0 font-bold text-[20px] text-ink" :text="heading()">Sign in to Postline</h1>
         <p class="m-0 text-[13px] text-muted" :text="subtitle()">Compose once, publish everywhere.</p>
       </header>

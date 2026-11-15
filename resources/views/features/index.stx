@@ -1,136 +1,98 @@
 @extends('layouts/marketing')
 
-@section('title', 'Features - The Open Times')
-@section('description', 'Everything The Open Times does, and how each part works.')
-@section('canonical', 'https://opentimes.stacksjs.com/features')
-@section('ogImage', 'https://opentimes.stacksjs.com/images/og/feature-index.png')
+@section('title', 'Features - Postline')
+@section('description', 'Everything Postline does, and how each part works.')
+@section('canonical', 'https://postline.stacksjs.com/features')
+@section('ogImage', 'https://postline.stacksjs.com/images/og/feature-index.png')
 
 @section('content')
-  <div class="mx-auto px-6 max-w-[1400px]">
-    <header class="grid gap-5 pb-12 pt-16 lg:pt-20 max-w-2xl">
-      <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">Features</h1>
-      <p class="m-0 leading-relaxed text-body text-lg">Everything The Open Times does, and how each part works.</p>
+  <div class="mx-auto px-5 sm:px-8 max-w-[1200px]">
+    <header class="grid gap-5 pb-12 pt-14 sm:pt-20 max-w-[42rem]">
+      <p class="m-0 eyebrow">Features</p>
+      <h1 class="m-0 leading-[1.04] text-4xl text-ink sm:text-6xl">What Postline does.</h1>
+      <p class="m-0 leading-relaxed text-[17px] text-body sm:text-lg">Everything Postline does, and how each part works.</p>
     </header>
 
-    <ul class="grid gap-0 m-0 p-0 pb-16 list-none border-line border-t divide-line divide-y">
+    <ul class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 m-0 p-0 pb-20 list-none">
       <li>
-        <a class="grid gap-4 items-start sm:grid-cols-[auto_minmax(0,1fr)_auto] py-6 group" href="/features/publications" data-stx-link>
-          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-quill-write-02"></span></span>
-          <span class="grid gap-1.5">
-            <span class="font-semibold text-ink text-lg">Publications</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Write long-form posts to a publication you own, at your own domain, with nothing sitting between you and the page.</span>
+        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/crossposting" data-stx-link>
+          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-share-08"></span></span>
+          <span class="grid gap-2">
+            <span class="font-semibold text-[17px] text-ink">Crossposting</span>
+            <span class="leading-relaxed text-[14.5px] text-body">Write once and publish to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon in a single action.</span>
           </span>
-          <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>
       </li>
       <li>
-        <a class="grid gap-4 items-start sm:grid-cols-[auto_minmax(0,1fr)_auto] py-6 group" href="/features/newsletter" data-stx-link>
-          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-mail-01"></span></span>
-          <span class="grid gap-1.5">
-            <span class="font-semibold text-ink text-lg">Newsletter</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Publishing a post emails it to your subscribers. The web page and the send are one action, not two tools.</span>
+        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/scheduling" data-stx-link>
+          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-calendar-03"></span></span>
+          <span class="grid gap-2">
+            <span class="font-semibold text-[17px] text-ink">Scheduling</span>
+            <span class="leading-relaxed text-[14.5px] text-body">Schedule posts ahead in your own timezone and let the queue publish them, or send immediately.</span>
           </span>
-          <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>
       </li>
       <li>
-        <a class="grid gap-4 items-start sm:grid-cols-[auto_minmax(0,1fr)_auto] py-6 group" href="/features/paid-subscriptions" data-stx-link>
-          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-dollar-circle"></span></span>
-          <span class="grid gap-1.5">
-            <span class="font-semibold text-ink text-lg">Paid subscriptions</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Turn on paid tiers, mark posts subscriber-only, and take payment straight into your own Stripe account.</span>
+        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/per-network-variants" data-stx-link>
+          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-text-align-left"></span></span>
+          <span class="grid gap-2">
+            <span class="font-semibold text-[17px] text-ink">Per-network variants</span>
+            <span class="leading-relaxed text-[14.5px] text-body">Override the text for any single network without maintaining six separate drafts of the same post.</span>
           </span>
-          <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>
       </li>
       <li>
-        <a class="grid gap-4 items-start sm:grid-cols-[auto_minmax(0,1fr)_auto] py-6 group" href="/features/discover" data-stx-link>
-          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-compass"></span></span>
-          <span class="grid gap-1.5">
-            <span class="font-semibold text-ink text-lg">Discover</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Publications on the Open Times network recommend each other, so new readers arrive through someone they already trust.</span>
+        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/campaigns" data-stx-link>
+          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-flowchart-01"></span></span>
+          <span class="grid gap-2">
+            <span class="font-semibold text-[17px] text-ink">Campaigns</span>
+            <span class="leading-relaxed text-[14.5px] text-body">Lay a whole launch out across weeks on a calendar, then move the finished plan into the queue in one step.</span>
           </span>
-          <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>
       </li>
       <li>
-        <a class="grid gap-4 items-start sm:grid-cols-[auto_minmax(0,1fr)_auto] py-6 group" href="/features/comments" data-stx-link>
-          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-comment-01"></span></span>
-          <span class="grid gap-1.5">
-            <span class="font-semibold text-ink text-lg">Comments</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Threaded comments under every piece, open to the readers you choose, moderated by you and stored with your posts.</span>
+        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/inbox" data-stx-link>
+          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-message-01"></span></span>
+          <span class="grid gap-2">
+            <span class="font-semibold text-[17px] text-ink">Inbox</span>
+            <span class="leading-relaxed text-[14.5px] text-body">Read and reply to direct messages from Bluesky, X, Mastodon and Instagram without switching apps.</span>
           </span>
-          <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>
       </li>
       <li>
-        <a class="grid gap-4 items-start sm:grid-cols-[auto_minmax(0,1fr)_auto] py-6 group" href="/features/import" data-stx-link>
-          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-download-04"></span></span>
-          <span class="grid gap-1.5">
-            <span class="font-semibold text-ink text-lg">Import</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Move posts, subscribers and paid subscriptions across in one import, without asking a single reader to sign up again.</span>
+        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/listening" data-stx-link>
+          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-radar-02"></span></span>
+          <span class="grid gap-2">
+            <span class="font-semibold text-[17px] text-ink">Listening</span>
+            <span class="leading-relaxed text-[14.5px] text-body">Watch brand, product and competitor keywords across Bluesky, X and Mastodon, and read the mentions in one place.</span>
           </span>
-          <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>
       </li>
       <li>
-        <a class="grid gap-4 items-start sm:grid-cols-[auto_minmax(0,1fr)_auto] py-6 group" href="/features/crossposting" data-stx-link>
-          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-share-08"></span></span>
-          <span class="grid gap-1.5">
-            <span class="font-semibold text-ink text-lg">Crossposting</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Announce what you publish everywhere at once, or post to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon on their own.</span>
+        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/analytics" data-stx-link>
+          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-chart-line-data-01"></span></span>
+          <span class="grid gap-2">
+            <span class="font-semibold text-[17px] text-ink">Analytics</span>
+            <span class="leading-relaxed text-[14.5px] text-body">Publishing activity and per-network engagement, stored against the posts that earned it.</span>
           </span>
-          <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>
       </li>
       <li>
-        <a class="grid gap-4 items-start sm:grid-cols-[auto_minmax(0,1fr)_auto] py-6 group" href="/features/scheduling" data-stx-link>
-          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-calendar-03"></span></span>
-          <span class="grid gap-1.5">
-            <span class="font-semibold text-ink text-lg">Scheduling</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Schedule posts ahead in your own timezone and let the queue publish them, or send immediately.</span>
+        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/bulk-delete" data-stx-link>
+          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-delete-02"></span></span>
+          <span class="grid gap-2">
+            <span class="font-semibold text-[17px] text-ink">Cleanup</span>
+            <span class="leading-relaxed text-[14.5px] text-body">Delete old posts automatically after a set number of days, or clear a whole account in one run, with a preview first.</span>
           </span>
-          <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>
       </li>
       <li>
-        <a class="grid gap-4 items-start sm:grid-cols-[auto_minmax(0,1fr)_auto] py-6 group" href="/features/per-network-variants" data-stx-link>
-          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-text-align-left"></span></span>
-          <span class="grid gap-1.5">
-            <span class="font-semibold text-ink text-lg">Per-network variants</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Override the text for any single network without maintaining six separate drafts of the same post.</span>
+        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/own-your-keys" data-stx-link>
+          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-key-01"></span></span>
+          <span class="grid gap-2">
+            <span class="font-semibold text-[17px] text-ink">Own your keys</span>
+            <span class="leading-relaxed text-[14.5px] text-body">Your posts, your history and your access tokens live in a database you run. There is no vendor in the middle.</span>
           </span>
-          <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
-        </a>
-      </li>
-      <li>
-        <a class="grid gap-4 items-start sm:grid-cols-[auto_minmax(0,1fr)_auto] py-6 group" href="/features/analytics" data-stx-link>
-          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-chart-line-data-01"></span></span>
-          <span class="grid gap-1.5">
-            <span class="font-semibold text-ink text-lg">Analytics</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Subscriber growth, revenue and per-network engagement against the posts that caused them, in one view.</span>
-          </span>
-          <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
-        </a>
-      </li>
-      <li>
-        <a class="grid gap-4 items-start sm:grid-cols-[auto_minmax(0,1fr)_auto] py-6 group" href="/features/bulk-delete" data-stx-link>
-          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-delete-02"></span></span>
-          <span class="grid gap-1.5">
-            <span class="font-semibold text-ink text-lg">Bulk delete</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Delete every post from a connected account, on the networks whose APIs allow it, with a preview first.</span>
-          </span>
-          <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
-        </a>
-      </li>
-      <li>
-        <a class="grid gap-4 items-start sm:grid-cols-[auto_minmax(0,1fr)_auto] py-6 group" href="/features/own-your-keys" data-stx-link>
-          <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-key-01"></span></span>
-          <span class="grid gap-1.5">
-            <span class="font-semibold text-ink text-lg">Own everything</span>
-            <span class="max-w-[62ch] leading-relaxed text-body text-sm">Your posts, your subscribers, your revenue and your access tokens all live in a database you run. There is no vendor in the middle.</span>
-          </span>
-          <span class="hidden sm:block self-center h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
         </a>
       </li>
     </ul>

@@ -1,14 +1,8 @@
 <!--
-  The Postline mark: the initial on a warm ground, ruled top and bottom.
-
-  Deliberately not the blackletter face — a webfont cannot be relied on inside
-  an SVG a browser renders in a 16px tab, and UnifrakturMaguntia at that size is
-  an inkblot. A bold serif "P" between two rules reads at every size and still
-  belongs to the same identity.
+  The Postline mark: a signal dot on an ink tile. Two flat shapes, so it reads
+  in a 16px tab and needs no font.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Postline">
-  <rect width="64" height="64" fill="#f1ecdd"/>
-  <rect x="6" y="11" width="52" height="3" fill="#17130f"/>
-  <rect x="6" y="50" width="52" height="3" fill="#17130f"/>
-  <text x="32" y="43" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="700" fill="#17130f" text-anchor="middle" >P</text>
+  <rect width="64" height="64" rx="15" fill="#0a0a0b"/>
+  <circle cx="32" cy="32" r="10" fill="#f0441e"/>
 </svg>

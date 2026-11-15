@@ -1,89 +1,82 @@
 @extends('layouts/marketing')
 
-@section('title', 'Release notes that travel - The Open Times')
+@section('title', 'Release notes that travel - Postline')
 @section('description', 'Announce releases across networks from a tool you can read, fork and audit before it touches your accounts.')
-@section('canonical', 'https://opentimes.stacksjs.com/use-cases/open-source-maintainers')
-@section('ogImage', 'https://opentimes.stacksjs.com/images/og/use-case-open-source-maintainers.png')
+@section('canonical', 'https://postline.stacksjs.com/use-cases/open-source-maintainers')
+@section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-open-source-maintainers.png')
 
 @section('content')
-  <article class="mx-auto px-6 max-w-[1400px]">
-    {{-- Hero. Left-aligned, asset-free: this is a detail page, so the headline
-        and the single CTA carry it. --}}
-    <header class="grid gap-6 pb-14 pt-16 lg:pt-20 max-w-3xl">
+  <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">
+    <header class="grid gap-6 pb-14 pt-14 sm:pt-20 max-w-[46rem]">
       <nav class="flex gap-2 items-center text-[13px] text-muted" aria-label="Breadcrumb">
-        <a class="hover:text-ink transition-colors" href="/" data-stx-link>The Open Times</a>
+        <a class="hover:text-ink transition-colors" href="/" data-stx-link>Postline</a>
         <span aria-hidden="true">/</span>
-        <span class="text-body">Use cases</span>
+        <a class="hover:text-ink transition-colors" href="/use-cases" data-stx-link>Use cases</a>
       </nav>
-      <h1 class="m-0 font-semibold leading-[1.05] text-4xl text-ink tracking-tight md:text-6xl">Release notes that travel</h1>
-      <p class="m-0 max-w-[60ch] leading-relaxed text-body text-lg">Giving a closed service permission to post as you is a bigger ask than it looks. The Open Times is MIT licensed and runs on your own machine, so you can read exactly what it does before it gets that permission.</p>
+      <span class="grid place-items-center h-12 w-12 text-ink text-xl bg-panel border border-line rounded-2xl" aria-hidden="true"><span class="i-hugeicons-source-code"></span></span>
+      <h1 class="m-0 leading-[1.04] text-4xl text-ink sm:text-6xl">Release notes that travel</h1>
+      <p class="m-0 max-w-[60ch] leading-relaxed text-[17px] text-body sm:text-lg">Giving a closed service permission to post as you is a bigger ask than it looks. Postline is MIT licensed and runs on your own machine, so you can read exactly what it does before it gets that permission.</p>
       <div class="flex flex-wrap gap-3 items-center">
-        <a class="inline-flex items-center px-5 h-11 font-medium text-on-accent text-sm bg-ink hover:bg-neutral-800 rounded-xl transition-colors" href="/login" data-stx-link>Get started</a>
-        <a class="inline-flex items-center px-5 h-11 font-medium text-body text-sm hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/opentimes">Read the source</a>
+        <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/login" data-stx-link>Get started<span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span></a>
+        <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline"><span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>Read the source</a>
       </div>
     </header>
 
-    {{-- Body. Two stacked prose blocks, not a card grid: this is reading
-        material, and cards would add chrome without adding hierarchy. --}}
     <section class="grid gap-10 lg:gap-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] py-14 border-line border-t">
       <div class="grid gap-10">
         <div class="grid gap-3 max-w-[62ch]">
-          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Announce a release once</h2>
-          <p class="m-0 leading-relaxed text-body">Version announcements go to every network in one action, so shipping a release does not turn into a marketing chore.</p>
+          <h2 class="m-0 text-2xl text-ink">Announce a release once</h2>
+          <p class="m-0 leading-relaxed text-[16px] text-body">Version announcements go to every network in one action, so shipping a release does not turn into a marketing chore.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
-          <h2 class="m-0 font-semibold text-2xl text-ink tracking-tight">Software you can inspect</h2>
-          <p class="m-0 leading-relaxed text-body">The whole codebase is readable and MIT licensed. If it does not do what you need, the fix is a pull request rather than a support ticket.</p>
+          <h2 class="m-0 text-2xl text-ink">Software you can inspect</h2>
+          <p class="m-0 leading-relaxed text-[16px] text-body">The whole codebase is readable and MIT licensed. If it does not do what you need, the fix is a pull request and not a support ticket.</p>
         </div>
       </div>
 
       <aside class="lg:pt-1">
-        <ul class="m-0 p-0 list-none border-line border-t divide-line divide-y">
-          <li class="flex gap-3 items-start py-4">
-            <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">MIT licensed, auditable end to end</span>
-          </li>
-          <li class="flex gap-3 items-start py-4">
-            <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">Runs on your machine, no account to create</span>
-          </li>
-          <li class="flex gap-3 items-start py-4">
-            <span class="shrink-0 mt-0.5 h-5 w-5 text-accent i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-            <span class="text-[15px] text-body">No vendor holding publish rights</span>
-          </li>
-        </ul>
+        <div class="p-6 bg-panel border border-line rounded-2xl">
+          <p class="m-0 eyebrow">In short</p>
+          <ul class="grid gap-4 m-0 mt-5 p-0 list-none">
+            <li class="flex gap-3 items-start">
+              <span class="shrink-0 mt-0.5 h-5 w-5 text-ink i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
+              <span class="text-[15px] text-body">MIT licensed, auditable end to end</span>
+            </li>
+            <li class="flex gap-3 items-start">
+              <span class="shrink-0 mt-0.5 h-5 w-5 text-ink i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
+              <span class="text-[15px] text-body">Runs on your machine</span>
+            </li>
+            <li class="flex gap-3 items-start">
+              <span class="shrink-0 mt-0.5 h-5 w-5 text-ink i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
+              <span class="text-[15px] text-body">No vendor holding publish rights</span>
+            </li>
+          </ul>
+        </div>
       </aside>
     </section>
 
-    {{-- Related. A plain divided list rather than three equal cards. --}}
-    <section class="py-14 border-line border-t">
-      <h2 class="m-0 font-semibold text-ink text-xl tracking-tight">More use cases</h2>
-      <ul class="grid gap-0 m-0 mt-6 p-0 list-none divide-line divide-y">
+    <section class="pb-20 pt-14 border-line border-t">
+      <h2 class="m-0 text-ink text-xl">More use cases</h2>
+      <ul class="grid gap-4 md:grid-cols-3 m-0 mt-6 p-0 list-none">
         <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/writers" data-stx-link>
-            <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Writers</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Publish essays to your own site, email them to your list, and promote each one across every network in one pass.</span>
-            </span>
-            <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+          <a class="grid content-start gap-3 p-5 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/use-cases/founders" data-stx-link>
+            <span class="grid place-items-center h-9 w-9 text-ink bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-rocket-01"></span></span>
+            <span class="font-semibold text-[15px] text-ink">Founders</span>
+            <span class="leading-relaxed text-[13.5px] text-muted">Post launches, changelogs and build notes to every network without doing it six times.</span>
           </a>
         </li>
         <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/paid-newsletters" data-stx-link>
-            <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Paid newsletters</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Run a paid publication where the platform fee is zero, because there is no platform between you and your readers.</span>
-            </span>
-            <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+          <a class="grid content-start gap-3 p-5 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/use-cases/developer-advocates" data-stx-link>
+            <span class="grid place-items-center h-9 w-9 text-ink bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-user-group"></span></span>
+            <span class="font-semibold text-[15px] text-ink">Developer advocates</span>
+            <span class="leading-relaxed text-[13.5px] text-muted">Developers are split across Bluesky, X and Mastodon. Reach all of them without choosing a favourite.</span>
           </a>
         </li>
         <li>
-          <a class="flex gap-4 items-center justify-between py-5 group" href="/use-cases/founders" data-stx-link>
-            <span class="grid gap-1">
-              <span class="font-semibold text-[15px] text-ink">Founders</span>
-              <span class="max-w-[60ch] text-[13px] text-muted">Post launches, changelogs and build notes to every network without doing it six times.</span>
-            </span>
-            <span class="shrink-0 h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+          <a class="grid content-start gap-3 p-5 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/use-cases/agencies" data-stx-link>
+            <span class="grid place-items-center h-9 w-9 text-ink bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-building-03"></span></span>
+            <span class="font-semibold text-[15px] text-ink">Agencies</span>
+            <span class="leading-relaxed text-[13.5px] text-muted">Manage posting for client accounts without a per-seat subscription or a vendor holding their tokens.</span>
           </a>
         </li>
       </ul>

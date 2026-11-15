@@ -1,319 +1,368 @@
 @extends('layouts/marketing')
 
-@section('title', 'The Open Times — publish it, send it, own it')
-@section('description', 'An independent paper you actually own: the publication, the newsletter and the paid subscriptions all run on software you host. Crossposts to every network. Open source, and nobody takes a cut.')
-@section('canonical', 'https://theopentimes.org/')
-@section('ogImage', 'https://theopentimes.org/images/og/home.png')
+@section('title', 'Postline — write once, publish everywhere')
+@section('description', 'Postline publishes one draft to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Queue, campaigns, inbox and analytics in one open-source app that runs with your keys.')
+@section('canonical', 'https://postline.stacksjs.com/')
+@section('ogImage', 'https://postline.stacksjs.com/images/og/home.png')
+
+<script server>
+import { FEATURES, USE_CASES } from '../../app/Support/Marketing/catalog'
+
+const features = FEATURES
+const useCases = USE_CASES
+
+// The six networks, in the order the composer lists them. `limit` is each
+// network's character limit, which is what the hero's composer counts against.
+const networks = [
+  { name: 'Bluesky', icon: 'bluesky', limit: 300 },
+  { name: 'X', icon: 'x', limit: 280 },
+  { name: 'LinkedIn', icon: 'linkedin', limit: 3000 },
+  { name: 'Instagram', icon: 'instagram', limit: 2200 },
+  { name: 'Threads', icon: 'threads', limit: 500 },
+  { name: 'Mastodon', icon: 'mastodon', limit: 500 },
+]
+
+// The draft in the hero's composer. Its length is counted, not typed in, so
+// the counters under it are true of the text above them.
+const draft = 'We rewrote the queue this week. One draft now goes to six networks, scheduled posts publish while you sleep, and your access tokens never leave your own machine.'
+const counted = networks.map(network => ({ ...network, used: draft.length, over: draft.length > network.limit }))
+
+const steps = [
+  { n: 1, title: 'Connect your accounts', body: 'Sign in to each network once. Connect more than one account per network when you post as yourself and as a company.' },
+  { n: 2, title: 'Write it once', body: 'One draft, counted against every network you picked. Give a network its own wording when it needs different words.' },
+  { n: 3, title: 'Publish, or queue it', body: 'Send it now, schedule it in your own timezone, or lay out a whole launch on a campaign calendar.' },
+]
+
+const queue = [
+  { when: 'Mon 09:00', text: 'We rewrote the queue this week. Here is what changed.', state: 'Published', tone: 'done' },
+  { when: 'Wed 13:30', text: 'How the queue decides what goes out next.', state: 'Scheduled', tone: 'next' },
+  { when: 'Fri 17:00', text: 'What we learned from a month of launch posts.', state: 'Scheduled', tone: 'next' },
+  { when: 'Draft', text: 'Per-network variants, explained in one post.', state: 'Draft', tone: 'idle' },
+]
+
+const faqs = [
+  { q: 'Is Postline free?', a: 'Yes. Postline is MIT licensed and free to run yourself, with no limit on accounts or posts. A hosted plan, for people who would rather not run it, is on the way; leave your address below to hear when it opens.' },
+  { q: 'Which networks does it publish to?', a: 'Bluesky, X, LinkedIn, Instagram, Threads and Mastodon, plus long-form posts to a blog on your own site. You can connect several accounts on the same network.' },
+  { q: 'Where are my access tokens kept?', a: 'In your own database, encrypted with a key your instance generates. Postline has no service in the middle, so there is nobody else who could hold a copy.' },
+  { q: 'Do I need a server?', a: 'No. It runs on a laptop. Scheduled posts go out while Postline is running, so put it on a small always-on server when you want the queue to publish overnight.' },
+  { q: 'What do the networks charge?', a: 'Most of them nothing. X bills API access per use, and that cost is between you and X: Postline adds nothing on top and tells you which network a failed post was rejected by.' },
+]
+</script>
 
 @section('content')
+  {{-- Hero --}}
+  <section class="overflow-hidden relative">
+    <div class="absolute inset-0 grid-backdrop pointer-events-none" aria-hidden="true"></div>
 
-  {{--
-    THE FRONT PAGE
+    <div class="relative mx-auto pb-10 pt-16 px-5 sm:pt-24 sm:px-8 max-w-[1200px] text-center">
+      <a class="inline-flex gap-2 items-center px-3 py-1.5 text-[13px] text-body bg-panel hover:bg-panel-2 border border-line rounded-full transition-colors" href="https://github.com/stacksjs/postline">
+        <span class="h-1.5 w-1.5 bg-brand rounded-full live-dot" aria-hidden="true"></span>
+        Open source and MIT licensed
+        <span class="h-3.5 w-3.5 text-muted i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+      </a>
 
-    Laid out the way a broadsheet is rather than the way a landing page is: a
-    banner headline across the full measure, a lede running in columns beneath
-    it, and a boxed insert in the right-hand well. Everything below is another
-    story on the same sheet, separated by printed rules rather than by cards
-    floating over a background.
-  --}}
-  <article class="mx-auto px-6 max-w-[1400px]">
-
-    {{-- Lead story --}}
-    <section class="pt-10 sm:pt-14">
-      <p class="text-center kicker">Late edition &middot; Open source &middot; Volume one</p>
-
-      <h1 class="mt-4 font-black leading-[0.92] text-[13vw] text-center text-ink sm:text-7xl lg:text-[5.75rem]">
-        Publish it.<br class="sm:hidden"> Send it. Own it.
+      <h1 class="m-0 mt-7 mx-auto max-w-[16ch] font-semibold leading-[1.02] text-[2.75rem] text-ink sm:text-6xl lg:text-7xl">
+        Write it once. Publish it <span class="text-brand">everywhere</span>.
       </h1>
 
-      <p class="mt-5 mx-auto max-w-3xl text-center text-xl sm:text-2xl deck">
-        Your publication, your newsletter and your paying subscribers, on software you run — with nobody standing between you and the people who read you.
+      <p class="m-0 mt-6 mx-auto max-w-[56ch] leading-relaxed text-[17px] text-body sm:text-lg">
+        Postline sends one draft to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon, then keeps the queue, the replies and the numbers in one place. Open source, and it runs with your keys.
       </p>
 
-      <div class="mt-6 rule-thin"></div>
-      <p class="py-2 text-center byline">By the staff &middot; Filed from your own machine &middot; MIT licensed</p>
-      <div class="rule-thick"></div>
-    </section>
-
-    {{-- The lede and the boxed insert, set the way a column and a well are --}}
-    <section class="grid gap-10 lg:gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] pb-14 pt-8">
-      <div class="copy">
-        <div class="columns-print leading-relaxed text-body">
-          <p class="m-0 dropcap">Every publishing platform you can sign up for makes the same trade: it hosts your words, and in return it holds your readers. The list is theirs, the payment relationship is theirs, and the terms are whatever they happen to be this quarter.</p>
-          <p class="m-0 mt-4">The Open Times is the other arrangement. It is one program, on one machine you control, that renders the page, sends the email, takes the payment and files the announcement to every network you post to. One action does all four.</p>
-          <p class="m-0 mt-4">There is no platform fee, because there is no platform — only your database, your mail provider, your Stripe account and your domain.</p>
-        </div>
-
-        <div class="flex flex-wrap gap-3 items-center mt-8">
-          <a class="inline-flex items-center px-6 h-12 text-sm ink-button" href="/login" data-stx-link>Start your paper</a>
-          <a class="inline-flex gap-2 items-center px-6 h-12 text-sm ink-button ink-button--ghost" href="https://github.com/stacksjs/opentimes">
-            <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
-            Read the source
-          </a>
-        </div>
+      <div class="flex flex-wrap gap-3 items-center justify-center mt-9">
+        <a class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/login" data-stx-link>
+          Get started
+          <span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+        </a>
+        <a class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">
+          <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
+          Get the source
+        </a>
       </div>
+      <p class="m-0 mt-4 text-[13px] text-muted">Free and MIT licensed. No account with us to create.</p>
+    </div>
 
-      {{--
-        The insert. A single published story carrying the whole product: the
-        page it made, the mail it sent, and the wires it went out on. Boxed and
-        captioned, because that is what a newspaper does with a picture.
-      --}}
-      <figure class="self-start m-0">
-        <div class="bg-panel border-2 border-ink" role="img" aria-label="A story published to a custom domain, mailed to 4,182 subscribers and wired to six networks">
-          <div class="flex gap-3 items-baseline justify-between px-4 py-2 bg-ink">
-            <span class="text-on-accent folio">The Weekly Build</span>
-            <span class="text-on-accent folio">theweeklybuild.dev</span>
+    {{-- The composer, drawn rather than screenshotted: it stays sharp at any
+        size, weighs nothing, and its counters are computed from the draft it
+        shows. Decorative, so it is hidden from assistive technology, which
+        gets the same facts from the copy above. --}}
+    <div class="relative mx-auto pb-20 px-5 sm:px-8 max-w-[1040px]" aria-hidden="true">
+      <div class="overflow-hidden product-frame">
+        <div class="flex gap-3 items-center px-4 h-11 bg-panel-2 border-b border-line">
+          <span class="flex gap-1.5">
+            <span class="h-2.5 w-2.5 bg-panel-3 border border-line rounded-full"></span>
+            <span class="h-2.5 w-2.5 bg-panel-3 border border-line rounded-full"></span>
+            <span class="h-2.5 w-2.5 bg-panel-3 border border-line rounded-full"></span>
+          </span>
+          <span class="font-mono text-[12px] text-muted">Postline · Composer</span>
+        </div>
+
+        <div class="grid md:grid-cols-[13rem_minmax(0,1fr)]">
+          <div class="hidden md:grid content-start gap-1 p-3 text-left border-line border-r">
+            <span class="flex gap-2.5 items-center px-3 py-2 font-medium text-[13px] text-ink bg-panel-2 rounded-lg"><span class="h-4 w-4 i-hugeicons-edit-02"></span>Composer</span>
+            <span class="flex gap-2.5 items-center px-3 py-2 text-[13px] text-body"><span class="h-4 w-4 text-muted i-hugeicons-calendar-03"></span>Queue</span>
+            <span class="flex gap-2.5 items-center px-3 py-2 text-[13px] text-body"><span class="h-4 w-4 text-muted i-hugeicons-flowchart-01"></span>Campaigns</span>
+            <span class="flex gap-2.5 items-center px-3 py-2 text-[13px] text-body"><span class="h-4 w-4 text-muted i-hugeicons-message-01"></span>Inbox</span>
+            <span class="flex gap-2.5 items-center px-3 py-2 text-[13px] text-body"><span class="h-4 w-4 text-muted i-hugeicons-radar-02"></span>Listening</span>
+            <span class="flex gap-2.5 items-center px-3 py-2 text-[13px] text-body"><span class="h-4 w-4 text-muted i-hugeicons-chart-line-data-01"></span>Analytics</span>
           </div>
-          <div class="p-5">
-            <p class="m-0 font-bold leading-tight text-2xl text-ink">What shipping every Friday for a year actually cost me</p>
-            <p class="m-0 mt-2.5 leading-relaxed text-body text-sm">Fifty-one issues, two rewrites, and one week I nearly stopped. The honest version of the ledger.</p>
 
-            <div class="grid gap-2.5 mt-5 pt-4 rule-thin">
-              <div class="flex gap-3 items-center">
-                <span class="shrink-0 h-4 w-4 text-accent i-hugeicons-mail-01" aria-hidden="true"></span>
-                <span class="text-body text-sm">Mailed to 4,182 subscribers</span>
-              </div>
-              <div class="flex gap-3 items-center">
-                <span class="shrink-0 h-4 w-4 text-accent i-hugeicons-share-08" aria-hidden="true"></span>
-                <span class="flex flex-wrap gap-2 items-center text-body text-sm">
-                  On the wire to
-                  <span class="inline-flex gap-1.5 items-center text-ink">
-                    <span class="h-4 w-4 i-simple-icons-bluesky" aria-hidden="true"></span>
-                    <span class="h-4 w-4 i-simple-icons-x" aria-hidden="true"></span>
-                    <span class="h-4 w-4 i-simple-icons-linkedin" aria-hidden="true"></span>
-                    <span class="h-4 w-4 i-simple-icons-instagram" aria-hidden="true"></span>
-                    <span class="h-4 w-4 i-simple-icons-threads" aria-hidden="true"></span>
-                    <span class="h-4 w-4 i-simple-icons-mastodon" aria-hidden="true"></span>
-                  </span>
+          <div class="grid gap-4 p-4 sm:p-6 text-left">
+            <div class="flex flex-wrap gap-2">
+              @foreach (networks as network)
+                <span class="inline-flex gap-1.5 items-center px-2.5 h-8 font-medium text-[12px] text-on-accent bg-accent rounded-lg">
+                  <span class="h-3.5 w-3.5 i-simple-icons-{{ network.icon }}"></span>
+                  {{ network.name }}
                 </span>
-              </div>
+              @endforeach
+            </div>
+
+            <p class="m-0 min-h-24 leading-relaxed text-[16px] text-ink sm:text-[17px]">{{ draft }}</p>
+
+            <div class="grid gap-2 grid-cols-2 sm:grid-cols-3">
+              @foreach (counted as network)
+                <span class="flex gap-2 items-center justify-between px-3 h-9 min-w-0 bg-panel-2 border border-line rounded-lg">
+                  <span class="flex gap-2 items-center min-w-0 text-[12px] text-body"><span class="shrink-0 h-3.5 w-3.5 i-simple-icons-{{ network.icon }}"></span><span class="truncate">{{ network.name }}</span></span>
+                  <span class="shrink-0 font-mono tabular-nums text-[11.5px] text-muted">{{ network.used }}/{{ network.limit }}</span>
+                </span>
+              @endforeach
+            </div>
+
+            <div class="flex flex-wrap gap-2 items-center justify-between pt-1">
+              <span class="font-mono text-[12px] text-muted">6 networks · fits all of them</span>
+              <span class="flex gap-2">
+                <span class="inline-flex gap-2 items-center px-3.5 h-9 font-medium text-[13px] text-ink bg-panel border border-line rounded-lg"><span class="h-4 w-4 i-hugeicons-calendar-03"></span>Schedule</span>
+                <span class="inline-flex gap-2 items-center px-3.5 h-9 font-medium text-[13px] text-on-accent bg-accent rounded-lg"><span class="h-4 w-4 i-hugeicons-sent"></span>Publish</span>
+              </span>
             </div>
           </div>
         </div>
-        <figcaption class="mt-2 byline">One publish &mdash; the page, the send and six announcements.</figcaption>
-      </figure>
-    </section>
-  </article>
-
-  {{-- The wire: the networks a story goes out on --}}
-  <section class="bg-panel-2 border-ink border-y-2" aria-label="Supported networks">
-    <ul class="sr-only">
-      <li>Bluesky</li><li>X</li><li>LinkedIn</li><li>Instagram</li><li>Threads</li><li>Mastodon</li>
-    </ul>
-    <div class="mx-auto px-6 max-w-[1400px]">
-      <div class="flex flex-col gap-4 sm:flex-row sm:gap-10 sm:items-center py-5">
-        <p class="shrink-0 m-0 kicker">On the wire</p>
-        <div class="overflow-hidden relative grow [mask-image:linear-gradient(90deg,transparent,#000_7%,#000_93%,transparent)]">
-          <ul class="flex gap-12 items-center w-max marquee-track" aria-hidden="true">
-            <ProviderChip icon="bluesky" name="Bluesky" />
-            <ProviderChip icon="x" name="X" />
-            <ProviderChip icon="linkedin" name="LinkedIn" />
-            <ProviderChip icon="instagram" name="Instagram" />
-            <ProviderChip icon="threads" name="Threads" />
-            <ProviderChip icon="mastodon" name="Mastodon" />
-            <ProviderChip icon="bluesky" name="Bluesky" />
-            <ProviderChip icon="x" name="X" />
-            <ProviderChip icon="linkedin" name="LinkedIn" />
-            <ProviderChip icon="instagram" name="Instagram" />
-            <ProviderChip icon="threads" name="Threads" />
-            <ProviderChip icon="mastodon" name="Mastodon" />
-          </ul>
-        </div>
       </div>
     </div>
   </section>
 
-  {{-- Story 02 · The publication --}}
-  <section id="publish" class="mx-auto px-6 py-16 sm:py-20 max-w-[1400px]">
-    <div class="grid gap-10 lg:gap-14 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      <div class="max-w-md reveal">
-        <SectionLabel index="02" label="The publication" />
-        <h2 class="mt-3 leading-[1.02] text-4xl text-ink sm:text-5xl">A paper you are<br>not renting.</h2>
-        <div class="mt-4 rule-thin"></div>
-        <p class="mt-4 leading-relaxed text-body copy">Long-form stories render at your own domain, on templates that are files in your project. The archive is a table you can query, back up and move.</p>
-        <a class="inline-flex gap-2 items-center mt-6 font-semibold text-accent text-sm group" href="/features/publications" data-stx-link>
-          How publications work
-          <span class="h-4 w-4 transition-transform group-hover:translate-x-0.5 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
-        </a>
-      </div>
-
-      {{-- Three steps as a numbered ledger. Deliberately not cards: this is a
-          sequence, and cards would flatten it into three equal things. --}}
-      <ol class="grid gap-0 m-0 p-0 list-none border-line border-t divide-line divide-y reveal">
-        <li class="grid gap-2 sm:gap-6 sm:grid-cols-[auto_minmax(0,1fr)] py-6">
-          <span class="font-mono text-muted text-sm">01</span>
-          <div class="max-w-[54ch]">
-            <h3 class="m-0 text-ink text-xl">Write the piece</h3>
-            <p class="m-0 mt-2 leading-relaxed text-body">The same composer handles a two-line note and a three-thousand-word essay. Long-form gets a title, a slug and an archive entry.</p>
-          </div>
-        </li>
-        <li class="grid gap-2 sm:gap-6 sm:grid-cols-[auto_minmax(0,1fr)] py-6">
-          <span class="font-mono text-muted text-sm">02</span>
-          <div class="max-w-[54ch]">
-            <h3 class="m-0 text-ink text-xl">Decide who reads it</h3>
-            <p class="m-0 mt-2 leading-relaxed text-body">Free for everyone, subscribers only, or paying subscribers only. A choice per story rather than a plan you commit to.</p>
-          </div>
-        </li>
-        <li class="grid gap-2 sm:gap-6 sm:grid-cols-[auto_minmax(0,1fr)] py-6">
-          <span class="font-mono text-muted text-sm">03</span>
-          <div class="max-w-[54ch]">
-            <h3 class="m-0 text-ink text-xl">Put it to bed</h3>
-            <p class="m-0 mt-2 leading-relaxed text-body">The page goes live, the email goes out, and the announcement goes to every network you post to. One action covers all three.</p>
-          </div>
-        </li>
-      </ol>
-    </div>
-  </section>
-
-  {{-- Story 03 · The mail and the money, as two facing panels of unequal weight --}}
-  <section class="mx-auto pb-16 px-6 sm:pb-20 max-w-[1400px]">
-    <div class="grid gap-px lg:grid-cols-2 bg-ink border-2 border-ink reveal">
-      <div class="grid content-between gap-8 p-7 sm:p-9 bg-bg">
-        <div class="max-w-[44ch]">
-          <p class="m-0 kicker">The mail</p>
-          <h2 class="mt-3 leading-tight text-3xl text-ink">Publishing a story is sending it.</h2>
-          <p class="mt-3 leading-relaxed text-body copy">Mail goes out through your own provider, so deliverability, reputation and cost per email all stay yours. Export the list whenever you want — it was never held anywhere else.</p>
-        </div>
-        <a class="inline-flex gap-2 items-center font-semibold text-accent text-sm group" href="/features/newsletter" data-stx-link>
-          How sending works
-          <span class="h-4 w-4 transition-transform group-hover:translate-x-0.5 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
-        </a>
-      </div>
-
-      <div class="grid content-between gap-8 p-7 sm:p-9 text-on-accent bg-ink">
-        <div class="max-w-[44ch]">
-          <p class="m-0 text-on-accent/70 kicker">The money</p>
-          <h2 class="mt-3 leading-tight text-3xl text-on-accent">Charge for it. Keep all of it.</h2>
-          <p class="mt-3 leading-relaxed text-on-accent/70">Readers pay into your Stripe account. The only fee is the one Stripe charges you directly, because there is nobody else in the transaction.</p>
-        </div>
-        <a class="inline-flex gap-2 items-center font-semibold text-on-accent text-sm group" href="/features/paid-subscriptions" data-stx-link>
-          How payments work
-          <span class="h-4 w-4 transition-transform group-hover:translate-x-0.5 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
-        </a>
-      </div>
-    </div>
-  </section>
-
-  {{-- Story 04 · Discover, set as a classified index --}}
-  <section id="discover" class="bg-panel-2 border-line border-y">
-    <div class="mx-auto px-6 py-16 sm:py-20 max-w-[1400px]">
-      <div class="mx-auto max-w-2xl text-center reveal">
-        <SectionLabel index="03" label="The exchange" />
-        <h2 class="mt-3 leading-[1.02] text-4xl text-ink sm:text-5xl">Found by people who already read.</h2>
-        <p class="mt-4 mx-auto max-w-xl leading-relaxed text-body copy">Papers recommend each other. A reader who trusts one writer sees the handful that writer vouches for — ranked by subscriptions rather than by spend.</p>
-      </div>
-
-      <ul class="grid gap-0 m-0 mt-10 mx-auto p-0 max-w-3xl list-none border-ink border-t-2 divide-line divide-y reveal">
-        <li class="flex flex-wrap gap-x-6 gap-y-1 items-baseline justify-between py-4">
-          <span class="grid gap-0.5">
-            <span class="font-bold text-ink text-lg">The Weekly Build</span>
-            <span class="text-muted text-sm">Shipping notes from a solo founder, every Friday</span>
-          </span>
-          <span class="byline">Marta Ihenacho</span>
-        </li>
-        <li class="flex flex-wrap gap-x-6 gap-y-1 items-baseline justify-between py-4">
-          <span class="grid gap-0.5">
-            <span class="font-bold text-ink text-lg">Margins</span>
-            <span class="text-muted text-sm">What small software businesses actually earn</span>
-          </span>
-          <span class="byline">Devansh Rau</span>
-        </li>
-        <li class="flex flex-wrap gap-x-6 gap-y-1 items-baseline justify-between py-4">
-          <span class="grid gap-0.5">
-            <span class="font-bold text-ink text-lg">Cold Open</span>
-            <span class="text-muted text-sm">Long reads on the business of independent film</span>
-          </span>
-          <span class="byline">Siobh&aacute;n Carrick</span>
-        </li>
-        <li class="flex flex-wrap gap-x-6 gap-y-1 items-baseline justify-between py-4">
-          <span class="grid gap-0.5">
-            <span class="font-bold text-ink text-lg">Second System</span>
-            <span class="text-muted text-sm">Rewrites that worked, and the ones that did not</span>
-          </span>
-          <span class="byline">Tomas Lindqvist</span>
-        </li>
+  {{-- Networks --}}
+  <section class="py-8 border-line border-y" aria-label="Supported networks">
+    <div class="overflow-hidden marquee-mask">
+      <ul class="flex gap-14 items-center m-0 p-0 w-max list-none marquee-track">
+        {{-- Two identical halves, so the track loops without a seam. The
+            second is hidden from assistive technology: it is the same list. --}}
+        @foreach (networks as network)
+          <li class="flex gap-2.5 items-center text-body"><span class="h-5 w-5 i-simple-icons-{{ network.icon }}" aria-hidden="true"></span><span class="font-medium text-[15px]">{{ network.name }}</span></li>
+        @endforeach
+        @foreach (networks as network)
+          <li class="flex gap-2.5 items-center text-body" aria-hidden="true"><span class="h-5 w-5 i-simple-icons-{{ network.icon }}"></span><span class="font-medium text-[15px]">{{ network.name }}</span></li>
+        @endforeach
+        @foreach (networks as network)
+          <li class="flex gap-2.5 items-center text-body" aria-hidden="true"><span class="h-5 w-5 i-simple-icons-{{ network.icon }}"></span><span class="font-medium text-[15px]">{{ network.name }}</span></li>
+        @endforeach
+        @foreach (networks as network)
+          <li class="flex gap-2.5 items-center text-body" aria-hidden="true"><span class="h-5 w-5 i-simple-icons-{{ network.icon }}"></span><span class="font-medium text-[15px]">{{ network.name }}</span></li>
+        @endforeach
       </ul>
-
-      <p class="mt-6 text-center byline">Your paper stays unlisted until you list it.</p>
     </div>
   </section>
 
-  {{-- Story 05 · The stone: what is going out this week --}}
-  <section id="queue" class="mx-auto px-6 py-16 sm:py-20 max-w-[1400px]">
-    <div class="grid gap-10 items-center lg:gap-14 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-      <figure class="order-2 lg:order-1 m-0 reveal">
-        <div class="bg-panel border-2 border-ink" role="img" aria-label="The schedule showing three queued stories, one currently going out">
-          <div class="flex items-center justify-between px-4 py-2 bg-ink" aria-hidden="true">
-            <span class="text-on-accent folio">The schedule</span>
-            <span class="text-on-accent folio">This week</span>
+  {{-- Features --}}
+  <section class="mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px]" aria-labelledby="features-heading">
+    <div class="max-w-[44rem] reveal">
+      <p class="m-0 eyebrow">Features</p>
+      <h2 id="features-heading" class="m-0 mt-4 leading-[1.08] text-3xl text-ink sm:text-5xl">Everything that happens after the draft.</h2>
+      <p class="m-0 mt-5 leading-relaxed text-[17px] text-body">Publishing is the easy part. Postline also holds the schedule, the launch plan, the replies and the numbers, so a post is one job and not six.</p>
+    </div>
+
+    <ul class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 m-0 mt-12 p-0 list-none">
+      @foreach (features as feature)
+        <li class="reveal">
+          <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors group" href="/features/{{ feature.slug }}" data-stx-link>
+            <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 group-hover:bg-panel border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-{{ feature.icon }}"></span></span>
+            <span class="grid gap-2">
+              <span class="flex gap-2 items-center font-semibold text-[17px] text-ink tracking-tight">
+                {{ feature.nav }}
+                <span class="h-4 w-4 text-muted opacity-0 group-hover:opacity-100 transition-opacity i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+              </span>
+              <span class="leading-relaxed text-[14.5px] text-body">{{ feature.summary }}</span>
+            </span>
+          </a>
+        </li>
+      @endforeach
+    </ul>
+  </section>
+
+  {{-- How it works, beside the queue it produces --}}
+  <section class="bg-panel border-line border-y" aria-labelledby="how-heading">
+    <div class="grid gap-12 items-center lg:gap-16 lg:grid-cols-2 mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px]">
+      <div class="reveal">
+        <p class="m-0 eyebrow">How it works</p>
+        <h2 id="how-heading" class="m-0 mt-4 leading-[1.08] text-3xl text-ink sm:text-5xl">Three steps, then it runs itself.</h2>
+        <ol class="grid gap-7 m-0 mt-10 p-0 list-none">
+          @foreach (steps as step)
+            <li class="flex gap-5">
+              <span class="grid place-items-center shrink-0 h-8 w-8 font-mono text-[13px] text-ink bg-panel-2 border border-line rounded-full" aria-hidden="true">{{ step.n }}</span>
+              <span class="grid gap-1.5">
+                <span class="font-semibold text-[17px] text-ink tracking-tight">{{ step.title }}</span>
+                <span class="max-w-[46ch] leading-relaxed text-[15px] text-body">{{ step.body }}</span>
+              </span>
+            </li>
+          @endforeach
+        </ol>
+      </div>
+
+      <div class="reveal" aria-hidden="true">
+        <div class="overflow-hidden product-frame">
+          <div class="flex items-center justify-between px-5 h-12 border-b border-line">
+            <span class="font-semibold text-[14px] text-ink">Queue</span>
+            <span class="font-mono text-[12px] text-muted">This week</span>
           </div>
-          <ul class="divide-line divide-y">
-            <QueueRow slot="Mon 09:00" body="New issue: what shipping every Friday for a year cost me." icons="bluesky,x,mastodon" status="published" />
-            <QueueRow slot="Wed 13:30" body="The paragraph everyone replied to, on its own." icons="linkedin,threads" status="publishing" />
-            <QueueRow slot="Fri 18:00" body="Paying subscribers get the full ledger this weekend." icons="instagram,x" status="scheduled" />
+          <ul class="m-0 p-0 list-none divide-line divide-y">
+            @foreach (queue as item)
+              <li class="grid gap-3 grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center px-5 py-4">
+                <span class="font-mono text-[12px] text-muted">{{ item.when }}</span>
+                <span class="text-[14px] text-ink truncate">{{ item.text }}</span>
+                <span class="inline-flex gap-1.5 items-center px-2.5 h-6 font-medium text-[11.5px] rounded-full {{ item.tone === 'done' ? 'text-emerald-700 bg-emerald-50' : item.tone === 'next' ? 'text-ink bg-panel-2' : 'text-muted bg-panel-2' }}">
+                  <span class="h-1.5 w-1.5 rounded-full {{ item.tone === 'done' ? 'bg-emerald-500' : item.tone === 'next' ? 'bg-brand' : 'bg-zinc-300' }}"></span>
+                  {{ item.state }}
+                </span>
+              </li>
+            @endforeach
           </ul>
         </div>
-        <figcaption class="mt-2 byline">Three slots, six networks, one draft each.</figcaption>
-      </figure>
+      </div>
+    </div>
+  </section>
 
-      <div class="order-1 lg:order-2 max-w-md reveal">
-        <SectionLabel index="04" label="Distribution" />
-        <h2 class="mt-3 leading-[1.02] text-4xl text-ink sm:text-5xl">Every network,<br>from one draft.</h2>
-        <div class="mt-4 rule-thin"></div>
-        <p class="mt-4 leading-relaxed text-body copy">Announce the issue, queue the follow-ups, and let each network get wording that fits it. Publishing the piece is where the sequence starts, not another chore after it.</p>
-        <ul class="mt-6 border-line border-t divide-line divide-y">
-          <li class="flex gap-3 items-center py-3"><span class="grid place-items-center shrink-0 h-6 w-6 text-ink border border-ink folio">1</span><span class="text-body text-sm">Six networks from one composer</span></li>
-          <li class="flex gap-3 items-center py-3"><span class="grid place-items-center shrink-0 h-6 w-6 text-ink border border-ink folio">2</span><span class="text-body text-sm">Per-network limits and previews</span></li>
-          <li class="flex gap-3 items-center py-3"><span class="grid place-items-center shrink-0 h-6 w-6 text-ink border border-ink folio">3</span><span class="text-body text-sm">Schedule ahead or put it out now</span></li>
+  {{-- Self-hosting. The one dark band on the page. --}}
+  <section class="mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px]" aria-labelledby="own-heading">
+    <div class="grid overflow-hidden gap-10 items-center lg:gap-14 lg:grid-cols-2 p-8 sm:p-12 bg-ink rounded-3xl reveal">
+      <div>
+        <p class="m-0 font-mono text-[12px] text-white/50">Own your keys</p>
+        <h2 id="own-heading" class="m-0 mt-4 leading-[1.08] text-3xl text-white sm:text-4xl">Nobody else can post as you.</h2>
+        <p class="m-0 mt-5 max-w-[48ch] leading-relaxed text-[16px] text-white/70">
+          A hosted scheduler holds permission to post as you on every account you connect. Postline keeps that permission in your own database, encrypted with a key your instance generates.
+        </p>
+        <ul class="grid gap-3 m-0 mt-8 p-0 list-none">
+          <li class="flex gap-3 items-start text-[15px] text-white/85"><span class="shrink-0 mt-0.5 h-5 w-5 text-brand i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>One Bun process and a SQLite file</li>
+          <li class="flex gap-3 items-start text-[15px] text-white/85"><span class="shrink-0 mt-0.5 h-5 w-5 text-brand i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>MIT licensed, readable end to end</li>
+          <li class="flex gap-3 items-start text-[15px] text-white/85"><span class="shrink-0 mt-0.5 h-5 w-5 text-brand i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>Your posting history stays a table you can query</li>
         </ul>
+        <a class="inline-flex gap-2 items-center mt-9 font-medium text-[15px] text-white hover:text-white/80 transition-colors" href="/features/own-your-keys" data-stx-link>
+          How your keys are kept
+          <span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+        </a>
+      </div>
+
+      <div class="overflow-hidden bg-white/5 border border-white/10 rounded-2xl">
+        <div class="flex gap-2 items-center px-4 h-10 border-b border-white/10">
+          <span class="h-2.5 w-2.5 bg-white/15 rounded-full" aria-hidden="true"></span>
+          <span class="h-2.5 w-2.5 bg-white/15 rounded-full" aria-hidden="true"></span>
+          <span class="h-2.5 w-2.5 bg-white/15 rounded-full" aria-hidden="true"></span>
+          <span class="ml-2 font-mono text-[12px] text-white/40">Terminal</span>
+        </div>
+        <pre class="overflow-x-auto m-0 p-5 font-mono leading-7 text-[13px] text-white/85"><code><span class="text-white/40">$</span> git clone https://github.com/stacksjs/postline
+<span class="text-white/40">$</span> cd postline
+<span class="text-white/40">$</span> ./bootstrap
+<span class="text-white/40">$</span> ./buddy dev
+<span class="text-white/40">  ➜</span> <span class="text-brand">App</span>   http://localhost:3000/composer</code></pre>
       </div>
     </div>
   </section>
 
-  {{-- The EXTRA banner: the one reversed beat on the sheet --}}
-  <section class="text-on-accent bg-ink" aria-label="Open source and owned">
-    <div class="mx-auto px-6 py-16 sm:py-24 max-w-[1400px]">
-      <div class="max-w-3xl reveal">
-        <p class="m-0 text-on-accent/70 kicker">Extra &middot; Own it</p>
-        <h2 class="mt-4 leading-[0.98] text-5xl text-on-accent sm:text-7xl">Your list. Your revenue.<br>Your machine.</h2>
-        <p class="mt-5 max-w-xl leading-relaxed text-lg text-on-accent/70">Subscribers, payments, stories and tokens all live in a database you run. A platform cannot change its terms on an audience it does not hold.</p>
-        <div class="inline-flex gap-3 items-center mt-8 px-4 h-12 font-typewriter text-sm border border-on-accent/25">
-          <span class="text-on-accent/50" aria-hidden="true">$</span>
-          <span class="text-on-accent">bunx opentimes</span>
+  {{-- Use cases --}}
+  <section class="bg-panel border-line border-y" aria-labelledby="who-heading">
+    <div class="mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px]">
+      <div class="max-w-[44rem] reveal">
+        <p class="m-0 eyebrow">Who uses it</p>
+        <h2 id="who-heading" class="m-0 mt-4 leading-[1.08] text-3xl text-ink sm:text-5xl">For people who publish for a living, or for a launch.</h2>
+      </div>
+      <ul class="grid gap-0 m-0 mt-10 p-0 list-none border-line border-t divide-line divide-y">
+        @foreach (useCases as useCase)
+          <li class="reveal">
+            <a class="grid gap-3 items-center sm:gap-6 sm:grid-cols-[14rem_minmax(0,1fr)_auto] py-6 group" href="/use-cases/{{ useCase.slug }}" data-stx-link>
+              <span class="flex gap-3 items-center font-semibold text-[17px] text-ink tracking-tight"><span class="h-5 w-5 text-muted i-hugeicons-{{ useCase.icon }}" aria-hidden="true"></span>{{ useCase.nav }}</span>
+              <span class="leading-relaxed text-[15px] text-body">{{ useCase.summary }}</span>
+              <span class="hidden sm:block h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+            </a>
+          </li>
+        @endforeach
+      </ul>
+    </div>
+  </section>
+
+  {{-- Pricing --}}
+  <section id="pricing" class="mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px] scroll-mt-20" aria-labelledby="pricing-heading">
+    <div class="mx-auto max-w-[40rem] text-center reveal">
+      <p class="m-0 eyebrow">Pricing</p>
+      <h2 id="pricing-heading" class="m-0 mt-4 leading-[1.08] text-3xl text-ink sm:text-5xl">Free to run. Hosted when you want it.</h2>
+      <p class="m-0 mt-5 leading-relaxed text-[17px] text-body">Postline is open source, so running it yourself costs nothing and has no limits. A hosted plan is on the way for people who would rather not.</p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2 mt-12 mx-auto max-w-[56rem]">
+      <div class="grid content-start gap-6 p-8 bg-panel border border-line rounded-3xl reveal">
+        <div>
+          <h3 class="m-0 font-semibold text-ink text-xl">Self-hosted</h3>
+          <p class="m-0 mt-2 text-[15px] text-body">The whole product, on your machine.</p>
+        </div>
+        <p class="flex gap-2 items-baseline m-0"><span class="font-semibold text-5xl text-ink tracking-tight">$0</span><span class="text-[15px] text-muted">forever</span></p>
+        <ul class="grid gap-3 m-0 p-0 list-none">
+          <li class="flex gap-3 items-start text-[15px] text-body"><span class="shrink-0 mt-0.5 h-5 w-5 text-ink i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>Every feature, every network</li>
+          <li class="flex gap-3 items-start text-[15px] text-body"><span class="shrink-0 mt-0.5 h-5 w-5 text-ink i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>No limit on accounts or posts</li>
+          <li class="flex gap-3 items-start text-[15px] text-body"><span class="shrink-0 mt-0.5 h-5 w-5 text-ink i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>Runs on any machine that runs Bun</li>
+          <li class="flex gap-3 items-start text-[15px] text-body"><span class="shrink-0 mt-0.5 h-5 w-5 text-ink i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>MIT licensed</li>
+        </ul>
+        <a class="inline-flex gap-2 items-center justify-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="https://github.com/stacksjs/postline">
+          <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
+          Get the source
+        </a>
+      </div>
+
+      <div class="grid content-start gap-6 p-8 bg-panel-2 border border-line rounded-3xl reveal">
+        <div>
+          <h3 class="flex gap-2.5 items-center m-0 font-semibold text-ink text-xl">Hosted <span class="px-2 py-0.5 font-medium font-mono text-[11px] text-muted bg-panel border border-line rounded-full">Coming soon</span></h3>
+          <p class="m-0 mt-2 text-[15px] text-body">We run it, the queue never sleeps.</p>
+        </div>
+        <p class="m-0 leading-relaxed text-[15px] text-body">The same Postline, kept running and up to date for you, so scheduled posts go out whether or not your laptop is open. Pricing will be published before it opens.</p>
+        <div>
+          <p class="m-0 mb-3 font-medium text-[14px] text-ink">Hear when it opens</p>
+          <Waitlist />
         </div>
       </div>
     </div>
   </section>
 
-  {{-- The colophon --}}
-  <section class="mx-auto px-6 py-16 sm:py-20 max-w-[1400px]">
-    <div class="max-w-2xl reveal">
-      <SectionLabel index="05" label="Colophon" />
-      <h2 class="mt-3 leading-tight text-4xl text-ink sm:text-5xl">Open source, and yours to change.</h2>
-    </div>
-    <div class="grid gap-px sm:grid-cols-3 mt-8 bg-ink border-2 border-ink reveal">
-      <ValueCard icon="source-code" title="MIT licensed" description="Read every line, fork it, and run your own. No black boxes and no vendor." />
-      <ValueCard icon="package" title="Single binary" description="One Bun binary to run. No sprawling services to babysit at two in the morning." />
-      <ValueCard icon="layers-01" title="Built on Stacks" description="A full-stack TypeScript framework underneath, end to end and all of it readable." />
-    </div>
-  </section>
-
-  {{-- Put the paper to bed --}}
-  <section class="border-ink border-t-2">
-    <div class="mx-auto px-6 py-16 sm:py-24 max-w-[1400px] text-center">
-      <div class="mx-auto max-w-2xl reveal">
-        <p class="m-0 kicker">Final edition</p>
-        <h2 class="mt-4 leading-[0.98] text-5xl text-ink sm:text-7xl">Publish once.<br>Own everything.</h2>
-        <p class="mt-5 mx-auto max-w-xl leading-relaxed text-body copy">Stand up your own edition of The Open Times and run your paper on something nobody can take away from you.</p>
-        <div class="flex flex-wrap gap-3 justify-center mt-8">
-          <a class="inline-flex items-center px-6 h-12 text-sm ink-button" href="/login" data-stx-link>Start your paper</a>
-          <a class="inline-flex gap-2 items-center px-6 h-12 text-sm ink-button ink-button--ghost" href="https://github.com/stacksjs/opentimes">
-            <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
-            Star on GitHub
-          </a>
-        </div>
+  {{-- FAQ --}}
+  <section class="bg-panel border-line border-y" aria-labelledby="faq-heading">
+    <div class="grid gap-10 lg:gap-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px]">
+      <div class="reveal">
+        <p class="m-0 eyebrow">Questions</p>
+        <h2 id="faq-heading" class="m-0 mt-4 leading-[1.08] text-3xl text-ink sm:text-4xl">The ones people ask first.</h2>
+      </div>
+      <div class="border-line border-t divide-line divide-y reveal">
+        @foreach (faqs as faq)
+          <details class="py-5 group">
+            <summary class="flex gap-4 items-center justify-between font-medium list-none text-[17px] text-ink cursor-pointer">
+              {{ faq.q }}
+              <span class="shrink-0 h-5 w-5 text-muted transition-transform group-open:rotate-45 i-hugeicons-add-01" aria-hidden="true"></span>
+            </summary>
+            <p class="m-0 mt-3 max-w-[62ch] leading-relaxed text-[15px] text-body">{{ faq.a }}</p>
+          </details>
+        @endforeach
       </div>
     </div>
   </section>
 
+  {{-- Closing call to action --}}
+  <section class="mx-auto px-5 py-24 sm:px-8 sm:py-32 max-w-[1200px] text-center" aria-labelledby="cta-heading">
+    <h2 id="cta-heading" class="m-0 mx-auto max-w-[18ch] leading-[1.05] text-4xl text-ink sm:text-6xl reveal">Post once. Be everywhere.</h2>
+    <p class="m-0 mt-6 mx-auto max-w-[48ch] leading-relaxed text-[17px] text-body reveal">Connect your accounts and send the first post in a few minutes.</p>
+    <div class="flex flex-wrap gap-3 items-center justify-center mt-9 reveal">
+      <a class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/login" data-stx-link>
+        Get started
+        <span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+      </a>
+      <a class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">
+        <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
+        Star on GitHub
+      </a>
+    </div>
+  </section>
 @endsection
