@@ -1,0 +1,170 @@
+# The desktop release, on ReviewOS (reviewos.org/stacks/postline).
+#
+# `bun run release:minor` bumps package.json, writes the changelog, commits,
+# tags vX.Y.Z and pushes. ReviewOS mirrors the tag and runs this file: build
+# the macOS app, package it as a DMG, and publish a GitHub release with the
+# DMG attached.
+#
+# It runs on Postline's own Mac runner, because building a Mac app needs a
+# Mac: `[self-hosted, macos-arm64, postline]`. A runner takes a job only when
+# it carries every label a job asks for, so nobody else's Mac runner picks
+# this up, and this one picks up nothing else.
+#
+# NEEDED ON THE INSTANCE before the first release:
+#   variable DESKTOP_URL      the https address of the Postline the app opens
+#   secret   GH_RELEASE_TOKEN a GitHub token that may create releases on
+#                             stacksjs/postline (contents: write)
+#
+# Why a token of its own: inside a ReviewOS job `GITHUB_TOKEN` and
+# `GITHUB_API_URL` are ReviewOS's, and ReviewOS answers no releases API there.
+# The release is published on GitHub, where the code and the downloads are, so
+# the publish step is pointed at GitHub by name.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to (re)build and attach the DMG to, e.g. v0.1.0
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  BUN_VERSION: 1.4.4
+  # Prebuilt Craft runtime, pinned by release and checksum. v0.0.118 is the
+  # first release with --persistent-storage and --no-web-chrome-controls,
+  # which app/Desktop/launcher.ts passes.
+  CRAFT_VERSION: v0.0.118
+  CRAFT_SHA256_ARM64: bba1ff388afc70e734b6ac955c52dbd1c90da723a3f458c311d3aec592fb0bec
+
+jobs:
+  desktop:
+    name: Desktop DMG (macOS arm64)
+    reviewos:
+      secrets: [GH_RELEASE_TOKEN]
+      # Kept with the run as well, so a release that fails to publish still
+      # leaves the DMG it built.
+      artifact-paths:
+        - storage/framework/desktop-dmg/*.dmg
+    runs-on: [self-hosted, macos-arm64, postline]
+    timeout-minutes: 30
+    env:
+      APP_NAME: Postline
+      DESKTOP_APP_NAME: Postline
+      DESKTOP_BUNDLE_ID: ${{ vars.APPLE_BUNDLE_ID || 'org.stacksjs.postline' }}
+      DESKTOP_URL: ${{ vars.DESKTOP_URL }}
+      DESKTOP_RELEASE_CHANNEL: stable
+      DESKTOP_SIGNING_IDENTITY: ${{ vars.DESKTOP_SIGNING_IDENTITY }}
+      DESKTOP_NOTARY_PROFILE: ${{ vars.DESKTOP_NOTARY_PROFILE }}
+    steps:
+      - name: Resolve tag and version
+        id: version
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          case "$TAG" in v*) ;; *) echo "Not a release tag: $TAG" >&2; exit 1 ;; esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      # Before anything is built: a release with nowhere for the app to open
+      # is not a release.
+      - name: Require the app's address
+        run: |
+          set -euo pipefail
+          case "$DESKTOP_URL" in
+            https://*) ;;
+            '') echo "::error::Set the repository variable DESKTOP_URL to the https address of the Postline the desktop app opens." >&2; exit 1 ;;
+            *) echo "::error::DESKTOP_URL must be an https address, got: $DESKTOP_URL" >&2; exit 1 ;;
+          esac
+
+      # The runner checked out the commit the event names. A manual run names
+      # a branch, so move to the tag it was asked to build.
+      - name: Check out the tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force origin
+          git checkout --detach "refs/tags/$TAG"
+
+      - name: Check the tag matches package.json
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          declared=$(sed -n 's/^  "version": "\(.*\)",$/\1/p' package.json | head -1)
+          test "$declared" = "$VERSION" || { echo "::error::Tag v$VERSION does not match package.json version $declared." >&2; exit 1; }
+
+      - name: Set up Pantry and Bun
+        uses: pantry-pm/pantry/packages/action@17b46d931ed96929b391a8c6c6fc49f0714e772e # v0.11.207
+        with:
+          version: 0.11.207
+          install: 'false'
+          packages: bun.sh@${{ env.BUN_VERSION }} git-scm.org@2.53.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Fetched over plain HTTPS and checked against the pinned digest: the
+      # release is public, and a job that needs no GitHub token to read it
+      # should not be handed one.
+      - name: Fetch pinned Craft runtime
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/craft"
+          mkdir -p "$dir"
+          curl --fail --silent --show-error --location --retry 3 \
+            -o "$dir/craft-darwin-arm64.zip" \
+            "https://github.com/craft-native/craft/releases/download/$CRAFT_VERSION/craft-darwin-arm64.zip"
+          echo "$CRAFT_SHA256_ARM64  $dir/craft-darwin-arm64.zip" | shasum -a 256 -c -
+          unzip -q -o "$dir/craft-darwin-arm64.zip" -d "$dir"
+          test "$(lipo -archs "$dir/craft")" = arm64
+          echo "CRAFT_BIN=$dir/craft" >> "$GITHUB_ENV"
+
+      - name: Build desktop app
+        run: bun node_modules/@stacksjs/buddy/dist/cli.js build:desktop
+
+      - name: Package DMG
+        env:
+          DESKTOP_APP_VERSION: ${{ steps.version.outputs.version }}
+        run: bun node_modules/@stacksjs/buddy/dist/cli.js build:dmg
+
+      - name: Name the DMG for its platform
+        id: dmg
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd storage/framework/desktop-dmg
+          test -f "Postline-$VERSION.dmg"
+          mv "Postline-$VERSION.dmg" "Postline-$VERSION-macos-arm64.dmg"
+          echo "path=storage/framework/desktop-dmg/Postline-$VERSION-macos-arm64.dmg" >> "$GITHUB_OUTPUT"
+
+      # Published on GitHub through the Pantry action: notes from this
+      # version's section of CHANGELOG.md, the DMG and a checksums file. The
+      # three variables below name GitHub explicitly, because the ones a
+      # ReviewOS job inherits name ReviewOS.
+      - name: Publish the GitHub release
+        uses: pantry-pm/pantry/packages/action@17b46d931ed96929b391a8c6c6fc49f0714e772e # v0.11.207
+        with:
+          version: 0.11.207
+          install: 'false'
+          release: 'true'
+          release-tag: ${{ steps.version.outputs.tag }}
+          release-files: ${{ steps.dmg.outputs.path }}
+          release-checksums: sha256
+          release-changelog: CHANGELOG.md
+          release-notes: Postline ${{ steps.version.outputs.version }} for macOS (Apple Silicon).
+          release-token: ${{ secrets.GH_RELEASE_TOKEN }}
+        env:
+          GITHUB_API_URL: https://api.github.com
+          GITHUB_SERVER_URL: https://github.com
+          GITHUB_REPOSITORY: stacksjs/postline

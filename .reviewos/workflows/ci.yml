@@ -1,0 +1,94 @@
+# CI on ReviewOS (reviewos.org/stacks/postline).
+#
+# Postline's code lives on GitHub; ReviewOS mirrors it, runs this file on every
+# commit the mirror fetches, and posts the verdict back to the commit as the
+# status "ReviewOS / CI", so it shows on GitHub where the code is pushed.
+#
+# ReviewOS reads `.reviewos/workflows` instead of `.github/workflows` when it
+# exists, so nothing under `.github/workflows` runs there.
+#
+# None of these jobs holds a secret, so they run on the instance's autoscaled
+# Linux runners (`aws`). The Mac build is release.yml, on this project's own
+# Mac runner.
+#
+# Bun comes from the pinned Pantry action, the same way on every runner. The
+# checkout is done by the runner before the first step, so there is no
+# checkout step to write.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push to a branch replaces its older run. Main finishes every run, so
+# each commit there has a verdict of its own.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  BUN_VERSION: 1.4.4
+
+jobs:
+  lint:
+    reviewos:
+      secrets: []
+    runs-on: [self-hosted, aws]
+    timeout-minutes: 15
+    steps:
+      - name: Set up Pantry and Bun
+        uses: pantry-pm/pantry/packages/action@17b46d931ed96929b391a8c6c6fc49f0714e772e # v0.11.207
+        with:
+          version: 0.11.207
+          install: 'false'
+          packages: bun.sh@${{ env.BUN_VERSION }} git-scm.org@2.53.0
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Lint
+        run: bun run lint
+
+  typecheck:
+    reviewos:
+      secrets: []
+    runs-on: [self-hosted, aws]
+    timeout-minutes: 15
+    steps:
+      - name: Set up Pantry and Bun
+        uses: pantry-pm/pantry/packages/action@17b46d931ed96929b391a8c6c6fc49f0714e772e # v0.11.207
+        with:
+          version: 0.11.207
+          install: 'false'
+          packages: bun.sh@${{ env.BUN_VERSION }} git-scm.org@2.53.0
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Type check
+        run: bun run typecheck
+
+  test:
+    reviewos:
+      secrets: []
+    runs-on: [self-hosted, aws]
+    timeout-minutes: 20
+    # The database the suite runs on. Postline runs on SQLite, and a runner has
+    # no `.env`, so without these the connection defaults to MySQL with no
+    # password and every test that reaches the database fails.
+    env:
+      DB_CONNECTION: sqlite
+      DB_DATABASE_PATH: database/postline_ci.sqlite
+    steps:
+      - name: Set up Pantry and Bun
+        uses: pantry-pm/pantry/packages/action@17b46d931ed96929b391a8c6c6fc49f0714e772e # v0.11.207
+        with:
+          version: 0.11.207
+          install: 'false'
+          packages: bun.sh@${{ env.BUN_VERSION }} git-scm.org@2.53.0
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      # The feature tests exercise real routes, and a route needs its tables.
+      - name: Create the test database
+        run: bun node_modules/@stacksjs/buddy/dist/cli.js migrate
+      - name: Test suite
+        run: bun run test

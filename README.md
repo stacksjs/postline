@@ -131,9 +131,12 @@ Store.
 
 ## Deploying
 
-Automatic deploys are off. `.github/workflows/ci.yml` lints, type checks and
-tests every push; its deploy job runs only when you start the workflow by hand
-with **deploy** ticked.
+CI runs on [ReviewOS](https://reviewos.org) from `.reviewos/workflows`:
+lint, type check and test on every push, and the desktop release on a `v*`
+tag. [docs/ci.md](docs/ci.md) covers the setup and how to read a run.
+
+Automatic deploys are off. The deploy job in `.github/workflows/ci.yml` runs
+only when you start that workflow by hand with **deploy** ticked.
 
 Before the first deploy, Postline needs a home of its own: a host in
 `config/domains.ts`, a server in `config/cloud.ts`, and the deploy secrets in
@@ -149,8 +152,8 @@ bun run release:minor
 ```
 
 That bumps the version, writes the changelog, tags and pushes. The tag builds
-the DMG and publishes a GitHub release with it attached, through the
-[Pantry](https://github.com/pantry-pm/pantry) action.
+the DMG on Postline's Mac runner and publishes a GitHub release with it
+attached, through the [Pantry](https://github.com/pantry-pm/pantry) action.
 
 ## Contributing
 
