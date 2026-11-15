@@ -18,7 +18,7 @@ with nothing deployed, is the next step for this app and is not done yet (see
 | `resources/assets/images/app-icon.png` | The icon the DMG build converts into an `.icns` |
 | `app/Desktop/AppIcon.icns` | The icon the App Store build embeds |
 | `app/Desktop/Info.plist.json` | Extra Info.plist keys for the DMG build (category, encryption declaration) |
-| `.github/workflows/release.yml` | Builds the DMG for a release tag and publishes the GitHub release |
+| `.reviewos/workflows/release.yml` | Builds the DMG for a release tag, on the Mac runner, and publishes the GitHub release |
 | `.github/workflows/apple-app-store.yml` | Mac App Store packaging and upload (manual) |
 
 ## Build locally

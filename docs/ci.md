@@ -50,33 +50,42 @@ reviewos run ci.yml --ref main --watch --repo stacks/postline
   publish step sets the last two to GitHub's and uses the `GH_RELEASE_TOKEN`
   secret.
 
-## Setting it up
+## How it is set up
 
-Done once. The second and third steps need an instance administrator.
+Recorded so it can be repeated on another machine. All of it is done.
 
-1. **Mirror the repository.** `mirrors.yml` in the ReviewOS repository lists
-   `stacksjs/postline` with `ci: true`; it is applied on every deploy of the
-   instance (`buddy mirror:apply mirrors.yml`).
-2. **Register the Mac runner.** On the instance host:
+1. **The mirror.** `mirrors.yml` in the ReviewOS repository lists
+   `stacksjs/postline` with `ci: true`; the instance applies it on every
+   deploy (`buddy mirror:apply mirrors.yml`).
+2. **The Mac runner**, registered on the instance host for this repository
+   alone:
 
    ```bash
    ./buddy runner:local --register --repository stacks/postline --name postline-macos-arm64 --labels self-hosted,macos-arm64,postline
    ```
 
-   That prints a runner token. On the Mac, put it in
-   `~/.local/share/reviewos/postline/runner.token` (mode 0600) beside a copy of
-   the `reviewos-runner` binary and a `start.sh` that exports `REVIEWOS_URL`,
-   `REVIEWOS_RUNNER_TOKEN`, `REVIEWOS_ACTION_HOSTS=github.com`,
-   `REVIEWOS_ACTION_DEFAULT_HOST=github.com` and `REVIEWOS_ACTION_PINNED=1`,
-   then runs the binary. A LaunchAgent keeps it running; the two already on
-   this Mac (`~/.local/share/reviewos/stacks-source`, `hq-mobile`) are the
-   pattern.
-3. **Set what the release needs**, on the repository in ReviewOS: the variable
-   `DESKTOP_URL` and the secret `GH_RELEASE_TOKEN` (a GitHub token with
-   `contents: write` on `stacksjs/postline`).
+   On the Mac it lives in `~/.local/share/reviewos/postline/`: the
+   `reviewos-runner` binary, `runner.token` (mode 0600) and `start.sh`, kept
+   running by the LaunchAgent `org.reviewos.postline-runner`. Running the
+   command again rotates the token.
 
-Until the runner is registered, runs queue and the commit status stays
-pending.
+Still to set, on the repository in ReviewOS, before the first release: the
+variable `DESKTOP_URL` and the secret `GH_RELEASE_TOKEN` (a GitHub token with
+`contents: write` on `stacksjs/postline`).
+
+## Checking on the runner
+
+```bash
+launchctl list | grep org.reviewos.postline-runner
+```
+
+```bash
+tail -f ~/.local/share/reviewos/postline/runner.log
+```
+
+"Waiting for work" is healthy. "Runner capacity hold" names what it is short
+of. The runner needs 8 GB of free disk before it takes a job, and this Mac has
+run close to that.
 
 ## The Mac runner and load
 
@@ -97,9 +106,3 @@ tail -f ~/.local/share/reviewos/postline/runner.log
 
 "Runner capacity hold" repeating there means the limit is refusing work, not
 that there is none.
-
-## Until the first green run
-
-`.github/workflows/ci.yml` and `release.yml` are still in the repository, so a
-push is checked somewhere while the mirror and the runner are being set up.
-Delete both once a ReviewOS run has passed.

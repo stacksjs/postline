@@ -135,8 +135,7 @@ CI runs on [ReviewOS](https://reviewos.org) from `.reviewos/workflows`:
 lint, type check and test on every push, and the desktop release on a `v*`
 tag. [docs/ci.md](docs/ci.md) covers the setup and how to read a run.
 
-Automatic deploys are off. The deploy job in `.github/workflows/ci.yml` runs
-only when you start that workflow by hand with **deploy** ticked.
+Nothing deploys Postline yet.
 
 Before the first deploy, Postline needs a home of its own: a host in
 `config/domains.ts`, a server in `config/cloud.ts`, and the deploy secrets in
