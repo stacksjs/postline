@@ -5,7 +5,7 @@ import { imports } from '../../Services/ImportService'
 
 export default new Action({
   name: 'Postline Import Posts',
-  description: 'Import an archive of posts into the publication.',
+  description: 'Import an archive of long-form posts into the blog.',
   method: 'POST',
 
   async handle(request: RequestInstance) {

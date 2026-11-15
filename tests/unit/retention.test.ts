@@ -68,8 +68,8 @@ describe('retention settings', () => {
     expect(settings).toEqual({ enabled: false, days: 14, providers: ['bluesky', 'twitter'], scope: 'tracked' })
   })
 
-  test('by default a schedule touches the social networks, never the publication', () => {
-    expect(DEFAULT_RETENTION_PROVIDERS).not.toContain('postline')
+  test('by default a schedule touches every network that can delete, never the blog', () => {
+    expect(DEFAULT_RETENTION_PROVIDERS).not.toContain('blog')
     expect(DEFAULT_RETENTION_PROVIDERS).toEqual(['bluesky', 'twitter', 'mastodon', 'linkedin'])
   })
 })

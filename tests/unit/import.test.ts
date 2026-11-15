@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { parseCsv, subscriberFromCsvRow } from '../../app/Services/ImportService'
+import { parseCsv } from '../../app/Services/ImportService'
 
 describe('csv parsing', () => {
   test('a plain export becomes rows keyed by header', () => {
@@ -34,7 +34,7 @@ describe('csv parsing', () => {
     expect(rows[0].name).toBe('A Reader')
   })
 
-  test('blank lines are dropped rather than becoming empty subscribers', () => {
+  test('blank lines are dropped rather than becoming empty rows', () => {
     expect(parseCsv('email\nreader@example.com\n\n\n')).toHaveLength(1)
   })
 
@@ -47,24 +47,5 @@ describe('csv parsing', () => {
   test('a short row does not read undefined into later columns', () => {
     const rows = parseCsv('email,name,plan\nreader@example.com,A Reader')
     expect(rows[0].plan).toBe('')
-  })
-})
-
-describe('column aliases', () => {
-  test('the common export spellings all map onto email', () => {
-    expect(subscriberFromCsvRow({ email: 'a@example.com' }).email).toBe('a@example.com')
-    expect(subscriberFromCsvRow({ email_address: 'b@example.com' }).email).toBe('b@example.com')
-    expect(subscriberFromCsvRow({ 'email address': 'c@example.com' }).email).toBe('c@example.com')
-  })
-
-  test('name falls back through full name and first name', () => {
-    expect(subscriberFromCsvRow({ full_name: 'A Reader' }).name).toBe('A Reader')
-    expect(subscriberFromCsvRow({ first_name: 'A' }).name).toBe('A')
-  })
-
-  test('an unrecognised shape yields blanks rather than a guess', () => {
-    const mapped = subscriberFromCsvRow({ something: 'else' })
-    expect(mapped.email).toBe('')
-    expect(mapped.name).toBe('')
   })
 })

@@ -73,7 +73,7 @@ const strategyDirections: Record<CampaignAIStrategy, string> = {
 }
 
 function requestedBodyLimit(providers: string[]): number {
-  const limits: Record<string, number> = { postline: 4000, twitter: 280, bluesky: 300, mastodon: 500, threads: 500, instagram: 2200, linkedin: 3000, blog: 4000 }
+  const limits: Record<string, number> = { twitter: 280, bluesky: 300, mastodon: 500, threads: 500, instagram: 2200, linkedin: 3000, blog: 4000 }
   return Math.min(...providers.map(provider => limits[provider] || 4000))
 }
 

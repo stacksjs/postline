@@ -23,12 +23,8 @@ const database = db as any
 export const MIN_RETENTION_DAYS = 1
 export const MAX_RETENTION_DAYS = 3650
 
-/**
- * What "every network" means for a schedule: the social networks, not the
- * publication itself. Expiring old articles from your own paper is a choice
- * someone has to make by ticking it, never a default.
- */
-export const DEFAULT_RETENTION_PROVIDERS: SocialProvider[] = PURGEABLE_PROVIDERS.filter(provider => provider !== 'postline')
+/** What "every network" means for a schedule: every network that can delete. */
+export const DEFAULT_RETENTION_PROVIDERS: SocialProvider[] = [...PURGEABLE_PROVIDERS]
 
 export interface RetentionSettings {
   enabled: boolean

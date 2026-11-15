@@ -1,12 +1,16 @@
 /**
  * The broadcast server process.
  *
- * Postline's realtime surfaces (the Discover feeds, comment threads) publish
- * through `@stacksjs/realtime`, which is the framework's integration over
- * ts-broadcasting. Publishing is a no-op until a server exists to publish
- * *to*: `emit` warns and returns when none is running, which is the right
- * behaviour for a web request but means the feature is dormant until this
- * process is up.
+ * Postline's realtime surfaces publish through `@stacksjs/realtime`, which is
+ * the framework's integration over ts-broadcasting. Publishing is a no-op until
+ * a server exists to publish *to*: `emit` warns and returns when none is
+ * running, which is the right behaviour for a web request but means realtime
+ * is dormant until this process is up.
+ *
+ * Nothing publishes at the moment: the feeds that used this went with the
+ * publication product when it was split out. The server and the publisher
+ * (app/Support/Realtime/publisher.ts) stay as the seam for live workspace
+ * updates (queue, inbox, listening).
  *
  * Run it alongside the app:
  *
@@ -17,10 +21,8 @@
  * raw port, which matters because a page served over https cannot open a `ws:`
  * connection at all.
  *
- * Channels are public. Discover only carries entries from publications that
- * opted into being indexed, and a comment thread is already readable by anyone
- * who can read the post, so there is nothing here to authorize. A private
- * channel would imply a permission check that does not exist.
+ * Channels are public: there is no authorization hook here. Anything
+ * workspace-private must add one before it is published on a channel.
  */
 
 import process from 'node:process'
@@ -62,10 +64,10 @@ const server = await createServer({
       port,
       scheme: 'ws',
       options: {
-        // Long enough that a reader idling on a quiet feed is not dropped
+        // Long enough that a client idling on a quiet channel is not dropped
         // every two minutes and forced to reconnect.
         idleTimeout: 120,
-        // A Discover entry is a few kilobytes. A megabyte ceiling is generous
+        // An event is a few kilobytes. A megabyte ceiling is generous
         // and still refuses anything that could only be an attack.
         maxPayloadLength: 1024 * 1024,
         sendPings: true,

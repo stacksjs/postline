@@ -78,7 +78,6 @@ const PROVIDER_LABELS: Record<string, string> = {
   threads: 'Threads',
   tiktok: 'TikTok',
   blog: 'Blog',
-  postline: 'Postline',
 }
 
 export function providerLabel(provider: string): string {
@@ -111,7 +110,6 @@ const PROVIDER_ICONS: Record<string, string> = {
   instagram: 'i-simple-icons-instagram',
   threads: 'i-simple-icons-threads',
   blog: 'i-hugeicons-quill-write-02',
-  postline: 'i-hugeicons-news',
 }
 
 /** The Iconify class for a network. Pages list these statically for Crosswind. */

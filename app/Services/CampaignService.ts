@@ -9,10 +9,6 @@ import { ensureAccount, now, uuid } from './Social/support'
 const database = db as any
 
 export const CAMPAIGN_PROVIDERS: SocialProvider[] = [
-  // Postline's own feed. The planner preselects every connected network
-  // and this one is always connected, so leaving it out here dropped it from
-  // every plan, and a plan for it alone failed with "Select at least one".
-  'postline',
   'bluesky',
   'twitter',
   'mastodon',
@@ -271,7 +267,7 @@ export function buildCampaignFallbackPlan(
 }
 
 export function campaignBodyLimit(providers: SocialProvider[]): number {
-  const limits: Partial<Record<SocialProvider, number>> = { postline: 4000, twitter: 280, bluesky: 300, mastodon: 500, threads: 500, instagram: 2200, linkedin: 3000, blog: 4000 }
+  const limits: Partial<Record<SocialProvider, number>> = { twitter: 280, bluesky: 300, mastodon: 500, threads: 500, instagram: 2200, linkedin: 3000, blog: 4000 }
   if (!providers.length) return 4000
   return Math.min(...providers.map(provider => limits[provider] || 4000))
 }

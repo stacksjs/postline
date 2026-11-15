@@ -8,28 +8,22 @@ interface SeedPost {
   excerpt: string
   body: string
   status: 'draft' | 'published' | 'archived'
-  access: 'free' | 'paid'
-  /** Days before now. Published posts need an ordering the reader can see. */
+  /** Days before now. Published posts need an ordering the list can show. */
   daysAgo: number | null
 }
 
 /**
- * Posts covering the states that behave differently, rather than volume.
+ * Blog posts covering the states that behave differently, rather than volume.
  *
  * The model factory pass is the right tool for "give me 50 rows". This is the
- * opposite: one post per branch the reader and editor code actually takes, so
- * walking the app exercises each of them once.
+ * opposite: one post per branch the blog code actually takes, so walking the
+ * app exercises each of them once.
  *
  * | Post | Exercises |
  * |---|---|
- * | free + published | the ordinary read path, and the feed |
- * | paid + published | the access gate and the preview_chars truncation |
- * | draft | that unpublished work never leaks to a reader |
- * | archived | that it drops out of the feed without being deleted |
- *
- * `preview_chars` on the paid post is deliberately shorter than the body, so
- * the paywall has something to cut. Equal values would pass a test that a real
- * paywall would fail.
+ * | published | the ordinary list on the Blog page, newest first |
+ * | draft | that unpublished work never shows up as published |
+ * | archived | that it drops out of the list without being deleted |
  */
 export default class Content extends Seeder {
   static order = 30
@@ -44,39 +38,35 @@ export default class Content extends Seeder {
 
     const posts: SeedPost[] = [
       {
-        title: 'Why we built our own press',
-        slug: 'why-we-built-our-own-press',
-        excerpt: 'Owning the publication, the list and the payments turns out to be one decision, not three.',
-        body: longBody('Every newsletter platform makes the same trade: they hold the list, they take the cut, and they decide what happens if they ever stop liking you.'),
+        title: 'Compose once, publish everywhere',
+        slug: 'compose-once-publish-everywhere',
+        excerpt: 'One draft, a variant per network where it matters, and a queue that sends them on time.',
+        body: longBody('Every network wants the same announcement in a slightly different shape: a different length, a different tone, a different idea of what a link is.'),
         status: 'published',
-        access: 'free',
         daysAgo: 6,
       },
       {
-        title: 'What a paid edition looks like',
-        slug: 'what-a-paid-edition-looks-like',
-        excerpt: 'The first few hundred characters are free. The rest is for subscribers.',
-        body: longBody('This edition is gated. A reader without a subscription sees the opening and then the wall, which is the behaviour worth testing.'),
+        title: 'What a launch week looks like in the queue',
+        slug: 'what-a-launch-week-looks-like-in-the-queue',
+        excerpt: 'A campaign is a calendar with opinions. Here is one, day by day.',
+        body: longBody('A launch is not one post. It is a teaser, a story, proof, the announcement itself and the follow-up, spread over the days when people are paying attention.'),
         status: 'published',
-        access: 'paid',
         daysAgo: 2,
       },
       {
-        title: 'Notes on the next edition',
-        slug: 'notes-on-the-next-edition',
+        title: 'Notes on the next release',
+        slug: 'notes-on-the-next-release',
         excerpt: 'Unfinished on purpose.',
-        body: 'Still being written. If this is visible to a reader, the draft gate is broken.',
+        body: 'Still being written. If this is listed as published, the draft gate is broken.',
         status: 'draft',
-        access: 'free',
         daysAgo: null,
       },
       {
-        title: 'An edition we pulled',
-        slug: 'an-edition-we-pulled',
-        excerpt: 'Archived rather than deleted, so the URL does not rot.',
-        body: 'Archived. It should not appear in the feed, and it should not 404 for someone holding the link.',
+        title: 'A post we pulled',
+        slug: 'a-post-we-pulled',
+        excerpt: 'Archived rather than deleted, so the row survives.',
+        body: 'Archived. It should not appear in the published list.',
         status: 'archived',
-        access: 'free',
         daysAgo: 30,
       },
     ]
@@ -106,9 +96,6 @@ export default class Content extends Seeder {
           body: post.body,
           excerpt: post.excerpt,
           status: post.status,
-          access: post.access,
-          // Shorter than the body, so a paid post genuinely truncates.
-          preview_chars: 280,
           published_at: publishedAt,
           account_id: account.id,
           created_at: now.toISOString(),
@@ -124,34 +111,17 @@ export default class Content extends Seeder {
       return
     }
 
-    log.success(`Content: seeded ${seeded} post(s) across free/paid/draft/archived`)
-
-    // entry_count is the publication's own tally of what it has published.
-    // Recomputed rather than incremented, so re-running cannot drift it.
-    const published = await db
-      .selectFrom('blog_posts')
-      .select(['id'])
-      .where('status', '=', 'published')
-      .execute()
-
-    await db
-      .updateTable('publications')
-      .set({
-        entry_count: published.length,
-        last_published_at: new Date(now.getTime() - 2 * 86_400_000).toISOString(),
-      })
-      .where('slug', '=', 'the-open-times')
-      .execute()
+    log.success(`Content: seeded ${seeded} blog post(s) across published/draft/archived`)
   }
 }
 
-/** Long enough that preview_chars has something to cut. */
+/** A few paragraphs, so the list has an excerpt-length body to clamp. */
 function longBody(opening: string): string {
   return [
     opening,
     '',
-    'The argument is not that hosted platforms are bad at what they do. It is that the thing they are good at — reach — is the part you give up least when you leave, and the parts you cannot afford to lose are exactly the ones they hold.',
+    'Writing it once and pasting it six times is how the fourth network ends up with a truncated sentence and the fifth gets skipped entirely.',
     '',
-    'So the test is simple: if the service disappeared tomorrow, what would you still have? The list, the archive, the ability to charge. If the answer is none of those, that is not a publication, it is a tenancy.',
+    'So the draft is shared, the overrides are per network, and the schedule is one calendar. What goes out is what you approved, where and when you said.',
   ].join('\n')
 }

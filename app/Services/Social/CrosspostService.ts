@@ -11,7 +11,6 @@ import { bluesky } from './BlueskyService'
 import { instagram } from './InstagramService'
 import { linkedin } from './LinkedInService'
 import { mastodon } from './MastodonService'
-import { postline } from './PostlineService'
 import { threads } from './ThreadsService'
 import { twitter } from './TwitterService'
 import { ensureAccount, now, uuid } from './support'
@@ -21,8 +20,8 @@ const database = db as any
 export interface ProviderPublisher {
   /**
    * Publish through one account. `identityId` names a `social_identities` row;
-   * omitted, the network's default account. Our own targets (blog, The Open
-   * Times) have no accounts and ignore it.
+   * omitted, the network's default account. The blog has no accounts and
+   * ignores it.
    */
   publishToPost: (post: { id: number, body: string }, content?: PublishContent, identityId?: number | null) => Promise<CrosspostTargetResult>
   /** The account a bare network target means right now, or null if none is connected. */
@@ -34,9 +33,7 @@ export type TargetInput = SocialProvider | PublishTarget | string
 
 // Each provider owns its own connection/token handling behind `publishToPost`.
 const publishers: Partial<Record<SocialProvider, ProviderPublisher>> = {
-  // Ours first: it is the one target that is always connected, so listing it
-  // first is also the order the composer renders its checkboxes in.
-  postline,
+  // This is also the order the composer renders its checkboxes in.
   bluesky,
   twitter,
   linkedin,

@@ -6,7 +6,7 @@ saves a lot of confusion:
 | Pass | Source | What it is good for |
 |---|---|---|
 | **Model factories** | `traits.useSeeder` on a model in `app/Models/` | Volume. Plausible-but-random rows, wired up by `belongsTo`. |
-| **Application seeders** | the classes in this directory | Specific rows that have to be exactly right: the workspace account, the publication, the fixtures a test asserts on. |
+| **Application seeders** | the classes in this directory | Specific rows that have to be exactly right: the workspace account, the fixtures a test asserts on. |
 
 Factories run first, then the seeders here.
 
@@ -45,7 +45,7 @@ export default class MySeeder extends Seeder {
 
   | Tag | Meaning |
   |---|---|
-  | `core` | The minimum for the app to be usable: an account to sign in with, a publication to write into. Safe anywhere. |
+  | `core` | The minimum for the app to be usable: an account to sign in with. Safe anywhere. |
   | `demo` | Content volume, so screens are not empty when you look at them. |
   | `e2e` | Deterministic fixtures. Change these and tests that assert on them change too. |
 
@@ -55,7 +55,7 @@ export default class MySeeder extends Seeder {
 ## Rules
 
 1. **Idempotent.** Check before inserting. `buddy seed` twice in a row must not
-   produce two publications, and must not throw on a unique constraint.
+   produce two accounts, and must not throw on a unique constraint.
 2. **Deterministic where it is asserted on.** Anything tagged `e2e` uses fixed
    values, never `faker`. Random data belongs in a factory.
 3. **No secrets.** The development password below is deliberately well-known and

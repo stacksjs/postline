@@ -184,8 +184,7 @@ describe('campaign scheduling time zones', () => {
 })
 
 describe('campaign channels', () => {
-  test('Postline feed is a valid campaign channel', () => {
-    // It is always connected and preselected, so dropping it broke single-channel plans.
-    expect(normalizeProviders(['postline', 'bluesky', 'myspace'])).toEqual(['postline', 'bluesky'])
+  test('unknown channels are dropped, the blog and the networks are kept', () => {
+    expect(normalizeProviders(['blog', 'bluesky', 'myspace'])).toEqual(['blog', 'bluesky'])
   })
 })

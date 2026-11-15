@@ -294,12 +294,6 @@ export default {
   },
 
 
-  // Stripe webhook signing secret, checked by StripeWebhookAction.
-  STRIPE_WEBHOOK_SECRET: {
-    validation: schema.string(),
-    default: '',
-  },
-
 
 
   // Social network credentials. Each is the env-level fallback for a single

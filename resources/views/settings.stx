@@ -118,7 +118,6 @@
             <label class="inline-flex gap-2 items-center text-[13px]"><input type="checkbox" value="twitter" x-model="autoProviders"> X (Twitter)</label>
             <label class="inline-flex gap-2 items-center text-[13px]"><input type="checkbox" value="mastodon" x-model="autoProviders"> Mastodon</label>
             <label class="inline-flex gap-2 items-center text-[13px]"><input type="checkbox" value="linkedin" x-model="autoProviders"> LinkedIn</label>
-            <label class="inline-flex gap-2 items-center text-[13px]"><input type="checkbox" value="postline" x-model="autoProviders"> Your publication's Discover posts</label>
           </div>
           <p class="m-0 text-muted text-xs">Every connected account on a ticked network is included. Instagram and Threads can't delete posts through their APIs. A post whose date can't be read is always kept.</p>
         </fieldset>
@@ -426,7 +425,7 @@
       else {
         const label = social.providerLabel
         void social.fetchProviders().then((all) => {
-          const channels = all.filter(entry => entry.provider !== 'blog' && entry.provider !== 'postline')
+          const channels = all.filter(entry => entry.provider !== 'blog')
           const ready = channels.filter(entry => entry.canPublish)
           // Connected but not publishable: a token that lapsed, or a row whose
           // credential never arrived. Worth separating from "nothing here

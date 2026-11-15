@@ -11,8 +11,7 @@
  * it. It mounts alongside, and every change is serialized back to Markdown
  * with `toMarkdown` and written into the textarea, which then dispatches its
  * normal `input` event. Every existing consumer keeps working, unmodified, and
- * the stored body stays the Markdown the blog and the newsletter already
- * expect.
+ * the stored body stays the Markdown the blog already expects.
  *
  * Only long-form gets it. A 300-character Bluesky post does not want a
  * formatting toolbar, and the Markdown a rich editor emits would be published

@@ -3,7 +3,6 @@ import { db } from '@stacksjs/database'
 import { bluesky } from './BlueskyService'
 import { linkedin } from './LinkedInService'
 import { mastodon } from './MastodonService'
-import { postline } from './PostlineService'
 import { ensureAccount, now, uuid } from './support'
 import { twitter } from './TwitterService'
 
@@ -20,7 +19,7 @@ const database = db as any
 export const PURGE_CONFIRMATION = 'DELETE ALL POSTS'
 
 /** Providers whose API can delete a post the account authored. */
-export const PURGEABLE_PROVIDERS: SocialProvider[] = ['postline', 'bluesky', 'twitter', 'mastodon', 'linkedin']
+export const PURGEABLE_PROVIDERS: SocialProvider[] = ['bluesky', 'twitter', 'mastodon', 'linkedin']
 
 /**
  * Why the remaining providers can't take part, shown verbatim in the UI.
@@ -389,7 +388,6 @@ export class PurgeService {
     if (provider === 'twitter') return await twitter.purgeAdapter(identityId)
     if (provider === 'mastodon') return await mastodon.purgeAdapter(identityId)
     if (provider === 'linkedin') return await linkedin.purgeAdapter(identityId)
-    if (provider === 'postline') return await postline.purgeAdapter()
     throw new Error(`${provider} cannot delete posts through its API.`)
   }
 
@@ -432,7 +430,7 @@ export class PurgeService {
 
   /**
    * Everything the account ever posted, walked page by page. Also maps each
-   * remote post back to an Postline target row where one exists, so local
+   * remote post back to a Postline target row where one exists, so local
    * cleanup stays accurate.
    */
   private async collectRemote(adapter: ProviderPurgeAdapter, result: PurgeProviderResult, cutoff: Date | null = null): Promise<PurgeCandidate[]> {

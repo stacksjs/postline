@@ -42,20 +42,19 @@ export type {
 export type TimelineItem = import('@stacksjs/socials').TimelineResult['items'][number]
 
 /**
- * Core's publishing providers plus Postline's own two.
+ * Core's publishing providers plus Postline's own one.
  *
  * `blog` is the long-form target: publishing to it writes a post on your own
- * publication. `postline` is the short-form one: it puts the post in the
- * Discover feed other Postline readers browse.
+ * blog.
  *
- * Both are deliberately modelled as providers rather than as a separate
- * concept. A network you publish to is a network you publish to, and making
- * ours the exception would mean every scheduling, variant, queue and metrics
- * path needing to know about it. Neither the framework knows about them, so
- * the union extends rather than replaces, and a provider added upstream still
- * arrives here for free.
+ * It is deliberately modelled as a provider rather than as a separate concept.
+ * A place you publish to is a place you publish to, and making ours the
+ * exception would mean every scheduling, variant, queue and metrics path
+ * needing to know about it. The framework does not know about it, so the union
+ * extends rather than replaces, and a provider added upstream still arrives
+ * here for free.
  */
-export type SocialProvider = SocialPublishingProvider | 'blog' | 'postline'
+export type SocialProvider = SocialPublishingProvider | 'blog'
 
 /**
  * Kept local, but only just: core's `PublishPostInput` is a strict superset.
@@ -98,14 +97,6 @@ export interface PublishedPost {
 export interface PublishContent {
   /** Explicit post title — used by long-form targets (blog); ignored by social providers. */
   title?: string
-  /**
-   * Who receives the newsletter when this is published to the blog.
-   *
-   * `paid` is how a paywalled piece reaches only paying readers. Ignored by
-   * social providers, which have no audience of their own to segment. Absent
-   * means everyone, since a post nobody is mailed is the surprising default.
-   */
-  audience?: 'everyone' | 'paid'
   external?: {
     uri: string
     title: string

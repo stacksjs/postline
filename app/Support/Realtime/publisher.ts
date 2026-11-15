@@ -16,7 +16,7 @@
  *
  * When Redis is not configured this falls back to the in-process `emit`, which
  * is correct for a single-process dev machine and honest about what it can do:
- * a dropped event costs a reader one refresh, never a lost post.
+ * a dropped event costs one refresh, never a lost post.
  */
 
 import type { RedisAdapter as RedisAdapterType } from 'ts-broadcasting'

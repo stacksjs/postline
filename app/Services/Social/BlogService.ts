@@ -3,8 +3,6 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { db } from '@stacksjs/database'
-import { discover } from '../DiscoverService'
-import { newsletter } from '../NewsletterService'
 import { ensureAccount, now, uuid } from './support'
 
 const database = db as any
@@ -114,11 +112,6 @@ export class BlogService {
         slug,
         body,
         excerpt: body.slice(0, 280),
-        // One decision drives both halves: a piece sent to paying readers is
-        // the same piece paying readers can read on the site. Splitting them
-        // would let a post be mailed to payers and then sit open on the web.
-        access: content?.audience === 'paid' ? 'paid' : 'free',
-        preview_chars: 600,
         status: 'published',
         published_at: publishedAt,
         post_id: post.id,
@@ -134,45 +127,6 @@ export class BlogService {
         failure_reason: null,
         updated_at: publishedAt,
       }).where('id', '=', target.id).execute()
-
-      // The long-form half of Discover. `record` returns null for an unlisted
-      // publication, so this is a no-op until the owner opts in, and it never
-      // fails the publish: the post is already live on the blog by now, and
-      // losing its feed entry is not a reason to report the publish as failed.
-      try {
-        await discover.record({
-          form: 'long',
-          sourceKey: `blog:${slug}`,
-          title,
-          body: markdownBody || body,
-          url,
-          postId: post.id,
-          publishedAt,
-        })
-      }
-      catch (error) {
-        console.warn(`[postline] blog post published but Discover entry failed: ${error instanceof Error ? error.message : String(error)}`)
-      }
-
-      // Publish is send. Queued rather than delivered here for the same reason
-      // the Discover entry is written after the post: the piece is already
-      // live, and a slow or broken mail transport must not turn a successful
-      // publish into a failed one. `queue` is idempotent on the slug, so a
-      // republish never mails the same post twice.
-      try {
-        const audience = content?.audience === 'paid' ? 'paid' : 'everyone'
-        await newsletter.queue({
-          sourceKey: `blog:${slug}`,
-          subject: title,
-          body: markdownBody || body,
-          url,
-          audience,
-          postId: post.id,
-        })
-      }
-      catch (error) {
-        console.warn(`[postline] blog post published but newsletter queue failed: ${error instanceof Error ? error.message : String(error)}`)
-      }
 
       return { provider: 'blog', ok: true, url, uri: url, targetId: Number(target.id) }
     }

@@ -5,7 +5,6 @@ import { bluesky } from '../../Services/Social/BlueskyService'
 import { instagram } from '../../Services/Social/InstagramService'
 import { linkedin } from '../../Services/Social/LinkedInService'
 import { mastodon } from '../../Services/Social/MastodonService'
-import { postline } from '../../Services/Social/PostlineService'
 import { threads } from '../../Services/Social/ThreadsService'
 import { twitter } from '../../Services/Social/TwitterService'
 
@@ -17,9 +16,7 @@ export default new Action({
   async handle() {
     try {
       const providers = await Promise.all([
-        // Ours leads the list, which is also the order the composer renders
-        // its chips in and therefore what gets selected first by default.
-        postline.status(),
+        // This is also the order the composer renders its chips in.
         bluesky.status(),
         twitter.status(),
         linkedin.status(),
