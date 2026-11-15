@@ -3,73 +3,58 @@ import { env } from '@stacksjs/env'
 /**
  * **Domains**
  *
- * The single source of truth for every hostname The Open Times answers on.
+ * The single source of truth for every hostname Postline answers on.
  *
- * `config/app.ts`, `config/dns.ts` and `config/cloud.ts` all need to agree on
- * which host is canonical and which ones merely redirect to it. When each of
- * them spelled a domain out itself they drifted: the SSL block still listed
- * `stacksjs.com`, `dns.ts` had published an `A` record for a hostname this app
- * does not own, and `cloud.ts` hardcoded the subdomain as its fallback. Every
- * one of those now reads from here.
+ * `config/app.ts`, `config/dns.ts`, `config/email.ts` and `config/cloud.ts` all
+ * need to agree on which host is canonical and which ones merely redirect to
+ * it. When each of them spelled a domain out itself they drifted, so every one
+ * of them reads from here.
  *
  * TWO MODES, ONE CANONICAL HOST
  *
  * The app can live at a subdomain of the shared Stacks box
- * (`opentimes.stacksjs.com`) or at its own apex (`theopentimes.org`). Exactly
- * one of them is canonical at a time, and *every other owned host redirects to
- * whichever one that is* — including the subdomain once the apex takes over, so
+ * (`postline.stacksjs.com`) or at an apex domain of its own. Exactly one of
+ * them is canonical at a time, and every other owned host redirects to
+ * whichever one that is — including the subdomain once an apex takes over, so
  * links handed out before the move keep working instead of 404ing.
  *
- * Flip between them with `buddy domain:use`, which writes `DOMAIN_MODE` into
- * the target env file. Nothing else needs editing.
+ * Postline has no domain of its own yet, so `APEX` is `null` and the subdomain
+ * is the only mode that resolves. Registering a domain is a one-line change
+ * here (`APEX`), after which `buddy domain:use domain` flips to it.
  */
 
 export type DomainMode = 'subdomain' | 'domain'
 
 /**
- * The masthead domain. This is the one readers see and the one canonical URLs,
- * OG tags and outgoing mail are built from.
+ * Postline's own apex domain.
+ *
+ * TODO: set this once a real Postline domain is registered. While it is `null`
+ * the app is served from `SUBDOMAIN`, `DOMAIN_MODE=domain` is ignored, and mail
+ * is sent from `FALLBACK_MAIL_DOMAIN`.
  */
-export const APEX = 'theopentimes.org'
+export const APEX: string | null = null
 
 /**
- * The short forms, all registered at Porkbun alongside the apex. They exist to
- * be typed and shared, not to serve content — each one 301s to the canonical
- * host with its path preserved.
+ * The tenant hostname on the shared `stacks` box. The canonical production
+ * host until Postline has a domain of its own; a redirect afterwards.
  */
-export const SHORT_DOMAINS: readonly string[] = ['theot.org', 'theot.app', 'theot.blog']
+export const SUBDOMAIN = 'postline.stacksjs.com'
 
 /**
- * The tenant hostname on the shared `stacks` Hetzner box. This is where the app
- * ran before it had domains of its own; it stays owned (and stays redirecting)
- * after the move.
+ * The zone mail is sent from while there is no apex. It is the parent zone of
+ * `SUBDOMAIN`; config/email.ts prefers `MAIL_DOMAIN`, then `APEX`, then this.
  */
-export const SUBDOMAIN = 'opentimes.stacksjs.com'
+export const FALLBACK_MAIL_DOMAIN = 'stacksjs.com'
 
 /**
  * The development host. `buddy setup:ssl` issues a certificate for it and adds
  * it to /etc/hosts, and it is the origin every OAuth redirect URL in
  * `.env.example` is written against.
  */
-export const LOCAL_HOST = 'theopentimes.localhost'
-
-/**
- * Hosts from the previous identity.
- *
- * `postline.stacksjs.com` served this app for months and is in inbound links,
- * bookmarks and at least one OAuth app's redirect list. Declaring it here turns
- * it into a 301 like every other non-canonical host.
- *
- * It is not merely cosmetic. The gateway keeps routing a hostname it has a rule
- * for, and after the rename that rule still pointed at port 3100 — which the
- * new app now owns. The legacy host was therefore serving the full site under
- * the old name: duplicate content on a second hostname, which is worse than
- * either a redirect or a 404.
- */
-export const LEGACY_HOSTS: readonly string[] = ['postline.stacksjs.com']
+export const LOCAL_HOST = 'postline.localhost'
 
 /** Every host this project owns, canonical or not, in preference order. */
-export const OWNED: readonly string[] = [APEX, ...SHORT_DOMAINS, SUBDOMAIN, ...LEGACY_HOSTS]
+export const OWNED: readonly string[] = [...(APEX ? [APEX] : []), SUBDOMAIN]
 
 export interface ResolvedDomains {
   mode: DomainMode
@@ -79,7 +64,7 @@ export interface ResolvedDomains {
   redirects: string[]
   /** Canonical host first, then every redirecting host. */
   all: string[]
-  /** `https://theopentimes.org` — no trailing slash, safe to append a path to. */
+  /** `https://<canonical>` — no trailing slash, safe to append a path to. */
   url: string
 }
 
@@ -87,28 +72,28 @@ export interface ResolvedDomains {
  * Resolve the domain layout from two environment values.
  *
  * Kept pure and exported so `buddy domain` can answer for an env file it is not
- * itself running under — reporting on `.env.production` from a local shell has
- * to read that file's values, not `process.env`.
+ * itself running under.
  *
  * `APP_DOMAIN` is an escape hatch that wins outright, for a staging box or a
- * preview host that is neither declared mode. Otherwise `DOMAIN_MODE` picks,
- * and the default is the apex: a fresh checkout should describe the product as
- * it is meant to ship.
+ * preview host that is neither declared mode. Otherwise `DOMAIN_MODE` picks:
+ * `domain` means the apex, and only takes effect once `APEX` is set — until
+ * then both modes resolve to the subdomain rather than to an empty host.
  *
  * `redirects` is derived rather than listed, so it can never disagree with
  * `canonical` — it is every owned host that is not canonical, plus the `www.`
- * form of the apex. `www` is only generated for the apex; a `www.theot.app`
- * nobody will type would just be another DNS record and another certificate to
- * keep alive.
+ * form of the apex when there is one.
  */
-export function resolveDomains(source: { APP_DOMAIN?: string | null, DOMAIN_MODE?: string | null } = {}): ResolvedDomains {
+export function resolveDomains(
+  source: { APP_DOMAIN?: string | null, DOMAIN_MODE?: string | null } = {},
+  apex: string | null = APEX,
+): ResolvedDomains {
   const override = String(source.APP_DOMAIN ?? '').trim()
-  const mode: DomainMode = override
-    ? 'domain'
-    : (String(source.DOMAIN_MODE ?? 'domain').trim() === 'subdomain' ? 'subdomain' : 'domain')
+  const wantsApex = String(source.DOMAIN_MODE ?? '').trim() === 'domain' && Boolean(apex)
+  const mode: DomainMode = override || wantsApex ? 'domain' : 'subdomain'
 
-  const canonical = override || (mode === 'subdomain' ? SUBDOMAIN : APEX)
-  const redirects = [...OWNED, `www.${APEX}`].filter(d => d !== canonical)
+  const canonical = override || (wantsApex && apex ? apex : SUBDOMAIN)
+  const owned = [...(apex ? [apex, `www.${apex}`] : []), SUBDOMAIN]
+  const redirects = owned.filter(d => d !== canonical)
 
   return { mode, canonical, redirects, all: [canonical, ...redirects], url: `https://${canonical}` }
 }
@@ -134,9 +119,8 @@ export function urlTo(path: string): string {
  *
  * ts-cloud treats a site with a `redirect` and no `start`/`root` as a gateway
  * rule rather than a deployment, so these cost no process and no release
- * directory — just a server block each. `preservePath` is what makes
- * `theot.org/archive/2026` land on `theopentimes.org/archive/2026` instead of
- * dumping every short-link visitor on the front page.
+ * directory — just a server block each. `preservePath` keeps a deep link deep.
+ * Empty while the subdomain is the only owned host.
  */
 export function redirectSites(from: ResolvedDomains = resolved): Record<string, { domain: string, redirect: { to: string, status: number, preservePath: boolean } }> {
   return Object.fromEntries(

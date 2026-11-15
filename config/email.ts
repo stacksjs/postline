@@ -1,5 +1,5 @@
 import type { EmailConfig } from '@stacksjs/types'
-import { APEX, url as siteUrl } from '~/config/domains'
+import { APEX, FALLBACK_MAIL_DOMAIN, url as siteUrl } from '~/config/domains'
 import { env } from '@stacksjs/env'
 
 /**
@@ -15,23 +15,20 @@ import { env } from '@stacksjs/env'
  * DKIM and DMARC records from it, and registers the tenant with the shared mail
  * daemon under it.
  *
- * It used to be the scaffold's `stacksjs.com`, which this project does not own:
- * every deploy printed "Mail DNS skipped: stacksjs.com is not administered by
- * these Porkbun credentials" and dumped four records for someone to add by
- * hand. Nobody did. The practical consequence was not a warning — production
- * sends as `noreply@theopentimes.org`, and that domain had no SPF, no DKIM and
- * no DMARC, so every confirmation email went out unauthenticated.
+ * Postline has no domain of its own yet, so the sending domain falls back to
+ * `stacksjs.com`, the parent zone of the `postline.stacksjs.com` subdomain the
+ * app is served from. TODO: once a real Postline domain is registered, set
+ * `APEX` in config/domains.ts (or `MAIL_DOMAIN` in the env) and mail moves to
+ * it with everything else.
  *
- * Pinned to the apex from config/domains.ts rather than spelled out, so it
- * cannot drift from the host the app actually serves.
- *
- * NOTE: mail DNS is the one part of the deploy that is single-provider. The
- * address-record path resolves a provider per domain (it publishes Porkbun and
- * Route53 zones in the same run); `reconcileMailDns` in @stacksjs/buddy reads
- * PORKBUN_API_KEY directly and never consults that registry. The apex is a
- * Porkbun zone, so this works — but a mail domain in Route53 would still be
- * skipped. See the deploy notes in config/domains.ts.
+ * NOTE: mail DNS is the one part of the deploy that is single-provider.
+ * `reconcileMailDns` in @stacksjs/buddy reads PORKBUN_API_KEY directly, so a
+ * mail domain whose zone is in Route53 (as stacksjs.com is) is skipped and its
+ * MX/SPF/DKIM/DMARC records have to exist already.
  */
+
+/** The zone mail is sent from: the env override, the apex, then the fallback. */
+const MAIL_DOMAIN: string = env.MAIL_DOMAIN || APEX || FALLBACK_MAIL_DOMAIN
 
 /**
  * Give a host an explicit scheme, and leave one that already has it alone.
@@ -50,11 +47,11 @@ function normalizeOrigin(value: string | undefined): string {
 
 export default {
   from: {
-    name: env.MAIL_FROM_NAME || 'The Open Times',
-    address: env.MAIL_FROM_ADDRESS || `hello@${env.MAIL_DOMAIN || APEX}`,
+    name: env.MAIL_FROM_NAME || 'Postline',
+    address: env.MAIL_FROM_ADDRESS || `hello@${MAIL_DOMAIN}`,
   },
 
-  domain: env.MAIL_DOMAIN || APEX,
+  domain: MAIL_DOMAIN,
 
   /**
    * Mailbox users for IMAP/SMTP access.
@@ -75,9 +72,9 @@ export default {
   /**
    * The origin templated into mail links (confirmation, unsubscribe).
    *
-   * `APP_URL` is a bare host everywhere in this project — `theopentimes.org`,
-   * not `https://theopentimes.org` — while this field is concatenated with a
-   * path to build a link. Taking it raw produced `theopentimes.org/confirm/…`,
+   * `APP_URL` is a bare host everywhere in this project — `postline.stacksjs.com`,
+   * not `https://postline.stacksjs.com` — while this field is concatenated with
+   * a path to build a link. Taking it raw produced `<host>/confirm/…`,
    * which a mail client renders as relative text rather than a link. The
    * scaffold's fallback had a scheme and the env value did not, so the bug only
    * appeared once APP_URL was set, which is to say only in production.
@@ -88,7 +85,7 @@ export default {
   server: {
     enabled: true,
     scan: true, // scans for spam and viruses
-    subdomain: 'mail', // mail.theopentimes.org
+    subdomain: 'mail', // mail.<MAIL_DOMAIN>
 
     /**
      * Server mode:
@@ -100,16 +97,15 @@ export default {
     /**
      * Report-only, deliberately.
      *
-     * theopentimes.org started sending in August 2026 and has no history to
-     * enforce against. The framework default is `p=quarantine`, which is right
-     * for an established sender and wrong here: a young domain that trips a
-     * single alignment problem starts losing subscriber confirmations to the
-     * spam folder, which is the exact failure this project already had once.
-     * Read the aggregate reports first, then tighten to quarantine.
+     * Postline has no sending history of its own to enforce against. The
+     * framework default is `p=quarantine`, which is right for an established
+     * sender and wrong for a new one: a single alignment problem starts sending
+     * account mail to the spam folder. Read the aggregate reports first, then
+     * tighten to quarantine.
      */
     dmarc: {
       policy: 'none',
-      reportTo: `chris@${APEX}`,
+      reportTo: `chris@${MAIL_DOMAIN}`,
     },
 
     storage: {

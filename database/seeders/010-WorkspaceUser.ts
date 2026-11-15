@@ -27,7 +27,7 @@ export default class WorkspaceUser extends Seeder {
       return
     }
 
-    const email = process.env.SEED_USER_EMAIL ?? 'dev@theopentimes.org'
+    const email = process.env.SEED_USER_EMAIL ?? 'dev@postline.test'
     const name = process.env.SEED_USER_NAME ?? 'Postline Dev'
     const password = process.env.SEED_USER_PASSWORD ?? 'password'
 

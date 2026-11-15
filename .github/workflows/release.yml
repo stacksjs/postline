@@ -45,11 +45,11 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     env:
-      APP_NAME: The Open Times
-      DESKTOP_APP_NAME: The Open Times
-      DESKTOP_BUNDLE_ID: ${{ vars.APPLE_BUNDLE_ID || 'org.theopentimes.desktop' }}
+      APP_NAME: Postline
+      DESKTOP_APP_NAME: Postline
+      DESKTOP_BUNDLE_ID: ${{ vars.APPLE_BUNDLE_ID || 'org.stacksjs.postline' }}
       # The page the window opens: the signed-in workspace on the deployed site.
-      DESKTOP_URL: ${{ vars.DESKTOP_URL || 'https://theopentimes.org/composer' }}
+      DESKTOP_URL: ${{ vars.DESKTOP_URL || 'https://postline.stacksjs.com/composer' }}
       # Optional Developer ID signing + notarization, picked up by build:dmg
       # when set. Unset, the DMG is unsigned and Gatekeeper asks on first open.
       DESKTOP_SIGNING_IDENTITY: ${{ vars.DESKTOP_SIGNING_IDENTITY }}
@@ -104,7 +104,7 @@ jobs:
           cd storage/framework/desktop-dmg
           dmg="$DESKTOP_APP_NAME-$VERSION.dmg"
           test -f "$dmg"
-          zip="The-Open-Times-$VERSION-macos-arm64.dmg.zip"
+          zip="Postline-$VERSION-macos-arm64.dmg.zip"
           ditto -c -k --keepParent "$dmg" "$zip"
           shasum -a 256 "$zip" > "$zip.sha256"
           echo "zip=storage/framework/desktop-dmg/$zip" >> "$GITHUB_OUTPUT"

@@ -28,7 +28,7 @@ export type CommandRegistry = Record<string, string | CommandConfig>
  */
 export default {
   'inspire': 'Inspire',
-  // Moves the app between `theopentimes.org` and `opentimes.stacksjs.com` by
+  // Moves the app between `postline.stacksjs.com` and an apex of its own by
   // writing DOMAIN_MODE into an env file. Registers `domain`, `domain:list` and
   // `domain:use`; `dns` is the framework's own record-listing command and is
   // deliberately left alone.

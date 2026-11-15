@@ -5,15 +5,16 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import process from 'node:process'
 import { encryptEnv, parse, resolveEnvFile } from '@stacksjs/env'
 import { ExitCode } from '@stacksjs/types'
-import { APEX, LEGACY_HOSTS, LOCAL_HOST, resolveDomains, SHORT_DOMAINS, SUBDOMAIN } from '~/config/domains'
+import { APEX, LOCAL_HOST, resolveDomains, SUBDOMAIN } from '~/config/domains'
 
 /**
  * `buddy domain` — move the app between hosting shapes without hand-editing
  * config.
  *
  * The app can live at a subdomain of the shared Stacks box
- * (`opentimes.stacksjs.com`) or at its own apex (`theopentimes.org`). Which one
- * is canonical is a single env value, `DOMAIN_MODE`, that config/domains.ts
+ * (`postline.stacksjs.com`) or at an apex domain of its own, once `APEX` is set
+ * in config/domains.ts (Postline has none yet). Which one is canonical is a
+ * single env value, `DOMAIN_MODE`, that config/domains.ts
  * resolves and config/app.ts, config/dns.ts and config/cloud.ts all read. This
  * command is the only thing that writes it.
  *
@@ -166,12 +167,11 @@ export default function (cli: CLI) {
       const { canonical, redirects } = resolveDomains(readEnvFile(file))
 
       console.log('')
-      console.log(`  ${APEX.padEnd(28)} apex${canonical === APEX ? ' · canonical' : ''}`)
-      for (const domain of SHORT_DOMAINS)
-        console.log(`  ${domain.padEnd(28)} short form${canonical === domain ? ' · canonical' : ''}`)
+      if (APEX)
+        console.log(`  ${APEX.padEnd(28)} apex${canonical === APEX ? ' · canonical' : ''}`)
+      else
+        console.log(`  ${'(none yet)'.padEnd(28)} apex · set APEX in config/domains.ts`)
       console.log(`  ${SUBDOMAIN.padEnd(28)} shared-box tenant${canonical === SUBDOMAIN ? ' · canonical' : ''}`)
-      for (const domain of LEGACY_HOSTS)
-        console.log(`  ${domain.padEnd(28)} legacy · redirect only`)
       console.log(`  ${LOCAL_HOST.padEnd(28)} development only`)
       console.log('')
       console.log(`  ${redirects.length} of them redirect to https://${canonical}`)
@@ -182,9 +182,9 @@ export default function (cli: CLI) {
   cli
     .command('domain:use [target]', 'Serve on the apex domain, the shared subdomain, or a specific host')
     .option('--file [file]', 'Write to a specific env file instead of the one --env implies', { default: '' })
-    .example('buddy domain:use domain                 # theopentimes.org')
-    .example('buddy domain:use subdomain              # opentimes.stacksjs.com')
-    .example('buddy domain:use staging.theot.org      # any other host')
+    .example('buddy domain:use subdomain              # postline.stacksjs.com')
+    .example('buddy domain:use domain                 # the apex, once config/domains.ts has one')
+    .example('buddy domain:use staging.example.com    # any other host')
     .example('buddy domain:use domain --env production')
     .action((target: string | undefined, options: DomainOptions) => {
       if (!target) {
@@ -201,6 +201,14 @@ export default function (cli: CLI) {
       const isHost = !KNOWN_TARGETS.has(choice)
       if (isHost && !/^(?=.{1,253}$)[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(choice)) {
         console.error(`"${target}" is neither \`domain\`, \`subdomain\`, nor a valid hostname.`)
+        process.exit(ExitCode.FatalError)
+      }
+
+      // `domain` means the apex, and there is none until config/domains.ts
+      // declares one. Writing DOMAIN_MODE=domain anyway would look like it
+      // worked while the app kept resolving to the subdomain.
+      if (!isHost && choice !== 'subdomain' && !APEX) {
+        console.error('Postline has no apex domain yet. Set APEX in config/domains.ts first, or pass a hostname.')
         process.exit(ExitCode.FatalError)
       }
 

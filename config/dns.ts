@@ -10,13 +10,15 @@ import { redirects } from '~/config/domains'
  *
  * WHERE THE ZONES ACTUALLY LIVE
  *
- * theopentimes.org, theot.org, theot.app and theot.blog are registered at
- * Porkbun, and Porkbun serves their DNS. ts-cloud picks that provider up on its
- * own from `PORKBUN_API_KEY` / `PORKBUN_SECRET_KEY` (see `loadFromEnv` in its
- * DNS registry) and asks each configured provider which domain it can manage —
- * so there is no driver to name here. The `nameservers` below belong to the
- * legacy stacksjs.com zone in Route53, which still hosts the
- * `opentimes.stacksjs.com` subdomain.
+ * Postline has no domain of its own yet: it is served from
+ * `postline.stacksjs.com`, and the `nameservers` below belong to the
+ * stacksjs.com zone in Route53 that hosts that subdomain.
+ *
+ * When a Postline domain is registered (set `APEX` in config/domains.ts),
+ * ts-cloud picks its DNS provider up from the environment — e.g.
+ * `PORKBUN_API_KEY` / `PORKBUN_SECRET_KEY` (see `loadFromEnv` in its DNS
+ * registry) — and asks each configured provider which domain it can manage, so
+ * there is no driver to name here.
  */
 export default {
   /**

@@ -77,15 +77,16 @@ export default {
   // deployed environments set it to the canonical domain.
   APP_URL: {
     validation: schema.string(),
-    default: 'theopentimes.localhost',
+    default: 'postline.localhost',
   },
 
   // Which of the two hosting shapes config/domains.ts should resolve:
-  // 'domain' -> theopentimes.org, 'subdomain' -> opentimes.stacksjs.com.
+  // 'subdomain' -> postline.stacksjs.com, 'domain' -> the apex in
+  // config/domains.ts (ignored until one is set).
   // Written by `buddy domain:use`; read by config/domains.ts and nothing else.
   DOMAIN_MODE: {
     validation: schema.enum(['domain', 'subdomain']),
-    default: 'domain',
+    default: 'subdomain',
   },
 
   // Hard override for the canonical host, for a staging or preview box that is
@@ -95,8 +96,8 @@ export default {
     default: '',
   },
 
-  // Porkbun API credentials. Porkbun registers and serves DNS for
-  // theopentimes.org and the theot.* short domains; ts-cloud discovers the
+  // Porkbun API credentials, for a Postline domain registered there. Unused
+  // while the app lives on the stacksjs.com subdomain; ts-cloud discovers the
   // provider from these two variables alone.
   PORKBUN_API_KEY: {
     validation: schema.string(),
@@ -153,7 +154,7 @@ export default {
   // replaced — and silently emptied — by the next deploy.
   DB_DATABASE_PATH: {
     validation: schema.string(),
-    default: 'database/opentimes.sqlite',
+    default: 'database/postline.sqlite',
   },
 
   DB_HOST: {

@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy to production after lint, typecheck and tests pass
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -66,8 +72,22 @@ jobs:
           AWS_DYNAMODB_ENDPOINT: http://localhost:8000
         run: bun run test
 
+  # AUTOMATIC DEPLOYS ARE OFF.
+  #
+  # This job used to run on every push to main. The server, secrets and
+  # `production` environment it deploys with still belong to the publication
+  # product that was split out of this repo into its own, and that box is live
+  # — so a push here must never deploy. Until Postline has its own server (or
+  # tenant and ports), its own domain and its own secrets, this job runs ONLY
+  # when someone starts the workflow by hand from main with the `deploy` input
+  # ticked. A push, a pull request, or a manual run without the input skips it.
+  #
+  # Before the first manual deploy: replace the HCLOUD_TOKEN /
+  # DOTENV_PRIVATE_KEY_PRODUCTION / DEPLOY_SSH_PRIVATE_KEY secrets and the host
+  # in the SSH step with Postline's own, commit a Postline `.env.production`,
+  # and check config/cloud.ts against the target box.
   deploy-production:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy == true && github.ref == 'refs/heads/main'
     needs: [lint, typecheck, test]
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -107,45 +127,15 @@ jobs:
         run: bun node_modules/@stacksjs/buddy/dist/cli.js deploy production --yes
       - name: Verify production routes
         run: |
-          # Verify the canonical host. opentimes.stacksjs.com is configured as a
-          # redirect to it, and curl does not follow redirects without -L, so
-          # checking the redirect host asserted against an empty body and failed
-          # a deploy that had in fact succeeded.
-          curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 https://theopentimes.org/login > /dev/null
-          curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 https://theopentimes.org/api/v1/status | grep -q '"status":"ok"'
+          # Verify the canonical host (config/domains.ts). Postline has no
+          # redirect hosts yet, so there is no second redirect check; add one
+          # here when an apex domain is registered and the subdomain starts
+          # redirecting to it.
+          curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 https://postline.stacksjs.com/login > /dev/null
+          curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 https://postline.stacksjs.com/api/v1/status | grep -q '"status":"ok"'
           # The realtime gateway route. A plain GET is not an upgrade request,
           # so the broadcast server answers 400 — which is proof the route
           # reaches it rather than 404ing at the gateway.
-          test "$(curl --silent --output /dev/null --write-out '%{http_code}' https://theopentimes.org/ws)" = '400'
-          status=$(curl --silent --output /dev/null --write-out '%{http_code}' https://theopentimes.org/campaigns)
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' https://postline.stacksjs.com/ws)" = '400'
+          status=$(curl --silent --output /dev/null --write-out '%{http_code}' https://postline.stacksjs.com/campaigns)
           test "$status" = '200' || test "$status" = '302' || test "$status" = '303'
-      - name: Verify the redirect hosts, across both DNS accounts
-        run: |
-          # These hosts span two providers: theot.* are Porkbun zones, the
-          # stacksjs.com hosts are records in a Route53 zone owned by a
-          # different cloud account. One `buddy deploy` publishes both, and
-          # this is the assertion that it kept doing so — a provider that
-          # silently stops being reconciled shows up here as a redirect that
-          # went missing, not as a support ticket months later.
-          #
-          # Asserted without -L on purpose: the redirect itself is what is
-          # under test, so following it would pass even if the host had started
-          # serving the site directly (which is exactly how the duplicate
-          # content on postline.stacksjs.com went unnoticed).
-          for host in \
-            www.theopentimes.org \
-            theot.org \
-            theot.app \
-            theot.blog \
-            opentimes.stacksjs.com \
-            postline.stacksjs.com
-          do
-            location=$(curl --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 \
-              --output /dev/null --write-out '%{http_code} %{redirect_url}' "https://$host/deep/link")
-            echo "  $host -> $location"
-            # 301 to the canonical host, with the path carried across.
-            case "$location" in
-              '301 https://theopentimes.org/deep/link') ;;
-              *) echo "::error::$host did not 301 to the canonical host with its path preserved (got: $location)"; exit 1 ;;
-            esac
-          done

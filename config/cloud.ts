@@ -30,19 +30,14 @@ import { env } from '@stacksjs/env'
  * deploys, but only per-site: `main` and `api` deploy to separate directories
  * and would each get their own copy of a database they are supposed to share.
  *
- * REBRAND NOTE: this path used to be `/var/lib/postline/postline.sqlite`. It is
- * outside the release tree precisely so a deploy cannot replace it — which also
- * means a deploy cannot MOVE it. Any box that already ran the old name needs
- * the file relocated once, by hand, before the next deploy:
- *
- *   mv /var/lib/postline /var/lib/opentimes
- *   mv /var/lib/opentimes/postline.sqlite /var/lib/opentimes/opentimes.sqlite
- *
- * Skipping that does not error: `buddy migrate` would create an empty database
- * at the new path and the app would come up looking freshly installed.
+ * SPLIT NOTE: the publication product was split out of this repo and kept the
+ * shared box's existing tenant, ports and data directory. Postline has not
+ * been deployed since, so nothing exists at this path yet — the first Postline
+ * deploy creates it. It also needs its own ports and secrets first; see the
+ * `deploy-production` job in .github/workflows/ci.yml.
  */
-const DATA_DIR = '/var/lib/opentimes'
-const DB_DATABASE_PATH = `${DATA_DIR}/opentimes.sqlite`
+const DATA_DIR = '/var/lib/postline'
+const DB_DATABASE_PATH = `${DATA_DIR}/postline.sqlite`
 
 /**
  * The release tarball is packed from the working tree, not from git — so
@@ -78,15 +73,15 @@ export const tsCloud: TsCloudConfig = {
    * Project configuration
    */
   project: {
-    name: 'opentimes',
-    slug: 'opentimes',
+    name: 'postline',
+    slug: 'postline',
     region: 'us-east-1',
   },
 
   stateDir: 'storage/cloud',
 
   /**
-   * The Open Times is a tenant of the shared `stacks` Hetzner box, not the owner of
+   * Postline is a tenant of the shared `stacks` Hetzner box, not the owner of
    * its own server.
    *
    * `attachTo` is what makes that true rather than aspirational: it stops this
@@ -94,7 +89,7 @@ export const tsCloud: TsCloudConfig = {
    * host also serves stacksjs.com, mail, PostgreSQL and ten other tenants, and
    * its Hetzner firewall is reconciled from whichever config claims ownership
    * — so deploying without this would silently rewrite the shared firewall
-   * from The Open Times' (much smaller) port list and drop public mail.
+   * from Postline's (much smaller) port list and drop public mail.
    */
   cloud: {
     provider: 'hetzner',
@@ -349,7 +344,7 @@ export const tsCloud: TsCloudConfig = {
       redirectHttp: true,
       // Let's Encrypt configuration (used when provider: 'letsencrypt' or loadBalancer.enabled: false)
       letsEncrypt: {
-        email: env.LETSENCRYPT_EMAIL || `admin@${domains.APEX}`,
+        email: env.LETSENCRYPT_EMAIL || `admin@${domains.APEX ?? domains.FALLBACK_MAIL_DOMAIN}`,
         staging: false, // Set to true for testing
         autoRenew: true,
       },
@@ -360,8 +355,9 @@ export const tsCloud: TsCloudConfig = {
      *
      * `domain` is the canonical host, so the zone this resolves against follows
      * `DOMAIN_MODE` with everything else. The Route53 hosted zone only covers
-     * stacksjs.com — the apex and the short domains are served by Porkbun,
-     * which ts-cloud discovers from the environment (see config/dns.ts).
+     * stacksjs.com, which is where the subdomain lives. An apex registered
+     * elsewhere is discovered by ts-cloud from that provider's credentials in
+     * the environment (see config/dns.ts).
      */
     dns: {
       domain: domains.canonical,
@@ -614,7 +610,7 @@ export const tsCloud: TsCloudConfig = {
      * read as authoritative, and did nothing. Every value in it was also
      * already contradicted by the live zone (selector `default` where the
      * server signs with `mail`, `mail.stacksjs.com` where the MX is
-     * `mail.theopentimes.org`, `p=none` where the record said `p=quarantine`).
+     * a different host, `p=none` where the record said `p=quarantine`).
      *
      * The records are published by `reconcileMailDns` in @stacksjs/buddy,
      * driven by config/email.ts — that is the file to edit.
@@ -641,8 +637,8 @@ export const tsCloud: TsCloudConfig = {
    * For multi-site deployments
    */
   sites: {
-    // The canonical host — `theopentimes.org`, or `opentimes.stacksjs.com` when
-    // DOMAIN_MODE=subdomain. Either way it is a host of its own rather than a
+    // The canonical host — `postline.stacksjs.com` until Postline has an apex
+    // of its own (config/domains.ts). Either way it is a host of its own rather than a
     // path on stacksjs.com, so it never competes with the apex app's `/` route
     // in the gateway's longest-prefix routing.
     main: {
@@ -693,7 +689,7 @@ export const tsCloud: TsCloudConfig = {
       // The page server reverse-proxies `/api/**` to the API process. Name that
       // port explicitly: the framework default (3008) is already owned by a
       // *different* tenant on this shared box, and an unconfigured proxy would
-      // post The Open Times' form submissions into that app instead.
+      // post Postline's form submissions into that app instead.
       // BROADCAST_REDIS_ENABLED makes this process publish realtime events to
       // Redis instead of to an in-process server it does not have. The
       // broadcast service relays them to the sockets.
@@ -765,7 +761,7 @@ export const tsCloud: TsCloudConfig = {
       exclude: RELEASE_EXCLUDES,
     },
 
-    // The Open Times' own API process, bound to loopback and reached only through
+    // Postline's own API process, bound to loopback and reached only through
     // the main site's `/api/**` proxy — so it needs no domain of its own.
     // Unlike the framework repo, a consumer app has no framework source to
     // compile an entry from: the installed package ships one prebuilt.

@@ -22,9 +22,9 @@ name: Publish Mac App Store
 #
 # Repository variables:
 #   APPLE_TEAM_ID                       required
-#   APPLE_BUNDLE_ID                     default org.theopentimes.desktop
-#   APPLE_APP_NAME                      default "The Open Times"
-#   DESKTOP_URL                         default https://theopentimes.org/composer
+#   APPLE_BUNDLE_ID                     default org.stacksjs.postline
+#   APPLE_APP_NAME                      default "Postline"
+#   DESKTOP_URL                         default https://postline.stacksjs.com/composer
 
 on:
   workflow_dispatch:
@@ -54,15 +54,15 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 45
     env:
-      APP_NAME: ${{ vars.APPLE_APP_NAME || 'The Open Times' }}
-      APPLE_APP_NAME: ${{ vars.APPLE_APP_NAME || 'The Open Times' }}
-      APPLE_BUNDLE_ID: ${{ vars.APPLE_BUNDLE_ID || 'org.theopentimes.desktop' }}
+      APP_NAME: ${{ vars.APPLE_APP_NAME || 'Postline' }}
+      APPLE_APP_NAME: ${{ vars.APPLE_APP_NAME || 'Postline' }}
+      APPLE_BUNDLE_ID: ${{ vars.APPLE_BUNDLE_ID || 'org.stacksjs.postline' }}
       APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
       APPLE_APP_CATEGORY: public.app-category.social-networking
       APPLE_MINIMUM_MACOS: '13.0'
       APPLE_APP_ICON: app/Desktop/AppIcon.icns
       APPLE_UNIVERSAL: 'true'
-      DESKTOP_URL: ${{ vars.DESKTOP_URL || 'https://theopentimes.org/composer' }}
+      DESKTOP_URL: ${{ vars.DESKTOP_URL || 'https://postline.stacksjs.com/composer' }}
       APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
       APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
 
