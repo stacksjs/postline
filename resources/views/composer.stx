@@ -60,7 +60,7 @@
                 are single-quoted literals, so the Crosswind extractor still
                 sees them, and the static class is the pre-hydration state. --}}
             <span class="flex items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 border border-line rounded-xl" :class="{ 'hidden': !providersPending() }">Loading accounts…</span>
-            <a class="hidden inline-flex items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-xl transition-colors" :class="{ 'hidden': !providersEmpty() }" href="/accounts" data-stx-link>No accounts yet. Connect one →</a>
+            <a class="flex hidden items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-xl transition-colors" :class="{ 'hidden': !providersEmpty() }" href="/accounts" data-stx-link>No accounts yet. Connect one →</a>
             <button
               class="inline-flex gap-1.5 items-center px-2.5 min-h-8 font-bold text-xs border rounded-xl transition-colors"
               type="button"

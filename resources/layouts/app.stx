@@ -353,7 +353,8 @@
           })
         }
 
-        // Number keys 1-9 jump between pages (the sidebar shows the badges).
+        // Number keys jump between pages and the comma opens Settings (the sidebar
+        // shows the badges). Settings used to advertise 0, which is Blog's key.
         // Bound through stx's useEventListener rather than a raw document
         // listener: it unsubscribes on destroy, so repeated SPA navigations
         // can't stack duplicate handlers. Routing goes through stx `navigate`
@@ -361,7 +362,7 @@
         const bindKeyboardShortcuts = () => {
           if (window.__opentimesShortcutsBound) return
           window.__opentimesShortcutsBound = true
-          const routes = { 1: '/composer', 2: '/queue', 3: '/timeline', 4: '/analytics', 5: '/campaigns', 6: '/listening', 7: '/inbox', 8: '/discover', 9: '/publication', 0: '/blog' }
+          const routes = { 1: '/composer', 2: '/queue', 3: '/timeline', 4: '/analytics', 5: '/campaigns', 6: '/listening', 7: '/inbox', 8: '/discover', 9: '/publication', 0: '/blog', ',': '/settings' }
           window.stx?.useEventListener('keydown', (event) => {
             if (event.metaKey || event.ctrlKey || event.altKey) return
             const target = event.target

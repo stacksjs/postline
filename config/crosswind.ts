@@ -367,7 +367,7 @@ const APP_UI: string = `
  */
 const QUEUE_STATUS: string = `
 [data-view-toggle] { color: var(--muted); }
-[data-view-toggle][data-active] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+[data-view-toggle][data-active]:not([data-active="false"]) { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
 
 [data-status-pill] { color: var(--muted); background: var(--panel-3); border-color: var(--line); }
 [data-status-pill][data-status="published"] { color: rgb(4 120 87); background: rgb(236 253 245); border-color: rgb(167 243 208); }
@@ -385,14 +385,20 @@ html.dark [data-status-pill][data-status="failed"] { color: rgb(252 165 165); ba
 [data-cal-dot][data-status="scheduled"] { background: rgb(59 130 246); }
 
 [data-cal-cell] { background: var(--panel); }
-[data-cal-cell][data-blank] { background: var(--panel-2); }
-[data-cal-cell][data-today] { background: rgb(239 246 255 / 0.6); }
-html.dark [data-cal-cell][data-today] { background: rgb(30 58 138 / 0.2); }
+[data-cal-cell][data-blank]:not([data-blank="false"]) { background: var(--panel-2); }
+[data-cal-cell][data-today]:not([data-today="false"]) { background: rgb(239 246 255 / 0.6); }
+html.dark [data-cal-cell][data-today]:not([data-today="false"]) { background: rgb(30 58 138 / 0.2); }
 [data-cal-day] { color: var(--muted); }
-[data-cal-cell][data-today] [data-cal-day] { color: rgb(29 78 216); }
-html.dark [data-cal-cell][data-today] [data-cal-day] { color: rgb(147 197 253); }
+[data-cal-cell][data-today]:not([data-today="false"]) [data-cal-day] { color: rgb(29 78 216); }
+html.dark [data-cal-cell][data-today]:not([data-today="false"]) [data-cal-day] { color: rgb(147 197 253); }
 `
 
+/**
+ * State attributes are matched as `[data-x]:not([data-x="false"])`, not bare
+ * `[data-x]`. stx renders a bound `:data-x="false"` as the string "false", the
+ * way it does for any data attribute, so a presence selector matched every
+ * element and painted them all as selected, active or today.
+ */
 /**
  * Composer provider chips.
  *
@@ -408,12 +414,12 @@ html.dark [data-cal-cell][data-today] [data-cal-day] { color: rgb(147 197 253); 
 const COMPOSER_CHIPS: string = `
 [data-provider-toggle] { border-color: var(--line); background: var(--panel-2); color: var(--muted); }
 [data-provider-toggle]:not([disabled]):hover { background: #ffffff; }
-[data-provider-toggle][data-selected] { border-color: #0a0a0a; background: var(--accent); color: var(--on-accent); }
+[data-provider-toggle][data-selected]:not([data-selected="false"]) { border-color: #0a0a0a; background: var(--accent); color: var(--on-accent); }
 [data-provider-toggle][disabled] { color: #a1a1aa; cursor: not-allowed; }
 
 [data-provider-toggle] [data-provider-dot] { background: #d4d4d8; }
-[data-provider-toggle][data-selected] [data-provider-dot] { background: #34d399; }
-[data-provider-toggle][data-over] [data-provider-dot] { background: #ef4444; }
+[data-provider-toggle][data-selected]:not([data-selected="false"]) [data-provider-dot] { background: #34d399; }
+[data-provider-toggle][data-over]:not([data-over="false"]) [data-provider-dot] { background: #ef4444; }
 
 html.dark [data-provider-toggle]:not([disabled]):hover { background: #26262a; }
 html.dark [data-provider-toggle][disabled] { color: #52525b; }
@@ -426,7 +432,7 @@ html.dark [data-provider-toggle][disabled] { color: #52525b; }
  */
 const SETTINGS_STATUS: string = `
 [data-theme-option] { color: var(--muted); }
-[data-theme-option][data-active] {
+[data-theme-option][data-active]:not([data-active="false"]) {
   background: var(--panel);
   color: var(--ink);
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
