@@ -95,11 +95,27 @@ scheduled posts and the inbox are the obvious next ones.
 
 ## What is not done
 
-- **The app is not self-contained.** It needs a Postline reachable at
-  `DESKTOP_URL`. Stacks has a desktop mode that compiles the server into the
-  app and serves it on loopback (`config/desktop.ts` with a `webview` section,
-  `buddy release:desktop`); moving to it means running migrations, generating
-  the app key and running the scheduler inside the app on first launch.
+- **The app is not self-contained yet.** It needs a Postline reachable at
+  `DESKTOP_URL`. The plan is Stacks' `webview` desktop mode: the app's
+  executable is a compiled agent that serves the API on loopback, and its
+  window is a web view pointed at it.
+
+  What is proven, on Stacks 0.75.599: `scripts/desktop-bundle.ts` writes the
+  app's route file and all 65 actions as static imports
+  (`app/Desktop/bundle.generated.js`), and a binary compiled from them with
+  `stacksAgentHandler` boots the router outside the project, reaches SQLite
+  and answers `/api/login` correctly.
+
+  What blocks it: every route behind `.middleware('auth')` answers 500 in that
+  binary, and the automatic `csrf` check fails on every write. The router
+  finds middleware by importing files off disk, and a compiled binary has
+  none. The fix is in the framework (`provideMiddleware`, the counterpart of
+  `provideActions`) and is written and tested there, but not released.
+
+  Still to do after that release: run the migrations and generate the app key
+  inside the app on first launch, keep the database and uploaded media in
+  Application Support, run the scheduler in the agent, and build the workspace
+  views as static pages.
 - **No signed updates.** That arrives with the `webview` mode above.
 - **Apple Silicon only.** The release workflow builds `arm64`. The App Store
   workflow builds a universal binary.
