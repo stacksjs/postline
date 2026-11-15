@@ -124,7 +124,7 @@ const filteredEntries = derived(() => {
  * on a derived band and `badgeLabelKey` puts the number itself in the pill.
  */
 const SEO_ROW_ACTIONS = [
-  { action: 'edit', label: 'Edit SEO for', icon: 'i-hugeicons-edit-02' },
+  { action: 'edit', label: 'Edit SEO for' },
 ]
 
 const SEO_COLUMNS = [
@@ -227,10 +227,10 @@ void loadEntries()
 </script>
 
 <template>
-<div class="mx-auto pb-12 pt-6 px-6 space-y-6 max-w-7xl">
+<div class="flex flex-col gap-6 mx-auto pb-12 pt-6 px-6 max-w-7xl">
   <PageHeader
     title="SEO"
-    description="Review model-backed search metadata for every CMS post"
+    description="How every post appears in search results: its title, description and focus keyword"
   />
 
   <div class="px-4 py-3 text-blue-800 text-sm dark:text-blue-200 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 rounded-lg dark:border-blue-500/20">
@@ -299,6 +299,7 @@ void loadEntries()
          adding one to a working table, watching `/dependencies` stop
          responding, and removing it again. See stacksjs/stx#2101. --}}
     <Table
+      :framed="false"
       :columns="SEO_COLUMNS"
       :data="seoRows()"
       :loading="loading()"
@@ -306,7 +307,7 @@ void loadEntries()
       paginated
       :page-size="25"
       empty-title="No matching posts"
-      empty-description="Adjust the search or score filter, or create a CMS post first."
+      empty-description="Adjust the search or score filter, or create a post first."
       :row-actions="SEO_ROW_ACTIONS"
       action-label-key="title"
       @row-action="openEdit($event.row)"

@@ -65,13 +65,13 @@
     "stx": "./buddy"
   },
   "dependencies": {
-    "@stacksjs/ai": "^0.75.463",
-    "@stacksjs/payments": "0.75.463",
-    "@stacksjs/realtime": "0.75.463",
-    "@stacksjs/socials": "^0.75.463",
-    "@stacksjs/stx": "^0.2.798",
-    "@stacksjs/ts-cloud": "^0.16.44",
-    "stacks": "^0.75.463",
+    "@stacksjs/ai": "^0.75.599",
+    "@stacksjs/payments": "0.75.599",
+    "@stacksjs/realtime": "0.75.599",
+    "@stacksjs/socials": "^0.75.599",
+    "@stacksjs/stx": "^0.2.894",
+    "@stacksjs/ts-cloud": "^0.16.135",
+    "stacks": "^0.75.599",
     "stripe": "^22.4.0",
     "ts-broadcasting": "0.0.9",
     "ts-medium-editor": "^0.1.6"
@@ -96,7 +96,7 @@
     "commit-msg": "bun x gitlint --edit .git/COMMIT_EDITMSG"
   },
   "overrides": {
-    "@stacksjs/ts-cloud": "^0.16.44",
-    "@stacksjs/stx": "^0.2.798"
+    "@stacksjs/ts-cloud": "^0.16.135",
+    "@stacksjs/stx": "^0.2.894"
   }
 }

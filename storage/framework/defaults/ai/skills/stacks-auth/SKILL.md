@@ -348,6 +348,17 @@ interface PermissionRecord { id, name, guard_name, description?, created_at?, up
 interface RbacStore { findRoleByName, createRole, deleteRole, getAllRoles, findPermissionByName, createPermission, ... }
 ```
 
+### Configured administrators (admins.ts)
+List operator emails in `config/auth.ts` and run `./buddy seed:admins` (alias `admins:seed`; safe in a deploy's preStart):
+```typescript
+admins: ['ops@example.com', 'founder@example.com'],
+adminRole: { name: 'admin', guard: 'web' }, // default; false = accounts only
+```
+- A missing account is created with a verified email and a random password nobody knows; first sign-in is a password reset or a social sign-in linking the verified address.
+- Grants only: removing an address never revokes. A malformed or repeated address throws.
+- `provisionAdmins({ emails?, role?, accounts?: { findUserId, createUser }, afterEach? })` for app-specific authority (an organization membership): `afterEach({ userId, email, created })` returns `true` when it changed something. Results: `{ email, userId, outcome: 'created' | 'granted' | 'unchanged' }`.
+- `adminEmails(list)` normalizes/validates; `nameFromEmail('ada.lovelace@x')` → `Ada Lovelace`.
+
 ## Session Auth (session-auth.ts)
 
 - `SessionAuth.login(email, password): Promise<{ user, sessionId }>`
@@ -357,6 +368,63 @@ interface RbacStore { findRoleByName, createRole, deleteRole, getAllRoles, findP
 - `SessionAuth.refresh(sessionId, ttlMs?): Promise<boolean>`, rejects non-positive or non-finite TTLs without changing the session
 
 Internal: database-backed `sessions` rows with expiry, optional IP/User-Agent fingerprint checks, transactional logout and refresh, and timing-safe password comparison with a dummy bcrypt hash. Sessions survive process restarts and are shared by workers through the configured database.
+
+## Durable database browser sessions
+
+Keep browser authority separate from short-lived API bearer credentials. After
+completed password/MFA, registration or verified SSO/social sign-in, a server
+adapter can exchange its freshly issued, ordinary full-scope sign-in token:
+
+```typescript
+const session = await startBrowserSession(issued.token, {
+  previousSession: request.cookie('session_id'),
+})
+if (!session) throw new Error('Sign-in is no longer valid')
+headers.append('Set-Cookie', browserSessionCookie(session))
+```
+
+This helper belongs inside the completed server sign-in path. Do not expose a
+public bearer-to-browser-session exchange endpoint. Limited/delegated tokens
+cannot acquire full browser authority. The exchange locks the credential owner,
+revalidates the token, saves the browser session, revokes the consumed access and
+refresh pair and retires an offered previous browser credential atomically.
+Keep an API client's ordinary JSON token/refresh response unchanged instead.
+
+Configure `auth.session.lifetime` in milliseconds (default 24 hours), independently
+of `auth.tokenExpiry`. For example, a database browser session lasting 30 days does not
+extend a one-hour API bearer. The auth migrator creates `auth_browser_sessions`; apply the normal
+`buddy migrate --auth` path before adopting this transport, not local table DDL.
+
+The HttpOnly, SameSite cookie is `session_id`; Secure follows the canonical app
+URL policy. Only a hash-backed identifier is stored in SQL. `Auth.user`, auth
+middleware and `SessionAuth` read this credential, preserving primary reads,
+absolute/idle expiry and configured fingerprint checks. Normal reads neither
+rotate cookies nor extend absolute expiry, so concurrent tabs cannot overwrite
+one another's renewed credentials. There is no browser-readable refresh secret
+or public cookie-renewal endpoint. Keep normal CSRF protection on sign-in,
+logout and session-management mutations.
+
+- `browserSessions(userId, currentCredential?)` returns owner-scoped metadata
+  and safe identifiers, never credentials. It includes existing ordinary full-scope sign-ins during migration; delegated and limited API tokens keep their own management contract. A listed identifier cannot be
+  replayed as a cookie or bearer.
+- `revokeBrowserSession(userId, identifier)` revokes only that owner's session.
+- `SessionAuth.logout(credential)` and `clearedBrowserSessionCookie()` end the
+  active browser session. Clear the old access-token cookie when changing
+  transports so it cannot mask the new identity.
+- `revokeAccountCredentials` includes database sessions. Its `exceptSessionId`
+  can preserve the current cookie credential or its server-side identifier.
+  Account deprovisioning must use the shared revocation primitive and also
+  revoke any application-owned credentials.
+
+Retain application provisioning, audit and new-device hooks. Password/MFA,
+registration and SSO/social adapters must all use the same transport. A JSON
+sign-in which issues an access-cookie for another account must retire/clear an
+old database browser cookie, so it cannot later restore the earlier identity.
+
+Real HTTP/database evidence: `auth/tests/browser-session-store.test.ts`, including
+service restart, real short bearer expiry, safe metadata identifiers, concurrent
+one-use exchange, owner isolation, failed-revocation rollback, account replacement,
+CSRF, logout races, current-session preservation, idle and absolute expiry.
 
 ## Email Verification (email-verification.ts)
 
@@ -382,7 +450,14 @@ const result = await actions.resetPassword(token, newPassword)
 
 `deliver` runs after the token commits, instead of the framework mail; the
 `token`/`url` are the live credential, never log them. `sendEmail` stays a
-silent no-op for unknown or throttled addresses (anti-enumeration).
+no-op for unknown or throttled addresses (anti-enumeration) and resolves
+`false` for them, `true` when a link was issued and delivered. That result is
+for the server: a public endpoint keeps answering every caller the same way,
+while an operator-facing one (the dashboard's user invitation) has to know the
+mail did not go. The mail states the link's lifetime in words ("7 days", "2
+hours", "60 minutes") through the `expiresIn` template variable
+(`describeLinkLifetime`); `expireMinutes` is still passed for templates an app
+overrides.
 
 ### One credential sweep (password/credentials.ts)
 
@@ -404,6 +479,30 @@ silent no-op for unknown or throttled addresses (anti-enumeration).
 ## Registration (register.ts)
 
 - `register(credentials: NewUser): Promise<{ token: AuthToken }>`
+
+### Registration hardening
+
+`register()` refuses a display name that is not a name: no link or web address
+(`bit.ly/x`, `example.com`, `www.`, a scheme, `/`, `@`), no markup, no control
+characters, only letters, digits, spaces and `. , ' - ( )`, at most
+`DISPLAY_NAME_MAX_LENGTH` (80) characters. It answers 422 with a sentence for
+the person, and stores the name whitespace-tidied. The rule lives in
+`@stacksjs/auth/display-name` (`displayNameProblem`, `displayNameMessage`,
+`normalizeDisplayName`).
+
+Mail that greets someone reads the name through `greetingName(name)`: a first
+name, or `undefined` when the stored value would not pass registration. Use it
+in every mail of your own that goes to an address the recipient has not
+confirmed. `RegisterAction` already passes `user:registered` listeners the
+greeting name rather than the stored one.
+
+`POST /register` is limited three ways: the route's 3 a minute per client, and
+inside the action 20 an hour per client address and 5 an hour per email
+(`config.auth.registration.rateLimit: { perIp, perEmail }`, `false` to turn
+one off). It also carries the `honeypot` middleware (see `stacks-forms`).
+
+`buddy user:audit` lists accounts whose stored name would be refused today,
+with the reason and whether the address was ever verified. It only lists.
 
 ## User Helpers (user.ts)
 
@@ -773,3 +872,23 @@ The credential is consumed before the callback, so it composes with
 `revokeAccountCredentials(claim.userId)`. That sweep also removes any pending
 password-reset links; changing a password must retire recovery credentials too.
 The existing `passwordResets(email)` flow supports email-addressed bcrypt tokens.
+
+## Enterprise relying-party identity
+
+Use `@stacksjs/auth/enterprise-oidc` for signed OIDC callbacks with PKCE, state,
+nonce, issuer, audience and JWKS verification. Use `@stacksjs/auth/enterprise-saml`
+for signed SAML requests and strict signed Response + Assertion verification.
+Keep each challenge in a native durable, browser-bound, one-use OAuth flow and
+consume it before accepting a callback. These helpers return provider subject
+identity only; they never assign roles or link a local account by email.
+
+HQ.support uses operator-approved issuer/endpoint configuration. The OIDC helper
+requires discovery endpoints on the issuer origin and client-secret-post support.
+SAML requires persistent NameIDs, RSA-SHA256 and SHA256 digests, exact audience and
+callback recipient, request correlation and bounded assertion lifetime. Provider
+configuration and private keys belong to the operator, never login input.
+
+Tests: `auth/tests/enterprise-oidc.test.ts` and `auth/tests/enterprise-saml.test.ts`.
+They exercise signed fixtures and refusals, not live identity-provider readiness.
+Deprovision workspace memberships and linked identities within that workspace;
+a tenant administrator must not revoke another workspace's native credentials.

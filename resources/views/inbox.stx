@@ -22,15 +22,15 @@
 
     <div class="grid gap-3 sm:grid-cols-3">
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-blue-700 text-lg bg-blue-50 rounded-xl i-hugeicons-message-01" aria-hidden="true"></span>
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-blue-700 text-lg bg-blue-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-message-01"></span></span>
         <div><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Conversations</span><strong class="block mt-1 text-ink text-xl" :text="String(conversations().length)">0</strong></div>
       </article>
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-violet-700 bg-violet-50 rounded-xl i-hugeicons-notification-02" aria-hidden="true"></span>
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-violet-700 bg-violet-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-notification-02"></span></span>
         <div><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Unread</span><strong class="block mt-1 text-ink text-xl" :text="String(unreadCount())">0</strong></div>
       </article>
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-emerald-700 text-lg bg-emerald-50 rounded-xl i-hugeicons-link-02" aria-hidden="true"></span>
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-emerald-700 text-lg bg-emerald-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-link-02"></span></span>
         <div class="min-w-0"><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Connected</span><strong class="block mt-1 text-ink text-sm truncate" :text="connectedLabel()">None yet</strong></div>
       </article>
     </div>
@@ -55,7 +55,7 @@
           </div>
 
           <div class="grid gap-3 place-items-center px-6 py-16 text-center" x-show="showEmptyList()">
-            <span class="grid place-items-center h-12 w-12 text-blue-700 text-xl bg-blue-50 rounded-2xl i-hugeicons-message-01" aria-hidden="true"></span>
+            <span class="grid place-items-center h-12 w-12 text-blue-700 text-xl bg-blue-50 rounded-2xl" aria-hidden="true"><span class="i-hugeicons-message-01"></span></span>
             <div>
               <h3 class="m-0 font-bold text-ink text-sm" :text="connectedCount() ? 'No conversations yet' : 'Connect a network first'"></h3>
               <p class="m-0 mt-1 text-muted text-xs" :text="connectedCount() ? 'Run a sync to pull your latest DMs into The Open Times.' : 'Connect Bluesky, X, Mastodon, or Instagram on Accounts to start reading DMs here.'"></p>
@@ -93,7 +93,7 @@
 
       <section class="flex overflow-hidden flex-col min-h-[34rem] bg-panel border border-line rounded-2xl shadow-sm" aria-label="Conversation">
         <div class="grid flex-1 gap-3 place-items-center px-6 py-20 text-center" x-show="!activeId()">
-          <span class="grid place-items-center h-14 w-14 text-2xl text-blue-700 bg-blue-50 rounded-2xl i-hugeicons-message-01" aria-hidden="true"></span>
+          <span class="grid place-items-center h-14 w-14 text-2xl text-blue-700 bg-blue-50 rounded-2xl" aria-hidden="true"><span class="i-hugeicons-message-01"></span></span>
           <div>
             <h2 class="m-0 font-bold text-base text-ink">Pick a conversation</h2>
             <p class="m-0 mt-1 max-w-md text-muted text-sm">Choose a thread on the left to read it and reply. The Open Times marks it read as soon as you open it.</p>

@@ -22,15 +22,15 @@
 
     <div class="grid gap-3 sm:grid-cols-3">
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-violet-700 bg-violet-50 rounded-xl i-hugeicons-radar-02" aria-hidden="true"></span>
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-violet-700 bg-violet-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-radar-02"></span></span>
         <div><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Active watches</span><strong class="block mt-1 text-ink text-xl" :text="String(activeCount())">0</strong></div>
       </article>
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-blue-700 text-lg bg-blue-50 rounded-xl i-hugeicons-notification-02" aria-hidden="true"></span>
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-blue-700 text-lg bg-blue-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-notification-02"></span></span>
         <div><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Unread mentions</span><strong class="block mt-1 text-ink text-xl" :text="String(unreadCount())">0</strong></div>
       </article>
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-emerald-700 text-lg bg-emerald-50 rounded-xl i-hugeicons-clock-01" aria-hidden="true"></span>
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-emerald-700 text-lg bg-emerald-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-clock-01"></span></span>
         <div class="min-w-0"><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Last checked</span><strong class="block mt-1 text-ink text-sm truncate" :text="lastCheckedLabel()">Not yet</strong></div>
       </article>
     </div>
@@ -80,7 +80,7 @@
           <span class="h-7 w-7 text-muted animate-spin i-hugeicons-loading-03" aria-hidden="true"></span><p class="m-0 text-muted text-sm">Loading listening rules…</p>
         </div>
         <div class="grid gap-3 place-items-center px-6 py-20 text-center" x-show="showEmpty()">
-          <span class="grid place-items-center h-14 w-14 text-2xl text-violet-700 bg-violet-50 rounded-2xl i-hugeicons-radar-02" aria-hidden="true"></span>
+          <span class="grid place-items-center h-14 w-14 text-2xl text-violet-700 bg-violet-50 rounded-2xl" aria-hidden="true"><span class="i-hugeicons-radar-02"></span></span>
           <div><h2 class="m-0 font-bold text-base text-ink" :text="monitors().length ? 'No mentions found yet' : 'Create your first listening rule'">Create your first listening rule</h2><p class="m-0 mt-1 max-w-md text-muted text-sm" :text="monitors().length ? 'Run a scan now. New matching posts will be saved here and highlighted as unread.' : 'Choose the terms and networks you care about. The Open Times will keep checking them for you.'"></p></div>
         </div>
 

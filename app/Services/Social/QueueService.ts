@@ -34,20 +34,30 @@ const database = db as any
 let storedContentColumn: Promise<'content' | 'notes'> | null = null
 
 async function contentColumn(): Promise<'content' | 'notes'> {
-  storedContentColumn ??= database
-    .selectFrom('posts')
-    .select(['content'])
-    .limit(1)
-    .execute()
-    .then(() => 'content' as const)
-    .catch((error: unknown) => {
-      // Only a missing column settles the answer. Anything else (a locked
-      // database, say) must not pin the wrong column for the process lifetime.
-      if (/no such column|has no column|unknown column|does not exist/i.test(String(error))) return 'notes' as const
-      storedContentColumn = null
-      throw error
-    })
-  return await storedContentColumn!
+  storedContentColumn ??= probeContentColumn()
+  return await storedContentColumn
+}
+
+/**
+ * Awaited inside a `try`, not chained with `.catch()`: the query builder
+ * raises a statement SQLite cannot prepare from `execute()` itself, before
+ * there is a promise to reject, and a chained handler never saw it. Every
+ * queue read on a database without `content` then failed with the probe's own
+ * "no such column: content".
+ */
+async function probeContentColumn(): Promise<'content' | 'notes'> {
+  try {
+    await database.selectFrom('posts').select(['content']).limit(1).execute()
+    return 'content'
+  }
+  catch (error) {
+    // Only a missing column settles the answer. Anything else (a locked
+    // database, say) must not pin the wrong column for the process lifetime.
+    if (/no such column|has no column|unknown column|does not exist/i.test(String(error)))
+      return 'notes'
+    storedContentColumn = null
+    throw error
+  }
 }
 
 /** The stored-content value of a `posts` row read with `selectAll()`. */

@@ -27,15 +27,15 @@
 
     <div class="grid gap-3 sm:grid-cols-3">
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-blue-700 text-lg bg-blue-50 rounded-xl i-hugeicons-share-08" aria-hidden="true"></span>
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-blue-700 text-lg bg-blue-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-share-08"></span></span>
         <div><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Destinations</span><strong class="block mt-1 text-ink text-sm">7 publishing channels</strong></div>
       </article>
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-emerald-700 text-lg bg-emerald-50 rounded-xl i-hugeicons-shield-key" aria-hidden="true"></span>
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-emerald-700 text-lg bg-emerald-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-shield-key"></span></span>
         <div><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Credentials</span><strong class="block mt-1 text-ink text-sm">Stored in your workspace</strong></div>
       </article>
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-violet-700 bg-violet-50 rounded-xl i-hugeicons-radar-02" aria-hidden="true"></span>
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-violet-700 bg-violet-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-radar-02"></span></span>
         <div><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Listening</span><a class="block mt-1 font-bold text-ink text-sm hover:underline" href="/listening" data-stx-link>Watch brand mentions</a></div>
       </article>
     </div>
@@ -47,7 +47,7 @@
       </header>
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" data-bluesky-channels>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="bluesky">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-blue-600 text-xl bg-blue-50 rounded-xl i-simple-icons-bluesky" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-bluesky-channel-status>Setup</span></div>
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-blue-600 text-xl bg-blue-50 rounded-xl" aria-hidden="true"><span class="i-simple-icons-bluesky"></span></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-bluesky-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-bold text-[15px]">Bluesky</h2>
             <p class="my-1.5 text-[13px] text-body" data-bluesky-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-bluesky-channel-detail>Add an app password to publish and sync your timeline.</p>
@@ -73,7 +73,7 @@
           </details>
         </article>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="linkedin">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-[#0a66c2] text-xl bg-blue-50 rounded-xl i-simple-icons-linkedin" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-linkedin-channel-status>Setup</span></div>
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-[#0a66c2] text-xl bg-blue-50 rounded-xl" aria-hidden="true"><span class="i-simple-icons-linkedin"></span></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-linkedin-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-bold text-[15px]">LinkedIn</h2>
             <p class="my-1.5 text-[13px] text-body" data-linkedin-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-linkedin-channel-detail>Connect with LinkedIn to crosspost member shares.</p>
@@ -94,7 +94,7 @@
           </div>
         </article>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="instagram">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-pink-600 text-xl bg-pink-50 rounded-xl i-simple-icons-instagram" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-instagram-channel-status>Setup</span></div>
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-pink-600 text-xl bg-pink-50 rounded-xl" aria-hidden="true"><span class="i-simple-icons-instagram"></span></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-instagram-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-bold text-[15px]">Instagram</h2>
             <p class="my-1.5 text-[13px] text-body" data-instagram-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-instagram-channel-detail>Connect an Instagram Business account to crosspost. Posts require an image.</p>
@@ -115,7 +115,7 @@
           </div>
         </article>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="threads">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl i-simple-icons-threads" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-threads-channel-status>Setup</span></div>
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-simple-icons-threads"></span></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-threads-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-bold text-[15px]">Threads</h2>
             <p class="my-1.5 text-[13px] text-body" data-threads-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-threads-channel-detail>Connect a Threads account to crosspost.</p>
@@ -136,7 +136,7 @@
           </div>
         </article>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="twitter">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 rounded-xl i-simple-icons-x" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-twitter-channel-status>Setup</span></div>
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-simple-icons-x"></span></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-twitter-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-bold text-[15px]">X</h2>
             <p class="my-1.5 text-[13px] text-body" data-twitter-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-twitter-channel-detail>Connect X to crosspost tweets. X bills per post, and a post with a link costs far more.</p>
@@ -157,7 +157,7 @@
           </div>
         </article>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="blog">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl i-hugeicons-quill-write-02" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full">Ready</span></div>
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-hugeicons-quill-write-02"></span></span><span class="px-2.5 py-1 font-bold text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full">Ready</span></div>
             <h2 class="mb-0 mt-4 font-bold text-[15px]">Blog</h2>
             <p class="my-1.5 text-[13px] text-body">Built into The Open Times</p>
             <p class="m-0 text-muted text-xs">Publish long-form posts to your site without another account.</p>
@@ -165,7 +165,7 @@
           <a class="inline-flex items-center justify-center h-9 font-bold text-ink text-xs bg-panel-2 hover:bg-white border border-line rounded-xl" href="/blog" data-stx-link>Open Blog</a>
         </article>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="mastodon">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-indigo-600 text-xl bg-indigo-50 rounded-xl i-simple-icons-mastodon" aria-hidden="true"></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-mastodon-channel-status>Setup</span></div>
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-indigo-600 text-xl bg-indigo-50 rounded-xl" aria-hidden="true"><span class="i-simple-icons-mastodon"></span></span><span class="px-2.5 py-1 font-bold text-[11px] text-muted whitespace-nowrap border border-line rounded-full" data-mastodon-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-bold text-[15px]">Mastodon</h2>
             <p class="my-1.5 text-[13px] text-body" data-mastodon-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-mastodon-channel-detail>Connect any Mastodon instance with an access token to crosspost.</p>
@@ -198,7 +198,7 @@
 
     <details class="overflow-hidden bg-panel border border-line rounded-2xl open:border-red-200 shadow-sm group" data-purge-card>
       <summary class="flex gap-3 items-center justify-between p-4 list-none hover:bg-panel-2 transition-colors cursor-pointer">
-        <div class="flex gap-3 items-center"><span class="grid place-items-center h-9 w-9 text-red-600 bg-red-50 rounded-xl i-lucide-triangle-alert" aria-hidden="true"></span><div>
+        <div class="flex gap-3 items-center"><span class="grid place-items-center h-9 w-9 text-lg text-red-600 bg-red-50 rounded-xl" aria-hidden="true"><span class="i-lucide-triangle-alert"></span></span><div>
           <strong class="text-[13px] text-ink">Post removal tools</strong>
           <p class="mb-0 mt-1 text-muted text-xs">Preview or permanently remove posts from connected accounts.</p>
         </div></div>

@@ -10,15 +10,15 @@ allowed-tools: Read Edit Write Bash Grep Glob
 
 Full Stripe integration via the Payment facade. The Stripe SDK is initialized from `services.stripe.secretKey` (sourced from `config/payment.ts`), at the API version the installed SDK declares (`Stripe.API_VERSION`), not a version written down here.
 
-## The Stripe SDK is the app's dependency, not the framework's
+## Stripe SDK ownership and availability
 
-`stripe` is an **optional peer** of `@stacksjs/payments`, and Bun does not install optional peers. An app that uses Stripe has to declare it: `bun add stripe`, **pinned to an exact version, not a range**. The driver refuses to start when `services.stripe.apiVersion` does not equal the installed SDK's `Stripe.API_VERSION`, so a range that resolves to a new major on the next `bun install` breaks billing (stacksjs/stacks#2911).
+`@stacksjs/payments` declares the Stripe SDK it exposes in its public types. Install the framework normally; its dependency supplies Stripe for runtime and strict SDK consumers. The driver initializes lazily and selects `Stripe.API_VERSION`. If an app explicitly configures `services.stripe.apiVersion`, it must match that installed SDK version.
 
-Nothing throws at import, by design, so an app missing the SDK starts clean and every health check passes. Ask before using it rather than finding out inside a webhook handler:
+Check provider availability before handling payments:
 
-- `isStripeConfigured()` - true only when a secret key is set **and** the SDK resolves. It used to check only the key, and answered true on a tree where every Stripe call would throw.
-- `stripeAvailability()` - `{ key, sdk }`, to tell the two apart. They are fixed in different places: one in the environment, one in the app's package.json.
-- `describeStripeAvailability(available)` - one sentence naming everything missing, or null when Stripe is usable. Suitable for a boot log or a health endpoint.
+- `isStripeConfigured()` requires a secret key and a resolvable SDK.
+- `stripeAvailability()` returns `{ key, sdk }`. Configure a missing key through the environment. A missing SDK indicates an incomplete dependency installation; restore it with the app's frozen install.
+- `describeStripeAvailability(available)` reports the missing prerequisites, or null when usable. Use it in boot logs and health endpoints.
 
 ## Payment Drivers (provider-neutral)
 
@@ -35,6 +35,7 @@ Nothing throws at import, by design, so an app missing the SDK starts clean and 
 - The Stripe driver delegates to the existing billable modules, so idempotency keys and `stripe_id` handling are unchanged.
 - Webhook route: the `payments` default route bundle (mounted with the `commerce` feature) serves `POST /webhooks/payments` through `orders.receivePaymentWebhook(request)`: 401 `missing-config` while the driver's secret is unset (`WebhookNotConfiguredError`), 400 `invalid-signature` (`WebhookSignatureError`), otherwise applies the events and answers with `acknowledgeWebhook()`.
 - Commerce: `orders.handleCommercePaymentEvent(event)` from `@stacksjs/commerce` applies `payment.succeeded` / `payment.failed` (reason into `payments.failure_reason`) / `refund.succeeded` (added to `refund_amount`; `refunded` + order REFUNDED only when it covers the payment, else `partiallyRefunded`) to the order, deduplicated in `payment_webhook_events` (the `PaymentWebhookEvent` model) in the same transaction.
+- Licensing: the same webhook calls `licensing.handleLicensePaymentEvent(event)`. A checkout whose `reference` is `licensing.licensePurchaseReference({ tier })` is issued a license once when it is paid, on any driver, and a refund of that payment revokes it. See `stacks-licensing`.
 - The Payment facade's neutral functions go through this driver; its Stripe-only functions and everything Stripe-level below return Stripe objects.
 
 ## Key Paths

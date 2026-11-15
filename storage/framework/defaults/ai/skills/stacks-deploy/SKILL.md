@@ -209,7 +209,14 @@ buddy cloud --diff            # preview infrastructure changes before deploying
 buddy cloud --ssh             # SSH into deployed server
 buddy cloud:remove            # tear down infrastructure (alias: undeploy)
 buddy cloud:cleanup           # clean retained resources
+buddy cloud:targets --json    # each deployed site: host, SSH user and key, app path, env file
 ```
+
+`cloud:targets` is read-only and answers "where does this app run, and how do I
+get a shell in it?" from the stack's pinned state plus at most one provider
+listing (`--no-remote` skips the listing). It is what a tool that opens a
+session in a deployed app starts from, instead of asking for a host and a path.
+It needs `@stacksjs/ts-cloud` 0.16.126 or newer and says so on an older one.
 
 ## Gotchas
 - The API reachability guard recognises `serve:api`, source `serve/api.js`
@@ -249,3 +256,20 @@ installed file's shape rather than moving tsCloud settings into an unrelated
 flat object. A cloud SQS queue definition does not implement QUEUE_DRIVER=sqs
 in the Stacks queue package. Previews, destructive removal, secret writes and
 provider mutations need the user's existing task authorization.
+
+## Projects with multiple runtimes
+
+Keep an application's models, routes and cloud configuration in its own top-level
+project. An attached app owns its website and API and deploys from its own repo;
+the compute host must not check out or publish tenant source. Use `cloud.attachTo`
+with an independent project slug.
+
+`buddy deploy --prod --env-file .env.web` selects only the web runtime's env file
+and its scoped decryption key. It never falls back to the native signing file.
+Use `database.models.include` and `security.api.models` to scope hosted schema and
+APIs, keeping local native models in their explicit native registry.
+
+For an intentional hostname handoff, the old owner removes its site and runs
+`buddy deploy --prod --retire-domains old.example.com`. This operator input retires
+omitted names without committing tenant names to the host's config. It cannot
+retire a domain the configuration still declares.

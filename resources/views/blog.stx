@@ -50,7 +50,7 @@
       </div>
 
       <div class="grid gap-3 place-items-center px-6 py-16 text-center" x-show="showEmpty()">
-        <span class="grid place-items-center h-12 w-12 text-muted text-xl bg-panel-2 rounded-2xl i-hugeicons-quill-write-02" aria-hidden="true"></span>
+        <span class="grid place-items-center h-12 w-12 text-muted text-xl bg-panel-2 rounded-2xl" aria-hidden="true"><span class="i-hugeicons-quill-write-02"></span></span>
         <div>
           <h2 class="m-0 font-bold text-base text-ink">Your first article starts in Composer</h2>
           <p class="m-0 mt-1 max-w-md text-muted text-sm">Choose Blog as a channel, add a title, and publish. It will appear here without leaving the app shell.</p>

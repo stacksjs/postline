@@ -49,7 +49,7 @@
         </div>
 
         <div class="grid gap-3 place-items-center px-6 py-20 text-center" x-show="showEmpty()">
-          <span class="grid place-items-center h-14 w-14 text-2xl text-blue-700 bg-blue-50 rounded-2xl i-hugeicons-compass" aria-hidden="true"></span>
+          <span class="grid place-items-center h-14 w-14 text-2xl text-blue-700 bg-blue-50 rounded-2xl" aria-hidden="true"><span class="i-hugeicons-compass"></span></span>
           <div>
             <h2 class="m-0 font-bold text-base text-ink" :text="form() === 'long' ? 'No essays yet' : 'No posts yet'"></h2>
             <p class="m-0 mt-1 max-w-md text-muted text-sm" :text="form() === 'long' ? 'Long-form entries appear here when a listed publication publishes to its blog.' : 'Short-form entries appear here when a listed publication posts to The Open Times from the composer.'"></p>
