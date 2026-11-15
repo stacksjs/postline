@@ -11,7 +11,7 @@ export interface LinkedInStatusPayload {
 }
 
 export async function fetchLinkedInStatus(): Promise<LinkedInStatusPayload> {
-  const response = await fetch('/api/ot/linkedin/status')
+  const response = await fetch('/api/postline/linkedin/status')
   const payload = await response.json()
   if (!response.ok || !payload.ok) {
     throw new Error(payload.error || 'Could not load LinkedIn status.')
@@ -30,14 +30,14 @@ export function formatLinkedInConnectionLabel(status: LinkedInStatusPayload): st
 
 declare global {
   interface Window {
-    opentimesLinkedin?: {
+    postlineLinkedin?: {
       fetchStatus: typeof fetchLinkedInStatus
       formatConnectionLabel: typeof formatLinkedInConnectionLabel
     }
   }
 }
 
-window.opentimesLinkedin = {
+window.postlineLinkedin = {
   fetchStatus: fetchLinkedInStatus,
   formatConnectionLabel: formatLinkedInConnectionLabel,
 }

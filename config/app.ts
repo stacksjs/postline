@@ -10,8 +10,8 @@ import { env } from '@stacksjs/env'
  * you have any questions, feel free to reach out via Discord or GitHub Discussions.
  */
 export default {
-  name: env.APP_NAME ?? 'The Open Times',
-  description: 'An independent newspaper you own — write it, send it, syndicate it, and keep the list.',
+  name: env.APP_NAME ?? 'Postline',
+  description: 'Compose once and publish to every network — queue, campaigns, analytics, listening and one inbox.',
   env: env.APP_ENV ?? 'local',
   /**
    * `APP_URL` is the dev host; deployed environments set it to the canonical

@@ -69,7 +69,7 @@ describe('retention settings', () => {
   })
 
   test('by default a schedule touches the social networks, never the publication', () => {
-    expect(DEFAULT_RETENTION_PROVIDERS).not.toContain('opentimes')
+    expect(DEFAULT_RETENTION_PROVIDERS).not.toContain('postline')
     expect(DEFAULT_RETENTION_PROVIDERS).toEqual(['bluesky', 'twitter', 'mastodon', 'linkedin'])
   })
 })

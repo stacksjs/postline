@@ -14,7 +14,7 @@ export default new Job({
     try {
       const result = await directMessages.sync()
       if (result.messages)
-        console.log(`[opentimes] dm sync: ${result.messages} new messages across ${result.conversations} conversations`)
+        console.log(`[postline] dm sync: ${result.messages} new messages across ${result.conversations} conversations`)
       return result
     }
     catch (error) {

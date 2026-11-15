@@ -1,9 +1,9 @@
 @extends('layouts/default')
 
-@section('title', 'The Open Times - Sign in')
+@section('title', 'Postline - Sign in')
 
 @section('content')
-  @meta('description', 'Sign in to your Open Times workspace.')
+  @meta('description', 'Sign in to your Postline workspace.')
   {{-- The theme bootstrap that used to live here is now `app.colorMode` in
       config/ui.ts, so this page gets the same pre-paint stamp as every layout
       without carrying its own copy. stacksjs/stx#1788, the reason it was
@@ -12,13 +12,13 @@
     <section class="grid gap-5 p-6 max-w-sm w-full bg-panel border border-line rounded-2xl shadow-sm">
       <header class="grid gap-2 justify-items-center text-center">
         {{--
-          The nameplate initials between two rules — the same mark as the
+          The initial between two rules — the same mark as the
           favicon. Set in the serif rather than the blackletter face: at 11
           units the display face is legible where Unifraktur is a blot.
         --}}
-        <span class="grid place-items-center px-3 py-1 font-bold text-ink text-lg tracking-widest border-ink border-y-2" aria-hidden="true">OT</span>
-        <h1 class="m-0 font-bold text-[20px] text-ink" :text="heading()">Sign in to The Open Times</h1>
-        <p class="m-0 text-[13px] text-muted" :text="subtitle()">The newsroom behind your paper.</p>
+        <span class="grid place-items-center px-3 py-1 font-bold text-ink text-lg tracking-widest border-ink border-y-2" aria-hidden="true">P</span>
+        <h1 class="m-0 font-bold text-[20px] text-ink" :text="heading()">Sign in to Postline</h1>
+        <p class="m-0 text-[13px] text-muted" :text="subtitle()">Compose once, publish everywhere.</p>
       </header>
 
       <form class="grid gap-3" @submit.prevent="onSubmit">
@@ -60,10 +60,10 @@
     const password = state('')
     const confirmPassword = state('')
 
-    const heading = derived(() => registering() ? 'Set up the newsroom' : 'Sign in to The Open Times')
+    const heading = derived(() => registering() ? 'Set up Postline' : 'Sign in to Postline')
     const subtitle = derived(() => registering()
-      ? 'One account owns this edition.'
-      : 'The newsroom behind your paper.')
+      ? 'One account owns this workspace.'
+      : 'Compose once, publish everywhere.')
     const submitLabel = derived(() => registering() ? 'Create account' : 'Sign in')
     const toggleLabel = derived(() => registering()
       ? 'Already set up? Sign in instead'
@@ -100,7 +100,7 @@
      */
     const enterApp = (expiresIn?: number | string | null): void => {
       const maxAge = Number(expiresIn) > 0 ? Number(expiresIn) : 60 * 60 * 24 * 30
-      useCookie('ot-signed-in', { maxAge }).set('1')
+      useCookie('postline-signed-in', { maxAge }).set('1')
       // stx-strict-ignore-next-line location.assign
       location.assign('/composer')
     }

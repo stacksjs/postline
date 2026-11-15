@@ -12,7 +12,7 @@ export interface ThreadsStatusPayload {
 }
 
 export async function fetchThreadsStatus(): Promise<ThreadsStatusPayload> {
-  const response = await fetch('/api/ot/threads/status')
+  const response = await fetch('/api/postline/threads/status')
   const payload = await response.json()
   if (!response.ok || !payload.ok) {
     throw new Error(payload.error || 'Could not load Threads status.')
@@ -30,14 +30,14 @@ export function formatThreadsConnectionLabel(status: ThreadsStatusPayload): stri
 
 declare global {
   interface Window {
-    opentimesThreads?: {
+    postlineThreads?: {
       fetchStatus: typeof fetchThreadsStatus
       formatConnectionLabel: typeof formatThreadsConnectionLabel
     }
   }
 }
 
-window.opentimesThreads = {
+window.postlineThreads = {
   fetchStatus: fetchThreadsStatus,
   formatConnectionLabel: formatThreadsConnectionLabel,
 }

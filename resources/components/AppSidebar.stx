@@ -32,8 +32,8 @@ const settingsActive = currentPath === '/accounts' || currentPath === '/settings
 
 <template>
   <div class="contents">
-  <nav class="flex lg:hidden overflow-x-auto sticky top-0 z-50 gap-1.5 items-center px-3 py-2 bg-bg border-b border-line" aria-label="Primary" data-ot-mobile-nav>
-    <span class="grid place-items-center shrink-0 mr-1 px-1.5 h-8 font-bold text-[13px] text-ink tracking-widest border-ink border-y-2" aria-hidden="true">OT</span>
+  <nav class="flex lg:hidden overflow-x-auto sticky top-0 z-50 gap-1.5 items-center px-3 py-2 bg-bg border-b border-line" aria-label="Primary" data-postline-mobile-nav>
+    <span class="grid place-items-center shrink-0 mr-1 px-1.5 h-8 font-bold text-[13px] text-ink tracking-widest border-ink border-y-2" aria-hidden="true">P</span>
     @foreach (navLinks as link)
       <a
         href="{{ link.href }}"
@@ -62,7 +62,7 @@ const settingsActive = currentPath === '/accounts' || currentPath === '/settings
     </a>
   </nav>
 
-  <aside class="hidden lg:flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[68px] px-5 h-screen min-w-0 bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-200 ease-out transition-[width,padding]" aria-label="The Open Times" data-ot-sidebar data-window-drag-region>
+  <aside class="hidden lg:flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[68px] px-5 h-screen min-w-0 bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-200 ease-out transition-[width,padding]" aria-label="Postline" data-postline-sidebar data-window-drag-region>
     <div class="absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_45%,rgba(226,226,222,0.16)_100%)] pointer-events-none"></div>
     <div class="flex absolute right-5 top-3.5 z-20 items-center min-h-7" data-shell-controls-row>
       <div class="flex gap-1.5 items-center">
@@ -85,15 +85,15 @@ const settingsActive = currentPath === '/accounts' || currentPath === '/settings
       data-stx-exact-active-class="text-ink"
       data-sidebar-collapsible-content="true"
       data-no-window-drag
-      aria-label="The Open Times composer"
+      aria-label="Postline composer"
     >
-      {{-- The nameplate initials between rules — the mark used by the favicon
+      {{-- The initial between rules — the mark used by the favicon
           and the sign-in page, so the three agree. --}}
-      <span class="grid place-items-center px-1.5 h-9 font-bold text-ink text-sm tracking-widest border-ink border-y-2">OT</span>
-      <span class="font-semibold text-[15px]" data-sidebar-expanded>The Open Times</span>
+      <span class="grid place-items-center px-1.5 h-9 font-bold text-ink text-sm tracking-widest border-ink border-y-2">P</span>
+      <span class="font-semibold text-[15px]" data-sidebar-expanded>Postline</span>
     </a>
 
-    <nav class="grid relative z-10 gap-1" aria-label="Primary" data-stx-nav data-testid="opentimes-nav" data-sidebar-collapsible-content="true">
+    <nav class="grid relative z-10 gap-1" aria-label="Primary" data-stx-nav data-testid="postline-nav" data-sidebar-collapsible-content="true">
       @foreach (navLinks as link)
         <a
           href="{{ link.href }}"

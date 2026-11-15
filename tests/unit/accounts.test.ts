@@ -20,7 +20,7 @@ import { dedupeTargets, parseTarget, parseTargets, resolveTargets, targetKey, ta
  * here: it lives in `publishThread`, which writes a `posts` row per segment.
  */
 
-const AVAILABLE = ['opentimes', 'bluesky', 'twitter', 'linkedin', 'instagram', 'threads', 'mastodon', 'blog']
+const AVAILABLE = ['postline', 'bluesky', 'twitter', 'linkedin', 'instagram', 'threads', 'mastodon', 'blog']
 
 describe('target specs', () => {
   test('a bare network name means the default account', () => {
@@ -49,7 +49,7 @@ describe('target specs', () => {
 
   test('our own targets have no accounts, so an id on them is dropped', () => {
     expect(parseTarget('blog:4', AVAILABLE)).toEqual({ provider: 'blog', identityId: null })
-    expect(parseTarget('opentimes:9', AVAILABLE)).toEqual({ provider: 'opentimes', identityId: null })
+    expect(parseTarget('postline:9', AVAILABLE)).toEqual({ provider: 'postline', identityId: null })
   })
 
   test('accepts parsed objects as well as strings', () => {

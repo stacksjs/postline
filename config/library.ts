@@ -15,7 +15,7 @@ export default {
   author: 'Chris Breuer',
   contributors: ['Chris Breuer <chris@stacksjs.com>'],
   defaultLanguage: 'en',
-  // The Open Times is an app, not a library: a release ships the desktop app
+  // Postline is an app, not a library: a release ships the desktop app
   // (release.yml), not the scaffold packages below. Leaving this on made
   // `bun run release:patch` try to build them as npm packages, and fail.
   releaseable: false,

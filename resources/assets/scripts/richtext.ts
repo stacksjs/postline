@@ -49,7 +49,7 @@ function markdownToHtml(markdown: string): string {
 }
 
 function setupRichText(): void {
-  const root = document.querySelector('[data-ot-page="composer"]')
+  const root = document.querySelector('[data-postline-page="composer"]')
   if (!root) return
 
   const textarea = root.querySelector<HTMLTextAreaElement>('[data-bluesky-text]')

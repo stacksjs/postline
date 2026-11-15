@@ -301,7 +301,7 @@ export class TwitterService {
   async dmIdentity(identityId?: number | null): Promise<{ identityId: number, accessToken: string, userId: string, handle: string }> {
     const identity = await this.requireIdentity(identityId)
     if (!identity.external_id)
-      throw new Error('Reconnect X on the Accounts page — The Open Times needs your user id to tell your own replies apart.')
+      throw new Error('Reconnect X on the Accounts page — Postline needs your user id to tell your own replies apart.')
 
     return {
       identityId: Number(identity.id),

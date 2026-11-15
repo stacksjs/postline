@@ -2,7 +2,7 @@ import type { CrosswindOptions } from '@cwcss/crosswind'
 import { defaultConfig } from '@cwcss/crosswind'
 
 /**
- * Crosswind config — the single source of truth for The Open Times' design tokens
+ * Crosswind config — the single source of truth for Postline's design tokens
  * and for every rule a utility class cannot express.
  *
  * WHY EVERYTHING LIVES HERE
@@ -15,7 +15,7 @@ import { defaultConfig } from '@cwcss/crosswind'
  *     `[data-crosswind]` on navigation, but the ENTRY page's server-rendered
  *     block carries no `data-stx-page` and is never removed. Two pages that
  *     each shipped a `:root` block therefore ended up with both live at once,
- *     fighting. The Open Times had exactly that: the app layout declared
+ *     fighting. Postline had exactly that: the app layout declared
  *     `--bg: #f3f3f1` and the marketing layout `--bg: #f4f4f2`.
  *  3. Tokens declared per-file drift. There were four blocks across four files.
  *
@@ -41,7 +41,7 @@ import { defaultConfig } from '@cwcss/crosswind'
  */
 
 /**
- * THE OPEN TIMES — an old-newspaper identity, expressed as tokens.
+ * POSTLINE — a warm, print-inspired identity, expressed as tokens.
  *
  * The palette is a print palette, not a screen one: paper stock, ink, and one
  * spot colour. Nothing here is a neutral grey — every surface is warm, because
@@ -180,15 +180,15 @@ const DARK_OVERRIDES: string = `
 .dark input::placeholder, .dark textarea::placeholder { color: #71717a; }
 .dark code { background-color: #26262a; color: #e4e4e7; }
 
-.dark [data-ot-content-shell],
-.dark [data-ot-workspace],
-.dark [data-ot-sidebar] { background-color: #0a0a0c; }
-.dark [data-ot-workspace] {
+.dark [data-postline-content-shell],
+.dark [data-postline-workspace],
+.dark [data-postline-sidebar] { background-color: #0a0a0c; }
+.dark [data-postline-workspace] {
   border-color: #2a2a2e;
   box-shadow: -10px 0 36px rgba(0, 0, 0, 0.4);
 }
-.dark [data-ot-sidebar] { background-color: rgba(24, 24, 27, 0.5); }
-.dark [data-ot-sidebar] > .absolute { opacity: 0.35; }
+.dark [data-postline-sidebar] { background-color: rgba(24, 24, 27, 0.5); }
+.dark [data-postline-sidebar] > .absolute { opacity: 0.35; }
 
 .dark .bg-\\[\\#e8e8e6\\]\\/90 { background-color: rgba(63, 63, 70, 0.6); }
 .dark .bg-white\\/95 { background-color: rgba(39, 39, 42, 0.95); }
@@ -210,14 +210,14 @@ const DARK_OVERRIDES: string = `
 
 /** App shell: sidebar collapse animation, native-window chrome, focus rings. */
 const APP_SHELL: string = `
-@property --ot-sidebar-width {
+@property --postline-sidebar-width {
   syntax: '<length>';
   inherits: true;
   initial-value: 286px;
 }
 
-[data-ot-shell] {
-  transition-property: --ot-sidebar-width;
+[data-postline-shell] {
+  transition-property: --postline-sidebar-width;
   transition-duration: 220ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -227,30 +227,30 @@ html.has-native-sidebar body {
   background: transparent !important;
 }
 
-html.has-native-sidebar [data-ot-sidebar] {
+html.has-native-sidebar [data-postline-sidebar] {
   background-color: rgba(246, 246, 244, 0.18) !important;
   -webkit-backdrop-filter: blur(24px) saturate(1.08);
   backdrop-filter: blur(24px) saturate(1.08);
 }
 
-html.ot-sidebar-collapsed [data-ot-content-shell],
-html.has-native-sidebar [data-ot-content-shell],
-html.has-native-sidebar [data-ot-workspace] {
+html.postline-sidebar-collapsed [data-postline-content-shell],
+html.has-native-sidebar [data-postline-content-shell],
+html.has-native-sidebar [data-postline-workspace] {
   background: #f3f3f1 !important;
 }
 
-html.ot-sidebar-collapsed [data-ot-workspace] {
+html.postline-sidebar-collapsed [data-postline-workspace] {
   border-top-left-radius: 0 !important;
   border-left-color: transparent !important;
   box-shadow: none !important;
 }
 
-html.ot-sidebar-collapsed [data-ot-sidebar] {
+html.postline-sidebar-collapsed [data-postline-sidebar] {
   overflow: visible;
   pointer-events: none;
 }
 
-html.ot-sidebar-collapsed [data-shell-controls-row] {
+html.postline-sidebar-collapsed [data-shell-controls-row] {
   display: none !important;
 }
 
@@ -263,7 +263,7 @@ html.ot-sidebar-collapsed [data-shell-controls-row] {
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-html.ot-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fab] {
+html.postline-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fab] {
   opacity: 1;
   transform: translate3d(0, 0, 0) scale(1);
   pointer-events: auto;
@@ -272,37 +272,37 @@ html.ot-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fab] {
 @media (max-width: 1023px) {
   [data-sidebar-expand-fab] { display: none; }
 
-  [data-ot-mobile-nav] {
+  [data-postline-mobile-nav] {
     scrollbar-width: none;
     -ms-overflow-style: none;
     -webkit-mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 28px), transparent);
     mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 28px), transparent);
   }
 
-  [data-ot-mobile-nav]::-webkit-scrollbar { display: none; }
+  [data-postline-mobile-nav]::-webkit-scrollbar { display: none; }
 }
 
-[data-ot-app] :is(a, button, [role='button']):focus-visible {
+[data-postline-app] :is(a, button, [role='button']):focus-visible {
   outline: 2px solid rgb(82 82 91 / 0.6);
   outline-offset: 2px;
 }
 
-html.dark.has-native-sidebar [data-ot-content-shell],
-html.dark.has-native-sidebar [data-ot-workspace] {
+html.dark.has-native-sidebar [data-postline-content-shell],
+html.dark.has-native-sidebar [data-postline-workspace] {
   background: #0a0a0c !important;
 }
 `
 
 /** Shared product UI rhythm: one radius scale, one surface language, and compact pages. */
 const APP_UI: string = `
-[data-ot-router] { width: 100%; }
+[data-postline-router] { width: 100%; }
 
-[data-ot-page] {
+[data-postline-page] {
   width: min(100%, 96rem);
   margin-inline: auto;
 }
 
-[data-ot-page] > header:first-child {
+[data-postline-page] > header:first-child {
   min-height: 72px;
   padding: 5px 2px 7px;
 }
@@ -313,7 +313,7 @@ const APP_UI: string = `
   controls stay in the UI sans: this surface is read in short bursts at small
   sizes, where a book serif costs legibility for atmosphere.
 */
-[data-ot-page] > header:first-child h1 {
+[data-postline-page] > header:first-child h1 {
   font-family: var(--font-display);
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -321,36 +321,36 @@ const APP_UI: string = `
 }
 
 /* Section eyebrows and meta rows across the workspace, matching the front page. */
-[data-ot-page] .kicker,
-[data-ot-page] .folio,
-[data-ot-page] .byline { font-family: var(--font-label); }
+[data-postline-page] .kicker,
+[data-postline-page] .folio,
+[data-postline-page] .byline { font-family: var(--font-label); }
 
-[data-ot-page] .rounded-2xl { border-radius: 14px; }
-[data-ot-page] .rounded-xl { border-radius: 10px; }
-[data-ot-page] .rounded-lg { border-radius: 8px; }
+[data-postline-page] .rounded-2xl { border-radius: 14px; }
+[data-postline-page] .rounded-xl { border-radius: 10px; }
+[data-postline-page] .rounded-lg { border-radius: 8px; }
 
-[data-ot-page] .shadow-sm {
+[data-postline-page] .shadow-sm {
   box-shadow: 0 1px 2px rgb(24 24 27 / 0.035), 0 8px 24px rgb(24 24 27 / 0.025);
 }
 
-[data-ot-page] :is(a, button, summary) {
+[data-postline-page] :is(a, button, summary) {
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-[data-ot-page] :is(button, summary):active,
-[data-ot-page] a:active { transform: translateY(1px); }
+[data-postline-page] :is(button, summary):active,
+[data-postline-page] a:active { transform: translateY(1px); }
 
-[data-ot-page] :is(input, textarea, select) { border-radius: 10px; }
+[data-postline-page] :is(input, textarea, select) { border-radius: 10px; }
 
 .dark .bg-white { background-color: var(--panel); }
 .dark .hover\:bg-white:hover { background-color: var(--panel-3); }
 
 @media (max-width: 640px) {
-  [data-ot-router] { padding: 12px; }
-  [data-ot-page] { gap: 12px; }
-  [data-ot-page] > header:first-child { min-height: auto; padding: 2px 1px 5px; }
-  [data-ot-page] > header:first-child h1 { font-size: 21px; }
+  [data-postline-router] { padding: 12px; }
+  [data-postline-page] { gap: 12px; }
+  [data-postline-page] > header:first-child { min-height: auto; padding: 2px 1px 5px; }
+  [data-postline-page] > header:first-child h1 { font-size: 21px; }
 }
 `
 

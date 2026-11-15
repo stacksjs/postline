@@ -239,7 +239,7 @@ export class MastodonService {
   async dmIdentity(identityId?: number | null): Promise<{ identityId: number, instance: string, accessToken: string, handle: string }> {
     const identity = await this.requireIdentity(identityId)
     if (!identity.external_id)
-      throw new Error('Reconnect Mastodon on the Accounts page — The Open Times needs your instance URL.')
+      throw new Error('Reconnect Mastodon on the Accounts page — Postline needs your instance URL.')
 
     return {
       identityId: Number(identity.id),

@@ -11,5 +11,5 @@
   <rect x="220" y="330" width="584" height="8" fill="#17130f"/>
   <rect x="220" y="686" width="584" height="8" fill="#17130f"/>
   <rect x="220" y="708" width="584" height="34" fill="#17130f"/>
-  <text x="512" y="638" font-family="Georgia, 'Times New Roman', serif" font-size="330" font-weight="700" fill="#17130f" text-anchor="middle" letter-spacing="10">OT</text>
+  <text x="512" y="638" font-family="Georgia, 'Times New Roman', serif" font-size="330" font-weight="700" fill="#17130f" text-anchor="middle" letter-spacing="0">P</text>
 </svg>

@@ -1,7 +1,7 @@
 /**
  * The broadcast server process.
  *
- * The Open Times' realtime surfaces (the Discover feeds, comment threads) publish
+ * Postline's realtime surfaces (the Discover feeds, comment threads) publish
  * through `@stacksjs/realtime`, which is the framework's integration over
  * ts-broadcasting. Publishing is a no-op until a server exists to publish
  * *to*: `emit` warns and returns when none is running, which is the right
@@ -47,7 +47,7 @@ const redis = relayEnabled
       host: String(process.env.REDIS_HOST || 'localhost'),
       port: Number(process.env.REDIS_PORT || 6379),
       password: String(process.env.REDIS_PASSWORD || '') || undefined,
-      keyPrefix: String(process.env.BROADCAST_REDIS_PREFIX || 'opentimes:realtime:'),
+      keyPrefix: String(process.env.BROADCAST_REDIS_PREFIX || 'postline:realtime:'),
     }
   : undefined
 
@@ -80,7 +80,7 @@ const server = await createServer({
 setServer(server)
 
 // eslint-disable-next-line no-console
-console.log(`[opentimes] broadcast server listening on ${host}:${port}${relayEnabled ? ' (redis relay on)' : ''}`)
+console.log(`[postline] broadcast server listening on ${host}:${port}${relayEnabled ? ' (redis relay on)' : ''}`)
 
 /**
  * Shut down cleanly so systemd's restart does not leave sockets in TIME_WAIT
@@ -89,7 +89,7 @@ console.log(`[opentimes] broadcast server listening on ${host}:${port}${relayEna
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     // eslint-disable-next-line no-console
-    console.log(`[opentimes] broadcast server stopping (${signal})`)
+    console.log(`[postline] broadcast server stopping (${signal})`)
     process.exit(0)
   })
 }

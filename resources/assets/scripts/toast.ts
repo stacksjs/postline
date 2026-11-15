@@ -1,9 +1,9 @@
-export type OpenTimesToastTone = 'neutral' | 'success' | 'error' | 'info'
+export type PostlineToastTone = 'neutral' | 'success' | 'error' | 'info'
 
-export interface OpenTimesToastOptions {
+export interface PostlineToastOptions {
   title?: string
   message: string
-  tone?: OpenTimesToastTone
+  tone?: PostlineToastTone
   url?: string
   durationMs?: number
   /** Replaces an existing toast with this id (e.g. dismiss "Publishing" on success). */
@@ -12,21 +12,21 @@ export interface OpenTimesToastOptions {
   dedupeMs?: number
 }
 
-const ICONS: Record<OpenTimesToastTone, string> = {
+const ICONS: Record<PostlineToastTone, string> = {
   success: `<svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd"/></svg>`,
   error: `<svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-8-3a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 10 7Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clip-rule="evenodd"/></svg>`,
   info: `<svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path fill-rule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Zm-7-4a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM9 9a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 9 9Z" clip-rule="evenodd"/></svg>`,
   neutral: `<svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20" aria-hidden="true"><path d="M10 2a6 6 0 0 0-6 6v3.586l-.707.707A1 1 0 0 0 4 14h12a1 1 0 0 0 .707-1.707L16 11.586V8a6 6 0 0 0-6-6Zm0 16a2 2 0 0 0 1.995-1.85L12 16h-4l.005.15A2 2 0 0 0 10 18Z"/></svg>`,
 }
 
-const SPINNER = `<svg class="ot-toast__spinner" viewBox="0 0 20 20" fill="none" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="2" stroke-opacity="0.25"/><path d="M17 10a7 7 0 0 0-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`
+const SPINNER = `<svg class="postline-toast__spinner" viewBox="0 0 20 20" fill="none" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="2" stroke-opacity="0.25"/><path d="M17 10a7 7 0 0 0-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`
 
 const toastRegistry = new Map<string, HTMLElement>()
 const recentToasts = new Map<string, number>()
 let stylesheetLinked = false
-const RECENT_TOASTS_KEY = 'opentimes.toast.recent'
+const RECENT_TOASTS_KEY = 'postline.toast.recent'
 
-function toastFingerprint(options: OpenTimesToastOptions, tone: OpenTimesToastTone, title: string): string {
+function toastFingerprint(options: PostlineToastOptions, tone: PostlineToastTone, title: string): string {
   return [tone, title, options.message, options.url || ''].join('\u001f')
 }
 
@@ -68,10 +68,10 @@ function ensureStyles(): void {
 }
 
 function host(): HTMLElement {
-  let element = document.getElementById('ot-toast-host')
+  let element = document.getElementById('postline-toast-host')
   if (!element) {
     element = document.createElement('div')
-    element.id = 'ot-toast-host'
+    element.id = 'postline-toast-host'
     element.className = 'flex bottom-6 fixed right-6 z-[100] sm:right-6 flex-col-reverse gap-2.5 max-w-[22rem] w-[calc(100%-2rem)] pointer-events-none'
     element.setAttribute('aria-live', 'polite')
     element.setAttribute('aria-relevant', 'additions')
@@ -113,11 +113,11 @@ function dismissToastById(id: string): void {
   if (existing) dismissToast(existing, id)
 }
 
-export function showOpenTimesToast(options: OpenTimesToastOptions): void {
+export function showPostlineToast(options: PostlineToastOptions): void {
   ensureStyles()
 
   const tone = options.tone ?? 'neutral'
-  const title = options.title ?? (tone === 'success' ? 'Published' : tone === 'error' ? 'Error' : tone === 'info' ? 'Working' : 'The Open Times')
+  const title = options.title ?? (tone === 'success' ? 'Published' : tone === 'error' ? 'Error' : tone === 'info' ? 'Working' : 'Postline')
   const dedupeMs = options.dedupeMs ?? (tone === 'success' ? 6000 : 2000)
   if (wasRecentlyShown(toastFingerprint(options, tone, title), dedupeMs)) return
 
@@ -126,23 +126,23 @@ export function showOpenTimesToast(options: OpenTimesToastOptions): void {
   const isLoading = tone === 'info' && /publish/i.test(title)
 
   const toast = document.createElement('div')
-  toast.className = `ot-toast ot-toast--${tone}`
+  toast.className = `postline-toast postline-toast--${tone}`
   toast.setAttribute('role', 'status')
 
   const iconMarkup = isLoading ? SPINNER : ICONS[tone]
 
   const bodyMarkup = options.url
-    ? `<p class="ot-toast__message">${escapeHtml(options.message)}</p>
-      <a class="ot-toast__url" href="${escapeHtml(options.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(options.url)}">${escapeHtml(formatUrlLabel(options.url))}</a>`
-    : `<p class="ot-toast__message">${escapeHtml(options.message)}</p>`
+    ? `<p class="postline-toast__message">${escapeHtml(options.message)}</p>
+      <a class="postline-toast__url" href="${escapeHtml(options.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(options.url)}">${escapeHtml(formatUrlLabel(options.url))}</a>`
+    : `<p class="postline-toast__message">${escapeHtml(options.message)}</p>`
 
   toast.innerHTML = `
-    <div class="ot-toast__row">
-      <div class="ot-toast__icon">${iconMarkup}</div>
-      <div class="ot-toast__body">
-        <div class="ot-toast__header">
-          <strong class="ot-toast__title">${escapeHtml(title)}</strong>
-          <button type="button" class="ot-toast__close" aria-label="Dismiss" data-toast-dismiss>
+    <div class="postline-toast__row">
+      <div class="postline-toast__icon">${iconMarkup}</div>
+      <div class="postline-toast__body">
+        <div class="postline-toast__header">
+          <strong class="postline-toast__title">${escapeHtml(title)}</strong>
+          <button type="button" class="postline-toast__close" aria-label="Dismiss" data-toast-dismiss>
             <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>
           </button>
         </div>
@@ -150,9 +150,9 @@ export function showOpenTimesToast(options: OpenTimesToastOptions): void {
       </div>
     </div>
     ${options.url
-      ? `<div class="ot-toast__actions">
-          <a class="ot-toast__btn ot-toast__btn--primary" href="${escapeHtml(options.url)}" target="_blank" rel="noopener noreferrer">Open on Bluesky</a>
-          <button type="button" class="ot-toast__btn ot-toast__btn--secondary" data-toast-copy>Copy link</button>
+      ? `<div class="postline-toast__actions">
+          <a class="postline-toast__btn postline-toast__btn--primary" href="${escapeHtml(options.url)}" target="_blank" rel="noopener noreferrer">Open on Bluesky</a>
+          <button type="button" class="postline-toast__btn postline-toast__btn--secondary" data-toast-copy>Copy link</button>
         </div>`
       : ''}
   `
@@ -162,10 +162,10 @@ export function showOpenTimesToast(options: OpenTimesToastOptions): void {
     if (!options.url) return
     try {
       await navigator.clipboard.writeText(options.url)
-      showOpenTimesToast({ title: 'Copied', message: 'Link copied to clipboard.', tone: 'success', durationMs: 2800 })
+      showPostlineToast({ title: 'Copied', message: 'Link copied to clipboard.', tone: 'success', durationMs: 2800 })
     }
     catch {
-      showOpenTimesToast({ title: 'Copy failed', message: 'Could not copy the link.', tone: 'error', durationMs: 5000 })
+      showPostlineToast({ title: 'Copy failed', message: 'Could not copy the link.', tone: 'error', durationMs: 5000 })
     }
   })
 
@@ -183,11 +183,11 @@ export function showOpenTimesToast(options: OpenTimesToastOptions): void {
 
 declare global {
   interface Window {
-    opentimesToast?: {
-      show: typeof showOpenTimesToast
+    postlineToast?: {
+      show: typeof showPostlineToast
       dismiss: typeof dismissToastById
     }
   }
 }
 
-window.opentimesToast = { show: showOpenTimesToast, dismiss: dismissToastById }
+window.postlineToast = { show: showPostlineToast, dismiss: dismissToastById }

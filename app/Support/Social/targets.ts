@@ -20,7 +20,7 @@ import type { SocialProvider } from './types'
  */
 
 /**
- * Networks whose targets name an account. The Open Times and the blog are ours,
+ * Networks whose targets name an account. Postline and the blog are ours,
  * so they have no `social_identities` row and an account id on them means
  * nothing — it is dropped rather than rejected.
  */

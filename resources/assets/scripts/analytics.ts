@@ -43,7 +43,7 @@ interface AnalyticsPayload {
   windows: Array<{ hour: number, count: number }>
 }
 
-// Populated from /api/ot/analytics before the chart renders.
+// Populated from /api/postline/analytics before the chart renders.
 let points: Point[] = []
 let analyticsPromise: Promise<AnalyticsPayload | null> | null = null
 
@@ -351,7 +351,7 @@ function showAnalyticsError(message: string): void {
 
 async function loadAnalytics(): Promise<void> {
   if (!analyticsPromise) {
-    analyticsPromise = fetch('/api/ot/analytics')
+    analyticsPromise = fetch('/api/postline/analytics')
       .then(async (response) => {
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load analytics.')

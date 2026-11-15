@@ -41,7 +41,7 @@ function redisConfig() {
     host: String(env.REDIS_HOST || 'localhost'),
     port: Number(env.REDIS_PORT || 6379),
     password: String(env.REDIS_PASSWORD || '') || undefined,
-    keyPrefix: String(env.BROADCAST_REDIS_PREFIX || 'opentimes:realtime:'),
+    keyPrefix: String(env.BROADCAST_REDIS_PREFIX || 'postline:realtime:'),
   }
 }
 
@@ -67,7 +67,7 @@ async function adapter(): Promise<RedisAdapterType | null> {
       return instance
     }
     catch (error) {
-      console.warn(`[opentimes] realtime relay unavailable, falling back to in-process: ${error instanceof Error ? error.message : String(error)}`)
+      console.warn(`[postline] realtime relay unavailable, falling back to in-process: ${error instanceof Error ? error.message : String(error)}`)
 
       return null
     }
@@ -96,7 +96,7 @@ export async function publish(channel: string, event: string, data: unknown): Pr
     emit(channel, event, data)
   }
   catch (error) {
-    console.warn(`[opentimes] realtime publish failed for ${channel}/${event}: ${error instanceof Error ? error.message : String(error)}`)
+    console.warn(`[postline] realtime publish failed for ${channel}/${event}: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 

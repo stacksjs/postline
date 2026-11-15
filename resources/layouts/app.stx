@@ -31,7 +31,7 @@
       // credential: the API decides what a request may do, and the wrapper
       // below drops the marker the moment the API says the session is over.
       // stx-strict-ignore-next-line document.cookie
-      if (!(isNativeApp && isLoopback) && !/(?:^|;\s*)ot-signed-in=1\b/.test(document.cookie)) {
+      if (!(isNativeApp && isLoopback) && !/(?:^|;\s*)postline-signed-in=1\b/.test(document.cookie)) {
         // replace(), not assign(), so Back does not return to a page the
         // viewer was just bounced off.
         // stx-strict-ignore-next-line location.replace window.location
@@ -70,7 +70,7 @@
         // This wrapper installs before any runtime exists, so useCookie() is
         // not available yet.
         // stx-strict-ignore-next-line document.cookie
-        document.cookie = 'ot-signed-in=; path=/; max-age=0; SameSite=Lax'
+        document.cookie = 'postline-signed-in=; path=/; max-age=0; SameSite=Lax'
         // stx-strict-ignore-next-line location.replace window.location
         window.location.replace('/login')
       }
@@ -95,7 +95,7 @@
           sameOriginApi = url.startsWith('/api/') || url.startsWith(`${window.location.origin}/api/`)
           if (sameOriginApi && isNativeApp()) {
             const headers = new Headers(init.headers || (typeof input !== 'string' ? input.headers : undefined))
-            headers.set('x-ot-native', 'craft')
+            headers.set('x-postline-native', 'craft')
             return watchForSignOut(nativeFetch(input, { ...init, headers }), true)
           }
         } catch {}
@@ -107,7 +107,7 @@
     // Sidebar bootstrap — runs before paint so the shell does not jump from
     // expanded to collapsed on the first frame. The theme half of this block
     // moved to `app.colorMode` in config/ui.ts; what is left has no config
-    // equivalent, because --ot-sidebar-width lands on document.documentElement,
+    // equivalent, because --postline-sidebar-width lands on document.documentElement,
     // outside every component's markup.
     ;(() => {
       const root = document.documentElement
@@ -116,16 +116,16 @@
         // reading this after hydration would paint the shell expanded and then
         // snap it shut.
         // stx-strict-ignore-next-line window.localStorage
-        const sidebarCollapsed = window.localStorage?.getItem('ot.sidebar.collapsed') === 'true'
-        root.classList.toggle('ot-sidebar-collapsed', sidebarCollapsed)
+        const sidebarCollapsed = window.localStorage?.getItem('postline.sidebar.collapsed') === 'true'
+        root.classList.toggle('postline-sidebar-collapsed', sidebarCollapsed)
         root.dataset.stxSidebarCollapsed = sidebarCollapsed ? 'true' : 'false'
-        root.style.setProperty('--ot-sidebar-width', sidebarCollapsed ? '0px' : '286px')
+        root.style.setProperty('--postline-sidebar-width', sidebarCollapsed ? '0px' : '286px')
       } catch {}
     })()
   </script>
-  <script>window.STX_ROUTER_OPTIONS = { container: '[data-ot-workspace]', viewTransitions: false };</script>
+  <script>window.STX_ROUTER_OPTIONS = { container: '[data-postline-workspace]', viewTransitions: false };</script>
   {{--
-    The newsroom runs on two of the paper's four faces: the display serif for
+    The workspace runs on two of the four brand faces: the display serif for
     page headings and the condensed gothic for labels. The body face is
     deliberately NOT loaded here — a workspace is read in short bursts at small
     sizes, where the UI sans is more legible than Baskerville, and each family
@@ -139,10 +139,10 @@
   <link rel="stylesheet" href="/assets/styles/timeline.css">
 @endhead
 
-    <div class="grid lg:overflow-hidden grid-cols-1 grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[var(--ot-sidebar-width,286px)_minmax(0,1fr)] lg:grid-rows-1 min-h-screen min-w-80 lg:h-screen antialiased font-sans text-ink bg-bg duration-200 ease-out transition-[grid-template-columns]" data-ot-app data-ot-shell>
+    <div class="grid lg:overflow-hidden grid-cols-1 grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] lg:grid-rows-1 min-h-screen min-w-80 lg:h-screen antialiased font-sans text-ink bg-bg duration-200 ease-out transition-[grid-template-columns]" data-postline-app data-postline-shell>
       <AppSidebar />
 
-      <div class="relative lg:overflow-hidden min-w-0 lg:h-screen bg-bg" data-ot-content-shell>
+      <div class="relative lg:overflow-hidden min-w-0 lg:h-screen bg-bg" data-postline-content-shell>
         <button
           class="inline-flex fixed left-3.5 top-3.5 z-[90] items-center justify-center h-9 w-9 text-body hover:text-zinc-900 bg-white/95 hover:bg-white border border-zinc-200/90 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60 shadow-[0_8px_28px_rgba(24,31,42,0.12)] backdrop-blur-sm"
           type="button"
@@ -153,14 +153,14 @@
         >
           <span class="h-[18px] w-[18px] i-hugeicons-sidebar-right" aria-hidden="true"></span>
         </button>
-        <section class="overflow-hidden lg:overflow-y-auto min-h-screen min-w-0 lg:h-screen bg-bg border-t border-zinc-200/80 lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="The Open Times workspace" data-ot-workspace data-window-drag-region>
-          <main class="p-3.5 sm:p-4 min-w-0" data-ot-router>
+        <section class="overflow-hidden lg:overflow-y-auto min-h-screen min-w-0 lg:h-screen bg-bg border-t border-zinc-200/80 lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace data-window-drag-region>
+          <main class="p-3.5 sm:p-4 min-w-0" data-postline-router>
             @yield('content')
           </main>
         </section>
       </div>
     </div>
-    <div id="ot-toast-host" class="flex bottom-6 fixed right-6 z-[100] sm:right-6 flex-col-reverse gap-2.5 max-w-[22rem] w-[calc(100%-2rem)] pointer-events-none" aria-live="polite" aria-relevant="additions"></div>
+    <div id="postline-toast-host" class="flex bottom-6 fixed right-6 z-[100] sm:right-6 flex-col-reverse gap-2.5 max-w-[22rem] w-[calc(100%-2rem)] pointer-events-none" aria-live="polite" aria-relevant="additions"></div>
     <script type="module" src="/assets/scripts/toast.ts"></script>
     <script type="module" src="/assets/scripts/bluesky.ts"></script>
     <script type="module" src="/assets/scripts/linkedin.ts"></script>
@@ -172,15 +172,15 @@
     <script>
       ;(() => {
         const syncSidebarCollapse = (collapsed) => {
-          const shell = document.querySelector('[data-ot-shell]')
-          const sidebar = document.querySelector('[data-ot-sidebar]')
+          const shell = document.querySelector('[data-postline-shell]')
+          const sidebar = document.querySelector('[data-postline-sidebar]')
           const button = document.querySelector('[data-sidebar-collapse]')
           const collapseIcon = document.querySelector('[data-sidebar-collapse-icon]')
           const expandFab = document.querySelector('[data-sidebar-expand-fab]')
 
-          shell?.style.setProperty('--ot-sidebar-width', collapsed ? '0px' : '286px')
-          document.documentElement.style.setProperty('--ot-sidebar-width', collapsed ? '0px' : '286px')
-          document.documentElement.classList.toggle('ot-sidebar-collapsed', collapsed)
+          shell?.style.setProperty('--postline-sidebar-width', collapsed ? '0px' : '286px')
+          document.documentElement.style.setProperty('--postline-sidebar-width', collapsed ? '0px' : '286px')
+          document.documentElement.classList.toggle('postline-sidebar-collapsed', collapsed)
           document.documentElement.dataset.stxSidebarCollapsed = collapsed ? 'true' : 'false'
           if (shell?.dataset) shell.dataset.sidebarCollapsed = collapsed ? 'true' : 'false'
           sidebar?.classList.remove('opacity-0')
@@ -208,13 +208,13 @@
           else
             collapseIcon?.classList.toggle('rotate-180', collapsed)
           expandFab?.setAttribute('aria-hidden', String(!collapsed))
-          window.localStorage?.setItem('ot.sidebar.collapsed', collapsed ? 'true' : 'false')
+          window.localStorage?.setItem('postline.sidebar.collapsed', collapsed ? 'true' : 'false')
           window.craft?.window?.setWebSidebarCollapsed?.(collapsed).catch?.(() => {})
           syncNativeShell()
         }
 
         const bindSidebarCollapse = () => {
-          const initial = window.localStorage?.getItem('ot.sidebar.collapsed') === 'true'
+          const initial = window.localStorage?.getItem('postline.sidebar.collapsed') === 'true'
           syncSidebarCollapse(initial)
 
           document.querySelectorAll('[data-sidebar-collapse]').forEach(button => {
@@ -254,9 +254,9 @@
 
         const syncNativeShell = () => {
           const row = document.querySelector('[data-shell-controls-row]')
-          const sidebar = document.querySelector('[data-ot-sidebar]')
+          const sidebar = document.querySelector('[data-postline-sidebar]')
           if (!row || !sidebar) return
-          const collapsed = window.localStorage?.getItem('ot.sidebar.collapsed') === 'true'
+          const collapsed = window.localStorage?.getItem('postline.sidebar.collapsed') === 'true'
 
           if (isNativeShell()) {
             // Craft draws a sidebar toggle and history arrows beside the window
@@ -360,8 +360,8 @@
         // can't stack duplicate handlers. Routing goes through stx `navigate`
         // instead of synthesising a click on a link element.
         const bindKeyboardShortcuts = () => {
-          if (window.__opentimesShortcutsBound) return
-          window.__opentimesShortcutsBound = true
+          if (window.__postlineShortcutsBound) return
+          window.__postlineShortcutsBound = true
           const routes = { 1: '/composer', 2: '/queue', 3: '/timeline', 4: '/analytics', 5: '/campaigns', 6: '/listening', 7: '/inbox', 8: '/discover', 9: '/publication', 0: '/blog', ',': '/settings' }
           window.stx?.useEventListener('keydown', (event) => {
             if (event.metaKey || event.ctrlKey || event.altKey) return
@@ -378,8 +378,8 @@
         // avoiding needless work, this prevents page-init success feedback
         // from being replayed when someone repeatedly clicks the same tab.
         const bindIdempotentNavigation = () => {
-          if (window.__opentimesIdempotentNavigationBound) return
-          window.__opentimesIdempotentNavigationBound = true
+          if (window.__postlineIdempotentNavigationBound) return
+          window.__postlineIdempotentNavigationBound = true
           window.stx?.useEventListener('click', (event) => {
             if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
             const link = event.target instanceof Element ? event.target.closest('a[data-stx-link]') : null

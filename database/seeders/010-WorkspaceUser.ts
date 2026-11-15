@@ -6,7 +6,7 @@ import { hashMake } from '@stacksjs/security'
 /**
  * The single workspace account.
  *
- * The Open Times is a one-user workspace — `RegisterFirstUserAction` only
+ * Postline is a one-user workspace — `RegisterFirstUserAction` only
  * answers while the users table is empty, so a seeded database with no user is
  * a database nobody can sign in to, and every app route bounces to `/login`.
  * The model factory pass cannot fill this gap: it loads `app/Models/` and,
@@ -28,7 +28,7 @@ export default class WorkspaceUser extends Seeder {
     }
 
     const email = process.env.SEED_USER_EMAIL ?? 'dev@theopentimes.org'
-    const name = process.env.SEED_USER_NAME ?? 'Open Times Dev'
+    const name = process.env.SEED_USER_NAME ?? 'Postline Dev'
     const password = process.env.SEED_USER_PASSWORD ?? 'password'
 
     const existing = await db

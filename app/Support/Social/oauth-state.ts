@@ -10,7 +10,7 @@
  * So: a small map keyed by the state itself, each entry carrying whatever the
  * callback needs (X keeps its PKCE verifier here), expiring after a TTL so an
  * abandoned consent screen cannot pin memory or be replayed hours later.
- * Module memory is still an adequate store: The Open Times runs one process
+ * Module memory is still an adequate store: Postline runs one process
  * per workspace, and a restart only costs an in-flight flow a retry.
  */
 

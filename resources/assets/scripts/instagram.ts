@@ -12,7 +12,7 @@ export interface InstagramStatusPayload {
 }
 
 export async function fetchInstagramStatus(): Promise<InstagramStatusPayload> {
-  const response = await fetch('/api/ot/instagram/status')
+  const response = await fetch('/api/postline/instagram/status')
   const payload = await response.json()
   if (!response.ok || !payload.ok) {
     throw new Error(payload.error || 'Could not load Instagram status.')
@@ -30,14 +30,14 @@ export function formatInstagramConnectionLabel(status: InstagramStatusPayload): 
 
 declare global {
   interface Window {
-    opentimesInstagram?: {
+    postlineInstagram?: {
       fetchStatus: typeof fetchInstagramStatus
       formatConnectionLabel: typeof formatInstagramConnectionLabel
     }
   }
 }
 
-window.opentimesInstagram = {
+window.postlineInstagram = {
   fetchStatus: fetchInstagramStatus,
   formatConnectionLabel: formatInstagramConnectionLabel,
 }

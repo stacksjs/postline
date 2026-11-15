@@ -45,7 +45,7 @@ export default class Publication extends Seeder {
     await db
       .insertInto('publications')
       .values({
-        name: 'The Open Times',
+        name: 'Postline',
         slug,
         tagline: 'Publish it. Send it. Own it.',
         description: 'An independent paper you actually own: the publication, the newsletter and the paying subscribers, on software you run.',
@@ -72,7 +72,7 @@ export default class Publication extends Seeder {
       .where('slug', '=', slug)
       .executeTakeFirst()
 
-    log.success('Publication: seeded "The Open Times"')
+    log.success('Publication: seeded "Postline"')
 
     if (inserted)
       await this.seedTiers(Number(inserted.id))

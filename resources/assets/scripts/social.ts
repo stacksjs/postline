@@ -78,7 +78,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   threads: 'Threads',
   tiktok: 'TikTok',
   blog: 'Blog',
-  opentimes: 'The Open Times',
+  postline: 'Postline',
 }
 
 export function providerLabel(provider: string): string {
@@ -111,7 +111,7 @@ const PROVIDER_ICONS: Record<string, string> = {
   instagram: 'i-simple-icons-instagram',
   threads: 'i-simple-icons-threads',
   blog: 'i-hugeicons-quill-write-02',
-  opentimes: 'i-hugeicons-news',
+  postline: 'i-hugeicons-news',
 }
 
 /** The Iconify class for a network. Pages list these statically for Crosswind. */
@@ -120,7 +120,7 @@ export function providerIcon(provider: string): string {
 }
 
 export async function fetchProviders(): Promise<ProviderStatus[]> {
-  const response = await fetch('/api/ot/providers')
+  const response = await fetch('/api/postline/providers')
   const payload = await response.json()
   if (!response.ok || !payload.ok) {
     throw new Error(payload.error || 'Could not load connected accounts.')
@@ -130,7 +130,7 @@ export async function fetchProviders(): Promise<ProviderStatus[]> {
 
 /** Every connected account, across networks. */
 export async function fetchAccounts(): Promise<AccountStatus[]> {
-  const response = await fetch('/api/ot/accounts')
+  const response = await fetch('/api/postline/accounts')
   const payload = await response.json()
   if (!response.ok || !payload.ok) {
     throw new Error(payload.error || 'Could not load connected accounts.')
@@ -145,7 +145,7 @@ export async function fetchAccounts(): Promise<AccountStatus[]> {
 export async function disconnectAccount(id: number): Promise<AccountStatus> {
   const body = new FormData()
   body.set('id', String(id))
-  const response = await fetch('/api/ot/accounts/disconnect', { method: 'POST', body })
+  const response = await fetch('/api/postline/accounts/disconnect', { method: 'POST', body })
   const payload = await response.json()
   if (!response.ok || !payload.ok) {
     throw new Error(payload.error || 'Could not disconnect the account.')
@@ -174,7 +174,7 @@ export async function publishCrosspost(input: CrosspostInput): Promise<{ postId:
   if (input.variants && Object.keys(input.variants).length)
     body.set('variants', JSON.stringify(input.variants))
 
-  const response = await fetch('/api/ot/publish', { method: 'POST', body })
+  const response = await fetch('/api/postline/publish', { method: 'POST', body })
   const payload = await response.json()
   if (!payload?.data) {
     throw new Error(payload?.error || 'Publish failed.')
@@ -184,7 +184,7 @@ export async function publishCrosspost(input: CrosspostInput): Promise<{ postId:
 
 declare global {
   interface Window {
-    opentimesSocial?: {
+    postlineSocial?: {
       fetchProviders: typeof fetchProviders
       fetchAccounts: typeof fetchAccounts
       disconnectAccount: typeof disconnectAccount
@@ -197,7 +197,7 @@ declare global {
   }
 }
 
-window.opentimesSocial = {
+window.postlineSocial = {
   fetchProviders,
   fetchAccounts,
   disconnectAccount,

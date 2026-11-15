@@ -2,7 +2,7 @@ import { defineModel } from '@stacksjs/orm'
 import { schema } from '@stacksjs/validation'
 
 /**
- * A publication on the Open Times network.
+ * A publication on Postline network.
  *
  * One per account today, but modelled as its own table rather than as columns
  * on `accounts` because Discover ranks, lists and recommends publications, and

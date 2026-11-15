@@ -1,22 +1,22 @@
 {
-  "name": "opentimes",
+  "name": "postline",
   "type": "module",
   "version": "0.0.0",
   "private": true,
-  "description": "The Open Times — an independent newspaper you own: publish, send and syndicate from one desk.",
+  "description": "Postline — compose once, publish to every social network: queue, campaigns, analytics, listening and a unified inbox.",
   "author": "Chris Breuer <chris@stacksjs.org>",
   "contributors": [
     "Chris Breuer <chris@stacksjs.org>"
   ],
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
-  "homepage": "https://github.com/stacksjs/stacks#readme",
+  "homepage": "https://github.com/stacksjs/postline#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/stacksjs/stacks.git"
+    "url": "git+https://github.com/stacksjs/postline.git"
   },
   "bugs": {
-    "url": "https://github.com/stacksjs/stacks/issues"
+    "url": "https://github.com/stacksjs/postline/issues"
   },
   "scripts": {
     "build:reset": "rm -rf node_modules && bun install && ./buddy generate:types && ./buddy lint:fix",

@@ -16,13 +16,13 @@ export default new Job({
       if (!outcome.ran) return { skipped: outcome.reason }
 
       const { result, settings } = outcome
-      console.log(`[opentimes] auto-delete (> ${settings.days} days): ${result.deleted} deleted, ${result.failed} failed of ${result.matched} matched`)
+      console.log(`[postline] auto-delete (> ${settings.days} days): ${result.deleted} deleted, ${result.failed} failed of ${result.matched} matched`)
       return { matched: result.matched, deleted: result.deleted, failed: result.failed }
     }
     catch (error) {
       // Per-network failures are already in purge_runs; this is the run itself.
       const message = error instanceof Error ? error.message : String(error)
-      console.error(`[opentimes] auto-delete failed: ${message}`)
+      console.error(`[postline] auto-delete failed: ${message}`)
       return { failed: true, error: message }
     }
   },

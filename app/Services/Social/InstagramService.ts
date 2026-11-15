@@ -304,7 +304,7 @@ export class InstagramService {
   async dmIdentity(identityId?: number | null): Promise<{ identityId: number, accessToken: string, igUserId: string, handle: string, graphVersion: string }> {
     const identity = await this.requireIdentity(identityId)
     if (!identity.external_id)
-      throw new Error('Reconnect Instagram on the Accounts page — The Open Times needs your Instagram account id to read DMs.')
+      throw new Error('Reconnect Instagram on the Accounts page — Postline needs your Instagram account id to read DMs.')
 
     return {
       identityId: Number(identity.id),

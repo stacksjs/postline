@@ -28,7 +28,7 @@ export const MAX_RETENTION_DAYS = 3650
  * publication itself. Expiring old articles from your own paper is a choice
  * someone has to make by ticking it, never a default.
  */
-export const DEFAULT_RETENTION_PROVIDERS: SocialProvider[] = PURGEABLE_PROVIDERS.filter(provider => provider !== 'opentimes')
+export const DEFAULT_RETENTION_PROVIDERS: SocialProvider[] = PURGEABLE_PROVIDERS.filter(provider => provider !== 'postline')
 
 export interface RetentionSettings {
   enabled: boolean

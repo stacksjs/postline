@@ -1,5 +1,5 @@
 /**
- * The Open Times desktop launcher.
+ * Postline desktop launcher.
  *
  * `buddy build:desktop` compiles this file into the bundle's main executable in
  * place of the framework's generic launcher, which opens the manifest URL in a
@@ -88,7 +88,7 @@ const args = [
   String(manifest.height),
   '--titlebar-hidden',
   // Native sidebar material behind the web sidebar, at the width the layout
-  // reserves for it (--ot-sidebar-width).
+  // reserves for it (--postline-sidebar-width).
   '--web-sidebar-material',
   '--web-sidebar-width',
   '286',

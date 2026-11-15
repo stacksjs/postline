@@ -10,7 +10,7 @@ export interface BlueskyStatusPayload {
 }
 
 export async function fetchBlueskyStatus(): Promise<BlueskyStatusPayload> {
-  const response = await fetch('/api/ot/bluesky/status')
+  const response = await fetch('/api/postline/bluesky/status')
   const payload = await response.json()
   if (!response.ok || !payload.ok) {
     throw new Error(payload.error || 'Could not load Bluesky status.')
@@ -27,14 +27,14 @@ export function formatBlueskyConnectionLabel(status: BlueskyStatusPayload): stri
 
 declare global {
   interface Window {
-    opentimesBluesky?: {
+    postlineBluesky?: {
       fetchStatus: typeof fetchBlueskyStatus
       formatConnectionLabel: typeof formatBlueskyConnectionLabel
     }
   }
 }
 
-window.opentimesBluesky = {
+window.postlineBluesky = {
   fetchStatus: fetchBlueskyStatus,
   formatConnectionLabel: formatBlueskyConnectionLabel,
 }

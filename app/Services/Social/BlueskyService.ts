@@ -655,7 +655,7 @@ export class BlueskyService {
     await database.insertInto('accounts').values({
       uuid: accountUuid,
       name: 'Chris Breuer',
-      workspace_name: 'The Open Times',
+      workspace_name: 'Postline',
       timezone: 'America/Los_Angeles',
       default_audience: 'public',
       created_at: now(),

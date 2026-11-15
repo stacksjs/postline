@@ -1,10 +1,10 @@
 @extends('layouts/app')
 
-@section('title', 'The Open Times - Queue')
+@section('title', 'Postline - Queue')
 
 @section('content')
-  @meta('description', 'Review scheduled and drafted social posts in The Open Times.')
-  <section class="grid gap-5" data-ot-page="queue" data-testid="queue-page">
+  @meta('description', 'Review scheduled and drafted social posts in Postline.')
+  <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
     <header class="flex flex-wrap gap-4 items-center justify-between min-h-11">
       <div>
         <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Queue</p>
@@ -117,7 +117,7 @@
 
   <script client>
     /**
-     * Wire shapes for `/api/ot/queue/*`, declared where they are used.
+     * Wire shapes for `/api/postline/queue/*`, declared where they are used.
      *
      * These describe what the BROWSER receives, which is a flattened projection
      * of `app/Support/Social/types.ts` — deliberately separate, because the wire
@@ -178,10 +178,10 @@
     const busyId = state(0)
     const calMonthStart = state(monthStart(new Date()))
 
-    // A fresh key, not the legacy 'opentimes.queue.view': useLocalStorage
+    // A fresh key, not the legacy 'postline.queue.view': useLocalStorage
     // JSON.parses whatever is already stored, and the old value was a bare
     // string ("list"), which would throw and take the whole script down.
-    const view = useLocalStorage('opentimes.queue.view.v2', 'list')
+    const view = useLocalStorage('postline.queue.view.v2', 'list')
 
     function monthStart(date: Date): Date {
       return new Date(date.getFullYear(), date.getMonth(), 1)
@@ -204,7 +204,7 @@
       return date.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
     }
 
-    const providerLabel = (provider: string): string => opentimesSocial?.providerLabel(provider) || provider
+    const providerLabel = (provider: string): string => postlineSocial?.providerLabel(provider) || provider
 
     /**
      * A row's channels. A network appears once per account, so when one post
@@ -214,7 +214,7 @@
     const channelLabels = (targets: QueueApiTarget[]): string[] => targets.map((target) => {
       const shared = targets.filter(other => other.provider === target.provider).length > 1
       return shared && target.handle
-        ? opentimesSocial?.targetLabel(target.provider, target.handle) || `${providerLabel(target.provider)} ${target.handle}`
+        ? postlineSocial?.targetLabel(target.provider, target.handle) || `${providerLabel(target.provider)} ${target.handle}`
         : providerLabel(target.provider)
     })
 
@@ -330,7 +330,7 @@
 
     const refresh = async () => {
       try {
-        const response = await fetch('/api/ot/queue')
+        const response = await fetch('/api/postline/queue')
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the queue.')
         items.set(payload.data.items || [])
@@ -341,7 +341,7 @@
         // failing fetch (e.g. an expired session) can't spam or stack.
         items.set([])
         loadError.set(error instanceof Error ? error.message : String(error))
-        console.warn('[opentimes] queue load failed:', error)
+        console.warn('[postline] queue load failed:', error)
       }
       finally {
         loaded.set(true)
@@ -361,10 +361,10 @@
       busyId.set(id)
       try {
         await post(path, id)
-        opentimesToast?.show?.({ title: success.title, message: success.message, tone: 'success' })
+        postlineToast?.show?.({ title: success.title, message: success.message, tone: 'success' })
       }
       catch (error) {
-        opentimesToast?.show?.({
+        postlineToast?.show?.({
           title: failure,
           message: error instanceof Error ? error.message : String(error),
           tone: 'error',
@@ -378,7 +378,7 @@
 
     const publishItem = (id: number): void => void runAction(
       id,
-      '/api/ot/queue/publish-now',
+      '/api/postline/queue/publish-now',
       { title: 'Published', message: 'Post published.' },
       'Publish failed',
     )
@@ -387,7 +387,7 @@
       if (!confirm('Delete this post? This cannot be undone.')) return
       void runAction(
         id,
-        '/api/ot/queue/delete',
+        '/api/postline/queue/delete',
         { title: 'Removed', message: 'Post removed from the queue.' },
         'Delete failed',
       )
