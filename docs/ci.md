@@ -89,20 +89,17 @@ run close to that.
 
 ## The Mac runner and load
 
-A runner can be told to hold new work while the machine is busy:
-`REVIEWOS_RUNNER_MAX_LOAD_PER_CPU`. It compares the one-minute load average
-with that number per CPU.
+A runner can hold new work while the machine is busy:
+`REVIEWOS_RUNNER_MAX_LOAD_PER_CPU`, compared with the one-minute load average
+per CPU. Postline's runner sets it to 6, and both extremes are why.
 
-On macOS the load average is a poor measure of headroom. Measured on the Mac
-that runs these jobs, on 2026-11-15: a load average of 23 to 27 on 11 CPUs
-while `top` reported the CPUs 38% idle. With the limit at 1.5 per CPU the
-existing runners logged "Runner capacity hold" 9,905 times and took almost no
-work. Leave the limit unset for Postline's runner, or set it well above what
-the machine idles at (4 per CPU), and check the log:
+- **Too low refuses everything.** On macOS the load average is a poor measure
+  of headroom: this Mac idles at 20 to 39 on 11 CPUs while `top` reports the
+  CPUs 40% idle. The other runners here use 1.5 per CPU, and one of them
+  logged "Runner capacity hold" 9,905 times.
+- **No limit loses jobs.** With none, a lint job was taken while another
+  runner had the load at 300. It could not renew its lease in time and the
+  instance cancelled it: "The instance did not renew this job before its
+  lease expired". That is a busy machine, not a broken workflow; run it again.
 
-```bash
-tail -f ~/.local/share/reviewos/postline/runner.log
-```
-
-"Runner capacity hold" repeating there means the limit is refusing work, not
-that there is none.
+6 per CPU (66 here) passes the first case and holds for the second.
