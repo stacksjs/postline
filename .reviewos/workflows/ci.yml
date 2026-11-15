@@ -42,7 +42,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Set up Pantry and Bun
-        uses: pantry-pm/pantry/packages/action@17b46d931ed96929b391a8c6c6fc49f0714e772e # v0.11.207
+        uses: pantry-pm/pantry/packages/action@be9f7a5b0af91351f5c0b7ea3b2fa98e267753a8 # v0.11.207
         with:
           version: 0.11.207
           install: 'false'
@@ -59,7 +59,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Set up Pantry and Bun
-        uses: pantry-pm/pantry/packages/action@17b46d931ed96929b391a8c6c6fc49f0714e772e # v0.11.207
+        uses: pantry-pm/pantry/packages/action@be9f7a5b0af91351f5c0b7ea3b2fa98e267753a8 # v0.11.207
         with:
           version: 0.11.207
           install: 'false'
@@ -82,7 +82,7 @@ jobs:
       DB_DATABASE_PATH: database/postline_ci.sqlite
     steps:
       - name: Set up Pantry and Bun
-        uses: pantry-pm/pantry/packages/action@17b46d931ed96929b391a8c6c6fc49f0714e772e # v0.11.207
+        uses: pantry-pm/pantry/packages/action@be9f7a5b0af91351f5c0b7ea3b2fa98e267753a8 # v0.11.207
         with:
           version: 0.11.207
           install: 'false'

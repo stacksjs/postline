@@ -104,7 +104,7 @@ jobs:
           test "$declared" = "$VERSION" || { echo "::error::Tag v$VERSION does not match package.json version $declared." >&2; exit 1; }
 
       - name: Set up Pantry and Bun
-        uses: pantry-pm/pantry/packages/action@17b46d931ed96929b391a8c6c6fc49f0714e772e # v0.11.207
+        uses: pantry-pm/pantry/packages/action@be9f7a5b0af91351f5c0b7ea3b2fa98e267753a8 # v0.11.207
         with:
           version: 0.11.207
           install: 'false'
@@ -153,7 +153,7 @@ jobs:
       # three variables below name GitHub explicitly, because the ones a
       # ReviewOS job inherits name ReviewOS.
       - name: Publish the GitHub release
-        uses: pantry-pm/pantry/packages/action@17b46d931ed96929b391a8c6c6fc49f0714e772e # v0.11.207
+        uses: pantry-pm/pantry/packages/action@be9f7a5b0af91351f5c0b7ea3b2fa98e267753a8 # v0.11.207
         with:
           version: 0.11.207
           install: 'false'
