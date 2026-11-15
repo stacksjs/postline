@@ -336,7 +336,7 @@ silently and a wrong assumption would be replicated across ~1900 lines.
   `useColorMode` applies a class *or* an attribute but never both, and its
   persisted vocabulary is hard-coded to `light|dark|auto` so an app storing
   `'system'` gets that value silently overwritten. Both block replacing
-  The Open Times' theme block; until fixed, the two `document.documentElement` calls
+  Postline' theme block; until fixed, the two `document.documentElement` calls
   in `settings.stx` are justified and commented as such.
 
 No other gap found. Everything else this codebase does imperatively — focus,

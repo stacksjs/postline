@@ -87,7 +87,11 @@ const config: PickierOptions = {
     // errors in it, which failed CI's lint job on an otherwise clean app.
     '**/storage/framework/defaults/**',
     '**/storage/framework/frontend-dist/**',
-    '**/storage/framework/server/storage/**',
+    // Framework-owned for the same reason: the server entry is replaced by
+    // `buddy upgrade`, and `types/` is rewritten by `buddy generate:types`.
+    // 0.75.599 ships unused imports in both, which failed `buddy lint` here.
+    '**/storage/framework/server/**',
+    '**/storage/framework/types/**',
     '**/.bunpress/**',
     '**/docs/deps/**',
     // Generated scaffolds copied into pantry — out of project control

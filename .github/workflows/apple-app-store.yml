@@ -24,7 +24,7 @@ name: Publish Mac App Store
 #   APPLE_TEAM_ID                       required
 #   APPLE_BUNDLE_ID                     default org.stacksjs.postline
 #   APPLE_APP_NAME                      default "Postline"
-#   DESKTOP_URL                         default https://postline.stacksjs.com/composer
+#   DESKTOP_URL                         required: the https address of the Postline the app opens
 
 on:
   workflow_dispatch:
@@ -62,7 +62,8 @@ jobs:
       APPLE_MINIMUM_MACOS: '13.0'
       APPLE_APP_ICON: app/Desktop/AppIcon.icns
       APPLE_UNIVERSAL: 'true'
-      DESKTOP_URL: ${{ vars.DESKTOP_URL || 'https://postline.stacksjs.com/composer' }}
+      # Required, with no default: see the note at the top of release.yml.
+      DESKTOP_URL: ${{ vars.DESKTOP_URL }}
       APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
       APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
 
@@ -75,6 +76,14 @@ jobs:
           set -euo pipefail
           case "$TAG" in v*) ;; *) echo "Not a release tag: $TAG" >&2; exit 1 ;; esac
           echo "value=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Require the app's address
+        run: |
+          set -euo pipefail
+          case "$DESKTOP_URL" in
+            https://*) ;;
+            *) echo "::error::Set the repository variable DESKTOP_URL to the https address of the Postline the desktop app opens." >&2; exit 1 ;;
+          esac
 
       - uses: actions/checkout@v6
         with:

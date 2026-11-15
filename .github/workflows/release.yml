@@ -1,13 +1,18 @@
 name: Release
 
-# `bun run release:patch` (likewise :minor / :major) bumps package.json, writes
+# `bun run release:minor` (likewise :patch / :major) bumps package.json, writes
 # the changelog, commits, tags vX.Y.Z and pushes the tag. That tag lands here:
-# build the macOS desktop app, package it as a DMG, zip it, and attach it to
-# the GitHub release for the tag.
+# build the macOS desktop app, package it as a DMG, and publish a GitHub release
+# with the DMG attached.
 #
-# This file used to be a copy of the Stacks *framework's* releaser — publishing
-# npm packages and a Homebrew formula this app does not have — so every tag
-# failed before building anything.
+# The release itself (notes from CHANGELOG.md, the DMG and its checksums) is
+# created by the Pantry action, so this file holds no `gh release` scripting.
+#
+# REQUIRED before the first release: the repository variable DESKTOP_URL.
+# The desktop app is a native window around a running Postline, and that
+# variable is the address it opens. There is deliberately no default: the app
+# would otherwise ship pointing at whatever happens to answer on a guessed
+# host, and a release is the wrong moment to find that out.
 #
 # Mac App Store delivery is its own, manually dispatched workflow
 # (apple-app-store.yml); it needs Apple signing material this one does not.
@@ -19,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to (re)build and attach the DMG to, e.g. v0.0.3
+        description: Existing tag to (re)build and attach the DMG to, e.g. v0.1.0
         required: true
         type: string
 
@@ -48,8 +53,12 @@ jobs:
       APP_NAME: Postline
       DESKTOP_APP_NAME: Postline
       DESKTOP_BUNDLE_ID: ${{ vars.APPLE_BUNDLE_ID || 'org.stacksjs.postline' }}
-      # The page the window opens: the signed-in workspace on the deployed site.
-      DESKTOP_URL: ${{ vars.DESKTOP_URL || 'https://postline.stacksjs.com/composer' }}
+      # The page the window opens: the signed-in workspace of a running
+      # Postline. Required; see the note at the top of this file.
+      DESKTOP_URL: ${{ vars.DESKTOP_URL }}
+      # A tagged build is the stable channel. Unset, the manifest says
+      # "experimental", which is what a local build is.
+      DESKTOP_RELEASE_CHANNEL: stable
       # Optional Developer ID signing + notarization, picked up by build:dmg
       # when set. Unset, the DMG is unsigned and Gatekeeper asks on first open.
       DESKTOP_SIGNING_IDENTITY: ${{ vars.DESKTOP_SIGNING_IDENTITY }}
@@ -65,9 +74,30 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
+      # Before anything is built: a release with nowhere for the app to open
+      # is not a release.
+      - name: Require the app's address
+        run: |
+          set -euo pipefail
+          case "$DESKTOP_URL" in
+            https://*) ;;
+            '') echo "::error::Set the repository variable DESKTOP_URL to the https address of the Postline the desktop app opens (for example https://postline.example.com/composer)." >&2; exit 1 ;;
+            *) echo "::error::DESKTOP_URL must be an https address, got: $DESKTOP_URL" >&2; exit 1 ;;
+          esac
+
       - uses: actions/checkout@v6
         with:
           ref: ${{ steps.version.outputs.tag }}
+
+      # The tag and package.json must agree, or the DMG would be named for one
+      # version and report another in its About box.
+      - name: Check the tag matches package.json
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          declared=$(sed -n 's/^  "version": "\(.*\)",$/\1/p' package.json | head -1)
+          test "$declared" = "$VERSION" || { echo "::error::Tag v$VERSION does not match package.json version $declared." >&2; exit 1; }
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -95,39 +125,32 @@ jobs:
           DESKTOP_APP_VERSION: ${{ steps.version.outputs.version }}
         run: bun node_modules/@stacksjs/buddy/dist/cli.js build:dmg
 
-      - name: Zip DMG
-        id: zip
+      # Named for the platform it runs on, so a later Intel or Windows build
+      # can sit beside it in the same release without a rename.
+      - name: Name the DMG for its platform
+        id: dmg
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           cd storage/framework/desktop-dmg
-          dmg="$DESKTOP_APP_NAME-$VERSION.dmg"
-          test -f "$dmg"
-          zip="Postline-$VERSION-macos-arm64.dmg.zip"
-          ditto -c -k --keepParent "$dmg" "$zip"
-          shasum -a 256 "$zip" > "$zip.sha256"
-          echo "zip=storage/framework/desktop-dmg/$zip" >> "$GITHUB_OUTPUT"
+          test -f "Postline-$VERSION.dmg"
+          mv "Postline-$VERSION.dmg" "Postline-$VERSION-macos-arm64.dmg"
+          echo "path=storage/framework/desktop-dmg/Postline-$VERSION-macos-arm64.dmg" >> "$GITHUB_OUTPUT"
 
-      - name: Publish to GitHub release
+      # Creates the release for the tag when there is none, takes its notes
+      # from this version's section of CHANGELOG.md, and attaches the DMG with
+      # a checksums file. `install: false` because nothing here needs Pantry to
+      # install packages: the action is used for the release alone.
+      - name: Publish the GitHub release
+        uses: pantry-pm/pantry/packages/action@17b46d931ed96929b391a8c6c6fc49f0714e772e # v0.11.207
+        with:
+          install: 'false'
+          release: 'true'
+          release-tag: ${{ steps.version.outputs.tag }}
+          release-files: ${{ steps.dmg.outputs.path }}
+          release-checksums: sha256
+          release-changelog: CHANGELOG.md
+          release-notes: Postline ${{ steps.version.outputs.version }} for macOS (Apple Silicon).
         env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
-          VERSION: ${{ steps.version.outputs.version }}
-          ZIP: ${{ steps.zip.outputs.zip }}
-        run: |
-          set -euo pipefail
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
-            # The release commit put this version's section at the top of the
-            # changelog; use it as the notes, or let GitHub write them.
-            awk -v v="v$VERSION" '
-              /^## / { if (found) exit; if ($0 ~ v "([^0-9.]|$)") { found = 1; next } }
-              found { print }
-            ' CHANGELOG.md > "$RUNNER_TEMP/notes.md" || true
-            if [ -s "$RUNNER_TEMP/notes.md" ]; then
-              gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
-            else
-              gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
-            fi
-          fi
-          gh release upload "$TAG" "$ZIP" "$ZIP.sha256" --clobber
+          GITHUB_TOKEN: ${{ github.token }}
