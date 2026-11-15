@@ -7,9 +7,11 @@
 # ReviewOS reads `.reviewos/workflows` instead of `.github/workflows` when it
 # exists, so nothing under `.github/workflows` runs there.
 #
-# None of these jobs holds a secret, so they run on the instance's autoscaled
-# Linux runners (`aws`). The Mac build is release.yml, on this project's own
-# Mac runner.
+# Every job runs on Postline's own Mac runner,
+# `[self-hosted, macos-arm64, postline]`. A runner takes a job only when it
+# carries every label the job asks for, so no other project's runner picks
+# these up and this one picks up nothing else. The instance's Linux pools
+# serve other repositories and are not used here.
 #
 # Bun comes from the pinned Pantry action, the same way on every runner. The
 # checkout is done by the runner before the first step, so there is no
@@ -36,7 +38,7 @@ jobs:
   lint:
     reviewos:
       secrets: []
-    runs-on: [self-hosted, aws]
+    runs-on: [self-hosted, macos-arm64, postline]
     timeout-minutes: 15
     steps:
       - name: Set up Pantry and Bun
@@ -53,7 +55,7 @@ jobs:
   typecheck:
     reviewos:
       secrets: []
-    runs-on: [self-hosted, aws]
+    runs-on: [self-hosted, macos-arm64, postline]
     timeout-minutes: 15
     steps:
       - name: Set up Pantry and Bun
@@ -70,7 +72,7 @@ jobs:
   test:
     reviewos:
       secrets: []
-    runs-on: [self-hosted, aws]
+    runs-on: [self-hosted, macos-arm64, postline]
     timeout-minutes: 20
     # The database the suite runs on. Postline runs on SQLite, and a runner has
     # no `.env`, so without these the connection defaults to MySQL with no

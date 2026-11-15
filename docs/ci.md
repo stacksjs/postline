@@ -6,10 +6,14 @@ repository, runs `.reviewos/workflows` on every commit and tag the mirror
 fetches, and posts the verdict back to the commit as the status
 "ReviewOS / CI".
 
-| File | Runs | Where |
-|---|---|---|
-| `.reviewos/workflows/ci.yml` | lint, type check, test, on every push and pull request | the instance's Linux runners, `[self-hosted, aws]` |
-| `.reviewos/workflows/release.yml` | builds the DMG and publishes the GitHub release, on a `v*` tag | Postline's Mac runner, `[self-hosted, macos-arm64, postline]` |
+| File | Runs |
+|---|---|
+| `.reviewos/workflows/ci.yml` | lint, type check, test, on every push and pull request |
+| `.reviewos/workflows/release.yml` | builds the DMG and publishes the GitHub release, on a `v*` tag |
+
+Every job runs on Postline's own Mac runner, labelled
+`[self-hosted, macos-arm64, postline]`. A runner takes a job only when it
+carries every label the job asks for.
 
 ReviewOS reads `.reviewos/workflows` in place of `.github/workflows` when the
 directory exists, so nothing under `.github/workflows` runs there.
@@ -48,14 +52,12 @@ reviewos run ci.yml --ref main --watch --repo stacks/postline
 
 ## Setting it up
 
-These are done once, and three of them need an instance administrator.
+Done once. The second and third steps need an instance administrator.
 
 1. **Mirror the repository.** `mirrors.yml` in the ReviewOS repository lists
    `stacksjs/postline` with `ci: true`; it is applied on every deploy of the
    instance (`buddy mirror:apply mirrors.yml`).
-2. **Give the Linux jobs a pool.** The `aws` pool has to be assigned to
-   `stacks/postline` (`assign-repository` on the fleet API).
-3. **Register the Mac runner.** On the instance host:
+2. **Register the Mac runner.** On the instance host:
 
    ```bash
    ./buddy runner:local --register --repository stacks/postline --name postline-macos-arm64 --labels self-hosted,macos-arm64,postline
@@ -69,9 +71,12 @@ These are done once, and three of them need an instance administrator.
    then runs the binary. A LaunchAgent keeps it running; the two already on
    this Mac (`~/.local/share/reviewos/stacks-source`, `hq-mobile`) are the
    pattern.
-4. **Set what the release needs**, on the repository in ReviewOS: the variable
+3. **Set what the release needs**, on the repository in ReviewOS: the variable
    `DESKTOP_URL` and the secret `GH_RELEASE_TOKEN` (a GitHub token with
    `contents: write` on `stacksjs/postline`).
+
+Until the runner is registered, runs queue and the commit status stays
+pending.
 
 ## The Mac runner and load
 
