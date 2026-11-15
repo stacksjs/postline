@@ -46,30 +46,24 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    services:
-      redis:
-        image: redis:7-alpine
-        ports: ['6379:6379']
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: test_db
-          MYSQL_USER: user
-          MYSQL_PASSWORD: password
-        ports: ['3306:3306']
-      dynamodb:
-        image: amazon/dynamodb-local:latest
-        ports: ['8000:8000']
+    # The database the suite runs on. Postline runs on SQLite, and CI has no
+    # `.env`, so without these the connection defaulted to MySQL with no
+    # password: every test that reached the database failed with "Access
+    # denied", and this job was red on every push for weeks while the MySQL,
+    # Redis and DynamoDB containers it started sat unused.
+    env:
+      DB_CONNECTION: sqlite
+      DB_DATABASE_PATH: database/postline_ci.sqlite
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
+      # The feature tests exercise real routes, and a route needs its tables.
+      - name: Create the test database
+        run: bun node_modules/@stacksjs/buddy/dist/cli.js migrate
       - name: Test suite
-        env:
-          AWS_DYNAMODB_ENDPOINT: http://localhost:8000
         run: bun run test
 
   # AUTOMATIC DEPLOYS ARE OFF.
