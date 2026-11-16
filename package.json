@@ -1,7 +1,7 @@
 {
   "name": "postline",
   "type": "module",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Postline — compose once, publish to every social network: queue, campaigns, analytics, listening and a unified inbox.",
   "author": "Chris Breuer <chris@stacksjs.org>",
