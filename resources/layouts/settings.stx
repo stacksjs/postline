@@ -1,0 +1,22 @@
+{{--
+  The Settings window: a window of its own in the desktop app, the whole
+  viewport in a browser. No workspace shell, because System Settings has none.
+--}}
+@head
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <SessionScripts />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+@endhead
+
+@yield('content')
+
+{{-- Channel status for the Channels and Composer panes. --}}
+<script type="module" src="/assets/scripts/bluesky.ts"></script>
+<script type="module" src="/assets/scripts/linkedin.ts"></script>
+<script type="module" src="/assets/scripts/instagram.ts"></script>
+<script type="module" src="/assets/scripts/threads.ts"></script>
+<script type="module" src="/assets/scripts/social.ts"></script>
+@stack('scripts')

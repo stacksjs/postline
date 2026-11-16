@@ -430,37 +430,10 @@ html.dark [data-provider-toggle][disabled] { color: #52525b; }
 `
 
 /**
- * Settings theme picker and Bluesky connection pill. Same data-attribute
- * approach and same verified absence of competing colour utilities as
- * QUEUE_STATUS above.
+ * The tone of the message under the automatic deletion settings. The rest of
+ * the Settings window is stx's SettingsWindow and brings its own styles.
  */
 const SETTINGS_STATUS: string = `
-[data-theme-option] { color: var(--muted); }
-[data-theme-option][data-active]:not([data-active="false"]) {
-  background: var(--panel);
-  color: var(--ink);
-  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-}
-[data-channels-pill] { border-color: var(--line); color: var(--muted); }
-[data-channels-pill][data-state="ready"] {
-  border-color: rgb(167 243 208); background: rgb(236 253 245); color: rgb(4 120 87);
-}
-[data-channels-pill][data-state="setup"] {
-  border-color: rgb(253 230 138); background: rgb(255 251 235); color: rgb(146 64 14);
-}
-html.dark [data-channels-pill][data-state="ready"] {
-  border-color: rgb(6 78 59); background: rgb(6 78 59 / 0.3); color: rgb(110 231 183);
-}
-html.dark [data-channels-pill][data-state="setup"] {
-  border-color: rgb(120 53 15); background: rgb(120 53 15 / 0.3); color: rgb(252 211 77);
-}
-[data-retention-pill] { border-color: var(--line); color: var(--muted); }
-[data-retention-pill][data-state="on"] {
-  border-color: rgb(254 202 202); background: rgb(254 242 242); color: rgb(185 28 28);
-}
-html.dark [data-retention-pill][data-state="on"] {
-  border-color: rgb(127 29 29); background: rgb(127 29 29 / 0.3); color: rgb(252 165 165);
-}
 [data-retention-message] { color: var(--muted); }
 [data-retention-message][data-tone="success"] { color: rgb(4 120 87); }
 [data-retention-message][data-tone="error"] { color: rgb(185 28 28); }

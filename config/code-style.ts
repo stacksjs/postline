@@ -90,6 +90,8 @@ const config: PickierOptions = {
     // Framework-owned for the same reason: the server entry is replaced by
     // `buddy upgrade`, and `types/` is rewritten by `buddy generate:types`.
     // 0.75.599 ships unused imports in both, which failed `buddy lint` here.
+    // The desktop build's output: generated entries and built views.
+    '**/storage/framework/desktop/**',
     '**/storage/framework/server/**',
     '**/storage/framework/types/**',
     '**/.bunpress/**',

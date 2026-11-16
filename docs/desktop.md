@@ -1,32 +1,59 @@
 # Desktop app
 
-Postline ships as a native macOS app: a [Craft](https://github.com/craft-native/craft)
-window around a running Postline. Sign-in persists between launches, and the
-window uses the layout's own sidebar and window controls.
+Postline is a Mac app that runs itself. The app's executable is a compiled
+agent that serves the workspace and the API on a loopback port, and its window
+is a [Craft](https://github.com/craft-native/craft) web view pointed at that
+agent. Nothing is deployed for it to open, and there is no account to create:
+the person at the Mac is the owner.
 
-**The app opens an address; it does not contain the server.** `DESKTOP_URL` is
-the Postline it opens, and it is a build-time input. A release build needs a
-deployed Postline to point at. Bundling the server into the app, so it runs
-with nothing deployed, is the next step for this app and is not done yet (see
-"What is not done" below).
+What is theirs lives in `~/Library/Application Support/Postline`:
 
 | File | What it is |
 |---|---|
-| `app/Desktop/launcher.ts` | The bundle's main executable: starts Craft with the hidden titlebar, sidebar material and persistent storage |
-| `app/Desktop/icon.svg` | The icon, as a drawing |
-| `scripts/app-icon.ts` | Draws the icon PNGs: `bun scripts/app-icon.ts` |
-| `resources/assets/images/app-icon.png` | The icon the DMG build converts into an `.icns` |
-| `app/Desktop/AppIcon.icns` | The icon the App Store build embeds |
-| `app/Desktop/Info.plist.json` | Extra Info.plist keys for the DMG build (category, encryption declaration) |
-| `.reviewos/workflows/release.yml` | Builds the DMG for a release tag, on the Mac runner, and publishes the GitHub release |
-| `.github/workflows/apple-app-store.yml` | Mac App Store packaging and upload (manual) |
+| `postline.sqlite` | Posts, the queue, connected accounts, metrics |
+| `app.key` | The key that encrypts the access tokens in that database. Made on first launch, mode 0600. Lose it and every account has to be reconnected |
+| `storage/app/postline-media/` | Images attached to queued posts |
+| `content/blog/` | Long-form posts published to the blog channel |
+| `postline.before-<migration>.sqlite` | A copy made before an upgrade migrates the database |
 
-## Build locally
+The log is `~/Library/Logs/Postline.log`.
 
-You need a Craft binary. Point `CRAFT_BIN` at one, or have `craft` on your `PATH`.
+## How it is put together
+
+| File | What it does |
+|---|---|
+| `config/desktop.ts` | The `webview` app: name, bundle id, window, where the agent and the views are |
+| `app/Desktop/Agent.ts` | The agent's own code: answers `/api/*` with the app's routes, starts the recurring jobs |
+| `app/Desktop/data.ts` | Prepares the data directory before any framework code loads: database, app key, working directory |
+| `app/Desktop/schedule.ts` | Runs the recurring jobs on timers while the app is open |
+| `scripts/desktop-bundle.ts` | Writes what the agent carries: routes, actions, middleware, jobs, migrations, and a migrated empty database |
+| `app/Desktop/build-views.ts` | Builds the pages the app carries: the workspace, without the marketing site |
+| `scripts/desktop-check.ts` | Compiled and run from an empty directory, proves the agent serves the API and writes to its database. The release runs it before imaging |
+| `resources/views/settings.stx`, `resources/layouts/settings.stx` | The Settings window |
+| `app/Desktop/bundle.generated.js`, `database.template.sqlite` | That script's output. Build products, not committed |
+| `app/Desktop/icon.svg`, `AppIcon.icns`, `scripts/app-icon.ts` | The icon, and the script that draws it |
+
+Three things about a compiled agent shape all of this:
+
+- **It has no project tree.** The framework finds routes, actions, middleware
+  and migrations by reading files off disk. The agent is one binary, so
+  `scripts/desktop-bundle.ts` names each of them as a static import the
+  bundler can follow.
+- **Order matters at startup.** The framework reads the database path and the
+  app key when its modules are first evaluated. `Agent.ts` therefore imports
+  nothing from the framework at the top: it prepares the data directory, then
+  imports the rest.
+- **Nobody signs in.** The framework's launcher gives the window a one-time
+  token for a cookie and refuses any request without it, or with a Host that
+  is not the agent's own port. A request that reaches the router is already
+  the person at the Mac. `app/Desktop/data.ts` sets `POSTLINE_DESKTOP_AGENT`,
+  and the auth middleware lets those requests through; the flag is read from
+  the environment, never from a request.
+
+## Build and run
 
 ```bash
-export DESKTOP_URL=https://your-postline.example.com/composer
+bun scripts/desktop-bundle.ts
 ```
 
 ```bash
@@ -34,88 +61,84 @@ export DESKTOP_URL=https://your-postline.example.com/composer
 ```
 
 ```bash
-./buddy build:dmg
+open storage/framework/desktop/webview/darwin-arm64/Postline.app
 ```
 
-The DMG lands in `storage/framework/desktop-dmg/`. Use
-`DESKTOP_URL=http://postline.localhost/composer` to wrap a local dev server
-instead. On loopback the workspace lets the desktop shell in without signing in.
+`./buddy dev:desktop` runs the same agent from source, with the views rendered
+live. Run `bun scripts/desktop-bundle.ts` again after adding a route, an
+action, a middleware or a migration.
 
-`DESKTOP_APP_NAME`, `DESKTOP_BUNDLE_ID` and `DESKTOP_APP_VERSION` override the
-name, bundle id and version; they default to `APP_NAME`, `sh.stacks.<name>` and
-the version in `package.json`.
-
-## Regenerate the icon
+To check the compiled agent the way the release does:
 
 ```bash
-bun scripts/app-icon.ts
+bun build --compile scripts/desktop-check.ts --outfile /tmp/postline-check && (cd /tmp && ./postline-check)
 ```
 
-That rewrites `resources/assets/images/app-icon.png` and the touch icons. To
-rebuild `app/Desktop/AppIcon.icns` from it, make an iconset with `sips` at
-16, 32, 128, 256 and 512 points (each at 1x and 2x) and run
-`iconutil -c icns <name>.iconset -o app/Desktop/AppIcon.icns`.
+## Settings
+
+Settings is a window of its own, as in any Mac app: the app menu's
+Settings item, Cmd+, the comma key and the sidebar link all open it, and
+asking again brings the same window forward. It is stx's `SettingsWindow`
+with its Mac controls, opened with `craft.window.open` from
+`resources/layouts/app.stx`. In a browser the same page fills the tab, with a
+link back to the workspace.
+
+Two windows share the app's storage (`--persistent-storage` in
+`config/desktop.ts`), which is how the Settings window has the workspace's
+session, and how the theme, the sidebar and drafts survive a quit. The
+Settings window tells the workspace what it cannot do itself over a
+`BroadcastChannel`: apply the theme picked there, and show the Channels page.
+
+To start over as a new install, quit the app and move
+`~/Library/Application Support/Postline` aside.
+
+## First launch and upgrades
+
+A first launch writes the database the build made: already migrated, and
+empty. Every later launch compares the migrations the build carries with the
+ones the database has had, copies the database aside if any are pending, and
+applies them one at a time, each in a transaction with its ledger row. A
+migration that fails leaves no half of itself behind.
+
+The ledger is the framework's own `migrations` table, so the database is one
+`./buddy migrate` would recognise.
+
+## What runs while it is open
+
+Scheduled posts are published every minute, keyword rules and direct messages
+are checked every five, engagement is synced every thirty, and old posts are
+cleaned up daily. Posts that came due while the app was closed go out when it
+opens. **Nothing publishes while the app is quit**: for a queue that runs
+overnight, run Postline on a machine that stays on.
 
 ## Releases
-
-Before the first release, set the repository variable `DESKTOP_URL` to the
-`https` address of the Postline the app should open. The release workflow stops
-with an error when it is missing.
 
 ```bash
 bun run release:minor
 ```
 
-This bumps `package.json`, writes the changelog, commits, then tags `vX.Y.Z` and
-pushes. The tag triggers `release.yml`, which builds the app on macOS
-(Apple Silicon) and uses the [Pantry](https://github.com/pantry-pm/pantry)
-action to publish the GitHub release: notes from that version's section of
-`CHANGELOG.md`, `Postline-X.Y.Z-macos-arm64.dmg`, and a checksums file.
+That bumps `package.json`, writes the changelog, commits, tags `vX.Y.Z` and
+pushes. `.reviewos/workflows/release.yml` builds the app on Postline's Mac
+runner, makes `Postline-X.Y.Z-macos-arm64.dmg`, and publishes the GitHub
+release through the [Pantry](https://github.com/pantry-pm/pantry) action. It
+needs the secret `GH_RELEASE_TOKEN` on the repository in ReviewOS; see
+[ci.md](ci.md).
 
-The DMG is unsigned until you set the repository variables
-`DESKTOP_SIGNING_IDENTITY` (a Developer ID Application identity) and
-`DESKTOP_NOTARY_PROFILE`. Unsigned, the app needs a right-click, then Open, the
-first time.
-
-## Mac App Store
-
-1. Enroll in the Apple Developer Program and register the bundle id
-   `org.stacksjs.postline`, or your own, set as `APPLE_BUNDLE_ID`.
-2. Create the app record in App Store Connect, then fill in the pricing, privacy,
-   age rating and export-compliance answers.
-3. Add the repository secrets and variables listed at the top of
-   `.github/workflows/apple-app-store.yml`.
-4. Run **Publish Mac App Store** from the Actions tab against a release tag,
-   with *validate-only* on. When it passes, run it again with it off to upload.
-
-Review note: Apple's guideline 4.2 (minimum functionality) is strict with apps
-that only wrap a website. The persistent session and native window chrome
-help, but native features are what make the case at review. Notifications for
-scheduled posts and the inbox are the obvious next ones.
+The app is signed with the certificate named by the repository variable
+`DESKTOP_SIGNING_IDENTITY` (a Developer ID Application identity). Without it
+the build uses a development certificate, and Gatekeeper asks before the
+first open.
 
 ## What is not done
 
-- **The app is not self-contained yet.** It needs a Postline reachable at
-  `DESKTOP_URL`. The plan is Stacks' `webview` desktop mode: the app's
-  executable is a compiled agent that serves the API on loopback, and its
-  window is a web view pointed at it.
-
-  What is proven, on Stacks 0.75.599: `scripts/desktop-bundle.ts` writes the
-  app's route file and all 65 actions as static imports
-  (`app/Desktop/bundle.generated.js`), and a binary compiled from them with
-  `stacksAgentHandler` boots the router outside the project, reaches SQLite
-  and answers `/api/login` correctly.
-
-  What blocks it: every route behind `.middleware('auth')` answers 500 in that
-  binary, and the automatic `csrf` check fails on every write. The router
-  finds middleware by importing files off disk, and a compiled binary has
-  none. The fix is in the framework (`provideMiddleware`, the counterpart of
-  `provideActions`) and is written and tested there, but not released.
-
-  Still to do after that release: run the migrations and generate the app key
-  inside the app on first launch, keep the database and uploaded media in
-  Application Support, run the scheduler in the agent, and build the workspace
-  views as static pages.
-- **No signed updates.** That arrives with the `webview` mode above.
-- **Apple Silicon only.** The release workflow builds `arm64`. The App Store
-  workflow builds a universal binary.
+- **Notarization.** The release signs the app but does not notarize it. Until
+  it does, a downloaded copy needs a right-click, then Open, the first time.
+  `buddy release:desktop` notarizes, staples and publishes signed update
+  manifests; moving the release onto it needs a Developer ID and an update
+  signing key.
+- **The Mac App Store.** A web view app is built unsandboxed, because the
+  agent is a server and a sandboxed app cannot be one this way. The Store
+  requires the sandbox. Shipping there means the framework's `macos` desktop
+  mode, which is a different app shape.
+- **In-app updates.** Not wired up; a new version is a new download.
+- **Apple Silicon only.** The release builds `arm64`.

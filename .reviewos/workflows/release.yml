@@ -11,7 +11,6 @@
 # this up, and this one picks up nothing else.
 #
 # NEEDED ON THE INSTANCE before the first release:
-#   variable DESKTOP_URL      the https address of the Postline the app opens
 #   secret   GH_RELEASE_TOKEN a GitHub token that may create releases on
 #                             stacksjs/postline (contents: write)
 #
@@ -19,6 +18,9 @@
 # `GITHUB_API_URL` are ReviewOS's, and ReviewOS answers no releases API there.
 # The release is published on GitHub, where the code and the downloads are, so
 # the publish step is pointed at GitHub by name.
+#
+# The app is self-contained: it serves Postline from inside itself, so there
+# is no address to configure and nothing has to be deployed first.
 name: Release
 
 on:
@@ -38,11 +40,6 @@ concurrency:
 
 env:
   BUN_VERSION: 1.4.4
-  # Prebuilt Craft runtime, pinned by release and checksum. v0.0.118 is the
-  # first release with --persistent-storage and --no-web-chrome-controls,
-  # which app/Desktop/launcher.ts passes.
-  CRAFT_VERSION: v0.0.118
-  CRAFT_SHA256_ARM64: bba1ff388afc70e734b6ac955c52dbd1c90da723a3f458c311d3aec592fb0bec
 
 jobs:
   desktop:
@@ -56,13 +53,10 @@ jobs:
     runs-on: [self-hosted, macos-arm64, postline]
     timeout-minutes: 30
     env:
-      APP_NAME: Postline
-      DESKTOP_APP_NAME: Postline
-      DESKTOP_BUNDLE_ID: ${{ vars.APPLE_BUNDLE_ID || 'org.stacksjs.postline' }}
-      DESKTOP_URL: ${{ vars.DESKTOP_URL }}
-      DESKTOP_RELEASE_CHANNEL: stable
+      # Optional Developer ID signing, picked up by build:desktop when set.
+      # Unset, the app is signed with whatever development certificate the
+      # runner has, and Gatekeeper asks on first open.
       DESKTOP_SIGNING_IDENTITY: ${{ vars.DESKTOP_SIGNING_IDENTITY }}
-      DESKTOP_NOTARY_PROFILE: ${{ vars.DESKTOP_NOTARY_PROFILE }}
     steps:
       - name: Resolve tag and version
         id: version
@@ -73,17 +67,6 @@ jobs:
           case "$TAG" in v*) ;; *) echo "Not a release tag: $TAG" >&2; exit 1 ;; esac
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-
-      # Before anything is built: a release with nowhere for the app to open
-      # is not a release.
-      - name: Require the app's address
-        run: |
-          set -euo pipefail
-          case "$DESKTOP_URL" in
-            https://*) ;;
-            '') echo "::error::Set the repository variable DESKTOP_URL to the https address of the Postline the desktop app opens." >&2; exit 1 ;;
-            *) echo "::error::DESKTOP_URL must be an https address, got: $DESKTOP_URL" >&2; exit 1 ;;
-          esac
 
       # The runner checked out the commit the event names. A manual run names
       # a branch, so move to the tag it was asked to build.
@@ -113,40 +96,50 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Fetched over plain HTTPS and checked against the pinned digest: the
-      # release is public, and a job that needs no GitHub token to read it
-      # should not be handed one.
-      - name: Fetch pinned Craft runtime
-        run: |
-          set -euo pipefail
-          dir="$RUNNER_TEMP/craft"
-          mkdir -p "$dir"
-          curl --fail --silent --show-error --location --retry 3 \
-            -o "$dir/craft-darwin-arm64.zip" \
-            "https://github.com/craft-native/craft/releases/download/$CRAFT_VERSION/craft-darwin-arm64.zip"
-          echo "$CRAFT_SHA256_ARM64  $dir/craft-darwin-arm64.zip" | shasum -a 256 -c -
-          unzip -q -o "$dir/craft-darwin-arm64.zip" -d "$dir"
-          test "$(lipo -archs "$dir/craft")" = arm64
-          echo "CRAFT_BIN=$dir/craft" >> "$GITHUB_ENV"
+      # The routes, actions, middleware, migrations and a freshly migrated
+      # empty database, written where the bundler can follow them. The agent
+      # is one compiled binary and carries all of it.
+      - name: Write what the agent carries
+        run: bun scripts/desktop-bundle.ts
 
-      - name: Build desktop app
+      # The agent, compiled and run from an empty directory the way the app
+      # runs it: every page left to the views, the API answering, a post
+      # published and read back from the database. A release whose agent
+      # cannot do that is not imaged.
+      - name: Check the compiled agent
+        run: |
+          CHECK_DIR="$(mktemp -d)"
+          bun build --compile scripts/desktop-check.ts --outfile "$CHECK_DIR/postline-check"
+          (cd "$CHECK_DIR" && ./postline-check)
+
+      # Compiles the agent with the built views inside it and assembles
+      # Postline.app. The Craft web view runtime is fetched for the installed
+      # craft-native version and checked against that release's manifest.
+      - name: Build the app
         run: bun node_modules/@stacksjs/buddy/dist/cli.js build:desktop
 
-      - name: Package DMG
-        env:
-          DESKTOP_APP_VERSION: ${{ steps.version.outputs.version }}
-        run: bun node_modules/@stacksjs/buddy/dist/cli.js build:dmg
-
-      - name: Name the DMG for its platform
+      # A disk image with the app and a link to Applications, which is what a
+      # person expects to open. Named for the platform it runs on, so a later
+      # Intel or Windows build can sit beside it in the same release.
+      - name: Make the disk image
         id: dmg
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          cd storage/framework/desktop-dmg
-          test -f "Postline-$VERSION.dmg"
-          mv "Postline-$VERSION.dmg" "Postline-$VERSION-macos-arm64.dmg"
-          echo "path=storage/framework/desktop-dmg/Postline-$VERSION-macos-arm64.dmg" >> "$GITHUB_OUTPUT"
+          app=storage/framework/desktop/webview/darwin-arm64/Postline.app
+          test -d "$app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$VERSION"
+          stage="$RUNNER_TEMP/postline-dmg"
+          rm -rf "$stage"
+          mkdir -p "$stage" storage/framework/desktop-dmg
+          ditto "$app" "$stage/Postline.app"
+          ln -s /Applications "$stage/Applications"
+          dmg="storage/framework/desktop-dmg/Postline-$VERSION-macos-arm64.dmg"
+          rm -f "$dmg"
+          hdiutil create -volname "Postline $VERSION" -srcfolder "$stage" -format UDZO -ov "$dmg"
+          hdiutil verify "$dmg"
+          echo "path=$dmg" >> "$GITHUB_OUTPUT"
 
       # Published on GitHub through the Pantry action: notes from this
       # version's section of CHANGELOG.md, the DMG and a checksums file. The

@@ -92,3 +92,8 @@ storage/framework/desktop-dmg/
 .tmp-upgrade/
 .claude/scheduled_tasks.lock
 storage/app/postline-media/
+
+# Desktop agent build products (bun scripts/desktop-bundle.ts)
+app/Desktop/bundle.generated.js
+app/Desktop/database.template.sqlite
+storage/framework/desktop/

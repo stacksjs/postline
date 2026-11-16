@@ -70,8 +70,8 @@ Recorded so it can be repeated on another machine. All of it is done.
    command again rotates the token.
 
 Still to set, on the repository in ReviewOS, before the first release: the
-variable `DESKTOP_URL` and the secret `GH_RELEASE_TOKEN` (a GitHub token with
-`contents: write` on `stacksjs/postline`).
+secret `GH_RELEASE_TOKEN` (a GitHub token with `contents: write` on
+`stacksjs/postline`).
 
 ## Checking on the runner
 

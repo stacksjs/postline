@@ -114,20 +114,24 @@ OAuth callbacks are `https://<your host>/api/postline/<network>/callback`.
 
 ## Desktop app
 
-Postline builds into a native macOS app, a [Craft](https://github.com/craft-native/craft)
-window around a running Postline:
+Postline builds into a Mac app that runs itself: the workspace and the API are
+served from inside the app, and your data lives in
+`~/Library/Application Support/Postline`.
 
 ```bash
-DESKTOP_URL=https://your-postline.example.com/composer ./buddy build:desktop
+bun scripts/desktop-bundle.ts
 ```
 
 ```bash
-./buddy build:dmg
+./buddy build:desktop
 ```
 
-The app opens the address in `DESKTOP_URL`; it does not contain the server yet.
-[docs/desktop.md](docs/desktop.md) covers signing, releases and the Mac App
-Store.
+```bash
+open storage/framework/desktop/webview/darwin-arm64/Postline.app
+```
+
+[docs/desktop.md](docs/desktop.md) covers how it is put together, upgrades,
+releases and what is not done.
 
 ## Deploying
 
@@ -144,14 +148,12 @@ code shared with The Open Times, and deploying to it would collide.
 
 ## Releasing
 
-Set the repository variable `DESKTOP_URL` first, then:
-
 ```bash
 bun run release:minor
 ```
 
 That bumps the version, writes the changelog, tags and pushes. The tag builds
-the DMG on Postline's Mac runner and publishes a GitHub release with it
+the app on Postline's Mac runner and publishes a GitHub release with the DMG
 attached, through the [Pantry](https://github.com/pantry-pm/pantry) action.
 
 ## Contributing

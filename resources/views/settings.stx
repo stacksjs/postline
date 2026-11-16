@@ -1,141 +1,128 @@
-@extends('layouts/app')
+@extends('layouts/settings')
 
 @section('title', 'Postline - Settings')
 
 @section('content')
   @meta('description', 'Configure Postline publishing defaults.')
-  <section class="grid gap-5" data-postline-page="settings" data-testid="settings-page">
-    <header class="grid gap-4 items-center sm:grid-cols-[minmax(0,1fr)_auto] min-h-11">
-      <div>
-        <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Settings</p>
-        <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Publishing</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-muted">Configure how Postline looks, publishes, and connects.</p>
-      </div>
-      <button class="inline-flex items-center justify-center px-4 h-9 w-fit font-bold text-ink text-sm bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" @click="signOut">Sign out</button>
-    </header>
+  {{--
+    The Settings window stx ships: the two columns System Settings has, with
+    its sidebar, search, panes and Mac controls. In the desktop app the
+    workspace opens this page in a window of its own (craft.window.open, from
+    layouts/app.stx); in a browser it is the whole page, with a way back.
+  --}}
+  <section data-postline-page="settings" data-testid="settings-page">
+    <SettingsWindow id="postline-settings" title="Settings" storageKey="postline" v-model:pane="pane">
+      <template #account>
+        <a class="inline-flex gap-1.5 items-center px-2 py-1 text-[13px] text-muted hover:text-ink" href="/composer" x-show="!ownWindow()" data-settings-back>
+          <span class="h-3.5 w-3.5 i-lucide-chevron-left" aria-hidden="true"></span>
+          Back to Postline
+        </a>
+      </template>
+      <template #sidebar>
+        <SettingsSidebarGroup>
+          <SettingsSidebarItem id="general" label="General" icon="i-lucide-settings" tone="grey" />
+          <SettingsSidebarItem id="appearance" label="Appearance" icon="i-lucide-sun-moon" tone="ink" />
+        </SettingsSidebarGroup>
+        <SettingsSidebarGroup>
+          <SettingsSidebarItem id="channels" label="Channels" icon="i-lucide-share-2" tone="blue" keywords="accounts networks bluesky linkedin mastodon threads instagram" />
+          <SettingsSidebarItem id="composer" label="Composer" icon="i-lucide-pen-line" tone="orange" />
+          <SettingsSidebarItem id="deletion" label="Automatic Deletion" icon="i-lucide-trash-2" tone="red" keywords="retention delete cleanup" />
+        </SettingsSidebarGroup>
+        <div x-show="!ownWindow()">
+          <SettingsSidebarGroup>
+            <SettingsSidebarItem id="account" label="Account" icon="i-lucide-user" tone="indigo" keywords="sign out log out" />
+          </SettingsSidebarGroup>
+        </div>
+      </template>
 
-    <nav class="flex gap-1 p-1 w-fit bg-panel-3 border border-line rounded-xl" aria-label="Settings sections">
-      <a class="inline-flex items-center justify-center px-3 h-8 font-bold text-ink text-xs bg-panel border border-line rounded-lg shadow-sm" href="/settings" data-stx-link aria-current="page">General</a>
-      <a class="inline-flex items-center justify-center px-3 h-8 font-bold text-muted text-xs hover:text-ink rounded-lg transition-colors" href="/accounts" data-stx-link>Channels</a>
-    </nav>
+      <SettingsPane id="general" title="General" active>
+        <SettingsPaneHeader icon="i-lucide-send" tone="red" title="Postline" description="Draft once, then publish to every connected account." />
+        <SettingsGroup>
+          <SettingsRow label="Channels" setting="channels-summary" to="channels" :value="channelPill()" />
+          <SettingsRow label="Automatic deletion" setting="deletion-summary" to="deletion" :value="statusPill()" />
+          <SettingsRow label="Appearance" setting="appearance-summary" to="appearance" />
+        </SettingsGroup>
+      </SettingsPane>
 
-    <section class="grid gap-3.5 lg:grid-cols-2">
-      <article class="grid gap-3 lg:col-span-2 p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <header class="flex gap-3 items-center justify-between pb-3 border-b border-line">
-          <div>
-            <strong class="text-[13px]">Appearance</strong>
-            <p class="mb-0 mt-1 text-muted text-xs">Light, dark, or match your system.</p>
-          </div>
-          {{-- Active state binds to a data attribute rather than :class: the
-              binding removes the attribute on false, the styling lives in CSS
-              below, and no dynamically-applied class means nothing to safelist. --}}
-          <div class="grid grid-cols-3 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Theme">
-            <button class="px-3 py-1.5 min-w-16 font-bold text-xs rounded-lg transition-colors" type="button" data-theme-option :data-active="themePref() === 'light'" @click="setTheme('light')">Light</button>
-            <button class="px-3 py-1.5 min-w-16 font-bold text-xs rounded-lg transition-colors" type="button" data-theme-option :data-active="themePref() === 'dark'" @click="setTheme('dark')">Dark</button>
-            <button class="px-3 py-1.5 min-w-16 font-bold text-xs rounded-lg transition-colors" type="button" data-theme-option :data-active="themePref() === 'system'" @click="setTheme('system')">System</button>
-          </div>
-        </header>
-      </article>
+      <SettingsPane id="appearance" title="Appearance">
+        <SettingsGroup footer="Automatic follows the appearance your system is set to.">
+          <SettingsRow label="Appearance" layout="stacked" setting="appearance" keywords="theme light dark">
+            <AppearancePicker v-model:value="appearance" label="Appearance" @change="setAppearance" />
+          </SettingsRow>
+        </SettingsGroup>
+      </SettingsPane>
 
-      <article class="grid gap-3 p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <header class="flex gap-3 items-center justify-between pb-3 border-b border-line">
-          <div>
-            <strong class="text-[13px]">Publishing channels</strong>
-            <p class="mb-0 mt-1 text-muted text-xs" :text="channelSummary()">Checking…</p>
-          </div>
-          <span class="px-2.5 py-1 font-bold text-[11px] border rounded-full" data-channels-pill :data-state="channelState()" :text="channelPill()">Checking</span>
-        </header>
-        <p class="m-0 leading-relaxed text-[13px] text-body">Connect Bluesky, LinkedIn, Instagram, Threads, X, and Mastodon from the Channels section. Credentials stay in your workspace.</p>
-        <a class="inline-flex items-center justify-center px-4 h-9 w-fit font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" href="/accounts" data-stx-link>Manage channels</a>
-      </article>
+      <SettingsPane id="channels" title="Channels">
+        <SettingsGroup footer="Credentials stay in your workspace.">
+          <SettingsRow label="Publishing channels" :description="channelSummary()" setting="channels" keywords="accounts networks connect">
+            <Button appearance="mac" @click="manageChannels">Manage Channels…</Button>
+          </SettingsRow>
+        </SettingsGroup>
+      </SettingsPane>
 
-      <article class="grid gap-3 p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <header class="flex gap-3 items-center justify-between pb-3 border-b border-line">
-          <strong class="text-[13px]">Composer</strong>
-          <span class="text-muted text-xs" :text="charLimitSource()">—</span>
-        </header>
-        <label class="flex gap-4 items-center justify-between text-[13px] text-body">
-          <span>Character limit</span>
-          <span class="font-bold text-ink" :text="charLimitText()">—</span>
-        </label>
-        <label class="flex gap-4 items-center justify-between text-[13px] text-body">
-          <span>Default mode</span>
-          <span class="text-muted">Single post</span>
-        </label>
-        <label class="flex gap-4 items-center justify-between text-[13px] text-body">
-          <span>Auto-save drafts</span>
-          <span class="font-bold text-emerald-700">On</span>
-        </label>
-      </article>
+      <SettingsPane id="composer" title="Composer">
+        <SettingsGroup footer="The limit is the tightest one among the channels that can publish.">
+          <SettingsRow label="Character limit" :description="charLimitSource()" setting="character-limit">
+            <span :text="charLimitText()">—</span>
+          </SettingsRow>
+          <SettingsRow label="Default mode" setting="default-mode"><span>Single post</span></SettingsRow>
+          <SettingsRow label="Auto-save drafts" setting="auto-save"><span>On</span></SettingsRow>
+        </SettingsGroup>
+      </SettingsPane>
 
       {{--
         Retention. Saved on the workspace (accounts row) and applied once a day
         by the AutoDeletePosts job through the same purge engine as the manual
         tool under Channels, so it has the same caps and audit trail.
       --}}
-      <article class="grid gap-4 lg:col-span-2 p-4 bg-panel border border-line rounded-2xl shadow-sm" data-retention-card>
-        <header class="flex gap-3 items-center justify-between pb-3 border-b border-line">
-          <div>
-            <strong class="text-[13px]">Automatic deletion</strong>
-            <p class="mb-0 mt-1 text-muted text-xs">Delete posts once they are older than a set number of days. Checked daily.</p>
-          </div>
-          <span class="px-2.5 py-1 font-bold text-[11px] border rounded-full" data-retention-pill :data-state="savedEnabled() ? 'on' : 'off'" :text="statusPill()">Off</span>
-        </header>
+      <SettingsPane id="deletion" title="Automatic Deletion">
+        <SettingsGroup footer="Checked once a day. A post whose date can't be read is always kept.">
+          <SettingsRow label="Delete my posts automatically" :description="statusPill()" setting="auto-delete" keywords="retention cleanup">
+            <Switch variant="mac" v-model:checked="autoEnabled" data-retention-enabled />
+          </SettingsRow>
+          <SettingsRow label="Delete posts older than" description="Days, from 1 to 3650." setting="auto-delete-days">
+            <NumberInput variant="mac" v-model:value="autoDaysText" min="1" max="3650" step="1" data-retention-days />
+          </SettingsRow>
+        </SettingsGroup>
 
-        <label class="flex gap-3 items-center text-[13px] text-ink cursor-pointer">
-          <input class="h-4 w-4" type="checkbox" x-model="autoEnabled" :disabled="!retentionLoaded()" data-retention-enabled>
-          <span class="font-bold">Delete my posts automatically</span>
-        </label>
+        <SettingsGroup footer="Everything includes posts made outside Postline. Otherwise anything you posted elsewhere stays.">
+          <SettingsRow label="Posts to delete" setting="auto-delete-scope" keywords="scope which">
+            <Select variant="mac" v-model:value="autoScope" placeholder="" :options="[{ value: 'all', label: 'Everything on the account' }, { value: 'tracked', label: 'Only posts Postline published' }]" />
+          </SettingsRow>
+        </SettingsGroup>
 
-        <label class="flex flex-wrap gap-2 items-center text-[13px] text-body">
-          <span>Delete posts older than</span>
-          <input class="px-3 h-9 w-20 text-ink text-right text-sm bg-panel border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40" type="number" min="1" max="3650" step="1" x-model.number="autoDays" aria-label="Days to keep posts" data-retention-days>
-          <span>days</span>
-        </label>
+        <SettingsGroup header="Networks" footer="Every connected account on a network that is on is included. Instagram and Threads can't delete posts through their APIs.">
+          <SettingsRow label="Bluesky" setting="auto-delete-bluesky"><Switch variant="mac" size="mini" v-model:checked="onBluesky" /></SettingsRow>
+          <SettingsRow label="X (Twitter)" setting="auto-delete-twitter"><Switch variant="mac" size="mini" v-model:checked="onTwitter" /></SettingsRow>
+          <SettingsRow label="Mastodon" setting="auto-delete-mastodon"><Switch variant="mac" size="mini" v-model:checked="onMastodon" /></SettingsRow>
+          <SettingsRow label="LinkedIn" setting="auto-delete-linkedin"><Switch variant="mac" size="mini" v-model:checked="onLinkedin" /></SettingsRow>
+        </SettingsGroup>
 
-        <fieldset class="grid gap-2 m-0 p-0 border-0">
-          <legend class="mb-1 p-0 font-bold text-muted text-xs">Which posts</legend>
-          <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
-            <input class="mt-0.5" type="radio" name="retention-scope" value="all" x-model="autoScope">
-            <span>
-              <span class="block font-bold text-[13px] text-ink">Everything on the account</span>
-              <span class="block mt-0.5 text-muted text-xs">Every post past the cutoff, including ones made outside Postline.</span>
-            </span>
-          </label>
-          <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
-            <input class="mt-0.5" type="radio" name="retention-scope" value="tracked" x-model="autoScope">
-            <span>
-              <span class="block font-bold text-[13px] text-ink">Only posts Postline published</span>
-              <span class="block mt-0.5 text-muted text-xs">Anything you posted elsewhere stays.</span>
-            </span>
-          </label>
-        </fieldset>
-
-        <fieldset class="grid gap-2 m-0 p-0 border-0">
-          <legend class="mb-1 p-0 font-bold text-muted text-xs">Networks</legend>
-          <div class="flex flex-wrap gap-3">
-            <label class="inline-flex gap-2 items-center text-[13px]"><input type="checkbox" value="bluesky" x-model="autoProviders"> Bluesky</label>
-            <label class="inline-flex gap-2 items-center text-[13px]"><input type="checkbox" value="twitter" x-model="autoProviders"> X (Twitter)</label>
-            <label class="inline-flex gap-2 items-center text-[13px]"><input type="checkbox" value="mastodon" x-model="autoProviders"> Mastodon</label>
-            <label class="inline-flex gap-2 items-center text-[13px]"><input type="checkbox" value="linkedin" x-model="autoProviders"> LinkedIn</label>
-          </div>
-          <p class="m-0 text-muted text-xs">Every connected account on a ticked network is included. Instagram and Threads can't delete posts through their APIs. A post whose date can't be read is always kept.</p>
-        </fieldset>
-
-        <label class="flex gap-2.5 items-start p-3 text-red-800 text-xs dark:text-red-300 bg-red-50 dark:bg-red-950/40 border border-red-200 rounded-xl dark:border-red-900 cursor-pointer" x-show="needsAcknowledgement()">
-          <input class="mt-0.5" type="checkbox" x-model="acknowledged" data-retention-ack>
-          <span>I understand matching posts are permanently deleted from the networks every day, and cannot be restored.</span>
-        </label>
-
-        <div class="flex flex-wrap gap-3 items-center">
-          <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="!canSave()" @click="saveRetention" data-retention-save>Save</button>
-          <button class="inline-flex items-center justify-center px-4 h-9 font-bold text-ink text-sm bg-panel hover:bg-panel-3 border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="previewing() || !retentionLoaded()" @click="previewRetention" data-retention-preview>Preview what would be deleted now</button>
+        <div x-show="needsAcknowledgement()">
+          <SettingsGroup>
+            <SettingsRow label="I understand" description="Matching posts are permanently deleted from the networks every day, and cannot be restored." multiline destructive setting="auto-delete-acknowledge">
+              <Switch variant="mac" v-model:checked="acknowledged" data-retention-ack />
+            </SettingsRow>
+          </SettingsGroup>
         </div>
 
-        <p class="m-0 text-[13px]" :data-tone="retentionTone()" x-show="retentionMessage()" :text="retentionMessage()" role="status" aria-live="polite" data-retention-message></p>
-        <p class="m-0 text-muted text-xs" x-show="lastRunText()" :text="lastRunText()" data-retention-last-run></p>
-      </article>
-    </section>
+        <div class="flex flex-wrap gap-2 items-center justify-end">
+          <Button appearance="mac" :disabled="previewing() || !retentionLoaded()" @click="previewRetention">Preview What Would Be Deleted</Button>
+          <Button appearance="mac" variant="primary" :disabled="!canSave()" @click="saveRetention">Save</Button>
+        </div>
+
+        <p class="m-0 mt-3 text-[12px]" :data-tone="retentionTone()" x-show="retentionMessage()" :text="retentionMessage()" role="status" aria-live="polite" data-retention-message></p>
+        <p class="m-0 mt-2 text-[11px] text-muted" x-show="lastRunText()" :text="lastRunText()" data-retention-last-run></p>
+      </SettingsPane>
+
+      <SettingsPane id="account" title="Account">
+        <SettingsGroup footer="Signing out ends this session on the server and clears it from this browser.">
+          <SettingsRow label="Sign out of Postline" setting="sign-out">
+            <Button appearance="mac" variant="danger" @click="signOut">Sign Out</Button>
+          </SettingsRow>
+        </SettingsGroup>
+      </SettingsPane>
+    </SettingsWindow>
   </section>
 
 
@@ -160,9 +147,35 @@
     }
 
     const themePref = state(readStoredTheme())
+    const pane = state('general')
+
+    /**
+     * Whether this page is the desktop app's Settings window.
+     *
+     * There it is a window of its own beside the workspace, so there is no
+     * way back to offer and no account to sign out of (the app's agent has no
+     * login). In a browser it is a page like any other.
+     */
+    const ownWindow = state(!!window.craft?.window)
+
+    /**
+     * What this window tells the workspace window.
+     *
+     * Two windows of one app share an origin and nothing else: a theme picked
+     * here has to be applied there, and "Manage Channels" opens a workspace
+     * page, which belongs in the workspace window.
+     */
+    const workspace = typeof BroadcastChannel === 'function' ? new BroadcastChannel('postline:settings') : null
+    const tellWorkspace = (message: { type: 'theme', pref: string } | { type: 'navigate', path: string }): void => {
+      try {
+        workspace?.postMessage(message)
+      }
+      catch {}
+    }
+    // The picker says 'auto' where this app's stored preference says 'system'.
+    const appearance = state(readStoredTheme() === 'system' ? 'auto' : readStoredTheme())
     const channelSummary = state('Checking…')
     const channelPill = state('Checking')
-    const channelState = state('')
     const charLimitText = state('—')
     const charLimitSource = state('—')
 
@@ -206,6 +219,23 @@
       }
       catch {}
       applyTheme(pref)
+      // The window's own chrome (its buttons, its material) follows the
+      // window's appearance, not the page's.
+      void window.craft?.window?.setAppearance?.(pref)
+      tellWorkspace({ type: 'theme', pref })
+    }
+
+    const setAppearance = (mode: string): void => {
+      setTheme(mode === 'light' || mode === 'dark' ? mode : 'system')
+    }
+
+    // A full page, so the framework's own navigation and not a pane.
+    const manageChannels = (): void => {
+      if (ownWindow()) {
+        tellWorkspace({ type: 'navigate', path: '/accounts' })
+        return
+      }
+      navigate('/accounts')
     }
 
     // Signal-backed cookie: setting it to '' emits max-age=0, and it adds
@@ -267,9 +297,20 @@
     const savedEnabled = state(false)
     const savedDays = state(7)
     const autoEnabled = state(false)
-    const autoDays = state(7)
+    // The number field's model is text; the saved value is the whole number in it.
+    const autoDaysText = state('7')
+    const autoDays = derived(() => Number(autoDaysText()))
     const autoScope = state<'all' | 'tracked'>('all')
-    const autoProviders = state<string[]>([])
+    const onBluesky = state(false)
+    const onTwitter = state(false)
+    const onMastodon = state(false)
+    const onLinkedin = state(false)
+    const autoProviders = derived(() => [
+      onBluesky() ? 'bluesky' : '',
+      onTwitter() ? 'twitter' : '',
+      onMastodon() ? 'mastodon' : '',
+      onLinkedin() ? 'linkedin' : '',
+    ].filter(Boolean))
     const acknowledged = state(false)
     const saving = state(false)
     const previewing = state(false)
@@ -303,9 +344,13 @@
       savedEnabled.set(settings.enabled)
       savedDays.set(settings.days)
       autoEnabled.set(settings.enabled)
-      autoDays.set(settings.days)
+      autoDaysText.set(String(settings.days))
       autoScope.set(settings.scope)
-      autoProviders.set(settings.providers.length ? settings.providers : defaults)
+      const providers = settings.providers.length ? settings.providers : defaults
+      onBluesky.set(providers.includes('bluesky'))
+      onTwitter.set(providers.includes('twitter'))
+      onMastodon.set(providers.includes('mastodon'))
+      onLinkedin.set(providers.includes('linkedin'))
       acknowledged.set(false)
       lastRunText.set(describeLastRun(lastRun))
     }
@@ -393,6 +438,16 @@
 
     onMount(() => {
       void loadRetention()
+      onDestroy(() => workspace?.close())
+
+      // A window with a hidden titlebar moves only when the page hands the
+      // press to AppKit: WebKit ignores -webkit-app-region.
+      useEventListener('mousedown', (event: MouseEvent) => {
+        const target = event.target instanceof Element ? event.target : null
+        if (event.button !== 0 || !target?.closest('[data-window-drag]')) return
+        if (target.closest('button, input, a, select, textarea, [role="button"], .stx-settings-search')) return
+        void window.craft?.window?.startDrag?.()
+      }, { target: document })
 
       // Keep 'system' live if the OS theme flips while the page is open.
       // useEventListener unsubscribes on destroy; a raw addEventListener here
@@ -420,7 +475,6 @@
       if (!social) {
         channelSummary.set('Could not load channel status.')
         channelPill.set('Unknown')
-        channelState.set('setup')
       }
       else {
         const label = social.providerLabel
@@ -440,7 +494,6 @@
                 : 'No channels connected yet.',
           )
           channelPill.set(ready.length > 0 ? `${ready.length}/${channels.length}` : 'Setup')
-          channelState.set(ready.length > 0 ? 'ready' : 'setup')
 
           // The binding limit is the tightest among the channels that can
           // actually publish: with Bluesky on, 300 constrains the post however
@@ -460,7 +513,6 @@
         }).catch(() => {
           channelSummary.set('Could not load channel status.')
           channelPill.set('Unknown')
-          channelState.set('setup')
         })
       }
     })

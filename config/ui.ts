@@ -65,10 +65,9 @@ export default {
      *
      * Only the class is load-bearing, though both are set. Every `dark:`
      * utility and every CSS-var override in config/crosswind.ts is scoped
-     * `html.dark`; nothing in the generated sheet reads `data-theme`, whose
-     * only selectors are `[data-theme-option]` — the theme pills in
-     * resources/views/settings.stx. An earlier version of this note had it the
-     * other way round and said the design tokens key off the attribute.
+     * `html.dark`; nothing in the generated sheet reads `data-theme`. An
+     * earlier version of this note had it the other way round and said the
+     * design tokens key off the attribute.
      *
      * The attribute is kept because it is cheap, conventional, and what a page
      * would reach for first. But dropping `darkClass` as a simplification

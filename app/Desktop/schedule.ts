@@ -1,0 +1,69 @@
+/**
+ * The app's recurring work, run inside the desktop agent.
+ *
+ * On a server `app/Scheduler.ts` names each job by string and a scheduler
+ * daemon loads it from `app/Jobs/`. The desktop app has no daemon and no job
+ * files on disk, so the same jobs are imported here and run on timers for as
+ * long as the app is open. That is also the honest schedule for a desktop app:
+ * a queued post goes out while Postline is running.
+ *
+ * Intervals mirror `app/Scheduler.ts`. A job never overlaps itself: one that
+ * is still running when its next turn comes skips that turn.
+ */
+interface Runnable {
+  name: string
+  handle?: (...args: any[]) => unknown
+}
+
+interface Entry {
+  job: Runnable
+  everyMs: number
+}
+
+const MINUTE = 60_000
+
+export interface Schedule {
+  stop: () => void
+}
+
+export function startSchedule(jobs: {
+  publishScheduledPosts: Runnable
+  syncEngagementMetrics: Runnable
+  scanKeywordMonitors: Runnable
+  syncDirectMessages: Runnable
+  autoDeletePosts: Runnable
+}, options: { say?: (line: string) => void } = {}): Schedule {
+  const entries: Entry[] = [
+    { job: jobs.publishScheduledPosts, everyMs: MINUTE },
+    { job: jobs.scanKeywordMonitors, everyMs: 5 * MINUTE },
+    { job: jobs.syncDirectMessages, everyMs: 5 * MINUTE },
+    { job: jobs.syncEngagementMetrics, everyMs: 30 * MINUTE },
+    { job: jobs.autoDeletePosts, everyMs: 24 * 60 * MINUTE },
+  ]
+
+  const running = new Set<string>()
+  const timers: Array<ReturnType<typeof setInterval>> = []
+
+  const run = async (job: Runnable): Promise<void> => {
+    if (running.has(job.name) || typeof job.handle !== 'function') return
+    running.add(job.name)
+    try {
+      await job.handle()
+    }
+    catch (error) {
+      // A job that fails must not take the app down, or stop the next run.
+      options.say?.(`[schedule] ${job.name} failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+    finally {
+      running.delete(job.name)
+    }
+  }
+
+  for (const entry of entries)
+    timers.push(setInterval(() => void run(entry.job), entry.everyMs))
+
+  // Posts that came due while the app was closed go out now, not in a minute.
+  void run(jobs.publishScheduledPosts)
+
+  return { stop: () => timers.forEach(timer => clearInterval(timer)) }
+}
