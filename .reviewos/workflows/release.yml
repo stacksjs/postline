@@ -133,10 +133,20 @@ jobs:
           test -x "$binary"
           echo "binary=$binary" >> "$GITHUB_OUTPUT"
 
+      # ReviewOS leaves an expression it cannot resolve as written, where
+      # GitHub would make it empty. With no DESKTOP_SIGNING_IDENTITY variable on
+      # the instance the build would be told to sign as that literal text, so
+      # an unresolved one is dropped and the build signs with the runner's own
+      # development certificate.
       - name: Build the app
         env:
           CRAFT_BIN_DARWIN_ARM64: ${{ steps.craft.outputs.binary }}
-        run: bun node_modules/@stacksjs/buddy/dist/cli.js build:desktop
+        run: |
+          set -euo pipefail
+          case "${DESKTOP_SIGNING_IDENTITY:-}" in
+            ''|*vars.DESKTOP_SIGNING_IDENTITY*) unset DESKTOP_SIGNING_IDENTITY ;;
+          esac
+          bun node_modules/@stacksjs/buddy/dist/cli.js build:desktop
 
       # A disk image with the app and a link to Applications, which is what a
       # person expects to open. Named for the platform it runs on, so a later
