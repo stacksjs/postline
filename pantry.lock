@@ -3,16 +3,15 @@
   "lockfileVersion": 2,
   "workspaces": {
     "": {
-      "name": "opentimes",
+      "name": "postline",
       "dependencies": {
-        "@stacksjs/ai": "^0.75.463",
-        "@stacksjs/payments": "0.75.463",
-        "@stacksjs/realtime": "0.75.463",
-        "@stacksjs/socials": "^0.75.463",
-        "@stacksjs/stx": "^0.2.798",
-        "@stacksjs/ts-cloud": "^0.16.44",
-        "stacks": "^0.75.463",
-        "stripe": "^22.4.0",
+        "@stacksjs/ai": "^0.75.602",
+        "@stacksjs/payments": "0.75.602",
+        "@stacksjs/realtime": "0.75.602",
+        "@stacksjs/socials": "^0.75.602",
+        "@stacksjs/stx": "^0.2.894",
+        "@stacksjs/ts-cloud": "^0.16.135",
+        "stacks": "^0.75.602",
         "ts-broadcasting": "0.0.9",
         "ts-medium-editor": "^0.1.6"
       },
@@ -35,7 +34,7 @@
       "name": "hello-world-fx",
       "version": "0.70.40",
       "devDependencies": {
-        "stacks": "^0.75.463"
+        "stacks": "^0.75.602"
       }
     }
   },
