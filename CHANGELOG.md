@@ -1,5 +1,20 @@
 # Stacks Changelog
 
+[Compare changes](https://github.com/stacksjs/postline/compare/v0.1.0...v0.1.1)
+
+## 🐛 Bug Fixes
+
+- **ci**: build the release without a signing identity when none is set ([a398d76](https://github.com/stacksjs/postline/commit/a398d76)) _(by Chris)_
+- **ci**: name the fetched Craft runtime in the release build ([3dad6f1](https://github.com/stacksjs/postline/commit/3dad6f1)) _(by Chris)_
+
+## 🔧 Chores
+
+- upgrade to Stacks 0.75.606 and drop the Craft runtime workaround ([e294175](https://github.com/stacksjs/postline/commit/e294175)) _(by Chris)_
+
+## Contributors
+
+- _Chris_
+
 ## v0.1.0
 
 ## 💥 Breaking Changes
