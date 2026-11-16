@@ -113,9 +113,29 @@ jobs:
           (cd "$CHECK_DIR" && ./postline-check)
 
       # Compiles the agent with the built views inside it and assembles
-      # Postline.app. The Craft web view runtime is fetched for the installed
-      # craft-native version and checked against that release's manifest.
+      # Postline.app around that runtime.
+      # The web view runtime Craft published for the installed craft-native
+      # version, named outright. Left to itself the build takes whatever
+      # `craft` is on the runner's PATH, and on a machine with Pantry that is
+      # a shell shim, which cannot be put inside an app.
+      - name: Fetch the Craft runtime
+        id: craft
+        run: |
+          set -euo pipefail
+          binary=$(bun -e '
+            import { fetchCraftRuntime, installedCraftVersion } from "@stacksjs/desktop-build"
+            const root = process.cwd()
+            const version = installedCraftVersion(root)
+            if (!version) throw new Error("craft-native is not installed")
+            const fetched = await fetchCraftRuntime({ target: "darwin-arm64", version, directory: `${root}/storage/framework/desktop/runtimes/darwin-arm64` })
+            console.log(fetched.binary)
+          ' | tail -1)
+          test -x "$binary"
+          echo "binary=$binary" >> "$GITHUB_OUTPUT"
+
       - name: Build the app
+        env:
+          CRAFT_BIN_DARWIN_ARM64: ${{ steps.craft.outputs.binary }}
         run: bun node_modules/@stacksjs/buddy/dist/cli.js build:desktop
 
       # A disk image with the app and a link to Applications, which is what a
