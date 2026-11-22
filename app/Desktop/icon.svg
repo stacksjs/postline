@@ -1,8 +1,10 @@
 <!--
-  The Postline app icon: a signal dot on an ink tile, drawn on the 1024 grid
-  macOS icons use, with the tile inset so the system shadow has room.
+  The Postline app icon: a post on a line, making a P, on the ink tile. Drawn
+  on the 1024 grid macOS icons use, with the tile inset so the system shadow
+  has room. The proportions are the favicon's, scaled to the 824 tile.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Postline">
   <rect x="100" y="100" width="824" height="824" rx="186" fill="#0a0a0b"/>
-  <circle cx="512" cy="512" r="132" fill="#f0441e"/>
+  <rect x="325.3" y="293.1" width="90.1" height="437.8" rx="45.05" fill="#fafafa"/>
+  <circle cx="566.7" cy="428.3" r="135.2" fill="#f0441e"/>
 </svg>

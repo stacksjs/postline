@@ -29,7 +29,7 @@ const BODY = { r: 63, g: 63, b: 70 }
 const ACCENT = { r: 240, g: 68, b: 30 }
 const PAPER = { r: 250, g: 250, b: 250 }
 
-/** The Postline mark: an ink tile with the signal dot at its centre, drawn to match the nav. */
+/** The Postline mark: an ink tile, a pale stem and the signal dot, drawn to match the nav. */
 function drawMark(card: any, box: { x: number, y: number, size: number }): void {
   const { x, y, size } = box
   const data = card.data ?? card
@@ -52,18 +52,26 @@ function drawMark(card: any, box: { x: number, y: number, size: number }): void 
     }
   }
 
-  // The signal dot.
-  const centre = (size - 1) / 2
-  const dot = size * 0.16
+  // The stem and the signal dot, on the 64-unit grid public/favicon.svg uses.
+  const unit = size / 64
+  const stem = { x: 17.5, y: 15, width: 7, height: 34 }
+  const dot = { cx: 36.25, cy: 25.5, r: 10.5 }
+  const stemRadius = stem.width / 2
   for (let py = 0; py < size; py++) {
     for (let px = 0; px < size; px++) {
-      if ((px - centre) ** 2 + (py - centre) ** 2 > dot * dot)
+      const gx = (px + 0.5) / unit
+      const gy = (py + 0.5) / unit
+      const inDot = (gx - dot.cx) ** 2 + (gy - dot.cy) ** 2 <= dot.r * dot.r
+      const nearestY = Math.min(Math.max(gy, stem.y + stemRadius), stem.y + stem.height - stemRadius)
+      const inStem = (gx - stem.x - stemRadius) ** 2 + (gy - nearestY) ** 2 <= stemRadius * stemRadius
+      if (!inDot && !inStem)
         continue
 
+      const colour = inDot ? ACCENT : PAPER
       const i = ((y + py) * width + (x + px)) * 4
-      data[i] = ACCENT.r
-      data[i + 1] = ACCENT.g
-      data[i + 2] = ACCENT.b
+      data[i] = colour.r
+      data[i + 1] = colour.g
+      data[i + 2] = colour.b
       data[i + 3] = 255
     }
   }

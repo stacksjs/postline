@@ -11,9 +11,7 @@ const useCases = USE_CASES
   <header class="sticky top-0 z-40 bg-bg/80 border-b border-line backdrop-blur-md">
     <div class="flex gap-6 items-center justify-between mx-auto px-5 sm:px-8 h-16 max-w-[1200px]">
       <a class="flex gap-2.5 items-center text-ink" href="/" aria-label="Postline home" data-stx-link>
-        <span class="grid place-items-center h-7 w-7 bg-ink rounded-lg" aria-hidden="true">
-          <span class="h-2 w-2 bg-brand rounded-full"></span>
-        </span>
+        <span class="h-7 w-7 brand-mark" aria-hidden="true"></span>
         <span class="font-semibold text-[17px] tracking-tight">Postline</span>
       </a>
 

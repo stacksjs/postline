@@ -31,7 +31,7 @@ const settingsActive = currentPath === '/accounts' || currentPath === '/settings
 <template>
   <div class="contents">
   <nav class="flex lg:hidden overflow-x-auto sticky top-0 z-50 gap-1.5 items-center px-3 py-2 bg-bg border-b border-line" aria-label="Primary" data-postline-mobile-nav>
-    <span class="grid place-items-center shrink-0 mr-1 h-7 w-7 bg-ink rounded-lg" aria-hidden="true"><span class="h-2 w-2 bg-[var(--brand)] rounded-full"></span></span>
+    <span class="mr-1 h-7 w-7 brand-mark" aria-hidden="true"></span>
     @foreach (navLinks as link)
       <a
         href="{{ link.href }}"
@@ -85,9 +85,9 @@ const settingsActive = currentPath === '/accounts' || currentPath === '/settings
       data-no-window-drag
       aria-label="Postline composer"
     >
-      {{-- The initial between rules — the mark used by the favicon
-          and the sign-in page, so the three agree. --}}
-      <span class="grid place-items-center shrink-0 h-7 w-7 bg-ink rounded-lg" aria-hidden="true"><span class="h-2 w-2 bg-[var(--brand)] rounded-full"></span></span>
+      {{-- The same mark as the favicon and the sign-in page (`.brand-mark`
+          in config/css.ts), so the three agree. --}}
+      <span class="h-7 w-7 brand-mark" aria-hidden="true"></span>
       <span class="font-semibold text-[15px]" data-sidebar-expanded>Postline</span>
     </a>
 

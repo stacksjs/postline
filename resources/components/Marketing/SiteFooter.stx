@@ -15,9 +15,7 @@ const year = new Date().getFullYear()
     <div class="grid gap-10 lg:gap-12 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))] mx-auto px-5 py-14 sm:px-8 max-w-[1200px]">
       <div class="max-w-[36ch]">
         <a class="flex gap-2.5 items-center text-ink" href="/" aria-label="Postline home" data-stx-link>
-          <span class="grid place-items-center h-7 w-7 bg-ink rounded-lg" aria-hidden="true">
-            <span class="h-2 w-2 bg-brand rounded-full"></span>
-          </span>
+          <span class="h-7 w-7 brand-mark" aria-hidden="true"></span>
           <span class="font-semibold text-[17px] tracking-tight">Postline</span>
         </a>
         <p class="m-0 mt-4 leading-relaxed text-[14px] text-body">

@@ -114,6 +114,12 @@ const FACES: string = `
   --font-typewriter: var(--font-mono);
 `
 
+// `.brand-mark` is the Postline mark drawn in CSS: a post on a line, making a
+// P, on the ink tile. The percentages are `public/favicon.svg`'s shapes on its
+// 64-unit grid, so the mark in the page and the one in the tab are the same
+// drawing. It is CSS and not an image so the tile and stem follow the theme:
+// in dark mode the tile is pale and the stem dark.
+//
 // `font-family` on `:root` sets every surface in the sans face. Without it the
 // app shell fell back to the system font: only the marketing rules ever asked
 // for Geist. It rides on the `:root` block that carries the tokens because the
@@ -122,6 +128,9 @@ const FACES: string = `
 // beside the rule because the engine also drops whatever follows a comment.
 const TOKENS: string = `
 :root { ${FACES} font-family: var(--font-sans); }
+.brand-mark { position: relative; display: inline-block; flex-shrink: 0; background: var(--ink); border-radius: 23.4%; }
+.brand-mark::before { content: ''; position: absolute; left: 27.3%; top: 23.4%; width: 10.9%; height: 53.2%; border-radius: 999px; background: var(--bg); }
+.brand-mark::after { content: ''; position: absolute; left: 40.2%; top: 23.4%; width: 32.8%; height: 32.8%; border-radius: 50%; background: var(--brand); }
 :root { ${APP_LIGHT} }
 html.dark { ${APP_DARK} }
 html.marketing { ${MARKETING} }

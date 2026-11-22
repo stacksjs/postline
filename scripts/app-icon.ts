@@ -1,7 +1,8 @@
 /**
  * Draw the Postline icon as PNGs.
  *
- * The mark is two shapes (an ink tile and a signal dot), so it is drawn here
+ * The mark is three shapes (an ink tile, a pale stem and a signal dot, making
+ * a P: a post on a line), so it is drawn here
  * and not exported from a design tool: the app icon, the touch icons and the
  * favicon cannot drift, and regenerating them needs nothing but Bun.
  *
@@ -36,30 +37,55 @@ function inTile(x: number, y: number, inset: number, size: number, radius: numbe
   return (x - cx) ** 2 + (y - cy) ** 2 <= radius * radius
 }
 
-function draw(size: number, options: { inset: number, radius: number, dot: number }): Uint8Array {
+/**
+ * The mark, on the 64-unit grid `public/favicon.svg` is drawn on: a pale stem
+ * and the signal dot beside its top. Kept here as numbers so every size is
+ * drawn from the same proportions as the SVG.
+ */
+const GRID = 64
+const STEM = { x: 17.5, y: 15, width: 7, height: 34 }
+const DOT = { cx: 36.25, cy: 25.5, r: 10.5 }
+const PAPER = [250, 250, 250]
+
+/** Whether a point on the 64 grid is inside the stem, a rectangle with round ends. */
+function inStem(gx: number, gy: number): boolean {
+  const r = STEM.width / 2
+  const cx = STEM.x + r
+  if (gx < STEM.x || gx > STEM.x + STEM.width || gy < STEM.y || gy > STEM.y + STEM.height) return false
+  const cy = Math.min(Math.max(gy, STEM.y + r), STEM.y + STEM.height - r)
+  return (gx - cx) ** 2 + (gy - cy) ** 2 <= r * r
+}
+
+function draw(size: number, options: { inset: number, radius: number }): Uint8Array {
   const pixels = new Uint8Array(size * size * 4)
   const samples = 4
-  const centre = size / 2
+  const scale = GRID / (size - options.inset * 2)
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       let tile = 0
       let dot = 0
+      let stem = 0
       // Supersampled, so the curves are smooth at every size the OS scales to.
       for (let sy = 0; sy < samples; sy++) {
         for (let sx = 0; sx < samples; sx++) {
           const px = x + (sx + 0.5) / samples
           const py = y + (sy + 0.5) / samples
           if (inTile(px, py, options.inset, size, options.radius)) tile++
-          if ((px - centre) ** 2 + (py - centre) ** 2 <= options.dot * options.dot) dot++
+          const gx = (px - options.inset) * scale
+          const gy = (py - options.inset) * scale
+          if ((gx - DOT.cx) ** 2 + (gy - DOT.cy) ** 2 <= DOT.r * DOT.r) dot++
+          else if (inStem(gx, gy)) stem++
         }
       }
 
       const total = samples * samples
       const dotShare = dot / total
+      const stemShare = stem / total
+      const inkShare = 1 - dotShare - stemShare
       const i = (y * size + x) * 4
       for (let channel = 0; channel < 3; channel++)
-        pixels[i + channel] = Math.round(BRAND[channel]! * dotShare + INK[channel]! * (1 - dotShare))
+        pixels[i + channel] = Math.round(BRAND[channel]! * dotShare + PAPER[channel]! * stemShare + INK[channel]! * inkShare)
       pixels[i + 3] = Math.round(255 * tile / total)
     }
   }
@@ -113,13 +139,13 @@ function png(size: number, pixels: Uint8Array): Uint8Array {
   return out
 }
 
-const outputs: Array<[string, number, { inset: number, radius: number, dot: number }]> = [
+const outputs: Array<[string, number, { inset: number, radius: number }]> = [
   // macOS: the tile sits inside the canvas with transparent corners, on the
   // proportions of Apple's icon grid (824 of 1024, radius 186).
-  ['resources/assets/images/app-icon.png', 1024, { inset: 100, radius: 186, dot: 132 }],
+  ['resources/assets/images/app-icon.png', 1024, { inset: 100, radius: 186 }],
   // Touch icons: full bleed and square, because iOS and Android cut the shape.
-  ['public/images/postline-icon-512.png', 512, { inset: 0, radius: 0, dot: 80 }],
-  ['public/images/postline-icon-180.png', 180, { inset: 0, radius: 0, dot: 28 }],
+  ['public/images/postline-icon-512.png', 512, { inset: 0, radius: 0 }],
+  ['public/images/postline-icon-180.png', 180, { inset: 0, radius: 0 }],
 ]
 
 for (const [file, size, options] of outputs) {
