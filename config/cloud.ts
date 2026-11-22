@@ -690,74 +690,7 @@ export const tsCloud: TsCloudConfig = {
       // port explicitly: the framework default (3008) is already owned by a
       // *different* tenant on this shared box, and an unconfigured proxy would
       // post Postline's form submissions into that app instead.
-      // BROADCAST_REDIS_ENABLED makes this process publish realtime events to
-      // Redis instead of to an in-process server it does not have. The
-      // broadcast service relays them to the sockets.
-      env: { PORT_API: '3101', DB_DATABASE_PATH, BROADCAST_REDIS_ENABLED: 'true' },
-      exclude: RELEASE_EXCLUDES,
-    },
-
-    /**
-     * The realtime broadcast server.
-     *
-     * A site rather than a bare process so ts-cloud owns its systemd unit,
-     * its restarts and its release directory, exactly like the two app
-     * processes. It carries the canonical domain with a `/ws` path, which is
-     * how rpx routes by host *and* path: `wss://<domain>/ws` reaches loopback
-     * :6001 while every other path on the same host still goes to the app.
-     *
-     * Fronting it through the gateway rather than opening 6001 publicly is not
-     * a preference. A page served over https cannot open a `ws:` connection at
-     * all, and port 6001 has no certificate of its own, so a direct-port
-     * socket is unreachable from the deployed site. Through rpx it inherits
-     * the site's certificate and needs no DNS record, no second cert and no
-     * CORS exemption.
-     *
-     * Redis is what joins this process to the app's. `emit` resolves a
-     * module-level server instance, so an in-process emit from the web service
-     * would reach nobody here; the app publishes to Redis and this relays to
-     * its sockets. Without the flag the two halves cannot see each other and
-     * every event is dropped silently.
-     */
-    broadcast: {
-      root: '.',
-      domain: domains.canonical,
-      path: '/ws',
-      start: 'bun app/Broadcast/server.ts',
-      port: 6001,
-      /*
-       * Relaying Redis messages to sockets is the whole job, so this one is
-       * small and stays flat — but flat at 125 MB, not at the 16-21 MB the
-       * previous release idled on. Whatever the runtime now pulls in at boot,
-       * it costs six times what it used to, and a limit sized to the old
-       * number would have started OOM-killing this process on sight.
-       *
-       * So: measured on the running release, then roughly tripled. Enough that
-       * a burst of connections is never the thing that trips it, low enough
-       * that a runaway is caught while it is still cheap.
-       */
-      memoryHigh: '384M',
-      memoryMax: '512M',
-      preStart: [
-        // Redis lives on the box rather than as a managed service: it carries
-        // realtime fan-out between two processes on this same host, so a
-        // network hop to a managed cluster would add latency and a failure
-        // mode for no benefit. Idempotent, and it binds loopback by default on
-        // Debian, which is the only interface that should reach it.
-        'command -v redis-server >/dev/null 2>&1 || (apt-get update -y && apt-get install -y redis-server)',
-        'systemctl enable --now redis-server',
-        'bun install --production',
-      ],
-      env: {
-        BROADCAST_HOST: '127.0.0.1',
-        BROADCAST_PORT: '6001',
-        BROADCAST_REDIS_ENABLED: 'true',
-        DB_DATABASE_PATH,
-        // rpx only routes `/ws` here, so this never proxies a request, but
-        // since 0.75 the deploy refuses any page site on the API's domain that
-        // could not reach the API, and this one shares `main`'s domain.
-        PORT_API: '3101',
-      },
+      env: { PORT_API: '3101', DB_DATABASE_PATH },
       exclude: RELEASE_EXCLUDES,
     },
 
@@ -773,7 +706,7 @@ export const tsCloud: TsCloudConfig = {
        * The API serves JSON off the same database and holds flat — it renders
        * no views, so it never touches the component path that makes `main`
        * above grow. It sits at 141 MB on the current release, up from 39-66 MB
-       * on the previous one, the same boot-cost jump `broadcast` saw.
+       * on the previous one.
        *
        * 512M leaves generous room for a heavier request without leaving room
        * for an unbounded one.

@@ -41,7 +41,6 @@ export default {
     'notifications',
     'objects',
     'path',
-    'realtime',
     'router',
     'buddy',
     'security',
