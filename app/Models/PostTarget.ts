@@ -26,7 +26,11 @@ export default defineModel({
       // Mirrors `SocialProvider` in app/Support/Social/types.ts. The generated
       // CHECK constraint comes from this list, so a provider added to the union
       // without being added here fails at insert rather than at compile time.
-      validation: { rule: schema.enum(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin', 'threads', 'blog']).required() },
+      // `opentimes` is not a network Postline publishes to. It stays allowed
+      // because the table's constraint has allowed it since the Open Times
+      // era and databases from then still hold rows with it; narrowing the
+      // list would make the table rebuild fail on exactly those databases.
+      validation: { rule: schema.enum(['bluesky', 'twitter', 'mastodon', 'facebook', 'instagram', 'tiktok', 'linkedin', 'threads', 'blog', 'opentimes']).required() },
       factory: faker => faker.helpers.arrayElement(['bluesky', 'twitter', 'mastodon']),
     },
     status: {
