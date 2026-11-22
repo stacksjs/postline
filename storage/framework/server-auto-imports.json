@@ -61,6 +61,7 @@
     "HttpError": true,
     "I18n": true,
     "Job": true,
+    "KeepTokensAlive": true,
     "KeywordMention": true,
     "KeywordMonitor": true,
     "Label": true,

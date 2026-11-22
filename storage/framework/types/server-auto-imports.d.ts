@@ -138,6 +138,7 @@ declare global {
   const PageRevision: typeof import('@stacksjs/defaults/app/Models/Content/PageRevision.ts')['default']
   const Redirect: typeof import('@stacksjs/defaults/app/Models/Content/Redirect.ts')['default']
   const AutoDeletePosts: typeof import('../../../app/Jobs/AutoDeletePosts')['default']
+  const KeepTokensAlive: typeof import('../../../app/Jobs/KeepTokensAlive')['default']
   const PublishScheduledPosts: typeof import('../../../app/Jobs/PublishScheduledPosts')['default']
   const ScanKeywordMonitors: typeof import('../../../app/Jobs/ScanKeywordMonitors')['default']
   const SyncDirectMessages: typeof import('../../../app/Jobs/SyncDirectMessages')['default']
