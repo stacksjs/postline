@@ -1,3 +1,4 @@
+<CsrfScripts />
 @yield('content')
 
 @yield('footer')

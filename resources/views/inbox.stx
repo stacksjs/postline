@@ -283,11 +283,13 @@
       if (!activeId()) return
       if (!quiet) threadLoading.set(true)
       try {
-        const query = new URLSearchParams({ conversation_id: String(activeId()), mark_read: markRead ? '1' : '0' })
+        const conversationId = activeId()
+        const query = new URLSearchParams({ conversation_id: String(conversationId) })
         const payload = await requestJson(`/api/postline/inbox/thread?${query}`)
         messages.set(payload.data?.messages || [])
         activeCharacterLimit.set(Number(payload.data?.characterLimit || 1000))
         if (markRead) {
+          await postJson('/api/postline/inbox/read', { conversation_id: conversationId })
           conversations.set(conversations().map(item => item.id === activeId() ? { ...item, unreadCount: 0 } : item))
         }
       }

@@ -21,6 +21,8 @@ const APP_PUBLIC = [
   'POST /api/login',
   'POST /api/register',
   'POST /api/logout',
+  // Hands a browser its CSRF cookie. Reads and changes nothing.
+  'GET /api/csrf',
   // Instagram and Threads fetch a queued image from here, server to server.
   'GET /api/postline/media',
   // The marketing site's email capture.

@@ -30,6 +30,7 @@ const dataDir = mkdtempSync(join(tmpdir(), 'postline-desktop-check-'))
 const origin = 'http://127.0.0.1:4999'
 const context = { appName: 'Postline', version: '0.0.0', origin, port: 4999, dataDir }
 const failures: string[] = []
+let csrfToken = ''
 
 function check(what: string, passed: boolean, detail = ''): void {
   // eslint-disable-next-line no-console
@@ -41,7 +42,17 @@ async function call(method: string, path: string, form?: Record<string, string>)
   const body = form
     ? Object.entries(form).reduce((data, [key, value]) => (data.set(key, value), data), new FormData())
     : undefined
-  const response = await agent.fetch!(new Request(`${origin}${path}`, { method, body, headers: { origin } }), context as never) as Response | undefined
+  // A write has to carry the CSRF token the way the window's own `fetch`
+  // wrapper does: the cookie's value echoed in a header.
+  const headers: Record<string, string> = { origin }
+  if (csrfToken && method !== 'GET') {
+    headers.cookie = `X-CSRF-Token=${csrfToken}`
+    headers['x-csrf-token'] = csrfToken
+  }
+  const response = await agent.fetch!(new Request(`${origin}${path}`, { method, body, headers }), context as never) as Response | undefined
+  const issued = response?.headers.get('set-cookie')?.match(/X-CSRF-Token=([0-9a-f]+)/)?.[1]
+  if (issued)
+    csrfToken = issued
 
   return {
     status: response ? response.status : null,
@@ -64,10 +75,17 @@ check('the landing page sends the window to the workspace', front.status === 302
 const script = await call('GET', '/assets/scripts/social.ts')
 check('a workspace script is served as JavaScript', script.status === 200 && script.type === 'text/javascript' && !/\binterface\s+\w+\s*\{/.test(script.text), `${script.status} ${script.type}`)
 
-for (const path of ['/api/v1/status', '/api/postline/providers', '/api/postline/queue', '/api/postline/accounts', '/api/postline/analytics', '/api/postline/campaigns', '/api/postline/listening', '/api/postline/settings/retention']) {
+for (const path of ['/api/csrf', '/api/postline/providers', '/api/postline/queue', '/api/postline/accounts', '/api/postline/analytics', '/api/postline/campaigns', '/api/postline/listening', '/api/postline/settings/retention']) {
   const read = await call('GET', path)
   check(`GET ${path}`, read.status === 200, `${read.status} ${read.text.slice(0, 160)}`)
 }
+
+const unsigned = csrfToken
+csrfToken = ''
+const refused = await call('POST', '/api/postline/queue', { text: 'Sent without a CSRF token.', providers: 'blog' })
+check('a write without the CSRF token is refused', refused.status === 403, `${refused.status} ${refused.text.slice(0, 160)}`)
+csrfToken = unsigned
+check('the agent issued a CSRF token', csrfToken.length === 64, String(csrfToken.length))
 
 const published = await call('POST', '/api/postline/publish', { text: 'Published by the desktop check.', title: 'Desktop check', providers: 'blog' })
 check('publishing to the blog', published.status === 200 && JSON.parse(published.text)?.data?.results?.[0]?.ok === true, `${published.status} ${published.text.slice(0, 200)}`)

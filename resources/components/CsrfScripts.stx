@@ -1,0 +1,56 @@
+{{-- Sends the CSRF token with every same-origin API write. Shared by every layout. --}}
+  <script>
+    // The API checks a double-submit token on every write made with the
+    // session cookie: the value in the `X-CSRF-Token` cookie has to come back
+    // in a header of the same name. Another site can make a browser send the
+    // cookie, but it cannot read it, so it cannot produce the header.
+    //
+    // This wraps `fetch` once, here, so no view has to remember. It runs
+    // before the stx runtime exists, which is why it does not use the
+    // composables.
+    ;(() => {
+      // stx-strict-ignore-next-line window.fetch
+      const nativeFetch = window.fetch.bind(window)
+      const COOKIE = 'X-CSRF-Token'
+
+      const readToken = () => {
+        // stx-strict-ignore-next-line document.cookie
+        for (const part of document.cookie.split(';')) {
+          const at = part.indexOf('=')
+          if (at !== -1 && part.slice(0, at).trim() === COOKIE)
+            return decodeURIComponent(part.slice(at + 1).trim())
+        }
+        return ''
+      }
+
+      // The cookie lasts two hours. A page left open longer has none, so one
+      // is fetched before the write rather than letting the write fail.
+      let seeding
+      const ensureToken = async () => {
+        const existing = readToken()
+        if (existing) return existing
+        seeding ??= nativeFetch('/api/csrf', { credentials: 'same-origin' })
+          .catch(() => {})
+          .finally(() => { seeding = undefined })
+        await seeding
+        return readToken()
+      }
+
+      // stx-strict-ignore-next-line window.fetch
+      window.fetch = async (input, init = {}) => {
+        const isRequest = typeof input !== 'string' && !(input instanceof URL)
+        const url = typeof input === 'string' ? input : (isRequest ? input.url : String(input))
+        const method = String(init.method || (isRequest ? input.method : 'GET')).toUpperCase()
+        // stx-strict-ignore-next-line window.location
+        const sameOriginApi = url.startsWith('/api/') || url.startsWith(`${window.location.origin}/api/`)
+
+        if (!sameOriginApi || method === 'GET' || method === 'HEAD' || method === 'OPTIONS')
+          return nativeFetch(input, init)
+
+        const token = await ensureToken()
+        const headers = new Headers(init.headers || (isRequest ? input.headers : undefined))
+        if (token && !headers.has(COOKIE)) headers.set(COOKIE, token)
+        return nativeFetch(input, { ...init, headers })
+      }
+    })()
+  </script>
