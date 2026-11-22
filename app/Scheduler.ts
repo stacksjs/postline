@@ -40,6 +40,12 @@ export default function () {
     .daily()
     .withoutOverlapping(120)
 
+  // Remove sign-in tokens that have expired or been revoked. Every sign-in
+  // mints one and nothing else deletes them, so the table only ever grew.
+  schedule
+    .command('./buddy auth:prune')
+    .daily()
+
   // Run a custom action every five minutes
   // schedule.action('CleanupTempFiles').everyFiveMinutes()
 

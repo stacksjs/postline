@@ -47,6 +47,10 @@
       </form>
 
       <button class="text-muted text-xs underline hover:text-body transition-colors" type="button" @click="toggleMode" :text="toggleLabel()">First run? Create the workspace account</button>
+      <p class="text-center text-muted text-xs" :class="registering() ? 'hidden' : ''">
+        Lost the password? Reset it on the machine Postline runs on:
+        <code class="block mt-1 text-body whitespace-nowrap">./buddy user:add you@example.com --update</code>
+      </p>
     </section>
   </main>
 
@@ -108,8 +112,10 @@
     const onSubmit = async () => {
       errorMessage.set('')
 
-      // The workspace-owning account has no recovery path, so a first-run typo
-      // must not silently create an account nobody can sign into.
+      // There is no recovery email: the password is reset from the machine
+      // Postline runs on (`./buddy user:add <email> --update`, see the README).
+      // A first-run typo should still not create an account its owner then
+      // has to recover.
       if (registering() && password() !== confirmPassword()) {
         errorMessage.set('Passwords do not match.')
         return

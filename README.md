@@ -60,6 +60,18 @@ cp .env.example .env
 (`dev@postline.test`; the seeder prints the password, and `SEED_USER_PASSWORD`
 overrides it) and a few sample posts.
 
+### If you lose the password
+
+Postline has one account and no "forgot password" email. Reset it from the
+machine it runs on:
+
+```bash
+./buddy user:add you@example.com --update
+```
+
+That prints a new password once. Add `--password` to choose your own. The Mac
+app has no sign-in, so there is nothing to recover there.
+
 `./buddy dev` prints the URLs it is serving. If a port is taken it moves to the
 next free one and says so. Run `./buddy setup:ssl` once to get
 `https://postline.localhost` in place of a localhost port.
