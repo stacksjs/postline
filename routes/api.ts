@@ -35,47 +35,47 @@ route.post('/subscribe', 'Actions/SubscriberEmailAction').skipCsrf()
 // Public: Instagram/Threads fetch a queued post's image server-side, so this
 // route is intentionally unauthenticated. The filename is an unguessable
 // per-upload UUID and strictly validated against traversal (MediaServeAction).
-route.get('/postline/media', 'Actions/Postline/MediaServeAction').skipCsrf()
+route.get('/postline/media', 'Actions/Postline/MediaServeAction').skipCsrf().rateLimit(120, 'minute')
 
 route.group({ prefix: '/postline/bluesky' }, () => {
   route.get('/status', 'Actions/Postline/BlueskyStatusAction').middleware('auth').skipCsrf()
-  route.post('/connect', 'Actions/Postline/BlueskyConnectAction').middleware('auth').skipCsrf()
-  route.post('/publish', 'Actions/Postline/BlueskyPublishAction').middleware('auth').skipCsrf()
-  route.get('/link-preview', 'Actions/Postline/BlueskyLinkPreviewAction').middleware('auth').skipCsrf()
-  route.get('/timeline', 'Actions/Postline/BlueskyTimelineAction').middleware('auth').skipCsrf()
+  route.post('/connect', 'Actions/Postline/BlueskyConnectAction').middleware('auth').skipCsrf().rateLimit(10, 'minute')
+  route.post('/publish', 'Actions/Postline/BlueskyPublishAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
+  route.get('/link-preview', 'Actions/Postline/BlueskyLinkPreviewAction').middleware('auth').skipCsrf().rateLimit(60, 'minute')
+  route.get('/timeline', 'Actions/Postline/BlueskyTimelineAction').middleware('auth').skipCsrf().rateLimit(60, 'minute')
 })
 
 route.group({ prefix: '/postline/linkedin' }, () => {
   route.get('/status', 'Actions/Postline/LinkedInStatusAction').middleware('auth').skipCsrf()
-  route.post('/connect', 'Actions/Postline/LinkedInConnectAction').middleware('auth').skipCsrf()
-  route.get('/auth', 'Actions/Postline/LinkedInAuthAction').middleware('auth').skipCsrf()
-  route.get('/callback', 'Actions/Postline/LinkedInCallbackAction').middleware('auth').skipCsrf()
+  route.post('/connect', 'Actions/Postline/LinkedInConnectAction').middleware('auth').skipCsrf().rateLimit(10, 'minute')
+  route.get('/auth', 'Actions/Postline/LinkedInAuthAction').middleware('auth').skipCsrf().rateLimit(10, 'minute')
+  route.get('/callback', 'Actions/Postline/LinkedInCallbackAction').middleware('auth').skipCsrf().rateLimit(10, 'minute')
 })
 
 route.group({ prefix: '/postline/instagram' }, () => {
   route.get('/status', 'Actions/Postline/InstagramStatusAction').middleware('auth').skipCsrf()
-  route.post('/connect', 'Actions/Postline/InstagramConnectAction').middleware('auth').skipCsrf()
-  route.get('/auth', 'Actions/Postline/InstagramAuthAction').middleware('auth').skipCsrf()
-  route.get('/callback', 'Actions/Postline/InstagramCallbackAction').middleware('auth').skipCsrf()
+  route.post('/connect', 'Actions/Postline/InstagramConnectAction').middleware('auth').skipCsrf().rateLimit(10, 'minute')
+  route.get('/auth', 'Actions/Postline/InstagramAuthAction').middleware('auth').skipCsrf().rateLimit(10, 'minute')
+  route.get('/callback', 'Actions/Postline/InstagramCallbackAction').middleware('auth').skipCsrf().rateLimit(10, 'minute')
 })
 
 route.group({ prefix: '/postline/threads' }, () => {
   route.get('/status', 'Actions/Postline/ThreadsStatusAction').middleware('auth').skipCsrf()
-  route.post('/connect', 'Actions/Postline/ThreadsConnectAction').middleware('auth').skipCsrf()
-  route.get('/auth', 'Actions/Postline/ThreadsAuthAction').middleware('auth').skipCsrf()
-  route.get('/callback', 'Actions/Postline/ThreadsCallbackAction').middleware('auth').skipCsrf()
+  route.post('/connect', 'Actions/Postline/ThreadsConnectAction').middleware('auth').skipCsrf().rateLimit(10, 'minute')
+  route.get('/auth', 'Actions/Postline/ThreadsAuthAction').middleware('auth').skipCsrf().rateLimit(10, 'minute')
+  route.get('/callback', 'Actions/Postline/ThreadsCallbackAction').middleware('auth').skipCsrf().rateLimit(10, 'minute')
 })
 
 route.group({ prefix: '/postline/twitter' }, () => {
   route.get('/status', 'Actions/Postline/TwitterStatusAction').middleware('auth').skipCsrf()
-  route.post('/connect', 'Actions/Postline/TwitterConnectAction').middleware('auth').skipCsrf()
-  route.get('/auth', 'Actions/Postline/TwitterAuthAction').middleware('auth').skipCsrf()
-  route.get('/callback', 'Actions/Postline/TwitterCallbackAction').middleware('auth').skipCsrf()
+  route.post('/connect', 'Actions/Postline/TwitterConnectAction').middleware('auth').skipCsrf().rateLimit(10, 'minute')
+  route.get('/auth', 'Actions/Postline/TwitterAuthAction').middleware('auth').skipCsrf().rateLimit(10, 'minute')
+  route.get('/callback', 'Actions/Postline/TwitterCallbackAction').middleware('auth').skipCsrf().rateLimit(10, 'minute')
 })
 
 route.group({ prefix: '/postline/mastodon' }, () => {
   route.get('/status', 'Actions/Postline/MastodonStatusAction').middleware('auth').skipCsrf()
-  route.post('/connect', 'Actions/Postline/MastodonConnectAction').middleware('auth').skipCsrf()
+  route.post('/connect', 'Actions/Postline/MastodonConnectAction').middleware('auth').skipCsrf().rateLimit(10, 'minute')
 })
 
 route.group({ prefix: '/postline' }, () => {
@@ -85,21 +85,21 @@ route.group({ prefix: '/postline' }, () => {
   // attributed; throttled like the other single-row writes.
   route.get('/accounts', 'Actions/Postline/AccountListAction').middleware('auth').skipCsrf()
   route.post('/accounts/disconnect', 'Actions/Postline/AccountDisconnectAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
-  route.post('/publish', 'Actions/Postline/CrosspostPublishAction').middleware('auth').skipCsrf()
+  route.post('/publish', 'Actions/Postline/CrosspostPublishAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
   route.get('/analytics', 'Actions/Postline/AnalyticsAction').middleware('auth').skipCsrf()
   route.get('/blog', 'Actions/Postline/BlogListAction').middleware('auth').skipCsrf()
   route.get('/queue', 'Actions/Postline/QueueListAction').middleware('auth').skipCsrf()
   route.get('/queue/item', 'Actions/Postline/QueueGetAction').middleware('auth').skipCsrf()
-  route.post('/queue', 'Actions/Postline/QueueSaveAction').middleware('auth').skipCsrf()
-  route.post('/queue/update', 'Actions/Postline/QueueUpdateAction').middleware('auth').skipCsrf()
-  route.post('/queue/delete', 'Actions/Postline/QueueDeleteAction').middleware('auth').skipCsrf()
-  route.post('/queue/publish-now', 'Actions/Postline/QueuePublishNowAction').middleware('auth').skipCsrf()
-  route.post('/metrics/sync', 'Actions/Postline/MetricsSyncAction').middleware('auth').skipCsrf()
+  route.post('/queue', 'Actions/Postline/QueueSaveAction').middleware('auth').skipCsrf().rateLimit(60, 'minute')
+  route.post('/queue/update', 'Actions/Postline/QueueUpdateAction').middleware('auth').skipCsrf().rateLimit(60, 'minute')
+  route.post('/queue/delete', 'Actions/Postline/QueueDeleteAction').middleware('auth').skipCsrf().rateLimit(60, 'minute')
+  route.post('/queue/publish-now', 'Actions/Postline/QueuePublishNowAction').middleware('auth').skipCsrf().rateLimit(30, 'minute')
+  route.post('/metrics/sync', 'Actions/Postline/MetricsSyncAction').middleware('auth').skipCsrf().rateLimit(20, 'hour')
   route.get('/campaigns', 'Actions/Postline/CampaignListAction').middleware('auth').skipCsrf()
-  route.post('/campaigns', 'Actions/Postline/CampaignSaveAction').middleware('auth').skipCsrf()
-  route.post('/campaigns/post', 'Actions/Postline/CampaignPostSaveAction').middleware('auth').skipCsrf()
-  route.post('/campaigns/post/move', 'Actions/Postline/CampaignPostMoveAction').middleware('auth').skipCsrf()
-  route.post('/campaigns/post/delete', 'Actions/Postline/CampaignPostDeleteAction').middleware('auth').skipCsrf()
+  route.post('/campaigns', 'Actions/Postline/CampaignSaveAction').middleware('auth').skipCsrf().rateLimit(60, 'minute')
+  route.post('/campaigns/post', 'Actions/Postline/CampaignPostSaveAction').middleware('auth').skipCsrf().rateLimit(120, 'minute')
+  route.post('/campaigns/post/move', 'Actions/Postline/CampaignPostMoveAction').middleware('auth').skipCsrf().rateLimit(240, 'minute')
+  route.post('/campaigns/post/delete', 'Actions/Postline/CampaignPostDeleteAction').middleware('auth').skipCsrf().rateLimit(60, 'minute')
   route.get('/campaigns/ai/status', 'Actions/Postline/CampaignAIStatusAction').middleware('auth').skipCsrf()
   route.post('/campaigns/generate', 'Actions/Postline/CampaignGenerateAction').middleware('auth').skipCsrf().rateLimit(10, 'hour')
   route.post('/campaigns/activate', 'Actions/Postline/CampaignActivateAction').middleware('auth').skipCsrf().rateLimit(5, 'hour')

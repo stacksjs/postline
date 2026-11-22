@@ -31,11 +31,16 @@ export default new Action({
     if (!(await stored.exists()))
       return response.json({ ok: false, error: 'Media not found.' }, { status: 404 })
 
-    const bytes = new Uint8Array(await stored.arrayBuffer())
-    return new Response(bytes as unknown as BodyInit, {
+    // Handed over as a file, so it is streamed from disk rather than read
+    // into memory first. This route is public; a large file must not cost a
+    // large allocation per request.
+    return new Response(stored, {
       status: 200,
       headers: {
         'content-type': mediaContentType(file),
+        'content-length': String(stored.size),
+        'x-content-type-options': 'nosniff',
+        'content-disposition': 'inline',
         // Filenames are unique per upload, so the bytes never change — let a
         // platform re-fetching the same URL hit its cache instead of the app.
         'cache-control': 'public, max-age=31536000, immutable',
