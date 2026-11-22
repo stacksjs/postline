@@ -3,7 +3,8 @@ import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { crosspost, crosspostProviders } from '../../Services/Social/CrosspostService'
 import { parseTargets } from '../../Support/Social/targets'
-import { persistTempMedia, readUploadedImage, removeTempMedia } from '../../Support/Social/uploads'
+import { readImageInput } from '../../Support/Social/image-input'
+import { persistTempMedia, removeTempMedia } from '../../Support/Social/uploads'
 import { parseVariantsField } from '../../Support/Social/variants'
 
 export default new Action({
@@ -30,12 +31,15 @@ export default new Action({
         }
       : undefined
 
-    const imageUrl = String(request.get('image_url') || '').trim()
+    const imageInput = await readImageInput(request)
+    if (!imageInput.ok)
+      return response.json({ ok: false, error: imageInput.error }, { status: 422 })
+    const imageUrl = imageInput.url
     const imageAlt = String(request.get('image_alt') || '').trim()
 
     const media: NonNullable<Parameters<typeof crosspost.publish>[2]>['media'] = []
     let tempMediaFile: string | null = null
-    const uploadedImage = await readUploadedImage(request.file?.('image'))
+    const uploadedImage = imageInput.uploaded
     if (uploadedImage) {
       // Persist briefly so URL-only providers (Instagram/Threads) can fetch the
       // upload server-side; byte-upload providers use the bytes. Removed once

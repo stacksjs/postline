@@ -1,6 +1,7 @@
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { safeFetch, UnsafeUrlError } from '../../Support/Http/safe-fetch'
 
 const META_RE = /<meta\s+[^>]*(?:property|name)=["']([^"']+)["'][^>]*content=["']([^"']*)["'][^>]*>|<meta\s+[^>]*content=["']([^"']*)["'][^>]*(?:property|name)=["']([^"']+)["'][^>]*>/gi
 const TITLE_RE = /<title[^>]*>([^<]*)<\/title>/i
@@ -14,15 +15,6 @@ function decodeHtml(value: string): string {
     .replace(/&gt;/g, '>')
     .replace(/\s+/g, ' ')
     .trim()
-}
-
-function normalizePreviewUrl(value: string): URL {
-  const url = new URL(value)
-  if (!['http:', 'https:'].includes(url.protocol)) {
-    throw new Error('Only http and https links can be previewed.')
-  }
-
-  return url
 }
 
 function absolutize(value: string | undefined, base: URL): string | undefined {
@@ -43,23 +35,22 @@ export default new Action({
 
   async handle(request: RequestInstance) {
     try {
-      const url = normalizePreviewUrl(String(request.get('url') || '').trim())
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 5000)
-      const previewResponse = await fetch(url, {
+      // The metadata a preview needs sits in <head>, so a quarter of a
+      // megabyte is plenty and the rest of the page is never read.
+      const fetched = await safeFetch(String(request.get('url') || '').trim(), {
+        timeoutMs: 5000,
+        maxBytes: 250_000,
         headers: {
-          accept: 'text/html,application/xhtml+xml',
+          'accept': 'text/html,application/xhtml+xml',
           'user-agent': 'Postline/0.1 link-preview',
         },
-        signal: controller.signal,
       })
-      clearTimeout(timeout)
 
-      if (!previewResponse.ok) {
-        throw new Error(`Could not fetch link preview (${previewResponse.status}).`)
-      }
+      if (fetched.status < 200 || fetched.status >= 300)
+        throw new UnsafeUrlError(`That page answered with an error (${fetched.status}).`)
 
-      const html = (await previewResponse.text()).slice(0, 250000)
+      const url = fetched.url
+      const html = new TextDecoder().decode(fetched.bytes)
       const meta = new Map<string, string>()
       for (const match of html.matchAll(META_RE)) {
         const key = String(match[1] || match[4] || '').toLowerCase()
@@ -86,9 +77,11 @@ export default new Action({
       })
     }
     catch (error) {
+      // Only messages written for the person who pasted the link are passed
+      // on; anything else is a network or parsing failure they cannot act on.
       return response.json({
         ok: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof UnsafeUrlError ? error.message : 'That link could not be previewed.',
       }, { status: 422 })
     }
   },

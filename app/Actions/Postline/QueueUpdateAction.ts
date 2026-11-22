@@ -5,7 +5,7 @@ import { response } from '@stacksjs/router'
 import { crosspostProviders } from '../../Services/Social/CrosspostService'
 import { postQueue } from '../../Services/Social/QueueService'
 import { parseTargets, targetKey } from '../../Support/Social/targets'
-import { readUploadedImage } from '../../Support/Social/uploads'
+import { readImageInput } from '../../Support/Social/image-input'
 import { parseVariantsField } from '../../Support/Social/variants'
 
 export default new Action({
@@ -35,8 +35,11 @@ export default new Action({
     // Image tri-state: a new upload/url replaces; `remove_image=1` clears;
     // otherwise (undefined) the stored image is kept.
     const imageAlt = String(request.get('image_alt') || '').trim() || undefined
-    const uploaded = await readUploadedImage(request.file?.('image'))
-    const imageUrl = String(request.get('image_url') || '').trim()
+    const imageInput = await readImageInput(request)
+    if (!imageInput.ok)
+      return response.json({ ok: false, error: imageInput.error }, { status: 422 })
+    const uploaded = imageInput.uploaded
+    const imageUrl = imageInput.url
     const removeImage = String(request.get('remove_image') || '') === '1'
     const image = uploaded
       ? { ...uploaded, altText: imageAlt }

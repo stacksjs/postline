@@ -1,5 +1,6 @@
 import type { LinkedInTokenExchangeInput, PublishedPost, PublishPostInput, SocialIdentityCredentials } from '@stacksjs/socials'
 import { escapeLinkedInText, LinkedInApiError, LinkedInPublishingDriver } from '@stacksjs/socials'
+import { fetchRemoteImage } from '../../../Support/Social/image-input'
 
 export { LinkedInApiError }
 
@@ -34,6 +35,12 @@ export interface LinkedInRefreshedToken {
  * base driver drops.
  */
 export class LinkedInDriver extends LinkedInPublishingDriver {
+  /**
+   * Downloads an image a post refers to by address. A field so a test can
+   * replace it; in the app it is always the guarded fetch.
+   */
+  fetchImage: typeof fetchRemoteImage = fetchRemoteImage
+
   /**
    * Exchange an authorization code for a token, additionally surfacing the
    * `refresh_token` the base driver drops. LinkedIn only returns one when the
@@ -187,10 +194,10 @@ export class LinkedInDriver extends LinkedInPublishingDriver {
       let bytes = media.bytes
       let mimeType = media.mimeType
       if (!bytes?.length && media.url) {
-        const response = await fetch(media.url)
-        if (response.ok) {
-          bytes = new Uint8Array(await response.arrayBuffer())
-          mimeType = mimeType || response.headers.get('content-type') || 'image/jpeg'
+        const fetched = await this.fetchImage(media.url)
+        if (fetched) {
+          bytes = fetched.bytes
+          mimeType = fetched.mimeType
         }
       }
       if (bytes?.length) {

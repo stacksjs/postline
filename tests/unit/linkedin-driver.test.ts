@@ -99,9 +99,17 @@ describe('LinkedInDriver.publish', () => {
   test('fetches a media URL to bytes when only a url is given', async () => {
     const cap: Captured[] = []; mockLinkedInApi(cap)
     const driver = new LinkedInDriver()
+    // The download goes through the guarded fetch, which resolves the host
+    // and checks the bytes are an image, so it is replaced here rather than
+    // reached through the mocked `fetch`.
+    const fetched: string[] = []
+    driver.fetchImage = async (url) => {
+      fetched.push(url)
+      return { bytes: new Uint8Array([0x89, 0x50, 0x4E, 0x47]), mimeType: 'image/png' }
+    }
     await driver.publish(identity, { text: 'via url', media: [{ url: 'https://cdn.example/pic.png' }] })
 
-    expect(cap.find(c => c.url === 'https://cdn.example/pic.png')).toBeDefined()
+    expect(fetched).toEqual(['https://cdn.example/pic.png'])
     expect(cap.find(c => c.url.includes('initializeUpload'))).toBeDefined()
     expect(postRequest(cap)?.body.content.media.id).toBe('urn:li:image:IMG123')
   })

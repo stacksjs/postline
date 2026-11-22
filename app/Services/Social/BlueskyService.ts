@@ -4,6 +4,7 @@ import { env } from '@stacksjs/env'
 import type { PublicAccount } from '../../Support/Social/accounts'
 import { pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
 import { describeBlueskyError } from '../../Support/Social/bluesky-errors'
+import { fetchRemoteImage } from '../../Support/Social/image-input'
 import { BlueskyApiError, BlueskyDriver } from './Drivers/BlueskyDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 
@@ -249,17 +250,9 @@ export class BlueskyService {
           media.push({ bytes: item.bytes, mimeType: item.mimeType, altText: item.altText })
         }
         else if (item.url) {
-          try {
-            const response = await fetch(item.url)
-            if (!response.ok) continue
-            const bytes = new Uint8Array(await response.arrayBuffer())
-            media.push({
-              bytes,
-              mimeType: item.mimeType || response.headers.get('content-type') || 'image/jpeg',
-              altText: item.altText,
-            })
-          }
-          catch {}
+          const fetched = await fetchRemoteImage(item.url)
+          if (fetched)
+            media.push({ bytes: fetched.bytes, mimeType: fetched.mimeType, altText: item.altText })
         }
       }
       if (media.length) publishInput.media = media
