@@ -44,6 +44,13 @@ export default function () {
     .daily()
     .withoutOverlapping(120)
 
+  // Renew network tokens close to expiry, so an account nobody posts from
+  // for weeks is still connected when it is needed.
+  schedule
+    .job('KeepTokensAlive')
+    .daily()
+    .withoutOverlapping(30)
+
   // Remove sign-in tokens that have expired or been revoked. Every sign-in
   // mints one and nothing else deletes them, so the table only ever grew.
   schedule

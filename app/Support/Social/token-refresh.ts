@@ -1,0 +1,209 @@
+/**
+ * Refresh a network token once, however many callers want it.
+ *
+ * X hands out a new refresh token on every refresh and cancels the old one.
+ * The API process and the scheduler both publish, so two of them could send
+ * the same refresh token a moment apart: one wins and the other is left with
+ * a token the network has just cancelled, which disconnects the account.
+ *
+ * Two guards stop that. Inside one process, callers for the same account
+ * share one promise. Across processes, a lock file beside the database (the
+ * one place both processes see) lets one refresh run; whoever waited then
+ * reads the row again and finds it already fresh.
+ *
+ * A refresh the network refuses marks the account as needing a reconnect, so
+ * the owner sees it on Channels before a post fails. A refresh that fails for
+ * any other reason (the network is down) is logged and tried again later.
+ */
+import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from 'node:fs'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
+import process from 'node:process'
+import { log } from '@stacksjs/logging'
+
+const MINUTE = 60
+const DAY = 24 * 60 * 60
+
+/**
+ * How long before expiry each network's token is renewed. One number for all
+ * of them meant an X token, which lasts two hours, was always "expiring soon"
+ * and was refreshed on every call.
+ */
+export const REFRESH_BEFORE_SECONDS: Record<string, number> = {
+  twitter: 10 * MINUTE,
+  linkedin: 7 * DAY,
+  threads: 7 * DAY,
+  instagram: 7 * DAY,
+}
+
+/** How far ahead the owner is warned about a token nothing can renew. */
+export const EXPIRY_WARNING_SECONDS: number = 7 * DAY
+
+/** A refresh is one request; a lock older than this was left by a dead process. */
+const LOCK_STALE_MS = 60 * 1000
+const LOCK_WAIT_MS = 15 * 1000
+
+export interface RefreshableIdentity {
+  id: number
+  provider: string
+  handle?: string
+  access_token?: string | null
+  refresh_token?: string | null
+  token_expires_at?: string | null
+}
+
+export function refreshWindow(provider: string): number {
+  return REFRESH_BEFORE_SECONDS[provider] ?? 7 * DAY
+}
+
+/** Seconds until a stored `YYYY-MM-DD HH:MM:SS` (UTC) expiry, or null when unknown. */
+export function secondsUntil(value: string | null | undefined, nowMs: number = Date.now()): number | null {
+  if (!value) return null
+  const expiry = Date.parse(`${String(value).replace(' ', 'T')}Z`)
+  if (Number.isNaN(expiry)) return null
+  return Math.round((expiry - nowMs) / 1000)
+}
+
+export function needsRefresh(identity: RefreshableIdentity, nowMs: number = Date.now()): boolean {
+  const left = secondsUntil(identity.token_expires_at, nowMs)
+  return left !== null && left <= refreshWindow(identity.provider)
+}
+
+/**
+ * Whether the network turned the refresh down, as opposed to not answering.
+ * Only a refusal means the account has to be reconnected.
+ */
+export function isRefusedRefresh(error: unknown): boolean {
+  const status = Number((error as { status?: unknown } | null)?.status)
+  if (status >= 400 && status < 500 && status !== 408 && status !== 429) return true
+  const message = error instanceof Error ? error.message : String(error)
+  return /invalid_grant|invalid_token|token (?:has )?(?:expired|been revoked)/i.test(message)
+}
+
+function lockPath(identityId: number): string {
+  const database = String(process.env.DB_DATABASE_PATH || '').trim()
+  const folder = database
+    ? dirname(isAbsolute(database) ? database : resolve(process.cwd(), database))
+    : join(process.cwd(), 'storage/framework/runtime')
+  return join(folder, `postline-token-${identityId}.lock`)
+}
+
+function takeLock(path: string): (() => void) | null {
+  mkdirSync(dirname(path), { recursive: true })
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const handle = openSync(path, 'wx', 0o600)
+      writeSync(handle, JSON.stringify({ pid: process.pid, at: Date.now() }))
+      closeSync(handle)
+      return () => rmSync(path, { force: true })
+    }
+    catch {
+      let takenAt = 0
+      try {
+        takenAt = Number(JSON.parse(readFileSync(path, 'utf8')).at) || 0
+      }
+      catch {}
+      if (Date.now() - takenAt < LOCK_STALE_MS) return null
+      rmSync(path, { force: true })
+    }
+  }
+  return null
+}
+
+const inFlight = new Map<number, Promise<unknown>>()
+
+export interface RefreshSteps<T extends RefreshableIdentity> {
+  /** Read the account again from the database. */
+  reload: () => Promise<T | undefined>
+  /** Ask the network for new tokens and store them. Returns the updated row. */
+  refresh: (current: T) => Promise<T>
+  /** Called when the network refuses: the account needs reconnecting. */
+  refused: (current: T) => Promise<void>
+  /** For tests. */
+  lockFile?: string
+  wait?: (ms: number) => Promise<void>
+}
+
+/**
+ * Return the account with a token that is good for a while yet, refreshing it
+ * at most once across every caller and process.
+ */
+export async function refreshOnce<T extends RefreshableIdentity>(identity: T, steps: RefreshSteps<T>): Promise<T> {
+  if (!needsRefresh(identity)) return identity
+
+  const running = inFlight.get(identity.id) as Promise<T> | undefined
+  if (running) return await running
+
+  const work = run(identity, steps).finally(() => inFlight.delete(identity.id))
+  inFlight.set(identity.id, work)
+  return await work
+}
+
+async function run<T extends RefreshableIdentity>(identity: T, steps: RefreshSteps<T>): Promise<T> {
+  const path = steps.lockFile ?? lockPath(identity.id)
+  const wait = steps.wait ?? ((ms: number) => new Promise<void>(done => setTimeout(done, ms)))
+
+  let release = takeLock(path)
+  const deadline = Date.now() + LOCK_WAIT_MS
+  while (!release && Date.now() < deadline) {
+    await wait(150)
+    release = takeLock(path)
+  }
+
+  try {
+    // Whoever held the lock may have refreshed already, and with a rotating
+    // refresh token ours is then cancelled: always work from the stored row.
+    const current = await steps.reload() ?? identity
+    if (!needsRefresh(current)) return current
+    // Another process still holds the lock. Do not send a second refresh
+    // beside it; use what is stored and let the next call try again.
+    if (!release) return current
+
+    try {
+      return await steps.refresh(current)
+    }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const who = `${current.provider} account ${current.handle ?? current.id}`
+      if (isRefusedRefresh(error)) {
+        log.error(`[postline] ${who} could not renew its token and needs reconnecting: ${message}`)
+        await steps.refused(current)
+      }
+      else {
+        log.warn(`[postline] ${who} could not renew its token, will try again: ${message}`)
+      }
+      return current
+    }
+  }
+  finally {
+    release?.()
+  }
+}
+
+export type TokenRenewal = 'automatic' | 'reconnect' | 'none'
+
+/**
+ * What the owner needs to know about a token's lifetime.
+ *
+ * `automatic`: Postline renews it, nothing to do. `reconnect`: it will lapse
+ * and only signing in again replaces it. `none`: it does not expire.
+ */
+export function tokenLifetime(
+  identity: RefreshableIdentity,
+  nowMs: number = Date.now(),
+): { expiresAt: string | null, renewal: TokenRenewal, expiresSoon: boolean } {
+  const left = secondsUntil(identity.token_expires_at, nowMs)
+  if (left === null) return { expiresAt: null, renewal: 'none', expiresSoon: false }
+
+  // Threads renews the access token itself; X and LinkedIn need a refresh token.
+  const automatic = identity.provider === 'threads'
+    || ((identity.provider === 'twitter' || identity.provider === 'linkedin') && Boolean(identity.refresh_token))
+
+  const expiresAt = `${String(identity.token_expires_at).replace(' ', 'T')}Z`
+  if (automatic) {
+    // A renewed token never gets this close. If it has, renewing is failing.
+    const overdue = identity.provider !== 'twitter' && left <= refreshWindow(identity.provider) / 2
+    return { expiresAt, renewal: 'automatic', expiresSoon: overdue }
+  }
+
+  return { expiresAt, renewal: 'reconnect', expiresSoon: left <= EXPIRY_WARNING_SECONDS }
+}

@@ -56,7 +56,7 @@
               <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in blueskyAccounts()">
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="account.connected ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status"></span>
+                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="account.ok ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status" :title="account.statusTitle"></span>
                   <button class="text-[11px] text-muted underline hover:text-red-700 disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
@@ -82,7 +82,7 @@
               <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in linkedinAccounts()">
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="account.connected ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status"></span>
+                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="account.ok ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status" :title="account.statusTitle"></span>
                   <button class="text-[11px] text-muted underline hover:text-red-700 disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
@@ -103,7 +103,7 @@
               <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in instagramAccounts()">
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="account.connected ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status"></span>
+                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="account.ok ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status" :title="account.statusTitle"></span>
                   <button class="text-[11px] text-muted underline hover:text-red-700 disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
@@ -124,7 +124,7 @@
               <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in threadsAccounts()">
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="account.connected ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status"></span>
+                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="account.ok ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status" :title="account.statusTitle"></span>
                   <button class="text-[11px] text-muted underline hover:text-red-700 disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
@@ -145,7 +145,7 @@
               <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in twitterAccounts()">
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="account.connected ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status"></span>
+                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="account.ok ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status" :title="account.statusTitle"></span>
                   <button class="text-[11px] text-muted underline hover:text-red-700 disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
@@ -174,7 +174,7 @@
               <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in mastodonAccounts()">
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="account.connected ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status"></span>
+                  <span class="px-2 py-0.5 font-bold text-[10px] rounded-full" :class="account.ok ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status" :title="account.statusTitle"></span>
                   <button class="text-[11px] text-muted underline hover:text-red-700 disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
@@ -289,6 +289,15 @@
       return `@${handle}`
     }
 
+    /** "Expires in 3 days", from an ISO time. */
+    const expiryLabel = (expiresAt) => {
+      const hours = Math.round((Date.parse(String(expiresAt)) - Date.now()) / 3_600_000)
+      if (!Number.isFinite(hours)) return 'Expires soon'
+      if (hours <= 0) return 'Expired'
+      if (hours < 48) return `Expires in ${hours} hour${hours === 1 ? '' : 's'}`
+      return `Expires in ${Math.round(hours / 24)} days`
+    }
+
     /** One account row flattened to exactly what the template renders. */
     const accountRowsFor = (provider) => {
       const rows = accountList().filter(account => account.provider === provider)
@@ -301,7 +310,13 @@
           connected: Boolean(account.connected),
           // "Default" only means something once there is a choice: it is the
           // account a campaign or a plain network target publishes through.
-          status: !account.connected ? 'Reconnect' : rows.length > 1 && account.isDefault ? 'Default' : 'Connected',
+          // A token nothing can renew, or one whose renewal keeps failing,
+          // is said here a week ahead and not by a failed post.
+          ok: Boolean(account.connected) && !account.expiresSoon,
+          status: !account.connected ? 'Reconnect' : account.expiresSoon ? expiryLabel(account.expiresAt) : rows.length > 1 && account.isDefault ? 'Default' : 'Connected',
+          statusTitle: account.connected && account.expiresSoon
+            ? 'This sign-in is about to lapse. Connect the account again to keep publishing.'
+            : '',
           busy: disconnectingId() === account.id,
           disconnectLabel: `Disconnect ${name}`,
         }

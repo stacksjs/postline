@@ -17,19 +17,6 @@ export function expiresAt(secondsFromNow: number | null | undefined): string | n
   return new Date(Date.now() + secondsFromNow * 1000).toISOString().slice(0, 19).replace('T', ' ')
 }
 
-/**
- * Whether a stored `token_expires_at` (SQLite `YYYY-MM-DD HH:MM:SS`, UTC) is
- * already past or falls within `withinSeconds` of now — the trigger for a
- * proactive token refresh before publishing. Unknown/blank/unparseable expiry
- * returns false: there's nothing to refresh against, so leave the token alone.
- */
-export function isExpiringSoon(value: string | null | undefined, withinSeconds = 7 * 24 * 60 * 60): boolean {
-  if (!value) return false
-  const expiry = Date.parse(`${String(value).replace(' ', 'T')}Z`)
-  if (Number.isNaN(expiry)) return false
-  return expiry - Date.now() <= withinSeconds * 1000
-}
-
 export function uuid(): string {
   return crypto.randomUUID()
 }

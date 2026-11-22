@@ -6,7 +6,8 @@ import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Su
 import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { LinkedInApiError, LinkedInDriver } from './Drivers/LinkedInDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
-import { ensureAccount, expiresAt, isExpiringSoon, now, uuid } from './support'
+import { refreshOnce } from '../../Support/Social/token-refresh'
+import { ensureAccount, expiresAt, now, uuid } from './support'
 
 const database = db as any
 
@@ -328,31 +329,46 @@ export class LinkedInService {
    */
   private async refreshIfExpiring(identity: SocialIdentityRow): Promise<SocialIdentityRow> {
     const cfg = this.config()
-    if (!identity.refresh_token || !isExpiringSoon(identity.token_expires_at)) return identity
-    if (!cfg.clientId || !cfg.clientSecret) return identity
+    if (!identity.refresh_token || !cfg.clientId || !cfg.clientSecret) return identity
 
-    try {
-      const refreshed = await this.driver.refreshAccessToken({
-        clientId: cfg.clientId,
-        clientSecret: cfg.clientSecret,
-        refreshToken: identity.refresh_token,
-      })
-      const nextExpiry = expiresAt(refreshed.expiresIn)
-      // LinkedIn rotates the refresh token on some grants — keep the new one.
-      const nextRefresh = refreshed.refreshToken ?? identity.refresh_token
-      await saveIdentityTokens(identity.id, {
-        access_token: refreshed.accessToken,
-        refresh_token: nextRefresh,
-        token_expires_at: nextExpiry,
-        auth_status: 'connected',
-        updated_at: now(),
-      })
+    return await refreshOnce(identity, {
+      reload: async () => {
+        const row = await findIdentityRow<SocialIdentityRow>('linkedin', identity.id)
+        return isUsableIdentity(row) ? row : undefined
+      },
+      refresh: async (current) => {
+        const refreshed = await this.driver.refreshAccessToken({
+          clientId: cfg.clientId,
+          clientSecret: cfg.clientSecret,
+          refreshToken: String(current.refresh_token),
+        })
+        const nextExpiry = expiresAt(refreshed.expiresIn)
+        const nextRefresh = refreshed.refreshToken ?? current.refresh_token
+        await saveIdentityTokens(current.id, {
+          access_token: refreshed.accessToken,
+          refresh_token: nextRefresh,
+          token_expires_at: nextExpiry,
+          auth_status: 'connected',
+          updated_at: now(),
+        })
+        return { ...current, access_token: refreshed.accessToken, refresh_token: nextRefresh, token_expires_at: nextExpiry }
+      },
+      refused: async current => await markIdentityExpired(current.id),
+    })
+  }
 
-      return { ...identity, access_token: refreshed.accessToken, refresh_token: nextRefresh, token_expires_at: nextExpiry }
+  /**
+   * Renew every connected account's token that is close to expiry. Run daily
+   * by `KeepTokensAlive`, so an account nobody posts from stays connected.
+   */
+  async keepAlive(): Promise<number> {
+    const rows = await listIdentityRows<SocialIdentityRow>('linkedin')
+    let renewed = 0
+    for (const row of rows.filter(row => isUsableIdentity(row))) {
+      const after = await this.refreshIfExpiring(row)
+      if (after.token_expires_at !== row.token_expires_at) renewed++
     }
-    catch {
-      return identity
-    }
+    return renewed
   }
 
   /**

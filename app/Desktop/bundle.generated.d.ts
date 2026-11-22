@@ -32,4 +32,5 @@ export declare function jobs(): Promise<{
   scanKeywordMonitors: Runnable
   syncDirectMessages: Runnable
   autoDeletePosts: Runnable
+  keepTokensAlive: Runnable
 }>

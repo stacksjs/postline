@@ -32,6 +32,7 @@ export function startSchedule(jobs: {
   scanKeywordMonitors: Runnable
   syncDirectMessages: Runnable
   autoDeletePosts: Runnable
+  keepTokensAlive: Runnable
 }, options: { say?: (line: string) => void } = {}): Schedule {
   const entries: Entry[] = [
     { job: jobs.publishScheduledPosts, everyMs: MINUTE },
@@ -39,6 +40,7 @@ export function startSchedule(jobs: {
     { job: jobs.syncDirectMessages, everyMs: 5 * MINUTE },
     { job: jobs.syncEngagementMetrics, everyMs: 30 * MINUTE },
     { job: jobs.autoDeletePosts, everyMs: 24 * 60 * MINUTE },
+    { job: jobs.keepTokensAlive, everyMs: 24 * 60 * MINUTE },
   ]
 
   const running = new Set<string>()
@@ -66,6 +68,10 @@ export function startSchedule(jobs: {
   // minute: a recent one goes out, and one older than the grace window is
   // held back for the owner to decide on.
   void run(jobs.publishScheduledPosts)
+
+  // A desktop app is rarely open for a whole day, so a daily timer alone
+  // would never renew a token. Renewing is cheap and skips fresh tokens.
+  void run(jobs.keepTokensAlive)
 
   return { stop: () => timers.forEach(timer => clearInterval(timer)) }
 }

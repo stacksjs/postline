@@ -15,6 +15,7 @@ const idle = {
   scanKeywordMonitors: job('ScanKeywordMonitors'),
   syncDirectMessages: job('SyncDirectMessages'),
   autoDeletePosts: job('AutoDeletePosts'),
+  keepTokensAlive: job('KeepTokensAlive'),
 }
 
 let stop: (() => void) | null = null

@@ -13,6 +13,9 @@
  *   caller that still asks for "the" Bluesky account.
  */
 
+import type { TokenRenewal } from './token-refresh'
+import { tokenLifetime } from './token-refresh'
+
 export type IdentityAuthStatus = 'connected' | 'expired' | 'revoked' | 'missing'
 
 /** The columns these rules read. Service row types are structurally wider. */
@@ -24,6 +27,8 @@ export interface IdentityLike {
   external_id?: string | null
   auth_status: IdentityAuthStatus
   access_token?: string | null
+  refresh_token?: string | null
+  token_expires_at?: string | null
 }
 
 /**
@@ -107,6 +112,12 @@ export interface PublicAccount {
   isDefault: boolean
   /** Mastodon only: the instance base URL. */
   instance?: string | null
+  /** When the token lapses, as an ISO time, or null when it does not expire. */
+  expiresAt: string | null
+  /** `automatic`: Postline renews it. `reconnect`: only signing in again does. */
+  renewal: TokenRenewal
+  /** True when the owner should reconnect soon to avoid a failed post. */
+  expiresSoon: boolean
   /** No avatar is stored yet; present so clients can rely on the key. */
   avatar: string | null
 }
@@ -123,6 +134,7 @@ export function toPublicAccount(row: IdentityLike, options: { isDefault?: boolea
     canPublish: options.canPublish ?? connected,
     isDefault: Boolean(options.isDefault),
     ...(row.provider === 'mastodon' ? { instance: row.external_id || null } : {}),
+    ...(connected ? tokenLifetime(row) : { expiresAt: null, renewal: 'none' as const, expiresSoon: false }),
     avatar: null,
   }
 }

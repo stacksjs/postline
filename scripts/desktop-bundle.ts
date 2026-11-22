@@ -210,12 +210,13 @@ ${migrations.map((name, index) => `  ${JSON.stringify(name)}: migration${index},
 export const clientScripts = ${JSON.stringify(scripts)}
 
 export async function jobs() {
-  const [publishScheduledPosts, syncEngagementMetrics, scanKeywordMonitors, syncDirectMessages, autoDeletePosts] = await Promise.all([
+  const [publishScheduledPosts, syncEngagementMetrics, scanKeywordMonitors, syncDirectMessages, autoDeletePosts, keepTokensAlive] = await Promise.all([
     import('../Jobs/PublishScheduledPosts.ts'),
     import('../Jobs/SyncEngagementMetrics.ts'),
     import('../Jobs/ScanKeywordMonitors.ts'),
     import('../Jobs/SyncDirectMessages.ts'),
     import('../Jobs/AutoDeletePosts.ts'),
+    import('../Jobs/KeepTokensAlive.ts'),
   ])
 
   return {
@@ -224,6 +225,7 @@ export async function jobs() {
     scanKeywordMonitors: scanKeywordMonitors.default,
     syncDirectMessages: syncDirectMessages.default,
     autoDeletePosts: autoDeletePosts.default,
+    keepTokensAlive: keepTokensAlive.default,
   }
 }
 `
@@ -263,6 +265,7 @@ export declare function jobs(): Promise<{
   scanKeywordMonitors: Runnable
   syncDirectMessages: Runnable
   autoDeletePosts: Runnable
+  keepTokensAlive: Runnable
 }>
 `)
 

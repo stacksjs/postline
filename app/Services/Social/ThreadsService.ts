@@ -6,7 +6,8 @@ import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Su
 import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { ThreadsApiError, ThreadsDriver } from './Drivers/ThreadsDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
-import { ensureAccount, expiresAt, isExpiringSoon, now, uuid } from './support'
+import { refreshOnce } from '../../Support/Social/token-refresh'
+import { ensureAccount, expiresAt, now, uuid } from './support'
 
 const database = db as any
 
@@ -310,23 +311,40 @@ export class ThreadsService {
    * (marking the identity expired and prompting a reconnect) rather than here.
    */
   private async refreshIfExpiring(identity: SocialIdentityRow): Promise<SocialIdentityRow> {
-    if (!identity.access_token || !isExpiringSoon(identity.token_expires_at)) return identity
+    if (!identity.access_token) return identity
 
-    try {
-      const refreshed = await this.driver.refreshLongLivedToken(identity.access_token)
-      const nextExpiry = expiresAt(refreshed.expiresIn)
-      await saveIdentityTokens(identity.id, {
-        access_token: refreshed.accessToken,
-        token_expires_at: nextExpiry,
-        auth_status: 'connected',
-        updated_at: now(),
-      })
+    return await refreshOnce(identity, {
+      reload: async () => {
+        const row = await findIdentityRow<SocialIdentityRow>('threads', identity.id)
+        return isUsableIdentity(row) ? row : undefined
+      },
+      refresh: async (current) => {
+        const refreshed = await this.driver.refreshLongLivedToken(String(current.access_token))
+        const nextExpiry = expiresAt(refreshed.expiresIn)
+        await saveIdentityTokens(current.id, {
+          access_token: refreshed.accessToken,
+          token_expires_at: nextExpiry,
+          auth_status: 'connected',
+          updated_at: now(),
+        })
+        return { ...current, access_token: refreshed.accessToken, token_expires_at: nextExpiry }
+      },
+      refused: async current => await markIdentityExpired(current.id),
+    })
+  }
 
-      return { ...identity, access_token: refreshed.accessToken, token_expires_at: nextExpiry }
+  /**
+   * Renew every connected account's token that is close to expiry. Run daily
+   * by `KeepTokensAlive`, so an account nobody posts from stays connected.
+   */
+  async keepAlive(): Promise<number> {
+    const rows = await listIdentityRows<SocialIdentityRow>('threads')
+    let renewed = 0
+    for (const row of rows.filter(row => isUsableIdentity(row))) {
+      const after = await this.refreshIfExpiring(row)
+      if (after.token_expires_at !== row.token_expires_at) renewed++
     }
-    catch {
-      return identity
-    }
+    return renewed
   }
 
   /**
