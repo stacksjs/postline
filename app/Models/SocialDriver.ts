@@ -10,10 +10,20 @@ export default defineModel({
   traits: {
     useUuid: true,
     useTimestamps: true,
-    useSeeder: { count: 8 },
-    useApi: {
-      uri: 'social-drivers',
-      routes: ['index', 'store', 'show', 'update', 'destroy'],
+    // One row per network Postline can publish to, written out rather than
+    // generated. `provider` is unique and an enum: a random pick collides, and
+    // the seeder's answer to a collision is a suffix (`bluesky-3`), which the
+    // column's CHECK constraint rejects.
+    useSeeder: {
+      count: 6,
+      fixtures: [
+        { provider: 'bluesky', displayName: 'Bluesky', status: 'active', characterLimit: 300 },
+        { provider: 'twitter', displayName: 'Twitter/X', status: 'active', characterLimit: 280 },
+        { provider: 'mastodon', displayName: 'Mastodon', status: 'active', characterLimit: 500 },
+        { provider: 'linkedin', displayName: 'LinkedIn', status: 'active', characterLimit: 3000 },
+        { provider: 'instagram', displayName: 'Instagram', status: 'active', characterLimit: 2200 },
+        { provider: 'threads', displayName: 'Threads', status: 'active', characterLimit: 500 },
+      ],
     },
   },
 
