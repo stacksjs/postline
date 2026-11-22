@@ -1,49 +1,56 @@
-name: 🐞 Bug report
-description: Report an issue
-labels: [pending triage]
+name: Bug report
+description: Something in Postline does not work the way it should
+labels: [bug]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Thanks for taking the time to fill out this bug report!
   - type: textarea
-    id: bug-description
+    id: what-happened
     attributes:
-      label: Describe the bug
-      description: A clear and concise description of what the bug is. If you intend to submit a PR for this issue, tell us in the description. Thanks!
-      placeholder: Bug description
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the composer
+        2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How you run Postline
+      options:
+        - Mac app
+        - Self-hosted from source
+        - Development (./buddy dev)
     validations:
       required: true
   - type: input
-    id: reproduction
+    id: version
     attributes:
-      label: Reproduction
-      description: A [minimal reproduction](https://stackoverflow.com/help/minimal-reproducible-example) is **required**, otherwise the issue might be closed without further notice. [**Why & How?**](https://antfu.me/posts/why-reproductions-are-required)
-      placeholder: Reproduction
-    validations:
-      required: true
-  - type: textarea
-    id: system-info
-    attributes:
-      label: System Info
-      description: Output of `bunx envinfo --system --binaries --browsers`
-      render: Shell
-      placeholder: System, Binaries, Browsers
+      label: Version or commit
+      placeholder: v0.1.1
     validations:
       required: true
   - type: checkboxes
-    id: checkboxes
+    id: networks
     attributes:
-      label: Validations
-      description: Before submitting the issue, please make sure you do the following
+      label: Networks involved
       options:
-        - label: Follow our [Code of Conduct](https://github.com/stacksjs/.github/blob/main/CODE_OF_CONDUCT.md)
-          required: true
-        - label: Read the [Contributing Guide](https://github.com/stacksjs/contributing).
-          required: true
-        - label: Check that there isn't already an issue that reports the same bug to avoid creating a duplicate.
-          required: true
-        - label: Check that this is a concrete bug. For Q&A, please open a GitHub Discussion instead.
-          required: true
-        - label: The provided reproduction is a [minimal reproducible](https://stackoverflow.com/help/minimal-reproducible-example) of the bug.
-          required: true
+        - label: Bluesky
+        - label: X
+        - label: LinkedIn
+        - label: Instagram
+        - label: Threads
+        - label: Mastodon
+        - label: Blog
+        - label: None, or not network-specific
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove access tokens, app passwords and anything else private before pasting.
+      render: Shell
