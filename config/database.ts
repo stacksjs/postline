@@ -55,9 +55,14 @@ export default {
    */
   queryLogging: {
     /**
-     * Enable query logging to database
+     * Enable query logging to database.
+     *
+     * Off unless asked for. Switched on, every query (reads included) becomes
+     * a write to `query_logs` on the same SQLite file, and the values bound
+     * to it are stored outside production. Credentials are redacted there;
+     * post text and message bodies are not.
      */
-    enabled: env.DB_QUERY_LOGGING_ENABLED ?? true,
+    enabled: env.DB_QUERY_LOGGING_ENABLED ?? false,
 
     /**
      * The threshold in milliseconds to mark a query as slow

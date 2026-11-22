@@ -11,10 +11,6 @@ export default defineModel({
     useUuid: true,
     useTimestamps: true,
     useSeeder: { count: 8 },
-    useApi: {
-      uri: 'media-assets',
-      routes: ['index', 'store', 'show', 'update', 'destroy'],
-    },
   },
 
   belongsTo: ['Post'],

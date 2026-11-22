@@ -15,11 +15,6 @@ export default defineModel({
   traits: {
     useUuid: true,
     useTimestamps: true,
-    useApi: {
-      uri: 'keyword-monitors',
-      routes: ['index', 'show'],
-      middleware: ['auth'],
-    },
   },
 
   belongsTo: ['Account'],

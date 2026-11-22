@@ -16,11 +16,6 @@ export default defineModel({
   traits: {
     useUuid: true,
     useTimestamps: true,
-    useApi: {
-      uri: 'dm-messages',
-      routes: ['index', 'show'],
-      middleware: ['auth'],
-    },
   },
 
   belongsTo: ['DmConversation'],

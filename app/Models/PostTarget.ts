@@ -15,10 +15,6 @@ export default defineModel({
     useUuid: true,
     useTimestamps: true,
     useSeeder: { count: 18 },
-    useApi: {
-      uri: 'post-targets',
-      routes: ['index', 'store', 'show', 'update', 'destroy'],
-    },
   },
 
   belongsTo: ['Post', 'SocialDriver', 'SocialIdentity'],

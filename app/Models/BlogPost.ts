@@ -14,10 +14,6 @@ export default defineModel({
   traits: {
     useUuid: true,
     useTimestamps: true,
-    useApi: {
-      uri: 'blog-posts',
-      routes: ['index', 'show'],
-    },
   },
 
   belongsTo: ['Post', 'Account'],

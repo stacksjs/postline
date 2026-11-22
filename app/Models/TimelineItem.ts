@@ -15,10 +15,6 @@ export default defineModel({
     useUuid: true,
     useTimestamps: true,
     useSeeder: { count: 30 },
-    useApi: {
-      uri: 'timeline-items',
-      routes: ['index', 'store', 'show', 'update', 'destroy'],
-    },
   },
 
   belongsTo: ['SocialDriver', 'SocialIdentity'],

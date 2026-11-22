@@ -18,12 +18,6 @@ export default defineModel({
   traits: {
     useUuid: true,
     useTimestamps: true,
-    useApi: {
-      uri: 'purge-runs',
-      // Read-only: an audit row is written by the purge itself and must not be
-      // editable or removable through the API.
-      routes: ['index', 'show'],
-    },
   },
 
   belongsTo: ['Account'],

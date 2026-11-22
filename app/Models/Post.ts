@@ -21,10 +21,6 @@ export default defineModel({
       sortable: ['scheduled_at', 'created_at', 'updated_at'],
       filterable: ['status'],
     },
-    useApi: {
-      uri: 'posts',
-      routes: ['index', 'store', 'show', 'update', 'destroy'],
-    },
   },
 
   belongsTo: ['Account'],

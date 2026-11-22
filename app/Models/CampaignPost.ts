@@ -16,10 +16,6 @@ export default defineModel({
   traits: {
     useUuid: true,
     useTimestamps: true,
-    useApi: {
-      uri: 'campaign-posts',
-      routes: ['index', 'show'],
-    },
   },
 
   belongsTo: ['LaunchCampaign', 'Post'],
