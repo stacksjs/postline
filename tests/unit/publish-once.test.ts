@@ -13,7 +13,7 @@ import process from 'node:process'
 import { describe, expect, test } from 'bun:test'
 import { db } from '@stacksjs/database'
 import { CrosspostService } from '../../app/Services/Social/CrosspostService'
-import { AlreadyPublishingError, QueueService, STRANDED_REASON } from '../../app/Services/Social/QueueService'
+import { AlreadyPublishingError, MISSED_PREFIX, QueueService, STRANDED_REASON } from '../../app/Services/Social/QueueService'
 import { publicMessage } from '../../app/Support/Http/action-error'
 
 const database = db as any
@@ -296,5 +296,64 @@ describe('a post that went out on some networks and failed on others', () => {
 
     await queueWith({ blog: fakeNetwork('blog'), mastodon: fakeNetwork('mastodon') }).publishNow(postId)
     expect(existsSync(path)).toBe(false)
+  })
+})
+
+describe('a scheduled post that is late', () => {
+  async function saveLate(queue: QueueService, text: string, minutesLate: number): Promise<number> {
+    const { postId } = await queue.save({ text, providers: ['blog'], scheduledAt: stamp(3_600_000) })
+    const due = stamp(-minutesLate * 60_000)
+    await database.updateTable('posts').set({ scheduled_at: due }).where('id', '=', postId).execute()
+    await database.updateTable('post_targets').set({ scheduled_at: due }).where('post_id', '=', postId).execute()
+    return postId
+  }
+
+  test('goes out when it is only a little late', async () => {
+    const blog = fakeNetwork('blog')
+    const queue = queueWith({ blog })
+    const postId = await saveLate(queue, 'five minutes late', 5)
+
+    await queue.publishDue(30)
+
+    expect(blog.sends).toContain(postId)
+    expect(await status(postId)).toBe('published')
+  })
+
+  test('is held back, not sent, when it is later than the grace window', async () => {
+    const blog = fakeNetwork('blog')
+    const queue = queueWith({ blog })
+    const postId = await saveLate(queue, 'a week late', 7 * 24 * 60)
+
+    const outcome = await queue.publishDue(30)
+
+    expect(blog.sends).not.toContain(postId)
+    expect(outcome.missed).toBeGreaterThanOrEqual(1)
+    expect(await status(postId)).toBe('failed')
+    const [target] = await targets(postId)
+    expect(target?.status).toBe('failed')
+    expect(target?.failure_reason?.startsWith(MISSED_PREFIX)).toBe(true)
+  })
+
+  test('a missed post can still be published by the owner', async () => {
+    const blog = fakeNetwork('blog')
+    const queue = queueWith({ blog })
+    const postId = await saveLate(queue, 'missed, then sent by hand', 600)
+    await queue.publishDue(30)
+
+    await queue.publishNow(postId)
+
+    expect(blog.sends).toEqual([postId])
+    expect(await status(postId)).toBe('published')
+  })
+
+  test('a week of missed posts sends none of them', async () => {
+    const blog = fakeNetwork('blog')
+    const queue = queueWith({ blog })
+    const ids: number[] = []
+    for (let day = 1; day <= 7; day++) ids.push(await saveLate(queue, `day ${day}`, day * 24 * 60))
+
+    await queue.publishDue(30)
+
+    expect(blog.sends.filter(id => ids.includes(id))).toEqual([])
   })
 })

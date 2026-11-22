@@ -107,8 +107,11 @@ The ledger is the framework's own `migrations` table, so the database is one
 
 Scheduled posts are published every minute, keyword rules and direct messages
 are checked every five, engagement is synced every thirty, and old posts are
-cleaned up daily. Posts that came due while the app was closed go out when it
-opens. **Nothing publishes while the app is quit**: for a queue that runs
+cleaned up daily. A post that came due while the app was closed goes out when
+it opens if it is less than 30 minutes late. Anything later is held back as
+"missed" for you to publish or reschedule, so reopening the app after a week
+does not send a week of posts at once. **Nothing publishes while the app is
+quit**: for a queue that runs
 overnight, run Postline on a machine that stays on.
 
 ## Releases

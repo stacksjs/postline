@@ -247,6 +247,11 @@
       return item.partial ? `Sent to the others. ${lines.join(' ')}` : lines.join(' ')
     }
 
+    /** Held back because it was due while Postline was not running. Nothing was sent. */
+    const isMissed = (item: QueueApiItem): boolean => item.status === 'failed'
+      && item.providers.length > 0
+      && item.providers.every(target => String(target.failureReason || '').startsWith('Missed:'))
+
     /** Flatten an API item into exactly what a row renders. */
     const toRow = (item: QueueApiItem): QueueRow => {
       const when = item.status === 'scheduled'
@@ -270,8 +275,8 @@
         partial: Boolean(item.partial),
         // A post that reached only some networks is not simply "published".
         // It borrows the amber of an unfinished publish.
-        statusLabel: item.partial ? 'partly sent' : item.status,
-        pill: item.partial ? 'publishing' : item.status,
+        statusLabel: item.partial ? 'partly sent' : isMissed(item) ? 'missed' : item.status,
+        pill: item.partial || isMissed(item) ? 'publishing' : item.status,
         scheduledAt: item.scheduledAt,
         publishedAt: item.publishedAt,
         title: item.title,

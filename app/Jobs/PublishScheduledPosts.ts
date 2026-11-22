@@ -11,9 +11,9 @@ export default new Job({
   rate: Every.Minute,
 
   handle: async () => {
-    const { published, failed } = await postQueue.publishDue()
-    if (published || failed)
-      console.log(`[postline] scheduled publish run: ${published} published, ${failed} failed`)
-    return { published, failed }
+    const { published, failed, missed } = await postQueue.publishDue()
+    if (published || failed || missed)
+      console.log(`[postline] scheduled publish run: ${published} published, ${failed} failed, ${missed} held back as missed`)
+    return { published, failed, missed }
   },
 })

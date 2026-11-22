@@ -4,6 +4,7 @@ import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../.
 import type { VariantMap } from '../../Support/Social/variants'
 import { mkdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
+import process from 'node:process'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { UserFacingError } from '../../Support/Http/user-error'
@@ -104,6 +105,21 @@ const ACTIONABLE = new Set(['draft', 'scheduled', 'failed'])
 export const STRANDED_AFTER_MINUTES = 15
 
 export const STRANDED_REASON = 'Postline stopped while this was being sent. Check the network before retrying: it may have gone out.'
+
+/**
+ * How late a scheduled post may be and still go out by itself. A post that is
+ * later than this was missed: Postline was not running when it was due. A
+ * week of missed posts must not all fire the moment a laptop is opened.
+ */
+export const LATE_GRACE_MINUTES = Number(process.env.POSTLINE_LATE_GRACE_MINUTES) > 0
+  ? Number(process.env.POSTLINE_LATE_GRACE_MINUTES)
+  : 30
+
+export const MISSED_PREFIX = 'Missed:'
+
+function missedReason(scheduledAt: string): string {
+  return `${MISSED_PREFIX} Postline was not running when this was due (${scheduledAt} UTC). Publish it now, or give it a new time.`
+}
 
 /** Thrown when a post is already being published by another run. */
 export class AlreadyPublishingError extends UserFacingError {
@@ -724,19 +740,27 @@ export class QueueService {
    * PublishScheduledPosts job every minute; failures on one post never block
    * the rest.
    */
-  async publishDue(): Promise<{ published: number, failed: number }> {
+  async publishDue(graceMinutes = LATE_GRACE_MINUTES): Promise<{ published: number, failed: number, missed: number }> {
     await this.recoverStranded()
 
     const due = await database
       .selectFrom('posts')
-      .select(['id'])
+      .select(['id', 'scheduled_at'])
       .where('status', '=', 'scheduled')
       .where('scheduled_at', '<=', now())
       .execute()
 
+    const tooLate = new Date(Date.now() - graceMinutes * 60_000).toISOString().slice(0, 19).replace('T', ' ')
+
     let published = 0
     let failed = 0
+    let missed = 0
     for (const post of due) {
+      if (String(post.scheduled_at) < tooLate) {
+        missed += await this.holdAsMissed(Number(post.id), String(post.scheduled_at))
+        continue
+      }
+
       try {
         const { results } = await this.publishNow(Number(post.id))
         if (results.some(result => result.ok)) published += 1
@@ -750,7 +774,31 @@ export class QueueService {
       }
     }
 
-    return { published, failed }
+    return { published, failed, missed }
+  }
+
+  /**
+   * Set aside a post that is too late to send by itself. It becomes `failed`,
+   * which the owner can publish now, edit to reschedule, or delete; its
+   * targets carry the reason. Nothing is sent.
+   */
+  private async holdAsMissed(postId: number, scheduledAt: string): Promise<number> {
+    const at = now()
+    // Only if it is still waiting: a "publish now" may have taken it.
+    const held = affected(await database.updateTable('posts').set({
+      status: 'failed',
+      updated_at: at,
+    }).where('id', '=', postId).where('status', '=', 'scheduled').execute())
+    if (held !== 1)
+      return 0
+
+    await database.updateTable('post_targets').set({
+      status: 'failed',
+      failure_reason: missedReason(scheduledAt),
+      updated_at: at,
+    }).where('post_id', '=', postId).where('status', '=', 'scheduled').execute()
+
+    return 1
   }
 
   /**

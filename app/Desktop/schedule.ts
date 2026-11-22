@@ -62,7 +62,9 @@ export function startSchedule(jobs: {
   for (const entry of entries)
     timers.push(setInterval(() => void run(entry.job), entry.everyMs))
 
-  // Posts that came due while the app was closed go out now, not in a minute.
+  // Posts that came due while the app was closed are dealt with now, not in a
+  // minute: a recent one goes out, and one older than the grace window is
+  // held back for the owner to decide on.
   void run(jobs.publishScheduledPosts)
 
   return { stop: () => timers.forEach(timer => clearInterval(timer)) }
