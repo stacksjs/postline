@@ -2,6 +2,7 @@ import type { SocialProvider } from '../../Support/Social/types'
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { actionFailure } from '../../Support/Http/action-error'
 import { postPurge, PURGE_CONFIRMATION, PURGEABLE_PROVIDERS } from '../../Services/Social/PurgeService'
 
 /** `?providers=bluesky,twitter` → a typed list; empty means "all purgeable". */
@@ -42,10 +43,7 @@ export default new Action({
       })
     }
     catch (error) {
-      return response.json({
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      }, { status: 422 })
+      return actionFailure(error, 422)
     }
   },
 })

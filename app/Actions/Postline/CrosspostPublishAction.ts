@@ -1,6 +1,7 @@
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { actionFailure } from '../../Support/Http/action-error'
 import { crosspost, crosspostProviders } from '../../Services/Social/CrosspostService'
 import { parseTargets } from '../../Support/Social/targets'
 import { readImageInput } from '../../Support/Social/image-input'
@@ -84,10 +85,7 @@ export default new Action({
       return response.json({ ok: !allFailed, data }, { status: allFailed ? 422 : 200 })
     }
     catch (error) {
-      return response.json({
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      }, { status: 422 })
+      return actionFailure(error, 422)
     }
     finally {
       if (tempMediaFile) await removeTempMedia(tempMediaFile)

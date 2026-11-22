@@ -2,6 +2,7 @@ import type { SocialProvider } from '../../Support/Social/types'
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { actionFailure } from '../../Support/Http/action-error'
 import { postPurge, PURGE_CONFIRMATION } from '../../Services/Social/PurgeService'
 
 function parseProviders(value: unknown): SocialProvider[] | undefined {
@@ -46,10 +47,7 @@ export default new Action({
       return response.json({ ok: true, data: { ...result, confirmation: PURGE_CONFIRMATION } })
     }
     catch (error) {
-      return response.json({
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      }, { status: 422 })
+      return actionFailure(error, 422)
     }
   },
 })

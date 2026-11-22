@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { actionFailure } from '../../Support/Http/action-error'
 import { accounts } from '../../Services/Social/AccountService'
 
 export default new Action({
@@ -12,10 +13,7 @@ export default new Action({
       return response.json({ ok: true, data: { accounts: await accounts.list() } })
     }
     catch (error) {
-      return response.json({
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      }, { status: 500 })
+      return actionFailure(error, 500)
     }
   },
 })

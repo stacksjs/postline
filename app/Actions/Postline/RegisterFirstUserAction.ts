@@ -3,6 +3,7 @@ import { Action } from '@stacksjs/actions'
 import { authCookieForBrowserSession, register } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { response } from '@stacksjs/router'
+import { actionFailure } from '../../Support/Http/action-error'
 
 const database = db as any
 
@@ -68,10 +69,7 @@ export default new Action({
       }, headers ? { headers } : undefined)
     }
     catch (error) {
-      return response.json({
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      }, { status: 422 })
+      return actionFailure(error, 422)
     }
   },
 })

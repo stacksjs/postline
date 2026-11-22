@@ -2,6 +2,7 @@ import type { VariantMap } from '../../Support/Social/variants'
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { actionFailure } from '../../Support/Http/action-error'
 import { crosspostProviders } from '../../Services/Social/CrosspostService'
 import { postQueue } from '../../Services/Social/QueueService'
 import { parseTargets, targetKey } from '../../Support/Social/targets'
@@ -70,10 +71,7 @@ export default new Action({
       return response.json({ ok: true, data })
     }
     catch (error) {
-      return response.json({
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      }, { status: 422 })
+      return actionFailure(error, 422)
     }
   },
 })

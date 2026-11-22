@@ -1,6 +1,7 @@
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { actionFailure } from '../../Support/Http/action-error'
 import { postQueue } from '../../Services/Social/QueueService'
 
 export default new Action({
@@ -18,10 +19,7 @@ export default new Action({
       return response.json({ ok: true, data })
     }
     catch (error) {
-      return response.json({
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      }, { status: 404 })
+      return actionFailure(error, 404)
     }
   },
 })

@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { actionFailure } from '../../Support/Http/action-error'
 import { blog } from '../../Services/Social/BlogService'
 
 export default new Action({
@@ -13,10 +14,7 @@ export default new Action({
       return response.json({ ok: true, data: { items } })
     }
     catch (error) {
-      return response.json({
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      }, { status: 500 })
+      return actionFailure(error, 500)
     }
   },
 })

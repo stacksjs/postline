@@ -1,6 +1,7 @@
 import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
 import { response } from '@stacksjs/router'
+import { actionFailure } from '../../Support/Http/action-error'
 
 const database = db as any
 
@@ -120,10 +121,7 @@ export default new Action({
       })
     }
     catch (error) {
-      return response.json({
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      }, { status: 500 })
+      return actionFailure(error, 500)
     }
   },
 })

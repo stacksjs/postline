@@ -2,6 +2,7 @@ import type { SocialProvider } from '../../Support/Social/types'
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { actionFailure } from '../../Support/Http/action-error'
 import { retention } from '../../Services/RetentionService'
 
 function parseBoolean(value: unknown): boolean | undefined {
@@ -35,7 +36,7 @@ export default new Action({
       return response.json({ ok: true, data: { settings, lastRun: await retention.lastRun() } })
     }
     catch (error) {
-      return response.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 422 })
+      return actionFailure(error, 422)
     }
   },
 })

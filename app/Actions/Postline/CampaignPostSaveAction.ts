@@ -2,6 +2,7 @@ import type { RequestInstance } from '@stacksjs/types'
 import type { CampaignPostInput } from '../../Services/CampaignService'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { actionFailure } from '../../Support/Http/action-error'
 import { campaigns, normalizeProviders } from '../../Services/CampaignService'
 
 export default new Action({
@@ -27,7 +28,7 @@ export default new Action({
       return response.json({ ok: true, data: { post } })
     }
     catch (error) {
-      return response.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 422 })
+      return actionFailure(error, 422)
     }
   },
 })

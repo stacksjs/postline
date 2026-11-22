@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { actionFailure } from '../../Support/Http/action-error'
 import { DEFAULT_RETENTION_PROVIDERS, MAX_RETENTION_DAYS, MIN_RETENTION_DAYS, retention } from '../../Services/RetentionService'
 import { PURGEABLE_PROVIDERS } from '../../Services/Social/PurgeService'
 
@@ -23,7 +24,7 @@ export default new Action({
       })
     }
     catch (error) {
-      return response.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 422 })
+      return actionFailure(error, 422)
     }
   },
 })

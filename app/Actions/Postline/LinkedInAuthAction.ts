@@ -1,5 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { publicMessage } from '../../Support/Http/action-error'
 import { linkedin } from '../../Services/Social/LinkedInService'
 
 export default new Action({
@@ -12,7 +13,7 @@ export default new Action({
       return response.redirect(linkedin.getAuthUrl())
     }
     catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = publicMessage(error)
       return response.redirect(`/accounts?linkedin=error&message=${encodeURIComponent(message)}`)
     }
   },
