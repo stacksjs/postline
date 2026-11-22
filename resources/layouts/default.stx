@@ -1,3 +1,4 @@
+<FontFaces />
 <CsrfScripts />
 @yield('content')
 

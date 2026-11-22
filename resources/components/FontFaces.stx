@@ -1,0 +1,24 @@
+{{-- Geist and Geist Mono, served from this origin. Shared by every layout. --}}
+  {{-- The app promises that nothing leaves the machine it runs on, and the Mac
+      app has to look right with no network at all, so the typeface is not
+      fetched from a font service. One variable file per family covers every
+      weight. The sans is preloaded because every page sets text in it before
+      anything else paints; the mono is only used for small labels and loads
+      when first needed. --}}
+  <link rel="preload" href="/assets/fonts/geist/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <style>
+    @font-face {
+      font-family: 'Geist';
+      src: url('/assets/fonts/geist/Geist-Variable.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Geist Mono';
+      src: url('/assets/fonts/geist/GeistMono-Variable.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: swap;
+    }
+  </style>

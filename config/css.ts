@@ -114,8 +114,14 @@ const FACES: string = `
   --font-typewriter: var(--font-mono);
 `
 
+// `font-family` on `:root` sets every surface in the sans face. Without it the
+// app shell fell back to the system font: only the marketing rules ever asked
+// for Geist. It rides on the `:root` block that carries the tokens because the
+// CSS engine drops a separate `html, body { … }` rule from this string, and
+// `:root` outranks the reset's `html` selector. The note is here and not
+// beside the rule because the engine also drops whatever follows a comment.
 const TOKENS: string = `
-:root { ${FACES} }
+:root { ${FACES} font-family: var(--font-sans); }
 :root { ${APP_LIGHT} }
 html.dark { ${APP_DARK} }
 html.marketing { ${MARKETING} }
@@ -572,6 +578,14 @@ export default {
 
   theme: {
     extend: {
+      // `font-sans` and `font-mono` have to mean the same faces as the tokens.
+      // The shell's root element carries `font-sans`, and with the engine's
+      // default that utility set the whole app in the system font whatever
+      // `:root` said.
+      fontFamily: {
+        sans: ['var(--font-sans)'],
+        mono: ['var(--font-mono)'],
+      },
       colors: {
         // Surfaces
         'bg': 'var(--bg)', // page background

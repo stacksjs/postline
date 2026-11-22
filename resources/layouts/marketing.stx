@@ -33,11 +33,7 @@
   <meta name="twitter:description" content="@yield('description', 'One draft, six networks. Queue, campaigns, inbox and analytics in one open-source app that runs with your keys.')">
   <meta name="twitter:image" content="@yield('ogImage', 'https://postline.stacksjs.com/images/og/home.png')">
 
-  {{-- Geist and Geist Mono, the two faces declared in config/css.ts,
-      at the weights the site uses. --}}
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <FontFaces />
 @endhead
 
     {{-- Shared chrome: defined once here, so a new page picks up the header
