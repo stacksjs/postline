@@ -17,9 +17,101 @@
 import type { IdentityKey, IdentityLike } from '../../Support/Social/accounts'
 import { db } from '@stacksjs/database'
 import { matchIdentity, pickDefaultIdentity } from '../../Support/Social/accounts'
+import { isSealed, openToken, sealToken } from '../../Support/Social/token-vault'
 import { now, uuid } from './support'
 
 const database = db as any
+
+const TOKEN_COLUMNS = ['access_token', 'refresh_token'] as const
+
+/**
+ * A row as the rest of the app sees it: tokens readable.
+ *
+ * Everything outside this file works with plain tokens and never learns they
+ * are stored sealed. A token this install cannot read is treated as absent, so
+ * the account shows as needing a reconnect instead of failing every listing.
+ */
+export async function openIdentityRow<T>(row: T): Promise<T>
+export async function openIdentityRow<T>(row: T | undefined): Promise<T | undefined>
+export async function openIdentityRow<T>(row: T | undefined): Promise<T | undefined> {
+  if (!row)
+    return row
+
+  const opened = { ...row } as Record<string, unknown>
+  for (const column of TOKEN_COLUMNS) {
+    if (typeof opened[column] !== 'string')
+      continue
+    try {
+      opened[column] = await openToken(opened[column] as string)
+    }
+    catch {
+      opened[column] = null
+    }
+  }
+  return opened as T
+}
+
+/** Seal whichever token columns a write carries. */
+async function sealValues(values: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const sealed = { ...values }
+  for (const column of TOKEN_COLUMNS) {
+    if (column in sealed)
+      sealed[column] = await sealToken(sealed[column] as string | null | undefined)
+  }
+  return sealed
+}
+
+let sealing: Promise<number> | undefined
+
+/**
+ * Seal every token still stored in the clear. Runs once per process, the first
+ * time the table is read or written, which is what upgrades an install that
+ * connected its accounts before tokens were sealed. Returns how many rows it
+ * rewrote.
+ */
+export function sealStoredTokens(): Promise<number> {
+  sealing ??= (async () => {
+    const rows = await database
+      .selectFrom('social_identities')
+      .select(['id', ...TOKEN_COLUMNS])
+      .execute() as Array<{ id: number, access_token: string | null, refresh_token: string | null }>
+
+    let rewritten = 0
+    for (const row of rows) {
+      const plain = TOKEN_COLUMNS.filter(column => row[column] && !isSealed(row[column]))
+      if (plain.length === 0)
+        continue
+
+      const values: Record<string, unknown> = {}
+      for (const column of plain) values[column] = await sealToken(row[column])
+      await database.updateTable('social_identities').set(values).where('id', '=', row.id).execute()
+      rewritten++
+    }
+    return rewritten
+  })().catch((error) => {
+    // Try again on the next call rather than remembering the failure.
+    sealing = undefined
+    throw error
+  })
+
+  return sealing
+}
+
+/** For tests: forget that the sealing pass has run. */
+export function resetTokenSealing(): void {
+  sealing = undefined
+}
+
+/**
+ * Store refreshed tokens on one account. The only way a service should write
+ * a token outside `upsertIdentityRow`.
+ */
+export async function saveIdentityTokens(identityId: number, values: Record<string, unknown>): Promise<void> {
+  await database.updateTable('social_identities')
+    .set(await sealValues(values))
+    .where('id', '=', identityId)
+    .execute()
+}
 
 /**
  * Every account row for a network, newest first. Revoked rows are excluded
@@ -36,7 +128,9 @@ export async function listIdentityRows<T extends IdentityLike>(
     .where('provider', '=', provider)
   if (!options.includeRevoked) query = query.where('auth_status', '!=', 'revoked')
 
-  return await query.orderBy('updated_at', 'desc').execute() as T[]
+  await sealStoredTokens()
+  const rows = await query.orderBy('updated_at', 'desc').execute() as T[]
+  return await Promise.all(rows.map(row => openIdentityRow(row)))
 }
 
 /**
@@ -49,12 +143,13 @@ export async function findIdentityRow<T extends IdentityLike>(
   usable?: (row: T) => boolean,
 ): Promise<T | undefined> {
   if (identityId) {
-    return await database
+    await sealStoredTokens()
+    return await openIdentityRow(await database
       .selectFrom('social_identities')
       .selectAll()
       .where('id', '=', identityId)
       .where('provider', '=', provider)
-      .executeTakeFirst() as T | undefined
+      .executeTakeFirst() as T | undefined)
   }
 
   return pickDefaultIdentity(await listIdentityRows<T>(provider), usable)
@@ -77,6 +172,7 @@ export async function upsertIdentityRow<T extends IdentityLike>(
   const rows = await listIdentityRows<T>(provider, { includeRevoked: true })
   const existing = matchIdentity(rows, key)
   const savedAt = now()
+  values = await sealValues(values)
 
   if (existing) {
     if (existing.auth_status === 'revoked' && options.revive === false) {
@@ -88,11 +184,11 @@ export async function upsertIdentityRow<T extends IdentityLike>(
       .where('id', '=', existing.id)
       .execute()
 
-    return await database
+    return await openIdentityRow(await database
       .selectFrom('social_identities')
       .selectAll()
       .where('id', '=', existing.id)
-      .executeTakeFirstOrThrow() as T
+      .executeTakeFirstOrThrow() as T)
   }
 
   const identityUuid = uuid()
@@ -104,11 +200,11 @@ export async function upsertIdentityRow<T extends IdentityLike>(
     updated_at: savedAt,
   }).execute()
 
-  return await database
+  return await openIdentityRow(await database
     .selectFrom('social_identities')
     .selectAll()
     .where('uuid', '=', identityUuid)
-    .executeTakeFirstOrThrow() as T
+    .executeTakeFirstOrThrow() as T)
 }
 
 /**

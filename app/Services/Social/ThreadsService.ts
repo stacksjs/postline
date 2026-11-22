@@ -5,7 +5,7 @@ import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
 import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { ThreadsApiError, ThreadsDriver } from './Drivers/ThreadsDriver'
-import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
+import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
 import { ensureAccount, expiresAt, isExpiringSoon, now, uuid } from './support'
 
 const database = db as any
@@ -315,12 +315,12 @@ export class ThreadsService {
     try {
       const refreshed = await this.driver.refreshLongLivedToken(identity.access_token)
       const nextExpiry = expiresAt(refreshed.expiresIn)
-      await database.updateTable('social_identities').set({
+      await saveIdentityTokens(identity.id, {
         access_token: refreshed.accessToken,
         token_expires_at: nextExpiry,
         auth_status: 'connected',
         updated_at: now(),
-      }).where('id', '=', identity.id).execute()
+      })
 
       return { ...identity, access_token: refreshed.accessToken, token_expires_at: nextExpiry }
     }

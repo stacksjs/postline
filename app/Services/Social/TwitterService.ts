@@ -5,7 +5,7 @@ import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
 import { PendingOAuthStates, randomOAuthState } from '../../Support/Social/oauth-state'
 import { TwitterApiError, TwitterDriver } from './Drivers/TwitterDriver'
-import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
+import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
 import { ensureAccount, expiresAt, isExpiringSoon, now, uuid } from './support'
 
 const database = db as any
@@ -354,13 +354,13 @@ export class TwitterService {
       const nextExpiry = expiresAt(refreshed.expiresIn)
       // X rotates the refresh token on every refresh — always keep the new one.
       const nextRefresh = refreshed.refreshToken ?? identity.refresh_token
-      await database.updateTable('social_identities').set({
+      await saveIdentityTokens(identity.id, {
         access_token: refreshed.accessToken,
         refresh_token: nextRefresh,
         token_expires_at: nextExpiry,
         auth_status: 'connected',
         updated_at: now(),
-      }).where('id', '=', identity.id).execute()
+      })
 
       return { ...identity, access_token: refreshed.accessToken, refresh_token: nextRefresh, token_expires_at: nextExpiry }
     }

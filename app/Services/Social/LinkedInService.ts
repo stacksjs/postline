@@ -5,7 +5,7 @@ import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
 import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { LinkedInApiError, LinkedInDriver } from './Drivers/LinkedInDriver'
-import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
+import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
 import { ensureAccount, expiresAt, isExpiringSoon, now, uuid } from './support'
 
 const database = db as any
@@ -340,13 +340,13 @@ export class LinkedInService {
       const nextExpiry = expiresAt(refreshed.expiresIn)
       // LinkedIn rotates the refresh token on some grants — keep the new one.
       const nextRefresh = refreshed.refreshToken ?? identity.refresh_token
-      await database.updateTable('social_identities').set({
+      await saveIdentityTokens(identity.id, {
         access_token: refreshed.accessToken,
         refresh_token: nextRefresh,
         token_expires_at: nextExpiry,
         auth_status: 'connected',
         updated_at: now(),
-      }).where('id', '=', identity.id).execute()
+      })
 
       return { ...identity, access_token: refreshed.accessToken, refresh_token: nextRefresh, token_expires_at: nextExpiry }
     }

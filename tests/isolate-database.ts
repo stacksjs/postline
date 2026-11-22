@@ -15,7 +15,7 @@
  * on a fresh copy in the system temp directory and removes it on exit.
  */
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -66,6 +66,11 @@ copyFileSync(template, database)
 process.env.DB_CONNECTION = 'sqlite'
 process.env.DB_DATABASE_PATH = database
 process.env.POSTLINE_TEST_DATABASE = database
+
+// Network tokens are sealed with the app key. A CI runner has no `.env`, so
+// the suite gets a throwaway key of its own when none is set.
+if (!process.env.APP_KEY)
+  process.env.APP_KEY = `base64:${randomBytes(32).toString('base64')}`
 
 process.on('exit', () => {
   for (const suffix of ['', '-wal', '-shm'])

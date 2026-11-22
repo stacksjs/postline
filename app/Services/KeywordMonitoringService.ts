@@ -1,5 +1,7 @@
 import { db } from '@stacksjs/database'
+import { isUsableIdentity } from '../Support/Social/accounts'
 import { stripHtml } from '../Support/Social/text'
+import { findIdentityRow } from './Social/identities'
 import { ensureAccount, now, uuid } from './Social/support'
 
 const database = db as any
@@ -140,8 +142,8 @@ async function searchBluesky(keywords: string[], mode: MatchMode): Promise<Menti
 }
 
 async function searchTwitter(keywords: string[], mode: MatchMode): Promise<MentionCandidate[]> {
-  const identity = await database.selectFrom('social_identities').selectAll().where('provider', '=', 'twitter').where('auth_status', '=', 'connected').orderBy('updated_at', 'desc').executeTakeFirst()
-  if (!identity?.access_token) throw new Error('Connect X on Accounts to search recent posts.')
+  const identity = await findIdentityRow<any>('twitter', undefined, isUsableIdentity)
+  if (!isUsableIdentity(identity)) throw new Error('Connect X on Accounts to search recent posts.')
 
   const terms = mode === 'phrase'
     ? `"${keywords.join(' ')}"`
@@ -175,8 +177,8 @@ async function searchTwitter(keywords: string[], mode: MatchMode): Promise<Menti
 }
 
 async function searchMastodon(keywords: string[], mode: MatchMode): Promise<MentionCandidate[]> {
-  const identity = await database.selectFrom('social_identities').selectAll().where('provider', '=', 'mastodon').where('auth_status', '=', 'connected').orderBy('updated_at', 'desc').executeTakeFirst()
-  if (!identity?.access_token || !identity?.external_id) throw new Error('Connect Mastodon on Accounts to search public posts.')
+  const identity = await findIdentityRow<any>('mastodon', undefined, isUsableIdentity)
+  if (!isUsableIdentity(identity) || !identity?.external_id) throw new Error('Connect Mastodon on Accounts to search public posts.')
 
   const url = new URL('/api/v2/search', String(identity.external_id))
   url.searchParams.set('q', mode === 'phrase' ? `"${keywords.join(' ')}"` : keywords.join(' '))
