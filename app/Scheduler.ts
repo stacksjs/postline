@@ -11,14 +11,18 @@ import { schedule } from '@stacksjs/scheduler'
  */
 export default function () {
   // Publish scheduled Postline posts as they come due
+  // Never two at once: the next tick starts whether or not the last one has
+  // finished, and a run that is still publishing must not be joined.
   schedule
     .job('PublishScheduledPosts')
     .everyMinute()
+    .withoutOverlapping(10)
 
   // Refresh Bluesky engagement counts for the analytics page
   schedule
     .job('SyncEngagementMetrics')
     .everyThirtyMinutes()
+    .withoutOverlapping(30)
 
   // Watch configured brand and product keywords across connected networks
   schedule

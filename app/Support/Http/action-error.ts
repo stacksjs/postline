@@ -18,6 +18,7 @@
 import { log } from '@stacksjs/logging'
 import { response } from '@stacksjs/router'
 import { UnsafeUrlError } from './safe-fetch'
+import { UserFacingError } from './user-error'
 
 export const GENERIC_FAILURE = 'Something went wrong on our side. Try again.'
 
@@ -29,7 +30,7 @@ const INTERNAL = /\bSQLITE_|\bno such (?:table|column)\b|\bsyntax error\b|\bcons
 function writtenForPeople(error: unknown): error is Error {
   if (!(error instanceof Error))
     return false
-  if (error instanceof UnsafeUrlError)
+  if (error instanceof UnsafeUrlError || error instanceof UserFacingError)
     return true
   // Exactly `Error`: what app code throws. Subclasses (TypeError, a database
   // driver's error, an HTTP client's) were not written for the owner.

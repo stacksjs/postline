@@ -1,10 +1,12 @@
 import type { PublishTarget } from '../../Support/Social/targets'
+import type { CrosspostService } from './CrosspostService'
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
 import type { VariantMap } from '../../Support/Social/variants'
 import { mkdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import { UserFacingError } from '../../Support/Http/user-error'
 import { dedupeTargets, isAccountProvider, parseTargets, targetKey, targetProviders } from '../../Support/Social/targets'
 import { MEDIA_DIR, publicMediaUrl } from '../../Support/Social/uploads'
 import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/variants'
@@ -94,6 +96,30 @@ function parseStoredContent(raw: unknown): StoredContent | null {
 /** Post statuses a user may still act on (publish now, delete). */
 const ACTIONABLE = new Set(['draft', 'scheduled', 'failed'])
 
+/**
+ * How long a post may sit in `publishing` before it is taken to be stranded:
+ * the process that claimed it stopped before finishing. Far longer than any
+ * publish takes, so a slow network is never mistaken for a dead process.
+ */
+export const STRANDED_AFTER_MINUTES = 15
+
+export const STRANDED_REASON = 'Postline stopped while this was being sent. Check the network before retrying: it may have gone out.'
+
+/** Thrown when a post is already being published by another run. */
+export class AlreadyPublishingError extends UserFacingError {
+  constructor() {
+    super('This post is already being published.')
+  }
+}
+
+/** How many rows a write changed, whichever shape the query builder reports it in. */
+function affected(result: unknown): number {
+  if (typeof result === 'number' || typeof result === 'bigint')
+    return Number(result)
+  const count = (result as { numUpdatedRows?: number | bigint } | undefined)?.numUpdatedRows
+  return count === undefined ? 0 : Number(count)
+}
+
 export interface QueueTargetView {
   provider: SocialProvider
   /** The account it goes (or went) out through; null means the network default. */
@@ -165,6 +191,12 @@ export interface QueueEditView {
 }
 
 export class QueueService {
+  /**
+   * The crosspost service is injectable so tests can publish through fake
+   * networks, which is the only way to exercise two runs racing for one post.
+   */
+  constructor(private publisher: Pick<CrosspostService, 'publishExisting'> = crosspost) {}
+
   /**
    * Persist a post without publishing it. With `scheduledAt` the post is
    * queued (`scheduled`) and picked up by the PublishScheduledPosts job when
@@ -445,9 +477,31 @@ export class QueueService {
     }
   }
 
+  /**
+   * Take a post for publishing, or fail if another run already has.
+   *
+   * Reading the status and then writing `publishing` is two steps, and two
+   * runs can both pass the first before either does the second: the
+   * scheduler's next tick, a "publish now" click, a second process. Both then
+   * publish. So the claim is one statement that only changes a row still in
+   * an actionable state, and the answer to "did I get it" is whether that
+   * statement changed a row. SQLite runs one write at a time, so exactly one
+   * caller sees 1.
+   */
+  private async claim(post: { id: number | string }): Promise<void> {
+    const changed = affected(await database.updateTable('posts').set({
+      status: 'publishing',
+      updated_at: now(),
+    }).where('id', '=', post.id).where('status', 'in', [...ACTIONABLE]).execute())
+
+    if (changed !== 1)
+      throw new AlreadyPublishingError()
+  }
+
   /** Publish a draft/scheduled/failed post immediately. */
   async publishNow(id: number): Promise<{ postId: number, results: CrosspostTargetResult[] }> {
     const post = await this.findActionable(id)
+    await this.claim(post)
 
     const placeholders = await database
       .selectFrom('post_targets')
@@ -459,22 +513,22 @@ export class QueueService {
     // De-duplicated per account, not per network: two Bluesky accounts on one
     // post are two targets and both publish.
     const targets = targetsOf(placeholders)
-    if (targets.length === 0)
+    if (targets.length === 0) {
+      // Nothing to send: hand the post back as it was.
+      await database.updateTable('posts').set({ status: post.status, updated_at: now() }).where('id', '=', post.id).execute()
       throw new Error('This post has no pending targets to publish.')
-
-    await database.updateTable('posts').set({
-      status: 'publishing',
-      updated_at: now(),
-    }).where('id', '=', post.id).execute()
-
-    // The provider services insert fresh result rows; drop the placeholders
-    // so the queue doesn't show both. (Deleted one-by-one — the query
-    // builder mis-compiles `where in` on DELETE statements.)
-    for (const target of placeholders) {
-      await database.deleteFrom('post_targets').where('id', '=', target.id).execute()
     }
 
-    const results = await crosspost.publishExisting(
+    // The placeholders are kept, marked `publishing`, until the results are
+    // in. They used to be deleted here, which meant a process that stopped
+    // mid-publish left a post with no record of where it had been going and
+    // no way to retry it. `recoverStranded` reads them.
+    const placeholderIds = new Set<number>(placeholders.map((target: any) => Number(target.id)))
+    for (const target of placeholders) {
+      await database.updateTable('post_targets').set({ status: 'publishing', updated_at: now() }).where('id', '=', target.id).execute()
+    }
+
+    const results = await this.publisher.publishExisting(
       { id: Number(post.id), body: String(post.body) },
       targets,
       await this.hydrateContent(post),
@@ -489,6 +543,13 @@ export class QueueService {
     // the queue entirely: no row, no failure reason, and the post still marked
     // published because some other network succeeded. Matched per account, so
     // one Bluesky account's row does not hide another's missing one.
+    // The provider services insert fresh result rows, so the placeholders have
+    // done their job. (Deleted one-by-one — the query builder mis-compiles
+    // `where in` on DELETE statements.)
+    for (const placeholderId of placeholderIds) {
+      await database.deleteFrom('post_targets').where('id', '=', placeholderId).execute()
+    }
+
     const written = await database
       .selectFrom('post_targets')
       .select(['provider', 'social_identity_id'])
@@ -573,11 +634,71 @@ export class QueueService {
   }
 
   /**
+   * Give back posts whose publish never finished.
+   *
+   * A post is claimed by setting it to `publishing`. If the process stops
+   * before the results are written, nothing ever moves it on, and that state
+   * can be neither retried, edited nor deleted. This finds posts that have
+   * been `publishing` for longer than any publish takes and settles them.
+   *
+   * It never re-sends. A target with a result row went out, so its
+   * placeholder is simply removed. A target with none may or may not have
+   * reached the network, so it is marked failed with a reason that says to
+   * check before retrying. Sending it again is the owner's decision.
+   */
+  async recoverStranded(olderThanMinutes = STRANDED_AFTER_MINUTES): Promise<number> {
+    const cutoff = new Date(Date.now() - olderThanMinutes * 60_000).toISOString().slice(0, 19).replace('T', ' ')
+    const stranded = await database
+      .selectFrom('posts')
+      .select(['id'])
+      .where('status', '=', 'publishing')
+      .where('updated_at', '<=', cutoff)
+      .execute()
+
+    let recovered = 0
+    for (const post of stranded) {
+      const rows = await database.selectFrom('post_targets').selectAll().where('post_id', '=', post.id).execute()
+      const sent = new Set(rows
+        .filter((row: any) => row.status === 'published')
+        .map((row: any) => recordKey(row.provider, row.social_identity_id)))
+      const at = now()
+
+      for (const row of rows) {
+        if (row.status !== 'publishing')
+          continue
+        if (sent.has(recordKey(row.provider, row.social_identity_id))) {
+          await database.deleteFrom('post_targets').where('id', '=', row.id).execute()
+          continue
+        }
+        await database.updateTable('post_targets').set({
+          status: 'failed',
+          failure_reason: STRANDED_REASON,
+          updated_at: at,
+        }).where('id', '=', row.id).execute()
+      }
+
+      // Only if it is still stranded: a run that was merely slow may have
+      // finished between the read above and this write.
+      const settled = affected(await database.updateTable('posts').set({
+        status: sent.size > 0 ? 'published' : 'failed',
+        ...(sent.size > 0 ? { published_at: at } : {}),
+        updated_at: at,
+      }).where('id', '=', post.id).where('status', '=', 'publishing').execute())
+
+      recovered += settled
+    }
+
+    return recovered
+  }
+
+  /**
    * Publish every scheduled post whose time has come. Called by the
    * PublishScheduledPosts job every minute; failures on one post never block
    * the rest.
    */
   async publishDue(): Promise<{ published: number, failed: number }> {
+    await this.recoverStranded()
+
     const due = await database
       .selectFrom('posts')
       .select(['id'])
@@ -593,7 +714,10 @@ export class QueueService {
         if (results.some(result => result.ok)) published += 1
         else failed += 1
       }
-      catch {
+      catch (error) {
+        // Another run has it: neither a publish nor a failure of this one.
+        if (error instanceof AlreadyPublishingError)
+          continue
         failed += 1
       }
     }
