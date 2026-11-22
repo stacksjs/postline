@@ -94,3 +94,29 @@ jobs:
         run: bun node_modules/@stacksjs/buddy/dist/cli.js migrate
       - name: Test suite
         run: bun run test
+
+  # The Mac app's agent, compiled and run from an empty directory the way the
+  # app runs it. The release workflow has always done this before imaging the
+  # app; doing it here too means a change that breaks the agent fails on the
+  # commit that made it, not on the next tag.
+  desktop:
+    reviewos:
+      secrets: []
+    runs-on: [self-hosted, macos-arm64, postline]
+    timeout-minutes: 20
+    steps:
+      - name: Set up Pantry and Bun
+        uses: pantry-pm/pantry/packages/action@be9f7a5b0af91351f5c0b7ea3b2fa98e267753a8 # v0.11.207
+        with:
+          version: 0.11.207
+          install: 'false'
+          packages: bun.sh@${{ env.BUN_VERSION }} git-scm.org@2.53.0
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Write what the agent carries
+        run: bun scripts/desktop-bundle.ts
+      - name: Check the compiled agent
+        run: |
+          CHECK_DIR="$(mktemp -d)"
+          bun build --compile scripts/desktop-check.ts --outfile "$CHECK_DIR/postline-check"
+          (cd "$CHECK_DIR" && ./postline-check)
