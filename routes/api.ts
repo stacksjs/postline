@@ -1,23 +1,23 @@
-import { response, route } from '@stacksjs/router'
+import { route } from '@stacksjs/router'
 
 /**
  * This file is the entry point for your application's API routes.
  * The routes defined here are automatically registered. Last but
  * not least, you may also create any other `routes/*.ts` files.
  *
- * Framework routes (auth, dashboard, commerce, CMS, etc.) are loaded
- * automatically from storage/framework/defaults/routes/dashboard.ts.
- * You do NOT need to define them here — only add your own custom routes.
+ * The framework's bundled routes (dashboard, commerce, CMS and the rest) are
+ * switched off in `config/dashboard.ts`, so this file is the whole API.
+ * `tests/feature/public-routes.test.ts` pins which routes answer without a
+ * session; a new public route has to be added there on purpose.
  *
  * @see https://docs.stacksjs.com/routing
  */
 
 // Your custom routes go here:
-// Auth: the framework's /login lives in the feature-gated dashboard route
-// bundle, which this app doesn't load — declare it directly.
+// Auth: the framework's /login lives in the bundled dashboard routes, which
+// this app keeps off (`config/dashboard.ts`), so it is declared directly.
 route.post('/login', 'Actions/Auth/LoginAction').skipCsrf().rateLimit(5, 'minute')
-// Single-user workspace: /register only works until the first account
-// exists (overrides the open framework default).
+// Single-user workspace: /register only works until the first account exists.
 route.post('/register', 'Actions/Postline/RegisterFirstUserAction').skipCsrf().rateLimit(3, 'minute')
 // Sign-out needs a server round trip, for the same reason sign-in does: the
 // session lives in an httpOnly cookie, so the browser cannot end it on its own.
@@ -31,10 +31,6 @@ route.post('/logout', 'Actions/Auth/LogoutAction').skipCsrf()
 // the confirmation mail; this just exposes it. Unauthenticated by necessity, so
 // the action's per-IP throttle is the guard.
 route.post('/subscribe', 'Actions/SubscriberEmailAction').skipCsrf()
-
-route.get('/', () => response.text('hello world'))
-route.get('/v1/status', () => response.json({ version: 'v1', status: 'ok' }))
-route.get('/coming-soon', 'Controllers/ComingSoonController@index')
 
 // Public: Instagram/Threads fetch a queued post's image server-side, so this
 // route is intentionally unauthenticated. The filename is an unguessable
@@ -52,29 +48,29 @@ route.group({ prefix: '/postline/bluesky' }, () => {
 route.group({ prefix: '/postline/linkedin' }, () => {
   route.get('/status', 'Actions/Postline/LinkedInStatusAction').middleware('auth').skipCsrf()
   route.post('/connect', 'Actions/Postline/LinkedInConnectAction').middleware('auth').skipCsrf()
-  route.get('/auth', 'Actions/Postline/LinkedInAuthAction').skipCsrf()
-  route.get('/callback', 'Actions/Postline/LinkedInCallbackAction').skipCsrf()
+  route.get('/auth', 'Actions/Postline/LinkedInAuthAction').middleware('auth').skipCsrf()
+  route.get('/callback', 'Actions/Postline/LinkedInCallbackAction').middleware('auth').skipCsrf()
 })
 
 route.group({ prefix: '/postline/instagram' }, () => {
   route.get('/status', 'Actions/Postline/InstagramStatusAction').middleware('auth').skipCsrf()
   route.post('/connect', 'Actions/Postline/InstagramConnectAction').middleware('auth').skipCsrf()
-  route.get('/auth', 'Actions/Postline/InstagramAuthAction').skipCsrf()
-  route.get('/callback', 'Actions/Postline/InstagramCallbackAction').skipCsrf()
+  route.get('/auth', 'Actions/Postline/InstagramAuthAction').middleware('auth').skipCsrf()
+  route.get('/callback', 'Actions/Postline/InstagramCallbackAction').middleware('auth').skipCsrf()
 })
 
 route.group({ prefix: '/postline/threads' }, () => {
   route.get('/status', 'Actions/Postline/ThreadsStatusAction').middleware('auth').skipCsrf()
   route.post('/connect', 'Actions/Postline/ThreadsConnectAction').middleware('auth').skipCsrf()
-  route.get('/auth', 'Actions/Postline/ThreadsAuthAction').skipCsrf()
-  route.get('/callback', 'Actions/Postline/ThreadsCallbackAction').skipCsrf()
+  route.get('/auth', 'Actions/Postline/ThreadsAuthAction').middleware('auth').skipCsrf()
+  route.get('/callback', 'Actions/Postline/ThreadsCallbackAction').middleware('auth').skipCsrf()
 })
 
 route.group({ prefix: '/postline/twitter' }, () => {
   route.get('/status', 'Actions/Postline/TwitterStatusAction').middleware('auth').skipCsrf()
   route.post('/connect', 'Actions/Postline/TwitterConnectAction').middleware('auth').skipCsrf()
-  route.get('/auth', 'Actions/Postline/TwitterAuthAction').skipCsrf()
-  route.get('/callback', 'Actions/Postline/TwitterCallbackAction').skipCsrf()
+  route.get('/auth', 'Actions/Postline/TwitterAuthAction').middleware('auth').skipCsrf()
+  route.get('/callback', 'Actions/Postline/TwitterCallbackAction').middleware('auth').skipCsrf()
 })
 
 route.group({ prefix: '/postline/mastodon' }, () => {

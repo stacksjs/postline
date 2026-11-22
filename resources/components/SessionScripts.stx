@@ -5,11 +5,10 @@
     // also matching /login). The API rejects unauthenticated calls
     // regardless — this is UX, not the security boundary.
     //
-    // The desktop shell skips it only against a loopback dev server, the one
-    // place the API lets it in without a token (app/Support/Auth/native.ts).
-    // The packaged app opens the deployed site, where the API wants a login
-    // like any browser: skipping the guard there left a signed-out window on
-    // "Loading accounts…" with every call answering 401.
+    // The desktop shell on a loopback address skips it: the packaged app's
+    // agent has no sign-in at all (app/Support/Auth/native.ts). Against any
+    // other server the API still answers 401, and the wrapper below sends
+    // the window to /login.
     ;(() => {
       const isNativeApp = window.craft?.__craft_bridge_loaded === true
         || !!window.craft?.window
@@ -49,16 +48,11 @@
     // (app/Middleware/Auth.ts), and the browser attaches it to same-origin
     // requests by itself, so there is nothing left to bridge.
     //
-    // Two jobs remain. Tell the API when the caller is the native shell, and
-    // notice when the API says the session is over — the marker the guard above
-    // reads is set by the login page and could otherwise outlive the session it
-    // stands for.
+    // One job remains: notice when the API says the session is over — the
+    // marker the guard above reads is set by the login page and could
+    // otherwise outlive the session it stands for.
     ;(() => {
       const nativeFetch = window.fetch.bind(window)
-      const isNativeApp = () => window.craft?.__craft_bridge_loaded === true
-        || !!window.craft?.window
-        || !!window.webkit?.messageHandlers?.craft
-
       let leaving = false
       const sessionEnded = () => {
         if (leaving) return
@@ -91,11 +85,6 @@
           // answers a different question.
           // stx-strict-ignore-next-line window.location
           sameOriginApi = url.startsWith('/api/') || url.startsWith(`${window.location.origin}/api/`)
-          if (sameOriginApi && isNativeApp()) {
-            const headers = new Headers(init.headers || (typeof input !== 'string' ? input.headers : undefined))
-            headers.set('x-postline-native', 'craft')
-            return watchForSignOut(nativeFetch(input, { ...init, headers }), true)
-          }
         } catch {}
         return watchForSignOut(nativeFetch(input, init), sameOriginApi)
       }

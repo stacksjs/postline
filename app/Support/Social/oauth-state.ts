@@ -29,7 +29,8 @@ export interface TakenOAuthState<T> {
   found: boolean
   /**
    * True when no flow was pending at all — typically a restart between the
-   * redirect and the callback. Callers keep their old leniency for this case.
+   * redirect and the callback. Informational only, for the error message: a
+   * callback is never accepted without `found`.
    */
   noneOutstanding: boolean
   value?: T

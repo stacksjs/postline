@@ -28,9 +28,11 @@ import type { DashboardConfig } from '@stacksjs/types'
  *     `app/Models/` is auto-listed, and you always want to see those.
  */
 export default {
-  // Bundled dashboard routes + sidebar. Flip to `false` to skip the
-  // bundled route registration at boot (this app defines its own routes).
-  enabled: true,
+  // Off: Postline defines every route it serves in `routes/api.ts`. The
+  // bundled surface is hundreds of routes this app never calls, and
+  // `tests/feature/public-routes.test.ts` pins the list that answers without
+  // a session, so turning this back on fails the suite.
+  enabled: false,
   sections: {
     library: { enabled: true },
     content: { enabled: true },

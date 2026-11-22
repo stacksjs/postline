@@ -62,19 +62,17 @@ describe('the desktop schedule', () => {
 })
 
 describe('signing in inside the desktop app', () => {
-  const browser = { get: (name: string) => (name === 'host' ? 'postline.example.com' : null) }
-
   test('the agent lets its own window in, even in production', () => {
     process.env.POSTLINE_DESKTOP_AGENT = '1'
 
     expect(isDesktopAgent()).toBe(true)
-    expect(allowsNativeAppWithoutLogin(browser, 'production')).toBe(true)
+    expect(allowsNativeAppWithoutLogin()).toBe(true)
   })
 
   test('a server is never the agent, whatever a request claims', () => {
-    const claiming = { get: (name: string) => ({ 'host': 'postline.example.com', 'x-postline-native': 'craft', 'x-postline-desktop-agent': '1' } as Record<string, string>)[name] ?? null }
+    delete process.env.POSTLINE_DESKTOP_AGENT
 
     expect(isDesktopAgent()).toBe(false)
-    expect(allowsNativeAppWithoutLogin(claiming, 'production')).toBe(false)
+    expect(allowsNativeAppWithoutLogin()).toBe(false)
   })
 })

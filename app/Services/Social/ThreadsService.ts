@@ -128,10 +128,10 @@ export class ThreadsService {
   async handleCallback(code: string, state: string) {
     const cfg = this.config()
     if (!code) throw new Error('Threads did not return an authorization code.')
-    // Lenient only when no flow is outstanding at all (a restart mid-consent),
-    // which is the leniency the single-slot version had.
+    // Strict: a callback is honoured only for a state this process issued and
+    // has not yet consumed. A restart mid-consent costs one retry.
     const pending = this.pending.take(state)
-    if (!pending.found && !pending.noneOutstanding) {
+    if (!pending.found) {
       throw new Error('Threads OAuth state mismatch. Please start the connection again.')
     }
 

@@ -127,7 +127,7 @@ export class TwitterService {
     const pending = this.pending.take(state)
     // Strict either way: without the verifier minted for this exact state the
     // code exchange cannot succeed, so there is no lenient path to keep.
-    if (!pending.found && !pending.noneOutstanding) {
+    if (!pending.found) {
       throw new Error('X/Twitter OAuth state mismatch. Please start the connection again.')
     }
     const codeVerifier = pending.value?.codeVerifier
