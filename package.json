@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.1.1",
   "private": true,
-  "description": "Postline — compose once, publish to every social network: queue, campaigns, analytics, listening and a unified inbox.",
+  "description": "Postline \u2014 compose once, publish to every social network: queue, campaigns, analytics, listening and a unified inbox.",
   "author": "Chris Breuer <chris@stacksjs.org>",
   "contributors": [
     "Chris Breuer <chris@stacksjs.org>"
@@ -65,17 +65,17 @@
     "stx": "./buddy"
   },
   "dependencies": {
-    "@stacksjs/ai": "^0.75.628",
-    "@stacksjs/payments": "0.75.628",
-    "@stacksjs/realtime": "0.75.628",
-    "@stacksjs/socials": "^0.75.628",
-    "@stacksjs/stx": "^0.2.913",
-    "@stacksjs/ts-cloud": "^0.16.135",
-    "stacks": "^0.75.628",
-    "ts-broadcasting": "0.0.9",
-    "ts-medium-editor": "^0.1.6"
+    "@stacksjs/ai": "^0.75.653",
+    "@stacksjs/payments": "0.75.653",
+    "@stacksjs/socials": "^0.75.653",
+    "@stacksjs/stx": "^0.2.927",
+    "@stacksjs/ts-cloud": "^0.16.152",
+    "stacks": "^0.75.653",
+    "ts-images": "^0.2.35",
+    "ts-medium-editor": "^0.2.0"
   },
   "devDependencies": {
+    "@iconify-json/hugeicons": "^1.2.36",
     "@iconify-json/lucide": "^1.2.121",
     "@iconify-json/simple-icons": "^1.2.92",
     "better-dx": "^0.2.22",
@@ -93,9 +93,5 @@
       }
     },
     "commit-msg": "bun x gitlint --edit .git/COMMIT_EDITMSG"
-  },
-  "overrides": {
-    "@stacksjs/ts-cloud": "^0.16.135",
-    "@stacksjs/stx": "^0.2.913"
   }
 }

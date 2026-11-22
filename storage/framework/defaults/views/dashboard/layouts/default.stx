@@ -137,7 +137,7 @@ select:not([multiple]):not([size]):not([data-ui-select]) {
      the document or moving the fixed dashboard shell. */
   overflow-x: hidden;
   margin-left: var(--stx-sidebar-width, 250px);
-  background: #f4f4f5;
+  background: #f6f6f9;
   transition: margin-left 0.3s ease-out;
 }
 /*
@@ -188,29 +188,8 @@ html .dashboard-modal-layer {
     left: 0;
   }
 }
-/*
- * These three rules used to hide the web sidebar and collapse the content
- * offset, because Craft rendered a real NSOutlineView in that strip and
- * showing both would have meant two navigations side by side.
- *
- * That native sidebar is retired (see actions/src/dev/dashboard.ts: "the web
- * one owns rendering and behavior"), and the dev server never requests one.
- * It does request `webSidebarMaterial: true`, purely for the NSVisualEffectView
- * vibrancy that sits BEHIND the stx-rendered rows.
- *
- * Craft conflates the two: macos.zig gates its native-sidebar bootstrap on
- * `style.web_sidebar_material` alone, and that bootstrap sets the global
- * `__craftNativeSidebar` flag. So asking for vibrancy silently asserted "a
- * native sidebar exists", the marker got stamped on the root element, and
- * these rules hid the only navigation the window had. The Craft window showed
- * a vibrant empty strip.
- *
- * Removed rather than re-gated: with the native sidebar retired there is no
- * state in which hiding the web sidebar is correct. The upstream conflation is
- * worth fixing in Craft too, so the flag stops lying to every other consumer.
- */
 .dark [data-stx-content] {
-  background: #0a0a0a;
+  background: #121318;
 }
 
 /* ===========================================================================
@@ -465,18 +444,39 @@ html[data-appearance="arc"] [data-sidebar-section] > div:first-child {
   place-items: center;
   border-radius: 4px;
   color: currentColor;
-  opacity: .55;
+  opacity: 0;
+  pointer-events: none;
   cursor: grab;
   touch-action: none;
 }
 .dashboard-sidebar-order-grip[data-sidebar-order-handle="section"] { right: 23px; top: 7px; }
 [data-section-id="top"] > .dashboard-sidebar-order-grip { right: 1px; top: 2px; }
 .dashboard-sidebar-order-grip > span { display: block; width: 14px; height: 14px; }
-.dashboard-sidebar-order-grip:hover,
+[data-dashboard-sidebar-order]:has([data-sidebar-order-editing="true"]) .dashboard-sidebar-order-grip,
+[data-sidebar-row]:has(> [data-sidebar-item]:focus-visible) > .dashboard-sidebar-order-grip,
+[data-sidebar-section]:has(> [data-sidebar-section-header]:focus-visible) > .dashboard-sidebar-order-grip,
+.dashboard-sidebar-order-grip:focus-visible { opacity: .72; pointer-events: auto; }
 .dashboard-sidebar-order-grip:focus-visible { opacity: 1; background: rgba(127, 127, 127, .16); }
 .dashboard-sidebar-order-grip:focus-visible { outline: 2px solid #3b82f6; outline-offset: -2px; }
-.dashboard-sidebar-order-grip:disabled { cursor: wait; opacity: .25; }
-[data-order-dragging="true"] > .dashboard-sidebar-order-grip { cursor: grabbing; opacity: 1; }
+.dashboard-sidebar-order-grip:disabled { cursor: wait; }
+[data-order-dragging="true"] > .dashboard-sidebar-order-grip { cursor: grabbing; opacity: 1; pointer-events: auto; }
+@media (any-hover: hover) {
+  [data-sidebar-row]:hover > .dashboard-sidebar-order-grip,
+  [data-sidebar-section]:has(> :first-child:hover) > .dashboard-sidebar-order-grip,
+  .dashboard-sidebar-order-grip:hover { opacity: .72; pointer-events: auto; }
+  .dashboard-sidebar-order-grip:hover { opacity: 1; background: rgba(127, 127, 127, .16); }
+}
+@media (pointer: coarse) {
+  .dashboard-sidebar-order-mode { min-height: 44px; }
+  [data-dashboard-sidebar-order]:has([data-sidebar-order-editing="true"]) [data-sidebar-item],
+  [data-dashboard-sidebar-order]:has([data-sidebar-order-editing="true"]) [data-sidebar-section-header] { min-height: 44px; }
+  [data-dashboard-sidebar-order]:has([data-sidebar-order-editing="true"]) [data-sidebar-item] { padding-right: 50px; }
+  [data-dashboard-sidebar-order]:has([data-sidebar-order-editing="true"]) [data-sidebar-section-header] { padding-right: 68px; }
+  [data-dashboard-sidebar-order]:has([data-sidebar-order-editing="true"]) .dashboard-sidebar-order-grip { top: 0; width: 44px; height: 44px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dashboard-sidebar-order-grip { transition: opacity 120ms ease; }
+}
 [data-order-drop="before"] { box-shadow: 0 -2px #3b82f6; }
 [data-order-drop="after"] { box-shadow: 0 2px #3b82f6; }
 </style>
@@ -533,6 +533,7 @@ const route = useRoute()
 const sidebarHost = useRef('dashboardSidebarHost')
 const mobileSidebarHost = useRef('dashboardMobileSidebarHost')
 const sidebarOrderStatus = state({ ready: false, saving: false, custom: false, message: 'Loading sidebar order…' })
+const sidebarReordering = state(false)
 const sidebarOrder = createDashboardSidebarOrder({
   pane: () => sidebarPanes()[0],
   sections: sidebarSections,
@@ -703,6 +704,7 @@ function showSidebarInDrawer() {
 // markup is already gone by now, so the Sidebar is put back from the
 // reference kept above rather than looked up.
 function returnSidebarFromDrawer() {
+  sidebarReordering.set(false)
   if (!lentSidebar) return
   const { element, parent, next } = lentSidebar
   lentSidebar = null
@@ -777,8 +779,9 @@ onDestroy(() => {
       @endif
     </template>
     <template #footer>
-      <div class="px-3 py-2 text-neutral-600 text-xs dark:text-neutral-300" data-sidebar-order-controls>
+      <div class="px-3 py-2 text-neutral-600 text-xs dark:text-neutral-300" data-sidebar-order-controls :data-sidebar-order-editing="sidebarReordering() ? 'true' : 'false'">
         <p role="status" aria-live="polite" :text="sidebarOrderStatus.message"></p>
+        <Button :if="sidebarOrderStatus.ready" class="dashboard-sidebar-order-mode" variant="ghost" size="xs" @click="sidebarReordering.set(!sidebarReordering())">{{ sidebarReordering() ? 'Done reordering' : 'Reorder sidebar' }}</Button>
         <Button :if="!sidebarOrderStatus.ready" variant="ghost" size="xs" @click="sidebarOrder.load()">Retry loading order</Button>
         <Button :if="sidebarOrderStatus.ready" variant="ghost" size="xs" :disabled="sidebarOrderStatus.saving" @click="sidebarOrder.reset()">Reset order</Button>
       </div>

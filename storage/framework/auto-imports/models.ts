@@ -82,4 +82,3 @@ export { default as MenuItem } from '@stacksjs/defaults/app/Models/Content/MenuI
 export { default as Page } from '@stacksjs/defaults/app/Models/Content/Page.ts'
 export { default as PageRevision } from '@stacksjs/defaults/app/Models/Content/PageRevision.ts'
 export { default as Redirect } from '@stacksjs/defaults/app/Models/Content/Redirect.ts'
-export { default as Websocket } from '@stacksjs/defaults/app/Models/realtime/Websocket.ts'

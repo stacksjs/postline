@@ -137,7 +137,6 @@ declare global {
   const Page: typeof import('@stacksjs/defaults/app/Models/Content/Page.ts')['default']
   const PageRevision: typeof import('@stacksjs/defaults/app/Models/Content/PageRevision.ts')['default']
   const Redirect: typeof import('@stacksjs/defaults/app/Models/Content/Redirect.ts')['default']
-  const Websocket: typeof import('@stacksjs/defaults/app/Models/realtime/Websocket.ts')['default']
   const AutoDeletePosts: typeof import('../../../app/Jobs/AutoDeletePosts')['default']
   const PublishScheduledPosts: typeof import('../../../app/Jobs/PublishScheduledPosts')['default']
   const ScanKeywordMonitors: typeof import('../../../app/Jobs/ScanKeywordMonitors')['default']
@@ -205,4 +204,5 @@ declare global {
   const Transaction: typeof import('@stacksjs/orm')['Transaction']
   const WaitlistProduct: typeof import('@stacksjs/orm')['WaitlistProduct']
   const WaitlistRestaurant: typeof import('@stacksjs/orm')['WaitlistRestaurant']
+  const Websocket: typeof import('@stacksjs/orm')['Websocket']
 }
