@@ -2,7 +2,9 @@
 preload = [ "./storage/framework/defaults/resources/plugins/preloader.ts" ]
 
 [test]
-preload = [ "./tests/setup.ts" ]
+# Order matters: the first file points the suite at a database of its own
+# before anything reads the database path.
+preload = [ "./tests/isolate-database.ts", "./tests/setup.ts" ]
 coverage = false
 
 [run]
