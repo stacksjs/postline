@@ -5,5 +5,5 @@
 // resolves. Values are paths rather than import thunks on purpose: thunks
 // would make every compilation that touches a name resolve every module.
 export const listeners = {
-  'Console': '../../../app/Listeners/Console.ts',
+  'Console': '@stacksjs/defaults/app/Listeners/Console.ts',
 } as const

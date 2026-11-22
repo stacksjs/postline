@@ -5,7 +5,6 @@
 // resolves. Values are paths rather than import thunks on purpose: thunks
 // would make every compilation that touches a name resolve every module.
 export const actions = {
-  'Actions/NotifyUser': '../../../app/Actions/NotifyUser.ts',
   'Actions/Postline/AccountDisconnectAction': '../../../app/Actions/Postline/AccountDisconnectAction.ts',
   'Actions/Postline/AccountListAction': '../../../app/Actions/Postline/AccountListAction.ts',
   'Actions/Postline/AnalyticsAction': '../../../app/Actions/Postline/AnalyticsAction.ts',
@@ -68,7 +67,6 @@ export const actions = {
   'Actions/Postline/TwitterCallbackAction': '../../../app/Actions/Postline/TwitterCallbackAction.ts',
   'Actions/Postline/TwitterConnectAction': '../../../app/Actions/Postline/TwitterConnectAction.ts',
   'Actions/Postline/TwitterStatusAction': '../../../app/Actions/Postline/TwitterStatusAction.ts',
-  'Actions/SendWelcomeEmail': '../../../app/Actions/SendWelcomeEmail.ts',
   'Actions/AI/AskAction': '@stacksjs/defaults/app/Actions/AI/AskAction.ts',
   'Actions/AI/CompleteAction': '@stacksjs/defaults/app/Actions/AI/CompleteAction.ts',
   'Actions/AI/SummaryAction': '@stacksjs/defaults/app/Actions/AI/SummaryAction.ts',
@@ -797,6 +795,7 @@ export const actions = {
   'Actions/Monitoring/ErrorTimelineAction': '@stacksjs/defaults/app/Actions/Monitoring/ErrorTimelineAction.ts',
   'Actions/Monitoring/ErrorUnresolveAction': '@stacksjs/defaults/app/Actions/Monitoring/ErrorUnresolveAction.ts',
   'Actions/Monitoring/error-provider': '@stacksjs/defaults/app/Actions/Monitoring/error-provider.ts',
+  'Actions/NotifyUser': '@stacksjs/defaults/app/Actions/NotifyUser.ts',
   'Actions/Password/PasswordResetAction': '@stacksjs/defaults/app/Actions/Password/PasswordResetAction.ts',
   'Actions/Password/SendPasswordResetEmailAction': '@stacksjs/defaults/app/Actions/Password/SendPasswordResetEmailAction.ts',
   'Actions/Password/VerifyResetTokenAction': '@stacksjs/defaults/app/Actions/Password/VerifyResetTokenAction.ts',
@@ -825,6 +824,7 @@ export const actions = {
   'Actions/Queue/FetchQueuesAction': '@stacksjs/defaults/app/Actions/Queue/FetchQueuesAction.ts',
   'Actions/Realtime/FetchWebsocketsAction': '@stacksjs/defaults/app/Actions/Realtime/FetchWebsocketsAction.ts',
   'Actions/RobotsAction': '@stacksjs/defaults/app/Actions/RobotsAction.ts',
+  'Actions/SendWelcomeEmail': '@stacksjs/defaults/app/Actions/SendWelcomeEmail.ts',
   'Actions/SitemapAction': '@stacksjs/defaults/app/Actions/SitemapAction.ts',
   'Actions/Storefront/AcceptOrderOfferAction': '@stacksjs/defaults/app/Actions/Storefront/AcceptOrderOfferAction.ts',
   'Actions/Storefront/AddToCartAction': '@stacksjs/defaults/app/Actions/Storefront/AddToCartAction.ts',

@@ -10,12 +10,6 @@ import { schedule } from '@stacksjs/scheduler'
  * @see https://docs.stacksjs.com/scheduling
  */
 export default function () {
-  // Run the Inspire job every hour
-  schedule
-    .job('Inspire')
-    .hourly()
-    .setTimeZone('America/Los_Angeles')
-
   // Publish scheduled Postline posts as they come due
   schedule
     .job('PublishScheduledPosts')

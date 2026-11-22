@@ -1,7 +1,7 @@
 /**
  * DM transport registry.
  *
- * Mirrors `DriverRegistry` for the publishing side: one place that knows which
+ * The inbox counterpart of the publishing drivers: one place that knows which
  * networks Postline can hold a conversation on, so the service layer never
  * names a provider directly.
  */
