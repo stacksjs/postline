@@ -137,6 +137,8 @@ export class CrosspostService {
    * (grouped by `thread_key`). Providers that support reply chains
    * (Bluesky) receive root/parent refs so segments render as an actual
    * thread; other providers publish each segment independently.
+   *
+   * A segment that fails on an account stops the thread on that account.
    */
   async publishThread(
     texts: string[],
@@ -159,6 +161,10 @@ export class CrosspostService {
     // their own thread, and segment 2 on one must never reply to segment 1 on
     // the other. Only populated for results that carry a cid (Bluesky).
     const chains = new Map<string, ThreadChain>()
+    // The segment each target stopped at. Once a segment fails on an account,
+    // nothing after it is sent there: the rest would arrive as a thread with
+    // a hole in it, or as unrelated posts. Other accounts carry on.
+    const halted = new Map<string, number>()
 
     for (const [index, body] of segments.entries()) {
       const postUuid = uuid()
@@ -189,12 +195,20 @@ export class CrosspostService {
         const key = targetKey(target)
         const chain = chains.get(key)
 
+        const stoppedAt = halted.get(key)
+        if (stoppedAt !== undefined) {
+          segmentResults.push(await this.recordHeldBack(target, Number(post.id), stoppedAt, segments.length))
+          continue
+        }
+
         const result = await this.publishTarget(
           target,
           { id: Number(post.id), body },
           threadSegmentContent(index, content, chain),
         )
         segmentResults.push(result)
+        if (!result.ok)
+          halted.set(key, index)
 
         // A provider that returns no cid cannot be replied to, so its chain
         // stays undefined and its segments publish independently.
@@ -213,6 +227,32 @@ export class CrosspostService {
     }
 
     return { postIds, results }
+  }
+
+  /**
+   * Record a thread segment that was not sent because an earlier one failed
+   * on the same account, so the queue shows it and says why.
+   */
+  private async recordHeldBack(
+    target: PublishTarget,
+    postId: number,
+    failedIndex: number,
+    total: number,
+  ): Promise<CrosspostTargetResult> {
+    const error = `Not sent: post ${failedIndex + 1} of ${total} in this thread failed here, so the rest were held back.`
+    const at = now()
+    await database.insertInto('post_targets').values({
+      uuid: uuid(),
+      provider: target.provider,
+      social_identity_id: target.identityId || null,
+      status: 'failed',
+      failure_reason: error,
+      post_id: postId,
+      created_at: at,
+      updated_at: at,
+    }).execute()
+
+    return { provider: target.provider, ok: false, error, target: targetKey(target), identityId: target.identityId ?? undefined } as CrosspostTargetResult
   }
 
   /**
