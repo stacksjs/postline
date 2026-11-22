@@ -17,7 +17,17 @@ export default new Action({
     try {
       const data = await postQueue.publishNow(id)
       const allFailed = data.results.length > 0 && data.results.every(result => !result.ok)
-      return response.json({ ok: !allFailed, data }, { status: allFailed ? 422 : 200 })
+      if (!allFailed)
+        return response.json({ ok: true, data })
+
+      // Say why, per network. Without `error` the client could only report
+      // that the request failed.
+      const reasons = data.results.map(result => result.error).filter(Boolean)
+      return response.json({
+        ok: false,
+        error: [...new Set(reasons)].join(' ') || 'Nothing was published.',
+        data,
+      }, { status: 422 })
     }
     catch (error) {
       return actionFailure(error, 422)

@@ -144,6 +144,11 @@ export interface QueueItemView {
   providers: QueueTargetView[]
   hasImage: boolean
   hasLink: boolean
+  /**
+   * True for a post that went out on some networks and failed on others. Its
+   * failed networks can be sent again on their own with "publish now".
+   */
+  partial: boolean
 }
 
 export interface SaveQueueInput {
@@ -306,6 +311,8 @@ export class QueueService {
         createdAt: String(post.created_at),
         hasImage: Boolean(stored?.media?.length),
         hasLink: Boolean(stored?.external),
+        partial: String(post.status) === 'published'
+          && targets.some((target: any) => Number(target.post_id) === Number(post.id) && target.status === 'failed'),
         providers: targets
           .filter((target: any) => Number(target.post_id) === Number(post.id))
           .map((target: any): QueueTargetView => {
@@ -488,19 +495,27 @@ export class QueueService {
    * statement changed a row. SQLite runs one write at a time, so exactly one
    * caller sees 1.
    */
-  private async claim(post: { id: number | string }): Promise<void> {
+  private async claim(post: { id: number | string, status: string }): Promise<void> {
+    // From the exact state that was read: anything else means another run
+    // moved the post in between.
     const changed = affected(await database.updateTable('posts').set({
       status: 'publishing',
       updated_at: now(),
-    }).where('id', '=', post.id).where('status', 'in', [...ACTIONABLE]).execute())
+    }).where('id', '=', post.id).where('status', '=', post.status).execute())
 
     if (changed !== 1)
       throw new AlreadyPublishingError()
   }
 
-  /** Publish a draft/scheduled/failed post immediately. */
+  /**
+   * Publish a draft, scheduled or failed post immediately. Also sends the
+   * failed networks of a post that went out elsewhere: only targets still
+   * pending or failed are published, so a network that already has the post
+   * never gets it twice.
+   */
   async publishNow(id: number): Promise<{ postId: number, results: CrosspostTargetResult[] }> {
-    const post = await this.findActionable(id)
+    const post = await this.findPublishable(id)
+    const wasPublished = String(post.status) === 'published'
     await this.claim(post)
 
     const placeholders = await database
@@ -570,13 +585,25 @@ export class QueueService {
       }).execute()
     }
 
+    // A retry of a post that already went out somewhere leaves it published
+    // whatever the retry did, and keeps the time it first went out.
+    const published = anyOk || wasPublished
     await database.updateTable('posts').set({
-      status: anyOk ? 'published' : 'failed',
-      ...(anyOk ? { published_at: finishedAt } : {}),
+      status: published ? 'published' : 'failed',
+      ...(published && !post.published_at ? { published_at: finishedAt } : {}),
       updated_at: finishedAt,
     }).where('id', '=', post.id).execute()
 
-    if (anyOk) await this.removeStoredMedia(post)
+    // The image is kept while any network still needs it. It used to be
+    // removed as soon as one network succeeded, which left a failed network
+    // with nothing to retry with.
+    const stillFailed = await database
+      .selectFrom('post_targets')
+      .select(['id'])
+      .where('post_id', '=', post.id)
+      .where('status', '=', 'failed')
+      .execute()
+    if (published && stillFailed.length === 0) await this.removeStoredMedia(post)
 
     return { postId: Number(post.id), results }
   }
@@ -679,9 +706,10 @@ export class QueueService {
 
       // Only if it is still stranded: a run that was merely slow may have
       // finished between the read above and this write.
+      const full = await database.selectFrom('posts').select(['published_at']).where('id', '=', post.id).executeTakeFirst()
       const settled = affected(await database.updateTable('posts').set({
         status: sent.size > 0 ? 'published' : 'failed',
-        ...(sent.size > 0 ? { published_at: at } : {}),
+        ...(sent.size > 0 && !full?.published_at ? { published_at: at } : {}),
         updated_at: at,
       }).where('id', '=', post.id).where('status', '=', 'publishing').execute())
 
@@ -723,6 +751,38 @@ export class QueueService {
     }
 
     return { published, failed }
+  }
+
+  /**
+   * A post that can be sent: one that is still actionable, or one that is
+   * published but has networks that failed.
+   */
+  private async findPublishable(id: number): Promise<any> {
+    const post = await database
+      .selectFrom('posts')
+      .selectAll()
+      .where('id', '=', id)
+      .executeTakeFirst()
+
+    if (!post)
+      throw new Error('Post not found.')
+    if (ACTIONABLE.has(String(post.status)))
+      return post
+
+    if (String(post.status) === 'published') {
+      const failed = await database
+        .selectFrom('post_targets')
+        .select(['id'])
+        .where('post_id', '=', post.id)
+        .where('status', '=', 'failed')
+        .execute()
+      if (failed.length > 0)
+        return post
+    }
+
+    if (String(post.status) === 'publishing')
+      throw new AlreadyPublishingError()
+    throw new Error('This post has nothing left to publish.')
   }
 
   private async findActionable(id: number): Promise<any> {

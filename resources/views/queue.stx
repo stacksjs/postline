@@ -42,7 +42,7 @@
                 <span class="font-bold text-xs">{{ row.when }}</span>
                 <span class="text-muted text-xs">{{ row.channels }}</span>
               </div>
-              <span class="px-2 py-1 font-bold text-[11px] whitespace-nowrap border rounded-full" data-status-pill :data-status="row.status">{{ row.status }}</span>
+              <span class="px-2 py-1 font-bold text-[11px] whitespace-nowrap border rounded-full" data-status-pill :data-status="row.pill">{{ row.statusLabel }}</span>
             </header>
             <p class="m-0 leading-normal text-[13px] text-body">{{ row.body }}</p>
             <p class="m-0 text-red-700 text-xs" x-show="row.failure" :text="row.failure"></p>
@@ -69,12 +69,13 @@
                 <span class="font-bold text-xs">{{ row.when }}</span>
                 <span class="text-muted text-xs">{{ row.channels }}</span>
               </div>
-              <span class="px-2 py-1 font-bold text-[11px] whitespace-nowrap border rounded-full" data-status-pill :data-status="row.status">{{ row.status }}</span>
+              <span class="px-2 py-1 font-bold text-[11px] whitespace-nowrap border rounded-full" data-status-pill :data-status="row.pill">{{ row.statusLabel }}</span>
             </header>
             <p class="m-0 leading-normal text-[13px] text-body">{{ row.body }}</p>
             <p class="m-0 text-red-700 text-xs" x-show="row.failure" :text="row.failure"></p>
             <footer class="flex flex-wrap gap-2 items-center justify-end">
               <a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.partial" :disabled="busyId() === row.id" @click="retryItem(row.id)">Retry failed</button>
             </footer>
           </article>
         </div>
@@ -130,6 +131,7 @@
       provider: string
       /** The account's handle, when the target names one. */
       handle?: string | null
+      status?: string
       failureReason?: string | null
       remoteUri?: string | null
     }
@@ -144,6 +146,7 @@
       publishedAt?: string | null
       hasImage?: boolean
       hasLink?: boolean
+      partial?: boolean
       providers: QueueApiTarget[]
     }
 
@@ -158,6 +161,10 @@
       liveUrl: string
       editUrl: string
       actionable: boolean
+      /** Went out on some networks and failed on others. */
+      partial: boolean
+      statusLabel: string
+      pill: string
       scheduledAt?: string | null
       publishedAt?: string | null
       title?: string | null
@@ -228,6 +235,18 @@
       return match ? `https://bsky.app/profile/${encodeURIComponent(match[1])}/post/${encodeURIComponent(match[2])}` : ''
     }
 
+    /**
+     * What failed, per network. One network's reason on its own reads as if
+     * the whole post failed, which is wrong for a post that went out
+     * elsewhere.
+     */
+    const failureText = (item: QueueApiItem): string => {
+      const failed = item.providers.filter(target => target.status === 'failed' || target.failureReason)
+      if (failed.length === 0) return ''
+      const lines = failed.map(target => `${channelLabels([target])[0] || target.provider}: ${target.failureReason || 'failed'}`)
+      return item.partial ? `Sent to the others. ${lines.join(' ')}` : lines.join(' ')
+    }
+
     /** Flatten an API item into exactly what a row renders. */
     const toRow = (item: QueueApiItem): QueueRow => {
       const when = item.status === 'scheduled'
@@ -244,10 +263,15 @@
         body: item.body,
         when,
         channels,
-        failure: item.providers.find(target => target.failureReason)?.failureReason || '',
+        failure: failureText(item),
         liveUrl: liveUrlFor(item.providers.find(target => target.remoteUri)?.remoteUri),
         editUrl: `/composer?edit=${item.id}`,
         actionable: ACTIONABLE.has(item.status),
+        partial: Boolean(item.partial),
+        // A post that reached only some networks is not simply "published".
+        // It borrows the amber of an unfinished publish.
+        statusLabel: item.partial ? 'partly sent' : item.status,
+        pill: item.partial ? 'publishing' : item.status,
         scheduledAt: item.scheduledAt,
         publishedAt: item.publishedAt,
         title: item.title,
@@ -381,6 +405,13 @@
       '/api/postline/queue/publish-now',
       { title: 'Published', message: 'Post published.' },
       'Publish failed',
+    )
+
+    const retryItem = (id: number): void => void runAction(
+      id,
+      '/api/postline/queue/publish-now',
+      { title: 'Retried', message: 'The failed networks were sent again.' },
+      'Retry failed',
     )
 
     const deleteItem = (id: number): void => {

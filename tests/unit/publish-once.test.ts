@@ -8,6 +8,8 @@
  */
 import type { ProviderPublisher } from '../../app/Services/Social/CrosspostService'
 import type { CrosspostTargetResult } from '../../app/Support/Social/types'
+import { existsSync } from 'node:fs'
+import process from 'node:process'
 import { describe, expect, test } from 'bun:test'
 import { db } from '@stacksjs/database'
 import { CrosspostService } from '../../app/Services/Social/CrosspostService'
@@ -211,5 +213,88 @@ describe('a publish that never finished', () => {
 
     expect(await status(postId)).toBe('failed')
     expect(blog.sends).not.toContain(postId)
+  })
+})
+
+describe('a post that went out on some networks and failed on others', () => {
+  async function partlySent(): Promise<{ postId: number, mastodonFirst: Fake }> {
+    const blog = fakeNetwork('blog')
+    const mastodonFirst = fakeNetwork('mastodon', { fail: true })
+    const queue = queueWith({ blog, mastodon: mastodonFirst })
+    const { postId } = await queue.save({ text: 'two networks', providers: ['blog', 'mastodon'] })
+    await queue.publishNow(postId)
+    return { postId, mastodonFirst }
+  }
+
+  test('is published, and says which network failed', async () => {
+    const { postId } = await partlySent()
+
+    expect(await status(postId)).toBe('published')
+    expect((await targets(postId)).sort((a, b) => a.provider.localeCompare(b.provider))).toEqual([
+      { provider: 'blog', status: 'published', failure_reason: null },
+      { provider: 'mastodon', status: 'failed', failure_reason: 'The network said no.' },
+    ])
+
+    const listed = (await queueWith({}).list()).find(item => item.id === postId)
+    expect(listed?.partial).toBe(true)
+  })
+
+  test('can have only its failed network sent again', async () => {
+    const { postId } = await partlySent()
+    const blog = fakeNetwork('blog')
+    const mastodon = fakeNetwork('mastodon')
+
+    await queueWith({ blog, mastodon }).publishNow(postId)
+
+    expect(blog.sends).toEqual([])
+    expect(mastodon.sends).toEqual([postId])
+    expect(await status(postId)).toBe('published')
+    expect((await targets(postId)).map(row => row.status).sort()).toEqual(['published', 'published'])
+    expect((await queueWith({}).list()).find(item => item.id === postId)?.partial).toBe(false)
+  })
+
+  test('keeps the time it first went out', async () => {
+    const { postId } = await partlySent()
+    const before = (await database.selectFrom('posts').select(['published_at']).where('id', '=', postId).executeTakeFirstOrThrow()).published_at
+    await Bun.sleep(1100)
+
+    await queueWith({ blog: fakeNetwork('blog'), mastodon: fakeNetwork('mastodon') }).publishNow(postId)
+
+    const after = (await database.selectFrom('posts').select(['published_at']).where('id', '=', postId).executeTakeFirstOrThrow()).published_at
+    expect(after).toBe(before)
+  })
+
+  test('stays published when the retry fails again', async () => {
+    const { postId } = await partlySent()
+
+    await queueWith({ blog: fakeNetwork('blog'), mastodon: fakeNetwork('mastodon', { fail: true }) }).publishNow(postId)
+
+    expect(await status(postId)).toBe('published')
+    expect((await targets(postId)).filter(row => row.provider === 'mastodon').map(row => row.status)).toEqual(['failed'])
+  })
+
+  test('a fully sent post has nothing left to publish', async () => {
+    const blog = fakeNetwork('blog')
+    const queue = queueWith({ blog })
+    const { postId } = await queue.save({ text: 'all done', providers: ['blog'] })
+    await queue.publishNow(postId)
+
+    await expect(queue.publishNow(postId)).rejects.toThrow('This post has nothing left to publish.')
+  })
+
+  test('keeps its image until every network has it', async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+    const queue = queueWith({ blog: fakeNetwork('blog'), mastodon: fakeNetwork('mastodon', { fail: true }) })
+    const { postId } = await queue.save({ text: 'with a picture', providers: ['blog', 'mastodon'], image: { bytes: png, mimeType: 'image/png' } })
+    const edit = async (): Promise<boolean> => (await queueWith({}).list()).find(item => item.id === postId)?.hasImage ?? false
+
+    await queue.publishNow(postId)
+    const stored = JSON.parse((await database.selectFrom('posts').selectAll().where('id', '=', postId).executeTakeFirstOrThrow()).notes || '{}')
+    const path = `${process.cwd()}/storage/app/postline-media/${stored.media[0].path}`
+    expect(await edit()).toBe(true)
+    expect(existsSync(path)).toBe(true)
+
+    await queueWith({ blog: fakeNetwork('blog'), mastodon: fakeNetwork('mastodon') }).publishNow(postId)
+    expect(existsSync(path)).toBe(false)
   })
 })
