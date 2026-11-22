@@ -1,5 +1,6 @@
 import { route } from '@stacksjs/router'
 import { csrfSeedResponse } from '../app/Support/Http/csrf-cookie'
+import { assertSafeDeployment } from '../app/Support/Http/deployment-guard'
 
 /**
  * This file is the entry point for your application's API routes.
@@ -13,6 +14,10 @@ import { csrfSeedResponse } from '../app/Support/Http/csrf-cookie'
  *
  * @see https://docs.stacksjs.com/routing
  */
+
+// Checked before a single route exists: a development build must not serve an
+// address other machines can reach.
+assertSafeDeployment()
 
 // Your custom routes go here:
 // Auth: the framework's /login lives in the bundled dashboard routes, which
