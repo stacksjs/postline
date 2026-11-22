@@ -1,3 +1,4 @@
+import { log } from '@stacksjs/logging'
 import { Job } from '@stacksjs/queue'
 import { Every } from '@stacksjs/types'
 import { postQueue } from '../Services/Social/QueueService'
@@ -13,7 +14,7 @@ export default new Job({
   handle: async () => {
     const { published, failed, missed } = await postQueue.publishDue()
     if (published || failed || missed)
-      console.log(`[postline] scheduled publish run: ${published} published, ${failed} failed, ${missed} held back as missed`)
+      log.info(`[postline] scheduled publish run: ${published} published, ${failed} failed, ${missed} held back as missed`)
     return { published, failed, missed }
   },
 })

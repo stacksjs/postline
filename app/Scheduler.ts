@@ -57,6 +57,12 @@ export default function () {
   // schedule.command('echo "Daily maintenance complete"').daily()
 }
 
-process.on('SIGINT', () => {
-  schedule.gracefulShutdown().then(() => process.exit(0))
-})
+// SIGTERM as well as SIGINT: a deploy stops the scheduler with SIGTERM, and
+// unhandled it killed the process in the middle of whatever it was
+// publishing. A post cut off like that is recovered on the next start (see
+// `recoverStranded`), but it is better not to cut it off.
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    schedule.gracefulShutdown().then(() => process.exit(0))
+  })
+}

@@ -1,3 +1,4 @@
+import { log } from '@stacksjs/logging'
 import type { PublishTarget } from '../../Support/Social/targets'
 import type { CrosspostService } from './CrosspostService'
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
@@ -119,6 +120,13 @@ export const MISSED_PREFIX = 'Missed:'
 
 function missedReason(scheduledAt: string): string {
   return `${MISSED_PREFIX} Postline was not running when this was due (${scheduledAt} UTC). Publish it now, or give it a new time.`
+}
+
+/** Thrown when a queued post's attached image is no longer on disk. */
+export class MissingMediaError extends UserFacingError {
+  constructor() {
+    super('The image attached to this post is missing, so it was not sent. Attach it again, or remove it from the post.')
+  }
 }
 
 /** Thrown when a post is already being published by another run. */
@@ -532,6 +540,9 @@ export class QueueService {
   async publishNow(id: number): Promise<{ postId: number, results: CrosspostTargetResult[] }> {
     const post = await this.findPublishable(id)
     const wasPublished = String(post.status) === 'published'
+    // Read before the claim: a post whose image is gone is refused here, with
+    // nothing changed, instead of being claimed and then failing halfway.
+    const content = await this.hydrateContent(post)
     await this.claim(post)
 
     const placeholders = await database
@@ -562,7 +573,7 @@ export class QueueService {
     const results = await this.publisher.publishExisting(
       { id: Number(post.id), body: String(post.body) },
       targets,
-      await this.hydrateContent(post),
+      content,
     )
 
     const anyOk = results.some(result => result.ok)
@@ -599,6 +610,13 @@ export class QueueService {
         created_at: finishedAt,
         updated_at: finishedAt,
       }).execute()
+    }
+
+    for (const result of results) {
+      if (result.ok)
+        log.info(`[postline] post ${post.id} published to ${result.target || result.provider}`)
+      else
+        log.warn(`[postline] post ${post.id} failed on ${result.target || result.provider}: ${result.error || 'no reason given'}`)
     }
 
     // A retry of a post that already went out somewhere leaves it published
@@ -641,22 +659,22 @@ export class QueueService {
       const media: NonNullable<PublishContent['media']> = []
       for (const item of stored.media) {
         if (item.path) {
-          try {
-            const file = Bun.file(join(MEDIA_DIR, item.path))
-            if (await file.exists()) {
-              media.push({
-                bytes: new Uint8Array(await file.arrayBuffer()),
-                // Also expose a public URL so URL-only providers (Instagram,
-                // Threads) can publish the same uploaded file; byte-upload
-                // providers (Bluesky, LinkedIn, Mastodon) keep using `bytes`.
-                // Null when no public base is configured — then it's bytes-only.
-                url: publicMediaUrl(item.path) ?? undefined,
-                mimeType: item.mimeType,
-                altText: item.altText,
-              })
-            }
-          }
-          catch {}
+          const file = Bun.file(join(MEDIA_DIR, item.path))
+          // A post saved with an image must not go out without it. This used
+          // to be skipped silently, which is how a deploy that wiped the
+          // media folder turned image posts into text posts.
+          if (!(await file.exists()))
+            throw new MissingMediaError()
+          media.push({
+            bytes: new Uint8Array(await file.arrayBuffer()),
+            // Also expose a public URL so URL-only providers (Instagram,
+            // Threads) can publish the same uploaded file; byte-upload
+            // providers (Bluesky, LinkedIn, Mastodon) keep using `bytes`.
+            // Null when no public base is configured — then it's bytes-only.
+            url: publicMediaUrl(item.path) ?? undefined,
+            mimeType: item.mimeType,
+            altText: item.altText,
+          })
         }
         else if (item.url) {
           media.push({ url: item.url, altText: item.altText })
@@ -730,6 +748,8 @@ export class QueueService {
       }).where('id', '=', post.id).where('status', '=', 'publishing').execute())
 
       recovered += settled
+      if (settled)
+        log.warn(`[postline] post ${post.id} was stranded mid-publish and has been handed back (${sent.size} target(s) had gone out)`)
     }
 
     return recovered
@@ -757,7 +777,7 @@ export class QueueService {
     let missed = 0
     for (const post of due) {
       if (String(post.scheduled_at) < tooLate) {
-        missed += await this.holdAsMissed(Number(post.id), String(post.scheduled_at))
+        missed += await this.setAside(Number(post.id), missedReason(String(post.scheduled_at)))
         continue
       }
 
@@ -770,6 +790,13 @@ export class QueueService {
         // Another run has it: neither a publish nor a failure of this one.
         if (error instanceof AlreadyPublishingError)
           continue
+        // Refused before anything was claimed or sent. Left as it was it
+        // would be picked up and refused again every minute, so it is set
+        // aside with the reason for the owner to fix.
+        if (error instanceof MissingMediaError)
+          await this.setAside(Number(post.id), error.message)
+        // Swallowed so one post cannot stop the rest, but never silently.
+        log.error(`[postline] scheduled post ${post.id} could not be published: ${error instanceof Error ? error.message : String(error)}`)
         failed += 1
       }
     }
@@ -778,11 +805,12 @@ export class QueueService {
   }
 
   /**
-   * Set aside a post that is too late to send by itself. It becomes `failed`,
-   * which the owner can publish now, edit to reschedule, or delete; its
-   * targets carry the reason. Nothing is sent.
+   * Set aside a scheduled post that will not be sent by itself: one that is
+   * too late, or one that cannot be sent as it stands. It becomes `failed`,
+   * which the owner can publish now, edit, or delete; its targets carry the
+   * reason. Nothing is sent.
    */
-  private async holdAsMissed(postId: number, scheduledAt: string): Promise<number> {
+  private async setAside(postId: number, reason: string): Promise<number> {
     const at = now()
     // Only if it is still waiting: a "publish now" may have taken it.
     const held = affected(await database.updateTable('posts').set({
@@ -794,7 +822,7 @@ export class QueueService {
 
     await database.updateTable('post_targets').set({
       status: 'failed',
-      failure_reason: missedReason(scheduledAt),
+      failure_reason: reason,
       updated_at: at,
     }).where('post_id', '=', postId).where('status', '=', 'scheduled').execute()
 

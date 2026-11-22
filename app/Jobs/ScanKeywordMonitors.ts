@@ -1,3 +1,4 @@
+import { log } from '@stacksjs/logging'
 import { Job } from '@stacksjs/queue'
 import { Every } from '@stacksjs/types'
 import { keywordMonitoring } from '../Services/KeywordMonitoringService'
@@ -14,11 +15,13 @@ export default new Job({
     try {
       const result = await keywordMonitoring.scan()
       if (result.created)
-        console.log(`[postline] listening scan: ${result.created} new mentions across ${result.scanned} rules`)
+        log.info(`[postline] listening scan: ${result.created} new mentions across ${result.scanned} rules`)
       return result
     }
     catch (error) {
-      return { scanned: 0, found: 0, created: 0, errors: [{ message: error instanceof Error ? error.message : String(error) }] }
+      const message = error instanceof Error ? error.message : String(error)
+      log.error(`[postline] listening scan failed: ${message}`)
+      return { scanned: 0, found: 0, created: 0, errors: [{ message }] }
     }
   },
 })

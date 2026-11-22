@@ -8,12 +8,12 @@
  */
 import type { ProviderPublisher } from '../../app/Services/Social/CrosspostService'
 import type { CrosspostTargetResult } from '../../app/Support/Social/types'
-import { existsSync } from 'node:fs'
+import { existsSync, rmSync } from 'node:fs'
 import process from 'node:process'
 import { describe, expect, test } from 'bun:test'
 import { db } from '@stacksjs/database'
 import { CrosspostService } from '../../app/Services/Social/CrosspostService'
-import { AlreadyPublishingError, MISSED_PREFIX, QueueService, STRANDED_REASON } from '../../app/Services/Social/QueueService'
+import { AlreadyPublishingError, MISSED_PREFIX, MissingMediaError, QueueService, STRANDED_REASON } from '../../app/Services/Social/QueueService'
 import { publicMessage } from '../../app/Support/Http/action-error'
 
 const database = db as any
@@ -355,5 +355,47 @@ describe('a scheduled post that is late', () => {
     await queue.publishDue(30)
 
     expect(blog.sends.filter(id => ids.includes(id))).toEqual([])
+  })
+})
+
+describe('a queued post whose image has gone missing', () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+
+  async function saveWithLostImage(queue: QueueService, scheduled: boolean): Promise<number> {
+    const { postId } = await queue.save({
+      text: 'had a picture',
+      providers: ['blog'],
+      image: { bytes: png, mimeType: 'image/png' },
+      ...(scheduled ? { scheduledAt: stamp(3_600_000) } : {}),
+    })
+    const stored = JSON.parse((await database.selectFrom('posts').selectAll().where('id', '=', postId).executeTakeFirstOrThrow()).notes || '{}')
+    rmSync(`${process.cwd()}/storage/app/postline-media/${stored.media[0].path}`, { force: true })
+    return postId
+  }
+
+  test('is refused, not sent without it', async () => {
+    const blog = fakeNetwork('blog')
+    const queue = queueWith({ blog })
+    const postId = await saveWithLostImage(queue, false)
+
+    await expect(queue.publishNow(postId)).rejects.toBeInstanceOf(MissingMediaError)
+
+    expect(blog.sends).toEqual([])
+    // Refused before the claim: it is exactly as it was.
+    expect(await status(postId)).toBe('draft')
+  })
+
+  test('is set aside by the scheduler with the reason, once', async () => {
+    const blog = fakeNetwork('blog')
+    const queue = queueWith({ blog })
+    const postId = await saveWithLostImage(queue, true)
+    await database.updateTable('posts').set({ scheduled_at: stamp(-60_000) }).where('id', '=', postId).execute()
+
+    await queue.publishDue()
+    await queue.publishDue()
+
+    expect(blog.sends).toEqual([])
+    expect(await status(postId)).toBe('failed')
+    expect((await targets(postId))[0]?.failure_reason).toContain('image attached to this post is missing')
   })
 })

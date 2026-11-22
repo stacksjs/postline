@@ -1,10 +1,27 @@
 import { mkdir, unlink } from 'node:fs/promises'
-import { join } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import process from 'node:process'
 import { env } from '@stacksjs/env'
 
-/** Uploaded images for queued posts live here until publish. */
-export const MEDIA_DIR = join(process.cwd(), 'storage/app/postline-media')
+/**
+ * Where uploaded images for queued posts live until they are published.
+ *
+ * `POSTLINE_MEDIA_DIR` names it outright, and a hosted install must set it to
+ * a directory outside the release: a deploy replaces the release folder, and
+ * the API and the scheduler run from different ones, so an image written
+ * under the working directory is lost on the next deploy and was never
+ * visible to the process that publishes it. Unset, it sits under the working
+ * directory, which is right for development and for the Mac app (whose
+ * working directory is its data folder).
+ */
+export function mediaDirectory(env: Record<string, string | undefined> = process.env, cwd: string = process.cwd()): string {
+  const configured = String(env.POSTLINE_MEDIA_DIR || '').trim()
+  if (configured)
+    return isAbsolute(configured) ? configured : resolve(cwd, configured)
+  return join(cwd, 'storage/app/postline-media')
+}
+
+export const MEDIA_DIR: string = mediaDirectory()
 
 /**
  * Read an uploaded image regardless of shape: the router's multipart
@@ -64,7 +81,11 @@ export function buildMediaUrl(base: string, filename: string): string | null {
 
   const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
   const normalized = withScheme.replace(/\/+$/, '')
-  return `${normalized}/postline/media?file=${encodeURIComponent(filename)}`
+  // The route is registered as `/postline/media` in routes/api.ts, which the
+  // router serves under `/api`. A base that already ends in `/api` is left as
+  // it is, so an install that worked around the missing prefix still works.
+  const api = /\/api$/i.test(normalized) ? normalized : `${normalized}/api`
+  return `${api}/postline/media?file=${encodeURIComponent(filename)}`
 }
 
 /**

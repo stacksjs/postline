@@ -1,3 +1,4 @@
+import { log } from '@stacksjs/logging'
 import { Job } from '@stacksjs/queue'
 import { Every } from '@stacksjs/types'
 import { retention } from '../Services/RetentionService'
@@ -16,13 +17,13 @@ export default new Job({
       if (!outcome.ran) return { skipped: outcome.reason }
 
       const { result, settings } = outcome
-      console.log(`[postline] auto-delete (> ${settings.days} days): ${result.deleted} deleted, ${result.failed} failed of ${result.matched} matched`)
+      log.info(`[postline] auto-delete (> ${settings.days} days): ${result.deleted} deleted, ${result.failed} failed of ${result.matched} matched`)
       return { matched: result.matched, deleted: result.deleted, failed: result.failed }
     }
     catch (error) {
       // Per-network failures are already in purge_runs; this is the run itself.
       const message = error instanceof Error ? error.message : String(error)
-      console.error(`[postline] auto-delete failed: ${message}`)
+      log.error(`[postline] auto-delete failed: ${message}`)
       return { failed: true, error: message }
     }
   },

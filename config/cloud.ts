@@ -38,6 +38,10 @@ import { env } from '@stacksjs/env'
  */
 const DATA_DIR = '/var/lib/postline'
 const DB_DATABASE_PATH = `${DATA_DIR}/postline.sqlite`
+// Uploaded images for queued posts. Beside the database and outside every
+// release directory: a deploy replaces the release, and the API (which stores
+// an upload) and the scheduler (which publishes it) run from different ones.
+const POSTLINE_MEDIA_DIR = `${DATA_DIR}/media`
 
 /**
  * The release tarball is packed from the working tree, not from git — so
@@ -690,7 +694,7 @@ export const tsCloud: TsCloudConfig = {
       // port explicitly: the framework default (3008) is already owned by a
       // *different* tenant on this shared box, and an unconfigured proxy would
       // post Postline's form submissions into that app instead.
-      env: { PORT_API: '3101', DB_DATABASE_PATH },
+      env: { PORT_API: '3101', DB_DATABASE_PATH, POSTLINE_MEDIA_DIR },
       exclude: RELEASE_EXCLUDES,
     },
 
@@ -724,6 +728,7 @@ export const tsCloud: TsCloudConfig = {
         APP_ENV: 'production',
         NODE_ENV: 'production',
         DB_DATABASE_PATH,
+        POSTLINE_MEDIA_DIR,
         // String(): the env proxy coerces values that look numeric or boolean,
         // so these are typed string|number|boolean while a site's env map takes
         // strings only.

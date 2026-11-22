@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { buildMediaUrl, isSafeMediaFilename, mediaContentType } from '../../app/Support/Social/uploads'
+import { buildMediaUrl, isSafeMediaFilename, mediaContentType, mediaDirectory } from '../../app/Support/Social/uploads'
 
 describe('isSafeMediaFilename', () => {
   test('accepts the UUID basenames QueueService writes', () => {
@@ -41,14 +41,19 @@ describe('mediaContentType', () => {
 describe('buildMediaUrl', () => {
   test('builds a media URL from an https base', () => {
     expect(buildMediaUrl('https://posts.example.com', 'a.jpg'))
-      .toBe('https://posts.example.com/postline/media?file=a.jpg')
+      .toBe('https://posts.example.com/api/postline/media?file=a.jpg')
+  })
+
+  test('does not double the /api prefix when the base already has it', () => {
+    expect(buildMediaUrl('https://posts.example.com/api', 'a.jpg'))
+      .toBe('https://posts.example.com/api/postline/media?file=a.jpg')
   })
 
   test('adds https:// when the base has no scheme, and strips trailing slashes', () => {
     expect(buildMediaUrl('posts.example.com', 'a.jpg'))
-      .toBe('https://posts.example.com/postline/media?file=a.jpg')
+      .toBe('https://posts.example.com/api/postline/media?file=a.jpg')
     expect(buildMediaUrl('https://posts.example.com//', 'a.jpg'))
-      .toBe('https://posts.example.com/postline/media?file=a.jpg')
+      .toBe('https://posts.example.com/api/postline/media?file=a.jpg')
   })
 
   test('returns null when the base is empty', () => {
@@ -59,5 +64,23 @@ describe('buildMediaUrl', () => {
   test('returns null (never a traversing URL) for an unsafe filename', () => {
     expect(buildMediaUrl('https://posts.example.com', '../../etc/passwd')).toBeNull()
     expect(buildMediaUrl('https://posts.example.com', 'sub/dir.jpg')).toBeNull()
+  })
+})
+
+describe('mediaDirectory', () => {
+  test('sits under the working directory when nothing is configured', () => {
+    expect(mediaDirectory({}, '/srv/app/current')).toBe('/srv/app/current/storage/app/postline-media')
+  })
+
+  test('is wherever POSTLINE_MEDIA_DIR says, so it can outlive a release', () => {
+    expect(mediaDirectory({ POSTLINE_MEDIA_DIR: '/var/lib/postline/media' }, '/srv/app/releases/42')).toBe('/var/lib/postline/media')
+  })
+
+  test('resolves a relative setting against the working directory', () => {
+    expect(mediaDirectory({ POSTLINE_MEDIA_DIR: '../shared/media' }, '/srv/app/current')).toBe('/srv/app/shared/media')
+  })
+
+  test('ignores an empty setting', () => {
+    expect(mediaDirectory({ POSTLINE_MEDIA_DIR: '  ' }, '/srv/app')).toBe('/srv/app/storage/app/postline-media')
   })
 })
