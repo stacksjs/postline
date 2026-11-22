@@ -530,6 +530,11 @@ export class CampaignService {
       try {
         const schedule = zonedTimestampToUtc(sqliteTimestamp(item.scheduledAt), campaign.timezone)
         if (schedule <= now()) throw new Error('time is in the past')
+        // Instagram rejects a post without an image, and a planned post
+        // cannot carry one yet. Queued, it would sit there until its time and
+        // then fail. Better to say so now, while the plan can still change.
+        if (item.providers.some(provider => String(provider).split(':')[0] === 'instagram'))
+          throw new Error('Instagram needs an image, which a planned post cannot have yet. Remove Instagram from this post, or schedule it from the composer.')
         const result = await postQueue.save({ text: item.body, title: item.title, providers: item.providers, scheduledAt: schedule })
         await database.updateTable('campaign_posts').set({ post_id: result.postId, status: 'queued', updated_at: now() }).where('id', '=', item.id).execute()
         queued++

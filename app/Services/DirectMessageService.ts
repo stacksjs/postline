@@ -138,14 +138,18 @@ export class DirectMessageService {
    */
   async thread(conversationId: number, options: { markRead?: boolean } = {}) {
     const conversation = await this.requireConversation(conversationId)
-    const messages = await database
+    // The newest messages, shown oldest first. Ordering ascending and then
+    // limiting returned the first hundred ever exchanged, so a long
+    // conversation opened on its beginning and never showed the latest reply.
+    const newest = await database
       .selectFrom('dm_messages')
       .selectAll()
       .where('dm_conversation_id', '=', conversation.id)
-      .orderBy('sent_at', 'asc')
-      .orderBy('id', 'asc')
+      .orderBy('sent_at', 'desc')
+      .orderBy('id', 'desc')
       .limit(MESSAGE_LIMIT)
       .execute()
+    const messages = [...newest].reverse()
 
     if (options.markRead !== false && Number(conversation.unread_count || 0) > 0)
       await this.markRead(conversationId)
