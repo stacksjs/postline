@@ -1,6 +1,6 @@
 <script server>
   // htmlAttrs puts the marketing class on the root element, which is what the
-  // marketing rules in config/crosswind.ts are scoped to.
+  // marketing rules in config/css.ts are scoped to.
   useHead({
     htmlAttrs: { class: 'text-ink bg-bg marketing' },
     bodyAttrs: { class: 'min-w-0 antialiased' },
@@ -32,7 +32,7 @@
   <meta name="twitter:description" content="@yield('description', 'One draft, six networks. Queue, campaigns, inbox and analytics in one open-source app that runs with your keys.')">
   <meta name="twitter:image" content="@yield('ogImage', 'https://postline.stacksjs.com/images/og/home.png')">
 
-  {{-- Geist and Geist Mono, the two faces declared in config/crosswind.ts,
+  {{-- Geist and Geist Mono, the two faces declared in config/css.ts,
       at the weights the site uses. --}}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

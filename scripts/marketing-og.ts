@@ -22,7 +22,7 @@ const fontsDir = join(root, 'resources/assets/fonts/geist')
 const titleFont = loadFont(new Uint8Array(readFileSync(join(fontsDir, 'Geist-600.ttf'))))
 const bodyFont = loadFont(new Uint8Array(readFileSync(join(fontsDir, 'Geist-400.ttf'))))
 
-// The light tokens from config/crosswind.ts, so the
+// The light tokens from config/css.ts, so the
 // cards and the pages are the same palette rather than two near-misses.
 const INK = { r: 10, g: 10, b: 10 }
 const BODY = { r: 63, g: 63, b: 70 }

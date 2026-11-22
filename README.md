@@ -106,7 +106,7 @@ OAuth callbacks are `https://<your host>/api/postline/<network>/callback`.
 | `app/Models/` | The schema. Migrations are generated from these, never written by hand |
 | `resources/views/` | The marketing site and the workspace, as stx templates |
 | `resources/components/Marketing/` | The marketing site's header, footer and waitlist form |
-| `config/crosswind.ts` | Every design token, and every style a utility class cannot express |
+| `config/css.ts` | Every design token, and every style a utility class cannot express |
 | `config/domains.ts` | The canonical host and the hosts that redirect to it |
 | `routes/` | Route files, registered in `app/Routes.ts` |
 | `tests/` | Bun test suites |
