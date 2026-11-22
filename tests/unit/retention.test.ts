@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { DEFAULT_RETENTION_PROVIDERS, normalizeDays, resolveRetentionSave, settingsFromRow } from '../../app/Services/RetentionService'
+import { DEFAULT_RETENTION_PROVIDERS, normalizeDays, resolveRetentionSave, settingsFromRow, widensDeletion } from '../../app/Services/RetentionService'
 import { cutoffFor, isOlderThan, parseTimestamp, postPurge } from '../../app/Services/Social/PurgeService'
 
 /**
@@ -53,9 +53,15 @@ describe('retention settings', () => {
   })
 
   test('a missing or malformed row reads as off', () => {
-    expect(settingsFromRow(undefined)).toEqual({ enabled: false, days: 7, providers: [], scope: 'all' })
+    // The narrower scope, never "everything on the account", when the row
+    // does not say.
+    expect(settingsFromRow(undefined)).toEqual({ enabled: false, days: 7, providers: [], scope: 'tracked' })
     expect(settingsFromRow({ auto_delete_enabled: 1, auto_delete_days: -4, auto_delete_providers: '{', auto_delete_scope: 'nope' }))
-      .toEqual({ enabled: true, days: 7, providers: [], scope: 'all' })
+      .toEqual({ enabled: true, days: 7, providers: [], scope: 'tracked' })
+  })
+
+  test('a stored scope of everything is still honoured', () => {
+    expect(settingsFromRow({ auto_delete_enabled: 1, auto_delete_scope: 'all' }).scope).toBe('all')
   })
 
   test('stored providers are filtered to networks that can delete', () => {
@@ -88,9 +94,28 @@ describe('scheduled deletion safeguards', () => {
     expect(resolveRetentionSave({ enabled: true, days: 7, acknowledged: true }, off).enabled).toBe(true)
   })
 
-  test('once on, later edits and switching off need no acknowledgement', () => {
+  test('once on, edits that delete less and switching off need no acknowledgement', () => {
     expect(resolveRetentionSave({ days: 30 }, on)).toEqual({ ...on, days: 30 })
     expect(resolveRetentionSave({ enabled: false }, on).enabled).toBe(false)
+    const wide = { ...on, scope: 'all' as const, providers: ['bluesky', 'mastodon'] as never }
+    expect(resolveRetentionSave({ scope: 'tracked' }, wide).scope).toBe('tracked')
+    expect(resolveRetentionSave({ providers: ['bluesky'] }, wide).providers).toEqual(['bluesky'] as never)
+  })
+
+  test('once on, every change that deletes more needs the acknowledgement again', () => {
+    const current = { ...on, days: 30, providers: ['bluesky'] as never }
+
+    expect(() => resolveRetentionSave({ days: 7 }, current)).toThrow(/deletes more posts/)
+    expect(() => resolveRetentionSave({ scope: 'all' }, current)).toThrow(/deletes more posts/)
+    expect(() => resolveRetentionSave({ providers: ['bluesky', 'mastodon'] }, current)).toThrow(/deletes more posts/)
+
+    expect(resolveRetentionSave({ days: 7, acknowledged: true }, current).days).toBe(7)
+    expect(resolveRetentionSave({ scope: 'all', acknowledged: true }, current).scope).toBe('all')
+  })
+
+  test('widening while it is off needs nothing until it is switched on', () => {
+    expect(resolveRetentionSave({ days: 1, scope: 'all' }, off)).toMatchObject({ enabled: false, days: 1, scope: 'all' })
+    expect(widensDeletion({ ...off, days: 1 }, off)).toBe(false)
   })
 
   test('rejects networks that cannot delete, and bad day counts', () => {

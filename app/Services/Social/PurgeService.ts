@@ -1,5 +1,6 @@
 import type { AuthoredPost, ProviderPurgeAdapter, SocialProvider } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
+import { acquirePurgeLock } from '../../Support/Social/purge-lock'
 import { bluesky } from './BlueskyService'
 import { linkedin } from './LinkedInService'
 import { mastodon } from './MastodonService'
@@ -207,6 +208,25 @@ export class PurgeService {
   }
 
   private async run(input: PurgeInput & { dryRun: boolean, trigger?: PurgeTrigger }): Promise<PurgeResult> {
+    // A preview deletes nothing and may overlap anything. A real run may not
+    // overlap another: the manual purge runs in the API process and the daily
+    // one in the scheduler, and two at once would each page through the same
+    // history and race to delete the same posts.
+    if (input.dryRun)
+      return await this.runUnlocked(input)
+
+    const release = acquirePurgeLock()
+    if (!release)
+      throw new Error('A deletion run is already in progress. Wait for it to finish, then try again.')
+    try {
+      return await this.runUnlocked(input)
+    }
+    finally {
+      release()
+    }
+  }
+
+  private async runUnlocked(input: PurgeInput & { dryRun: boolean, trigger?: PurgeTrigger }): Promise<PurgeResult> {
     const scope: PurgeScope = input.scope === 'all' ? 'all' : 'tracked'
     const providers = this.resolveProviders(input.providers)
     const cutoff = cutoffFor(input.olderThanDays)

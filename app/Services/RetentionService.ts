@@ -88,29 +88,55 @@ export function settingsFromRow(row: Record<string, unknown> | undefined): Reten
     enabled: row?.auto_delete_enabled === true || Number(row?.auto_delete_enabled) === 1,
     days,
     providers: parseProviders(row?.auto_delete_providers).filter(provider => PURGEABLE_PROVIDERS.includes(provider)),
-    scope: row?.auto_delete_scope === 'tracked' ? 'tracked' : 'all',
+    // Anything that is not explicitly `all` reads as the narrower scope: a
+    // row with no scope recorded must not mean "everything the account ever
+    // posted".
+    scope: row?.auto_delete_scope === 'all' ? 'all' : 'tracked',
   }
 }
 
 /**
+ * Whether a change makes automatic deletion delete more than it did.
+ *
+ * Turning it on is the obvious case. So is everything that widens it while it
+ * is on: a shorter age limit, another network, or the scope going from "posts
+ * Postline published" to "everything on the account". Each of those deletes
+ * posts the owner had not agreed to lose, so each needs the same explicit
+ * confirmation as switching it on.
+ */
+export function widensDeletion(next: RetentionSettings, current: RetentionSettings): boolean {
+  if (!next.enabled)
+    return false
+  if (!current.enabled)
+    return true
+  return next.days < current.days
+    || next.providers.some(provider => !current.providers.includes(provider))
+    || (next.scope === 'all' && current.scope !== 'all')
+}
+
+/**
  * Validate a save against what is stored, returning what to write. Throws
- * before anything is persisted; switching automatic deletion on is the one
- * change that needs `acknowledged`.
+ * before anything is persisted. Any change that makes it delete more needs
+ * `acknowledged` (see `widensDeletion`).
  */
 export function resolveRetentionSave(input: SaveRetentionInput, current: RetentionSettings): RetentionSettings {
   const enabled = input.enabled ?? current.enabled
   const days = input.days === undefined ? current.days : normalizeDays(input.days)
   const providers = input.providers === undefined ? current.providers : parseProviders(input.providers)
-  const scope: PurgeScope = input.scope === undefined ? current.scope : input.scope === 'tracked' ? 'tracked' : 'all'
+  const scope: PurgeScope = input.scope === undefined ? current.scope : input.scope === 'all' ? 'all' : 'tracked'
 
   const unsupported = providers.filter(provider => !PURGEABLE_PROVIDERS.includes(provider))
   if (unsupported.length)
     throw new Error(`These networks cannot delete posts through their API: ${unsupported.join(', ')}.`)
 
-  if (enabled && !current.enabled && input.acknowledged !== true)
-    throw new Error('Confirm that posts will be permanently deleted before turning automatic deletion on.')
+  const next: RetentionSettings = { enabled, days, providers, scope }
+  if (widensDeletion(next, current) && input.acknowledged !== true) {
+    throw new Error(current.enabled
+      ? 'This change deletes more posts than before. Confirm that they will be permanently deleted.'
+      : 'Confirm that posts will be permanently deleted before turning automatic deletion on.')
+  }
 
-  return { enabled, days, providers, scope }
+  return next
 }
 
 export class RetentionService {

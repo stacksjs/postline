@@ -296,11 +296,13 @@
     const retentionLoaded = state(false)
     const savedEnabled = state(false)
     const savedDays = state(7)
+    const savedScope = state<'all' | 'tracked'>('tracked')
+    const savedProviders = state<string[]>([])
     const autoEnabled = state(false)
     // The number field's model is text; the saved value is the whole number in it.
     const autoDaysText = state('7')
     const autoDays = derived(() => Number(autoDaysText()))
-    const autoScope = state<'all' | 'tracked'>('all')
+    const autoScope = state<'all' | 'tracked'>('tracked')
     const onBluesky = state(false)
     const onTwitter = state(false)
     const onMastodon = state(false)
@@ -319,9 +321,17 @@
     const lastRunText = state('')
 
     const statusPill = derived(() => savedEnabled() ? `On · ${savedDays()} days` : 'Off')
-    // Consent is asked for once, when switching on, not on every later edit.
-    const needsAcknowledgement = derived(() => autoEnabled() && !savedEnabled())
     const daysValid = derived(() => Number.isInteger(autoDays()) && autoDays() >= 1 && autoDays() <= 3650)
+    // Consent is asked for whenever a change makes it delete more: switching
+    // it on, a shorter age limit, another network, or the wider scope. The
+    // server applies the same rule (`widensDeletion`), so this only decides
+    // whether the switch is shown.
+    const needsAcknowledgement = derived(() => autoEnabled() && (
+      !savedEnabled()
+      || (daysValid() && autoDays() < savedDays())
+      || autoProviders().some(provider => !savedProviders().includes(provider))
+      || (autoScope() === 'all' && savedScope() !== 'all')
+    ))
     const canSave = derived(() => retentionLoaded()
       && !saving()
       && daysValid()
@@ -343,6 +353,8 @@
     const applyRetention = (settings: RetentionSettings, defaults: string[], lastRun: RetentionLastRun | null): void => {
       savedEnabled.set(settings.enabled)
       savedDays.set(settings.days)
+      savedScope.set(settings.scope)
+      savedProviders.set(settings.enabled ? [...settings.providers] : [])
       autoEnabled.set(settings.enabled)
       autoDaysText.set(String(settings.days))
       autoScope.set(settings.scope)
