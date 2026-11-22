@@ -125,7 +125,7 @@ html.dark body { color: var(--ink); }
 /**
  * Dark-mode override layer for RAW colour utilities.
  *
- * DEBT, tracked in docs/stx-standards-audit.md: none of this should exist. It
+ * DEBT, tracked in stacksjs/postline#141: none of this should exist. It
  * shadows generated utilities by hand because the markup still uses raw palette
  * classes (`bg-blue-50`, `text-red-700`) instead of semantic status tokens. The
  * fix is to add success/warning/danger/info surface, border and text tokens
