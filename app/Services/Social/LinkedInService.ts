@@ -6,6 +6,7 @@ import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Su
 import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { LinkedInApiError, LinkedInDriver } from './Drivers/LinkedInDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
+import { resolveLinkedInVersion } from '../../Support/Social/linkedin-text'
 import { refreshOnce } from '../../Support/Social/token-refresh'
 import { ensureAccount, expiresAt, now, uuid } from './support'
 
@@ -58,7 +59,7 @@ export class LinkedInService {
       clientId: String(env.LINKEDIN_CLIENT_ID || '').trim(),
       clientSecret: String(env.LINKEDIN_CLIENT_SECRET || '').trim(),
       redirectUrl: String(env.LINKEDIN_REDIRECT_URL || '').trim(),
-      apiVersion: String(env.LINKEDIN_API_VERSION || '202405').trim(),
+      apiVersion: resolveLinkedInVersion(env.LINKEDIN_API_VERSION),
       accessToken: String(env.LINKEDIN_ACCESS_TOKEN || '').trim(),
       authorUrn: String(env.LINKEDIN_AUTHOR_URN || '').trim(),
       scopes: ['openid', 'profile', 'w_member_social'],

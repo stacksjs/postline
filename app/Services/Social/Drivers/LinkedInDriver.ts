@@ -1,6 +1,7 @@
 import type { LinkedInTokenExchangeInput, PublishedPost, PublishPostInput, SocialIdentityCredentials } from '@stacksjs/socials'
-import { escapeLinkedInText, LinkedInApiError, LinkedInPublishingDriver } from '@stacksjs/socials'
+import { LinkedInApiError, LinkedInPublishingDriver } from '@stacksjs/socials'
 import { fetchRemoteImage } from '../../../Support/Social/image-input'
+import { linkedInCommentary } from '../../../Support/Social/linkedin-text'
 
 export { LinkedInApiError }
 
@@ -207,7 +208,7 @@ export class LinkedInDriver extends LinkedInPublishingDriver {
 
     const record: Record<string, unknown> = {
       author,
-      commentary: escapeLinkedInText(post.text),
+      commentary: linkedInCommentary(post.text),
       visibility: 'PUBLIC',
       distribution: {
         feedDistribution: 'MAIN_FEED',
