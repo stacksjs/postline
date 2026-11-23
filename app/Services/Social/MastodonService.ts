@@ -7,6 +7,7 @@ import { MastodonApiError, MastodonDriver, normalizeInstance } from './Drivers/M
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, now, uuid } from './support'
+import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
 
@@ -192,7 +193,7 @@ export class MastodonService {
         updated_at: now(),
       }).where('id', '=', target.id).execute()
 
-      return { provider: 'mastodon', ok: false, error: message, targetId: Number(target.id), ...account }
+      return { provider: 'mastodon', ok: false, error: message, targetId: Number(target.id), retry: classifyFailure(error), ...account }
     }
   }
 

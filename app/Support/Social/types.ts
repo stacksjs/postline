@@ -148,6 +148,11 @@ export interface CrosspostTargetResult {
   handle?: string
   /** The target spec this result answers (`bluesky:12`, or `blog`). */
   target?: string
+  /**
+   * On a failure: whether sending again could work, and how long the network
+   * asked us to wait. Absent means do not retry.
+   */
+  retry?: import('./retry').RetryHint
 }
 
 /**

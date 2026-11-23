@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { db } from '@stacksjs/database'
 import { ensureAccount, now, uuid } from './support'
+import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
 
@@ -138,7 +139,7 @@ export class BlogService {
         updated_at: now(),
       }).where('id', '=', target.id).execute()
 
-      return { provider: 'blog', ok: false, error: message, targetId: Number(target.id) }
+      return { provider: 'blog', ok: false, error: message, targetId: Number(target.id), retry: classifyFailure(error) }
     }
   }
 

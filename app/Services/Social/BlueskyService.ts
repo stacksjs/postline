@@ -8,6 +8,7 @@ import { fetchRemoteImage } from '../../Support/Social/image-input'
 import { BlueskyApiError, BlueskyDriver } from './Drivers/BlueskyDriver'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
+import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
 
@@ -314,7 +315,7 @@ export class BlueskyService {
         updated_at: failedAt,
       }).where('id', '=', target.id).execute()
 
-      return { provider: 'bluesky', ok: false, error: message, targetId: Number(target.id), ...account }
+      return { provider: 'bluesky', ok: false, error: message, targetId: Number(target.id), retry: classifyFailure(error), ...account }
     }
   }
 

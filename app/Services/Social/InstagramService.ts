@@ -9,6 +9,7 @@ import { InstagramApiError, InstagramDriver } from './Drivers/InstagramDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, expiresAt, now, uuid } from './support'
+import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
 
@@ -298,7 +299,7 @@ export class InstagramService {
         updated_at: now(),
       }).where('id', '=', target.id).execute()
 
-      return { provider: 'instagram', ok: false, error: message, targetId: Number(target.id), ...account }
+      return { provider: 'instagram', ok: false, error: message, targetId: Number(target.id), retry: classifyFailure(error), ...account }
     }
   }
 

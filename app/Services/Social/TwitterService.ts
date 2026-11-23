@@ -9,6 +9,7 @@ import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityR
 import { refreshOnce } from '../../Support/Social/token-refresh'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, expiresAt, now, uuid } from './support'
+import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
 
@@ -265,7 +266,7 @@ export class TwitterService {
         updated_at: now(),
       }).where('id', '=', target.id).execute()
 
-      return { provider: 'twitter', ok: false, error: message, targetId: Number(target.id), ...account }
+      return { provider: 'twitter', ok: false, error: message, targetId: Number(target.id), retry: classifyFailure(error), ...account }
     }
   }
 
