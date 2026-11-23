@@ -79,6 +79,10 @@
             </footer>
           </article>
         </div>
+        {{-- The list is paged; this fetches the page of older posts. --}}
+        <div class="flex justify-center p-3" x-show="nextCursor()">
+          <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" :disabled="loadingMore()" @click="loadMore()" x-text="loadingMore() ? 'Loading…' : 'Load older posts'">Load older posts</button>
+        </div>
       </section>
     </div>
 
@@ -134,6 +138,7 @@
       status?: string
       failureReason?: string | null
       remoteUri?: string | null
+      nextAttemptAt?: string | null
     }
 
     interface QueueApiItem {
@@ -182,6 +187,9 @@
     const items = state([])
     const loadError = state('')
     const loaded = state(false)
+    /** The cursor for the next page of older posts; 0 when there are none. */
+    const nextCursor = state(0)
+    const loadingMore = state(false)
     const busyId = state(0)
     const calMonthStart = state(monthStart(new Date()))
 
@@ -240,10 +248,18 @@
      * the whole post failed, which is wrong for a post that went out
      * elsewhere.
      */
+    /** " Trying again at 14:05." when Postline will resend the network itself. */
+    const retryNote = (target: QueueApiTarget): string => {
+      if (!target.nextAttemptAt) return ''
+      const at = new Date(target.nextAttemptAt)
+      if (Number.isNaN(at.getTime())) return ''
+      return ` Trying again at ${at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`
+    }
+
     const failureText = (item: QueueApiItem): string => {
       const failed = item.providers.filter(target => target.status === 'failed' || target.failureReason)
       if (failed.length === 0) return ''
-      const lines = failed.map(target => `${channelLabels([target])[0] || target.provider}: ${target.failureReason || 'failed'}`)
+      const lines = failed.map(target => `${channelLabels([target])[0] || target.provider}: ${target.failureReason || 'failed'}${retryNote(target)}`)
       return item.partial ? `Sent to the others. ${lines.join(' ')}` : lines.join(' ')
     }
 
@@ -359,10 +375,13 @@
 
     const refresh = async () => {
       try {
-        const response = await fetch('/api/postline/queue')
+        // Reload as many rows as are on screen, so a refresh after an action
+        // does not throw away the older pages the owner had loaded.
+        const response = await fetch(`/api/postline/queue?limit=${Math.max(50, items().length)}`)
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the queue.')
         items.set(payload.data.items || [])
+        nextCursor.set(payload.data.nextCursor || 0)
         loadError.set('')
       }
       catch (error) {
@@ -374,6 +393,24 @@
       }
       finally {
         loaded.set(true)
+      }
+    }
+
+    const loadMore = async () => {
+      if (!nextCursor() || loadingMore()) return
+      loadingMore.set(true)
+      try {
+        const response = await fetch(`/api/postline/queue?before=${nextCursor()}`)
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load older posts.')
+        items.set([...items(), ...(payload.data.items || [])])
+        nextCursor.set(payload.data.nextCursor || 0)
+      }
+      catch (error) {
+        loadError.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        loadingMore.set(false)
       }
     }
 

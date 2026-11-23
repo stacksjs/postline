@@ -1331,6 +1331,21 @@
               "uuid"
             ],
             "type": "unique"
+          },
+          {
+            "name": "post_targets_post_id_index",
+            "columns": [
+              "post_id"
+            ],
+            "type": "index"
+          },
+          {
+            "name": "post_targets_status_next_attempt_at_index",
+            "columns": [
+              "status",
+              "next_attempt_at"
+            ],
+            "type": "index"
           }
         ]
       },
@@ -1797,6 +1812,13 @@
               "uuid"
             ],
             "type": "unique"
+          },
+          {
+            "name": "social_identities_provider_index",
+            "columns": [
+              "provider"
+            ],
+            "type": "index"
           }
         ]
       },
@@ -2324,7 +2346,7 @@
       }
     ]
   },
-  "hash": "ded696ee51dd0a5a15b3d5f0400ed9dae8f32c0155075a70ce5223925324e903",
+  "hash": "e0576d8969b048587b8ddbdfc3524e25da364d6e8c850fea978c5ff97e33776f",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-23T02:50:45.773Z"
+  "updatedAt": "2026-11-23T02:55:57.682Z"
 }

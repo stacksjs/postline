@@ -7,6 +7,11 @@ export default defineModel({
   primaryKey: 'id',
   autoIncrement: true,
 
+  indexes: [
+    // Accounts are always looked up by network.
+    { name: 'social_identities_provider_index', columns: ['provider'] },
+  ],
+
   traits: {
     useUuid: true,
     useTimestamps: true,

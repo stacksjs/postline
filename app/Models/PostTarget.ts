@@ -9,6 +9,11 @@ export default defineModel({
 
   indexes: [
     { name: 'post_targets_provider_status_index', columns: ['provider', 'status'] },
+    // Every queue row reads its targets by post, and with thousands of
+    // posts that was a scan of the whole table per row.
+    { name: 'post_targets_post_id_index', columns: ['post_id'] },
+    // The scheduler asks each minute which failed targets are due again.
+    { name: 'post_targets_status_next_attempt_at_index', columns: ['status', 'next_attempt_at'] },
   ],
 
   traits: {

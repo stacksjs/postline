@@ -97,6 +97,10 @@ function parseStoredContent(raw: unknown): StoredContent | null {
 }
 
 /** Post statuses a user may still act on (publish now, delete). */
+/** Posts per page of the queue, and the most one request may ask for. */
+export const QUEUE_PAGE_SIZE = 50
+export const MAX_QUEUE_PAGE_SIZE = 500
+
 const ACTIONABLE = new Set(['draft', 'scheduled', 'failed'])
 
 /**
@@ -156,6 +160,10 @@ export interface QueueTargetView {
   status: string
   remoteUri: string | null
   failureReason: string | null
+  /** Sends that have failed so far. */
+  attempts: number
+  /** When Postline sends it again by itself, as an ISO time; null when it will not. */
+  nextAttemptAt: string | null
 }
 
 export interface QueueItemView {
@@ -297,17 +305,31 @@ export class QueueService {
   }
 
   /** Recent posts with their per-provider targets, newest first. */
-  async list(limit = 50): Promise<QueueItemView[]> {
-    const posts = await database
+  async list(limit = QUEUE_PAGE_SIZE): Promise<QueueItemView[]> {
+    return (await this.listPage({ limit })).items
+  }
+
+  /**
+   * One page of the queue, newest first, and the cursor for the page after
+   * it. The list used to stop at fifty posts with nothing to say there were
+   * more. Paged by id, which never changes and is in creation order, so a
+   * post added while the owner scrolls cannot shift or repeat a row.
+   */
+  async listPage(options: { before?: number | null, limit?: number } = {}): Promise<{ items: QueueItemView[], nextCursor: number | null }> {
+    const limit = Math.min(MAX_QUEUE_PAGE_SIZE, Math.max(1, Math.floor(Number(options.limit) || QUEUE_PAGE_SIZE)))
+    let query = database
       .selectFrom('posts')
       .selectAll()
       .where('status', '!=', 'archived')
-      .orderBy('created_at', 'desc')
-      .limit(limit)
-      .execute()
+    if (options.before) query = query.where('id', '<', Number(options.before))
+
+    // One more than asked for: its presence is how we know there is a next page.
+    const fetched = await query.orderBy('id', 'desc').limit(limit + 1).execute()
+    const posts = fetched.slice(0, limit)
+    const nextCursor = fetched.length > limit ? Number(posts[posts.length - 1].id) : null
 
     if (posts.length === 0)
-      return []
+      return { items: [], nextCursor: null }
 
     const targets = await database
       .selectFrom('post_targets')
@@ -324,7 +346,7 @@ export class QueueService {
     const handles = new Map<number, string>(identities.map((row: any) => [Number(row.id), String(row.handle)]))
 
     const column = await contentColumn()
-    return posts.map((post: any): QueueItemView => {
+    const items = posts.map((post: any): QueueItemView => {
       const stored = parseStoredContent(post[column])
       return {
         id: Number(post.id),
@@ -350,10 +372,14 @@ export class QueueService {
               status: String(target.status),
               remoteUri: target.remote_uri || null,
               failureReason: target.failure_reason || null,
+              attempts: Number(target.attempts) || 0,
+              nextAttemptAt: target.status === 'failed' && target.next_attempt_at ? `${String(target.next_attempt_at).replace(' ', 'T')}Z` : null,
             }
           }),
       }
     })
+
+    return { items, nextCursor }
   }
 
   /** Delete a draft, scheduled, or failed post along with its targets. */

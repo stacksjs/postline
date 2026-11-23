@@ -513,3 +513,51 @@ describe('a network that fails for a reason sending again can fix', () => {
     expect((await targets(postId)).map(row => row.status).sort()).toEqual(['published', 'published'])
   })
 })
+
+describe('paging the queue', () => {
+  test('every post is reachable, none twice, in pages', async () => {
+    const queue = queueWith({ blog: fakeNetwork('blog') })
+    const made: number[] = []
+    for (let index = 0; index < 7; index++)
+      made.push((await queue.save({ text: `page ${index}`, providers: ['blog'] })).postId)
+
+    const seen: number[] = []
+    let before: number | null = null
+    for (let page = 0; page < 500; page++) {
+      const result = await queue.listPage({ before, limit: 3 })
+      expect(result.items.length).toBeLessThanOrEqual(3)
+      seen.push(...result.items.map(item => item.id))
+      before = result.nextCursor
+      if (!before) break
+    }
+
+    expect(new Set(seen).size).toBe(seen.length)
+    expect(seen).toEqual([...seen].sort((a, b) => b - a))
+    for (const id of made) expect(seen).toContain(id)
+  })
+
+  test('a post added while paging does not shift or repeat a row', async () => {
+    const queue = queueWith({ blog: fakeNetwork('blog') })
+    for (let index = 0; index < 4; index++)
+      await queue.save({ text: `steady ${index}`, providers: ['blog'] })
+
+    const first = await queue.listPage({ limit: 2 })
+    await queue.save({ text: 'arrived mid-scroll', providers: ['blog'] })
+    const second = await queue.listPage({ before: first.nextCursor, limit: 2 })
+
+    const ids = [...first.items, ...second.items].map(item => item.id)
+    expect(new Set(ids).size).toBe(4)
+  })
+
+  test('a failed network says when it will be sent again', async () => {
+    const queue = queueWith({ blog: fakeNetwork('blog', { fail: true }) })
+    const { postId } = await queue.save({ text: 'will retry', providers: ['blog'] })
+    await queue.publishNow(postId)
+    await database.updateTable('post_targets').set({ next_attempt_at: '2099-01-01 10:00:00' }).where('post_id', '=', postId).execute()
+
+    const item = (await queue.listPage({ limit: 500 })).items.find(entry => entry.id === postId)!
+    expect(item.providers[0]!.nextAttemptAt).toBe('2099-01-01T10:00:00Z')
+    expect(item.providers[0]!.attempts).toBe(1)
+    await database.updateTable('post_targets').set({ next_attempt_at: null }).where('post_id', '=', postId).execute()
+  })
+})
