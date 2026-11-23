@@ -16,6 +16,7 @@
 
 import type { IdentityKey, IdentityLike } from '../../Support/Social/accounts'
 import { db } from '@stacksjs/database'
+import { UserFacingError } from '../../Support/Http/user-error'
 import { matchIdentity, pickDefaultIdentity } from '../../Support/Social/accounts'
 import { isSealed, openToken, sealToken } from '../../Support/Social/token-vault'
 import { now, uuid } from './support'
@@ -191,11 +192,16 @@ export async function upsertIdentityRow<T extends IdentityLike>(
       .executeTakeFirstOrThrow() as T)
   }
 
+  // The first account on a network is its default. A later one never takes
+  // the flag by being connected: that is the owner's choice.
+  const hasDefault = rows.some(row => row.auth_status !== 'revoked' && Boolean(row.is_default))
+
   const identityUuid = uuid()
   await database.insertInto('social_identities').values({
     uuid: identityUuid,
     ...values,
     provider,
+    is_default: !hasDefault,
     created_at: savedAt,
     updated_at: savedAt,
   }).execute()
@@ -223,12 +229,32 @@ export async function revokeIdentityRow(provider: string, identityId: number): P
   // bumping it here would make a just-disconnected account the newest one.
   await database.updateTable('social_identities').set({
     auth_status: 'revoked',
+    // A disconnected account is nobody's default. The next one in line is
+    // chosen by `pickDefaultIdentity` until the owner marks another.
+    is_default: false,
     access_token: null,
     refresh_token: null,
     token_expires_at: null,
   }).where('id', '=', row.id).execute()
 
   return { ...row, auth_status: 'revoked', access_token: null }
+}
+
+/**
+ * Make one account its network's default. Exactly one row per network holds
+ * the flag afterwards.
+ */
+export async function setDefaultIdentityRow(identityId: number): Promise<IdentityLike> {
+  const row = await database
+    .selectFrom('social_identities')
+    .selectAll()
+    .where('id', '=', identityId)
+    .executeTakeFirst() as IdentityLike | undefined
+  if (!row || row.auth_status === 'revoked') throw new UserFacingError('That account is not connected.')
+
+  await database.updateTable('social_identities').set({ is_default: false }).where('provider', '=', row.provider).execute()
+  await database.updateTable('social_identities').set({ is_default: true }).where('id', '=', row.id).execute()
+  return { ...(await openIdentityRow(row))!, is_default: true }
 }
 
 /**

@@ -42,6 +42,17 @@ export default defineModel({
       validation: { rule: schema.string().max(255).optional() },
       factory: faker => `did:plc:${faker.string.alphanumeric(24).toLowerCase()}`,
     },
+    // The account a plain network target (`bluesky`, not `bluesky:12`)
+    // publishes through. Set by the owner; the first account connected on a
+    // network gets it. It used to be "whichever row was updated last", and a
+    // token refresh updates a row, so the default moved by itself.
+    isDefault: {
+      required: false,
+      fillable: true,
+      default: false,
+      validation: { rule: schema.boolean().optional() },
+      factory: () => false,
+    },
     authStatus: {
       required: true,
       fillable: true,

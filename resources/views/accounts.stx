@@ -57,6 +57,7 @@
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
                   <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
+                  <button class="hidden text-muted text-xs underline hover:text-ink disabled:opacity-50 transition-colors" :class="{ 'hidden': !account.canBeDefault }" type="button" :disabled="account.busy" :aria-label="account.defaultLabel" @click="makeDefaultAccount(account.id)">Make default</button>
                   <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
@@ -83,6 +84,7 @@
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
                   <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
+                  <button class="hidden text-muted text-xs underline hover:text-ink disabled:opacity-50 transition-colors" :class="{ 'hidden': !account.canBeDefault }" type="button" :disabled="account.busy" :aria-label="account.defaultLabel" @click="makeDefaultAccount(account.id)">Make default</button>
                   <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
@@ -104,6 +106,7 @@
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
                   <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
+                  <button class="hidden text-muted text-xs underline hover:text-ink disabled:opacity-50 transition-colors" :class="{ 'hidden': !account.canBeDefault }" type="button" :disabled="account.busy" :aria-label="account.defaultLabel" @click="makeDefaultAccount(account.id)">Make default</button>
                   <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
@@ -125,6 +128,7 @@
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
                   <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
+                  <button class="hidden text-muted text-xs underline hover:text-ink disabled:opacity-50 transition-colors" :class="{ 'hidden': !account.canBeDefault }" type="button" :disabled="account.busy" :aria-label="account.defaultLabel" @click="makeDefaultAccount(account.id)">Make default</button>
                   <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
@@ -146,6 +150,7 @@
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
                   <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
+                  <button class="hidden text-muted text-xs underline hover:text-ink disabled:opacity-50 transition-colors" :class="{ 'hidden': !account.canBeDefault }" type="button" :disabled="account.busy" :aria-label="account.defaultLabel" @click="makeDefaultAccount(account.id)">Make default</button>
                   <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
@@ -175,6 +180,7 @@
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
                   <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
+                  <button class="hidden text-muted text-xs underline hover:text-ink disabled:opacity-50 transition-colors" :class="{ 'hidden': !account.canBeDefault }" type="button" :disabled="account.busy" :aria-label="account.defaultLabel" @click="makeDefaultAccount(account.id)">Make default</button>
                   <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
@@ -318,6 +324,10 @@
             ? 'This sign-in is about to lapse. Connect the account again to keep publishing.'
             : '',
           busy: disconnectingId() === account.id,
+          // Offered only where it changes something: a connected account that
+          // is not already the default, on a network with more than one.
+          canBeDefault: Boolean(account.connected) && !account.isDefault && rows.length > 1,
+          defaultLabel: `Publish to ${name} by default`,
           disconnectLabel: `Disconnect ${name}`,
         }
       })
@@ -331,8 +341,9 @@
     const mastodonAccounts = derived(() => accountRowsFor('mastodon'))
 
     // Filled in by the IIFE below, which owns the DOM and the status refreshers.
-    const accountHandlers = { disconnect: null }
+    const accountHandlers = { disconnect: null, makeDefault: null }
     const disconnectAccount = id => accountHandlers.disconnect?.(id)
+    const makeDefaultAccount = id => accountHandlers.makeDefault?.(id)
 
     const purgeResultRows = state([])
 
@@ -915,6 +926,29 @@
         }
         catch (error) {
           notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Disconnect failed' })
+        }
+        finally {
+          disconnectingId.set(0)
+        }
+      }
+
+      accountHandlers.makeDefault = async (id) => {
+        const account = accountList().find(entry => entry.id === id)
+        if (!account || disconnectingId()) return
+        const name = accountName(account)
+
+        disconnectingId.set(id)
+        try {
+          const body = new FormData()
+          body.set('id', String(id))
+          const response = await fetch('/api/postline/accounts/default', { method: 'POST', body })
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not change the default account.')
+          await Promise.all([refreshAccounts(), refreshNetwork[account.provider]?.()])
+          notify(`Posts to this network now go to ${name} unless you pick another account.`, 'success', { title: 'Default changed' })
+        }
+        catch (error) {
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Could not change the default' })
         }
         finally {
           disconnectingId.set(0)

@@ -173,6 +173,30 @@ describe('default account', () => {
     expect(pickDefaultIdentity([expired, live])).toBe(live)
   })
 
+  test('the account the owner marked wins, whatever order the rows arrive in', () => {
+    const first = row({ id: 1 })
+    const marked = row({ id: 2, is_default: 1 })
+    const third = row({ id: 3 })
+    expect(pickDefaultIdentity([third, marked, first])).toBe(marked)
+    expect(pickDefaultIdentity([first, third, marked])).toBe(marked)
+  })
+
+  test('refreshing a token never moves the default: row order is ignored', () => {
+    // The rows come newest-updated first. A refresh bumps a row to the top,
+    // and that used to make it the default.
+    const refreshed = row({ id: 7 })
+    const original = row({ id: 3 })
+    expect(pickDefaultIdentity([refreshed, original])).toBe(original)
+    expect(pickDefaultIdentity([original, refreshed])).toBe(original)
+  })
+
+  test('a marked account that cannot publish gives way to one that can', () => {
+    const marked = row({ id: 1, is_default: 1, auth_status: 'expired' })
+    const live = row({ id: 2 })
+    expect(pickDefaultIdentity([marked, live])).toBe(live)
+    expect(pickDefaultIdentity([marked])).toBe(marked)
+  })
+
   test('never picks a disconnected account', () => {
     const revoked = row({ id: 1, auth_status: 'revoked', access_token: null })
     const expired = row({ id: 2, auth_status: 'expired' })

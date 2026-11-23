@@ -27,6 +27,8 @@ export interface IdentityLike {
   external_id?: string | null
   auth_status: IdentityAuthStatus
   access_token?: string | null
+  /** SQLite stores the flag as 0 or 1. */
+  is_default?: boolean | number | null
   refresh_token?: string | null
   token_expires_at?: string | null
 }
@@ -84,9 +86,15 @@ export function isUsableIdentity(row: Pick<IdentityLike, 'auth_status' | 'access
 }
 
 /**
- * The network's default account among `rows` (ordered most recently updated
- * first): the newest usable one, else the newest that is not revoked, so a
- * status card can still say "reconnect @handle" when nothing is usable.
+ * The network's default account among `rows`.
+ *
+ * The account the owner marked, when it is usable. Otherwise the usable
+ * account connected first (lowest id), and failing that the first that is
+ * not revoked, so a status card can still say "reconnect @handle".
+ *
+ * Nothing here reads `updated_at`. It used to pick the most recently updated
+ * row, and refreshing a token updates a row, so a post aimed at "X" could go
+ * to a different X account after a refresh.
  *
  * `usable` is overridable because Bluesky treats an expired row with a refresh
  * token as usable — its session refresh can revive it mid-request.
@@ -95,8 +103,8 @@ export function pickDefaultIdentity<T extends IdentityLike>(
   rows: readonly T[],
   usable: (row: T) => boolean = isUsableIdentity,
 ): T | undefined {
-  const live = rows.filter(row => row.auth_status !== 'revoked')
-  return live.find(usable) || live[0]
+  const live = rows.filter(row => row.auth_status !== 'revoked').sort((a, b) => Number(a.id) - Number(b.id))
+  return live.find(row => Boolean(row.is_default) && usable(row)) || live.find(usable) || live.find(row => Boolean(row.is_default)) || live[0]
 }
 
 /** The account shape every API response and page uses. Never carries tokens. */

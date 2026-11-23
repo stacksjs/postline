@@ -10,8 +10,10 @@
 import type { PublicAccount } from '../../Support/Social/accounts'
 import type { SocialProvider } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
+import { toPublicAccount } from '../../Support/Social/accounts'
 import { ACCOUNT_PROVIDERS } from '../../Support/Social/targets'
 import { bluesky } from './BlueskyService'
+import { setDefaultIdentityRow } from './identities'
 import { instagram } from './InstagramService'
 import { linkedin } from './LinkedInService'
 import { mastodon } from './MastodonService'
@@ -59,6 +61,12 @@ export class AccountService {
     if (!owner) throw new Error(`${row.provider} accounts cannot be disconnected here.`)
 
     return await owner.disconnect(Number(row.id))
+  }
+
+  /** Make one account the one a plain network target publishes through. */
+  async makeDefault(identityId: number): Promise<PublicAccount> {
+    const row = await setDefaultIdentityRow(identityId)
+    return toPublicAccount(row, { isDefault: true })
   }
 }
 
