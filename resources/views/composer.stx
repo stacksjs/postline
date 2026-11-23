@@ -321,13 +321,29 @@
       }
 
       /**
+       * A text's length as `provider` measures it: graphemes on Bluesky, a
+       * weighted count on X, links as 23 on X and Mastodon. The same function
+       * the server checks with (app/Support/Social/count-text.ts). Resolved
+       * at call time because the module loads after this script parses.
+       */
+      const lengthFor = (provider, text) => {
+        const value = String(text || '')
+        return window.postlineCountText ? window.postlineCountText(provider, value) : value.length
+      }
+
+      /** The selected network with the tightest limit: the one the counter counts for. */
+      const tightestProvider = () => selectedConnected()
+        .filter(provider => provider.characterLimit)
+        .sort((a, b) => a.characterLimit - b.characterLimit)[0]?.provider || ''
+
+      /**
        * Selected targets that would reject what they are actually going to
        * receive. A provider with an override is measured against that override,
        * not the shared body — otherwise the advisory reports on text the
        * provider will never see, and is wrong in both directions.
        */
       const overLimitProviders = () => selectedConnected()
-        .filter(provider => provider.characterLimit && bodyFor(provider.provider).length > provider.characterLimit)
+        .filter(provider => provider.characterLimit && lengthFor(provider.provider, bodyFor(provider.provider)) > provider.characterLimit)
       /** Over-limit targets named once per network, for the counter's message. */
       const overLimitNetworks = () => overLimitProviders().filter((target, index, list) =>
         list.findIndex(other => other.provider === target.provider) === index)
@@ -448,7 +464,7 @@
         if (!entry) {
           const inherit = document.createElement('p')
           inherit.className = 'text-muted text-xs'
-          const length = sharedBody().length
+          const length = lengthFor(provider, sharedBody())
           inherit.textContent = limit && length > limit
             ? `Uses the shared text - ${length} / ${limit}, too long for ${label}`
             : `Uses the shared text${limit ? ` - ${length} / ${limit}` : ''}`
@@ -492,7 +508,7 @@
           const entry = variants.get(provider)
           const inherit = variantPanel?.querySelector(`[data-variant-inherit="${provider}"]`)
           if (inherit) {
-            const length = sharedBody().length
+            const length = lengthFor(provider, sharedBody())
             const over = Boolean(limit) && length > limit
             inherit.textContent = over
               ? `Uses the shared text - ${length} / ${limit}, too long for ${providerLabel(provider)}`
@@ -502,7 +518,7 @@
           }
           const meta = variantPanel?.querySelector(`[data-variant-meta="${provider}"]`)
           if (meta && entry) {
-            const length = entry.text.length
+            const length = lengthFor(provider, entry.text)
             const over = Boolean(limit) && length > limit
             meta.textContent = limit ? `${length} / ${limit} characters` : `${length} characters`
             meta.classList.toggle('text-red-700', over)
@@ -750,7 +766,7 @@
       const updateCount = () => {
         const textarea = activeTextarea()
         if (!textarea || !count) return
-        const length = textarea.value.length
+        const length = lengthFor(tightestProvider(), textarea.value)
         const limit = effectiveLimit()
         const over = overLimitProviders()
         const posts = allPosts().length

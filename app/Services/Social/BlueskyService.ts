@@ -6,6 +6,7 @@ import { pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accou
 import { describeBlueskyError } from '../../Support/Social/bluesky-errors'
 import { fetchRemoteImage } from '../../Support/Social/image-input'
 import { BlueskyApiError, BlueskyDriver } from './Drivers/BlueskyDriver'
+import { exceedsLimit } from '../../Support/Social/count-text'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 
 const database = db as any
@@ -152,7 +153,7 @@ export class BlueskyService {
   ): Promise<{ post: PublishedPost, targetId: number, postId: number }> {
     const body = text.trim()
     if (!body) throw new Error('Post text is required.')
-    if (body.length > this.driver.characterLimit) {
+    if (exceedsLimit('bluesky', body, this.driver.characterLimit)) {
       throw new Error(`Bluesky posts must be ${this.driver.characterLimit} characters or fewer.`)
     }
 
@@ -224,7 +225,7 @@ export class BlueskyService {
     }
     const account = { identityId: Number(identity.id), handle: identity.handle }
 
-    if (post.body.length > this.driver.characterLimit) {
+    if (exceedsLimit('bluesky', post.body, this.driver.characterLimit)) {
       return {
         provider: 'bluesky',
         ok: false,

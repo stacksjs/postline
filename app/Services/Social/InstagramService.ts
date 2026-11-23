@@ -7,6 +7,7 @@ import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Su
 import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { InstagramApiError, InstagramDriver } from './Drivers/InstagramDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
+import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, expiresAt, now, uuid } from './support'
 
 const database = db as any
@@ -232,7 +233,7 @@ export class InstagramService {
     }
     const account = { identityId: Number(identity.id), handle: identity.handle }
 
-    if (post.body.length > this.driver.characterLimit) {
+    if (exceedsLimit('instagram', post.body, this.driver.characterLimit)) {
       return {
         provider: 'instagram',
         ok: false,

@@ -7,6 +7,7 @@ import { PendingOAuthStates, randomOAuthState } from '../../Support/Social/oauth
 import { TwitterApiError, TwitterDriver } from './Drivers/TwitterDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
 import { refreshOnce } from '../../Support/Social/token-refresh'
+import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, expiresAt, now, uuid } from './support'
 
 const database = db as any
@@ -196,7 +197,7 @@ export class TwitterService {
     }
     const account = { identityId: Number(identity.id), handle: identity.handle }
 
-    if (post.body.length > this.driver.characterLimit) {
+    if (exceedsLimit('twitter', post.body, this.driver.characterLimit)) {
       return {
         provider: 'twitter',
         ok: false,

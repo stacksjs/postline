@@ -5,6 +5,7 @@ import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
 import { MastodonApiError, MastodonDriver, normalizeInstance } from './Drivers/MastodonDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
+import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, now, uuid } from './support'
 
 const database = db as any
@@ -129,7 +130,7 @@ export class MastodonService {
     }
     const account = { identityId: Number(identity.id), handle: identity.handle }
 
-    if (post.body.length > this.driver.characterLimit) {
+    if (exceedsLimit('mastodon', post.body, this.driver.characterLimit)) {
       return {
         provider: 'mastodon',
         ok: false,

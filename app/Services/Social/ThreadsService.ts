@@ -7,6 +7,7 @@ import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { ThreadsApiError, ThreadsDriver } from './Drivers/ThreadsDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
 import { refreshOnce } from '../../Support/Social/token-refresh'
+import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, expiresAt, now, uuid } from './support'
 
 const database = db as any
@@ -212,7 +213,7 @@ export class ThreadsService {
     }
     const account = { identityId: Number(identity.id), handle: identity.handle }
 
-    if (post.body.length > this.driver.characterLimit) {
+    if (exceedsLimit('threads', post.body, this.driver.characterLimit)) {
       return {
         provider: 'threads',
         ok: false,

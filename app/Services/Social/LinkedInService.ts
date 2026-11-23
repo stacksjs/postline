@@ -8,6 +8,7 @@ import { LinkedInApiError, LinkedInDriver } from './Drivers/LinkedInDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
 import { resolveLinkedInVersion } from '../../Support/Social/linkedin-text'
 import { refreshOnce } from '../../Support/Social/token-refresh'
+import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, expiresAt, now, uuid } from './support'
 
 const database = db as any
@@ -201,7 +202,7 @@ export class LinkedInService {
     }
     const account = { identityId: Number(identity.id), handle: identity.handle }
 
-    if (post.body.length > this.driver.characterLimit) {
+    if (exceedsLimit('linkedin', post.body, this.driver.characterLimit)) {
       return {
         provider: 'linkedin',
         ok: false,

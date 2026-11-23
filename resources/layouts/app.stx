@@ -52,6 +52,7 @@
     </div>
     <div id="postline-toast-host" class="flex bottom-6 fixed right-6 z-[100] sm:right-6 flex-col-reverse gap-2.5 max-w-[22rem] w-[calc(100%-2rem)] pointer-events-none" aria-live="polite" aria-relevant="additions"></div>
     <script type="module" src="/assets/scripts/toast.ts"></script>
+    <script type="module" src="/assets/scripts/count-text.ts"></script>
     <script type="module" src="/assets/scripts/bluesky.ts"></script>
     <script type="module" src="/assets/scripts/linkedin.ts"></script>
     <script type="module" src="/assets/scripts/instagram.ts"></script>
