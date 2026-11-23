@@ -59,6 +59,7 @@ declare global {
   const useToggle: typeof import('@stacksjs/browser')['useToggle']
   const useStorage: typeof import('@stacksjs/browser')['useStorage']
   const Account: typeof import('../../../app/Models/Account')['default']
+  const Alert: typeof import('../../../app/Models/Alert')['default']
   const BlogPost: typeof import('../../../app/Models/BlogPost')['default']
   const CampaignPost: typeof import('../../../app/Models/CampaignPost')['default']
   const DmConversation: typeof import('../../../app/Models/DmConversation')['default']

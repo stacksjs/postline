@@ -6,6 +6,7 @@
   @meta('description', 'Review scheduled and drafted social posts in Postline.')
   <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
     <p class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !schedulerWarning() }" :text="schedulerWarning()" role="status" data-scheduler-warning></p>
+    <a class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !attentionText() }" href="/activity" data-stx-link :text="attentionText()" data-attention-link></a>
     <header class="flex flex-wrap gap-4 items-center justify-between min-h-11">
       <div>
         <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Queue</p>
@@ -409,6 +410,24 @@
       const when = Number.isNaN(at.getTime()) ? '' : ` since ${at.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`
       return `Scheduled posts are not going out: the scheduler has not run${when}.`
     })
+    /** How many alerts are unread: a failed post, a missed one, a refused sign-in. */
+    const unreadAlerts = state(0)
+    const attentionText = derived(() => {
+      const count = unreadAlerts()
+      if (!count) return ''
+      return `${count} thing${count === 1 ? ' needs' : 's need'} your attention. See what happened.`
+    })
+    const refreshAlerts = async () => {
+      try {
+        const response = await fetch('/api/postline/alerts')
+        const payload = await response.json()
+        if (response.ok && payload.ok) unreadAlerts.set(Number(payload.data.unread) || 0)
+      }
+      catch {
+        // Unknown is not worth an error on a page that otherwise loaded.
+      }
+    }
+
     const refreshScheduler = async () => {
       try {
         const response = await fetch('/api/postline/system')
@@ -493,6 +512,7 @@
     onMount(() => {
       void refresh()
       void refreshScheduler()
+      void refreshAlerts()
     })
   </script>
 @endsection

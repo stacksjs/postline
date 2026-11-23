@@ -17,6 +17,7 @@
 import type { IdentityKey, IdentityLike } from '../../Support/Social/accounts'
 import { db } from '@stacksjs/database'
 import { UserFacingError } from '../../Support/Http/user-error'
+import { alerts } from '../AlertService'
 import { matchIdentity, pickDefaultIdentity } from '../../Support/Social/accounts'
 import { isSealed, openToken, sealToken } from '../../Support/Social/token-vault'
 import { now, uuid } from './support'
@@ -267,6 +268,19 @@ export async function markIdentityExpired(identityId: number): Promise<void> {
     .where('id', '=', identityId)
     .where('auth_status', '!=', 'revoked')
     .execute()
+
+  // Posts to this account fail until it is connected again, so say so now
+  // and not when the next scheduled post bounces. Once a day at most.
+  const row = await database.selectFrom('social_identities').select(['provider', 'handle', 'auth_status']).where('id', '=', identityId).executeTakeFirst()
+  if (row && row.auth_status === 'expired') {
+    await alerts.raise({
+      kind: 'account-expired',
+      title: `${String(row.provider).replace(/^./, (letter: string) => letter.toUpperCase())} account ${row.handle} needs reconnecting`,
+      body: 'The network turned its sign-in down. Posts to it will fail until you connect it again under Settings, Channels.',
+      link: '/accounts',
+      key: `account-expired:${identityId}:${now().slice(0, 10)}`,
+    })
+  }
 }
 
 /** The error a service returns when an explicitly chosen account is unusable. */

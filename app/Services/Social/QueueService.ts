@@ -16,6 +16,7 @@ import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/va
 import { crosspost, crosspostProviders } from './CrosspostService'
 import { findIdentityRow, unavailableAccountError } from './identities'
 import { isRealTimestamp } from '../../Support/time'
+import { alerts } from '../AlertService'
 import { workspace } from '../WorkspaceService'
 import { ensureAccount, now, uuid } from './support'
 
@@ -103,6 +104,9 @@ function parseStoredContent(raw: unknown): StoredContent | null {
 /** Posts per page of the queue, and the most one request may ask for. */
 export const QUEUE_PAGE_SIZE = 50
 export const MAX_QUEUE_PAGE_SIZE = 500
+
+/** Network names as the owner reads them, for alerts. */
+const NETWORK_NAMES: Record<string, string> = { bluesky: 'Bluesky', twitter: 'X', mastodon: 'Mastodon', linkedin: 'LinkedIn', instagram: 'Instagram', threads: 'Threads', blog: 'the blog' }
 
 const ACTIONABLE = new Set(['draft', 'scheduled', 'failed'])
 
@@ -676,8 +680,19 @@ export class QueueService {
         ? failedRows.where('social_identity_id', '=', result.identityId)
         : failedRows.where('social_identity_id', 'is', null)
       await failedRows.execute()
-      if (next)
+      if (next) {
         log.info(`[postline] post ${post.id} will be sent to ${result.target || result.provider} again at ${next} UTC (attempt ${attempts + 1} of ${MAX_ATTEMPTS})`)
+      }
+      else {
+        // Nothing will send this again: it is the owner's now, so tell them.
+        await alerts.raise({
+          kind: 'post-failed',
+          title: `A post failed on ${NETWORK_NAMES[result.provider] || result.provider}${result.handle ? ` (${result.handle})` : ''}`,
+          body: `${result.error || 'No reason was given.'} The post: "${String(post.body).replace(/\s+/g, ' ').trim().slice(0, 120)}"`,
+          link: '/queue',
+          key: `post-failed:${post.id}:${recordKey(result.provider, result.identityId)}:${attempts}`,
+        })
+      }
     }
 
     for (const result of results) {
@@ -916,6 +931,14 @@ export class QueueService {
       failure_reason: reason,
       updated_at: at,
     }).where('post_id', '=', postId).where('status', '=', 'scheduled').execute()
+
+    await alerts.raise({
+      kind: reason.startsWith(MISSED_PREFIX) ? 'post-missed' : 'post-failed',
+      title: reason.startsWith(MISSED_PREFIX) ? 'A scheduled post was not sent' : 'A scheduled post could not be sent',
+      body: reason,
+      link: '/queue',
+      key: `post-set-aside:${postId}`,
+    })
 
     return 1
   }

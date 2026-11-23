@@ -146,6 +146,8 @@ route.group({ prefix: '/postline' }, () => {
   // AutoDeletePosts job does the deleting; these only read and save the rule.
   route.get('/system', 'Actions/Postline/SystemStatusAction').middleware('auth')
   route.get('/activity', 'Actions/Postline/ActivityAction').middleware('auth')
+  route.get('/alerts', 'Actions/Postline/AlertListAction').middleware('auth')
+  route.post('/alerts/read', 'Actions/Postline/AlertReadAction').middleware('auth').rateLimit(60, 'minute')
   route.get('/settings/workspace', 'Actions/Postline/WorkspaceGetAction').middleware('auth')
   route.post('/settings/workspace', 'Actions/Postline/WorkspaceSaveAction').middleware('auth').rateLimit(30, 'minute')
   route.get('/settings/retention', 'Actions/Postline/RetentionGetAction').middleware('auth')

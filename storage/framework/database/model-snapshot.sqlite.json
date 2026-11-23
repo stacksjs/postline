@@ -2453,10 +2453,112 @@
             "type": "unique"
           }
         ]
+      },
+      {
+        "table": "alerts",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "kind",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "post-failed",
+              "post-missed",
+              "account-expired"
+            ]
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 200
+          },
+          {
+            "name": "body",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "link",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 255
+          },
+          {
+            "name": "dedupe_key",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 190
+          },
+          {
+            "name": "read_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "UTC_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "alerts_dedupe_key_unique",
+            "columns": [
+              "dedupe_key"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "alerts_read_at_index",
+            "columns": [
+              "read_at"
+            ],
+            "type": "index"
+          }
+        ]
       }
     ]
   },
-  "hash": "ddf7597b39981891759f6a88ad79b092bfeb99268ca13993fd13022150f780d2",
+  "hash": "0a56d655dec0641a96f690d9ae84e5a9e907e70ff9ed40245c1a9392fcccf3df",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-23T03:15:44.411Z"
+  "updatedAt": "2026-11-23T03:50:07.459Z"
 }

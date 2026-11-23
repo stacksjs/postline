@@ -20,6 +20,25 @@
 
     <p class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !schedulerWarning() }" :text="schedulerWarning()" role="status" data-scheduler-warning></p>
 
+    {{-- Unread alerts: what will not sort itself out. Read ones are dropped
+        from the page; the sends below remain the full record. --}}
+    <section class="hidden overflow-hidden bg-panel border border-warning-line rounded-2xl shadow-sm" :class="{ 'hidden': attention().length === 0 }" aria-label="Needs your attention" data-activity-attention>
+      <div class="flex items-center justify-between px-4 py-3 bg-warning-soft border-b border-warning-line">
+        <strong class="font-semibold text-sm text-warning">Needs your attention</strong>
+        <button class="text-warning text-xs underline disabled:opacity-50" type="button" :disabled="marking()" @click="markAllRead()">Mark all as read</button>
+      </div>
+      <div>
+        <article class="grid gap-0.5 px-4 py-3 border-b border-line last:border-b-0" x-for="alert in attention()" data-activity-alert>
+          <div class="flex gap-2 items-center justify-between">
+            <span class="font-medium text-ink text-ui" :text="alert.title"></span>
+            <span class="shrink-0 text-muted text-xs" :text="alert.when"></span>
+          </div>
+          <p class="m-0 text-body text-xs" x-show="alert.body" :text="alert.body"></p>
+          <a class="text-muted text-xs underline hover:text-ink" x-show="alert.link" :href="alert.link" data-stx-link :text="alert.action"></a>
+        </article>
+      </div>
+    </section>
+
     <div class="grid gap-5 items-start lg:grid-cols-[minmax(0,1fr)_320px]">
       <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" aria-label="Sends">
         <div class="flex items-center justify-between px-4 py-3 border-b border-line">
@@ -101,6 +120,18 @@
     const nextCursor = state(0)
     const loadingMore = state(false)
 
+    interface AlertItem {
+      id: number
+      kind: string
+      title: string
+      body: string | null
+      link: string | null
+      at: string | null
+      read: boolean
+    }
+    const alertItems = state<AlertItem[]>([])
+    const marking = state(false)
+
     const NETWORKS: Record<string, string> = {
       bluesky: 'Bluesky',
       twitter: 'X',
@@ -171,6 +202,39 @@
       }
     }))
 
+    const attention = derived(() => alertItems().filter(alert => !alert.read).map(alert => ({
+      id: alert.id,
+      title: alert.title,
+      body: alert.body || '',
+      link: alert.link || '',
+      action: alert.link === '/accounts' ? 'Open Channels' : 'Open the queue',
+      when: ago(alert.at),
+    })))
+
+    const loadAlerts = async () => {
+      try {
+        const response = await fetch('/api/postline/alerts')
+        const payload = await response.json()
+        if (response.ok && payload.ok) alertItems.set(payload.data.alerts || [])
+      }
+      catch {
+        // The feed below still loads; a missing alert list is not worth an error.
+      }
+    }
+
+    const markAllRead = async () => {
+      if (marking()) return
+      marking.set(true)
+      try {
+        const response = await fetch('/api/postline/alerts/read', { method: 'POST', body: new FormData() })
+        const payload = await response.json()
+        if (response.ok && payload.ok) alertItems.set(payload.data.alerts || [])
+      }
+      finally {
+        marking.set(false)
+      }
+    }
+
     const showEmpty = derived(() => loaded() && !loadError() && events().length === 0)
     const showNoJobs = derived(() => loaded() && jobs().length === 0)
     const emptyText = derived(() => filter() === 'failed' ? 'Nothing has failed.' : 'Nothing has been sent yet. Publish a post and it shows up here.')
@@ -237,6 +301,7 @@
 
     onMount(() => {
       void refresh()
+      void loadAlerts()
     })
   </script>
 @endsection

@@ -3,6 +3,7 @@
     "Account": true,
     "Action": true,
     "Activity": true,
+    "Alert": true,
     "AnalyticsEvent": true,
     "Auction": true,
     "AuctionItem": true,
