@@ -5,6 +5,7 @@
 @section('content')
   @meta('description', 'Review scheduled and drafted social posts in Postline.')
   <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
+    <p class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !schedulerWarning() }" :text="schedulerWarning()" role="status" data-scheduler-warning></p>
     <header class="flex flex-wrap gap-4 items-center justify-between min-h-11">
       <div>
         <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Queue</p>
@@ -396,6 +397,29 @@
       }
     }
 
+    // --- Scheduler: say so when it is not running ---
+    // A stopped scheduler fails nothing: posts just stay scheduled. The
+    // heartbeat of the every-minute publish job is the only sign.
+    const schedulerStatus = state({ state: 'ok', lastRunAt: null })
+    const schedulerWarning = derived(() => {
+      const status = schedulerStatus()
+      if (status.state === 'ok') return ''
+      if (status.state === 'never') return 'Scheduled posts are not going out: the scheduler has not run yet. Start it with ./buddy schedule:run.'
+      const at = new Date(String(status.lastRunAt))
+      const when = Number.isNaN(at.getTime()) ? '' : ` since ${at.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`
+      return `Scheduled posts are not going out: the scheduler has not run${when}.`
+    })
+    const refreshScheduler = async () => {
+      try {
+        const response = await fetch('/api/postline/system')
+        const payload = await response.json()
+        if (response.ok && payload.ok) schedulerStatus.set(payload.data.scheduler)
+      }
+      catch {
+        // Unknown is not the same as stopped: say nothing rather than alarm.
+      }
+    }
+
     const loadMore = async () => {
       if (!nextCursor() || loadingMore()) return
       loadingMore.set(true)
@@ -468,6 +492,7 @@
 
     onMount(() => {
       void refresh()
+      void refreshScheduler()
     })
   </script>
 @endsection

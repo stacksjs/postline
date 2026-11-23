@@ -1,6 +1,7 @@
 import { log } from '@stacksjs/logging'
 import { Job } from '@stacksjs/queue'
 import { Every } from '@stacksjs/types'
+import { withHeartbeat } from '../Support/heartbeat'
 import { directMessages } from '../Services/DirectMessageService'
 
 export default new Job({
@@ -11,7 +12,7 @@ export default new Job({
   backoff: 10,
   rate: Every.FiveMinutes,
 
-  handle: async () => {
+  handle: async () => await withHeartbeat('SyncDirectMessages', async () => {
     try {
       const result = await directMessages.sync()
       if (result.messages)
@@ -26,5 +27,5 @@ export default new Job({
       log.error(`[postline] dm sync failed: ${message}`)
       return { synced: 0, conversations: 0, messages: 0, errors: [{ message }] }
     }
-  },
+  }),
 })

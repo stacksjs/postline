@@ -50,6 +50,10 @@ route.post('/subscribe', 'Actions/SubscriberEmailAction')
 // per-upload UUID and strictly validated against traversal (MediaServeAction).
 route.get('/postline/media', 'Actions/Postline/MediaServeAction').rateLimit(120, 'minute')
 
+// For a load balancer or an uptime monitor: fails when the scheduler has
+// stopped, which the framework's own health check cannot see.
+route.get('/postline/health', 'Actions/Postline/HealthAction').rateLimit(120, 'minute')
+
 route.group({ prefix: '/postline/bluesky' }, () => {
   route.get('/status', 'Actions/Postline/BlueskyStatusAction').middleware('auth')
   route.post('/connect', 'Actions/Postline/BlueskyConnectAction').middleware('auth').rateLimit(10, 'minute')
@@ -140,6 +144,7 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/purge', 'Actions/Postline/PurgeRunAction').middleware('auth').rateLimit(3, 'hour')
   // Automatic deletion of posts older than N days (Settings). The daily
   // AutoDeletePosts job does the deleting; these only read and save the rule.
+  route.get('/system', 'Actions/Postline/SystemStatusAction').middleware('auth')
   route.get('/settings/workspace', 'Actions/Postline/WorkspaceGetAction').middleware('auth')
   route.post('/settings/workspace', 'Actions/Postline/WorkspaceSaveAction').middleware('auth').rateLimit(30, 'minute')
   route.get('/settings/retention', 'Actions/Postline/RetentionGetAction').middleware('auth')

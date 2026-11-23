@@ -25,6 +25,8 @@ const APP_PUBLIC = [
   'GET /api/csrf',
   // Instagram and Threads fetch a queued image from here, server to server.
   'GET /api/postline/media',
+  // Health for a load balancer: database and scheduler state, nothing else.
+  'GET /api/postline/health',
   // The marketing site's email capture.
   'POST /api/subscribe',
 ]

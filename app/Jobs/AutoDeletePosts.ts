@@ -1,6 +1,7 @@
 import { log } from '@stacksjs/logging'
 import { Job } from '@stacksjs/queue'
 import { Every } from '@stacksjs/types'
+import { withHeartbeat } from '../Support/heartbeat'
 import { retention } from '../Services/RetentionService'
 
 export default new Job({
@@ -11,7 +12,7 @@ export default new Job({
   backoff: 3,
   rate: Every.Day,
 
-  handle: async () => {
+  handle: async () => await withHeartbeat('AutoDeletePosts', async () => {
     try {
       const outcome = await retention.run()
       if (!outcome.ran) return { skipped: outcome.reason }
@@ -26,5 +27,5 @@ export default new Job({
       log.error(`[postline] auto-delete failed: ${message}`)
       return { failed: true, error: message }
     }
-  },
+  }),
 })

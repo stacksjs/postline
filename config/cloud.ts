@@ -277,7 +277,11 @@ export const tsCloud: TsCloudConfig = {
         cpu: 512, // 256, 512, 1024, 2048, 4096
         memory: 1024, // Must be compatible with CPU (512 MB - 16 GB)
         port: 3000,
-        healthCheck: '/health',
+        // The framework's check: database and cache. `/health` was not a
+        // route. `/api/postline/health` also fails when the scheduler stops;
+        // point an uptime monitor at that one, not the load balancer, or a
+        // dead scheduler would take the web tier out of rotation with it.
+        healthCheck: '/api/health',
         desiredCount: 2,
         autoScaling: {
           min: 1,
@@ -309,7 +313,7 @@ export const tsCloud: TsCloudConfig = {
       enabled: true,
       type: 'application',
       healthCheck: {
-        path: '/health',
+        path: '/api/health',
         interval: 30,
         healthyThreshold: 2,
         unhealthyThreshold: 5,

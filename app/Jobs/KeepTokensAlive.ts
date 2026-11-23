@@ -3,6 +3,7 @@ import { Job } from '@stacksjs/queue'
 import { Every } from '@stacksjs/types'
 import { linkedin } from '../Services/Social/LinkedInService'
 import { threads } from '../Services/Social/ThreadsService'
+import { withHeartbeat } from '../Support/heartbeat'
 import { twitter } from '../Services/Social/TwitterService'
 
 /**
@@ -19,7 +20,7 @@ export default new Job({
   backoff: 10,
   rate: Every.Day,
 
-  handle: async () => {
+  handle: async () => await withHeartbeat('KeepTokensAlive', async () => {
     const renewed: Record<string, number> = {}
     for (const [name, service] of Object.entries({ twitter, linkedin, threads })) {
       try {
@@ -33,5 +34,5 @@ export default new Job({
     const total = Object.values(renewed).reduce((sum, count) => sum + count, 0)
     if (total) log.info(`[postline] token keepalive: renewed ${total} token(s)`)
     return renewed
-  },
+  }),
 })

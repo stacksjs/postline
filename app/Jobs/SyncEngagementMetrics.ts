@@ -1,6 +1,7 @@
 import { log } from '@stacksjs/logging'
 import { Job } from '@stacksjs/queue'
 import { Every } from '@stacksjs/types'
+import { withHeartbeat } from '../Support/heartbeat'
 import { bluesky } from '../Services/Social/BlueskyService'
 
 export default new Job({
@@ -11,7 +12,7 @@ export default new Job({
   backoff: 3,
   rate: Every.HalfHour,
 
-  handle: async () => {
+  handle: async () => await withHeartbeat('SyncEngagementMetrics', async () => {
     try {
       const { synced } = await bluesky.syncMetrics()
       if (synced) log.info(`[postline] engagement sync: ${synced} targets refreshed`)
@@ -25,5 +26,5 @@ export default new Job({
       log.warn(`[postline] engagement sync skipped: ${reason}`)
       return { synced: 0, skipped: reason }
     }
-  },
+  }),
 })

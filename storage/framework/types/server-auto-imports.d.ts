@@ -63,6 +63,7 @@ declare global {
   const CampaignPost: typeof import('../../../app/Models/CampaignPost')['default']
   const DmConversation: typeof import('../../../app/Models/DmConversation')['default']
   const DmMessage: typeof import('../../../app/Models/DmMessage')['default']
+  const JobHeartbeat: typeof import('../../../app/Models/JobHeartbeat')['default']
   const KeywordMention: typeof import('../../../app/Models/KeywordMention')['default']
   const KeywordMonitor: typeof import('../../../app/Models/KeywordMonitor')['default']
   const LaunchCampaign: typeof import('../../../app/Models/LaunchCampaign')['default']

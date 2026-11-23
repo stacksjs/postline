@@ -1,6 +1,7 @@
 import { log } from '@stacksjs/logging'
 import { Job } from '@stacksjs/queue'
 import { Every } from '@stacksjs/types'
+import { withHeartbeat } from '../Support/heartbeat'
 import { keywordMonitoring } from '../Services/KeywordMonitoringService'
 
 export default new Job({
@@ -11,7 +12,7 @@ export default new Job({
   backoff: 10,
   rate: Every.FiveMinutes,
 
-  handle: async () => {
+  handle: async () => await withHeartbeat('ScanKeywordMonitors', async () => {
     try {
       const result = await keywordMonitoring.scan()
       if (result.created)
@@ -23,5 +24,5 @@ export default new Job({
       log.error(`[postline] listening scan failed: ${message}`)
       return { scanned: 0, found: 0, created: 0, errors: [{ message }] }
     }
-  },
+  }),
 })
