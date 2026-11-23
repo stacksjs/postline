@@ -1,4 +1,5 @@
 import { log } from '@stacksjs/logging'
+import { mediaObjections } from '../../Support/Social/media-rules'
 import { isDue, MAX_ATTEMPTS, nextAttemptAt } from '../../Support/Social/retry'
 import type { PublishTarget } from '../../Support/Social/targets'
 import type { CrosspostService } from './CrosspostService'
@@ -134,6 +135,18 @@ function missedReason(scheduledAt: string): string {
   return `${MISSED_PREFIX} Postline was not running when this was due (${scheduledAt} UTC). Publish it now, or give it a new time.`
 }
 
+/**
+ * Refuse an image that one of the post's networks will not take, now and by
+ * name, instead of letting it fail on that network at publish time. An image
+ * given by address is not in hand and is not measured.
+ */
+function assertMediaAllowed(providers: string[], image: SaveQueueInput['image'] | undefined): void {
+  if (!image?.bytes?.length) return
+  const objections = mediaObjections(providers, [{ bytes: image.bytes.length, mimeType: image.mimeType }])
+  if (objections.length)
+    throw new UserFacingError(`${objections.join(' ')} Use a different image, or leave that network out.`)
+}
+
 /** Thrown when a queued post's attached image is no longer on disk. */
 export class MissingMediaError extends UserFacingError {
   constructor() {
@@ -256,6 +269,7 @@ export class QueueService {
       throw new Error('Post text is required.')
 
     const targets = await this.validTargets(input.providers)
+    assertMediaAllowed(targets.map(target => target.provider), input.image)
 
     const scheduledAt = input.scheduledAt?.trim() || null
     if (scheduledAt) {
@@ -446,6 +460,7 @@ export class QueueService {
       throw new Error('Post text is required.')
 
     const targets = await this.validTargets(input.providers)
+    assertMediaAllowed(targets.map(target => target.provider), input.image)
 
     const scheduledAt = input.scheduledAt?.trim() || null
     if (scheduledAt) {

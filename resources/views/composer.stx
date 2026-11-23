@@ -1353,9 +1353,16 @@
           clearAttachment()
           return
         }
-        if (file.size > 1_000_000) {
+        // Each network has its own size and format rules; Bluesky's 1 MB cap
+        // used to be applied to all of them. The server runs the same check
+        // on save, so a network added afterwards is still caught.
+        const objections = window.postlineMediaObjections?.(
+          selectedConnected().map(target => target.provider),
+          [{ bytes: file.size, mimeType: file.type }],
+        ) || []
+        if (objections.length) {
           clearAttachment()
-          setStatus('Images must be 1MB or smaller for Bluesky.', 'error', { title: 'Attachment' })
+          setStatus(`${objections.join(' ')} Use a different image, or leave that network out.`, 'error', { title: 'Attachment' })
           return
         }
         if (attachName) attachName.textContent = file.name

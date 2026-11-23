@@ -593,3 +593,23 @@ describe('where a queued post keeps its content', () => {
     expect(kept.content).toBeNull()
   })
 })
+
+describe('an image a network will not take', () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+
+  test('is refused when the post is saved, naming the network', async () => {
+    const queue = queueWith({ blog: fakeNetwork('blog') })
+    const before = (await queue.listPage({ limit: 500 })).items.length
+
+    await expect(queue.save({ text: 'a png for instagram', providers: ['blog', 'instagram'], image: { bytes: png, mimeType: 'image/png' } }))
+      .rejects.toThrow('Instagram takes JPEG only; this image is a PNG.')
+
+    expect((await queue.listPage({ limit: 500 })).items.length).toBe(before)
+  })
+
+  test('is accepted where every chosen network takes it', async () => {
+    const queue = queueWith({ blog: fakeNetwork('blog') })
+    const { postId } = await queue.save({ text: 'a png for the blog', providers: ['blog'], image: { bytes: png, mimeType: 'image/png' } })
+    expect(postId).toBeGreaterThan(0)
+  })
+})
