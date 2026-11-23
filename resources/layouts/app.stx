@@ -34,7 +34,7 @@
 
       <div class="relative lg:overflow-hidden min-w-0 lg:h-screen bg-bg" data-postline-content-shell>
         <button
-          class="inline-flex fixed left-3.5 top-3.5 z-[90] items-center justify-center h-9 w-9 text-body hover:text-zinc-900 bg-white/95 hover:bg-white border border-zinc-200/90 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60 shadow-[0_8px_28px_rgba(24,31,42,0.12)] backdrop-blur-sm"
+          class="inline-flex fixed left-3.5 top-3.5 z-[90] items-center justify-center h-9 w-9 text-body hover:text-ink bg-glass-strong hover:bg-raised border border-line rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus shadow-[0_8px_28px_rgba(24,31,42,0.12)] backdrop-blur-sm"
           type="button"
           aria-label="Expand sidebar"
           title="Expand sidebar"
@@ -43,7 +43,7 @@
         >
           <span class="h-[18px] w-[18px] i-hugeicons-sidebar-right" aria-hidden="true"></span>
         </button>
-        <section class="overflow-hidden lg:overflow-y-auto min-h-screen min-w-0 lg:h-screen bg-bg border-t border-zinc-200/80 lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace data-window-drag-region>
+        <section class="overflow-hidden lg:overflow-y-auto min-h-screen min-w-0 lg:h-screen bg-bg border-t border-line lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace data-window-drag-region>
           <main class="p-3.5 sm:p-4 min-w-0" data-postline-router>
             @yield('content')
           </main>

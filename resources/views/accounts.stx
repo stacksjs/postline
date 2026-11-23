@@ -7,14 +7,14 @@
   <section class="grid gap-4" data-postline-page="accounts" data-testid="accounts-page">
     {{-- Crosswind safelist: connection status-pill colors are set dynamically
         via JS, so list them in static markup for the CSS scanner. --}}
-    <div class="hidden text-amber-800 text-emerald-700 text-muted bg-amber-50 bg-emerald-50 border-amber-200 border-emerald-200 border-line" aria-hidden="true"></div>
+    <div class="hidden text-warning text-success text-muted bg-warning-soft bg-success-soft border-warning-line border-success-line border-line" aria-hidden="true"></div>
     <header class="flex flex-col gap-4 items-stretch justify-between sm:flex-row sm:items-end min-h-11">
       <div>
         <p class="mb-1.5 font-semibold text-xs text-muted tracking-wider uppercase">Settings</p>
         <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Connect your channels</h1>
         <p class="mb-0 mt-1.5 text-ui text-muted">Bring every place you publish into one calm, reliable workspace.</p>
       </div>
-      <a class="inline-flex gap-2 items-center justify-center px-4 h-9 w-fit font-semibold text-ink text-sm bg-panel hover:bg-white border border-line rounded-xl shadow-sm transition-colors" href="/composer" data-stx-link>
+      <a class="inline-flex gap-2 items-center justify-center px-4 h-9 w-fit font-semibold text-ink text-sm bg-panel hover:bg-raised border border-line rounded-xl shadow-sm transition-colors" href="/composer" data-stx-link>
         <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>
         Open Composer
       </a>
@@ -27,15 +27,15 @@
 
     <div class="grid gap-3 sm:grid-cols-3">
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-blue-700 text-lg bg-blue-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-share-08"></span></span>
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-info text-lg bg-info-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-share-08"></span></span>
         <div><span class="block font-semibold text-xs text-muted tracking-wider uppercase">Destinations</span><strong class="block mt-1 text-ink text-sm">7 publishing channels</strong></div>
       </article>
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-emerald-700 text-lg bg-emerald-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-shield-key"></span></span>
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-success text-lg bg-success-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-shield-key"></span></span>
         <div><span class="block font-semibold text-xs text-muted tracking-wider uppercase">Credentials</span><strong class="block mt-1 text-ink text-sm">Stored in your workspace</strong></div>
       </article>
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-violet-700 bg-violet-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-radar-02"></span></span>
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-note bg-note-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-radar-02"></span></span>
         <div><span class="block font-semibold text-xs text-muted tracking-wider uppercase">Listening</span><a class="block mt-1 font-semibold text-ink text-sm hover:underline" href="/listening" data-stx-link>Watch brand mentions</a></div>
       </article>
     </div>
@@ -46,8 +46,8 @@
         <span class="px-2.5 py-1 font-semibold text-xs text-muted bg-panel-2 border border-line rounded-full">7 destinations</span>
       </header>
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" data-bluesky-channels>
-        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="bluesky">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-blue-600 text-xl bg-blue-50 rounded-xl" aria-hidden="true"><span class="i-simple-icons-bluesky"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-bluesky-channel-status>Setup</span></div>
+        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="bluesky">
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-info text-xl bg-info-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-bluesky"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-bluesky-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-semibold text-sm">Bluesky</h2>
             <p class="my-1.5 text-ui text-body" data-bluesky-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-bluesky-channel-detail>Add an app password to publish and sync your timeline.</p>
@@ -56,24 +56,24 @@
               <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in blueskyAccounts()">
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="text-xs text-muted underline hover:text-red-700 disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
+                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
+                  <button class="text-xs text-muted underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
             </ul>
           </div>
           <details class="group">
-            <summary class="inline-flex items-center justify-center h-9 w-full font-semibold list-none text-ink text-xs bg-panel-2 hover:bg-white border border-line rounded-xl transition-colors cursor-pointer">Manage Bluesky</summary>
+            <summary class="inline-flex items-center justify-center h-9 w-full font-semibold list-none text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl transition-colors cursor-pointer">Manage Bluesky</summary>
             <form id="bluesky-connect-form" class="grid gap-2 pt-3" data-bluesky-connect-form>
-              <input class="px-3 h-9 text-ink text-xs bg-white border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="identifier" placeholder="name.bsky.social" autocomplete="username" aria-label="Bluesky handle" data-bluesky-identifier required>
-              <input class="px-3 h-9 text-ink text-xs bg-white border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password" type="password" autocomplete="current-password" placeholder="App password" aria-label="Bluesky app password" data-bluesky-password required>
-              <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" data-bluesky-connect-submit>Connect Bluesky</button>
+              <input class="px-3 h-9 text-ink text-xs bg-raised border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="identifier" placeholder="name.bsky.social" autocomplete="username" aria-label="Bluesky handle" data-bluesky-identifier required>
+              <input class="px-3 h-9 text-ink text-xs bg-raised border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password" type="password" autocomplete="current-password" placeholder="App password" aria-label="Bluesky app password" data-bluesky-password required>
+              <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" data-bluesky-connect-submit>Connect Bluesky</button>
               <p class="m-0 text-xs text-muted">Use an app password from Bluesky Settings, never your account password. Sign in with another handle to add a second account.</p>
             </form>
           </details>
         </article>
-        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="linkedin">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-[#0a66c2] text-xl bg-blue-50 rounded-xl" aria-hidden="true"><span class="i-simple-icons-linkedin"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-linkedin-channel-status>Setup</span></div>
+        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="linkedin">
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-[#0a66c2] text-xl bg-info-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-linkedin"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-linkedin-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-semibold text-sm">LinkedIn</h2>
             <p class="my-1.5 text-ui text-body" data-linkedin-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-linkedin-channel-detail>Connect with LinkedIn to crosspost member shares.</p>
@@ -82,19 +82,19 @@
               <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in linkedinAccounts()">
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="text-xs text-muted underline hover:text-red-700 disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
+                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
+                  <button class="text-xs text-muted underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
             </ul>
           </div>
           <div class="grid gap-2">
-            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" data-linkedin-connect>Connect LinkedIn</button>
-            <button class="hidden text-muted text-xs underline hover:text-zinc-700 transition-colors" type="button" data-linkedin-connect-env>Use configured token</button>
+            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" data-linkedin-connect>Connect LinkedIn</button>
+            <button class="hidden text-muted text-xs underline hover:text-ink transition-colors" type="button" data-linkedin-connect-env>Use configured token</button>
           </div>
         </article>
-        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="instagram">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-pink-600 text-xl bg-pink-50 rounded-xl" aria-hidden="true"><span class="i-simple-icons-instagram"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-instagram-channel-status>Setup</span></div>
+        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="instagram">
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-note text-xl bg-note-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-instagram"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-instagram-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-semibold text-sm">Instagram</h2>
             <p class="my-1.5 text-ui text-body" data-instagram-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-instagram-channel-detail>Connect an Instagram Business account to crosspost. Posts require an image.</p>
@@ -103,18 +103,18 @@
               <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in instagramAccounts()">
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="text-xs text-muted underline hover:text-red-700 disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
+                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
+                  <button class="text-xs text-muted underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
             </ul>
           </div>
           <div class="grid gap-2">
-            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" data-instagram-connect>Connect Instagram</button>
-            <button class="hidden text-muted text-xs underline hover:text-zinc-700 transition-colors" type="button" data-instagram-connect-env>Use configured token</button>
+            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" data-instagram-connect>Connect Instagram</button>
+            <button class="hidden text-muted text-xs underline hover:text-ink transition-colors" type="button" data-instagram-connect-env>Use configured token</button>
           </div>
         </article>
-        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="threads">
+        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="threads">
           <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-simple-icons-threads"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-threads-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-semibold text-sm">Threads</h2>
             <p class="my-1.5 text-ui text-body" data-threads-channel-handle>Not connected</p>
@@ -124,18 +124,18 @@
               <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in threadsAccounts()">
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="text-xs text-muted underline hover:text-red-700 disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
+                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
+                  <button class="text-xs text-muted underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
             </ul>
           </div>
           <div class="grid gap-2">
-            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" data-threads-connect>Connect Threads</button>
-            <button class="hidden text-muted text-xs underline hover:text-zinc-700 transition-colors" type="button" data-threads-connect-env>Use configured token</button>
+            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" data-threads-connect>Connect Threads</button>
+            <button class="hidden text-muted text-xs underline hover:text-ink transition-colors" type="button" data-threads-connect-env>Use configured token</button>
           </div>
         </article>
-        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="twitter">
+        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="twitter">
           <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-simple-icons-x"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-twitter-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-semibold text-sm">X</h2>
             <p class="my-1.5 text-ui text-body" data-twitter-channel-handle>Not connected</p>
@@ -145,27 +145,27 @@
               <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in twitterAccounts()">
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="text-xs text-muted underline hover:text-red-700 disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
+                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
+                  <button class="text-xs text-muted underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
             </ul>
           </div>
           <div class="grid gap-2">
-            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" data-twitter-connect>Connect X</button>
-            <button class="hidden text-muted text-xs underline hover:text-zinc-700 transition-colors" type="button" data-twitter-connect-env>Use configured token</button>
+            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" data-twitter-connect>Connect X</button>
+            <button class="hidden text-muted text-xs underline hover:text-ink transition-colors" type="button" data-twitter-connect-env>Use configured token</button>
           </div>
         </article>
-        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="blog">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-hugeicons-quill-write-02"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full">Ready</span></div>
+        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="blog">
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-hugeicons-quill-write-02"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-success bg-success-soft border border-success-line rounded-full">Ready</span></div>
             <h2 class="mb-0 mt-4 font-semibold text-sm">Blog</h2>
             <p class="my-1.5 text-ui text-body">Built into Postline</p>
             <p class="m-0 text-muted text-xs">Publish long-form posts to your site without another account.</p>
           </div>
-          <a class="inline-flex items-center justify-center h-9 font-semibold text-ink text-xs bg-panel-2 hover:bg-white border border-line rounded-xl" href="/blog" data-stx-link>Open Blog</a>
+          <a class="inline-flex items-center justify-center h-9 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl" href="/blog" data-stx-link>Open Blog</a>
         </article>
-        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-zinc-300 hover:shadow-sm transition-all" data-channel="mastodon">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-indigo-600 text-xl bg-indigo-50 rounded-xl" aria-hidden="true"><span class="i-simple-icons-mastodon"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-mastodon-channel-status>Setup</span></div>
+        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="mastodon">
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-info text-xl bg-info-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-mastodon"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-mastodon-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-semibold text-sm">Mastodon</h2>
             <p class="my-1.5 text-ui text-body" data-mastodon-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-mastodon-channel-detail>Connect any Mastodon instance with an access token to crosspost.</p>
@@ -174,18 +174,18 @@
               <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in mastodonAccounts()">
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-emerald-700 bg-emerald-50' : 'text-amber-800 bg-amber-50'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="text-xs text-muted underline hover:text-red-700 disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
+                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
+                  <button class="text-xs text-muted underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
             </ul>
           </div>
           <details class="group">
-            <summary class="inline-flex items-center justify-center h-9 w-full font-semibold list-none text-ink text-xs bg-panel-2 hover:bg-white border border-line rounded-xl transition-colors cursor-pointer">Manage Mastodon</summary>
+            <summary class="inline-flex items-center justify-center h-9 w-full font-semibold list-none text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl transition-colors cursor-pointer">Manage Mastodon</summary>
             <form class="grid gap-2 pt-3" data-mastodon-connect-form>
-              <input class="px-3 h-9 text-ink text-xs bg-white border border-line outline-none rounded-xl focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" name="instance" placeholder="mastodon.social" autocomplete="url" aria-label="Mastodon instance" data-mastodon-instance required>
-              <input class="px-3 h-9 text-ink text-xs bg-white border border-line outline-none rounded-xl focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" name="access_token" type="password" placeholder="Access token" autocomplete="off" aria-label="Mastodon access token" data-mastodon-token required>
-              <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" data-mastodon-connect-submit>Connect Mastodon</button>
+              <input class="px-3 h-9 text-ink text-xs bg-raised border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="instance" placeholder="mastodon.social" autocomplete="url" aria-label="Mastodon instance" data-mastodon-instance required>
+              <input class="px-3 h-9 text-ink text-xs bg-raised border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="access_token" type="password" placeholder="Access token" autocomplete="off" aria-label="Mastodon access token" data-mastodon-token required>
+              <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" data-mastodon-connect-submit>Connect Mastodon</button>
               {{-- read:accounts is not optional: connecting verifies the token
                   against /api/v1/accounts/verify_credentials before it is saved,
                   so a write-only token fails at connect, not at publish. --}}
@@ -196,17 +196,17 @@
       </div>
     </section>
 
-    <details class="overflow-hidden bg-panel border border-line rounded-2xl open:border-red-200 shadow-sm group" data-purge-card>
+    <details class="overflow-hidden bg-panel border border-line rounded-2xl open:border-danger-line shadow-sm group" data-purge-card>
       <summary class="flex gap-3 items-center justify-between p-4 list-none hover:bg-panel-2 transition-colors cursor-pointer">
-        <div class="flex gap-3 items-center"><span class="grid place-items-center h-9 w-9 text-lg text-red-600 bg-red-50 rounded-xl" aria-hidden="true"><span class="i-lucide-triangle-alert"></span></span><div>
+        <div class="flex gap-3 items-center"><span class="grid place-items-center h-9 w-9 text-lg text-danger bg-danger-soft rounded-xl" aria-hidden="true"><span class="i-lucide-triangle-alert"></span></span><div>
           <strong class="text-ui text-ink">Post removal tools</strong>
           <p class="mb-0 mt-1 text-muted text-xs">Preview or permanently remove posts from connected accounts.</p>
         </div></div>
         <span class="h-4 w-4 text-muted transition-transform group-open:rotate-180 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
       </summary>
 
-      <div class="grid gap-4 p-4 border-red-200 border-t">
-        <div class="flex gap-2 items-center p-3 text-red-800 text-xs bg-red-50 border border-red-200 rounded-xl"><span class="shrink-0 h-4 w-4 i-hugeicons-alert-02" aria-hidden="true"></span><span>Deletion is permanent. Postline always shows a preview and requires an exact confirmation phrase first.</span></div>
+      <div class="grid gap-4 p-4 border-danger-line border-t">
+        <div class="flex gap-2 items-center p-3 text-danger text-xs bg-danger-soft border border-danger-line rounded-xl"><span class="shrink-0 h-4 w-4 i-hugeicons-alert-02" aria-hidden="true"></span><span>Deletion is permanent. Postline always shows a preview and requires an exact confirmation phrase first.</span></div>
         <fieldset class="grid gap-2 m-0 p-0 border-0">
           <legend class="mb-1 p-0 font-semibold text-muted text-xs">What to delete</legend>
           <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
@@ -259,13 +259,13 @@
           </div>
         </div>
 
-        <div class="grid gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
+        <div class="grid gap-2 p-3 bg-danger-soft border border-danger-line rounded-xl">
           <label class="grid gap-1.5">
-            <span class="font-semibold text-red-800 text-xs">Type <code class="px-1 py-0.5 text-xs bg-panel rounded">DELETE ALL POSTS</code> to confirm</span>
-            <input class="px-3 h-10 text-ink text-sm bg-panel border border-red-200 outline-none rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-100" type="text" autocomplete="off" placeholder="DELETE ALL POSTS" aria-label="Deletion confirmation phrase" data-purge-confirmation>
+            <span class="font-semibold text-danger text-xs">Type <code class="px-1 py-0.5 text-xs bg-panel rounded">DELETE ALL POSTS</code> to confirm</span>
+            <input class="px-3 h-10 text-ink text-sm bg-panel border border-danger-line outline-none rounded-xl focus:border-danger-solid focus:ring-2 focus:ring-danger-soft" type="text" autocomplete="off" placeholder="DELETE ALL POSTS" aria-label="Deletion confirmation phrase" data-purge-confirmation>
           </label>
-          <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-sm text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" disabled data-purge-run>Delete permanently</button>
-          <p class="m-0 text-red-800 text-xs" data-purge-hint>Run a preview first, then type the phrase to enable deletion.</p>
+          <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-sm text-on-solid bg-danger-solid hover:bg-danger-solid-hover rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" disabled data-purge-run>Delete permanently</button>
+          <p class="m-0 text-danger text-xs" data-purge-hint>Run a preview first, then type the phrase to enable deletion.</p>
         </div>
       </div>
     </details>
@@ -408,9 +408,9 @@
           status.textContent = connected ? 'Connected' : data?.handle ? 'Needs password' : 'Setup'
           status.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
             connected
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              ? 'border-success-line bg-success-soft text-success'
               : data?.handle
-                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                ? 'border-warning-line bg-warning-soft text-warning'
                 : 'border-line text-muted'
           }`
         }
@@ -481,9 +481,9 @@
           linkedinStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
           linkedinStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
             connected
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              ? 'border-success-line bg-success-soft text-success'
               : data?.handle
-                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                ? 'border-warning-line bg-warning-soft text-warning'
                 : 'border-line text-muted'
           }`
         }
@@ -590,9 +590,9 @@
           twitterStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
           twitterStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
             connected
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              ? 'border-success-line bg-success-soft text-success'
               : data?.handle
-                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                ? 'border-warning-line bg-warning-soft text-warning'
                 : 'border-line text-muted'
           }`
         }
@@ -675,9 +675,9 @@
           instagramStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
           instagramStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
             connected
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              ? 'border-success-line bg-success-soft text-success'
               : data?.handle
-                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                ? 'border-warning-line bg-warning-soft text-warning'
                 : 'border-line text-muted'
           }`
         }
@@ -758,9 +758,9 @@
           threadsStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
           threadsStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
             connected
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              ? 'border-success-line bg-success-soft text-success'
               : data?.handle
-                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                ? 'border-warning-line bg-warning-soft text-warning'
                 : 'border-line text-muted'
           }`
         }
@@ -839,9 +839,9 @@
           mastodonStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
           mastodonStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
             connected
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              ? 'border-success-line bg-success-soft text-success'
               : data?.handle
-                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                ? 'border-warning-line bg-warning-soft text-warning'
                 : 'border-line text-muted'
           }`
         }

@@ -16,7 +16,7 @@
       </div>
       <div class="flex flex-wrap gap-2 items-center">
         <label class="sr-only" for="campaign-picker">Current campaign</label>
-        <select id="campaign-picker" class="px-3 h-9 min-w-44 text-ui text-ink bg-panel border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40" x-show="campaignsList().length" @change="selectCampaign($event.target.value)">
+        <select id="campaign-picker" class="px-3 h-9 min-w-44 text-ui text-ink bg-panel border border-line outline-none rounded-xl focus:ring-2 focus:ring-focus" x-show="campaignsList().length" @change="selectCampaign($event.target.value)">
           <option x-for="option in campaignsList()" :value="option.id" :selected="option.id === campaign()?.id">{{ option.name }}</option>
         </select>
         <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Campaign view" x-show="campaign()">
@@ -27,7 +27,7 @@
             <span class="h-3.5 w-3.5 i-hugeicons-menu-01" aria-hidden="true"></span><span>List</span>
           </button>
         </div>
-        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" type="button" x-show="campaign()" @click="openCampaignForm()">
+        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors" type="button" x-show="campaign()" @click="openCampaignForm()">
           <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
           <span>New campaign</span>
         </button>
@@ -51,7 +51,7 @@
       <p>Campaigns turn a launch brief into a sequence of useful posts.</p>
       <h2>Start with the story, not the schedule.</h2>
       <p class="campaign-empty__copy">Set the goal and launch window. Postline will give you a six-week planning board you can fill by hand or draft with AI.</p>
-      <button class="inline-flex gap-2 items-center justify-center px-5 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" type="button" @click="openCampaignForm()">
+      <button class="inline-flex gap-2 items-center justify-center px-5 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors" type="button" @click="openCampaignForm()">
         <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
         Create a campaign
       </button>

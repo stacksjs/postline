@@ -13,7 +13,7 @@
         layout utilities of its own (grid, min-h-20, p-3), and relying on
         hidden to out-rank them would leave a visible empty block if the
         generated stylesheet ever ordered them the other way. --}}
-    <div class="grid gap-2 mt-2 p-2 p-3 min-h-20 min-h-7 leading-relaxed text-amber-700 text-emerald-800 text-ink text-muted text-muted text-on-accent text-red-700 text-sm text-zinc-400 bg-accent bg-emerald-400 bg-emerald-50 bg-emerald-500 bg-panel bg-panel-2 bg-panel-3 bg-red-500 bg-zinc-300 hover:bg-white border-blue-300 border-emerald-200 border-line border-neutral-950 outline-none rounded-lg rounded-xl shadow-sm cursor-not-allowed resize-none" style="display:none" aria-hidden="true"></div>
+    <div class="grid gap-2 mt-2 p-2 p-3 min-h-20 min-h-7 leading-relaxed text-warning text-success text-ink text-muted text-muted text-on-accent text-danger text-sm text-muted bg-accent bg-success-solid bg-success-soft bg-success-solid bg-panel bg-panel-2 bg-panel-3 bg-danger-solid bg-line-strong hover:bg-raised border-info-line border-success-line border-line border-ink outline-none rounded-lg rounded-xl shadow-sm cursor-not-allowed resize-none" style="display:none" aria-hidden="true"></div>
     {{-- Network icons on per-account chips come from row.icon at runtime; listed
         here so the Crosswind scanner emits them. --}}
     <div class="i-hugeicons-news i-hugeicons-quill-write-02 i-hugeicons-share-08 i-simple-icons-bluesky i-simple-icons-instagram i-simple-icons-linkedin i-simple-icons-mastodon i-simple-icons-threads i-simple-icons-x" style="display:none" aria-hidden="true"></div>
@@ -26,15 +26,15 @@
     </header>
     <div class="grid">
       <section class="grid content-start grid-rows-[auto_auto_auto] self-start bg-panel border border-line rounded-2xl shadow-sm" aria-label="Post composer">
-        <div class="hidden flex-wrap gap-3 items-center justify-between px-3 py-2 text-xs bg-blue-50 border-b border-blue-200" data-edit-banner>
-          <span class="font-semibold text-blue-800">Editing a queued post</span>
-          <a class="inline-flex items-center px-2.5 min-h-6 font-semibold text-blue-800 bg-panel hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors" href="/composer" data-stx-link>Cancel</a>
+        <div class="hidden flex-wrap gap-3 items-center justify-between px-3 py-2 text-xs bg-info-soft border-b border-info-line" data-edit-banner>
+          <span class="font-semibold text-info">Editing a queued post</span>
+          <a class="inline-flex items-center px-2.5 min-h-6 font-semibold text-info bg-panel hover:bg-info-line border border-info-line rounded-lg transition-colors" href="/composer" data-stx-link>Cancel</a>
         </div>
         <header class="flex flex-wrap gap-3 items-center justify-between p-3 border-b border-line">
           <div class="flex gap-2 items-center">
             <strong class="text-ui" data-composer-heading>New post</strong>
-            <a class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-lg transition-colors" href="/accounts" data-stx-link data-bluesky-connection data-no-window-drag>
-              <span class="h-2 w-2 bg-zinc-300 rounded-full" data-bluesky-connection-dot aria-hidden="true"></span>
+            <a class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg transition-colors" href="/accounts" data-stx-link data-bluesky-connection data-no-window-drag>
+              <span class="h-2 w-2 bg-line-strong rounded-full" data-bluesky-connection-dot aria-hidden="true"></span>
               <span data-bluesky-connection-label>Checking accounts…</span>
             </a>
           </div>
@@ -60,7 +60,7 @@
                 are single-quoted literals, so the Crosswind extractor still
                 sees them, and the static class is the pre-hydration state. --}}
             <span class="flex items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 border border-line rounded-xl" :class="{ 'hidden': !providersPending() }">Loading accounts…</span>
-            <a class="flex hidden items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-xl transition-colors" :class="{ 'hidden': !providersEmpty() }" href="/accounts" data-stx-link>No accounts yet. Connect one →</a>
+            <a class="flex hidden items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl transition-colors" :class="{ 'hidden': !providersEmpty() }" href="/accounts" data-stx-link>No accounts yet. Connect one →</a>
             <button
               class="inline-flex gap-1.5 items-center px-2.5 min-h-8 font-semibold text-xs border rounded-xl transition-colors"
               type="button"
@@ -82,7 +82,7 @@
               selected target. Hidden in thread mode: the server publishes a
               thread's shared segments, so an override there would be a lie. --}}
           <div class="hidden mb-3" data-variant-section>
-            <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel-2 hover:bg-white border border-line rounded-lg transition-colors" type="button" data-variant-toggle aria-expanded="false">
+            <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg transition-colors" type="button" data-variant-toggle aria-expanded="false">
               <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
               <span data-variant-toggle-label>Customise per network</span>
             </button>
@@ -90,9 +90,9 @@
           </div>
           <label class="hidden gap-2 items-center mb-2.5" data-compose-image-row>
             <span class="h-4 w-4 text-muted i-hugeicons-image-01" aria-hidden="true"></span>
-            <input class="px-3 h-9 w-full text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" type="url" inputmode="url" placeholder="Image URL (required for Instagram)" aria-label="Image URL for Instagram" data-compose-image>
+            <input class="px-3 h-9 w-full text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="url" inputmode="url" placeholder="Image URL (required for Instagram)" aria-label="Image URL for Instagram" data-compose-image>
           </label>
-          <input class="hidden mb-2 w-full font-semibold leading-snug text-2xl text-ink placeholder:text-zinc-400 bg-transparent border-0 outline-none" type="text" maxlength="200" placeholder="Post title" aria-label="Blog post title" data-compose-title>
+          <input class="hidden mb-2 w-full font-semibold leading-snug text-2xl text-ink placeholder:text-muted bg-transparent border-0 outline-none" type="text" maxlength="200" placeholder="Post title" aria-label="Blog post title" data-compose-title>
           <div class="grid overflow-y-auto content-start gap-4 pr-1 max-h-72" data-composer-posts>
             <article class="grid gap-2 pb-3 last:pb-0 border-b border-line last:border-b-0" data-composer-post data-active="true">
               <header class="flex gap-3 items-center justify-between">
@@ -100,11 +100,11 @@
                   <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
                   <span data-post-label>Post 1</span>
                 </button>
-                <button class="hidden items-center justify-center h-7 w-7 text-muted hover:text-zinc-700 bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Remove post" title="Remove post" data-remove-post>
+                <button class="hidden items-center justify-center h-7 w-7 text-muted hover:text-ink bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Remove post" title="Remove post" data-remove-post>
                   <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
                 </button>
               </header>
-              <textarea class="min-h-36 w-full leading-relaxed text-xl text-ink placeholder:text-zinc-400 bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" placeholder="What do you want to share?" data-bluesky-text></textarea>
+              <textarea class="min-h-36 w-full leading-relaxed text-xl text-ink placeholder:text-muted bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" placeholder="What do you want to share?" data-bluesky-text></textarea>
               {{-- Long-form rich text mounts here and writes Markdown back into
                   the textarea above, which stays the source of truth. Hidden
                   until the blog is a target. --}}
@@ -120,27 +120,27 @@
             <span class="hidden gap-1.5 items-center px-2.5 max-w-48 min-h-7 font-semibold text-muted text-xs bg-panel-2 border border-line rounded-lg" data-attach-chip>
               <span class="shrink-0 h-3.5 w-3.5 i-hugeicons-image-01" aria-hidden="true"></span>
               <span class="truncate" data-attach-name></span>
-              <button class="inline-flex items-center justify-center shrink-0 h-4 w-4 text-muted hover:text-zinc-800 transition-colors" type="button" aria-label="Remove attached image" data-attach-clear>
+              <button class="inline-flex items-center justify-center shrink-0 h-4 w-4 text-muted hover:text-ink transition-colors" type="button" aria-label="Remove attached image" data-attach-clear>
                 <span class="h-3 w-3 i-hugeicons-cancel-01" aria-hidden="true"></span>
               </button>
             </span>
           </div>
           <div class="flex flex-nowrap gap-2 items-center justify-end w-full sm:w-auto">
             <input class="hidden" type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="Attach image" data-attach-input>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach image" title="Attach image" data-attach-button>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach image" title="Attach image" data-attach-button>
               <span class="h-4 w-4 i-hugeicons-image-01" aria-hidden="true"></span>
             </button>
-            <input class="hidden px-2 h-9 text-ink text-xs bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" type="datetime-local" aria-label="Schedule time" data-compose-schedule>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Schedule post" title="Schedule post" data-schedule-toggle>
+            <input class="hidden px-2 h-9 text-ink text-xs bg-panel border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="datetime-local" aria-label="Schedule time" data-compose-schedule>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Schedule post" title="Schedule post" data-schedule-toggle>
               <span class="h-4 w-4 i-hugeicons-calendar-03" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Add post" title="Add post" data-add-post>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Add post" title="Add post" data-add-post>
               <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-zinc-50 border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Preview post" title="Preview post" data-preview-post>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Preview post" title="Preview post" data-preview-post>
               <span class="h-4 w-4 i-hugeicons-view" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex gap-2 items-center justify-center ml-auto px-4 sm:ml-0 h-9 font-semibold text-on-accent bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" data-bluesky-publish>
+            <button class="inline-flex gap-2 items-center justify-center ml-auto px-4 sm:ml-0 h-9 font-semibold text-on-accent bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" data-bluesky-publish>
               <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
               <span data-bluesky-publish-label>Publish</span>
             </button>
@@ -453,7 +453,7 @@
 
         const action = document.createElement('button')
         action.type = 'button'
-        action.className = 'inline-flex items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel hover:bg-white border border-line rounded-lg transition-colors'
+        action.className = 'inline-flex items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel hover:bg-raised border border-line rounded-lg transition-colors'
         action.dataset.variantAction = entry ? 'reset' : 'fork'
         action.dataset.variantProvider = provider
         action.textContent = entry ? 'Use shared text' : 'Customise'
@@ -489,7 +489,7 @@
         // front means staleness can be re-evaluated on every keystroke without
         // rebuilding the row and stealing focus.
         const stale = document.createElement('p')
-        stale.className = 'hidden text-amber-700 text-xs'
+        stale.className = 'hidden text-warning text-xs'
         stale.dataset.variantStale = provider
         stale.textContent = 'The shared text changed after you customised this.'
         row.append(stale)
@@ -513,7 +513,7 @@
             inherit.textContent = over
               ? `Uses the shared text - ${length} / ${limit}, too long for ${providerLabel(provider)}`
               : `Uses the shared text${limit ? ` - ${length} / ${limit}` : ''}`
-            inherit.classList.toggle('text-red-700', over)
+            inherit.classList.toggle('text-danger', over)
             inherit.classList.toggle('text-muted', !over)
           }
           const meta = variantPanel?.querySelector(`[data-variant-meta="${provider}"]`)
@@ -521,7 +521,7 @@
             const length = lengthFor(provider, entry.text)
             const over = Boolean(limit) && length > limit
             meta.textContent = limit ? `${length} / ${limit} characters` : `${length} characters`
-            meta.classList.toggle('text-red-700', over)
+            meta.classList.toggle('text-danger', over)
             meta.classList.toggle('text-muted', !over)
           }
           const stale = variantPanel?.querySelector(`[data-variant-stale="${provider}"]`)
@@ -588,11 +588,11 @@
             ? `${[...counts].map(([provider, total]) => total > 1 ? `${providerLabel(provider)} (${total})` : providerLabel(provider)).join(', ')} ready`
             : 'Connect an account'
         }
-        connection?.classList.toggle('border-emerald-200', ready)
-        connection?.classList.toggle('bg-emerald-50', ready)
-        connection?.classList.toggle('text-emerald-800', ready)
-        connectionDot?.classList.toggle('bg-emerald-500', ready)
-        connectionDot?.classList.toggle('bg-zinc-300', !ready)
+        connection?.classList.toggle('border-success-line', ready)
+        connection?.classList.toggle('bg-success-soft', ready)
+        connection?.classList.toggle('text-success', ready)
+        connectionDot?.classList.toggle('bg-success-solid', ready)
+        connectionDot?.classList.toggle('bg-line-strong', !ready)
       }
 
       const updatePublishability = () => {
@@ -672,7 +672,7 @@
             <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
             <span data-post-label>Post ${number}</span>
           </button>
-          <button class="inline-flex items-center justify-center h-7 w-7 text-muted hover:text-zinc-700 bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Remove post" title="Remove post" data-remove-post>
+          <button class="inline-flex items-center justify-center h-7 w-7 text-muted hover:text-ink bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Remove post" title="Remove post" data-remove-post>
             <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
           </button>
         </header>
@@ -793,8 +793,8 @@
         // full message reachable when several targets are over at once.
         count.title = count.textContent
 
-        count.classList.toggle('text-red-700', over.length > 0)
-        count.classList.toggle('text-amber-700', over.length === 0 && length > limit - 40)
+        count.classList.toggle('text-danger', over.length > 0)
+        count.classList.toggle('text-warning', over.length === 0 && length > limit - 40)
         count.classList.toggle('text-muted', over.length === 0 && length <= limit - 40)
 
         updateVariantMeta()
@@ -882,8 +882,8 @@
           const active = item === post
           const select = item.querySelector('[data-select-post]')
           item.dataset.active = active ? 'true' : 'false'
-          item.classList.toggle('border-neutral-950', active)
-          item.classList.toggle('border-blue-300', active)
+          item.classList.toggle('border-ink', active)
+          item.classList.toggle('border-info-line', active)
           item.classList.toggle('shadow-sm', active)
           item.classList.toggle('border-line', !active)
           select?.classList.toggle('bg-accent', active)

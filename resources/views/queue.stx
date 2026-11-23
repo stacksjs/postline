@@ -20,7 +20,7 @@
             <span class="h-3.5 w-3.5 i-hugeicons-calendar-03" aria-hidden="true"></span><span>Calendar</span>
           </button>
         </div>
-        <a href="/composer" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors">
+        <a href="/composer" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors">
           <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
           <span>New post</span>
         </a>
@@ -45,12 +45,12 @@
               <span class="px-2 py-1 font-semibold text-xs whitespace-nowrap border rounded-full" data-status-pill :data-status="row.pill">{{ row.statusLabel }}</span>
             </header>
             <p class="m-0 leading-normal text-ui text-body">{{ row.body }}</p>
-            <p class="m-0 text-red-700 text-xs" x-show="row.failure" :text="row.failure"></p>
+            <p class="m-0 text-danger text-xs" x-show="row.failure" :text="row.failure"></p>
             <footer class="flex flex-wrap gap-2 items-center justify-end">
-              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
-              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" x-show="row.actionable" :href="row.editUrl" data-stx-link>Edit</a>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-lg transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="publishItem(row.id)">Publish now</button>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-red-700 text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="deleteItem(row.id)">Delete</button>
+              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
+              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.actionable" :href="row.editUrl" data-stx-link>Edit</a>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="publishItem(row.id)">Publish now</button>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-danger text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="deleteItem(row.id)">Delete</button>
             </footer>
           </article>
         </div>
@@ -72,10 +72,10 @@
               <span class="px-2 py-1 font-semibold text-xs whitespace-nowrap border rounded-full" data-status-pill :data-status="row.pill">{{ row.statusLabel }}</span>
             </header>
             <p class="m-0 leading-normal text-ui text-body">{{ row.body }}</p>
-            <p class="m-0 text-red-700 text-xs" x-show="row.failure" :text="row.failure"></p>
+            <p class="m-0 text-danger text-xs" x-show="row.failure" :text="row.failure"></p>
             <footer class="flex flex-wrap gap-2 items-center justify-end">
-              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.partial" :disabled="busyId() === row.id" @click="retryItem(row.id)">Retry failed</button>
+              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.partial" :disabled="busyId() === row.id" @click="retryItem(row.id)">Retry failed</button>
             </footer>
           </article>
         </div>
@@ -85,11 +85,11 @@
     <section class="bg-panel border border-line rounded-2xl shadow-sm" style="display:none" x-show="view() === 'calendar'">
       <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
         <div class="flex gap-2 items-center">
-          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Previous month" @click="prevMonth">
+          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Previous month" @click="prevMonth">
             <span class="h-4 w-4 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
           </button>
-          <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" @click="goToday">Today</button>
-          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Next month" @click="nextMonth">
+          <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" @click="goToday">Today</button>
+          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Next month" @click="nextMonth">
             <span class="h-4 w-4 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
           </button>
         </div>
@@ -102,12 +102,12 @@
           </div>
           <div class="grid grid-cols-7">
             <div class="grid content-start gap-1 p-1.5 min-h-24 border-b border-line border-r" data-cal-cell :data-blank="cell.blank" :data-today="cell.isToday" x-for="cell in calCells()">
-              <a class="font-semibold text-xs hover:text-neutral-950 transition-colors" data-cal-day x-show="!cell.blank" :href="cell.scheduleUrl" data-stx-link title="Schedule a post on this day">{{ cell.day }}</a>
-              <a class="flex gap-1 items-center px-1 py-0.5 text-xs text-body bg-panel-2 hover:bg-zinc-100 rounded transition-colors" x-for="chip in cell.chips" :href="chip.href" data-stx-link>
+              <a class="font-semibold text-xs hover:text-ink transition-colors" data-cal-day x-show="!cell.blank" :href="cell.scheduleUrl" data-stx-link title="Schedule a post on this day">{{ cell.day }}</a>
+              <a class="flex gap-1 items-center px-1 py-0.5 text-xs text-body bg-panel-2 hover:bg-panel-2 rounded transition-colors" x-for="chip in cell.chips" :href="chip.href" data-stx-link>
                 <span class="shrink-0 h-1.5 w-1.5 rounded-full" data-cal-dot :data-status="chip.status"></span>
                 <span class="truncate">{{ chip.label }}</span>
               </a>
-              <span class="px-1 text-xs text-zinc-400" x-show="cell.more" :text="cell.more"></span>
+              <span class="px-1 text-xs text-muted" x-show="cell.more" :text="cell.more"></span>
             </div>
           </div>
         </div>

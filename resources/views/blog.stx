@@ -11,7 +11,7 @@
         <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Long-form publishing</h1>
         <p class="mb-0 mt-1.5 text-ui text-muted">Write once in Composer, publish to your site, and keep every article easy to find.</p>
       </div>
-      <a class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors" href="/composer" data-stx-link data-no-window-drag x-show="!loaded() || items().length > 0">
+      <a class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors" href="/composer" data-stx-link data-no-window-drag x-show="!loaded() || items().length > 0">
         <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>
         Write a post
       </a>
@@ -38,7 +38,7 @@
           <h2 class="m-0 font-semibold text-ink text-sm">Published posts</h2>
           <p class="m-0 mt-1 text-muted text-xs" :text="summaryText()">Loading your blog…</p>
         </div>
-        <button class="inline-flex gap-2 items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-white border border-line rounded-lg disabled:opacity-50 transition-colors" type="button" :disabled="loading()" @click="loadPosts">
+        <button class="inline-flex gap-2 items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg disabled:opacity-50 transition-colors" type="button" :disabled="loading()" @click="loadPosts">
           <span class="h-3.5 w-3.5 i-hugeicons-refresh" aria-hidden="true"></span>
           Refresh
         </button>
@@ -55,27 +55,27 @@
           <h2 class="m-0 font-semibold text-base text-ink">Your first article starts in Composer</h2>
           <p class="m-0 mt-1 max-w-md text-muted text-sm">Choose Blog as a channel, add a title, and publish. It will appear here without leaving the app shell.</p>
         </div>
-        <a class="inline-flex items-center justify-center px-4 h-9 font-semibold text-ink text-sm bg-panel-2 hover:bg-white border border-line rounded-xl" href="/composer" data-stx-link>Open Composer</a>
+        <a class="inline-flex items-center justify-center px-4 h-9 font-semibold text-ink text-sm bg-panel-2 hover:bg-raised border border-line rounded-xl" href="/composer" data-stx-link>Open Composer</a>
       </div>
 
       <div class="divide-line divide-y" x-show="!loading() && items().length">
         <article class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center p-4 hover:bg-panel-2/50 transition-colors" x-for="item in items()">
           <div class="min-w-0">
             <div class="flex gap-2 items-center mb-1.5">
-              <span class="px-2 py-0.5 font-semibold text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full">Published</span>
+              <span class="px-2 py-0.5 font-semibold text-xs text-success bg-success-soft border border-success-line rounded-full">Published</span>
               <time class="text-muted text-xs" :datetime="item.publishedAt" :text="dateLabel(item.publishedAt)"></time>
             </div>
             <h3 class="m-0 font-semibold text-sm text-ink" :text="item.title"></h3>
             <p class="m-0 mt-1 line-clamp-2 text-ui text-muted" :text="item.excerpt || item.body"></p>
           </div>
-          <a class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel hover:bg-white border border-line rounded-lg" :href="`/blog/${item.slug}`" target="_blank" rel="noopener noreferrer">
+          <a class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" :href="`/blog/${item.slug}`" target="_blank" rel="noopener noreferrer">
             View live
             <span class="h-3.5 w-3.5 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span>
           </a>
         </article>
       </div>
 
-      <p class="m-0 px-4 py-3 text-red-700 text-sm bg-red-50 border-red-100 border-t" x-show="errorMessage()" :text="errorMessage()"></p>
+      <p class="m-0 px-4 py-3 text-danger text-sm bg-danger-soft border-danger-line border-t" x-show="errorMessage()" :text="errorMessage()"></p>
     </section>
   </section>
 

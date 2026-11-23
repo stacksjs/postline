@@ -68,6 +68,39 @@ const APP_LIGHT: string = `
   --accent: #0a0a0b;
   --on-accent: #fafafa;
   --brand: #f0441e;
+  --raised: #ffffff;
+  --nav-active: rgba(232, 232, 230, 0.9);
+  --hover: #fafafa;
+  --line-strong: #d4d4d8;
+  --accent-hover: #262626;
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-strong: rgba(255, 255, 255, 0.95);
+  --glass-hover: rgba(255, 255, 255, 0.4);
+  --focus: rgba(161, 161, 170, 0.5);
+  --on-solid: #ffffff;
+  --success: #047857;
+  --success-soft: #ecfdf5;
+  --success-line: #a7f3d0;
+  --success-solid: #10b981;
+  --warning: #92400e;
+  --warning-soft: #fffbeb;
+  --warning-line: #fde68a;
+  --danger: #b91c1c;
+  --danger-soft: #fef2f2;
+  --danger-line: #fecaca;
+  --danger-solid: #dc2626;
+  --danger-solid-hover: #b91c1c;
+  --info: #1d4ed8;
+  --info-soft: #eff6ff;
+  --info-line: #bfdbfe;
+  --info-solid: #3b82f6;
+  --note: #6d28d9;
+  --note-soft: #f5f3ff;
+  --note-line: #ede9fe;
+  --net-x: #18181b;
+  --net-mastodon: #4f46e5;
+  --net-instagram: #db2777;
+  --net-bluesky: #2563eb;
 `
 
 /** Dark theme: the same roles, inverted. */
@@ -85,6 +118,39 @@ const APP_DARK: string = `
   --accent: #f4f4f5;
   --on-accent: #0b0b0d;
   --brand: #ff6a45;
+  --raised: #232329;
+  --nav-active: rgba(63, 63, 70, 0.6);
+  --hover: #26262a;
+  --line-strong: #52525b;
+  --accent-hover: #d4d4d8;
+  --glass: rgba(63, 63, 70, 0.72);
+  --glass-strong: rgba(39, 39, 42, 0.95);
+  --glass-hover: rgba(63, 63, 70, 0.55);
+  --focus: rgba(161, 161, 170, 0.55);
+  --on-solid: #ffffff;
+  --success: #6ee7b7;
+  --success-soft: #052e2b;
+  --success-line: #0f766e;
+  --success-solid: #10b981;
+  --warning: #fcd34d;
+  --warning-soft: #3a2a08;
+  --warning-line: #78500a;
+  --danger: #fca5a5;
+  --danger-soft: #3a1414;
+  --danger-line: #7f1d1d;
+  --danger-solid: #dc2626;
+  --danger-solid-hover: #b91c1c;
+  --info: #93c5fd;
+  --info-soft: #172554;
+  --info-line: #1e3a8a;
+  --info-solid: #3b82f6;
+  --note: #c4b5fd;
+  --note-soft: #251a47;
+  --note-line: #3b2a6b;
+  --net-x: #3f3f46;
+  --net-mastodon: #4f46e5;
+  --net-instagram: #db2777;
+  --net-bluesky: #2563eb;
 `
 
 /**
@@ -165,43 +231,6 @@ function overriding(css: string): string {
 }
 
 const DARK_OVERRIDES: string = overriding(`
-.dark .bg-blue-50 { background-color: #172554; }
-.dark .bg-emerald-50 { background-color: #052e2b; }
-.dark .bg-amber-50 { background-color: #3a2a08; }
-.dark .bg-red-50 { background-color: #3a1414; }
-.dark .bg-violet-50 { background-color: #251a47; }
-.dark .bg-indigo-50 { background-color: #1e1b4b; }
-.dark .bg-pink-50 { background-color: #3a1230; }
-.dark .bg-white { background-color: var(--panel-3); }
-.dark .bg-zinc-300 { background-color: #52525b; }
-
-.dark .bg-zinc-50\\/80, .dark .bg-zinc-50\\/48 { background-color: #1c1c1f; }
-.dark .bg-zinc-50\\/40 { background-color: rgba(255, 255, 255, 0.02); }
-
-.dark .border-zinc-200\\/80 { border-color: #2a2a2e; }
-.dark .border-blue-200 { border-color: #1e3a8a; }
-.dark .border-emerald-200 { border-color: #0f766e; }
-.dark .border-amber-200 { border-color: #78500a; }
-.dark .border-red-200 { border-color: #7f1d1d; }
-
-.dark .text-blue-700, .dark .text-blue-800 { color: #93c5fd; }
-.dark .text-emerald-700, .dark .text-emerald-800 { color: #6ee7b7; }
-.dark .text-amber-800, .dark .text-amber-700 { color: #fcd34d; }
-.dark .text-red-700 { color: #fca5a5; }
-.dark .text-red-600 { color: #fca5a5; }
-.dark .text-violet-700 { color: #c4b5fd; }
-.dark .text-indigo-600 { color: #a5b4fc; }
-.dark .text-pink-600 { color: #f9a8d4; }
-.dark .text-blue-600 { color: #93c5fd; }
-.dark .text-zinc-500\\/80 { color: #a1a1aa; }
-
-.dark .hover\\:bg-white:hover { background-color: #26262a; }
-.dark .hover\\:bg-zinc-50:hover { background-color: #26262a; }
-.dark .hover\\:bg-zinc-100:hover { background-color: #2f2f34; }
-.dark .hover\\:text-zinc-900:hover { color: #f4f4f5; }
-.dark .hover\\:bg-neutral-800:hover { background-color: #d4d4d8; }
-
-.dark .border-zinc-200\\/70 { border-color: rgb(63 63 70 / 0.7); }
 
 .dark input, .dark textarea, .dark select { color: #f4f4f5; }
 .dark input::placeholder, .dark textarea::placeholder { color: #71717a; }
@@ -217,22 +246,12 @@ const DARK_OVERRIDES: string = overriding(`
 .dark [data-postline-sidebar] { background-color: #0f0f12; }
 .dark [data-postline-sidebar] > .absolute { opacity: 0.35; }
 
-.dark .bg-\\[\\#e8e8e6\\]\\/90 { background-color: rgba(63, 63, 70, 0.6); }
-.dark .bg-white\\/95 { background-color: rgba(39, 39, 42, 0.95); }
-.dark .bg-white\\/72 { background-color: rgba(63, 63, 70, 0.72); }
-.dark .bg-white\\/60 { background-color: rgba(63, 63, 70, 0.6); }
-.dark .hover\\:bg-white\\/38:hover,
-.dark .hover\\:bg-white\\/60:hover,
-.dark .hover\\:bg-white\\/35:hover { background-color: rgba(63, 63, 70, 0.55); }
-.dark .bg-white\\/48 { background-color: rgba(39, 39, 42, 0.48); }
-
 /* Analytics chart — CSS fill/stroke beat SVG presentation attributes, so the
   chart is not a light island on a dark page. */
 .dark [data-analytics-chart] rect[rx="16"] { fill: #101014; }
 .dark [data-analytics-chart] line[stroke="#e4e4e7"] { stroke: #2a2a2e; }
 .dark [data-analytics-chart] text[fill="#18181b"] { fill: #e4e4e7; }
 .dark [data-analytics-chart] rect[fill="#fff"] { fill: #26262a; stroke: #3f3f46; }
-.dark [data-analytics-chart] .bg-zinc-100 { background-color: #26262a; }
 `)
 
 /** App shell: sidebar collapse animation, native-window chrome, focus rings. */
@@ -622,6 +641,50 @@ export default {
         // Accent (primary buttons — inverts in dark)
         'accent': 'var(--accent)',
         'on-accent': 'var(--on-accent)',
+        // Everything below has a light and a dark value in APP_LIGHT and
+        // APP_DARK. Views use these names and never a palette colour
+        // (tests/unit/colour-tokens.test.ts): a palette colour has one value,
+        // so it needed an override layer to survive dark mode.
+        //
+        // raised/hover/glass: surfaces above the page. line-strong: a border
+        // under the pointer. focus: the focus ring. on-solid: text on a solid
+        // status or network colour.
+        // success, warning, danger, info, note: the text colour; -soft is its
+        // tinted background, -line its border, -solid a filled dot or button.
+        // net-*: a network's own colour, for avatars.
+        'raised': 'var(--raised)',
+        'nav-active': 'var(--nav-active)',
+        'hover': 'var(--hover)',
+        'line-strong': 'var(--line-strong)',
+        'accent-hover': 'var(--accent-hover)',
+        'glass': 'var(--glass)',
+        'glass-strong': 'var(--glass-strong)',
+        'glass-hover': 'var(--glass-hover)',
+        'focus': 'var(--focus)',
+        'on-solid': 'var(--on-solid)',
+        'success': 'var(--success)',
+        'success-soft': 'var(--success-soft)',
+        'success-line': 'var(--success-line)',
+        'success-solid': 'var(--success-solid)',
+        'warning': 'var(--warning)',
+        'warning-soft': 'var(--warning-soft)',
+        'warning-line': 'var(--warning-line)',
+        'danger': 'var(--danger)',
+        'danger-soft': 'var(--danger-soft)',
+        'danger-line': 'var(--danger-line)',
+        'danger-solid': 'var(--danger-solid)',
+        'danger-solid-hover': 'var(--danger-solid-hover)',
+        'info': 'var(--info)',
+        'info-soft': 'var(--info-soft)',
+        'info-line': 'var(--info-line)',
+        'info-solid': 'var(--info-solid)',
+        'note': 'var(--note)',
+        'note-soft': 'var(--note-soft)',
+        'note-line': 'var(--note-line)',
+        'net-x': 'var(--net-x)',
+        'net-mastodon': 'var(--net-mastodon)',
+        'net-instagram': 'var(--net-instagram)',
+        'net-bluesky': 'var(--net-bluesky)',
       },
     },
   },

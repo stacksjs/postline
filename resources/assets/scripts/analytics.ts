@@ -288,14 +288,14 @@ function fillStats(payload: AnalyticsPayload): void {
           <div class="grid gap-1.5">
             <div class="flex items-center justify-between text-xs">
               <span class="font-bold">${providerNames[channel.provider] || channel.provider}</span>
-              <span class="text-zinc-500">${channel.share}%</span>
+              <span class="text-muted">${channel.share}%</span>
             </div>
-            <div class="overflow-hidden h-2 bg-zinc-100 rounded-full">
-              <div class="h-full bg-blue-600 rounded-full" style="width: ${channel.share}%"></div>
+            <div class="overflow-hidden h-2 bg-panel-2 rounded-full">
+              <div class="h-full bg-net-bluesky rounded-full" style="width: ${channel.share}%"></div>
             </div>
           </div>
         `).join('')
-      : '<p class="m-0 text-xs text-zinc-500">Publish a post to see the channel mix.</p>'
+      : '<p class="m-0 text-xs text-muted">Publish a post to see the channel mix.</p>'
   }
 
   const windows = page.querySelector('[data-analytics-windows]')
@@ -304,7 +304,7 @@ function fillStats(payload: AnalyticsPayload): void {
       ? (payload.windows ?? []).map(window_ => `
           <div class="flex items-center justify-between">
             <span>${window_.count} post${window_.count === 1 ? '' : 's'}</span>
-            <span class="font-bold text-neutral-950">${formatHour(window_.hour)}</span>
+            <span class="font-semibold text-ink">${formatHour(window_.hour)}</span>
           </div>
         `).join('')
       : '<p class="m-0 text-xs">No publishing history yet.</p>'

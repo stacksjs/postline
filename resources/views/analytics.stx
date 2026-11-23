@@ -13,9 +13,9 @@
       </div>
     </header>
 
-    <div class="hidden gap-3 items-center justify-between p-3.5 text-ui text-red-700 bg-red-50 border border-red-200 rounded-2xl" data-analytics-error>
+    <div class="hidden gap-3 items-center justify-between p-3.5 text-ui text-danger bg-danger-soft border border-danger-line rounded-2xl" data-analytics-error>
       <span data-analytics-error-message>Couldn't load analytics.</span>
-      <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-lg transition-colors" type="button" data-analytics-retry>Retry</button>
+      <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg transition-colors" type="button" data-analytics-retry>Retry</button>
     </div>
 
     <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
