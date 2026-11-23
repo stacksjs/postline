@@ -7,9 +7,9 @@
   <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
     <header class="flex flex-wrap gap-4 items-center justify-between min-h-11">
       <div>
-        <p class="mb-1.5 font-semibold text-xs text-muted tracking-wider uppercase">Queue</p>
+        <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Queue</p>
         <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Scheduled posts</h1>
-        <p class="mb-0 mt-1.5 text-ui text-muted">What's drafted, scheduled, and recently published.</p>
+        <p class="mb-0 mt-1.5 text-muted text-ui">What's drafted, scheduled, and recently published.</p>
       </div>
       <div class="flex flex-wrap gap-2 items-center">
         <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Queue view">
@@ -34,8 +34,8 @@
           <span class="text-muted text-xs" :text="metaText()">Loading…</span>
         </header>
         <div class="grid gap-2.5 p-3">
-          <p class="m-0 p-3 text-ui text-muted" x-show="loadError()" :text="loadError()"></p>
-          <p class="m-0 p-3 text-ui text-muted" x-show="showPendingEmpty()">Nothing queued yet. Schedule a post from the composer and it will show up here.</p>
+          <p class="m-0 p-3 text-muted text-ui" x-show="loadError()" :text="loadError()"></p>
+          <p class="m-0 p-3 text-muted text-ui" x-show="showPendingEmpty()">Nothing queued yet. Schedule a post from the composer and it will show up here.</p>
           <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl" x-for="row in pending()">
             <header class="flex gap-3 items-center justify-between">
               <div class="grid gap-1">
@@ -44,7 +44,7 @@
               </div>
               <span class="px-2 py-1 font-semibold text-xs whitespace-nowrap border rounded-full" data-status-pill :data-status="row.pill">{{ row.statusLabel }}</span>
             </header>
-            <p class="m-0 leading-normal text-ui text-body">{{ row.body }}</p>
+            <p class="m-0 leading-normal text-body text-ui">{{ row.body }}</p>
             <p class="m-0 text-danger text-xs" x-show="row.failure" :text="row.failure"></p>
             <footer class="flex flex-wrap gap-2 items-center justify-end">
               <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
@@ -62,7 +62,7 @@
           <span class="text-muted text-xs" :text="recentMetaText()"></span>
         </header>
         <div class="grid gap-2.5 p-3">
-          <p class="m-0 p-3 text-ui text-muted" x-show="showRecentEmpty()">No published posts yet.</p>
+          <p class="m-0 p-3 text-muted text-ui" x-show="showRecentEmpty()">No published posts yet.</p>
           <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl" x-for="row in recent()">
             <header class="flex gap-3 items-center justify-between">
               <div class="grid gap-1">
@@ -71,7 +71,7 @@
               </div>
               <span class="px-2 py-1 font-semibold text-xs whitespace-nowrap border rounded-full" data-status-pill :data-status="row.pill">{{ row.statusLabel }}</span>
             </header>
-            <p class="m-0 leading-normal text-ui text-body">{{ row.body }}</p>
+            <p class="m-0 leading-normal text-body text-ui">{{ row.body }}</p>
             <p class="m-0 text-danger text-xs" x-show="row.failure" :text="row.failure"></p>
             <footer class="flex flex-wrap gap-2 items-center justify-end">
               <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
@@ -97,17 +97,17 @@
       </header>
       <div class="overflow-x-auto">
         <div class="min-w-[560px]">
-          <div class="grid grid-cols-7 font-semibold text-xs text-muted border-b border-line">
+          <div class="grid grid-cols-7 font-semibold text-muted text-xs border-b border-line">
             <div class="p-2 text-center">Sun</div><div class="p-2 text-center">Mon</div><div class="p-2 text-center">Tue</div><div class="p-2 text-center">Wed</div><div class="p-2 text-center">Thu</div><div class="p-2 text-center">Fri</div><div class="p-2 text-center">Sat</div>
           </div>
           <div class="grid grid-cols-7">
             <div class="grid content-start gap-1 p-1.5 min-h-24 border-b border-line border-r" data-cal-cell :data-blank="cell.blank" :data-today="cell.isToday" x-for="cell in calCells()">
               <a class="font-semibold text-xs hover:text-ink transition-colors" data-cal-day x-show="!cell.blank" :href="cell.scheduleUrl" data-stx-link title="Schedule a post on this day">{{ cell.day }}</a>
-              <a class="flex gap-1 items-center px-1 py-0.5 text-xs text-body bg-panel-2 hover:bg-panel-2 rounded transition-colors" x-for="chip in cell.chips" :href="chip.href" data-stx-link>
+              <a class="flex gap-1 items-center px-1 py-0.5 text-body text-xs bg-panel-2 hover:bg-panel-2 rounded transition-colors" x-for="chip in cell.chips" :href="chip.href" data-stx-link>
                 <span class="shrink-0 h-1.5 w-1.5 rounded-full" data-cal-dot :data-status="chip.status"></span>
                 <span class="truncate">{{ chip.label }}</span>
               </a>
-              <span class="px-1 text-xs text-muted" x-show="cell.more" :text="cell.more"></span>
+              <span class="px-1 text-muted text-xs" x-show="cell.more" :text="cell.more"></span>
             </div>
           </div>
         </div>

@@ -7,16 +7,16 @@
   <section class="grid gap-4 campaigns-page" data-postline-page="campaigns" data-testid="campaigns-page">
     <header class="flex flex-wrap gap-3 items-center justify-between min-h-11">
       <div class="min-w-0">
-        <p class="mb-1.5 font-semibold text-xs text-muted tracking-wider uppercase">Campaign Builder</p>
+        <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Campaign Builder</p>
         <div class="flex flex-wrap gap-2 items-center">
           <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Plan the whole launch</h1>
           <span class="campaign-status" :data-status="campaign()?.status" x-show="campaign()" :text="campaign()?.status"></span>
         </div>
-        <p class="mb-0 mt-1.5 text-ui text-muted">Shape the story across weeks, then move the finished plan into your publishing queue.</p>
+        <p class="mb-0 mt-1.5 text-muted text-ui">Shape the story across weeks, then move the finished plan into your publishing queue.</p>
       </div>
       <div class="flex flex-wrap gap-2 items-center">
         <label class="sr-only" for="campaign-picker">Current campaign</label>
-        <select id="campaign-picker" class="px-3 h-9 min-w-44 text-ui text-ink bg-panel border border-line outline-none rounded-xl focus:ring-2 focus:ring-focus" x-show="campaignsList().length" @change="selectCampaign($event.target.value)">
+        <select id="campaign-picker" class="px-3 h-9 min-w-44 text-ink text-ui bg-panel border border-line outline-none rounded-xl focus:ring-2 focus:ring-focus" x-show="campaignsList().length" @change="selectCampaign($event.target.value)">
           <option x-for="option in campaignsList()" :value="option.id" :selected="option.id === campaign()?.id">{{ option.name }}</option>
         </select>
         <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Campaign view" x-show="campaign()">

@@ -7,12 +7,12 @@
   <section class="grid gap-4" data-postline-page="accounts" data-testid="accounts-page">
     {{-- Crosswind safelist: connection status-pill colors are set dynamically
         via JS, so list them in static markup for the CSS scanner. --}}
-    <div class="hidden text-warning text-success text-muted bg-warning-soft bg-success-soft border-warning-line border-success-line border-line" aria-hidden="true"></div>
+    <div class="hidden text-muted text-success text-warning bg-success-soft bg-warning-soft border-line border-success-line border-warning-line" aria-hidden="true"></div>
     <header class="flex flex-col gap-4 items-stretch justify-between sm:flex-row sm:items-end min-h-11">
       <div>
-        <p class="mb-1.5 font-semibold text-xs text-muted tracking-wider uppercase">Settings</p>
+        <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Settings</p>
         <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Connect your channels</h1>
-        <p class="mb-0 mt-1.5 text-ui text-muted">Bring every place you publish into one calm, reliable workspace.</p>
+        <p class="mb-0 mt-1.5 text-muted text-ui">Bring every place you publish into one calm, reliable workspace.</p>
       </div>
       <a class="inline-flex gap-2 items-center justify-center px-4 h-9 w-fit font-semibold text-ink text-sm bg-panel hover:bg-raised border border-line rounded-xl shadow-sm transition-colors" href="/composer" data-stx-link>
         <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>
@@ -28,28 +28,28 @@
     <div class="grid gap-3 sm:grid-cols-3">
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
         <span class="grid place-items-center shrink-0 h-10 w-10 text-info text-lg bg-info-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-share-08"></span></span>
-        <div><span class="block font-semibold text-xs text-muted tracking-wider uppercase">Destinations</span><strong class="block mt-1 text-ink text-sm">7 publishing channels</strong></div>
+        <div><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Destinations</span><strong class="block mt-1 text-ink text-sm">7 publishing channels</strong></div>
       </article>
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-success text-lg bg-success-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-shield-key"></span></span>
-        <div><span class="block font-semibold text-xs text-muted tracking-wider uppercase">Credentials</span><strong class="block mt-1 text-ink text-sm">Stored in your workspace</strong></div>
+        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-success bg-success-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-shield-key"></span></span>
+        <div><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Credentials</span><strong class="block mt-1 text-ink text-sm">Stored in your workspace</strong></div>
       </article>
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
         <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-note bg-note-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-radar-02"></span></span>
-        <div><span class="block font-semibold text-xs text-muted tracking-wider uppercase">Listening</span><a class="block mt-1 font-semibold text-ink text-sm hover:underline" href="/listening" data-stx-link>Watch brand mentions</a></div>
+        <div><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Listening</span><a class="block mt-1 font-semibold text-ink text-sm hover:underline" href="/listening" data-stx-link>Watch brand mentions</a></div>
       </article>
     </div>
 
     <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" data-bluesky-channel-card>
       <header class="flex gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
         <div><strong class="text-ink text-sm">Publishing destinations</strong><p class="m-0 mt-1 text-muted text-xs">Connect only the channels you actually use.</p></div>
-        <span class="px-2.5 py-1 font-semibold text-xs text-muted bg-panel-2 border border-line rounded-full">7 destinations</span>
+        <span class="px-2.5 py-1 font-semibold text-muted text-xs bg-panel-2 border border-line rounded-full">7 destinations</span>
       </header>
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" data-bluesky-channels>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="bluesky">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-info text-xl bg-info-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-bluesky"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-bluesky-channel-status>Setup</span></div>
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-info text-xl bg-info-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-bluesky"></span></span><span class="px-2.5 py-1 font-semibold text-muted text-xs whitespace-nowrap border border-line rounded-full" data-bluesky-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-semibold text-sm">Bluesky</h2>
-            <p class="my-1.5 text-ui text-body" data-bluesky-channel-handle>Not connected</p>
+            <p class="my-1.5 text-body text-ui" data-bluesky-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-bluesky-channel-detail>Add an app password to publish and sync your timeline.</p>
             {{-- Every connected Bluesky account, from the blueskyAccounts() signal. --}}
             <ul class="grid hidden gap-1.5 m-0 mt-3 p-0 list-none" :class="{ 'hidden': blueskyAccounts().length === 0 }" data-account-list="bluesky">
@@ -57,7 +57,7 @@
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
                   <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="text-xs text-muted underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
+                  <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
             </ul>
@@ -68,14 +68,14 @@
               <input class="px-3 h-9 text-ink text-xs bg-raised border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="identifier" placeholder="name.bsky.social" autocomplete="username" aria-label="Bluesky handle" data-bluesky-identifier required>
               <input class="px-3 h-9 text-ink text-xs bg-raised border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password" type="password" autocomplete="current-password" placeholder="App password" aria-label="Bluesky app password" data-bluesky-password required>
               <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" data-bluesky-connect-submit>Connect Bluesky</button>
-              <p class="m-0 text-xs text-muted">Use an app password from Bluesky Settings, never your account password. Sign in with another handle to add a second account.</p>
+              <p class="m-0 text-muted text-xs">Use an app password from Bluesky Settings, never your account password. Sign in with another handle to add a second account.</p>
             </form>
           </details>
         </article>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="linkedin">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-[#0a66c2] text-xl bg-info-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-linkedin"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-linkedin-channel-status>Setup</span></div>
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-[#0a66c2] text-xl bg-info-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-linkedin"></span></span><span class="px-2.5 py-1 font-semibold text-muted text-xs whitespace-nowrap border border-line rounded-full" data-linkedin-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-semibold text-sm">LinkedIn</h2>
-            <p class="my-1.5 text-ui text-body" data-linkedin-channel-handle>Not connected</p>
+            <p class="my-1.5 text-body text-ui" data-linkedin-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-linkedin-channel-detail>Connect with LinkedIn to crosspost member shares.</p>
             {{-- Every connected LinkedIn account, from the linkedinAccounts() signal. --}}
             <ul class="grid hidden gap-1.5 m-0 mt-3 p-0 list-none" :class="{ 'hidden': linkedinAccounts().length === 0 }" data-account-list="linkedin">
@@ -83,7 +83,7 @@
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
                   <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="text-xs text-muted underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
+                  <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
             </ul>
@@ -94,9 +94,9 @@
           </div>
         </article>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="instagram">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-note text-xl bg-note-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-instagram"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-instagram-channel-status>Setup</span></div>
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-note text-xl bg-note-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-instagram"></span></span><span class="px-2.5 py-1 font-semibold text-muted text-xs whitespace-nowrap border border-line rounded-full" data-instagram-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-semibold text-sm">Instagram</h2>
-            <p class="my-1.5 text-ui text-body" data-instagram-channel-handle>Not connected</p>
+            <p class="my-1.5 text-body text-ui" data-instagram-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-instagram-channel-detail>Connect an Instagram Business account to crosspost. Posts require an image.</p>
             {{-- Every connected Instagram account, from the instagramAccounts() signal. --}}
             <ul class="grid hidden gap-1.5 m-0 mt-3 p-0 list-none" :class="{ 'hidden': instagramAccounts().length === 0 }" data-account-list="instagram">
@@ -104,7 +104,7 @@
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
                   <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="text-xs text-muted underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
+                  <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
             </ul>
@@ -115,9 +115,9 @@
           </div>
         </article>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="threads">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-simple-icons-threads"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-threads-channel-status>Setup</span></div>
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-simple-icons-threads"></span></span><span class="px-2.5 py-1 font-semibold text-muted text-xs whitespace-nowrap border border-line rounded-full" data-threads-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-semibold text-sm">Threads</h2>
-            <p class="my-1.5 text-ui text-body" data-threads-channel-handle>Not connected</p>
+            <p class="my-1.5 text-body text-ui" data-threads-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-threads-channel-detail>Connect a Threads account to crosspost.</p>
             {{-- Every connected Threads account, from the threadsAccounts() signal. --}}
             <ul class="grid hidden gap-1.5 m-0 mt-3 p-0 list-none" :class="{ 'hidden': threadsAccounts().length === 0 }" data-account-list="threads">
@@ -125,7 +125,7 @@
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
                   <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="text-xs text-muted underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
+                  <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
             </ul>
@@ -136,9 +136,9 @@
           </div>
         </article>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="twitter">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-simple-icons-x"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-twitter-channel-status>Setup</span></div>
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-simple-icons-x"></span></span><span class="px-2.5 py-1 font-semibold text-muted text-xs whitespace-nowrap border border-line rounded-full" data-twitter-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-semibold text-sm">X</h2>
-            <p class="my-1.5 text-ui text-body" data-twitter-channel-handle>Not connected</p>
+            <p class="my-1.5 text-body text-ui" data-twitter-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-twitter-channel-detail>Connect X to crosspost tweets. X bills per post, and a post with a link costs far more.</p>
             {{-- Every connected X account, from the twitterAccounts() signal. --}}
             <ul class="grid hidden gap-1.5 m-0 mt-3 p-0 list-none" :class="{ 'hidden': twitterAccounts().length === 0 }" data-account-list="twitter">
@@ -146,7 +146,7 @@
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
                   <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="text-xs text-muted underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
+                  <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
             </ul>
@@ -157,17 +157,17 @@
           </div>
         </article>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="blog">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-hugeicons-quill-write-02"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-success bg-success-soft border border-success-line rounded-full">Ready</span></div>
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-hugeicons-quill-write-02"></span></span><span class="px-2.5 py-1 font-semibold text-success text-xs bg-success-soft border border-success-line rounded-full">Ready</span></div>
             <h2 class="mb-0 mt-4 font-semibold text-sm">Blog</h2>
-            <p class="my-1.5 text-ui text-body">Built into Postline</p>
+            <p class="my-1.5 text-body text-ui">Built into Postline</p>
             <p class="m-0 text-muted text-xs">Publish long-form posts to your site without another account.</p>
           </div>
           <a class="inline-flex items-center justify-center h-9 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl" href="/blog" data-stx-link>Open Blog</a>
         </article>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="mastodon">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-info text-xl bg-info-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-mastodon"></span></span><span class="px-2.5 py-1 font-semibold text-xs text-muted whitespace-nowrap border border-line rounded-full" data-mastodon-channel-status>Setup</span></div>
+          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-info text-xl bg-info-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-mastodon"></span></span><span class="px-2.5 py-1 font-semibold text-muted text-xs whitespace-nowrap border border-line rounded-full" data-mastodon-channel-status>Setup</span></div>
             <h2 class="mb-0 mt-4 font-semibold text-sm">Mastodon</h2>
-            <p class="my-1.5 text-ui text-body" data-mastodon-channel-handle>Not connected</p>
+            <p class="my-1.5 text-body text-ui" data-mastodon-channel-handle>Not connected</p>
             <p class="m-0 text-muted text-xs" data-mastodon-channel-detail>Connect any Mastodon instance with an access token to crosspost.</p>
             {{-- Every connected Mastodon account, from the mastodonAccounts() signal. --}}
             <ul class="grid hidden gap-1.5 m-0 mt-3 p-0 list-none" :class="{ 'hidden': mastodonAccounts().length === 0 }" data-account-list="mastodon">
@@ -175,7 +175,7 @@
                 <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
                 <span class="flex gap-1.5 items-center shrink-0">
                   <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="text-xs text-muted underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
+                  <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
                 </span>
               </li>
             </ul>
@@ -189,7 +189,7 @@
               {{-- read:accounts is not optional: connecting verifies the token
                   against /api/v1/accounts/verify_credentials before it is saved,
                   so a write-only token fails at connect, not at publish. --}}
-              <p class="m-0 text-xs text-muted">Create a token in your instance settings with the read:accounts, write:statuses and write:media scopes. A token for another account, on any instance, adds it alongside.</p>
+              <p class="m-0 text-muted text-xs">Create a token in your instance settings with the read:accounts, write:statuses and write:media scopes. A token for another account, on any instance, adds it alongside.</p>
             </form>
           </details>
         </article>
@@ -198,8 +198,8 @@
 
     <details class="overflow-hidden bg-panel border border-line rounded-2xl open:border-danger-line shadow-sm group" data-purge-card>
       <summary class="flex gap-3 items-center justify-between p-4 list-none hover:bg-panel-2 transition-colors cursor-pointer">
-        <div class="flex gap-3 items-center"><span class="grid place-items-center h-9 w-9 text-lg text-danger bg-danger-soft rounded-xl" aria-hidden="true"><span class="i-lucide-triangle-alert"></span></span><div>
-          <strong class="text-ui text-ink">Post removal tools</strong>
+        <div class="flex gap-3 items-center"><span class="grid place-items-center h-9 w-9 text-danger text-lg bg-danger-soft rounded-xl" aria-hidden="true"><span class="i-lucide-triangle-alert"></span></span><div>
+          <strong class="text-ink text-ui">Post removal tools</strong>
           <p class="mb-0 mt-1 text-muted text-xs">Preview or permanently remove posts from connected accounts.</p>
         </div></div>
         <span class="h-4 w-4 text-muted transition-transform group-open:rotate-180 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
@@ -212,14 +212,14 @@
           <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
             <input class="mt-0.5" type="radio" name="purge-scope" value="tracked" checked data-purge-scope>
             <span>
-              <span class="block font-semibold text-ui text-ink">Posts Postline published</span>
+              <span class="block font-semibold text-ink text-ui">Posts Postline published</span>
               <span class="block mt-0.5 text-muted text-xs">Only posts sent from this workspace. Anything you posted elsewhere stays.</span>
             </span>
           </label>
           <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
             <input class="mt-0.5" type="radio" name="purge-scope" value="all" data-purge-scope>
             <span>
-              <span class="block font-semibold text-ui text-ink">Everything on the account</span>
+              <span class="block font-semibold text-ink text-ui">Everything on the account</span>
               <span class="block mt-0.5 text-muted text-xs">Every post the account ever made, including posts created outside Postline.</span>
             </span>
           </label>
@@ -264,7 +264,7 @@
             <span class="font-semibold text-danger text-xs">Type <code class="px-1 py-0.5 text-xs bg-panel rounded">DELETE ALL POSTS</code> to confirm</span>
             <input class="px-3 h-10 text-ink text-sm bg-panel border border-danger-line outline-none rounded-xl focus:border-danger-solid focus:ring-2 focus:ring-danger-soft" type="text" autocomplete="off" placeholder="DELETE ALL POSTS" aria-label="Deletion confirmation phrase" data-purge-confirmation>
           </label>
-          <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-sm text-on-solid bg-danger-solid hover:bg-danger-solid-hover rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" disabled data-purge-run>Delete permanently</button>
+          <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-solid text-sm bg-danger-solid hover:bg-danger-solid-hover rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" disabled data-purge-run>Delete permanently</button>
           <p class="m-0 text-danger text-xs" data-purge-hint>Run a preview first, then type the phrase to enable deletion.</p>
         </div>
       </div>

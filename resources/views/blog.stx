@@ -7,9 +7,9 @@
   <section class="grid gap-4" data-postline-page="blog" data-testid="blog-page">
     <header class="flex flex-col gap-4 items-stretch justify-between sm:flex-row sm:items-center min-h-11">
       <div>
-        <p class="mb-1.5 font-semibold text-xs text-muted tracking-wider uppercase">Blog</p>
+        <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Blog</p>
         <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Long-form publishing</h1>
-        <p class="mb-0 mt-1.5 text-ui text-muted">Write once in Composer, publish to your site, and keep every article easy to find.</p>
+        <p class="mb-0 mt-1.5 text-muted text-ui">Write once in Composer, publish to your site, and keep every article easy to find.</p>
       </div>
       <a class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors" href="/composer" data-stx-link data-no-window-drag x-show="!loaded() || items().length > 0">
         <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>
@@ -19,15 +19,15 @@
 
     <div class="grid gap-3 sm:grid-cols-3">
       <article class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="font-semibold text-xs text-muted tracking-wider uppercase">Published</span>
+        <span class="font-semibold text-muted text-xs tracking-wider uppercase">Published</span>
         <strong class="block mt-2 text-2xl text-ink" :text="String(items().length)">0</strong>
       </article>
       <article class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="font-semibold text-xs text-muted tracking-wider uppercase">Latest</span>
+        <span class="font-semibold text-muted text-xs tracking-wider uppercase">Latest</span>
         <strong class="block mt-2 text-ink text-sm truncate" :text="latestTitle()">No posts yet</strong>
       </article>
       <article class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="font-semibold text-xs text-muted tracking-wider uppercase">Workflow</span>
+        <span class="font-semibold text-muted text-xs tracking-wider uppercase">Workflow</span>
         <strong class="block mt-2 text-ink text-sm">Composer → Blog</strong>
       </article>
     </div>
@@ -62,11 +62,11 @@
         <article class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center p-4 hover:bg-panel-2/50 transition-colors" x-for="item in items()">
           <div class="min-w-0">
             <div class="flex gap-2 items-center mb-1.5">
-              <span class="px-2 py-0.5 font-semibold text-xs text-success bg-success-soft border border-success-line rounded-full">Published</span>
+              <span class="px-2 py-0.5 font-semibold text-success text-xs bg-success-soft border border-success-line rounded-full">Published</span>
               <time class="text-muted text-xs" :datetime="item.publishedAt" :text="dateLabel(item.publishedAt)"></time>
             </div>
-            <h3 class="m-0 font-semibold text-sm text-ink" :text="item.title"></h3>
-            <p class="m-0 mt-1 line-clamp-2 text-ui text-muted" :text="item.excerpt || item.body"></p>
+            <h3 class="m-0 font-semibold text-ink text-sm" :text="item.title"></h3>
+            <p class="m-0 mt-1 line-clamp-2 text-muted text-ui" :text="item.excerpt || item.body"></p>
           </div>
           <a class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" :href="`/blog/${item.slug}`" target="_blank" rel="noopener noreferrer">
             View live

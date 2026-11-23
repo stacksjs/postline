@@ -295,7 +295,7 @@ function fillStats(payload: AnalyticsPayload): void {
             </div>
           </div>
         `).join('')
-      : '<p class="m-0 text-xs text-muted">Publish a post to see the channel mix.</p>'
+      : '<p class="m-0 text-muted text-xs">Publish a post to see the channel mix.</p>'
   }
 
   const windows = page.querySelector('[data-analytics-windows]')

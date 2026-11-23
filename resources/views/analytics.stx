@@ -7,13 +7,13 @@
   <section class="grid gap-5" data-postline-page="analytics" data-testid="analytics-page">
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
-        <p class="mb-1.5 font-semibold text-xs text-muted tracking-wider uppercase">Analytics</p>
+        <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Analytics</p>
         <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Publishing insights</h1>
-        <p class="mb-0 mt-1.5 text-ui text-muted">How your posting has performed over the last 30 days.</p>
+        <p class="mb-0 mt-1.5 text-muted text-ui">How your posting has performed over the last 30 days.</p>
       </div>
     </header>
 
-    <div class="hidden gap-3 items-center justify-between p-3.5 text-ui text-danger bg-danger-soft border border-danger-line rounded-2xl" data-analytics-error>
+    <div class="hidden gap-3 items-center justify-between p-3.5 text-danger text-ui bg-danger-soft border border-danger-line rounded-2xl" data-analytics-error>
       <span data-analytics-error-message>Couldn't load analytics.</span>
       <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg transition-colors" type="button" data-analytics-retry>Retry</button>
     </div>

@@ -105,7 +105,7 @@ const settingsActive = currentPath === '/accounts' || currentPath === '/settings
         >
           <span class="h-[18px] w-[18px] {{ link.icon }} {{ link.active ? 'text-ink' : 'text-muted' }}" aria-hidden="true"></span>
           <span class="flex-1 font-medium truncate" data-sidebar-expanded>{{ link.label }}</span>
-          <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-sans text-xs text-muted bg-glass rounded-full shadow-sm" data-sidebar-expanded aria-label="Shortcut {{ link.shortcut }}">{{ link.shortcut }}</kbd>
+          <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-sans text-muted text-xs bg-glass rounded-full shadow-sm" data-sidebar-expanded aria-label="Shortcut {{ link.shortcut }}">{{ link.shortcut }}</kbd>
         </a>
       @endforeach
     </nav>
@@ -123,7 +123,7 @@ const settingsActive = currentPath === '/accounts' || currentPath === '/settings
     >
       <span class="h-[18px] w-[18px] i-hugeicons-settings-02 {{ settingsActive ? 'text-ink' : 'text-muted' }}" aria-hidden="true"></span>
       <span class="flex-1 font-medium" data-sidebar-expanded>Settings</span>
-      <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-sans text-xs text-muted bg-glass rounded-full shadow-sm" data-sidebar-expanded aria-label="Shortcut comma">,</kbd>
+      <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-sans text-muted text-xs bg-glass rounded-full shadow-sm" data-sidebar-expanded aria-label="Shortcut comma">,</kbd>
     </a>
   </aside>
   </div>

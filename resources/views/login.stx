@@ -13,8 +13,8 @@
       <header class="grid gap-2 justify-items-center text-center">
         {{-- The same mark as the favicon and the sidebar (`.brand-mark`). --}}
         <span class="h-11 w-11 brand-mark" aria-hidden="true"></span>
-        <h1 class="m-0 font-semibold text-xl text-ink" :text="heading()">Sign in to Postline</h1>
-        <p class="m-0 text-ui text-muted" :text="subtitle()">Compose once, publish everywhere.</p>
+        <h1 class="m-0 font-semibold text-ink text-xl" :text="heading()">Sign in to Postline</h1>
+        <p class="m-0 text-muted text-ui" :text="subtitle()">Compose once, publish everywhere.</p>
       </header>
 
       <form class="grid gap-3" @submit.prevent="onSubmit">

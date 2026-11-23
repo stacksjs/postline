@@ -43,7 +43,7 @@
         >
           <span class="h-[18px] w-[18px] i-hugeicons-sidebar-right" aria-hidden="true"></span>
         </button>
-        <section class="overflow-hidden lg:overflow-y-auto min-h-screen min-w-0 lg:h-screen bg-bg border-t border-line lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace data-window-drag-region>
+        <section class="overflow-hidden lg:overflow-y-auto min-h-screen min-w-0 lg:h-screen bg-bg border-line border-t lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace data-window-drag-region>
           <main class="p-3.5 sm:p-4 min-w-0" data-postline-router>
             @yield('content')
           </main>

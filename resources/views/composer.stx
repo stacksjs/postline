@@ -13,15 +13,15 @@
         layout utilities of its own (grid, min-h-20, p-3), and relying on
         hidden to out-rank them would leave a visible empty block if the
         generated stylesheet ever ordered them the other way. --}}
-    <div class="grid gap-2 mt-2 p-2 p-3 min-h-20 min-h-7 leading-relaxed text-warning text-success text-ink text-muted text-muted text-on-accent text-danger text-sm text-muted bg-accent bg-success-solid bg-success-soft bg-success-solid bg-panel bg-panel-2 bg-panel-3 bg-danger-solid bg-line-strong hover:bg-raised border-info-line border-success-line border-line border-ink outline-none rounded-lg rounded-xl shadow-sm cursor-not-allowed resize-none" style="display:none" aria-hidden="true"></div>
+    <div class="grid gap-2 mt-2 p-2 p-3 min-h-20 min-h-7 leading-relaxed text-danger text-ink text-muted text-muted text-muted text-on-accent text-sm text-success text-warning bg-accent bg-danger-solid bg-line-strong bg-panel bg-panel-2 bg-panel-3 bg-success-soft bg-success-solid bg-success-solid hover:bg-raised border-info-line border-ink border-line border-success-line outline-none rounded-lg rounded-xl shadow-sm cursor-not-allowed resize-none" style="display:none" aria-hidden="true"></div>
     {{-- Network icons on per-account chips come from row.icon at runtime; listed
         here so the Crosswind scanner emits them. --}}
     <div class="i-hugeicons-news i-hugeicons-quill-write-02 i-hugeicons-share-08 i-simple-icons-bluesky i-simple-icons-instagram i-simple-icons-linkedin i-simple-icons-mastodon i-simple-icons-threads i-simple-icons-x" style="display:none" aria-hidden="true"></div>
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
-        <p class="mb-1.5 font-semibold text-xs text-muted tracking-wider uppercase">Composer</p>
+        <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Composer</p>
         <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Write a post</h1>
-        <p class="mb-0 mt-1.5 text-ui text-muted">Draft once, then publish to every connected account.</p>
+        <p class="mb-0 mt-1.5 text-muted text-ui">Draft once, then publish to every connected account.</p>
       </div>
     </header>
     <div class="grid">
@@ -104,7 +104,7 @@
                   <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
                 </button>
               </header>
-              <textarea class="min-h-36 w-full leading-relaxed text-xl text-ink placeholder:text-muted bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" placeholder="What do you want to share?" data-bluesky-text></textarea>
+              <textarea class="min-h-36 w-full leading-relaxed text-ink text-xl placeholder:text-muted bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" placeholder="What do you want to share?" data-bluesky-text></textarea>
               {{-- Long-form rich text mounts here and writes Markdown back into
                   the textarea above, which stays the source of truth. Hidden
                   until the blog is a target. --}}
@@ -676,7 +676,7 @@
             <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
           </button>
         </header>
-          <textarea class="min-h-36 w-full leading-relaxed text-xl text-ink bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body ${number}" data-bluesky-text>${escapeHtml(text)}</textarea>
+          <textarea class="min-h-36 w-full leading-relaxed text-ink text-xl bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body ${number}" data-bluesky-text>${escapeHtml(text)}</textarea>
         <div class="hidden overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview></div>
       `
 
@@ -820,9 +820,9 @@
         container.innerHTML = `
           ${preview.image ? `<div class="h-28 bg-center bg-cover bg-panel-3 border-b border-line" style="background-image:url('${escapeHtml(preview.image)}')"></div>` : ''}
           <div class="grid gap-1 p-3">
-            <div class="font-semibold text-xs text-muted uppercase">${escapeHtml(preview.domain)}</div>
+            <div class="font-semibold text-muted text-xs uppercase">${escapeHtml(preview.domain)}</div>
             <div class="font-semibold text-ink text-sm">${escapeHtml(preview.title)}</div>
-            ${preview.description ? `<div class="leading-normal line-clamp-2 text-ui text-muted">${escapeHtml(preview.description)}</div>` : ''}
+            ${preview.description ? `<div class="leading-normal line-clamp-2 text-muted text-ui">${escapeHtml(preview.description)}</div>` : ''}
           </div>
         `
       }
