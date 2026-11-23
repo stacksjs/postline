@@ -3,10 +3,11 @@ import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
-import { MastodonApiError, MastodonDriver, mastodonIdempotencyKey, normalizeInstance } from './Drivers/MastodonDriver'
+import { MastodonDriver, mastodonIdempotencyKey, normalizeInstance } from './Drivers/MastodonDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, now, uuid } from './support'
+import { explainNetworkError } from '../../Support/Social/network-errors'
 import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
@@ -189,11 +190,13 @@ export class MastodonService {
       }
     }
     catch (error) {
-      const message = messageOf(error)
-      // Only a rejected token means "connect again". A 403 is the instance
-      // refusing this one thing (a token without the write:media scope, a
-      // post it does not allow), and the account is still connected.
-      if (error instanceof MastodonApiError && error.status === 401)
+      // In words the owner can act on, never the network's raw response. Only
+      // a sign-in the network no longer accepts marks the account: a 403 is
+      // usually one refused post (a duplicate, a missing permission), and
+      // treating it as signed out disconnected accounts that were working.
+      const explained = explainNetworkError('mastodon', error)
+      const message = explained.message
+      if (explained.kind === 'expired')
         await markIdentityExpired(identity.id)
       await database.updateTable('post_targets').set({
         status: 'failed',

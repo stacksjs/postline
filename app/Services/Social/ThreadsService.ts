@@ -4,11 +4,12 @@ import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
 import { PendingOAuthStates } from '../../Support/Social/oauth-state'
-import { ThreadsApiError, ThreadsDriver } from './Drivers/ThreadsDriver'
+import { ThreadsDriver } from './Drivers/ThreadsDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
 import { refreshOnce } from '../../Support/Social/token-refresh'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, expiresAt, now, uuid } from './support'
+import { explainNetworkError } from '../../Support/Social/network-errors'
 import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
@@ -272,10 +273,14 @@ export class ThreadsService {
       }
     }
     catch (error) {
-      const message = messageOf(error)
-      if (error instanceof ThreadsApiError && error.isAuthError) {
+      // In words the owner can act on, never the network's raw response. Only
+      // a sign-in the network no longer accepts marks the account: a 403 is
+      // usually one refused post (a duplicate, a missing permission), and
+      // treating it as signed out disconnected accounts that were working.
+      const explained = explainNetworkError('threads', error)
+      const message = explained.message
+      if (explained.kind === 'expired')
         await markIdentityExpired(identity.id)
-      }
       await database.updateTable('post_targets').set({
         status: 'failed',
         failure_reason: message,

@@ -4,12 +4,13 @@ import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
 import { PendingOAuthStates } from '../../Support/Social/oauth-state'
-import { LinkedInApiError, LinkedInDriver } from './Drivers/LinkedInDriver'
+import { LinkedInDriver } from './Drivers/LinkedInDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
 import { resolveLinkedInVersion } from '../../Support/Social/linkedin-text'
 import { refreshOnce } from '../../Support/Social/token-refresh'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, expiresAt, now, uuid } from './support'
+import { explainNetworkError } from '../../Support/Social/network-errors'
 import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
@@ -259,10 +260,14 @@ export class LinkedInService {
       }
     }
     catch (error) {
-      const message = messageOf(error)
-      if (error instanceof LinkedInApiError && error.isAuthError) {
+      // In words the owner can act on, never the network's raw response. Only
+      // a sign-in the network no longer accepts marks the account: a 403 is
+      // usually one refused post (a duplicate, a missing permission), and
+      // treating it as signed out disconnected accounts that were working.
+      const explained = explainNetworkError('linkedin', error)
+      const message = explained.message
+      if (explained.kind === 'expired')
         await markIdentityExpired(identity.id)
-      }
       await database.updateTable('post_targets').set({
         status: 'failed',
         failure_reason: message,

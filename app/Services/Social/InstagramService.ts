@@ -5,10 +5,11 @@ import { log } from '@stacksjs/logging'
 import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
 import { PendingOAuthStates } from '../../Support/Social/oauth-state'
-import { InstagramApiError, InstagramDriver } from './Drivers/InstagramDriver'
+import { InstagramDriver } from './Drivers/InstagramDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, expiresAt, now, uuid } from './support'
+import { explainNetworkError } from '../../Support/Social/network-errors'
 import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
@@ -289,10 +290,14 @@ export class InstagramService {
       }
     }
     catch (error) {
-      const message = messageOf(error)
-      if (error instanceof InstagramApiError && error.isAuthError) {
+      // In words the owner can act on, never the network's raw response. Only
+      // a sign-in the network no longer accepts marks the account: a 403 is
+      // usually one refused post (a duplicate, a missing permission), and
+      // treating it as signed out disconnected accounts that were working.
+      const explained = explainNetworkError('instagram', error)
+      const message = explained.message
+      if (explained.kind === 'expired')
         await markIdentityExpired(identity.id)
-      }
       await database.updateTable('post_targets').set({
         status: 'failed',
         failure_reason: message,
