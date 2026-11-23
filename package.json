@@ -3,7 +3,7 @@
   "type": "module",
   "version": "0.1.1",
   "private": true,
-  "description": "Postline \u2014 compose once, publish to every social network: queue, campaigns, analytics, listening and a unified inbox.",
+  "description": "Postline — compose once, publish to every social network: queue, campaigns, analytics, listening and a unified inbox.",
   "author": "Chris Breuer <chris@stacksjs.org>",
   "contributors": [
     "Chris Breuer <chris@stacksjs.org>"
@@ -65,12 +65,12 @@
     "stx": "./buddy"
   },
   "dependencies": {
-    "@stacksjs/ai": "^0.75.653",
-    "@stacksjs/payments": "0.75.653",
-    "@stacksjs/socials": "^0.75.653",
+    "@stacksjs/ai": "^0.75.659",
+    "@stacksjs/payments": "0.75.659",
+    "@stacksjs/socials": "^0.75.659",
     "@stacksjs/stx": "^0.2.927",
     "@stacksjs/ts-cloud": "^0.16.152",
-    "stacks": "^0.75.653",
+    "stacks": "^0.75.659",
     "ts-images": "^0.2.35",
     "ts-medium-editor": "^0.2.0"
   },

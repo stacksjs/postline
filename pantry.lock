@@ -5,17 +5,17 @@
     "": {
       "name": "postline",
       "dependencies": {
-        "@stacksjs/ai": "^0.75.653",
-        "@stacksjs/payments": "0.75.653",
-        "@stacksjs/realtime": "0.75.653",
-        "@stacksjs/socials": "^0.75.653",
+        "@stacksjs/ai": "^0.75.659",
+        "@stacksjs/payments": "0.75.659",
+        "@stacksjs/socials": "^0.75.659",
         "@stacksjs/stx": "^0.2.927",
-        "@stacksjs/ts-cloud": "^0.16.135",
-        "stacks": "^0.75.653",
-        "ts-broadcasting": "0.0.9",
-        "ts-medium-editor": "^0.1.6"
+        "@stacksjs/ts-cloud": "^0.16.152",
+        "stacks": "^0.75.659",
+        "ts-images": "^0.2.35",
+        "ts-medium-editor": "^0.2.0"
       },
       "devDependencies": {
+        "@iconify-json/hugeicons": "^1.2.36",
         "@iconify-json/lucide": "^1.2.121",
         "@iconify-json/simple-icons": "^1.2.92",
         "better-dx": "^0.2.22",
@@ -34,7 +34,7 @@
       "name": "hello-world-fx",
       "version": "0.70.40",
       "devDependencies": {
-        "stacks": "^0.75.653"
+        "stacks": "^0.75.659"
       }
     }
   },
