@@ -3,7 +3,7 @@ import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
-import { MastodonApiError, MastodonDriver, normalizeInstance } from './Drivers/MastodonDriver'
+import { MastodonApiError, MastodonDriver, mastodonIdempotencyKey, normalizeInstance } from './Drivers/MastodonDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, now, uuid } from './support'
@@ -60,7 +60,7 @@ export class MastodonService {
       displayName: identity?.display_name || null,
       instance: identity?.external_id || null,
       authStatus: connected ? 'connected' : (identity?.handle ? identity.auth_status : 'missing'),
-      characterLimit: this.driver.characterLimit,
+      characterLimit: identity && connected ? (await this.driver.instanceLimits(this.credentialsFor(identity))).characters : this.driver.characterLimit,
       canPublish: connected,
       requiresMedia: false,
       configuredFromEnv: Boolean(cfg.instance && cfg.accessToken),
@@ -131,11 +131,13 @@ export class MastodonService {
     }
     const account = { identityId: Number(identity.id), handle: identity.handle }
 
-    if (exceedsLimit('mastodon', post.body, this.driver.characterLimit)) {
+    // The instance's own limit: 500 is only Mastodon's default.
+    const limits = await this.driver.instanceLimits(this.credentialsFor(identity))
+    if (exceedsLimit('mastodon', post.body, limits.characters)) {
       return {
         provider: 'mastodon',
         ok: false,
-        error: `Mastodon posts must be ${this.driver.characterLimit} characters or fewer.`,
+        error: `Posts on ${instanceName(identity.external_id)} must be ${limits.characters} characters or fewer.`,
         ...account,
       }
     }
@@ -163,6 +165,9 @@ export class MastodonService {
       const published = await this.driver.publish(
         this.credentialsFor(identity),
         { text: post.body, media: content?.media, reply: content?.reply },
+        // A retry of the same text to the same account gets the status the
+        // first attempt created, instead of creating a second.
+        { idempotencyKey: mastodonIdempotencyKey(Number(post.id), Number(identity.id), post.body) },
       )
 
       await database.updateTable('post_targets').set({
@@ -185,7 +190,10 @@ export class MastodonService {
     }
     catch (error) {
       const message = messageOf(error)
-      if (error instanceof MastodonApiError && error.isAuthError)
+      // Only a rejected token means "connect again". A 403 is the instance
+      // refusing this one thing (a token without the write:media scope, a
+      // post it does not allow), and the account is still connected.
+      if (error instanceof MastodonApiError && error.status === 401)
         await markIdentityExpired(identity.id)
       await database.updateTable('post_targets').set({
         status: 'failed',
@@ -354,6 +362,16 @@ export class MastodonService {
       instance: row.external_id || null,
       authStatus: connected ? 'connected' : 'missing',
     }
+  }
+}
+
+/** "hachyderm.io" from the stored instance URL, for messages. */
+function instanceName(instance: string | null | undefined): string {
+  try {
+    return new URL(String(instance)).host
+  }
+  catch {
+    return 'this instance'
   }
 }
 

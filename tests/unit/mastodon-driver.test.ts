@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { MastodonApiError, MastodonPublishingDriver, normalizeInstance } from '../../app/Services/Social/Drivers/MastodonDriver'
+import { MastodonApiError, MastodonDriver, mastodonIdempotencyKey, MastodonPublishingDriver, normalizeInstance } from '../../app/Services/Social/Drivers/MastodonDriver'
 
 const realFetch = globalThis.fetch
 afterEach(() => { globalThis.fetch = realFetch })
@@ -98,5 +98,65 @@ describe('MastodonPublishingDriver', () => {
     expect(caught).toBeInstanceOf(MastodonApiError)
     expect((caught as MastodonApiError).status).toBe(401)
     expect((caught as MastodonApiError).isAuthError).toBe(true)
+  })
+})
+
+describe('MastodonDriver, what Postline adds', () => {
+  const instance = (limits: Record<string, unknown> | null) => (url: string): Response | null => {
+    if (!url.includes('/api/v2/instance')) return null
+    return limits ? new Response(JSON.stringify({ configuration: { statuses: limits } }), { status: 200 }) : new Response('nope', { status: 404 })
+  }
+
+  test('reads the instance limit, once, and falls back to 500', async () => {
+    const cap: Captured[] = []; mockApi(cap, instance({ max_characters: 5000, characters_reserved_per_url: 23, max_media_attachments: 4 }))
+    const driver = new MastodonDriver()
+
+    expect((await driver.instanceLimits(creds)).characters).toBe(5000)
+    await driver.instanceLimits(creds)
+    expect(cap.filter(call => call.url.includes('/api/v2/instance'))).toHaveLength(1)
+
+    mockApi([], instance(null))
+    expect((await new MastodonDriver().instanceLimits(creds)).characters).toBe(500)
+  })
+
+  test('a publish carries its idempotency key, so a retry cannot post twice', async () => {
+    const cap: Captured[] = []; mockApi(cap, instance(null))
+    const key = mastodonIdempotencyKey(7, 3, 'hello fediverse')
+    await new MastodonDriver().publish(creds, { text: 'hello fediverse' }, { idempotencyKey: key })
+
+    const post = cap.find(call => call.url.endsWith('/api/v1/statuses'))!
+    expect(post.headers['Idempotency-Key']).toBe(key)
+  })
+
+  test('the key is the same for a retry and different once the text changes', () => {
+    expect(mastodonIdempotencyKey(7, 3, 'same text')).toBe(mastodonIdempotencyKey(7, 3, 'same text'))
+    expect(mastodonIdempotencyKey(7, 3, 'same text')).not.toBe(mastodonIdempotencyKey(7, 3, 'edited text'))
+    expect(mastodonIdempotencyKey(7, 3, 'same text')).not.toBe(mastodonIdempotencyKey(7, 4, 'same text'))
+    expect(mastodonIdempotencyKey(7, 3, 'same text')).not.toBe(mastodonIdempotencyKey(8, 3, 'same text'))
+  })
+
+  test('visibility, a content warning and a language are sent when given', async () => {
+    const cap: Captured[] = []; mockApi(cap, instance(null))
+    await new MastodonDriver().publish(creds, { text: 'spoilers' }, { visibility: 'unlisted', spoilerText: 'Film ending', language: 'en' })
+
+    const post = cap.find(call => call.url.endsWith('/api/v1/statuses'))!
+    expect(post.body).toMatchObject({ status: 'spoilers', visibility: 'unlisted', spoiler_text: 'Film ending', language: 'en' })
+  })
+
+  test('four images at most, each with its alt text', async () => {
+    const cap: Captured[] = []; mockApi(cap, instance(null))
+    const png = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+    const media = Array.from({ length: 6 }, (_, index) => ({ bytes: png, mimeType: 'image/png', altText: `picture ${index}` }))
+    await new MastodonDriver().publish(creds, { text: 'gallery', media })
+
+    expect(cap.filter(call => call.url.includes('/api/v2/media'))).toHaveLength(4)
+    expect(cap.find(call => call.url.endsWith('/api/v1/statuses'))!.body.media_ids).toHaveLength(4)
+  })
+
+  test('a reply is sent to its parent', async () => {
+    const cap: Captured[] = []; mockApi(cap, instance(null))
+    const ref = { uri: '111', cid: '111' }
+    await new MastodonDriver().publish(creds, { text: 'second', reply: { root: ref, parent: ref } })
+    expect(cap.find(call => call.url.endsWith('/api/v1/statuses'))!.body.in_reply_to_id).toBe('111')
   })
 })
