@@ -5,7 +5,10 @@ import type { PublicAccount } from '../../Support/Social/accounts'
 import { pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
 import { describeBlueskyError } from '../../Support/Social/bluesky-errors'
 import { fetchRemoteImage } from '../../Support/Social/image-input'
-import { BlueskyApiError, BlueskyDriver } from './Drivers/BlueskyDriver'
+import type { BlueskyPublishInput } from './Drivers/BlueskyDriver'
+import { BLUESKY_MAX_BLOB_BYTES, BlueskyDriver, isBlueskySessionError } from './Drivers/BlueskyDriver'
+import { DEFAULT_BLUESKY_SERVER, resolveBlueskyServer } from '../../Support/Social/bluesky-server'
+import { fetchLinkPreview } from '../../Support/Social/link-preview'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { workspace } from '../WorkspaceService'
@@ -83,7 +86,24 @@ function hasSession(row: SocialIdentityRow): boolean {
 }
 
 export class BlueskyService {
+  /** The driver for the default server; `driverFor` hands out the others. */
   private driver = new BlueskyDriver()
+  private readonly drivers = new Map<string, BlueskyDriver>([[DEFAULT_BLUESKY_SERVER, this.driver]])
+
+  /** One driver per account server, made the first time that server is needed. */
+  private driverAt(server: string): BlueskyDriver {
+    let driver = this.drivers.get(server)
+    if (!driver) {
+      driver = new BlueskyDriver({ service: server })
+      this.drivers.set(server, driver)
+    }
+    return driver
+  }
+
+  /** The driver that talks to the server this account lives on. */
+  private async driverFor(identity: { external_id?: string | null, handle?: string | null }): Promise<BlueskyDriver> {
+    return this.driverAt(await resolveBlueskyServer(identity.external_id || identity.handle))
+  }
 
   /**
    * The network card's state. The top-level fields describe the default
@@ -122,7 +142,9 @@ export class BlueskyService {
    */
   async connect(identifier: string, password: string, options: { revive?: boolean } = {}) {
     const driver = await this.ensureDriver()
-    const session = await this.driver.createSession({
+    // Sign in at the account's own server, which need not be bsky.social.
+    const server = await resolveBlueskyServer(normalizeHandle(identifier))
+    const session = await this.driverAt(server).createSession({
       identifier: normalizeHandle(identifier),
       password,
     })
@@ -239,12 +261,16 @@ export class BlueskyService {
 
     const targetUuid = uuid()
     const createdAt = now()
-    const publishInput = { text: post.body } as Parameters<BlueskyDriver['publish']>[1] & {
-      external?: { uri: string, title: string, description?: string }
-      reply?: { root: { uri: string, cid: string }, parent: { uri: string, cid: string } }
-      media?: Array<{ bytes?: Uint8Array, mimeType?: string, altText?: string }>
+    const publishInput: BlueskyPublishInput = { text: post.body }
+    if (content?.external) {
+      publishInput.external = { ...content.external }
+      // A card without its picture is a grey box. Only when no image is
+      // attached: Bluesky shows images or a card, never both.
+      if (!content.media?.length) {
+        const thumb = await this.cardThumbnail(content.external.uri)
+        if (thumb) publishInput.external.thumb = thumb
+      }
     }
-    if (content?.external) publishInput.external = content.external
     if (content?.reply) publishInput.reply = content.reply
     if (content?.media?.length) {
       // The driver embeds raw bytes; fetch URL-only media server-side.
@@ -280,8 +306,9 @@ export class BlueskyService {
       .executeTakeFirstOrThrow()
 
     try {
+      const accountDriver = await this.driverFor(identity)
       const published = await this.withFreshSession(identity, freshIdentity =>
-        this.driver.publish({
+        accountDriver.publish({
           handle: freshIdentity.handle,
           did: freshIdentity.external_id || undefined,
           accessToken: freshIdentity.access_token || undefined,
@@ -382,8 +409,9 @@ export class BlueskyService {
     let synced = 0
     for (let offset = 0; offset < targets.length; offset += 25) {
       const chunk = targets.slice(offset, offset + 25)
+      const accountDriver = await this.driverFor(current)
       const metrics = await this.withFreshSession(current, freshIdentity =>
-        this.driver.postMetrics({
+        accountDriver.postMetrics({
           handle: freshIdentity.handle,
           did: freshIdentity.external_id || undefined,
           accessToken: freshIdentity.access_token || undefined,
@@ -413,8 +441,9 @@ export class BlueskyService {
   async syncTimeline(limit = 30, identityId?: number | null): Promise<TimelineResult & { saved: number }> {
     const identity = await this.requireIdentity(identityId)
     const driver = await this.ensureDriver()
+    const accountDriver = await this.driverFor(identity)
     const timeline = await this.withFreshSession(identity, freshIdentity =>
-      this.driver.timeline({
+      accountDriver.timeline({
         handle: freshIdentity.handle,
         did: freshIdentity.external_id || undefined,
         accessToken: freshIdentity.access_token || undefined,
@@ -484,8 +513,8 @@ export class BlueskyService {
       provider: 'bluesky',
       identityId: Number(current.id),
       handle: current.handle,
-      listPage: cursor => run(identity => this.driver.listAuthoredPosts(credentials(identity), { cursor })),
-      deletePost: ref => run(identity => this.driver.deletePost(credentials(identity), ref)),
+      listPage: cursor => run(async identity => (await this.driverFor(identity)).listAuthoredPosts(credentials(identity), { cursor })),
+      deletePost: ref => run(async identity => (await this.driverFor(identity)).deletePost(credentials(identity), ref)),
     }
   }
 
@@ -521,7 +550,7 @@ export class BlueskyService {
       return await callback(identity)
     }
     catch (error) {
-      if (!(error instanceof BlueskyApiError) || !error.isAuthError || !identity.refresh_token) {
+      if (!isBlueskySessionError(error) || !identity.refresh_token) {
         throw error
       }
 
@@ -529,7 +558,7 @@ export class BlueskyService {
       // also dead, mark the identity expired so /accounts prompts a reconnect.
       let refreshed: SocialIdentityRow
       try {
-        const session = await this.driver.refreshSession(identity.refresh_token)
+        const session = await (await this.driverFor(identity)).refreshSession(identity.refresh_token)
         const driver = await this.ensureDriver()
         // `revive: false`: a refresh racing a disconnect must not undo it.
         refreshed = await this.saveSession(session, driver, { revive: false })
@@ -591,6 +620,23 @@ export class BlueskyService {
       account_id: accountId,
       social_driver_id: driver.id,
     }, { revive: options.revive, label: 'This Bluesky' })
+  }
+
+  /**
+   * The picture for a link card, read from the page it links to. Best effort:
+   * a page that cannot be read, or a picture too large for Bluesky, leaves the
+   * card without one and never stops the post.
+   */
+  private async cardThumbnail(uri: string): Promise<{ bytes: Uint8Array, mimeType: string } | null> {
+    try {
+      const preview = await fetchLinkPreview(uri)
+      if (!preview.image) return null
+      const image = await fetchRemoteImage(preview.image)
+      return image && image.bytes.length <= BLUESKY_MAX_BLOB_BYTES ? image : null
+    }
+    catch {
+      return null
+    }
   }
 
   private toAccounts(rows: SocialIdentityRow[], fallback: SocialIdentityRow | undefined): PublicAccount[] {
