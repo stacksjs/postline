@@ -22,12 +22,11 @@ export interface ThreadChain {
  * Advance one target's chain with the segment that just published.
  *
  * A result without both `uri` and `cid` leaves the chain untouched, and that
- * absence is the whole signal: `cid` is an AT-protocol content hash, so
- * Bluesky returns one and the other networks do not. A provider that cannot
- * identify the post it just made cannot be replied to, so its segments go out
- * as independent posts. No provider list is consulted and none has to be kept
- * up to date — a network that gains native threading starts chaining as soon
- * as its driver returns a cid.
+ * absence is the whole signal. Bluesky returns an AT-protocol uri and content
+ * hash; X, Mastodon and Threads return the post id as both, and reply to the
+ * parent's `uri`. A network that cannot be replied to (Instagram, LinkedIn,
+ * the blog) returns no cid, so its segments go out as independent posts. No
+ * provider list is consulted and none has to be kept up to date.
  *
  * `root` is pinned on the first chained segment and never moves; `parent`
  * follows the most recent one. That is what makes segment 3 reply to segment 2

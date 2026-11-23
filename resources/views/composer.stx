@@ -763,6 +763,19 @@
       }
 
       
+      /**
+       * Said before publishing, not found out after: these networks have no
+       * replies to chain on, so each part of a thread lands as its own post.
+       */
+      const unthreadedNote = (posts) => {
+        if (posts < 2) return ''
+        const names = selectedConnected()
+          .filter(target => ['instagram', 'linkedin'].includes(target.provider))
+          .map(target => providerLabel(target.provider))
+          .filter((name, index, list) => list.indexOf(name) === index)
+        return names.length ? ` - ${names.join(' and ')} will post each part separately` : ''
+      }
+
       const updateCount = () => {
         const textarea = activeTextarea()
         if (!textarea || !count) return
@@ -775,7 +788,7 @@
         // mixed targets "over" is only true for some of them.
         count.textContent = over.length
           ? `${length} characters - too long for ${overLimitNetworks().map(provider => providerLabel(provider.provider)).join(', ')}`
-          : `${length} / ${limit} characters - ${posts} post${posts === 1 ? '' : 's'}`
+          : `${length} / ${limit} characters - ${posts} post${posts === 1 ? '' : 's'}${unthreadedNote(posts)}`
         // The span truncates, and the network names are at the end — keep the
         // full message reachable when several targets are over at once.
         count.title = count.textContent

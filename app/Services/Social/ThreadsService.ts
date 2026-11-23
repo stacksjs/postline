@@ -249,11 +249,13 @@ export class ThreadsService {
       }, {
         text: post.body,
         media: content?.media,
+        reply: content?.reply,
       })
 
       await database.updateTable('post_targets').set({
         status: 'published',
         remote_uri: published.uri || null,
+        remote_cid: published.cid || null,
         failure_reason: null,
         updated_at: now(),
       }).where('id', '=', target.id).execute()
@@ -263,6 +265,7 @@ export class ThreadsService {
         ok: true,
         url: published.url,
         uri: published.uri,
+        cid: published.cid,
         targetId: Number(target.id),
         ...account,
       }
