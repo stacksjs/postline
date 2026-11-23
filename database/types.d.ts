@@ -1409,7 +1409,7 @@ declare module '@stacksjs/database' {
       uuid: string
       created_at: string
       updated_at: string | null
-      provider: "bluesky" | "twitter" | "mastodon" | "facebook" | "instagram" | "tiktok" | "linkedin" | "threads" | "blog"
+      provider: "bluesky" | "twitter" | "mastodon" | "facebook" | "instagram" | "tiktok" | "linkedin" | "threads" | "blog" | "opentimes"
       status: "draft" | "scheduled" | "publishing" | "published" | "failed" | "skipped"
       scheduled_at: string
       remote_uri: string
@@ -1597,7 +1597,7 @@ declare module '@stacksjs/database' {
       uuid: string
       created_at: string
       updated_at: string | null
-      provider: "bluesky" | "twitter" | "mastodon" | "facebook" | "instagram" | "tiktok" | "linkedin" | "threads" | "blog"
+      provider: "bluesky" | "twitter" | "mastodon" | "facebook" | "instagram" | "tiktok" | "linkedin" | "threads" | "blog" | "opentimes"
       handle: string
       scope: "tracked" | "all"
       mode: "preview" | "execute"

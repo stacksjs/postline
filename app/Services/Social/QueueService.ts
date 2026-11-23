@@ -1,4 +1,5 @@
 import { log } from '@stacksjs/logging'
+import { isDue, MAX_ATTEMPTS, nextAttemptAt } from '../../Support/Social/retry'
 import type { PublishTarget } from '../../Support/Social/targets'
 import type { CrosspostService } from './CrosspostService'
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
@@ -537,7 +538,7 @@ export class QueueService {
    * pending or failed are published, so a network that already has the post
    * never gets it twice.
    */
-  async publishNow(id: number): Promise<{ postId: number, results: CrosspostTargetResult[] }> {
+  async publishNow(id: number, options: { retriesOnly?: boolean } = {}): Promise<{ postId: number, results: CrosspostTargetResult[] }> {
     const post = await this.findPublishable(id)
     const wasPublished = String(post.status) === 'published'
     // Read before the claim: a post whose image is gone is refused here, with
@@ -545,12 +546,23 @@ export class QueueService {
     const content = await this.hydrateContent(post)
     await this.claim(post)
 
-    const placeholders = await database
+    const pending: any[] = await database
       .selectFrom('post_targets')
       .selectAll()
       .where('post_id', '=', post.id)
       .where('status', 'in', ['draft', 'scheduled', 'failed'])
       .execute()
+    // An automatic retry sends only the networks whose wait is over. One
+    // that was refused, or is still waiting, is left exactly as it is.
+    const placeholders = options.retriesOnly
+      ? pending.filter(row => row.status === 'failed' && isDue(row.next_attempt_at))
+      : pending
+
+    // How many sends each target has had, carried across this one: the
+    // provider services write fresh rows, which start again from nothing.
+    const attemptsBefore = new Map<string, number>(
+      placeholders.map((row: any) => [recordKey(row.provider, row.social_identity_id), Number(row.attempts) || 0]),
+    )
 
     // De-duplicated per account, not per network: two Bluesky accounts on one
     // post are two targets and both publish.
@@ -610,6 +622,26 @@ export class QueueService {
         created_at: finishedAt,
         updated_at: finishedAt,
       }).execute()
+    }
+
+    // Count the send on every network that failed, and say when it goes again.
+    // A manual "publish now" counts too, so a network that keeps failing
+    // stops being retried whoever was pressing the button.
+    for (const result of results) {
+      if (result.ok) continue
+      const attempts = (attemptsBefore.get(recordKey(result.provider, result.identityId)) ?? 0) + 1
+      const next = nextAttemptAt(result.retry, attempts)
+      let failedRows = database.updateTable('post_targets')
+        .set({ attempts, next_attempt_at: next })
+        .where('post_id', '=', post.id)
+        .where('provider', '=', result.provider)
+        .where('status', '=', 'failed')
+      failedRows = result.identityId
+        ? failedRows.where('social_identity_id', '=', result.identityId)
+        : failedRows.where('social_identity_id', 'is', null)
+      await failedRows.execute()
+      if (next)
+        log.info(`[postline] post ${post.id} will be sent to ${result.target || result.provider} again at ${next} UTC (attempt ${attempts + 1} of ${MAX_ATTEMPTS})`)
     }
 
     for (const result of results) {
@@ -798,6 +830,28 @@ export class QueueService {
         // Swallowed so one post cannot stop the rest, but never silently.
         log.error(`[postline] scheduled post ${post.id} could not be published: ${error instanceof Error ? error.message : String(error)}`)
         failed += 1
+      }
+    }
+
+    // Networks that failed for a reason sending again can fix, whose wait is
+    // over. Each is sent on its own: the networks that have the post are not
+    // touched.
+    const retryable = await database
+      .selectFrom('post_targets')
+      .select(['post_id', 'next_attempt_at'])
+      .where('status', '=', 'failed')
+      .where('next_attempt_at', '<=', now())
+      .execute()
+    const retryPosts = [...new Set<number>(retryable.map((row: any) => Number(row.post_id)))]
+    for (const postId of retryPosts) {
+      try {
+        const { results } = await this.publishNow(postId, { retriesOnly: true })
+        if (results.some(result => result.ok)) published += 1
+      }
+      catch (error) {
+        if (error instanceof AlreadyPublishingError)
+          continue
+        log.error(`[postline] retry of post ${postId} could not run: ${error instanceof Error ? error.message : String(error)}`)
       }
     }
 

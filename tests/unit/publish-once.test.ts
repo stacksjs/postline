@@ -399,3 +399,117 @@ describe('a queued post whose image has gone missing', () => {
     expect((await targets(postId))[0]?.failure_reason).toContain('image attached to this post is missing')
   })
 })
+
+describe('a network that fails for a reason sending again can fix', () => {
+  /** A network that fails with the given hint until told to recover. */
+  function flaky(provider: string, retry: CrosspostTargetResult['retry']): Fake & { recover: () => void } {
+    const sends: number[] = []
+    let failing = true
+    const publisher: ProviderPublisher = {
+      async publishToPost(post): Promise<CrosspostTargetResult> {
+        sends.push(post.id)
+        await database.insertInto('post_targets').values({
+          uuid: crypto.randomUUID(),
+          provider,
+          status: failing ? 'failed' : 'published',
+          failure_reason: failing ? 'Too many requests.' : null,
+          post_id: post.id,
+        }).execute()
+        return { provider, ok: !failing, error: failing ? 'Too many requests.' : undefined, target: provider, ...(failing ? { retry } : {}) } as CrosspostTargetResult
+      },
+    }
+    return { publisher, sends, recover: () => { failing = false } }
+  }
+
+  async function retryState(postId: number): Promise<{ status: string, attempts: number, next_attempt_at: string | null }> {
+    return await database.selectFrom('post_targets').select(['status', 'attempts', 'next_attempt_at']).where('post_id', '=', postId).executeTakeFirstOrThrow()
+  }
+
+  async function makeDue(postId: number): Promise<void> {
+    await database.updateTable('post_targets').set({ next_attempt_at: stamp(-1_000) }).where('post_id', '=', postId).execute()
+  }
+
+  /** Other tests share this database: leave nothing waiting for their scheduler runs. */
+  async function settle(postId: number): Promise<void> {
+    await database.updateTable('post_targets').set({ next_attempt_at: null }).where('post_id', '=', postId).execute()
+  }
+
+  test('a 429 with Retry-After: 60 is retried after a minute and not before', async () => {
+    const blog = flaky('blog', { kind: 'rate-limited', afterSeconds: 60 })
+    const queue = queueWith({ blog })
+    const { postId } = await queue.save({ text: 'rate limited', providers: ['blog'] })
+
+    await queue.publishNow(postId)
+    const waiting = await retryState(postId)
+    expect(waiting.status).toBe('failed')
+    expect(Number(waiting.attempts)).toBe(1)
+    const wait = Date.parse(`${String(waiting.next_attempt_at).replace(' ', 'T')}Z`) - Date.now()
+    expect(wait).toBeGreaterThan(55_000)
+    expect(wait).toBeLessThanOrEqual(61_000)
+
+    // Before the minute is up the scheduler leaves it alone.
+    await queue.publishDue()
+    expect(blog.sends).toEqual([postId])
+
+    // After it, the network is sent again and, having recovered, takes it.
+    blog.recover()
+    await makeDue(postId)
+    await queue.publishDue()
+    expect(blog.sends).toEqual([postId, postId])
+    expect(await status(postId)).toBe('published')
+    expect((await targets(postId)).map(row => row.status)).toEqual(['published'])
+  })
+
+  test('a refusal is never retried', async () => {
+    const blog = flaky('blog', { kind: 'permanent' })
+    const queue = queueWith({ blog })
+    const { postId } = await queue.save({ text: 'refused', providers: ['blog'] })
+
+    await queue.publishNow(postId)
+    expect((await retryState(postId)).next_attempt_at).toBeNull()
+
+    await queue.publishDue()
+    expect(blog.sends).toEqual([postId])
+  })
+
+  test('it gives up after five sends and waits for the owner', async () => {
+    const blog = flaky('blog', { kind: 'transient' })
+    const queue = queueWith({ blog })
+    const { postId } = await queue.save({ text: 'keeps failing', providers: ['blog'] })
+
+    await queue.publishNow(postId)
+    for (let run = 0; run < 8; run++) {
+      await makeDue(postId).catch(() => {})
+      const state = await retryState(postId)
+      if (Number(state.attempts) >= 5) {
+        await database.updateTable('post_targets').set({ next_attempt_at: null }).where('post_id', '=', postId).execute()
+        break
+      }
+      await queue.publishDue()
+    }
+
+    const final = await retryState(postId)
+    expect(blog.sends).toHaveLength(5)
+    expect(Number(final.attempts)).toBe(5)
+    expect(final.status).toBe('failed')
+    await settle(postId)
+  })
+
+  test('only the network that is due is sent again', async () => {
+    const blog = fakeNetwork('blog')
+    const mastodon = flaky('mastodon', { kind: 'transient' })
+    const queue = queueWith({ blog, mastodon })
+    const { postId } = await queue.save({ text: 'one of two', providers: ['blog', 'mastodon'] })
+
+    await queue.publishNow(postId)
+    expect(await status(postId)).toBe('published')
+
+    mastodon.recover()
+    await database.updateTable('post_targets').set({ next_attempt_at: stamp(-1_000) }).where('post_id', '=', postId).where('status', '=', 'failed').execute()
+    await queue.publishDue()
+
+    expect(blog.sends).toEqual([postId])
+    expect(mastodon.sends).toEqual([postId, postId])
+    expect((await targets(postId)).map(row => row.status).sort()).toEqual(['published', 'published'])
+  })
+})

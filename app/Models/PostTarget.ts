@@ -64,6 +64,22 @@ export default defineModel({
       validation: { rule: schema.string().max(1000).optional() },
       factory: faker => faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.1 }) ?? null,
     },
+    // How many times this target has been sent and failed, and when it is
+    // sent again. A null `nextAttemptAt` on a failed target means it will
+    // not be retried: the network refused it, or it ran out of attempts.
+    attempts: {
+      required: false,
+      fillable: true,
+      default: 0,
+      validation: { rule: schema.number().min(0).optional() },
+      factory: () => 0,
+    },
+    nextAttemptAt: {
+      required: false,
+      fillable: true,
+      validation: { rule: schema.timestamp().optional() },
+      factory: () => null,
+    },
     metrics: {
       required: false,
       fillable: true,
