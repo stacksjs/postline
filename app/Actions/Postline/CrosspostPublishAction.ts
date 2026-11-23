@@ -4,7 +4,8 @@ import { response } from '@stacksjs/router'
 import { actionFailure } from '../../Support/Http/action-error'
 import { crosspost, crosspostProviders } from '../../Services/Social/CrosspostService'
 import { parseTargets } from '../../Support/Social/targets'
-import { readImageInput } from '../../Support/Social/image-input'
+import { readImagesInput } from '../../Support/Social/image-input'
+import { mediaObjections } from '../../Support/Social/media-rules'
 import { persistTempMedia, removeTempMedia } from '../../Support/Social/uploads'
 import { parseVariantsField } from '../../Support/Social/variants'
 
@@ -32,26 +33,31 @@ export default new Action({
         }
       : undefined
 
-    const imageInput = await readImageInput(request)
+    const imageInput = await readImagesInput(request)
     if (!imageInput.ok)
       return response.json({ ok: false, error: imageInput.error }, { status: 422 })
-    const imageUrl = imageInput.url
-    const imageAlt = String(request.get('image_alt') || '').trim()
+
+    // Refused before anything is sent, naming the network that objects.
+    const objections = mediaObjections(providers.map(target => target.provider), imageInput.images.map(image => image.bytes?.length ? { bytes: image.bytes.length, mimeType: image.mimeType } : {}))
+    if (objections.length)
+      return response.json({ ok: false, error: `${objections.join(' ')} Use a different image, or leave that network out.` }, { status: 422 })
 
     const media: NonNullable<Parameters<typeof crosspost.publish>[2]>['media'] = []
-    let tempMediaFile: string | null = null
-    const uploadedImage = imageInput.uploaded
-    if (uploadedImage) {
-      // Persist briefly so URL-only providers (Instagram/Threads) can fetch the
-      // upload server-side; byte-upload providers use the bytes. Removed once
-      // publishing finishes (Meta downloads during container creation, so the
-      // file is safe to delete by then).
-      const temp = await persistTempMedia(uploadedImage.bytes, uploadedImage.mimeType)
-      tempMediaFile = temp?.filename ?? null
-      media.push({ ...uploadedImage, url: temp?.url, altText: imageAlt || undefined })
+    const tempMediaFiles: string[] = []
+    for (const image of imageInput.images) {
+      if (image.bytes?.length) {
+        // Persist briefly so URL-only providers (Instagram/Threads) can fetch
+        // the upload server-side; byte-upload providers use the bytes.
+        // Removed once publishing finishes (Meta downloads during container
+        // creation, so the file is safe to delete by then).
+        const temp = await persistTempMedia(image.bytes, image.mimeType || 'image/jpeg')
+        if (temp?.filename) tempMediaFiles.push(temp.filename)
+        media.push({ bytes: image.bytes, mimeType: image.mimeType, url: temp?.url, altText: image.altText })
+      }
+      else if (image.url) {
+        media.push({ url: image.url, altText: image.altText })
+      }
     }
-    if (imageUrl)
-      media.push({ url: imageUrl, altText: imageAlt || undefined })
 
     // Optional multi-segment thread: JSON array of post texts. Segments are
     // reply-chained on providers that support it (Bluesky).
@@ -88,7 +94,7 @@ export default new Action({
       return actionFailure(error, 422)
     }
     finally {
-      if (tempMediaFile) await removeTempMedia(tempMediaFile)
+      for (const file of tempMediaFiles) await removeTempMedia(file)
     }
   },
 })

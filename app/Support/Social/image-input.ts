@@ -78,6 +78,68 @@ export async function readImageInput(request: ImageRequest): Promise<ImageInput>
   return { ok: true, uploaded, url }
 }
 
+export interface PostImage {
+  bytes?: Uint8Array
+  url?: string
+  mimeType?: string
+  altText?: string
+}
+
+export type ImagesInput
+  = | { ok: true, images: PostImage[] }
+    | { ok: false, error: string }
+
+interface ImagesRequest extends ImageRequest {
+  getFiles?: (key: string) => unknown[]
+}
+
+/** The most images one request may attach. */
+export const MAX_REQUEST_IMAGES = 4
+
+function altTextList(raw: unknown): string[] {
+  if (raw === undefined || raw === null || raw === '') return []
+  try {
+    const parsed = JSON.parse(String(raw))
+    return Array.isArray(parsed) ? parsed.map(value => String(value ?? '').trim().slice(0, 1000)) : []
+  }
+  catch {
+    return []
+  }
+}
+
+/**
+ * Read every image a request attaches, in order, each with its alt text.
+ *
+ * Several uploads come as repeated `images` fields with their alt text as a
+ * JSON list in `image_alts`, in the same order. The older single `image`
+ * upload with `image_alt`, and an `image_url`, still work, so a client that
+ * sends one image does not change.
+ */
+export async function readImagesInput(request: ImagesRequest): Promise<ImagesInput> {
+  const images: PostImage[] = []
+  const alts = altTextList(request.get('image_alts'))
+
+  const files = request.getFiles?.('images') ?? []
+  for (const [index, file] of files.entries()) {
+    const raw = await readUploadedImage(file)
+    if (!raw) continue
+    const checked = checkImageBytes(raw.bytes)
+    if (!checked.ok)
+      return { ok: false, error: files.length > 1 ? `Image ${index + 1}: ${checked.error}` : checked.error }
+    images.push({ bytes: checked.bytes, mimeType: checked.mimeType, altText: alts[index] || undefined })
+  }
+
+  const single = await readImageInput(request)
+  if (!single.ok) return single
+  const singleAlt = String(request.get('image_alt') || '').trim().slice(0, 1000) || undefined
+  if (single.uploaded) images.push({ ...single.uploaded, altText: singleAlt })
+  if (single.url) images.push({ url: single.url, altText: singleAlt })
+
+  if (images.length > MAX_REQUEST_IMAGES)
+    return { ok: false, error: `A post can carry up to ${MAX_REQUEST_IMAGES} images; this one has ${images.length}.` }
+  return { ok: true, images }
+}
+
 /**
  * Download an image a post refers to by address. Returns null when it cannot
  * be fetched or is not an image; the caller decides what a missing image means.

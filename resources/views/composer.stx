@@ -114,20 +114,30 @@
           </div>
         </div>
 
+        {{--
+          Attached images, up to four, each with the text a screen reader
+          says in its place. Images saved on a post being edited show as one
+          row: attaching new ones replaces them.
+        --}}
+        <div class="grid hidden gap-2 pb-3 px-3" :class="{ 'hidden': imageRows().length === 0 }" data-attached-images>
+          <div class="flex gap-2 items-center px-2.5 py-2 bg-panel-2 border border-line rounded-xl" x-for="image in imageRows()" data-attached-image>
+            <span class="shrink-0 h-4 w-4 text-muted i-hugeicons-image-01" aria-hidden="true"></span>
+            <span class="shrink-0 max-w-40 text-ink text-xs truncate" :text="image.name" :title="image.name"></span>
+            <input class="flex-1 px-2.5 h-8 min-w-0 text-ink text-ui bg-panel border border-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="1000" placeholder="Describe it for people who cannot see it" x-show="image.editable" :value="image.alt" :aria-label="image.altLabel" @input="setImageAlt(image.id, $event)" data-image-alt>
+            <span class="flex-1 text-muted text-xs" x-show="!image.editable">Saved with the post. Attach new images to replace them.</span>
+            <button class="inline-flex items-center justify-center shrink-0 h-6 w-6 text-muted hover:text-ink rounded-md transition-colors" type="button" :aria-label="image.removeLabel" @click="removeImage(image.id)">
+              <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
+
         <footer class="flex flex-col gap-3 items-stretch justify-between sm:flex-row sm:items-center p-3 border-line border-t">
           <div class="flex gap-2 items-center min-w-0">
             <span class="min-w-0 text-muted text-xs truncate" data-bluesky-count>0 / 300 characters</span>
-            <span class="hidden gap-1.5 items-center px-2.5 max-w-48 min-h-7 font-semibold text-muted text-xs bg-panel-2 border border-line rounded-lg" data-attach-chip>
-              <span class="shrink-0 h-3.5 w-3.5 i-hugeicons-image-01" aria-hidden="true"></span>
-              <span class="truncate" data-attach-name></span>
-              <button class="inline-flex items-center justify-center shrink-0 h-4 w-4 text-muted hover:text-ink transition-colors" type="button" aria-label="Remove attached image" data-attach-clear>
-                <span class="h-3 w-3 i-hugeicons-cancel-01" aria-hidden="true"></span>
-              </button>
-            </span>
           </div>
           <div class="flex flex-nowrap gap-2 items-center justify-end w-full sm:w-auto">
-            <input class="hidden" type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="Attach image" data-attach-input>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach image" title="Attach image" data-attach-button>
+            <input class="hidden" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple aria-label="Attach images" data-attach-input>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach images" title="Attach images (up to 4)" data-attach-button>
               <span class="h-4 w-4 i-hugeicons-image-01" aria-hidden="true"></span>
             </button>
             <input class="hidden px-2 h-9 text-ink text-xs bg-panel border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="datetime-local" aria-label="Schedule time" data-compose-schedule>
@@ -163,6 +173,25 @@
     const composerHandlers = { toggleProvider: null }
     const toggleProvider = key => composerHandlers.toggleProvider?.(key)
 
+    // Attached images: { id, file, name, alt, kept }. `kept` stands for the
+    // images already saved on a post being edited, which have no file here.
+    const MAX_IMAGES = 4
+    const attachedImages = state([])
+    const imageRows = derived(() => attachedImages().map((image, index) => ({
+      id: image.id,
+      name: image.name,
+      alt: image.alt,
+      editable: !image.kept,
+      altLabel: `Alt text for image ${index + 1}`,
+      removeLabel: image.kept ? 'Remove the saved images' : `Remove ${image.name}`,
+    })))
+    const setImageAlt = (id, event) => {
+      const alt = String(event?.target?.value || '')
+      attachedImages.set(attachedImages().map(image => image.id === id ? { ...image, alt } : image))
+    }
+    const imageHandlers = { remove: null }
+    const removeImage = id => imageHandlers.remove?.(id)
+
     ;(() => {
       const root = document.querySelector('[data-testid="composer-page"]')
       if (!root) return
@@ -185,18 +214,22 @@
       const scheduleInput = root.querySelector('[data-compose-schedule]')
       const attachButton = root.querySelector('[data-attach-button]')
       const attachInput = root.querySelector('[data-attach-input]')
-      const attachChip = root.querySelector('[data-attach-chip]')
-      const attachName = root.querySelector('[data-attach-name]')
-      const attachClear = root.querySelector('[data-attach-clear]')
 
-      const attachedFile = () => attachInput?.files?.[0] || undefined
+      /** The images attached in this session, with their alt text; saved ones are not included. */
+      const attachedFiles = () => attachedImages().filter(image => image.file).map(image => ({ file: image.file, alt: image.alt.trim() }))
+      /** Add the attached images to a request: repeated `images`, alt text as a list in the same order. */
+      const appendImages = (form) => {
+        const files = attachedFiles()
+        for (const entry of files) form.append('images', entry.file, entry.file.name)
+        if (files.length) form.set('image_alts', JSON.stringify(files.map(entry => entry.alt)))
+        return files.length
+      }
       const composeTitle = root.querySelector('[data-compose-title]')
       const composedTitle = () => composeTitle?.value.trim() || undefined
 
       const clearAttachment = () => {
         if (attachInput) attachInput.value = ''
-        attachChip?.classList.add('hidden')
-        attachChip?.classList.remove('inline-flex')
+        attachedImages.set([])
       }
       const postsRoot = root.querySelector('[data-composer-posts]')
       const addPostButton = root.querySelector('[data-add-post]')
@@ -984,13 +1017,10 @@
 
         // Existing image → show a "kept" chip; attaching a new file replaces,
         // clearing it marks removal.
-        editHadImage = Boolean(item.image)
+        const saved = item.images?.length || (item.image ? 1 : 0)
+        editHadImage = saved > 0
         editRemoveImage = false
-        if (item.image) {
-          if (attachName) attachName.textContent = item.image.url ? 'Current image (URL)' : 'Current image'
-          attachChip?.classList.remove('hidden')
-          attachChip?.classList.add('inline-flex')
-        }
+        attachedImages.set(saved ? [{ id: 'saved', file: null, name: saved === 1 ? '1 saved image' : `${saved} saved images`, alt: '', kept: true }] : [])
 
         updateCount()
         void updateLinkPreview(activePost)
@@ -1036,9 +1066,9 @@
         }
         const editImageUrl = composeImage?.value.trim()
         if (editImageUrl) form.set('image_url', editImageUrl)
-        const editFile = attachedFile()
-        if (editFile) form.set('image', editFile, editFile.name)
-        else if (editRemoveImage) form.set('remove_image', '1')
+        // New images replace the saved ones; with none, the saved ones stay
+        // unless their row was removed.
+        if (!appendImages(form) && editRemoveImage) form.set('remove_image', '1')
         // Always sent, never conditional: the server treats an absent field as
         // "keep what is stored", so clearing every override has to be explicit.
         form.set('variants', JSON.stringify(variantsPayload()))
@@ -1096,8 +1126,7 @@
         }
         const queueImageUrl = composeImage?.value.trim()
         if (queueImageUrl) form.set('image_url', queueImageUrl)
-        const queueFile = attachedFile()
-        if (queueFile) form.set('image', queueFile, queueFile.name)
+        appendImages(form)
         const queueVariants = variantsPayload()
         if (Object.keys(queueVariants).length) form.set('variants', JSON.stringify(queueVariants))
 
@@ -1175,7 +1204,7 @@
           : undefined
         const imageUrl = composeImage?.value.trim()
         const image = imageUrl ? { url: imageUrl } : undefined
-        return await social.publishCrosspost({ text, title: composedTitle(), providers: targetProviders, external, image, imageFile: attachedFile(), variants: variantsPayload() })
+        return await social.publishCrosspost({ text, title: composedTitle(), providers: targetProviders, external, image, imageFiles: attachedFiles(), variants: variantsPayload() })
       }
 
       const publish = async () => {
@@ -1250,7 +1279,7 @@
               providers: targetProviders,
               external,
               image: imageUrl ? { url: imageUrl } : undefined,
-              imageFile: attachedFile(),
+              imageFiles: attachedFiles(),
             }))
           }
           else {
@@ -1348,32 +1377,38 @@
       scheduleInput?.addEventListener('input', updatePublishLabel)
       attachButton?.addEventListener('click', () => attachInput?.click())
       attachInput?.addEventListener('change', () => {
-        const file = attachedFile()
-        if (!file) {
-          clearAttachment()
+        const picked = [...(attachInput.files || [])]
+        // Cleared so choosing the same file again still fires `change`.
+        attachInput.value = ''
+        if (!picked.length) return
+
+        // New images replace the ones saved on a post being edited.
+        const current = attachedImages().filter(image => !image.kept)
+        const next = [...current, ...picked.map(file => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, file, name: file.name, alt: '', kept: false }))]
+        if (next.length > MAX_IMAGES) {
+          setStatus(`A post can carry up to ${MAX_IMAGES} images. Remove one first.`, 'error', { title: 'Attachment' })
           return
         }
-        // Each network has its own size and format rules; Bluesky's 1 MB cap
-        // used to be applied to all of them. The server runs the same check
-        // on save, so a network added afterwards is still caught.
+
+        // Each network has its own count, size and format rules; Bluesky's
+        // 1 MB cap used to be applied to all of them. The server runs the same
+        // check on save, so a network added afterwards is still caught.
         const objections = window.postlineMediaObjections?.(
           selectedConnected().map(target => target.provider),
-          [{ bytes: file.size, mimeType: file.type }],
+          next.map(image => ({ bytes: image.file.size, mimeType: image.file.type })),
         ) || []
         if (objections.length) {
-          clearAttachment()
           setStatus(`${objections.join(' ')} Use a different image, or leave that network out.`, 'error', { title: 'Attachment' })
           return
         }
-        if (attachName) attachName.textContent = file.name
-        attachChip?.classList.remove('hidden')
-        attachChip?.classList.add('inline-flex')
+        attachedImages.set(next)
       })
-      attachClear?.addEventListener('click', () => {
-        // In edit mode, clearing an existing image marks it for removal.
-        if (editingId && editHadImage && !attachedFile()) editRemoveImage = true
-        clearAttachment()
-      })
+      imageHandlers.remove = (id) => {
+        const removed = attachedImages().find(image => image.id === id)
+        // Removing the saved images' row marks them for removal on save.
+        if (removed?.kept && editingId && editHadImage) editRemoveImage = true
+        attachedImages.set(attachedImages().filter(image => image.id !== id))
+      }
       addPostButton?.addEventListener('click', addPost)
       previewButton?.addEventListener('click', () => {
         const text = activeTextarea()?.value.trim()

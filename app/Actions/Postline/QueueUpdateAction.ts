@@ -6,7 +6,7 @@ import { actionFailure } from '../../Support/Http/action-error'
 import { crosspostProviders } from '../../Services/Social/CrosspostService'
 import { postQueue } from '../../Services/Social/QueueService'
 import { parseTargets, targetKey } from '../../Support/Social/targets'
-import { readImageInput } from '../../Support/Social/image-input'
+import { readImagesInput } from '../../Support/Social/image-input'
 import { parseVariantsField } from '../../Support/Social/variants'
 
 export default new Action({
@@ -33,24 +33,19 @@ export default new Action({
       ? { uri: externalUri, title: externalTitle, description: String(request.get('external_description') || '').trim() || undefined }
       : null
 
-    // Image tri-state: a new upload/url replaces; `remove_image=1` clears;
-    // otherwise (undefined) the stored image is kept.
-    const imageAlt = String(request.get('image_alt') || '').trim() || undefined
-    const imageInput = await readImageInput(request)
+    // Images tri-state: new uploads or an address replace every stored image;
+    // `remove_image=1` clears them; otherwise (undefined) they are kept.
+    const imageInput = await readImagesInput(request)
     if (!imageInput.ok)
       return response.json({ ok: false, error: imageInput.error }, { status: 422 })
-    const uploaded = imageInput.uploaded
-    const imageUrl = imageInput.url
     const removeImage = String(request.get('remove_image') || '') === '1'
-    const image = uploaded
-      ? { ...uploaded, altText: imageAlt }
-      : imageUrl
-        ? { url: imageUrl, altText: imageAlt }
-        : removeImage
-          ? null
-          : undefined
+    const images = imageInput.images.length
+      ? imageInput.images
+      : removeImage
+        ? null
+        : undefined
 
-    // Variants tri-state, mirroring the image handling above: an omitted field
+    // Variants tri-state, mirroring the images above: an omitted field
     // keeps what is stored, a submitted-but-empty one clears. A malformed one
     // is rejected rather than treated as empty — clearing every stored override
     // is destructive and must never be the result of a payload we misread.
@@ -67,7 +62,7 @@ export default new Action({
     }
 
     try {
-      const data = await postQueue.update(id, { text, providers, title, scheduledAt, external, image, variants })
+      const data = await postQueue.update(id, { text, providers, title, scheduledAt, external, images, variants })
       return response.json({ ok: true, data })
     }
     catch (error) {

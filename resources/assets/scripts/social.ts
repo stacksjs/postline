@@ -59,6 +59,8 @@ export interface CrosspostInput {
   image?: { url: string, altText?: string }
   /** Attached image file — uploaded to providers that accept bytes (Bluesky). */
   imageFile?: File
+  /** Several attached images, in order, each with its alt text. */
+  imageFiles?: Array<{ file: File, alt?: string }>
   /** Multi-segment thread; reply-chained on providers that support it. */
   thread?: string[]
   /**
@@ -169,6 +171,10 @@ export async function publishCrosspost(input: CrosspostInput): Promise<{ postId:
   }
   if (input.imageFile)
     body.set('image', input.imageFile, input.imageFile.name)
+  if (input.imageFiles?.length) {
+    for (const entry of input.imageFiles) body.append('images', entry.file, entry.file.name)
+    body.set('image_alts', JSON.stringify(input.imageFiles.map(entry => entry.alt || '')))
+  }
   if (input.variants && Object.keys(input.variants).length)
     body.set('variants', JSON.stringify(input.variants))
 

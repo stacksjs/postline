@@ -140,11 +140,32 @@ function missedReason(scheduledAt: string): string {
  * name, instead of letting it fail on that network at publish time. An image
  * given by address is not in hand and is not measured.
  */
-function assertMediaAllowed(providers: string[], image: SaveQueueInput['image'] | undefined): void {
-  if (!image?.bytes?.length) return
-  const objections = mediaObjections(providers, [{ bytes: image.bytes.length, mimeType: image.mimeType }])
+function assertMediaAllowed(providers: string[], images: QueueImage[] | undefined): void {
+  if (!images?.length) return
+  const objections = mediaObjections(providers, images.map(image => image.bytes?.length ? { bytes: image.bytes.length, mimeType: image.mimeType } : {}))
   if (objections.length)
     throw new UserFacingError(`${objections.join(' ')} Use a different image, or leave that network out.`)
+}
+
+/**
+ * Write each uploaded image to the media folder and describe all of them for
+ * the stored content. An image given by address is kept as its address.
+ */
+async function storeImages(postUuid: string, images: QueueImage[]): Promise<NonNullable<StoredContent['media']>> {
+  const media: NonNullable<StoredContent['media']> = []
+  for (const image of images) {
+    if (image.bytes?.length) {
+      const extension = (image.mimeType || 'image/jpeg').split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'jpg'
+      const filename = `${postUuid}-${uuid().slice(0, 8)}.${extension}`
+      await mkdir(MEDIA_DIR, { recursive: true })
+      await Bun.write(join(MEDIA_DIR, filename), image.bytes)
+      media.push({ path: filename, mimeType: image.mimeType, altText: image.altText })
+    }
+    else if (image.url) {
+      media.push({ url: image.url, altText: image.altText })
+    }
+  }
+  return media
 }
 
 /** Thrown when a queued post's attached image is no longer on disk. */
@@ -217,18 +238,42 @@ export interface SaveQueueInput {
   /** UTC `YYYY-MM-DD HH:MM:SS`; omitted → saved as a draft. */
   scheduledAt?: string | null
   external?: { uri: string, title: string, description?: string } | null
-  /** Attached image: raw bytes (stored to disk until publish) or a URL. */
-  image?: { bytes?: Uint8Array, url?: string, mimeType?: string, altText?: string } | null
+  /** One attached image: raw bytes (stored to disk until publish) or a URL. */
+  image?: QueueImage | null
+  /** Several images, in order, up to four. Wins over `image` when given. */
+  images?: QueueImage[] | null
   /** Per-provider body overrides; providers without one publish `text`. */
   variants?: VariantMap | null
 }
 
 /**
- * Edit input. Both `image` and `variants` are tri-state:
- * undefined = keep what is stored, null = clear, object = replace.
+ * Edit input. The images and `variants` are tri-state: undefined keeps what
+ * is stored, null (or an empty list) clears it, a value replaces it.
  */
-export interface UpdateQueueInput extends Omit<SaveQueueInput, 'image'> {
-  image?: { bytes?: Uint8Array, url?: string, mimeType?: string, altText?: string } | null
+export type UpdateQueueInput = SaveQueueInput
+
+/** An image on a queued post. */
+export interface QueueImage {
+  bytes?: Uint8Array
+  url?: string
+  mimeType?: string
+  altText?: string
+}
+
+/** The most images a post carries: the most any network takes. */
+export const MAX_POST_IMAGES = 4
+
+/** The images an input names. Undefined keeps what is stored; an empty list removes it. */
+function imagesOf(input: { image?: QueueImage | null, images?: QueueImage[] | null }): QueueImage[] | undefined {
+  const usable = (image: QueueImage | null | undefined): image is QueueImage => Boolean(image && (image.bytes?.length || image.url))
+  if (input.images !== undefined) {
+    const images = (input.images ?? []).filter(usable)
+    if (images.length > MAX_POST_IMAGES)
+      throw new UserFacingError(`A post can carry up to ${MAX_POST_IMAGES} images; this one has ${images.length}.`)
+    return images
+  }
+  if (input.image === undefined) return undefined
+  return usable(input.image) ? [input.image] : []
 }
 
 /** Editable snapshot of a queued post for prefilling the composer. */
@@ -243,7 +288,10 @@ export interface QueueEditView {
   /** The exact targets, as specs, so an edit preselects the same accounts. */
   targets: string[]
   external: { uri: string, title: string, description?: string } | null
+  /** The first image, as before. */
   image: { kind: 'file' | 'url', url: string | null } | null
+  /** Every image, in order, with its alt text. */
+  images: Array<{ kind: 'file' | 'url', url: string | null, altText: string | null }>
   /** Per-provider overrides, so an edit round-trips them instead of dropping them. */
   variants: VariantMap | null
 }
@@ -269,7 +317,8 @@ export class QueueService {
       throw new Error('Post text is required.')
 
     const targets = await this.validTargets(input.providers)
-    assertMediaAllowed(targets.map(target => target.provider), input.image)
+    const images = imagesOf(input)
+    assertMediaAllowed(targets.map(target => target.provider), images)
 
     const scheduledAt = input.scheduledAt?.trim() || null
     if (scheduledAt) {
@@ -291,16 +340,7 @@ export class QueueService {
     if (input.external?.uri && input.external.title) stored.external = input.external
     const savedVariants = sanitizeVariants(input.variants)
     if (savedVariants) stored.variants = savedVariants
-    if (input.image?.bytes?.length) {
-      const extension = (input.image.mimeType || 'image/jpeg').split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'jpg'
-      const filename = `${postUuid}.${extension}`
-      await mkdir(MEDIA_DIR, { recursive: true })
-      await Bun.write(join(MEDIA_DIR, filename), input.image.bytes)
-      stored.media = [{ path: filename, mimeType: input.image.mimeType, altText: input.image.altText }]
-    }
-    else if (input.image?.url) {
-      stored.media = [{ url: input.image.url, altText: input.image.altText }]
-    }
+    if (images?.length) stored.media = await storeImages(postUuid, images)
 
     await database.insertInto('posts').values({
       uuid: postUuid,
@@ -442,6 +482,7 @@ export class QueueService {
       targets: targets.map(targetKey),
       external: stored?.external || null,
       image: media ? { kind: media.path ? 'file' : 'url', url: media.url || null } : null,
+      images: (stored?.media || []).map(item => ({ kind: item.path ? 'file' as const : 'url' as const, url: item.url || null, altText: item.altText || null })),
       variants: sanitizeVariants(stored?.variants) || null,
     }
   }
@@ -460,7 +501,8 @@ export class QueueService {
       throw new Error('Post text is required.')
 
     const targets = await this.validTargets(input.providers)
-    assertMediaAllowed(targets.map(target => target.provider), input.image)
+    const images = imagesOf(input)
+    assertMediaAllowed(targets.map(target => target.provider), images)
 
     const scheduledAt = input.scheduledAt?.trim() || null
     if (scheduledAt) {
@@ -483,21 +525,12 @@ export class QueueService {
     const updatedVariants = resolveStoredVariants(input.variants, existing?.variants)
     if (updatedVariants) stored.variants = updatedVariants
 
-    // Media: replace / remove / keep. Replacing or removing drops the old file.
-    if (input.image === null || input.image?.bytes?.length || input.image?.url) {
+    // Media: replace / remove / keep. Replacing or removing drops the old files.
+    if (images !== undefined) {
       await this.removeStoredMedia(post)
+      if (images.length) stored.media = await storeImages(String(post.uuid), images)
     }
-    if (input.image?.bytes?.length) {
-      const extension = (input.image.mimeType || 'image/jpeg').split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'jpg'
-      const filename = `${post.uuid}-${uuid().slice(0, 8)}.${extension}`
-      await mkdir(MEDIA_DIR, { recursive: true })
-      await Bun.write(join(MEDIA_DIR, filename), input.image.bytes)
-      stored.media = [{ path: filename, mimeType: input.image.mimeType, altText: input.image.altText }]
-    }
-    else if (input.image?.url) {
-      stored.media = [{ url: input.image.url, altText: input.image.altText }]
-    }
-    else if (input.image === undefined && existing?.media?.length) {
+    else if (existing?.media?.length) {
       stored.media = existing.media
     }
 

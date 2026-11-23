@@ -5,7 +5,7 @@ import { actionFailure } from '../../Support/Http/action-error'
 import { crosspostProviders } from '../../Services/Social/CrosspostService'
 import { postQueue } from '../../Services/Social/QueueService'
 import { parseTargets, targetKey } from '../../Support/Social/targets'
-import { readImageInput } from '../../Support/Social/image-input'
+import { readImagesInput } from '../../Support/Social/image-input'
 import { parseVariantsField } from '../../Support/Social/variants'
 
 export default new Action({
@@ -33,17 +33,10 @@ export default new Action({
         }
       : null
 
-    const imageAlt = String(request.get('image_alt') || '').trim() || undefined
-    const imageInput = await readImageInput(request)
+    const imageInput = await readImagesInput(request)
     if (!imageInput.ok)
       return response.json({ ok: false, error: imageInput.error }, { status: 422 })
-    const uploadedImage = imageInput.uploaded
-    const imageUrl = imageInput.url
-    const image = uploadedImage
-      ? { ...uploadedImage, altText: imageAlt }
-      : imageUrl
-        ? { url: imageUrl, altText: imageAlt }
-        : null
+    const images = imageInput.images
 
     // Rejected rather than dropped: silently discarding the per-network text
     // would publish the shared body everywhere with no indication why.
@@ -52,7 +45,7 @@ export default new Action({
       return response.json({ ok: false, error: 'Could not read the per-network text.' }, { status: 422 })
 
     try {
-      const data = await postQueue.save({ text, providers, title, scheduledAt, external, image, variants: parsedVariants.variants })
+      const data = await postQueue.save({ text, providers, title, scheduledAt, external, images, variants: parsedVariants.variants })
       return response.json({ ok: true, data })
     }
     catch (error) {

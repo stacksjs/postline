@@ -613,3 +613,62 @@ describe('an image a network will not take', () => {
     expect(postId).toBeGreaterThan(0)
   })
 })
+
+describe('a post with several images', () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3])
+
+  function capturing(): { publisher: ProviderPublisher, media: Array<Array<{ altText?: string, bytes?: Uint8Array }>> } {
+    const media: Array<Array<{ altText?: string, bytes?: Uint8Array }>> = []
+    return {
+      media,
+      publisher: {
+        async publishToPost(post, content): Promise<CrosspostTargetResult> {
+          media.push((content?.media || []).map(item => ({ altText: item.altText, bytes: item.bytes })))
+          await database.insertInto('post_targets').values({ uuid: crypto.randomUUID(), provider: 'blog', status: 'published', post_id: post.id }).execute()
+          return { provider: 'blog', ok: true, target: 'blog' } as CrosspostTargetResult
+        },
+      },
+    }
+  }
+
+  test('keeps every image in order, each with its alt text, and sends them all', async () => {
+    const network = capturing()
+    const queue = new QueueService(new CrosspostService({ blog: network.publisher } as never))
+    const images = ['a red door', 'a blue sky', 'a green field', 'a grey cat'].map(altText => ({ bytes: png, mimeType: 'image/png', altText }))
+
+    const { postId } = await queue.save({ text: 'four pictures', providers: ['blog'], images })
+    const view = await queue.get(postId)
+    expect(view.images.map(image => image.altText)).toEqual(['a red door', 'a blue sky', 'a green field', 'a grey cat'])
+    expect(view.images.every(image => image.kind === 'file')).toBe(true)
+
+    await queue.publishNow(postId)
+    expect(network.media[0]!.map(item => item.altText)).toEqual(['a red door', 'a blue sky', 'a green field', 'a grey cat'])
+    expect(network.media[0]!.every(item => item.bytes?.length === png.length)).toBe(true)
+  })
+
+  test('a fifth image is refused with the count', async () => {
+    const queue = queueWith({ blog: fakeNetwork('blog') })
+    const images = Array.from({ length: 5 }, () => ({ bytes: png, mimeType: 'image/png' }))
+    await expect(queue.save({ text: 'five', providers: ['blog'], images })).rejects.toThrow('up to 4 images; this one has 5')
+  })
+
+  test('four images for LinkedIn are refused by name; for the blog they are fine', async () => {
+    const queue = queueWith({ blog: fakeNetwork('blog') })
+    const images = Array.from({ length: 4 }, () => ({ bytes: png, mimeType: 'image/png' }))
+    await expect(queue.save({ text: 'four for linkedin', providers: ['linkedin'], images })).rejects.toThrow('LinkedIn takes one image per post; this post has 4.')
+  })
+
+  test('an edit that sends new images replaces all of them; one that sends none keeps them', async () => {
+    const queue = queueWith({ blog: fakeNetwork('blog') })
+    const { postId } = await queue.save({ text: 'edit me', providers: ['blog'], images: [{ bytes: png, mimeType: 'image/png', altText: 'first' }, { bytes: png, mimeType: 'image/png', altText: 'second' }] })
+
+    await queue.update(postId, { text: 'edit me, text only', providers: ['blog'] })
+    expect((await queue.get(postId)).images.map(image => image.altText)).toEqual(['first', 'second'])
+
+    await queue.update(postId, { text: 'edit me', providers: ['blog'], images: [{ bytes: png, mimeType: 'image/png', altText: 'replacement' }] })
+    expect((await queue.get(postId)).images.map(image => image.altText)).toEqual(['replacement'])
+
+    await queue.update(postId, { text: 'edit me', providers: ['blog'], images: null })
+    expect((await queue.get(postId)).images).toEqual([])
+  })
+})
