@@ -289,7 +289,7 @@ describe('a post that went out on some networks and failed on others', () => {
     const edit = async (): Promise<boolean> => (await queueWith({}).list()).find(item => item.id === postId)?.hasImage ?? false
 
     await queue.publishNow(postId)
-    const stored = JSON.parse((await database.selectFrom('posts').selectAll().where('id', '=', postId).executeTakeFirstOrThrow()).notes || '{}')
+    const stored = JSON.parse((await database.selectFrom('posts').selectAll().where('id', '=', postId).executeTakeFirstOrThrow()).content || '{}')
     const path = `${process.cwd()}/storage/app/postline-media/${stored.media[0].path}`
     expect(await edit()).toBe(true)
     expect(existsSync(path)).toBe(true)
@@ -368,7 +368,7 @@ describe('a queued post whose image has gone missing', () => {
       image: { bytes: png, mimeType: 'image/png' },
       ...(scheduled ? { scheduledAt: stamp(3_600_000) } : {}),
     })
-    const stored = JSON.parse((await database.selectFrom('posts').selectAll().where('id', '=', postId).executeTakeFirstOrThrow()).notes || '{}')
+    const stored = JSON.parse((await database.selectFrom('posts').selectAll().where('id', '=', postId).executeTakeFirstOrThrow()).content || '{}')
     rmSync(`${process.cwd()}/storage/app/postline-media/${stored.media[0].path}`, { force: true })
     return postId
   }
@@ -559,5 +559,37 @@ describe('paging the queue', () => {
     expect(item.providers[0]!.nextAttemptAt).toBe('2099-01-01T10:00:00Z')
     expect(item.providers[0]!.attempts).toBe(1)
     await database.updateTable('post_targets').set({ next_attempt_at: null }).where('post_id', '=', postId).execute()
+  })
+})
+
+describe('where a queued post keeps its content', () => {
+  test('a new post stores its extras in content and leaves notes alone', async () => {
+    const queue = queueWith({ blog: fakeNetwork('blog') })
+    const { postId } = await queue.save({ text: 'with a card', providers: ['blog'], external: { uri: 'https://example.com', title: 'Example' } })
+
+    const row = await database.selectFrom('posts').select(['content', 'notes']).where('id', '=', postId).executeTakeFirstOrThrow()
+    expect(JSON.parse(row.content).external.uri).toBe('https://example.com')
+    expect(row.notes).toBeNull()
+  })
+
+  test('content parked in notes by an older version is moved across once, and a real note is not', async () => {
+    const { resetLegacyContentMove } = await import('../../app/Services/Social/QueueService')
+    const queue = queueWith({ blog: fakeNetwork('blog') })
+    const parked = (await queue.save({ text: 'parked', providers: ['blog'] })).postId
+    const noted = (await queue.save({ text: 'noted', providers: ['blog'] })).postId
+    const stored = JSON.stringify({ external: { uri: 'https://example.com/old', title: 'Old' } })
+    await database.updateTable('posts').set({ content: null, notes: stored }).where('id', '=', parked).execute()
+    await database.updateTable('posts').set({ content: null, notes: '{not json, just how I write}' }).where('id', '=', noted).execute()
+
+    resetLegacyContentMove()
+    const items = (await queue.listPage({ limit: 500 })).items
+
+    expect(items.find(item => item.id === parked)!.hasLink).toBe(true)
+    const moved = await database.selectFrom('posts').select(['content', 'notes']).where('id', '=', parked).executeTakeFirstOrThrow()
+    expect(moved.content).toBe(stored)
+    expect(moved.notes).toBeNull()
+    const kept = await database.selectFrom('posts').select(['content', 'notes']).where('id', '=', noted).executeTakeFirstOrThrow()
+    expect(kept.notes).toBe('{not json, just how I write}')
+    expect(kept.content).toBeNull()
   })
 })

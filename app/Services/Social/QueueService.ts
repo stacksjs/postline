@@ -20,49 +20,50 @@ import { ensureAccount, now, uuid } from './support'
 const database = db as any
 
 /**
- * The `posts` column that holds `StoredContent`.
+ * The `posts` column that holds `StoredContent`: `content`.
  *
- * This used to be `posts.content`, added by a hand-written migration
- * (0000000031). The Post model never declared it, so when the schema was
- * regenerated from the models the column was not recreated: on any database
- * built from the current migrations, every queue save failed with "table posts
- * has no column named content" — drafts, schedules and campaign activation
- * alike.
- *
- * The model is not this service's to change, so the column is resolved at
- * runtime instead: `content` where it still exists (a database created before
- * the regeneration, whose queued posts already have their extras there), and
- * otherwise `notes` — the one free-form text column the model does declare,
- * and one nothing else in the app reads or writes. Declaring `content` on the
- * Post model is the proper fix; once it is, this picks it up with no change.
+ * For a while there was no such column. A hand-written migration had added
+ * it, the model never declared it, and a schema regenerated from the models
+ * lost it, so the queue kept its JSON in `notes` instead. The model declares
+ * `content` now. Rows written in between still have their JSON in `notes`,
+ * and are moved across once, the first time the queue is used after an
+ * upgrade.
  */
-let storedContentColumn: Promise<'content' | 'notes'> | null = null
+let legacyContentMoved: Promise<void> | null = null
 
-async function contentColumn(): Promise<'content' | 'notes'> {
-  storedContentColumn ??= probeContentColumn()
-  return await storedContentColumn
+async function contentColumn(): Promise<'content'> {
+  legacyContentMoved ??= moveLegacyContent().catch((error) => {
+    // Try again on the next call instead of pinning a failure for the
+    // lifetime of the process.
+    legacyContentMoved = null
+    throw error
+  })
+  await legacyContentMoved
+  return 'content'
 }
 
 /**
- * Awaited inside a `try`, not chained with `.catch()`: the query builder
- * raises a statement SQLite cannot prepare from `execute()` itself, before
- * there is a promise to reject, and a chained handler never saw it. Every
- * queue read on a database without `content` then failed with the probe's own
- * "no such column: content".
+ * Move stored content that was parked in `notes` into `content`. Only rows
+ * whose `notes` is the queue's own JSON are touched: a note somebody wrote
+ * stays a note.
  */
-async function probeContentColumn(): Promise<'content' | 'notes'> {
-  try {
-    await database.selectFrom('posts').select(['content']).limit(1).execute()
-    return 'content'
+async function moveLegacyContent(): Promise<void> {
+  const parked = await database
+    .selectFrom('posts')
+    .select(['id', 'notes'])
+    .where('content', 'is', null)
+    .where('notes', 'like', '{%')
+    .execute()
+
+  for (const row of parked) {
+    if (!parseStoredContent(row.notes)) continue
+    await database.updateTable('posts').set({ content: row.notes, notes: null }).where('id', '=', row.id).execute()
   }
-  catch (error) {
-    // Only a missing column settles the answer. Anything else (a locked
-    // database, say) must not pin the wrong column for the process lifetime.
-    if (/no such column|has no column|unknown column|does not exist/i.test(String(error)))
-      return 'notes'
-    storedContentColumn = null
-    throw error
-  }
+}
+
+/** For tests: forget that the move has run. */
+export function resetLegacyContentMove(): void {
+  legacyContentMoved = null
 }
 
 /** The stored-content value of a `posts` row read with `selectAll()`. */
@@ -317,6 +318,9 @@ export class QueueService {
    */
   async listPage(options: { before?: number | null, limit?: number } = {}): Promise<{ items: QueueItemView[], nextCursor: number | null }> {
     const limit = Math.min(MAX_QUEUE_PAGE_SIZE, Math.max(1, Math.floor(Number(options.limit) || QUEUE_PAGE_SIZE)))
+    // Before any row is read: content an older version parked in `notes`
+    // has to be in place first.
+    await contentColumn()
     let query = database
       .selectFrom('posts')
       .selectAll()
@@ -819,6 +823,7 @@ export class QueueService {
    * the rest.
    */
   async publishDue(graceMinutes = LATE_GRACE_MINUTES): Promise<{ published: number, failed: number, missed: number }> {
+    await contentColumn()
     await this.recoverStranded()
 
     const due = await database
@@ -914,6 +919,9 @@ export class QueueService {
    * published but has networks that failed.
    */
   private async findPublishable(id: number): Promise<any> {
+    // Before any row is read: content an older version parked in `notes`
+    // has to be in place first.
+    await contentColumn()
     const post = await database
       .selectFrom('posts')
       .selectAll()
@@ -942,6 +950,9 @@ export class QueueService {
   }
 
   private async findActionable(id: number): Promise<any> {
+    // Before any row is read: content an older version parked in `notes`
+    // has to be in place first.
+    await contentColumn()
     const post = await database
       .selectFrom('posts')
       .selectAll()

@@ -78,6 +78,14 @@ export default defineModel({
       validation: { rule: schema.enum(['composer', 'import', 'api']).required() },
       factory: () => 'composer',
     },
+    // Everything about a queued post beyond its text: an explicit title, a
+    // link card, media, per-network variants. JSON, written by QueueService.
+    content: {
+      required: false,
+      fillable: true,
+      validation: { rule: schema.string().max(200000).optional() },
+      factory: () => null,
+    },
     notes: {
       required: false,
       fillable: true,
