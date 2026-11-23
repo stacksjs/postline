@@ -8,6 +8,7 @@ export const actions = {
   'Actions/Postline/AccountDefaultAction': '../../../app/Actions/Postline/AccountDefaultAction.ts',
   'Actions/Postline/AccountDisconnectAction': '../../../app/Actions/Postline/AccountDisconnectAction.ts',
   'Actions/Postline/AccountListAction': '../../../app/Actions/Postline/AccountListAction.ts',
+  'Actions/Postline/ActivityAction': '../../../app/Actions/Postline/ActivityAction.ts',
   'Actions/Postline/AnalyticsAction': '../../../app/Actions/Postline/AnalyticsAction.ts',
   'Actions/Postline/BlogListAction': '../../../app/Actions/Postline/BlogListAction.ts',
   'Actions/Postline/BlueskyConnectAction': '../../../app/Actions/Postline/BlueskyConnectAction.ts',

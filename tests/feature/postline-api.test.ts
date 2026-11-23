@@ -37,6 +37,8 @@ describe('postline api — auth', () => {
     ['/api/postline/queue'],
     ['/api/postline/campaigns'],
     ['/api/postline/listening'],
+    ['/api/postline/activity'],
+    ['/api/postline/system'],
   ])('%s rejects an unauthenticated request', async (path) => {
     const response = await featureTest().get(path)
 

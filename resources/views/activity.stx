@@ -1,0 +1,242 @@
+@extends('layouts/app')
+
+@section('title', 'Postline - Activity')
+
+@section('content')
+  @meta('description', 'What Postline sent, what failed, and when each job last ran.')
+  <section class="grid gap-5" data-postline-page="activity" data-testid="activity-page">
+    <header class="flex flex-wrap gap-4 items-center justify-between min-h-11">
+      <div>
+        <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Activity</p>
+        <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">What Postline did</h1>
+        <p class="mb-0 mt-1.5 text-muted text-ui">Every send to a network, and when each background job last ran.</p>
+      </div>
+      <div class="grid grid-cols-3 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Show">
+        <button class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="filter() === ''" @click="setFilter('')">All</button>
+        <button class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="filter() === 'published'" @click="setFilter('published')">Sent</button>
+        <button class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="filter() === 'failed'" @click="setFilter('failed')">Failed</button>
+      </div>
+    </header>
+
+    <p class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !schedulerWarning() }" :text="schedulerWarning()" role="status" data-scheduler-warning></p>
+
+    <div class="grid gap-5 items-start lg:grid-cols-[minmax(0,1fr)_320px]">
+      <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" aria-label="Sends">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-line">
+          <strong class="font-semibold text-ink text-sm">Sends</strong>
+          <span class="text-muted text-xs" :text="countText()"></span>
+        </div>
+        <p class="m-0 p-4 text-danger text-ui" x-show="loadError()" :text="loadError()" role="alert"></p>
+        <p class="m-0 p-4 text-muted text-ui" x-show="showEmpty()" :text="emptyText()"></p>
+        <div>
+          <article class="grid gap-1 px-4 py-3 border-b border-line last:border-b-0" x-for="row in rows()" data-activity-row>
+            <div class="flex flex-wrap gap-2 items-center">
+              <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="row.failed ? 'text-danger bg-danger-soft' : 'text-success bg-success-soft'" :text="row.outcome"></span>
+              <span class="font-medium text-ink text-ui" :text="row.where"></span>
+              <span class="ml-auto text-muted text-xs" :text="row.when" :title="row.whenFull"></span>
+            </div>
+            <p class="m-0 text-body text-ui truncate" :text="row.excerpt"></p>
+            <p class="m-0 text-danger text-xs" x-show="row.reason" :text="row.reason"></p>
+            <div class="flex gap-3 items-center" x-show="row.url || row.failed">
+              <a class="text-muted text-xs underline hover:text-ink" x-show="row.url" :href="row.url" target="_blank" rel="noopener noreferrer">View on the network</a>
+              <a class="text-muted text-xs underline hover:text-ink" x-show="row.failed" href="/queue" data-stx-link>Open the queue to retry</a>
+            </div>
+          </article>
+        </div>
+        <div class="flex justify-center p-3" x-show="nextCursor()">
+          <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" :disabled="loadingMore()" @click="loadMore()" :text="loadingMore() ? 'Loading…' : 'Load older activity'">Load older activity</button>
+        </div>
+      </section>
+
+      <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" aria-label="Background jobs">
+        <div class="px-4 py-3 border-b border-line">
+          <strong class="font-semibold text-ink text-sm">Background jobs</strong>
+          <p class="m-0 mt-0.5 text-muted text-xs" :text="schedulerText()"></p>
+        </div>
+        <p class="m-0 p-4 text-muted text-ui" x-show="showNoJobs()">No job has run yet.</p>
+        <div>
+          <div class="grid gap-0.5 px-4 py-2.5 border-b border-line last:border-b-0" x-for="job in jobRows()" data-activity-job>
+            <div class="flex gap-2 items-center justify-between">
+              <span class="font-medium text-ink text-ui" :text="job.label"></span>
+              <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="job.failed ? 'text-danger bg-danger-soft' : 'text-success bg-success-soft'" :text="job.status"></span>
+            </div>
+            <p class="m-0 text-muted text-xs" :text="job.detail"></p>
+            <p class="m-0 text-danger text-xs" x-show="job.error" :text="job.error"></p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <script client>
+    interface ActivityEvent {
+      id: number
+      kind: 'published' | 'failed'
+      at: string | null
+      provider: string
+      handle: string | null
+      excerpt: string
+      url: string | null
+      reason: string | null
+      attempts: number
+      nextAttemptAt: string | null
+    }
+
+    interface JobBeat {
+      job: string
+      lastStartedAt: string | null
+      lastFinishedAt: string | null
+      lastDurationMs: number | null
+      lastStatus: 'running' | 'ok' | 'failed' | null
+      lastError: string | null
+      runs: number
+    }
+
+    const events = state<ActivityEvent[]>([])
+    const jobs = state<JobBeat[]>([])
+    const scheduler = state<{ state: string, lastRunAt: string | null }>({ state: 'ok', lastRunAt: null })
+    const filter = state('')
+    const loaded = state(false)
+    const loadError = state('')
+    const nextCursor = state(0)
+    const loadingMore = state(false)
+
+    const NETWORKS: Record<string, string> = {
+      bluesky: 'Bluesky',
+      twitter: 'X',
+      mastodon: 'Mastodon',
+      linkedin: 'LinkedIn',
+      instagram: 'Instagram',
+      threads: 'Threads',
+      blog: 'Blog',
+    }
+
+    /** What each job does, in the owner's words and not its class name. */
+    const JOBS: Record<string, string> = {
+      PublishScheduledPosts: 'Publish scheduled posts',
+      SyncEngagementMetrics: 'Update likes and replies',
+      ScanKeywordMonitors: 'Look for mentions',
+      SyncDirectMessages: 'Fetch direct messages',
+      AutoDeletePosts: 'Delete old posts',
+      KeepTokensAlive: 'Renew network sign-ins',
+    }
+
+    const parse = (value: string | null): Date | null => {
+      if (!value) return null
+      const date = new Date(value)
+      return Number.isNaN(date.getTime()) ? null : date
+    }
+
+    /** "5 minutes ago", falling back to a date once it is older than a week. */
+    const ago = (value: string | null): string => {
+      const date = parse(value)
+      if (!date) return ''
+      const seconds = Math.round((Date.now() - date.getTime()) / 1000)
+      if (seconds < 60) return 'just now'
+      if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`
+      if (seconds < 86_400) return `${Math.floor(seconds / 3600)} h ago`
+      if (seconds < 7 * 86_400) return `${Math.floor(seconds / 86_400)} d ago`
+      return date.toLocaleDateString([], { dateStyle: 'medium' })
+    }
+
+    const full = (value: string | null): string => parse(value)?.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) || ''
+
+    const rows = derived(() => events().map((event) => {
+      const failed = event.kind === 'failed'
+      const network = NETWORKS[event.provider] || event.provider
+      const retry = parse(event.nextAttemptAt)
+      const again = retry ? ` Trying again at ${retry.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.` : ''
+      return {
+        id: event.id,
+        failed,
+        outcome: failed ? 'Failed' : 'Sent',
+        where: event.handle ? `${network} · ${event.handle}` : network,
+        when: ago(event.at),
+        whenFull: full(event.at),
+        excerpt: event.excerpt || 'A post with no text',
+        reason: failed ? `${event.reason || ''}${again}` : '',
+        url: event.url || '',
+      }
+    }))
+
+    const jobRows = derived(() => jobs().map((job) => {
+      const failed = job.lastStatus === 'failed'
+      const took = job.lastDurationMs === null ? '' : job.lastDurationMs < 1000 ? `, took ${job.lastDurationMs} ms` : `, took ${(job.lastDurationMs / 1000).toFixed(1)} s`
+      return {
+        label: JOBS[job.job] || job.job,
+        failed,
+        status: failed ? 'Failed' : job.lastStatus === 'running' ? 'Running' : 'OK',
+        detail: `Last ran ${ago(job.lastStartedAt) || 'never'}${took}`,
+        error: failed ? job.lastError || '' : '',
+      }
+    }))
+
+    const showEmpty = derived(() => loaded() && !loadError() && events().length === 0)
+    const showNoJobs = derived(() => loaded() && jobs().length === 0)
+    const emptyText = derived(() => filter() === 'failed' ? 'Nothing has failed.' : 'Nothing has been sent yet. Publish a post and it shows up here.')
+    const countText = derived(() => !loaded() ? 'Loading…' : `${events().length}${nextCursor() ? '+' : ''} shown`)
+
+    const schedulerWarning = derived(() => {
+      const status = scheduler()
+      if (status.state === 'ok') return ''
+      if (status.state === 'never') return 'Scheduled posts are not going out: the scheduler has not run yet. Start it with ./buddy schedule:run.'
+      return `Scheduled posts are not going out: the scheduler has not run since ${full(status.lastRunAt) || 'it was stopped'}.`
+    })
+    const schedulerText = derived(() => scheduler().state === 'ok' ? 'The scheduler is running.' : 'The scheduler is not running.')
+
+    const url = (before = 0): string => {
+      const query = new URLSearchParams()
+      if (filter()) query.set('kind', filter())
+      if (before) query.set('before', String(before))
+      const text = query.toString()
+      return `/api/postline/activity${text ? `?${text}` : ''}`
+    }
+
+    const refresh = async () => {
+      try {
+        const response = await fetch(url())
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the activity.')
+        events.set(payload.data.events || [])
+        nextCursor.set(payload.data.nextCursor || 0)
+        jobs.set(payload.data.jobs || [])
+        if (payload.data.scheduler) scheduler.set(payload.data.scheduler)
+        loadError.set('')
+      }
+      catch (error) {
+        events.set([])
+        loadError.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        loaded.set(true)
+      }
+    }
+
+    const loadMore = async () => {
+      if (!nextCursor() || loadingMore()) return
+      loadingMore.set(true)
+      try {
+        const response = await fetch(url(nextCursor()))
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load older activity.')
+        events.set([...events(), ...(payload.data.events || [])])
+        nextCursor.set(payload.data.nextCursor || 0)
+      }
+      catch (error) {
+        loadError.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        loadingMore.set(false)
+      }
+    }
+
+    const setFilter = (next: string) => {
+      filter.set(next)
+      void refresh()
+    }
+
+    onMount(() => {
+      void refresh()
+    })
+  </script>
+@endsection

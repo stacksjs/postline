@@ -20,6 +20,7 @@ const navLinks = [
   { href: '/listening', label: 'Listening', shortcut: '6', icon: 'i-hugeicons-radar-02' },
   { href: '/inbox', label: 'Inbox', shortcut: '7', icon: 'i-hugeicons-message-01' },
   { href: '/blog', label: 'Blog', shortcut: '8', icon: 'i-hugeicons-quill-write-02' },
+  { href: '/activity', label: 'Activity', shortcut: '9', icon: 'i-hugeicons-activity-01' },
 ].map((link) => ({
   ...link,
   active: currentPath === link.href || currentPath.startsWith(`${link.href}/`),
