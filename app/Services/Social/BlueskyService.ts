@@ -8,6 +8,8 @@ import { fetchRemoteImage } from '../../Support/Social/image-input'
 import { BlueskyApiError, BlueskyDriver } from './Drivers/BlueskyDriver'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
+import { workspace } from '../WorkspaceService'
+import { ensureAccount as ensureWorkspaceAccount } from './support'
 import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
@@ -167,7 +169,7 @@ export class BlueskyService {
       title: body.slice(0, 80),
       body,
       status: 'publishing',
-      timezone: env.TZ || 'America/Los_Angeles',
+      timezone: await workspace.timezone(),
       source: 'composer',
       account_id: accountId,
       created_at: createdAt,
@@ -638,32 +640,7 @@ export class BlueskyService {
   }
 
   private async ensureAccount(): Promise<number> {
-    const existing = await database
-      .selectFrom('accounts')
-      .select(['id'])
-      .orderBy('id', 'asc')
-      .executeTakeFirst()
-
-    if (existing?.id) return Number(existing.id)
-
-    const accountUuid = uuid()
-    await database.insertInto('accounts').values({
-      uuid: accountUuid,
-      name: 'Chris Breuer',
-      workspace_name: 'Postline',
-      timezone: 'America/Los_Angeles',
-      default_audience: 'public',
-      created_at: now(),
-      updated_at: now(),
-    }).execute()
-
-    const account = await database
-      .selectFrom('accounts')
-      .select(['id'])
-      .where('uuid', '=', accountUuid)
-      .executeTakeFirstOrThrow()
-
-    return Number(account.id)
+    return await ensureWorkspaceAccount()
   }
 }
 

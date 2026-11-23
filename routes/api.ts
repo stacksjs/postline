@@ -140,6 +140,8 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/purge', 'Actions/Postline/PurgeRunAction').middleware('auth').rateLimit(3, 'hour')
   // Automatic deletion of posts older than N days (Settings). The daily
   // AutoDeletePosts job does the deleting; these only read and save the rule.
+  route.get('/settings/workspace', 'Actions/Postline/WorkspaceGetAction').middleware('auth')
+  route.post('/settings/workspace', 'Actions/Postline/WorkspaceSaveAction').middleware('auth').rateLimit(30, 'minute')
   route.get('/settings/retention', 'Actions/Postline/RetentionGetAction').middleware('auth')
   route.post('/settings/retention', 'Actions/Postline/RetentionSaveAction').middleware('auth').rateLimit(30, 'minute')
 })

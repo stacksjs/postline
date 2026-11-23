@@ -233,10 +233,14 @@ const providerNames: Record<string, string> = {
   mastodon: 'Mastodon',
 }
 
+/**
+ * An hour of the day as the reader's locale writes it. The hour is already
+ * on the workspace's clock (the server buckets in its time zone), so it is
+ * formatted as it stands and not shifted into the browser's zone.
+ */
 function formatHour(hour: number): string {
-  const local = new Date()
-  local.setUTCHours(hour, 0, 0, 0)
-  return local.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  const clock = new Date(Date.UTC(2000, 0, 1, hour, 0, 0))
+  return clock.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' })
 }
 
 function fillStats(payload: AnalyticsPayload): void {

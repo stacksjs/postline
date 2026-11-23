@@ -2,7 +2,6 @@ import type { PublishTarget } from '../../Support/Social/targets'
 import type { ThreadChain } from '../../Support/Social/threads'
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
-import { env } from '@stacksjs/env'
 import { parseTarget, resolveTargets, targetKey } from '../../Support/Social/targets'
 import { advanceChain, threadSegmentContent } from '../../Support/Social/threads'
 import { resolveVariantBody } from '../../Support/Social/variants'
@@ -13,6 +12,7 @@ import { linkedin } from './LinkedInService'
 import { mastodon } from './MastodonService'
 import { threads } from './ThreadsService'
 import { twitter } from './TwitterService'
+import { workspace } from '../WorkspaceService'
 import { ensureAccount, now, uuid } from './support'
 
 const database = db as any
@@ -106,7 +106,7 @@ export class CrosspostService {
       title: body.slice(0, 80),
       body,
       status: 'publishing',
-      timezone: env.TZ || 'America/Los_Angeles',
+      timezone: await workspace.timezone(),
       source: 'composer',
       account_id: accountId,
       created_at: createdAt,
@@ -175,7 +175,7 @@ export class CrosspostService {
         title: body.slice(0, 80),
         body,
         status: 'publishing',
-        timezone: env.TZ || 'America/Los_Angeles',
+        timezone: await workspace.timezone(),
         source: 'composer',
         thread_key: threadKey,
         account_id: accountId,

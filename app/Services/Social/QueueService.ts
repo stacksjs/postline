@@ -15,6 +15,8 @@ import { MEDIA_DIR, publicMediaUrl } from '../../Support/Social/uploads'
 import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/variants'
 import { crosspost, crosspostProviders } from './CrosspostService'
 import { findIdentityRow, unavailableAccountError } from './identities'
+import { isRealTimestamp } from '../../Support/time'
+import { workspace } from '../WorkspaceService'
 import { ensureAccount, now, uuid } from './support'
 
 const database = db as any
@@ -255,6 +257,8 @@ export class QueueService {
     if (scheduledAt) {
       if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(scheduledAt))
         throw new Error('Scheduled time must be a UTC YYYY-MM-DD HH:MM:SS timestamp.')
+      if (!isRealTimestamp(scheduledAt))
+        throw new UserFacingError('That date or time does not exist. Check the day and the hour.')
       if (scheduledAt <= now())
         throw new Error('Scheduled time must be in the future.')
     }
@@ -287,7 +291,7 @@ export class QueueService {
       status,
       [await contentColumn()]: Object.keys(stored).length ? JSON.stringify(stored) : null,
       scheduled_at: scheduledAt,
-      timezone: env.TZ || 'America/Los_Angeles',
+      timezone: await workspace.timezone(),
       source: 'composer',
       account_id: accountId,
       created_at: createdAt,
@@ -443,6 +447,8 @@ export class QueueService {
     if (scheduledAt) {
       if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(scheduledAt))
         throw new Error('Scheduled time must be a UTC YYYY-MM-DD HH:MM:SS timestamp.')
+      if (!isRealTimestamp(scheduledAt))
+        throw new UserFacingError('That date or time does not exist. Check the day and the hour.')
       if (scheduledAt <= now())
         throw new Error('Scheduled time must be in the future.')
     }

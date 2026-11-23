@@ -68,6 +68,8 @@ export const actions = {
   'Actions/Postline/TwitterCallbackAction': '../../../app/Actions/Postline/TwitterCallbackAction.ts',
   'Actions/Postline/TwitterConnectAction': '../../../app/Actions/Postline/TwitterConnectAction.ts',
   'Actions/Postline/TwitterStatusAction': '../../../app/Actions/Postline/TwitterStatusAction.ts',
+  'Actions/Postline/WorkspaceGetAction': '../../../app/Actions/Postline/WorkspaceGetAction.ts',
+  'Actions/Postline/WorkspaceSaveAction': '../../../app/Actions/Postline/WorkspaceSaveAction.ts',
   'Actions/AI/AskAction': '@stacksjs/defaults/app/Actions/AI/AskAction.ts',
   'Actions/AI/CompleteAction': '@stacksjs/defaults/app/Actions/AI/CompleteAction.ts',
   'Actions/AI/SummaryAction': '@stacksjs/defaults/app/Actions/AI/SummaryAction.ts',

@@ -1,7 +1,9 @@
 import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
 import { response } from '@stacksjs/router'
+import { workspace } from '../../Services/WorkspaceService'
 import { actionFailure } from '../../Support/Http/action-error'
+import { hourInZone } from '../../Support/time'
 
 const database = db as any
 
@@ -78,12 +80,16 @@ export default new Action({
           share: totalTargets ? Math.round((count / totalTargets) * 100) : 0,
         }))
 
-      // Publish-hour histogram (UTC) → best posting windows. Uses
+      // Publish-hour histogram, in the workspace's time zone, so "best time"
+      // is an hour on the owner's clock and agrees with the calendar. Uses
       // created_at: metric syncs bump updated_at, which would skew it.
+      const timezone = await workspace.timezone()
       const byHour = new Map<number, number>()
       for (const target of targets) {
         const date = parseUtc(target.created_at)
-        if (date) byHour.set(date.getUTCHours(), (byHour.get(date.getUTCHours()) || 0) + 1)
+        if (!date) continue
+        const hour = hourInZone(date, timezone)
+        byHour.set(hour, (byHour.get(hour) || 0) + 1)
       }
       const windows = [...byHour.entries()]
         .sort((a, b) => b[1] - a[1])
@@ -117,6 +123,7 @@ export default new Action({
           series,
           channelMix,
           windows,
+          timezone,
         },
       })
     }

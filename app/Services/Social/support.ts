@@ -1,4 +1,6 @@
+import process from 'node:process'
 import { db } from '@stacksjs/database'
+import { isValidTimeZone, systemTimeZone } from '../../Support/time'
 
 const database = db as any
 
@@ -38,9 +40,11 @@ export async function ensureAccount(): Promise<number> {
   const accountUuid = uuid()
   await database.insertInto('accounts').values({
     uuid: accountUuid,
-    name: 'Chris Breuer',
+    // Neutral until the owner sets them in Settings. The zone is this
+    // machine's, which for a self-hosted app is almost always the owner's.
+    name: 'Workspace owner',
     workspace_name: 'Postline',
-    timezone: 'America/Los_Angeles',
+    timezone: isValidTimeZone(process.env.TZ) ? String(process.env.TZ) : systemTimeZone(),
     default_audience: 'public',
     created_at: now(),
     updated_at: now(),

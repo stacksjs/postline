@@ -42,6 +42,26 @@
           <SettingsRow label="Automatic deletion" setting="deletion-summary" to="deletion" :value="statusPill()" />
           <SettingsRow label="Appearance" setting="appearance-summary" to="appearance" />
         </SettingsGroup>
+
+        {{--
+          The workspace. Its time zone is the one every schedule, campaign
+          and chart uses, so changing it here moves them together.
+        --}}
+        <SettingsGroup title="Workspace" footer="Schedules, campaigns and the best-time chart all use this time zone.">
+          <SettingsRow label="Workspace" setting="workspace-name" keywords="rename workspace">
+            <TextInput variant="mac" v-model:value="workspaceName" maxlength="120" data-workspace-name />
+          </SettingsRow>
+          <SettingsRow label="Your name" setting="owner-name" keywords="owner profile">
+            <TextInput variant="mac" v-model:value="ownerName" maxlength="120" data-workspace-owner />
+          </SettingsRow>
+          <SettingsRow label="Time zone" setting="timezone" keywords="timezone time zone clock schedule">
+            <Select variant="mac" v-model:value="workspaceZone" placeholder="" :options="zoneOptions()" data-workspace-timezone />
+          </SettingsRow>
+        </SettingsGroup>
+        <div class="flex gap-2 items-center justify-end mt-3">
+          <p class="m-0 mr-auto text-xs" :data-tone="workspaceTone()" x-show="workspaceMessage()" :text="workspaceMessage()" role="status" aria-live="polite" data-workspace-message></p>
+          <Button appearance="mac" variant="primary" :disabled="!canSaveWorkspace()" @click="saveWorkspace">Save</Button>
+        </div>
       </SettingsPane>
 
       <SettingsPane id="appearance" title="Appearance">
@@ -293,6 +313,85 @@
       failed: number
     }
 
+    // --- Workspace: name, owner and the one time zone ---
+    const workspaceLoaded = state(false)
+    const workspaceSaving = state(false)
+    const workspaceName = state('')
+    const ownerName = state('')
+    const workspaceZone = state('')
+    const savedWorkspace = state({ name: '', workspaceName: '', timezone: '' })
+    const workspaceMessage = state('')
+    const workspaceTone = state('')
+
+    /** Every zone the browser knows, with the saved one always present. */
+    const zoneOptions = derived(() => {
+      let zones: string[] = []
+      try {
+        zones = Intl.supportedValuesOf('timeZone')
+      }
+      catch {
+        zones = ['UTC']
+      }
+      const saved = savedWorkspace().timezone
+      if (saved && !zones.includes(saved)) zones = [saved, ...zones]
+      if (!zones.includes('UTC')) zones = ['UTC', ...zones]
+      return zones.map(zone => ({ value: zone, label: zone.replace(/_/g, ' ') }))
+    })
+
+    const canSaveWorkspace = derived(() => workspaceLoaded()
+      && !workspaceSaving()
+      && workspaceName().trim().length >= 2
+      && ownerName().trim().length >= 2
+      && Boolean(workspaceZone())
+      && (workspaceName().trim() !== savedWorkspace().workspaceName
+        || ownerName().trim() !== savedWorkspace().name
+        || workspaceZone() !== savedWorkspace().timezone))
+
+    const applyWorkspace = (profile: { name: string, workspaceName: string, timezone: string }): void => {
+      savedWorkspace.set(profile)
+      workspaceName.set(profile.workspaceName)
+      ownerName.set(profile.name)
+      workspaceZone.set(profile.timezone)
+    }
+
+    const loadWorkspace = async (): Promise<void> => {
+      try {
+        const response = await fetch('/api/postline/settings/workspace')
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the workspace.')
+        applyWorkspace(payload.data)
+        workspaceLoaded.set(true)
+      }
+      catch (error) {
+        workspaceMessage.set(error instanceof Error ? error.message : String(error))
+        workspaceTone.set('error')
+      }
+    }
+
+    const saveWorkspace = async (): Promise<void> => {
+      if (!canSaveWorkspace()) return
+      workspaceSaving.set(true)
+      try {
+        const body = new FormData()
+        body.set('workspaceName', workspaceName().trim())
+        body.set('name', ownerName().trim())
+        body.set('timezone', workspaceZone())
+        const response = await fetch('/api/postline/settings/workspace', { method: 'POST', body })
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save.')
+        applyWorkspace(payload.data)
+        workspaceMessage.set('Saved.')
+        workspaceTone.set('success')
+      }
+      catch (error) {
+        workspaceMessage.set(error instanceof Error ? error.message : String(error))
+        workspaceTone.set('error')
+      }
+      finally {
+        workspaceSaving.set(false)
+      }
+    }
+
     const retentionLoaded = state(false)
     const savedEnabled = state(false)
     const savedDays = state(7)
@@ -449,6 +548,7 @@
     }
 
     onMount(() => {
+      void loadWorkspace()
       void loadRetention()
       onDestroy(() => workspace?.close())
 

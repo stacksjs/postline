@@ -1,9 +1,11 @@
 import type { SocialProvider } from '../Support/Social/types'
 import { db } from '@stacksjs/database'
-import { env } from '@stacksjs/env'
 import type { CampaignAIStrategy, CampaignAISuggestion } from './CampaignAIService'
 import { campaignAI } from './CampaignAIService'
 import { postQueue } from './Social/QueueService'
+import { isRealTimestamp, isValidTimeZone } from '../Support/time'
+import { workspace } from './WorkspaceService'
+import { UserFacingError } from '../Support/Http/user-error'
 import { ensureAccount, now, uuid } from './Social/support'
 
 const database = db as any
@@ -82,13 +84,21 @@ interface PlanSuggestion extends CampaignAISuggestion {
   providers: SocialProvider[]
 }
 
+/** A campaign's zone as given, or undefined; a zone the runtime does not know is refused. */
+function campaignZone(value: string | undefined): string | undefined {
+  const zone = value?.trim()
+  if (!zone) return undefined
+  if (!isValidTimeZone(zone)) throw new UserFacingError(`"${zone}" is not a time zone Postline knows. Pick one from the list, such as Europe/Berlin.`)
+  return zone
+}
+
 function dateOnly(value: string): string {
   return value.trim().slice(0, 10)
 }
 
 function assertDate(value: string, field: string): string {
   const normalized = dateOnly(value)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized) || Number.isNaN(Date.parse(`${normalized}T00:00:00Z`)))
+  if (!isRealTimestamp(`${normalized} 00:00:00`))
     throw new Error(`${field} must be a valid date.`)
   return normalized
 }
@@ -98,8 +108,8 @@ function sqliteTimestamp(value: string): string {
   if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})?$/.test(normalized))
     throw new Error('Post time must include a date and time.')
   const timestamp = normalized.length === 16 ? `${normalized}:00` : normalized
-  if (Number.isNaN(Date.parse(`${timestamp.replace(' ', 'T')}Z`)))
-    throw new Error('Post time is not valid.')
+  if (!isRealTimestamp(timestamp))
+    throw new UserFacingError('That date or time does not exist. Check the day and the hour.')
   return timestamp
 }
 
@@ -112,7 +122,8 @@ export function normalizeProviders(values: unknown): SocialProvider[] {
 /**
  * A campaign post's time is wall-clock in the campaign's timezone (it is what
  * the planner's date-time inputs show); the publishing queue runs on UTC. This
- * converts one to the other, DST included. An unknown zone is treated as UTC.
+ * converts one to the other, DST included. An unknown zone is refused: it
+ * used to be read as UTC, which scheduled every post hours off with no sign.
  */
 export function zonedTimestampToUtc(timestamp: string, timeZone: string): string {
   const match = timestamp.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})(?::(\d{2}))?$/)
@@ -134,7 +145,7 @@ export function zonedTimestampToUtc(timestamp: string, timeZone: string): string
     })
   }
   catch {
-    return timestamp
+    throw new UserFacingError(`"${timeZone}" is not a time zone Postline knows. Pick the campaign's time zone again.`)
   }
 
   // How far the zone is from UTC at a given instant.
@@ -334,7 +345,7 @@ export class CampaignService {
       status: 'draft',
       start_date: startDate,
       end_date: endDate,
-      timezone: input.timezone?.trim() || env.TZ || 'America/Los_Angeles',
+      timezone: campaignZone(input.timezone) || await workspace.timezone(),
       account_id: accountId,
       created_at: timestamp,
       updated_at: timestamp,
@@ -360,7 +371,7 @@ export class CampaignService {
       status: input.status && statuses.includes(input.status) ? input.status : current.status,
       start_date: startDate,
       end_date: endDate,
-      timezone: input.timezone?.trim() || current.timezone,
+      timezone: campaignZone(input.timezone) || current.timezone,
       updated_at: now(),
     }).where('id', '=', id).execute()
     return (await this.get(id)).campaign

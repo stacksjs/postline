@@ -20,7 +20,7 @@ export default defineModel({
       required: true,
       fillable: true,
       validation: { rule: schema.string().required().min(2).max(120) },
-      factory: () => 'Chris Breuer',
+      factory: () => 'Workspace owner',
     },
     workspaceName: {
       required: true,

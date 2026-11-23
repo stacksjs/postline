@@ -178,8 +178,8 @@ describe('campaign scheduling time zones', () => {
     expect(zonedTimestampToUtc('2026-03-07 12:00:00', 'America/New_York')).toBe('2026-03-07 17:00:00')
   })
 
-  test('an unknown zone leaves the time as UTC rather than failing the schedule', () => {
-    expect(zonedTimestampToUtc('2026-07-01 09:00:00', 'Mars/Olympus_Mons')).toBe('2026-07-01 09:00:00')
+  test('an unknown zone is refused: read as UTC it scheduled every post hours off', () => {
+    expect(() => zonedTimestampToUtc('2026-07-01 09:00:00', 'Mars/Olympus_Mons')).toThrow('not a time zone')
   })
 })
 
