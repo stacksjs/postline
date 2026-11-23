@@ -7,20 +7,20 @@
   <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
     <header class="flex flex-wrap gap-4 items-center justify-between min-h-11">
       <div>
-        <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Queue</p>
-        <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Scheduled posts</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-muted">What's drafted, scheduled, and recently published.</p>
+        <p class="mb-1.5 font-semibold text-xs text-muted tracking-wider uppercase">Queue</p>
+        <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Scheduled posts</h1>
+        <p class="mb-0 mt-1.5 text-ui text-muted">What's drafted, scheduled, and recently published.</p>
       </div>
       <div class="flex flex-wrap gap-2 items-center">
         <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Queue view">
-          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-bold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'list'" @click="setView('list')">
+          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'list'" @click="setView('list')">
             <span class="h-3.5 w-3.5 i-hugeicons-menu-01" aria-hidden="true"></span><span>List</span>
           </button>
-          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-bold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'calendar'" @click="setView('calendar')">
+          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'calendar'" @click="setView('calendar')">
             <span class="h-3.5 w-3.5 i-hugeicons-calendar-03" aria-hidden="true"></span><span>Calendar</span>
           </button>
         </div>
-        <a href="/composer" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors">
+        <a href="/composer" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl transition-colors">
           <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
           <span>New post</span>
         </a>
@@ -30,27 +30,27 @@
     <div class="grid gap-5" x-show="view() === 'list'">
       <section class="bg-panel border border-line rounded-2xl shadow-sm">
         <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
-          <strong class="text-[13px]">Upcoming &amp; drafts</strong>
+          <strong class="text-ui">Upcoming &amp; drafts</strong>
           <span class="text-muted text-xs" :text="metaText()">Loading…</span>
         </header>
         <div class="grid gap-2.5 p-3">
-          <p class="m-0 p-3 text-[13px] text-muted" x-show="loadError()" :text="loadError()"></p>
-          <p class="m-0 p-3 text-[13px] text-muted" x-show="showPendingEmpty()">Nothing queued yet. Schedule a post from the composer and it will show up here.</p>
+          <p class="m-0 p-3 text-ui text-muted" x-show="loadError()" :text="loadError()"></p>
+          <p class="m-0 p-3 text-ui text-muted" x-show="showPendingEmpty()">Nothing queued yet. Schedule a post from the composer and it will show up here.</p>
           <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl" x-for="row in pending()">
             <header class="flex gap-3 items-center justify-between">
               <div class="grid gap-1">
-                <span class="font-bold text-xs">{{ row.when }}</span>
+                <span class="font-semibold text-xs">{{ row.when }}</span>
                 <span class="text-muted text-xs">{{ row.channels }}</span>
               </div>
-              <span class="px-2 py-1 font-bold text-[11px] whitespace-nowrap border rounded-full" data-status-pill :data-status="row.pill">{{ row.statusLabel }}</span>
+              <span class="px-2 py-1 font-semibold text-xs whitespace-nowrap border rounded-full" data-status-pill :data-status="row.pill">{{ row.statusLabel }}</span>
             </header>
-            <p class="m-0 leading-normal text-[13px] text-body">{{ row.body }}</p>
+            <p class="m-0 leading-normal text-ui text-body">{{ row.body }}</p>
             <p class="m-0 text-red-700 text-xs" x-show="row.failure" :text="row.failure"></p>
             <footer class="flex flex-wrap gap-2 items-center justify-end">
-              <a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
-              <a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" x-show="row.actionable" :href="row.editUrl" data-stx-link>Edit</a>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-lg transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="publishItem(row.id)">Publish now</button>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-red-700 text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="deleteItem(row.id)">Delete</button>
+              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
+              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" x-show="row.actionable" :href="row.editUrl" data-stx-link>Edit</a>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-on-accent text-xs bg-accent hover:bg-neutral-800 rounded-lg transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="publishItem(row.id)">Publish now</button>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-red-700 text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="deleteItem(row.id)">Delete</button>
             </footer>
           </article>
         </div>
@@ -58,24 +58,24 @@
 
       <section class="bg-panel border border-line rounded-2xl shadow-sm">
         <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
-          <strong class="text-[13px]">Recent</strong>
+          <strong class="text-ui">Recent</strong>
           <span class="text-muted text-xs" :text="recentMetaText()"></span>
         </header>
         <div class="grid gap-2.5 p-3">
-          <p class="m-0 p-3 text-[13px] text-muted" x-show="showRecentEmpty()">No published posts yet.</p>
+          <p class="m-0 p-3 text-ui text-muted" x-show="showRecentEmpty()">No published posts yet.</p>
           <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl" x-for="row in recent()">
             <header class="flex gap-3 items-center justify-between">
               <div class="grid gap-1">
-                <span class="font-bold text-xs">{{ row.when }}</span>
+                <span class="font-semibold text-xs">{{ row.when }}</span>
                 <span class="text-muted text-xs">{{ row.channels }}</span>
               </div>
-              <span class="px-2 py-1 font-bold text-[11px] whitespace-nowrap border rounded-full" data-status-pill :data-status="row.pill">{{ row.statusLabel }}</span>
+              <span class="px-2 py-1 font-semibold text-xs whitespace-nowrap border rounded-full" data-status-pill :data-status="row.pill">{{ row.statusLabel }}</span>
             </header>
-            <p class="m-0 leading-normal text-[13px] text-body">{{ row.body }}</p>
+            <p class="m-0 leading-normal text-ui text-body">{{ row.body }}</p>
             <p class="m-0 text-red-700 text-xs" x-show="row.failure" :text="row.failure"></p>
             <footer class="flex flex-wrap gap-2 items-center justify-end">
-              <a class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.partial" :disabled="busyId() === row.id" @click="retryItem(row.id)">Retry failed</button>
+              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.partial" :disabled="busyId() === row.id" @click="retryItem(row.id)">Retry failed</button>
             </footer>
           </article>
         </div>
@@ -88,26 +88,26 @@
           <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Previous month" @click="prevMonth">
             <span class="h-4 w-4 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
           </button>
-          <button class="inline-flex items-center justify-center px-3 h-8 font-bold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" @click="goToday">Today</button>
+          <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" @click="goToday">Today</button>
           <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-zinc-50 border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Next month" @click="nextMonth">
             <span class="h-4 w-4 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
           </button>
         </div>
-        <strong class="text-[13px]" :text="calTitle()">Calendar</strong>
+        <strong class="text-ui" :text="calTitle()">Calendar</strong>
       </header>
       <div class="overflow-x-auto">
         <div class="min-w-[560px]">
-          <div class="grid grid-cols-7 font-bold text-[11px] text-muted border-b border-line">
+          <div class="grid grid-cols-7 font-semibold text-xs text-muted border-b border-line">
             <div class="p-2 text-center">Sun</div><div class="p-2 text-center">Mon</div><div class="p-2 text-center">Tue</div><div class="p-2 text-center">Wed</div><div class="p-2 text-center">Thu</div><div class="p-2 text-center">Fri</div><div class="p-2 text-center">Sat</div>
           </div>
           <div class="grid grid-cols-7">
             <div class="grid content-start gap-1 p-1.5 min-h-24 border-b border-line border-r" data-cal-cell :data-blank="cell.blank" :data-today="cell.isToday" x-for="cell in calCells()">
-              <a class="font-bold text-[11px] hover:text-neutral-950 transition-colors" data-cal-day x-show="!cell.blank" :href="cell.scheduleUrl" data-stx-link title="Schedule a post on this day">{{ cell.day }}</a>
-              <a class="flex gap-1 items-center px-1 py-0.5 text-[10px] text-body bg-panel-2 hover:bg-zinc-100 rounded transition-colors" x-for="chip in cell.chips" :href="chip.href" data-stx-link>
+              <a class="font-semibold text-xs hover:text-neutral-950 transition-colors" data-cal-day x-show="!cell.blank" :href="cell.scheduleUrl" data-stx-link title="Schedule a post on this day">{{ cell.day }}</a>
+              <a class="flex gap-1 items-center px-1 py-0.5 text-xs text-body bg-panel-2 hover:bg-zinc-100 rounded transition-colors" x-for="chip in cell.chips" :href="chip.href" data-stx-link>
                 <span class="shrink-0 h-1.5 w-1.5 rounded-full" data-cal-dot :data-status="chip.status"></span>
                 <span class="truncate">{{ chip.label }}</span>
               </a>
-              <span class="px-1 text-[10px] text-zinc-400" x-show="cell.more" :text="cell.more"></span>
+              <span class="px-1 text-xs text-zinc-400" x-show="cell.more" :text="cell.more"></span>
             </div>
           </div>
         </div>

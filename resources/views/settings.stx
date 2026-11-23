@@ -13,7 +13,7 @@
   <section data-postline-page="settings" data-testid="settings-page">
     <SettingsWindow id="postline-settings" title="Settings" storageKey="postline" v-model:pane="pane">
       <template #account>
-        <a class="inline-flex gap-1.5 items-center px-2 py-1 text-[13px] text-muted hover:text-ink" href="/composer" x-show="!ownWindow()" data-settings-back>
+        <a class="inline-flex gap-1.5 items-center px-2 py-1 text-ui text-muted hover:text-ink" href="/composer" x-show="!ownWindow()" data-settings-back>
           <span class="h-3.5 w-3.5 i-lucide-chevron-left" aria-hidden="true"></span>
           Back to Postline
         </a>
@@ -111,8 +111,8 @@
           <Button appearance="mac" variant="primary" :disabled="!canSave()" @click="saveRetention">Save</Button>
         </div>
 
-        <p class="m-0 mt-3 text-[12px]" :data-tone="retentionTone()" x-show="retentionMessage()" :text="retentionMessage()" role="status" aria-live="polite" data-retention-message></p>
-        <p class="m-0 mt-2 text-[11px] text-muted" x-show="lastRunText()" :text="lastRunText()" data-retention-last-run></p>
+        <p class="m-0 mt-3 text-xs" :data-tone="retentionTone()" x-show="retentionMessage()" :text="retentionMessage()" role="status" aria-live="polite" data-retention-message></p>
+        <p class="m-0 mt-2 text-xs text-muted" x-show="lastRunText()" :text="lastRunText()" data-retention-last-run></p>
       </SettingsPane>
 
       <SettingsPane id="account" title="Account">

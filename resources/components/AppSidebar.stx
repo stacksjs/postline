@@ -88,7 +88,7 @@ const settingsActive = currentPath === '/accounts' || currentPath === '/settings
       {{-- The same mark as the favicon and the sign-in page (`.brand-mark`
           in config/css.ts), so the three agree. --}}
       <span class="h-7 w-7 brand-mark" aria-hidden="true"></span>
-      <span class="font-semibold text-[15px]" data-sidebar-expanded>Postline</span>
+      <span class="font-semibold text-sm" data-sidebar-expanded>Postline</span>
     </a>
 
     <nav class="grid relative z-10 gap-1" aria-label="Primary" data-stx-nav data-testid="postline-nav" data-sidebar-collapsible-content="true">
@@ -100,12 +100,12 @@ const settingsActive = currentPath === '/accounts' || currentPath === '/settings
           data-stx-exact-active-class="text-ink bg-[#e8e8e6]/90"
           data-no-window-drag
           title="Open {{ link.label }} ({{ link.shortcut }})"
-          class="flex w-full items-center gap-3 rounded-[14px] px-3 py-1.5 text-left text-[13.5px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ link.active ? 'bg-[#e8e8e6]/90 text-ink' : 'text-body' }}"
+          class="flex w-full items-center gap-3 rounded-[14px] px-3 py-1.5 text-left text-ui transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ link.active ? 'bg-[#e8e8e6]/90 text-ink' : 'text-body' }}"
           aria-current="{{ link.active ? 'page' : 'false' }}"
         >
           <span class="h-[18px] w-[18px] {{ link.icon }} {{ link.active ? 'text-ink' : 'text-muted' }}" aria-hidden="true"></span>
           <span class="flex-1 font-medium truncate" data-sidebar-expanded>{{ link.label }}</span>
-          <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-sans text-[11px] text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded aria-label="Shortcut {{ link.shortcut }}">{{ link.shortcut }}</kbd>
+          <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-sans text-xs text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded aria-label="Shortcut {{ link.shortcut }}">{{ link.shortcut }}</kbd>
         </a>
       @endforeach
     </nav>
@@ -118,12 +118,12 @@ const settingsActive = currentPath === '/accounts' || currentPath === '/settings
       data-sidebar-collapsible-content="true"
       data-no-window-drag
       title="Open Settings (,)"
-      class="relative z-10 mt-auto flex w-full items-center gap-3 rounded-[14px] px-3 py-1.5 text-left text-[13.5px] transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ settingsActive ? 'bg-[#e8e8e6]/90 text-ink' : 'text-body' }}"
+      class="relative z-10 mt-auto flex w-full items-center gap-3 rounded-[14px] px-3 py-1.5 text-left text-ui transition-colors hover:bg-white/38 focus-visible:bg-white/38 focus-visible:outline-none {{ settingsActive ? 'bg-[#e8e8e6]/90 text-ink' : 'text-body' }}"
       aria-current="{{ settingsActive ? 'page' : 'false' }}"
     >
       <span class="h-[18px] w-[18px] i-hugeicons-settings-02 {{ settingsActive ? 'text-ink' : 'text-muted' }}" aria-hidden="true"></span>
       <span class="flex-1 font-medium" data-sidebar-expanded>Settings</span>
-      <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-sans text-[11px] text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded aria-label="Shortcut comma">,</kbd>
+      <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-sans text-xs text-muted bg-white/72 rounded-full shadow-sm" data-sidebar-expanded aria-label="Shortcut comma">,</kbd>
     </a>
   </aside>
   </div>

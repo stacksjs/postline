@@ -595,6 +595,18 @@ export default {
         sans: ['var(--font-sans)'],
         mono: ['var(--font-mono)'],
       },
+      // The type scale is 12, 13, 14, 16, 20, 24. Five of those are the
+      // engine's own names (xs, sm, base, xl, 2xl); 13 is the size of
+      // interface text (rows, buttons, fields) and gets the one name added
+      // here. No view uses a bracketed pixel size: tests/unit/type-scale.test.ts
+      // fails if one comes back.
+      //
+      // Weights: 400 for reading text, 500 (`font-medium`) for labels and
+      // controls, 600 (`font-semibold`) for headings and emphasis. Nothing is
+      // set in 700.
+      fontSize: {
+        ui: ['13px', { lineHeight: '1.4' }],
+      },
       colors: {
         // Surfaces
         'bg': 'var(--bg)', // page background

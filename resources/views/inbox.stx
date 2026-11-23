@@ -7,13 +7,13 @@
   <section class="grid gap-4" data-postline-page="inbox" data-testid="inbox-page">
     <header class="flex flex-col gap-4 items-stretch justify-between md:flex-row md:items-center min-h-11">
       <div>
-        <p class="mb-1.5 font-bold text-[11px] text-muted tracking-wider uppercase">Direct Messages</p>
-        <h1 class="m-0 font-bold text-[22px] text-ink tracking-normal">Answer everyone from one inbox</h1>
-        <p class="mb-0 mt-1.5 text-[13px] text-muted">Read and reply to DMs from Bluesky, X, Mastodon, and Instagram without switching apps.</p>
+        <p class="mb-1.5 font-semibold text-xs text-muted tracking-wider uppercase">Direct Messages</p>
+        <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Answer everyone from one inbox</h1>
+        <p class="mb-0 mt-1.5 text-ui text-muted">Read and reply to DMs from Bluesky, X, Mastodon, and Instagram without switching apps.</p>
       </div>
       <div class="flex flex-wrap gap-2 items-center">
-        <button class="inline-flex gap-2 items-center justify-center px-3 h-9 font-bold text-ink text-xs bg-panel hover:bg-white border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="unreadCount() === 0" @click="markAllRead">Mark all read</button>
-        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="syncing() || connectedCount() === 0" @click="runSync">
+        <button class="inline-flex gap-2 items-center justify-center px-3 h-9 font-semibold text-ink text-xs bg-panel hover:bg-white border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="unreadCount() === 0" @click="markAllRead">Mark all read</button>
+        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="syncing() || connectedCount() === 0" @click="runSync">
           <span class="h-4 w-4 i-hugeicons-refresh" :class="syncing() ? 'animate-spin' : ''" aria-hidden="true"></span>
           <span :text="syncing() ? 'Syncing…' : 'Sync now'">Sync now</span>
         </button>
@@ -23,15 +23,15 @@
     <div class="grid gap-3 sm:grid-cols-3">
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
         <span class="grid place-items-center shrink-0 h-10 w-10 text-blue-700 text-lg bg-blue-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-message-01"></span></span>
-        <div><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Conversations</span><strong class="block mt-1 text-ink text-xl" :text="String(conversations().length)">0</strong></div>
+        <div><span class="block font-semibold text-xs text-muted tracking-wider uppercase">Conversations</span><strong class="block mt-1 text-ink text-xl" :text="String(conversations().length)">0</strong></div>
       </article>
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
         <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-violet-700 bg-violet-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-notification-02"></span></span>
-        <div><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Unread</span><strong class="block mt-1 text-ink text-xl" :text="String(unreadCount())">0</strong></div>
+        <div><span class="block font-semibold text-xs text-muted tracking-wider uppercase">Unread</span><strong class="block mt-1 text-ink text-xl" :text="String(unreadCount())">0</strong></div>
       </article>
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
         <span class="grid place-items-center shrink-0 h-10 w-10 text-emerald-700 text-lg bg-emerald-50 rounded-xl" aria-hidden="true"><span class="i-hugeicons-link-02"></span></span>
-        <div class="min-w-0"><span class="block font-bold text-[10px] text-muted tracking-wider uppercase">Connected</span><strong class="block mt-1 text-ink text-sm truncate" :text="connectedLabel()">None yet</strong></div>
+        <div class="min-w-0"><span class="block font-semibold text-xs text-muted tracking-wider uppercase">Connected</span><strong class="block mt-1 text-ink text-sm truncate" :text="connectedLabel()">None yet</strong></div>
       </article>
     </div>
 
@@ -40,8 +40,8 @@
         <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm">
           <header class="grid gap-2.5 px-4 py-3 border-b border-line">
             <div class="flex gap-2 items-center justify-between">
-              <h2 class="m-0 font-bold text-ink text-sm" :text="statusFilter() === 'archived' ? 'Archived' : 'Inbox'">Inbox</h2>
-              <button class="px-2.5 h-7 font-bold text-[11px] text-muted hover:text-ink bg-panel-2 hover:bg-white border border-line rounded-lg transition-colors" type="button" @click="toggleStatusFilter" :text="statusFilter() === 'archived' ? 'Show inbox' : 'Show archived'">Show archived</button>
+              <h2 class="m-0 font-semibold text-ink text-sm" :text="statusFilter() === 'archived' ? 'Archived' : 'Inbox'">Inbox</h2>
+              <button class="px-2.5 h-7 font-semibold text-xs text-muted hover:text-ink bg-panel-2 hover:bg-white border border-line rounded-lg transition-colors" type="button" @click="toggleStatusFilter" :text="statusFilter() === 'archived' ? 'Show inbox' : 'Show archived'">Show archived</button>
             </div>
             <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-line rounded-lg" @change="setProviderFilter($event.target.value)">
               <option value="">All networks</option>
@@ -57,7 +57,7 @@
           <div class="grid gap-3 place-items-center px-6 py-16 text-center" x-show="showEmptyList()">
             <span class="grid place-items-center h-12 w-12 text-blue-700 text-xl bg-blue-50 rounded-2xl" aria-hidden="true"><span class="i-hugeicons-message-01"></span></span>
             <div>
-              <h3 class="m-0 font-bold text-ink text-sm" :text="connectedCount() ? 'No conversations yet' : 'Connect a network first'"></h3>
+              <h3 class="m-0 font-semibold text-ink text-sm" :text="connectedCount() ? 'No conversations yet' : 'Connect a network first'"></h3>
               <p class="m-0 mt-1 text-muted text-xs" :text="connectedCount() ? 'Run a sync to pull your latest DMs into Postline.' : 'Connect Bluesky, X, Mastodon, or Instagram on Accounts to start reading DMs here.'"></p>
             </div>
           </div>
@@ -65,27 +65,27 @@
           <div class="overflow-y-auto max-h-[32rem] divide-line divide-y" x-show="!loading() && conversations().length">
             <button class="grid gap-1.5 p-3 w-full text-left hover:bg-panel-2 transition-colors" type="button" x-for="conversation in conversations()" @click="openConversation(conversation.id)" :class="conversation.id === activeId() ? 'bg-panel-2' : conversation.unreadCount ? 'bg-blue-50/30' : ''">
               <div class="flex gap-2 items-center">
-                <span class="grid place-items-center shrink-0 h-8 w-8 font-bold text-[11px] text-white rounded-xl" :class="providerColor(conversation.provider)" :text="providerInitial(conversation.provider)"></span>
+                <span class="grid place-items-center shrink-0 h-8 w-8 font-semibold text-xs text-white rounded-xl" :class="providerColor(conversation.provider)" :text="providerInitial(conversation.provider)"></span>
                 <div class="flex-1 min-w-0">
                   <div class="flex gap-2 items-center justify-between">
-                    <strong class="text-[13px] text-ink truncate" :text="conversation.participantName || conversation.participantHandle"></strong>
-                    <time class="shrink-0 text-[10px] text-muted" :datetime="conversation.lastMessageAt" :text="relativeTime(conversation.lastMessageAt)"></time>
+                    <strong class="text-ui text-ink truncate" :text="conversation.participantName || conversation.participantHandle"></strong>
+                    <time class="shrink-0 text-xs text-muted" :datetime="conversation.lastMessageAt" :text="relativeTime(conversation.lastMessageAt)"></time>
                   </div>
                   <p class="m-0 mt-0.5 text-muted text-xs truncate" :text="previewFor(conversation)"></p>
                 </div>
-                <span class="grid place-items-center shrink-0 px-1.5 h-5 min-w-5 font-bold text-[10px] text-white bg-blue-600 rounded-full" x-show="conversation.unreadCount > 0" :text="String(conversation.unreadCount)"></span>
+                <span class="grid place-items-center shrink-0 px-1.5 h-5 min-w-5 font-semibold text-xs text-white bg-blue-600 rounded-full" x-show="conversation.unreadCount > 0" :text="String(conversation.unreadCount)"></span>
               </div>
             </button>
           </div>
         </section>
 
         <section class="p-4 bg-panel border border-line rounded-2xl shadow-sm" x-show="unavailable().length">
-          <h2 class="m-0 font-bold text-ink text-sm">Not available yet</h2>
+          <h2 class="m-0 font-semibold text-ink text-sm">Not available yet</h2>
           <p class="m-0 mt-1 text-muted text-xs">These networks are connected for publishing, but their DMs are out of reach.</p>
           <ul class="grid gap-2 m-0 mt-3 p-0 list-none">
             <li class="grid gap-0.5" x-for="entry in unavailable()">
-              <strong class="capitalize text-[12px] text-ink" :text="entry.provider"></strong>
-              <span class="leading-4 text-[11px] text-muted" :text="entry.reason"></span>
+              <strong class="capitalize text-xs text-ink" :text="entry.provider"></strong>
+              <span class="leading-4 text-xs text-muted" :text="entry.reason"></span>
             </li>
           </ul>
         </section>
@@ -95,7 +95,7 @@
         <div class="grid flex-1 gap-3 place-items-center px-6 py-20 text-center" x-show="!activeId()">
           <span class="grid place-items-center h-14 w-14 text-2xl text-blue-700 bg-blue-50 rounded-2xl" aria-hidden="true"><span class="i-hugeicons-message-01"></span></span>
           <div>
-            <h2 class="m-0 font-bold text-base text-ink">Pick a conversation</h2>
+            <h2 class="m-0 font-semibold text-base text-ink">Pick a conversation</h2>
             <p class="m-0 mt-1 max-w-md text-muted text-sm">Choose a thread on the left to read it and reply. Postline marks it read as soon as you open it.</p>
           </div>
         </div>
@@ -103,15 +103,15 @@
         <div class="contents" x-show="activeId()">
           <header class="flex flex-wrap gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
             <div class="flex gap-3 items-center min-w-0">
-              <span class="grid place-items-center shrink-0 h-9 w-9 font-bold text-white text-xs rounded-xl" :class="providerColor(activeProvider())" :text="providerInitial(activeProvider())"></span>
+              <span class="grid place-items-center shrink-0 h-9 w-9 font-semibold text-white text-xs rounded-xl" :class="providerColor(activeProvider())" :text="providerInitial(activeProvider())"></span>
               <div class="min-w-0">
-                <h2 class="m-0 font-bold text-ink text-sm truncate" :text="activeTitle()"></h2>
+                <h2 class="m-0 font-semibold text-ink text-sm truncate" :text="activeTitle()"></h2>
                 <p class="m-0 mt-0.5 text-muted text-xs truncate" :text="activeSubtitle()"></p>
               </div>
             </div>
             <div class="flex gap-2 items-center">
-              <button class="px-3 h-8 font-bold text-ink text-xs bg-panel-2 hover:bg-white border border-line rounded-lg disabled:opacity-50" type="button" :disabled="refreshing()" @click="refreshThread" :text="refreshing() ? 'Refreshing…' : 'Refresh'">Refresh</button>
-              <button class="px-3 h-8 font-bold text-xs border rounded-lg transition-colors" type="button" @click="toggleArchive" :class="statusFilter() === 'archived' ? 'text-ink bg-panel-2 border-line hover:bg-white' : 'text-red-700 border-red-200 hover:bg-red-50'" :text="statusFilter() === 'archived' ? 'Restore' : 'Archive'">Archive</button>
+              <button class="px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-white border border-line rounded-lg disabled:opacity-50" type="button" :disabled="refreshing()" @click="refreshThread" :text="refreshing() ? 'Refreshing…' : 'Refresh'">Refresh</button>
+              <button class="px-3 h-8 font-semibold text-xs border rounded-lg transition-colors" type="button" @click="toggleArchive" :class="statusFilter() === 'archived' ? 'text-ink bg-panel-2 border-line hover:bg-white' : 'text-red-700 border-red-200 hover:bg-red-50'" :text="statusFilter() === 'archived' ? 'Restore' : 'Archive'">Archive</button>
             </div>
           </header>
 
@@ -121,12 +121,12 @@
             <article class="flex" x-for="message in messages()" :class="message.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
               <div class="grid gap-1 max-w-[80%]">
                 <div class="px-3.5 py-2.5 rounded-2xl" :class="message.direction === 'outgoing' ? 'bg-accent text-on-accent' : 'bg-panel-2 text-body border border-line'">
-                  <p class="m-0 leading-5 text-[13px] whitespace-pre-line" :text="message.body"></p>
+                  <p class="m-0 leading-5 text-ui whitespace-pre-line" :text="message.body"></p>
                 </div>
                 <div class="flex gap-2 items-center px-1" :class="message.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
-                  <span class="text-[10px] text-muted" :text="message.direction === 'outgoing' ? 'You' : (message.authorName || message.authorHandle)"></span>
-                  <time class="text-[10px] text-muted" :datetime="message.sentAt" :text="relativeTime(message.sentAt)"></time>
-                  <span class="font-bold text-[10px] text-red-700" x-show="message.status === 'failed'" :text="message.failureReason || 'Failed to send'"></span>
+                  <span class="text-xs text-muted" :text="message.direction === 'outgoing' ? 'You' : (message.authorName || message.authorHandle)"></span>
+                  <time class="text-xs text-muted" :datetime="message.sentAt" :text="relativeTime(message.sentAt)"></time>
+                  <span class="font-semibold text-xs text-red-700" x-show="message.status === 'failed'" :text="message.failureReason || 'Failed to send'"></span>
                 </div>
               </div>
             </article>
@@ -135,9 +135,9 @@
           <form class="grid gap-2 px-4 py-3 border-line border-t" @submit="sendReply($event)">
             <textarea class="px-3 py-2.5 min-h-20 text-ink text-sm bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40 resize-y" placeholder="Write a reply…" x-model="draftBody" :maxlength="String(characterLimit())" @keydown="maybeSend($event)"></textarea>
             <div class="flex flex-wrap gap-2 items-center justify-between">
-              <span class="text-[11px] text-muted" :text="`${remaining()} characters left · ⌘↵ to send`"></span>
-              <span class="basis-full text-[11px] text-amber-700" x-show="replyWindowClosed()">Instagram only allows replies within 24 hours of their last message. This thread is past that, so a reply will be rejected until they write again.</span>
-              <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="sending() || !draftBody().trim()">
+              <span class="text-xs text-muted" :text="`${remaining()} characters left · ⌘↵ to send`"></span>
+              <span class="basis-full text-xs text-amber-700" x-show="replyWindowClosed()">Instagram only allows replies within 24 hours of their last message. This thread is past that, so a reply will be rejected until they write again.</span>
+              <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="sending() || !draftBody().trim()">
                 <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
                 <span :text="sending() ? 'Sending…' : 'Send'">Send</span>
               </button>

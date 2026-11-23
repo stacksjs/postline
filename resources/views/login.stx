@@ -13,8 +13,8 @@
       <header class="grid gap-2 justify-items-center text-center">
         {{-- The same mark as the favicon and the sidebar (`.brand-mark`). --}}
         <span class="h-11 w-11 brand-mark" aria-hidden="true"></span>
-        <h1 class="m-0 font-bold text-[20px] text-ink" :text="heading()">Sign in to Postline</h1>
-        <p class="m-0 text-[13px] text-muted" :text="subtitle()">Compose once, publish everywhere.</p>
+        <h1 class="m-0 font-semibold text-xl text-ink" :text="heading()">Sign in to Postline</h1>
+        <p class="m-0 text-ui text-muted" :text="subtitle()">Compose once, publish everywhere.</p>
       </header>
 
       <form class="grid gap-3" @submit.prevent="onSubmit">
@@ -23,23 +23,23 @@
             the inline style and the grid class takes over — no flash, and no
             fighting between a hidden class and x-show. --}}
         <label class="grid gap-1.5" style="display:none" x-show="registering()">
-          <span class="font-bold text-muted text-xs">Name</span>
+          <span class="font-semibold text-muted text-xs">Name</span>
           <input class="px-3 h-10 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="name" autocomplete="name" placeholder="Your name" x-model="accountName" :required="registering()">
         </label>
         <label class="grid gap-1.5">
-          <span class="font-bold text-muted text-xs">Email</span>
+          <span class="font-semibold text-muted text-xs">Email</span>
           <input class="px-3 h-10 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="email" type="email" autocomplete="username" placeholder="you@example.com" required x-model="email">
         </label>
         <label class="grid gap-1.5">
-          <span class="font-bold text-muted text-xs">Password</span>
+          <span class="font-semibold text-muted text-xs">Password</span>
           <input class="px-3 h-10 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required :minlength="registering() ? 8 : 1" x-model="password">
         </label>
         <label class="grid gap-1.5" style="display:none" x-show="registering()">
-          <span class="font-bold text-muted text-xs">Confirm password</span>
+          <span class="font-semibold text-muted text-xs">Confirm password</span>
           <input class="px-3 h-10 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100" name="password_confirmation" type="password" autocomplete="new-password" placeholder="••••••••" minlength="8" x-model="confirmPassword" :required="registering()">
         </label>
         <p class="m-0 text-red-700 text-xs" style="display:none" x-show="errorMessage()" :text="errorMessage()"></p>
-        <button class="inline-flex items-center justify-center px-4 h-10 font-bold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="busy()" :text="submitLabel()">Sign in</button>
+        <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-neutral-800 rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="busy()" :text="submitLabel()">Sign in</button>
       </form>
 
       <button class="text-muted text-xs underline hover:text-body transition-colors" type="button" @click="toggleMode" :text="toggleLabel()">First run? Create the workspace account</button>
