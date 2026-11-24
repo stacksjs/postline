@@ -1,6 +1,8 @@
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions/runtime'
+import { unsubscribeAll } from '@stacksjs/newsletter'
 import { EmailList, EmailListSubscriber, Subscriber } from '@stacksjs/orm'
+import { subscriptionPage as unsubscribePage } from './subscription-page'
 
 export default new Action({
   name: 'UnsubscribeAction',
@@ -68,6 +70,9 @@ export default new Action({
         status: 'unsubscribed',
         unsubscribed_at: new Date().toISOString(),
       })
+      // The global link means every list. Campaigns send to list memberships,
+      // so marking only the subscriber row left them all still receiving.
+      await unsubscribeAll(subscriber.email)
 
       return new Response(unsubscribePage('Unsubscribed', `${subscriber.email} has been successfully unsubscribed. You will no longer receive emails from us.`, true), {
         headers: { 'Content-Type': 'text/html' },
@@ -82,27 +87,3 @@ export default new Action({
     }
   },
 })
-
-function unsubscribePage(title: string, message: string, success: boolean): string {
-  const icon = success ? '&#10003;' : '&#10007;'
-  const iconColor = success ? '#22c55e' : '#ef4444'
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0e0e0e; color: #d4d4d4; display: flex; align-items: center; justify-content: center; min-height: 100vh;">
-  <div style="max-width: 480px; margin: 0 auto; padding: 40px 20px; text-align: center;">
-    <div style="width: 64px; height: 64px; border-radius: 50%; background-color: ${iconColor}20; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 24px;">
-      <span style="font-size: 28px; color: ${iconColor};">${icon}</span>
-    </div>
-    <h1 style="color: #ececec; font-size: 24px; font-weight: 600; margin: 0 0 12px;">${title}</h1>
-    <p style="color: #a0a0a0; font-size: 16px; line-height: 1.6; margin: 0 0 32px;">${message}</p>
-    <a href="https://stacksjs.com" style="color: #888; font-size: 13px; text-decoration: none;">stacksjs.com</a>
-  </div>
-</body>
-</html>`
-}

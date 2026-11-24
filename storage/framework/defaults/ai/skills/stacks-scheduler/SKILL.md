@@ -252,6 +252,14 @@ import { runScheduler } from '@stacksjs/scheduler'
 const result = await runScheduler()
 ```
 
+Last, `runScheduler()` adds the framework's own housekeeping (`maintenance.ts`):
+`auth/prune` (what `buddy auth:prune` does: expired tokens, and revoked ones
+older than 7 days) daily at 03:15, unless the app already schedules
+`auth/prune` itself or `config/auth.ts` sets `pruneTokens: false`. It also warns
+when `config/auth.ts` still sets the dead `tokenRotation`. `buddy dev` starts
+the scheduler only for an app with an app/Scheduler.ts or a job, so an app
+with neither prunes only where `schedule:run` runs.
+
 ## Queue-Level Scheduler (queue/src/scheduler.ts)
 
 A separate, queue-integrated scheduler that discovers jobs and dispatches them to the queue system:
@@ -302,6 +310,8 @@ process.on('SIGINT', () => {
 
 - `buddy schedule:run` -- Runs `Action.ScheduleRun`, which calls `runScheduler()`
   - Options: `-p, --project [project]`, `--verbose`
+- `buddy dev` -- Runs the same `Action.ScheduleRun` beside the dev servers whenever the app has an `app/Scheduler.ts` or a job in `app/Jobs/`, and says so in the ready banner. `--no-schedule` or `STACKS_DEV_SCHEDULE=0` turns it off, for an app whose tasks send email or post for real.
+  - A process whose only tasks are sub-minute (`everySecond()`) does not stay up: those interval timers are `unref()`'d. A minute-or-longer task keeps it running.
 
 ## Code Examples
 

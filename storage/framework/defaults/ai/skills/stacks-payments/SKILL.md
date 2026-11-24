@@ -102,6 +102,8 @@ const upgrade = await Payment.subscriptionCheckout(user, 'price_xxx', {
 
 Send the payer to `session.url`. `trialDays` starts a subscription checkout with a trial. `reference` and `metadata` are copied onto the payment or subscription the checkout creates. Return URLs must be on the app's origin.
 
+For Stripe checkout, persist an `idempotencyKey` before starting an attempt. Reuse the key and the same parameters when retrying that attempt within Stripe's replay window. Reconcile the original attempt before retrying after the replay window. Omit the key to start a new attempt, or supply a new key if the app needs to retry it safely. The key goes in a Stripe request header. Other built-in drivers reject this option.
+
 ### Subscriptions
 
 ```typescript
@@ -706,6 +708,15 @@ portal: {
   paymentMethodUpdate: true,                // default true
   invoiceHistory: true,                     // default true
   emailUpdate: true,                        // default true
+  subscriptionUpdate: {
+    allowedUpdates: ['price', 'quantity'],
+    prorationBehavior: 'always_invoice',
+    products: [{
+      product: 'prod_xxx',
+      prices: ['price_monthly', 'price_yearly'],
+      adjustableQuantity: { minimum: 1, maximum: 20 },
+    }],
+  },
 }
 ```
 
@@ -713,6 +724,8 @@ The configuration is tagged `metadata: { managed_by: 'stacks', stacks_app: <APP_
 and found by that tag, so several apps can share one Stripe account without
 editing each other's portal. `billingPortal()` uses it, or the account default
 when the app declares no portal.
+
+Use Stripe product IDs and price IDs to choose which subscriptions customers can change. Include an `adjustableQuantity` range on each product where customers may change the seat count. Set `subscriptionUpdate: false` to disable the feature. Omit the setting to preserve the portal configuration's existing subscription-update settings.
 
 ### Utility Functions
 

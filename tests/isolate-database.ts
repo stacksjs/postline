@@ -66,6 +66,12 @@ copyFileSync(template, database)
 process.env.DB_CONNECTION = 'sqlite'
 process.env.DB_DATABASE_PATH = database
 process.env.POSTLINE_TEST_DATABASE = database
+// Stacks' `bootTestEnvironment()` (called from tests/setup.ts) makes an empty
+// throwaway database of its own unless told one is already configured. This
+// one is, and is migrated, so it keeps it. The path also tells the framework's
+// reset helpers that this file belongs to the test run.
+process.env.STACKS_TEST_DATABASE = 'configured'
+process.env.STACKS_TEST_DATABASE_PATH = database
 
 // Network tokens are sealed with the app key. A CI runner has no `.env`, so
 // the suite gets a throwaway key of its own when none is set.
