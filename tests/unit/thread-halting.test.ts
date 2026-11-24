@@ -88,3 +88,29 @@ describe('a thread whose post fails', () => {
     expect(results.every(result => result.ok)).toBe(true)
   })
 })
+
+describe('a network that throws instead of answering', () => {
+  test('is recorded as a failure with its reason, and the others still go out', async () => {
+    const { CrosspostService } = await import('../../app/Services/Social/CrosspostService')
+    const { db } = await import('@stacksjs/database')
+    const sent: string[] = []
+    const service = new CrosspostService({
+      mastodon: { async publishToPost() { throw new Error('socket hang up') } },
+      blog: {
+        async publishToPost(post: { id: number }) {
+          sent.push('blog')
+          await (db as any).insertInto('post_targets').values({ uuid: crypto.randomUUID(), provider: 'blog', status: 'published', post_id: post.id }).execute()
+          return { provider: 'blog', ok: true, target: 'blog' }
+        },
+      },
+    } as never)
+    const uuid = crypto.randomUUID()
+    await (db as any).insertInto('posts').values({ uuid, title: 't', body: 't', status: 'draft', source: 'composer', timezone: 'UTC' }).execute()
+    const postId = Number((await (db as any).selectFrom('posts').select(['id']).where('uuid', '=', uuid).executeTakeFirstOrThrow()).id)
+
+    const results = await service.publishExisting({ id: postId, body: 't' }, [{ provider: 'mastodon', identityId: null }, { provider: 'blog', identityId: null }] as never)
+
+    expect(results.find(result => result.provider === 'mastodon')).toMatchObject({ ok: false, error: 'socket hang up' })
+    expect(sent).toEqual(['blog'])
+  })
+})

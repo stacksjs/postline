@@ -22,7 +22,10 @@ export default new Job({
     catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       log.error(`[postline] listening scan failed: ${message}`)
-      return { scanned: 0, found: 0, created: 0, errors: [{ message }] }
+      // Thrown again after logging: a run that failed as a whole is recorded
+      // as failed on the job's heartbeat and shown on Activity, instead of
+      // looking like a run that found nothing to do.
+      throw error
     }
   }),
 })

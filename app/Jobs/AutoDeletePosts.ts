@@ -25,7 +25,10 @@ export default new Job({
       // Per-network failures are already in purge_runs; this is the run itself.
       const message = error instanceof Error ? error.message : String(error)
       log.error(`[postline] auto-delete failed: ${message}`)
-      return { failed: true, error: message }
+      // Thrown again after logging: a run that failed as a whole is recorded
+      // as failed on the job's heartbeat and shown on Activity, instead of
+      // looking like a run that found nothing to do.
+      throw error
     }
   }),
 })

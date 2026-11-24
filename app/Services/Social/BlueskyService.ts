@@ -282,9 +282,19 @@ export class BlueskyService {
           media.push({ bytes: item.bytes, mimeType: item.mimeType, altText: item.altText })
         }
         else if (item.url) {
+          // An image that cannot be fetched fails the post rather than letting
+          // it go out without the picture its author attached.
           const fetched = await fetchRemoteImage(item.url)
-          if (fetched)
-            media.push({ bytes: fetched.bytes, mimeType: fetched.mimeType, altText: item.altText })
+          if (!fetched) {
+            return {
+              provider: 'bluesky',
+              ok: false,
+              error: `Postline could not read the image at ${item.url}, so the post was not sent. Check the address, or attach the file instead.`,
+              ...account,
+              retry: { kind: 'transient' as const },
+            }
+          }
+          media.push({ bytes: fetched.bytes, mimeType: fetched.mimeType, altText: item.altText })
         }
       }
       if (media.length) publishInput.media = media

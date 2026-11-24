@@ -20,12 +20,15 @@ export default new Job({
       return result
     }
     catch (error) {
-      // A network that is down should not fail the job and trigger retries —
-      // `sync` already collects per-provider errors, so reaching here means
-      // something broader broke and the next tick is the right retry.
+      // One network that is down does not land here: `sync` collects
+      // per-network errors. Reaching here means something broader broke.
+      // The job has one try, so this is recorded, not retried at once.
       const message = error instanceof Error ? error.message : String(error)
       log.error(`[postline] dm sync failed: ${message}`)
-      return { synced: 0, conversations: 0, messages: 0, errors: [{ message }] }
+      // Thrown again after logging: a run that failed as a whole is recorded
+      // as failed on the job's heartbeat and shown on Activity, instead of
+      // looking like a run that found nothing to do.
+      throw error
     }
   }),
 })

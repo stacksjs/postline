@@ -3,6 +3,7 @@ import type { PublishTarget } from '../../Support/Social/targets'
 import type { ThreadChain } from '../../Support/Social/threads'
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
+import { log } from '@stacksjs/logging'
 import { parseTarget, resolveTargets, targetKey } from '../../Support/Social/targets'
 import { advanceChain, threadSegmentContent } from '../../Support/Social/threads'
 import { resolveVariantBody } from '../../Support/Social/variants'
@@ -414,8 +415,14 @@ export class CrosspostService {
     }
 
     let result: CrosspostTargetResult
+    const startedMs = Date.now()
     try {
       result = await publisher.publishToPost(post, fitted.content, target.identityId)
+    }
+    catch (error) {
+      // A publisher is meant to return its failures, not throw them. One that
+      // throws is recorded the same way, so the post shows why it failed.
+      result = { provider: target.provider, ok: false, error: error instanceof Error ? error.message : String(error), identityId: target.identityId ?? undefined }
     }
     finally {
       // The network fetches the image while the post is created, so the
@@ -424,6 +431,10 @@ export class CrosspostService {
       await share?.close()
     }
     const identityId = result.identityId ?? target.identityId ?? undefined
+    // One line per network call: which post, where, how it ended and how long it took.
+    const line = `[postline] publish post=${post.id} target=${targetKey({ provider: result.provider, identityId: identityId ?? null })} ok=${result.ok} ms=${Date.now() - startedMs}${result.ok ? '' : ` error=${JSON.stringify(String(result.error || '').slice(0, 300))}`}`
+    if (result.ok) log.info(line)
+    else log.warn(line)
     return {
       ...result,
       ...(identityId ? { identityId } : {}),

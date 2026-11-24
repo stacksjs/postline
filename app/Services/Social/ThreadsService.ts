@@ -1,6 +1,7 @@
 import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
+import { log } from '@stacksjs/logging'
 import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
 import { PendingOAuthStates } from '../../Support/Social/oauth-state'
@@ -165,7 +166,11 @@ export class ThreadsService {
       accessToken = longLived.accessToken
       expiresIn = longLived.expiresIn
     }
-    catch {}
+    catch (error) {
+      // The account still connects, on a token that lasts about an hour. Say
+      // so: silently, the first sign of it was a failed post.
+      log.warn(`[postline] threads: could not get a long-lived token, the connection will lapse within hours: ${error instanceof Error ? error.message : String(error)}`)
+    }
 
     const account = await this.driver.resolveAccount(accessToken)
     const identity = await this.saveSession({
