@@ -25,6 +25,7 @@ import { Database } from 'bun:sqlite'
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import process from 'node:process'
+import { bundleClientScripts } from './lib/client-scripts'
 
 const root = join(import.meta.dir, '..')
 const out = join(root, 'app/Desktop/bundle.generated.js')
@@ -164,7 +165,6 @@ const source = `// Written by scripts/desktop-bundle.ts. Do not edit: run \`bun 
 // Everything the desktop agent carries inside its compiled binary, as static
 // imports the bundler can follow. See the script for why.
 
-import { bundleClientScripts } from './lib/client-scripts'
 import databaseTemplate from './database.template.sqlite' with { type: 'file' }
 ${migrations.map((name, index) => `import migration${index} from ${spec(join(root, 'database/migrations', name))} with { type: 'text' }`).join('\n')}
 
