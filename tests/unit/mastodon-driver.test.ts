@@ -86,7 +86,8 @@ describe('MastodonPublishingDriver', () => {
     const cap: Captured[] = []; mockApi(cap)
     const driver = new MastodonPublishingDriver()
     await expect(driver.publish(creds, { text: 'x'.repeat(501) })).rejects.toThrow(/500 characters/)
-    expect(cap).toHaveLength(0)
+    // The instance is asked for its limit first; nothing is posted.
+    expect(cap.filter(call => call.url.endsWith('/api/v1/statuses'))).toHaveLength(0)
   })
 
   test('surfaces API errors as MastodonApiError with status', async () => {
@@ -125,7 +126,8 @@ describe('MastodonDriver, what Postline adds', () => {
     await new MastodonDriver().publish(creds, { text: 'hello fediverse' }, { idempotencyKey: key })
 
     const post = cap.find(call => call.url.endsWith('/api/v1/statuses'))!
-    expect(post.headers['Idempotency-Key']).toBe(key)
+    // Header names are case-insensitive; read it either way.
+    expect(new Headers(post.headers).get('Idempotency-Key')).toBe(key)
   })
 
   test('the key is the same for a retry and different once the text changes', () => {

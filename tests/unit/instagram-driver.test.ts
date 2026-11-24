@@ -8,7 +8,10 @@ interface Captured { url: string, method: string }
 
 function mockGraphApi(captured: Captured[], overrides: (url: string) => Response | null = () => null): void {
   globalThis.fetch = (async (input: any, init: any = {}) => {
-    const url = String(input)
+    // The framework sends token requests as a form body, which keeps the client
+    // secret out of the address; reading the body with the address lets the
+    // assertions below check the parameters wherever they travel.
+    const url = init.body && String(init.body).includes('=') && !String(input).includes('?') ? `${String(input)}?${String(init.body)}` : String(input)
     const over = overrides(url)
     if (over) { captured.push({ url, method: init.method || 'GET' }); return over }
 

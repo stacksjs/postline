@@ -1,30 +1,23 @@
 /**
  * Say what went wrong on a network, and what to do about it.
  *
- * A failed publish used to store whatever the driver threw: `Twitter API
- * failed (403): {"detail":"You are not allowed to create a Tweet with
- * duplicate content.","type":"about:blank",...}`. That is a response body,
- * not an explanation. Here every failure is put in one of a few kinds, each
- * with a sentence about what happened and one about what to do.
+ * A failed publish used to store whatever the driver threw: a response body,
+ * not an explanation. The failure is classified by `@stacksjs/socials`
+ * (`classifySocialError`, which reads the status and the network's own
+ * words); turning the kind into a sentence that says what to do is Postline's,
+ * because it knows where its settings live.
  *
  * The kind also decides whether the account is treated as signed out. Only
- * `expired` does: most drivers called every 403 an expired token, so X
- * refusing a duplicate post, or a token without one permission, disconnected
- * an account that was working.
- *
- * No imports: an error is read by its `status` and `body`, which every driver
- * error carries, so nothing here depends on a driver.
+ * `expired` does: a 403 is usually one refused post (a duplicate, a missing
+ * permission), and treating it as signed out disconnected accounts that were
+ * working.
  */
+import type { SocialErrorKind } from '@stacksjs/socials'
+import { classifySocialError, networkReason } from '@stacksjs/socials'
 
-export type NetworkErrorKind
-  = | 'expired'
-    | 'permission'
-    | 'rate-limited'
-    | 'duplicate'
-    | 'content'
-    | 'media'
-    | 'temporary'
-    | 'unknown'
+export { networkReason }
+
+export type NetworkErrorKind = SocialErrorKind
 
 export interface NetworkErrorExplanation {
   kind: NetworkErrorKind
@@ -42,50 +35,6 @@ const NAMES: Record<string, string> = {
   blog: 'The blog',
 }
 
-/** The short sentence a network gives as its reason, when it gives one. */
-export function networkReason(body: unknown): string {
-  let parsed: any
-  try {
-    parsed = typeof body === 'string' ? JSON.parse(body) : body
-  }
-  catch {
-    return ''
-  }
-  if (!parsed || typeof parsed !== 'object') return ''
-
-  const first = Array.isArray(parsed.errors) ? parsed.errors[0] : undefined
-  const candidates = [
-    parsed.detail,
-    parsed.error?.error_user_msg,
-    parsed.error?.message,
-    parsed.message,
-    parsed.error_description,
-    first?.detail,
-    first?.message,
-    typeof parsed.error === 'string' ? parsed.error : undefined,
-  ]
-  for (const candidate of candidates) {
-    const text = typeof candidate === 'string' ? candidate.replace(/\s+/g, ' ').trim() : ''
-    // A sentence, not a code or a dump: short, with a space, no braces.
-    if (text && text.length <= 200 && text.includes(' ') && !/[{}<>]/.test(text)) return text.replace(/[.!]+$/, '')
-  }
-  return ''
-}
-
-function kindOf(status: number, text: string): NetworkErrorKind {
-  const has = (pattern: RegExp): boolean => pattern.test(text)
-
-  if (status === 429 || has(/rate.?limit|too many requests|usage cap|throttl/i)) return 'rate-limited'
-  if (has(/duplicate|already (?:posted|published|exists)|DUPLICATE_POST/i)) return 'duplicate'
-  if (status === 401 || has(/invalid.?token|expired.?token|token (?:has )?(?:expired|been revoked)|session has (?:expired|been invalidated)|OAuthException.*(?:expired|invalid)|REVOKED_ACCESS_TOKEN/i)) return 'expired'
-  if (status === 413 || has(/media|image|video|attachment|aspect ratio|file size|unsupported (?:format|type)|blob/i)) return 'media'
-  if (status === 403 || has(/permission|scope|not (?:allowed|authorized|permitted)|forbidden|ACCESS_DENIED|insufficient/i)) return 'permission'
-  if (status === 408 || status >= 500) return 'temporary'
-  if (status === 400 || status === 404 || status === 409 || status === 422) return 'content'
-  if (has(/fetch failed|network|ENOTFOUND|ECONNREFUSED|ECONNRESET|EAI_AGAIN|timed? ?out|socket|aborted/i)) return 'temporary'
-  return 'unknown'
-}
-
 /**
  * Explain a publish failure on `provider`.
  *
@@ -96,11 +45,8 @@ function kindOf(status: number, text: string): NetworkErrorKind {
  */
 export function explainNetworkError(provider: string, error: unknown): NetworkErrorExplanation {
   const name = NAMES[provider] || provider
-  const source = (error ?? {}) as { status?: unknown, body?: unknown, message?: unknown }
-  const status = Number(source.status) || 0
-  const own = String(source.message ?? error ?? '')
-  const reason = networkReason(source.body)
-  const kind = kindOf(status, `${reason} ${typeof source.body === 'string' ? source.body.slice(0, 2000) : ''} ${status ? '' : own}`)
+  const { kind, status, reason } = classifySocialError(error)
+  const own = String((error as { message?: unknown } | null)?.message ?? error ?? '')
 
   if (!status && kind === 'unknown')
     return { kind, message: own || `${name} could not take this post.` }

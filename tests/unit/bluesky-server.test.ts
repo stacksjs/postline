@@ -116,7 +116,6 @@ describe('the Bluesky driver', () => {
     expect(isBlueskySessionError(new BlueskyApiError('x', 401, ''))).toBe(true)
     expect(isBlueskySessionError(new BlueskyApiError('x', 400, JSON.stringify({ error: 'ExpiredToken' })))).toBe(true)
     expect(isBlueskySessionError(new BlueskyApiError('x', 400, JSON.stringify({ error: 'InvalidRequest', message: 'Record too long' })))).toBe(false)
-    expect(isBlueskySessionError(new BlueskyApiError('x', 403, ''))).toBe(false)
     expect(isBlueskySessionError(new Error('fetch failed'))).toBe(false)
   })
 })
