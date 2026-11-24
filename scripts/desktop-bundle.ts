@@ -137,35 +137,14 @@ function buildDatabaseTemplate(): string[] {
 }
 
 /**
- * The workspace's own scripts, bundled for a browser.
- *
- * The layout loads them as `<script type="module" src="/assets/scripts/x.ts">`.
- * The dev server transpiles a `.ts` asset as it serves it; the built app has
- * no such server, and its static files would hand the web view TypeScript
- * with a video MIME type, which it refuses. Each script is bundled here, with
- * whatever it imports from npm, and the agent answers the same URLs with the
- * result.
+ * The workspace's own scripts, bundled for a browser (scripts/lib/client-scripts.ts).
+ * The built app has no dev server to transpile them, and its static files
+ * would hand the web view TypeScript with a video MIME type, which it
+ * refuses, so the agent answers the same URLs with the bundles.
  */
 async function clientScripts(): Promise<Record<string, string>> {
-  const dir = join(root, 'resources/assets/scripts')
-  const referenced = new Set<string>()
-  for (const folder of ['resources/layouts', 'resources/views', 'resources/components']) {
-    const glob = new Bun.Glob('**/*.stx')
-    for (const file of glob.scanSync({ cwd: join(root, folder), absolute: true })) {
-      for (const match of readFileSync(file, 'utf8').matchAll(/src="\/assets\/scripts\/([\w.-]+\.ts)"/g))
-        referenced.add(match[1]!)
-    }
-  }
-
-  const scripts: Record<string, string> = {}
-  for (const name of [...referenced].sort()) {
-    const built = await Bun.build({ entrypoints: [join(dir, name)], target: 'browser', format: 'esm', minify: true })
-    if (!built.success || built.outputs.length !== 1)
-      throw new Error(`Could not bundle resources/assets/scripts/${name}:\n${built.logs.map(log => String(log)).join('\n')}`)
-    scripts[`/assets/scripts/${name}`] = await built.outputs[0]!.text()
-  }
-
-  return scripts
+  const bundled = await bundleClientScripts(root)
+  return Object.fromEntries(Object.entries(bundled).map(([name, code]) => [`/assets/scripts/${name}`, code]))
 }
 
 const routes = await routeFiles()
@@ -185,6 +164,7 @@ const source = `// Written by scripts/desktop-bundle.ts. Do not edit: run \`bun 
 // Everything the desktop agent carries inside its compiled binary, as static
 // imports the bundler can follow. See the script for why.
 
+import { bundleClientScripts } from './lib/client-scripts'
 import databaseTemplate from './database.template.sqlite' with { type: 'file' }
 ${migrations.map((name, index) => `import migration${index} from ${spec(join(root, 'database/migrations', name))} with { type: 'text' }`).join('\n')}
 

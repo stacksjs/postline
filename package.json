@@ -29,6 +29,7 @@
     "dev": "./buddy dev",
     "development": "./buddy dev",
     "build": "./buddy build",
+    "build:frontend": "./buddy build:frontend && bun scripts/bundle-client-scripts.ts",
     "prod": "./buddy build",
     "deploy": "./buddy deploy",
     "lint": "./buddy lint",
