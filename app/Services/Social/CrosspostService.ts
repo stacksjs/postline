@@ -13,6 +13,8 @@ import { mastodon } from './MastodonService'
 import { threads } from './ThreadsService'
 import { twitter } from './TwitterService'
 import { workspace } from '../WorkspaceService'
+import { fitImage, suits } from '../../Support/Social/image-fit'
+import { MEDIA_RULES } from '../../Support/Social/media-rules'
 import { ensureAccount, now, uuid } from './support'
 
 const database = db as any
@@ -45,6 +47,30 @@ const publishers: Partial<Record<SocialProvider, ProviderPublisher>> = {
 
 export function crosspostProviders(): SocialProvider[] {
   return Object.keys(publishers) as SocialProvider[]
+}
+
+const NETWORK_NAMES: Record<string, string> = { bluesky: 'Bluesky', twitter: 'X', mastodon: 'Mastodon', linkedin: 'LinkedIn', instagram: 'Instagram', threads: 'Threads' }
+
+/**
+ * The content with its images fitted to one network. Only images whose bytes
+ * are in hand can be converted; one given by address is passed on as it is.
+ * A converted image loses its address, which pointed at the original.
+ */
+async function fitContentFor(provider: string, content: PublishContent | undefined): Promise<PublishContent | undefined> {
+  const rule = MEDIA_RULES[provider]
+  if (!rule || !content?.media?.length) return content
+  if (content.media.every(item => !item.bytes?.length || suits({ bytes: item.bytes, mimeType: item.mimeType || '' }, rule))) return content
+
+  const media: NonNullable<PublishContent['media']> = []
+  for (const item of content.media) {
+    if (!item.bytes?.length) {
+      media.push(item)
+      continue
+    }
+    const fitted = await fitImage({ bytes: item.bytes, mimeType: item.mimeType || '' }, rule, NETWORK_NAMES[provider] || provider)
+    media.push(fitted.changed ? { bytes: fitted.bytes, mimeType: fitted.mimeType, altText: item.altText } : item)
+  }
+  return { ...content, media }
 }
 
 export class CrosspostService {
@@ -292,7 +318,17 @@ export class CrosspostService {
       return { provider: target.provider, ok: false, error: 'This network is not available.', target: targetKey(target) }
     }
 
-    const result = await publisher.publishToPost(post, content, target.identityId)
+    // Each network gets the images the way it takes them: converted where
+    // its format or size limit needs it, untouched where it does not.
+    let fitted: PublishContent | undefined
+    try {
+      fitted = await fitContentFor(target.provider, content)
+    }
+    catch (error) {
+      return { provider: target.provider, ok: false, error: error instanceof Error ? error.message : String(error), target: targetKey(target), identityId: target.identityId ?? undefined }
+    }
+
+    const result = await publisher.publishToPost(post, fitted, target.identityId)
     const identityId = result.identityId ?? target.identityId ?? undefined
     return {
       ...result,

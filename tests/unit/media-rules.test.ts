@@ -14,11 +14,14 @@ describe('which network objects to an image, and why', () => {
     ])
   })
 
-  test('3 MB is too big for Bluesky and fine for X: the 1 MB cap is not everyone\'s', () => {
-    expect(mediaObjections(['bluesky', 'twitter'], [{ bytes: 3 * MB, mimeType: 'image/jpeg' }])).toEqual([
+  test('a 3 MB photo is not refused for Bluesky: it is shrunk for Bluesky at publish', () => {
+    expect(mediaObjections(['bluesky', 'twitter', 'mastodon'], [{ bytes: 3 * MB, mimeType: 'image/jpeg' }])).toEqual([])
+  })
+
+  test('a GIF too large for Bluesky is refused: converting would lose its animation', () => {
+    expect(mediaObjections(['bluesky'], [{ bytes: 3 * MB, mimeType: 'image/gif' }])).toEqual([
       'This image is 3 MB; Bluesky takes up to 1 MB.',
     ])
-    expect(mediaObjections(['twitter', 'mastodon'], [{ bytes: 3 * MB, mimeType: 'image/jpeg' }])).toEqual([])
   })
 
   test('four images: allowed where four are sent, refused clearly where one is', () => {
@@ -30,7 +33,10 @@ describe('which network objects to an image, and why', () => {
 
   test('each image is named when there are several', () => {
     expect(mediaObjections(['threads'], [{ bytes: 100, mimeType: 'image/webp' }])).toEqual(['Threads takes JPEG or PNG only; this image is a WebP.'])
-    expect(mediaObjections(['bluesky'], [{ bytes: 100, mimeType: 'image/jpeg' }, { bytes: 2 * MB, mimeType: 'image/jpeg' }])).toEqual([
+    expect(mediaObjections(['threads'], [{ bytes: 100, mimeType: 'image/jpeg' }, { bytes: 9 * MB, mimeType: 'image/jpeg' }])).toEqual([
+      'Threads takes one image per post; this post has 2.',
+    ])
+    expect(mediaObjections(['bluesky'], [{ bytes: 100, mimeType: 'image/jpeg' }, { bytes: 2 * MB, mimeType: 'image/gif' }])).toEqual([
       'Image 2 is 2 MB; Bluesky takes up to 1 MB.',
     ])
   })
