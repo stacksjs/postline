@@ -356,7 +356,7 @@
           blank: false,
           day,
           isToday: key === todayKey,
-          scheduleUrl: `/?schedule=${key}`,
+          scheduleUrl: `/composer?schedule=${key}`,
           chips: dayItems.slice(0, 3).map(({ row, date }) => ({
             status: row.status,
             href: row.actionable ? row.editUrl : row.liveUrl || row.editUrl,

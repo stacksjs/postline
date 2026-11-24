@@ -1,9 +1,9 @@
 @extends('layouts/app')
 
 @section('title', 'Postline - Campaigns')
-@section('description', 'Plan multi-week social launches, draft campaign posts with AI, and send them into Postline queue.')
 
 @section('content')
+  @meta('description', 'Plan multi-week social launches, draft campaign posts with AI, and send them into Postline queue.')
   <section class="grid gap-4 campaigns-page" data-postline-page="campaigns" data-testid="campaigns-page">
     <header class="flex flex-wrap gap-3 items-center justify-between min-h-11">
       <div class="min-w-0">

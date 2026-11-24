@@ -1,9 +1,9 @@
 @extends('layouts/app')
 
 @section('title', 'Postline - Blog')
-@section('description', 'Manage long-form posts published through Postline.')
 
 @section('content')
+  @meta('description', 'Manage long-form posts published through Postline.')
   <section class="grid gap-4" data-postline-page="blog" data-testid="blog-page">
     <header class="flex flex-col gap-4 items-stretch justify-between sm:flex-row sm:items-center min-h-11">
       <div>

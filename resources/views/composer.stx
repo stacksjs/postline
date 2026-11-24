@@ -1570,7 +1570,7 @@
       // Wait for the social module (a deferred `type=module` script) before the
       // first provider fetch so window.postlineSocial is guaranteed to exist.
       // Load the edit post only after connection so provider toggles resolve.
-      // /?schedule=YYYY-MM-DD (from the queue calendar) opens the schedule
+      // /composer?schedule=YYYY-MM-DD (from the queue calendar) opens the schedule
       // input pre-set to 09:00 local on that day.
       const scheduleParam = useRoute().query.schedule || null
       const applyScheduleParam = () => {

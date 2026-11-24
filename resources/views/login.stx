@@ -4,6 +4,7 @@
 
 @section('content')
   @meta('description', 'Sign in to your Postline workspace.')
+  @meta('robots', 'noindex, nofollow')
   {{-- The theme bootstrap that used to live here is now `app.colorMode` in
       config/ui.ts, so this page gets the same pre-paint stamp as every layout
       without carrying its own copy. stacksjs/stx#1788, the reason it was

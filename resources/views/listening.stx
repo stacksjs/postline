@@ -1,9 +1,9 @@
 @extends('layouts/app')
 
 @section('title', 'Postline - Listening')
-@section('description', 'Watch brand and product keywords across social networks and collect new mentions.')
 
 @section('content')
+  @meta('description', 'Watch brand and product keywords across social networks and collect new mentions.')
   <section class="grid gap-4" data-postline-page="listening" data-testid="listening-page">
     <header class="flex flex-col gap-4 items-stretch justify-between md:flex-row md:items-center min-h-11">
       <div>
