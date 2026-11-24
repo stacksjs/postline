@@ -14,6 +14,7 @@ import { threads } from './ThreadsService'
 import { twitter } from './TwitterService'
 import { workspace } from '../WorkspaceService'
 import { fitImage, suits } from '../../Support/Social/image-fit'
+import { persistTempMedia, removeTempMedia } from '../../Support/Social/uploads'
 import { MEDIA_RULES } from '../../Support/Social/media-rules'
 import { ensureAccount, now, uuid } from './support'
 
@@ -51,15 +52,23 @@ export function crosspostProviders(): SocialProvider[] {
 
 const NETWORK_NAMES: Record<string, string> = { bluesky: 'Bluesky', twitter: 'X', mastodon: 'Mastodon', linkedin: 'LinkedIn', instagram: 'Instagram', threads: 'Threads' }
 
+/** Networks that fetch an image from an address rather than taking its bytes. */
+const FETCHES_BY_ADDRESS = new Set(['instagram', 'threads'])
+
 /**
  * The content with its images fitted to one network. Only images whose bytes
  * are in hand can be converted; one given by address is passed on as it is.
- * A converted image loses its address, which pointed at the original.
+ *
+ * A converted image no longer matches the address of the original. For a
+ * network that fetches by address it is written as a temporary file with an
+ * address of its own; `tempFiles` lists them for removal once the network
+ * has taken the post.
  */
-async function fitContentFor(provider: string, content: PublishContent | undefined): Promise<PublishContent | undefined> {
+async function fitContentFor(provider: string, content: PublishContent | undefined): Promise<{ content: PublishContent | undefined, tempFiles: string[] }> {
   const rule = MEDIA_RULES[provider]
-  if (!rule || !content?.media?.length) return content
-  if (content.media.every(item => !item.bytes?.length || suits({ bytes: item.bytes, mimeType: item.mimeType || '' }, rule))) return content
+  const tempFiles: string[] = []
+  if (!rule || !content?.media?.length) return { content, tempFiles }
+  if (content.media.every(item => !item.bytes?.length || suits({ bytes: item.bytes, mimeType: item.mimeType || '' }, rule))) return { content, tempFiles }
 
   const media: NonNullable<PublishContent['media']> = []
   for (const item of content.media) {
@@ -68,9 +77,21 @@ async function fitContentFor(provider: string, content: PublishContent | undefin
       continue
     }
     const fitted = await fitImage({ bytes: item.bytes, mimeType: item.mimeType || '' }, rule, NETWORK_NAMES[provider] || provider)
-    media.push(fitted.changed ? { bytes: fitted.bytes, mimeType: fitted.mimeType, altText: item.altText } : item)
+    if (!fitted.changed) {
+      media.push(item)
+      continue
+    }
+    let url: string | undefined
+    if (FETCHES_BY_ADDRESS.has(provider)) {
+      const temp = await persistTempMedia(fitted.bytes, fitted.mimeType)
+      if (temp) {
+        tempFiles.push(temp.filename)
+        url = temp.url
+      }
+    }
+    media.push({ bytes: fitted.bytes, mimeType: fitted.mimeType, altText: item.altText, ...(url ? { url } : {}) })
   }
-  return { ...content, media }
+  return { content: { ...content, media }, tempFiles }
 }
 
 export class CrosspostService {
@@ -320,7 +341,7 @@ export class CrosspostService {
 
     // Each network gets the images the way it takes them: converted where
     // its format or size limit needs it, untouched where it does not.
-    let fitted: PublishContent | undefined
+    let fitted: Awaited<ReturnType<typeof fitContentFor>>
     try {
       fitted = await fitContentFor(target.provider, content)
     }
@@ -328,7 +349,15 @@ export class CrosspostService {
       return { provider: target.provider, ok: false, error: error instanceof Error ? error.message : String(error), target: targetKey(target), identityId: target.identityId ?? undefined }
     }
 
-    const result = await publisher.publishToPost(post, fitted, target.identityId)
+    let result: CrosspostTargetResult
+    try {
+      result = await publisher.publishToPost(post, fitted.content, target.identityId)
+    }
+    finally {
+      // The network fetches the image while the post is created, so the
+      // converted copies are no longer needed once it answers.
+      for (const file of fitted.tempFiles) await removeTempMedia(file)
+    }
     const identityId = result.identityId ?? target.identityId ?? undefined
     return {
       ...result,

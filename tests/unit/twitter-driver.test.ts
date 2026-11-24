@@ -158,3 +158,45 @@ describe('TwitterDriver.publish', () => {
     expect((caught as TwitterApiError).isAuthError).toBe(true)
   })
 })
+
+describe('TwitterDriver, several images with alt text', () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+
+  function mockWithIds(captured: Captured[], metadataStatus = 200): void {
+    let next = 0
+    mockTwitterApi(captured, (url) => {
+      if (url.includes('/2/media/upload')) return new Response(JSON.stringify({ data: { id: `m${++next}` } }), { status: 200 })
+      if (url.includes('/2/media/metadata')) return new Response(JSON.stringify({}), { status: metadataStatus })
+      return null
+    })
+  }
+
+  test('attaches up to four images, each described', async () => {
+    const cap: Captured[] = []; mockWithIds(cap)
+    const media = Array.from({ length: 5 }, (_, index) => ({ bytes: png, mimeType: 'image/png', altText: index === 1 ? '' : `picture ${index}` }))
+    await new TwitterDriver().publish(identity, { text: 'gallery', media })
+
+    expect(cap.filter(call => call.url.includes('/2/media/upload'))).toHaveLength(4)
+    expect(tweetRequest(cap)!.body.media.media_ids).toEqual(['m1', 'm2', 'm3', 'm4'])
+    const described = cap.filter(call => call.url.includes('/2/media/metadata')).map(call => JSON.parse(String(call.body)))
+    expect(described).toEqual([
+      { id: 'm1', metadata: { alt_text: { text: 'picture 0' } } },
+      { id: 'm3', metadata: { alt_text: { text: 'picture 2' } } },
+      { id: 'm4', metadata: { alt_text: { text: 'picture 3' } } },
+    ])
+  })
+
+  test('a refused description does not stop the post', async () => {
+    const cap: Captured[] = []; mockWithIds(cap, 400)
+    const result = await new TwitterDriver().publish(identity, { text: 'still posts', media: [{ bytes: png, mimeType: 'image/png', altText: 'a dot' }] })
+    expect(result.uri).toBe('tweet999')
+    expect(tweetRequest(cap)!.body.media.media_ids).toEqual(['m1'])
+  })
+
+  test('the limit is X\'s weighted count, not UTF-16 length', async () => {
+    const cap: Captured[] = []; mockWithIds(cap)
+    const driver = new TwitterDriver()
+    await expect(driver.publish(identity, { text: 'あ'.repeat(141) })).rejects.toThrow('280 characters')
+    await expect(driver.publish(identity, { text: `Read https://example.com/${'a'.repeat(300)}` })).resolves.toBeDefined()
+  })
+})

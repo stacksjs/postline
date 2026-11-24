@@ -96,6 +96,27 @@ describe('LinkedInDriver.publish', () => {
     expect(post?.body.content.article).toBeUndefined()
   })
 
+  test('two or more images become a multi-image post, each with its alt text', async () => {
+    const cap: Captured[] = []; mockLinkedInApi(cap)
+    await new LinkedInDriver().publish(identity, {
+      text: 'album',
+      media: [
+        { bytes: new Uint8Array([1]), mimeType: 'image/png', altText: 'first' },
+        { bytes: new Uint8Array([2]), mimeType: 'image/png' },
+        { bytes: new Uint8Array([3]), mimeType: 'image/png', altText: 'third' },
+      ],
+    })
+
+    expect(cap.filter(c => c.url.includes('initializeUpload'))).toHaveLength(3)
+    const content = postRequest(cap)?.body.content
+    expect(content.media).toBeUndefined()
+    expect(content.multiImage.images).toEqual([
+      { id: 'urn:li:image:IMG123', altText: 'first' },
+      { id: 'urn:li:image:IMG123' },
+      { id: 'urn:li:image:IMG123', altText: 'third' },
+    ])
+  })
+
   test('fetches a media URL to bytes when only a url is given', async () => {
     const cap: Captured[] = []; mockLinkedInApi(cap)
     const driver = new LinkedInDriver()

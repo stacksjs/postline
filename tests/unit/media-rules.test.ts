@@ -8,10 +8,8 @@ describe('which network objects to an image, and why', () => {
     expect(mediaObjections(['bluesky', 'twitter', 'mastodon', 'linkedin', 'instagram', 'threads', 'blog'], [{ bytes: 400_000, mimeType: 'image/jpeg' }])).toEqual([])
   })
 
-  test('a PNG is refused for Instagram only, by name', () => {
-    expect(mediaObjections(['bluesky', 'instagram', 'twitter'], [{ bytes: 400_000, mimeType: 'image/png' }])).toEqual([
-      'Instagram takes JPEG only; this image is a PNG.',
-    ])
+  test('a PNG for Instagram is not refused: it is converted to JPEG for Instagram at publish', () => {
+    expect(mediaObjections(['bluesky', 'instagram', 'twitter'], [{ bytes: 400_000, mimeType: 'image/png' }])).toEqual([])
   })
 
   test('a 3 MB photo is not refused for Bluesky: it is shrunk for Bluesky at publish', () => {
@@ -27,15 +25,13 @@ describe('which network objects to an image, and why', () => {
   test('four images: allowed where four are sent, refused clearly where one is', () => {
     const four = Array.from({ length: 4 }, () => ({ bytes: 200_000, mimeType: 'image/jpeg' }))
     expect(mediaObjections(['bluesky', 'twitter', 'mastodon'], four)).toEqual([])
-    expect(mediaObjections(['linkedin'], four)).toEqual(['LinkedIn takes one image per post; this post has 4.'])
+    expect(mediaObjections(['linkedin'], four)).toEqual([])
+    expect(mediaObjections(['instagram', 'threads'], four)).toEqual([])
     expect(mediaObjections(['bluesky'], [...four, four[0]!])).toEqual(['Bluesky takes up to 4 images per post; this post has 5.'])
   })
 
   test('each image is named when there are several', () => {
-    expect(mediaObjections(['threads'], [{ bytes: 100, mimeType: 'image/webp' }])).toEqual(['Threads takes JPEG or PNG only; this image is a WebP.'])
-    expect(mediaObjections(['threads'], [{ bytes: 100, mimeType: 'image/jpeg' }, { bytes: 9 * MB, mimeType: 'image/jpeg' }])).toEqual([
-      'Threads takes one image per post; this post has 2.',
-    ])
+    expect(mediaObjections(['threads'], [{ bytes: 100, mimeType: 'image/gif' }])).toEqual(['Threads takes JPEG or PNG only; this image is a GIF.'])
     expect(mediaObjections(['bluesky'], [{ bytes: 100, mimeType: 'image/jpeg' }, { bytes: 2 * MB, mimeType: 'image/gif' }])).toEqual([
       'Image 2 is 2 MB; Bluesky takes up to 1 MB.',
     ])

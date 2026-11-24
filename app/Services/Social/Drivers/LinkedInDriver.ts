@@ -1,9 +1,13 @@
 import type { LinkedInTokenExchangeInput, PublishedPost, PublishPostInput, SocialIdentityCredentials } from '@stacksjs/socials'
 import { LinkedInApiError, LinkedInPublishingDriver } from '@stacksjs/socials'
+import { exceedsLimit } from '../../../Support/Social/count-text'
 import { fetchRemoteImage } from '../../../Support/Social/image-input'
 import { linkedInCommentary } from '../../../Support/Social/linkedin-text'
 
 export { LinkedInApiError }
+
+/** Images per post Postline sends to LinkedIn. LinkedIn allows more; four is the composer's limit. */
+export const LINKEDIN_MAX_IMAGES = 4
 
 interface InitializeUploadResponse {
   value?: { uploadUrl?: string, image?: string }
@@ -166,9 +170,9 @@ export class LinkedInDriver extends LinkedInPublishingDriver {
   }
 
   /**
-   * Publish a member share. Extends the base text/article flow with a single
-   * attached image (`post.media[0]`): the image is uploaded first, then
-   * referenced under `content.media`. LinkedIn's `content` is a one-of, so an
+   * Publish a member share. Extends the base text/article flow with attached
+   * images: each is uploaded first, then referenced under `content.media`
+   * (one) or `content.multiImage` (two or more). LinkedIn's `content` is a one-of, so an
    * image supersedes an article link card when both are present (matching how
    * Bluesky lets an image override the link card).
    *
@@ -183,15 +187,14 @@ export class LinkedInDriver extends LinkedInPublishingDriver {
     const author = identity.did
     if (!author) throw new Error('LinkedIn member URN is required to publish.')
 
-    if (post.text.length > this.characterLimit) {
+    if (exceedsLimit('linkedin', post.text, this.characterLimit)) {
       throw new Error(`LinkedIn posts must be ${this.characterLimit} characters or fewer.`)
     }
 
-    // Resolve an attached image to bytes — uploaded files arrive as `bytes`;
+    // Resolve each attached image to bytes — uploaded files arrive as `bytes`;
     // a bare `url` is fetched first (same handling as the Mastodon driver).
-    const media = post.media?.[0]
-    let imageUrn: string | undefined
-    if (media) {
+    const images: Array<{ id: string, altText?: string }> = []
+    for (const media of (post.media ?? []).slice(0, LINKEDIN_MAX_IMAGES)) {
       let bytes = media.bytes
       let mimeType = media.mimeType
       if (!bytes?.length && media.url) {
@@ -202,7 +205,8 @@ export class LinkedInDriver extends LinkedInPublishingDriver {
         }
       }
       if (bytes?.length) {
-        imageUrn = await this.uploadImage(identity.accessToken, author, bytes, mimeType)
+        const id = await this.uploadImage(identity.accessToken, author, bytes, mimeType)
+        images.push({ id, ...(media.altText?.trim() ? { altText: media.altText.trim().slice(0, 4086) } : {}) })
       }
     }
 
@@ -219,13 +223,13 @@ export class LinkedInDriver extends LinkedInPublishingDriver {
       isReshareDisabledByAuthor: false,
     }
 
-    if (imageUrn) {
-      record.content = {
-        media: {
-          id: imageUrn,
-          ...(media?.altText ? { altText: media.altText } : {}),
-        },
-      }
+    // One image is `media`; two or more are a multi-image post. Each keeps
+    // its own alt text.
+    if (images.length === 1) {
+      record.content = { media: images[0] }
+    }
+    else if (images.length > 1) {
+      record.content = { multiImage: { images } }
     }
     else if (post.external) {
       record.content = {

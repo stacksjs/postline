@@ -4,6 +4,9 @@ import { exceedsLimit } from '../../../Support/Social/count-text'
 
 export { ThreadsApiError }
 
+/** Images per post Postline sends to Threads. Threads allows more; four is the composer's limit. */
+export const THREADS_MAX_IMAGES = 4
+
 export interface ThreadsLongLivedToken {
   accessToken: string
   expiresIn?: number
@@ -26,7 +29,8 @@ export class ThreadsDriver extends ThreadsPublishingDriver {
    * every segment of a thread went out as a separate post. This sends
    * `reply_to_id` for a later segment and returns the post id as both `uri`
    * and `cid`, which is what `advanceChain` needs to chain the next one.
-   * It also counts the way Threads does instead of in UTF-16 units.
+   * It also counts the way Threads does instead of in UTF-16 units, sends
+   * two or more images as a carousel, and gives each image its alt text.
    */
   override async publish(identity: SocialIdentityCredentials, post: PublishPostInput): Promise<PublishedPost> {
     if (!identity.accessToken) throw new Error('Threads access token is missing for this identity.')
@@ -36,23 +40,40 @@ export class ThreadsDriver extends ThreadsPublishingDriver {
       throw new Error(`Threads posts must be ${this.characterLimit} characters or fewer.`)
 
     const form = { 'content-type': 'application/x-www-form-urlencoded' }
-    const container = new URLSearchParams({ text: post.text })
-    const image = post.media?.[0]
-    if (image?.url) {
-      container.set('media_type', 'IMAGE')
-      container.set('image_url', image.url)
-      if (image.altText) container.set('alt_text', image.altText)
+    const create = async (fields: Record<string, string>): Promise<string> => {
+      const created = await this.graph<{ id?: string }>(`/${userId}/threads`, { method: 'POST', headers: form, body: new URLSearchParams(fields).toString() }, identity.accessToken)
+      if (!created.id) throw new ThreadsApiError('Threads did not return a media container id.', 400, JSON.stringify(created))
+      return created.id
+    }
+
+    // Threads fetches each image from its address; one without an address
+    // cannot be sent, and is refused rather than dropped from the post.
+    const images = (post.media ?? []).slice(0, THREADS_MAX_IMAGES)
+    if (images.some(image => !image.url))
+      throw new ThreadsApiError('Threads fetches images from a public address, and this image has none. Set STORAGE_PUBLIC_URL to an address Threads can reach.', 422, '')
+
+    const parent = post.reply?.parent?.uri
+    const imageFields = (image: { url?: string, altText?: string }): Record<string, string> => ({
+      media_type: 'IMAGE',
+      image_url: image.url!,
+      ...(image.altText?.trim() ? { alt_text: image.altText.trim().slice(0, 1000) } : {}),
+    })
+
+    let creationId: string
+    if (images.length > 1) {
+      // A carousel: one container per image, then one that holds them.
+      const children: string[] = []
+      for (const image of images) children.push(await create({ ...imageFields(image), is_carousel_item: 'true' }))
+      creationId = await create({ media_type: 'CAROUSEL', children: children.join(','), text: post.text, ...(parent ? { reply_to_id: parent } : {}) })
+    }
+    else if (images.length === 1) {
+      creationId = await create({ ...imageFields(images[0]!), text: post.text, ...(parent ? { reply_to_id: parent } : {}) })
     }
     else {
-      container.set('media_type', 'TEXT')
+      creationId = await create({ media_type: 'TEXT', text: post.text, ...(parent ? { reply_to_id: parent } : {}) })
     }
-    const parent = post.reply?.parent?.uri
-    if (parent) container.set('reply_to_id', parent)
 
-    const created = await this.graph<{ id?: string }>(`/${userId}/threads`, { method: 'POST', headers: form, body: container.toString() }, identity.accessToken)
-    if (!created.id) throw new ThreadsApiError('Threads did not return a media container id.', 400, JSON.stringify(created))
-
-    const published = await this.graph<{ id?: string }>(`/${userId}/threads_publish`, { method: 'POST', headers: form, body: new URLSearchParams({ creation_id: created.id }).toString() }, identity.accessToken)
+    const published = await this.graph<{ id?: string }>(`/${userId}/threads_publish`, { method: 'POST', headers: form, body: new URLSearchParams({ creation_id: creationId }).toString() }, identity.accessToken)
     if (!published.id) throw new ThreadsApiError('Threads did not return a published post id.', 400, JSON.stringify(published))
 
     const details = await this.graph<{ permalink?: string }>(`/${published.id}?fields=permalink`, { method: 'GET' }, identity.accessToken).catch(() => undefined)

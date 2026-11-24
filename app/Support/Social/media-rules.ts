@@ -11,8 +11,8 @@
  * be converted is an objection: too many images, or a GIF too large to send.
  *
  * The sizes and formats are each network's published limits. `count` is how
- * many images Postline sends there today, which for LinkedIn, Instagram and
- * Threads is one although the networks allow more.
+ * many images Postline sends there, which is four everywhere: the most the
+ * composer attaches, and within what each network allows.
  *
  * No imports, so the composer can run the same check before uploading.
  */
@@ -22,8 +22,8 @@ export interface MediaRule {
   count: number
   /**
    * Whether Postline converts an image that is too large or the wrong kind
-   * (see `image-fit.ts`) instead of refusing it. Not for the networks that
-   * fetch the image from an address: a converted copy has no address yet.
+   * (see `image-fit.ts`) instead of refusing it. For the networks that fetch
+   * images from an address, the converted copy is given a temporary one.
    */
   converts: boolean
   /** Largest file, in bytes. */
@@ -39,9 +39,9 @@ export const MEDIA_RULES: Record<string, MediaRule> = {
   bluesky: { count: 4, converts: true, maxBytes: 1_000_000, formats: COMMON },
   twitter: { count: 4, converts: true, maxBytes: 5 * MB, formats: COMMON },
   mastodon: { count: 4, converts: true, maxBytes: 16 * MB, formats: COMMON },
-  linkedin: { count: 1, converts: true, maxBytes: 8 * MB, formats: ['image/jpeg', 'image/png', 'image/gif'] },
-  instagram: { count: 1, converts: false, maxBytes: 8 * MB, formats: ['image/jpeg'] },
-  threads: { count: 1, converts: false, maxBytes: 8 * MB, formats: ['image/jpeg', 'image/png'] },
+  linkedin: { count: 4, converts: true, maxBytes: 8 * MB, formats: ['image/jpeg', 'image/png', 'image/gif'] },
+  instagram: { count: 4, converts: true, maxBytes: 8 * MB, formats: ['image/jpeg'] },
+  threads: { count: 4, converts: true, maxBytes: 8 * MB, formats: ['image/jpeg', 'image/png'] },
 }
 
 const NAMES: Record<string, string> = { bluesky: 'Bluesky', twitter: 'X', mastodon: 'Mastodon', linkedin: 'LinkedIn', instagram: 'Instagram', threads: 'Threads' }

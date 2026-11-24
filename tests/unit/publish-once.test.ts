@@ -601,8 +601,11 @@ describe('an image a network will not take', () => {
     const queue = queueWith({ blog: fakeNetwork('blog') })
     const before = (await queue.listPage({ limit: 500 })).items.length
 
-    await expect(queue.save({ text: 'a png for instagram', providers: ['blog', 'instagram'], image: { bytes: png, mimeType: 'image/png' } }))
-      .rejects.toThrow('Instagram takes JPEG only; this image is a PNG.')
+    // A GIF cannot be converted without losing its animation, so a network
+    // that does not take GIFs refuses it by name.
+    const gif = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 1, 2])
+    await expect(queue.save({ text: 'a gif for instagram', providers: ['blog', 'instagram'], image: { bytes: gif, mimeType: 'image/gif' } }))
+      .rejects.toThrow('Instagram takes JPEG only; this image is a GIF.')
 
     expect((await queue.listPage({ limit: 500 })).items.length).toBe(before)
   })
@@ -652,10 +655,11 @@ describe('a post with several images', () => {
     await expect(queue.save({ text: 'five', providers: ['blog'], images })).rejects.toThrow('up to 4 images; this one has 5')
   })
 
-  test('four images for LinkedIn are refused by name; for the blog they are fine', async () => {
+  test('four images are accepted for every network', async () => {
     const queue = queueWith({ blog: fakeNetwork('blog') })
     const images = Array.from({ length: 4 }, () => ({ bytes: png, mimeType: 'image/png' }))
-    await expect(queue.save({ text: 'four for linkedin', providers: ['linkedin'], images })).rejects.toThrow('LinkedIn takes one image per post; this post has 4.')
+    const { postId } = await queue.save({ text: 'four everywhere', providers: ['blog', 'instagram', 'threads', 'linkedin', 'twitter'], images })
+    expect((await queue.get(postId)).images).toHaveLength(4)
   })
 
   test('an edit that sends new images replaces all of them; one that sends none keeps them', async () => {
