@@ -6,6 +6,7 @@ import { crosspostProviders } from '../../Services/Social/CrosspostService'
 import { postQueue } from '../../Services/Social/QueueService'
 import { parseTargets, targetKey } from '../../Support/Social/targets'
 import { readImagesInput } from '../../Support/Social/image-input'
+import { readPostOptions } from '../../Support/Social/post-options'
 import { parseVariantsField } from '../../Support/Social/variants'
 
 export default new Action({
@@ -44,8 +45,12 @@ export default new Action({
     if (!parsedVariants.ok)
       return response.json({ ok: false, error: 'Could not read the per-network text.' }, { status: 422 })
 
+    const readOptions = readPostOptions(key => request.get(key))
+    if (!readOptions.ok)
+      return response.json({ ok: false, error: readOptions.error }, { status: 422 })
+
     try {
-      const data = await postQueue.save({ text, providers, title, scheduledAt, external, images, variants: parsedVariants.variants })
+      const data = await postQueue.save({ text, providers, title, scheduledAt, external, images, options: readOptions.options, variants: parsedVariants.variants })
       return response.json({ ok: true, data })
     }
     catch (error) {

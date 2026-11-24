@@ -1,5 +1,7 @@
 import { log } from '@stacksjs/logging'
 import { mediaObjections } from '../../Support/Social/media-rules'
+import type { PostOptions } from '../../Support/Social/post-options'
+import { sanitizePostOptions } from '../../Support/Social/post-options'
 import { isDue, MAX_ATTEMPTS, nextAttemptAt } from '../../Support/Social/retry'
 import type { PublishTarget } from '../../Support/Social/targets'
 import type { CrosspostService } from './CrosspostService'
@@ -88,6 +90,8 @@ interface StoredContent {
    * there would be destroyed exactly when it is needed.
    */
   variants?: VariantMap
+  /** Language, and Mastodon's visibility and content warning. */
+  options?: PostOptions
 }
 
 function parseStoredContent(raw: unknown): StoredContent | null {
@@ -242,6 +246,8 @@ export interface SaveQueueInput {
   image?: QueueImage | null
   /** Several images, in order, up to four. Wins over `image` when given. */
   images?: QueueImage[] | null
+  /** Language and Mastodon options. On an edit, undefined keeps what is stored. */
+  options?: PostOptions | null
   /** Per-provider body overrides; providers without one publish `text`. */
   variants?: VariantMap | null
 }
@@ -294,6 +300,7 @@ export interface QueueEditView {
   images: Array<{ kind: 'file' | 'url', url: string | null, altText: string | null }>
   /** Per-provider overrides, so an edit round-trips them instead of dropping them. */
   variants: VariantMap | null
+  options: PostOptions | null
 }
 
 export class QueueService {
@@ -340,6 +347,8 @@ export class QueueService {
     if (input.external?.uri && input.external.title) stored.external = input.external
     const savedVariants = sanitizeVariants(input.variants)
     if (savedVariants) stored.variants = savedVariants
+    const savedOptions = sanitizePostOptions(input.options)
+    if (savedOptions) stored.options = savedOptions
     if (images?.length) stored.media = await storeImages(postUuid, images)
 
     await database.insertInto('posts').values({
@@ -484,6 +493,7 @@ export class QueueService {
       image: media ? { kind: media.path ? 'file' : 'url', url: media.url || null } : null,
       images: (stored?.media || []).map(item => ({ kind: item.path ? 'file' as const : 'url' as const, url: item.url || null, altText: item.altText || null })),
       variants: sanitizeVariants(stored?.variants) || null,
+      options: sanitizePostOptions(stored?.options) || null,
     }
   }
 
@@ -524,6 +534,8 @@ export class QueueService {
     // Variants: replace / clear / keep, mirroring the media tri-state below.
     const updatedVariants = resolveStoredVariants(input.variants, existing?.variants)
     if (updatedVariants) stored.variants = updatedVariants
+    const updatedOptions = input.options === undefined ? sanitizePostOptions(existing?.options) : sanitizePostOptions(input.options)
+    if (updatedOptions) stored.options = updatedOptions
 
     // Media: replace / remove / keep. Replacing or removing drops the old files.
     if (images !== undefined) {
@@ -785,6 +797,8 @@ export class QueueService {
     // or stale row must not reach the publish path unchecked.
     const variants = sanitizeVariants(stored.variants)
     if (variants) content.variants = variants
+    const options = sanitizePostOptions(stored.options)
+    if (options) content.options = options
 
     if (stored.media?.length) {
       const media: NonNullable<PublishContent['media']> = []

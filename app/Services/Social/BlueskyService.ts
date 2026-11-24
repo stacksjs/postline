@@ -262,6 +262,8 @@ export class BlueskyService {
     const targetUuid = uuid()
     const createdAt = now()
     const publishInput: BlueskyPublishInput = { text: post.body }
+    // Bluesky takes a list; Postline records one language per post.
+    if (content?.options?.language) publishInput.langs = [content.options.language]
     if (content?.external) {
       publishInput.external = { ...content.external }
       // A card without its picture is a grey box. Only when no image is

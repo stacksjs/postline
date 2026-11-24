@@ -6,6 +6,7 @@ import { crosspost, crosspostProviders } from '../../Services/Social/CrosspostSe
 import { parseTargets } from '../../Support/Social/targets'
 import { readImagesInput } from '../../Support/Social/image-input'
 import { mediaObjections } from '../../Support/Social/media-rules'
+import { readPostOptions } from '../../Support/Social/post-options'
 import { persistTempMedia, removeTempMedia } from '../../Support/Social/uploads'
 import { parseVariantsField } from '../../Support/Social/variants'
 
@@ -76,11 +77,16 @@ export default new Action({
       if (!parsedVariants.ok)
         return response.json({ ok: false, error: 'Could not read the per-network text.' }, { status: 422 })
 
+      const readOptions = readPostOptions(key => request.get(key))
+      if (!readOptions.ok)
+        return response.json({ ok: false, error: readOptions.error }, { status: 422 })
+
       const content = {
         title,
         external,
         media: media.length ? media : undefined,
         variants: parsedVariants.variants || undefined,
+        options: readOptions.options,
       }
       const data = thread.length > 1
         ? await crosspost.publishThread(thread, providers, content)

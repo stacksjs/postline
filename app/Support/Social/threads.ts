@@ -56,6 +56,9 @@ export function advanceChain(
  * segment or the entire chain, so a thread always publishes its shared
  * segments. Dropping the field here makes that a decision someone took, not an
  * accident of every driver happening to ignore it.
+ *
+ * The post's options (language, Mastodon visibility and content warning) go
+ * on every segment.
  */
 export function threadSegmentContent(
   index: number,
@@ -65,5 +68,8 @@ export function threadSegmentContent(
   if (index === 0)
     return content ? { ...content, variants: undefined } : undefined
 
-  return chain ? { reply: chain } : undefined
+  // The language, visibility and content warning hold for the whole thread:
+  // a reply that dropped a content warning would show what the first hid.
+  if (!chain && !content?.options) return undefined
+  return { ...(chain ? { reply: chain } : {}), ...(content?.options ? { options: content.options } : {}) }
 }

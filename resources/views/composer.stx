@@ -131,6 +131,30 @@
           </div>
         </div>
 
+        {{--
+          The post's language (Bluesky and Mastodon record it), and Mastodon's
+          own visibility and content warning. Shown only when a network that
+          uses them is selected.
+        --}}
+        <div class="flex hidden flex-wrap gap-2 items-center pb-3 px-3" :class="{ 'hidden': !showPostOptions() }" data-post-options>
+          <label class="inline-flex gap-1.5 items-center text-muted text-xs" x-show="showLanguage()">
+            <span>Language</span>
+            <select class="px-2 h-8 text-ink text-ui bg-panel border border-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="postLanguage" data-post-language>
+              <option x-for="option in languageOptions" :value="option.value" :text="option.label"></option>
+            </select>
+          </label>
+          <label class="inline-flex gap-1.5 items-center text-muted text-xs" x-show="showMastodonOptions()">
+            <span>Mastodon</span>
+            <select class="px-2 h-8 text-ink text-ui bg-panel border border-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="mastodonVisibility" aria-label="Who can see it on Mastodon" data-mastodon-visibility>
+              <option value="public">Public</option>
+              <option value="unlisted">Quiet public</option>
+              <option value="private">Followers only</option>
+              <option value="direct">Mentioned people only</option>
+            </select>
+          </label>
+          <input class="flex-1 px-2.5 h-8 min-w-48 text-ink text-ui bg-panel border border-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="500" placeholder="Content warning on Mastodon (optional)" aria-label="Content warning on Mastodon" x-show="showMastodonOptions()" x-model="mastodonSpoiler" data-mastodon-spoiler>
+        </div>
+
         <footer class="flex flex-col gap-3 items-stretch justify-between sm:flex-row sm:items-center p-3 border-line border-t">
           <div class="flex gap-2 items-center min-w-0">
             <span class="min-w-0 text-muted text-xs truncate" data-bluesky-count>0 / 300 characters</span>
@@ -192,6 +216,28 @@
     const imageHandlers = { remove: null }
     const removeImage = id => imageHandlers.remove?.(id)
 
+    // Post options. The selected networks are mirrored here from the IIFE so
+    // the template can show only the options that apply.
+    const selectedNetworkIds = state([])
+    const postLanguage = state('')
+    const mastodonVisibility = state('public')
+    const mastodonSpoiler = state('')
+    const showMastodonOptions = derived(() => selectedNetworkIds().includes('mastodon'))
+    const showLanguage = derived(() => selectedNetworkIds().some(id => id === 'bluesky' || id === 'mastodon'))
+    const showPostOptions = derived(() => showLanguage() || showMastodonOptions())
+    /** Common languages, named in the reader's own language, the browser's first. */
+    const languageOptions = (() => {
+      const codes = ['en', 'es', 'de', 'fr', 'pt', 'pt-BR', 'it', 'nl', 'sv', 'pl', 'tr', 'ru', 'uk', 'ar', 'hi', 'ja', 'ko', 'zh']
+      const own = String(navigator.language || '').split('-')[0]
+      const ordered = own && codes.includes(own) ? [own, ...codes.filter(code => code !== own)] : codes
+      let names = null
+      try {
+        names = new Intl.DisplayNames([navigator.language || 'en'], { type: 'language' })
+      }
+      catch {}
+      return [{ value: '', label: 'Not set' }, ...ordered.map(code => ({ value: code, label: names?.of(code) || code }))]
+    })()
+
     ;(() => {
       const root = document.querySelector('[data-testid="composer-page"]')
       if (!root) return
@@ -223,6 +269,23 @@
         for (const entry of files) form.append('images', entry.file, entry.file.name)
         if (files.length) form.set('image_alts', JSON.stringify(files.map(entry => entry.alt)))
         return files.length
+      }
+      /** The options that apply to the selected networks; the rest go as empty, which clears them. */
+      const postOptions = () => ({
+        language: showLanguage() ? postLanguage() : '',
+        mastodonVisibility: showMastodonOptions() ? mastodonVisibility() : '',
+        mastodonSpoiler: showMastodonOptions() ? mastodonSpoiler().trim() : '',
+      })
+      const appendOptions = (form) => {
+        const options = postOptions()
+        form.set('language', options.language)
+        form.set('mastodon_visibility', options.mastodonVisibility)
+        form.set('mastodon_spoiler', options.mastodonSpoiler)
+      }
+      /** After a post goes out: the content warning was for that post. The language is kept. */
+      const resetPostOptions = () => {
+        mastodonVisibility.set('public')
+        mastodonSpoiler.set('')
       }
       const composeTitle = root.querySelector('[data-compose-title]')
       const composedTitle = () => composeTitle?.value.trim() || undefined
@@ -422,6 +485,7 @@
       })
 
       effect(() => providerRows.set(providerRowsView()))
+      effect(() => selectedNetworkIds.set(selectedNetworks().map(target => target.provider)))
       effect(() => providersPending.set(!providersLoaded()))
       effect(() => providersEmpty.set(providersLoaded() && providers().length === 0))
 
@@ -1020,6 +1084,9 @@
         const saved = item.images?.length || (item.image ? 1 : 0)
         editHadImage = saved > 0
         editRemoveImage = false
+        postLanguage.set(item.options?.language || '')
+        mastodonVisibility.set(item.options?.mastodon?.visibility || 'public')
+        mastodonSpoiler.set(item.options?.mastodon?.spoilerText || '')
         attachedImages.set(saved ? [{ id: 'saved', file: null, name: saved === 1 ? '1 saved image' : `${saved} saved images`, alt: '', kept: true }] : [])
 
         updateCount()
@@ -1069,6 +1136,7 @@
         // New images replace the saved ones; with none, the saved ones stay
         // unless their row was removed.
         if (!appendImages(form) && editRemoveImage) form.set('remove_image', '1')
+        appendOptions(form)
         // Always sent, never conditional: the server treats an absent field as
         // "keep what is stored", so clearing every override has to be explicit.
         form.set('variants', JSON.stringify(variantsPayload()))
@@ -1127,6 +1195,7 @@
         const queueImageUrl = composeImage?.value.trim()
         if (queueImageUrl) form.set('image_url', queueImageUrl)
         appendImages(form)
+        appendOptions(form)
         const queueVariants = variantsPayload()
         if (Object.keys(queueVariants).length) form.set('variants', JSON.stringify(queueVariants))
 
@@ -1142,6 +1211,7 @@
           if (composeTitle) composeTitle.value = ''
           scheduleInput?.classList.add('hidden')
           clearAttachment()
+          resetPostOptions()
           renderLinkPreview(activePost, null)
           // Same reason as the publish path: the overrides went with that post.
           variants.clear()
@@ -1204,7 +1274,7 @@
           : undefined
         const imageUrl = composeImage?.value.trim()
         const image = imageUrl ? { url: imageUrl } : undefined
-        return await social.publishCrosspost({ text, title: composedTitle(), providers: targetProviders, external, image, imageFiles: attachedFiles(), variants: variantsPayload() })
+        return await social.publishCrosspost({ text, title: composedTitle(), providers: targetProviders, external, image, imageFiles: attachedFiles(), variants: variantsPayload(), options: postOptions() })
       }
 
       const publish = async () => {
@@ -1280,6 +1350,7 @@
               external,
               image: imageUrl ? { url: imageUrl } : undefined,
               imageFiles: attachedFiles(),
+              options: postOptions(),
             }))
           }
           else {
@@ -1307,6 +1378,7 @@
           updateCount()
           saveDraft()
           clearAttachment()
+          resetPostOptions()
           if (composeTitle) composeTitle.value = ''
           window.postlineToast?.dismiss?.('publish')
           if (failures.length && successCount === 0) {

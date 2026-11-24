@@ -168,7 +168,12 @@ export class MastodonService {
         { text: post.body, media: content?.media, reply: content?.reply },
         // A retry of the same text to the same account gets the status the
         // first attempt created, instead of creating a second.
-        { idempotencyKey: mastodonIdempotencyKey(Number(post.id), Number(identity.id), post.body) },
+        {
+          idempotencyKey: mastodonIdempotencyKey(Number(post.id), Number(identity.id), post.body),
+          visibility: content?.options?.mastodon?.visibility,
+          spoilerText: content?.options?.mastodon?.spoilerText,
+          language: content?.options?.language,
+        },
       )
 
       await database.updateTable('post_targets').set({

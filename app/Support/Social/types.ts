@@ -112,6 +112,8 @@ export interface PublishContent {
     mimeType?: string
     altText?: string
   }>
+  /** The post's language, and Mastodon's visibility and content warning. */
+  options?: import('./post-options').PostOptions
   /** Thread chaining refs — only honored by providers that support replies. */
   reply?: {
     root: { uri: string, cid: string }

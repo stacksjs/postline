@@ -676,3 +676,35 @@ describe('a post with several images', () => {
     expect((await queue.get(postId)).images).toEqual([])
   })
 })
+
+describe('a post\'s options', () => {
+  test('are kept with a queued post and reach the network when it goes out', async () => {
+    let received: unknown
+    const queue = new QueueService(new CrosspostService({
+      blog: {
+        async publishToPost(post, content): Promise<CrosspostTargetResult> {
+          received = content?.options
+          await database.insertInto('post_targets').values({ uuid: crypto.randomUUID(), provider: 'blog', status: 'published', post_id: post.id }).execute()
+          return { provider: 'blog', ok: true, target: 'blog' } as CrosspostTargetResult
+        },
+      },
+    } as never))
+    const options = { language: 'de', mastodon: { visibility: 'unlisted' as const, spoilerText: 'Politics' } }
+
+    const { postId } = await queue.save({ text: 'with options', providers: ['blog'], options })
+    expect((await queue.get(postId)).options).toEqual(options)
+
+    await queue.update(postId, { text: 'with options, edited', providers: ['blog'] })
+    expect((await queue.get(postId)).options).toEqual(options)
+
+    await queue.publishNow(postId)
+    expect(received).toEqual(options)
+  })
+
+  test('an edit that clears them clears them', async () => {
+    const queue = queueWith({ blog: fakeNetwork('blog') })
+    const { postId } = await queue.save({ text: 'clear me', providers: ['blog'], options: { language: 'fr' } })
+    await queue.update(postId, { text: 'clear me', providers: ['blog'], options: null })
+    expect((await queue.get(postId)).options).toBeNull()
+  })
+})
