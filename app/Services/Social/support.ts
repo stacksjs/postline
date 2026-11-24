@@ -46,6 +46,8 @@ export async function ensureAccount(): Promise<number> {
     workspace_name: 'Postline',
     timezone: isValidTimeZone(process.env.TZ) ? String(process.env.TZ) : systemTimeZone(),
     default_audience: 'public',
+    // Automatic deletion starts at its narrowest: only posts made here.
+    auto_delete_scope: 'tracked',
     created_at: now(),
     updated_at: now(),
   }).execute()

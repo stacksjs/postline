@@ -3,7 +3,7 @@ import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { actionFailure } from '../../Support/Http/action-error'
-import { postPurge, PURGE_CONFIRMATION, PURGEABLE_PROVIDERS } from '../../Services/Social/PurgeService'
+import { postPurge, PURGEABLE_PROVIDERS } from '../../Services/Social/PurgeService'
 
 /** `?providers=bluesky,twitter` → a typed list; empty means "all purgeable". */
 function parseProviders(value: unknown): SocialProvider[] | undefined {
@@ -36,8 +36,9 @@ export default new Action({
       return response.json({
         ok: true,
         data: {
+          // `confirmation` is the phrase a run of this preview must send, and
+          // `previewToken` ties the run to exactly this selection and count.
           ...result,
-          confirmation: PURGE_CONFIRMATION,
           purgeableProviders: PURGEABLE_PROVIDERS,
         },
       })

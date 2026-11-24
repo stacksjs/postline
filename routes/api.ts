@@ -142,6 +142,8 @@ route.group({ prefix: '/postline' }, () => {
   // limited — the preview generously, the destructive run tightly.
   route.get('/purge/preview', 'Actions/Postline/PurgePreviewAction').middleware('auth').rateLimit(20, 'minute')
   route.post('/purge', 'Actions/Postline/PurgeRunAction').middleware('auth').rateLimit(3, 'hour')
+  route.get('/purge/status', 'Actions/Postline/PurgeStatusAction').middleware('auth').rateLimit(240, 'minute')
+  route.post('/purge/cancel', 'Actions/Postline/PurgeCancelAction').middleware('auth').rateLimit(30, 'minute')
   // Automatic deletion of posts older than N days (Settings). The daily
   // AutoDeletePosts job does the deleting; these only read and save the rule.
   route.get('/system', 'Actions/Postline/SystemStatusAction').middleware('auth')

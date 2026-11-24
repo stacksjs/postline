@@ -114,7 +114,7 @@
             "isUnique": false,
             "isNullable": true,
             "hasDefault": true,
-            "defaultValue": "all",
+            "defaultValue": "tracked",
             "enumValues": [
               "tracked",
               "all"
@@ -2567,7 +2567,7 @@
       }
     ]
   },
-  "hash": "2a791ce0944f6aeecdaf6c0e330e826abba893c189aaa97ab50a94f79c603e18",
+  "hash": "135b38557e8fff7745e4717fb3ce3e175e86305ce363a9991d457a50dc34351f",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-24T19:52:23.068Z"
+  "updatedAt": "2026-11-24T22:08:49.628Z"
 }

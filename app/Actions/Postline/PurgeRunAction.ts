@@ -3,7 +3,7 @@ import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { actionFailure } from '../../Support/Http/action-error'
-import { postPurge, PURGE_CONFIRMATION } from '../../Services/Social/PurgeService'
+import { postPurge } from '../../Services/Social/PurgeService'
 
 function parseProviders(value: unknown): SocialProvider[] | undefined {
   const raw = String(value || '').trim()
@@ -19,7 +19,8 @@ function parseOlderThanDays(value: unknown): number | undefined {
 
 /**
  * Permanently delete posts from the connected social accounts. Irreversible —
- * the caller must send the exact confirmation phrase, and `dry_run=1` still
+ * the caller must send the token its preview returned and the phrase that
+ * names the previewed count, and no more than that count is deleted; and `dry_run=1` still
  * routes through the preview path so a mis-wired client can't delete by
  * accident.
  */
@@ -35,16 +36,19 @@ export default new Action({
     const dryRun = ['1', 'true', 'yes'].includes(String(request.get('dry_run') || '').toLowerCase())
 
     try {
-      const result = dryRun
-        ? await postPurge.preview({ scope, providers, olderThanDays })
-        : await postPurge.purge({
-            scope,
-            providers,
-            olderThanDays,
-            confirmation: String(request.get('confirmation') || ''),
-          })
+      if (dryRun)
+        return response.json({ ok: true, data: await postPurge.preview({ scope, providers, olderThanDays }) })
 
-      return response.json({ ok: true, data: { ...result, confirmation: PURGE_CONFIRMATION } })
+      // Checked here, before answering; the deleting itself carries on in the
+      // background and the page follows it at /purge/status.
+      const progress = postPurge.start({
+        scope,
+        providers,
+        olderThanDays,
+        confirmation: String(request.get('confirmation') || ''),
+        previewToken: String(request.get('preview_token') || ''),
+      })
+      return response.json({ ok: true, data: progress }, { status: 202 })
     }
     catch (error) {
       return actionFailure(error, 422)

@@ -80,13 +80,17 @@ export default defineModel({
       validation: { rule: schema.json() },
       factory: () => JSON.stringify([]),
     },
-    /** `tracked`: only posts published from here. `all`: everything on the account. */
+    /**
+     * `tracked`: only posts published from here. `all`: everything on the
+     * account. The narrowest is the default: widening it is a choice the
+     * owner confirms (RetentionService `widensDeletion`).
+     */
     autoDeleteScope: {
       required: false,
       fillable: true,
-      default: 'all',
+      default: 'tracked',
       validation: { rule: schema.enum(['tracked', 'all']) },
-      factory: () => 'all',
+      factory: () => 'tracked',
     },
   },
 } as const)

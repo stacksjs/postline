@@ -1,3 +1,6 @@
+import { Buffer } from 'node:buffer'
+import { timingSafeEqual } from 'node:crypto'
+import process from 'node:process'
 import type { AuthoredPost, ProviderPurgeAdapter, SocialProvider } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { acquirePurgeLock } from '../../Support/Social/purge-lock'
@@ -5,6 +8,7 @@ import { bluesky } from './BlueskyService'
 import { linkedin } from './LinkedInService'
 import { mastodon } from './MastodonService'
 import { ensureAccount, now, uuid } from './support'
+import { UserFacingError } from '../../Support/Http/user-error'
 import { twitter } from './TwitterService'
 
 const database = db as any
@@ -16,8 +20,83 @@ const database = db as any
  * capped, and is written to `purge_runs` whether it previews or executes.
  */
 
-/** Exact phrase a caller must send to execute (not preview) a purge. */
-export const PURGE_CONFIRMATION = 'DELETE ALL POSTS'
+/**
+ * The phrase that confirms a manual run: the number of posts the preview
+ * showed. It used to be one fixed phrase that the preview itself returned, so
+ * a client could send it without anyone having read the count.
+ */
+export function purgeConfirmationFor(matched: number): string {
+  return `DELETE ${matched} POSTS`
+}
+
+/** Kept for callers that show an example; a run needs `purgeConfirmationFor`. */
+export const PURGE_CONFIRMATION = 'DELETE <count> POSTS'
+
+/** Where a background run has got to, for the page that started it. */
+export interface PurgeProgress {
+  runId: string
+  status: 'running' | 'completed' | 'cancelled' | 'failed'
+  /** How many the preview showed: the most this run will delete. */
+  limit: number
+  deleted: number
+  failed: number
+  startedAt: string
+  finishedAt: string | null
+  /** The full result once the run has finished. */
+  result: PurgeResult | null
+  error: string | null
+}
+
+/** How long a preview may be acted on: long enough to read it, too short to forget it. */
+export const PREVIEW_TTL_MS = 15 * 60 * 1000
+
+interface PreviewClaims {
+  scope: PurgeScope
+  providers: string[]
+  olderThanDays: number | null
+  matched: number
+  issuedAt: number
+}
+
+function previewKey(): string {
+  return String(process.env.APP_KEY || '') || fallbackPreviewKey
+}
+const fallbackPreviewKey = crypto.randomUUID()
+
+function signClaims(claims: PreviewClaims): string {
+  const body = Buffer.from(JSON.stringify(claims)).toString('base64url')
+  const signature = new Bun.CryptoHasher('sha256', previewKey()).update(body).digest('base64url')
+  return `${body}.${signature}`
+}
+
+/**
+ * Read a preview token back, or say why it cannot be used. It must be signed
+ * by this install, recent, and for exactly the selection being run.
+ */
+export function readPreviewToken(token: unknown, expected: { scope: PurgeScope, providers: string[], olderThanDays: number | null }, nowMs: number = Date.now()): PreviewClaims {
+  const [body, signature] = String(token || '').split('.')
+  if (!body || !signature)
+    throw new UserFacingError('Run a preview first. Nothing was deleted.')
+  const valid = new Bun.CryptoHasher('sha256', previewKey()).update(body).digest('base64url')
+  if (valid.length !== signature.length || !timingSafeEqual(Buffer.from(valid), Buffer.from(signature)))
+    throw new UserFacingError('That preview is not one this Postline made. Run the preview again. Nothing was deleted.')
+
+  let claims: PreviewClaims
+  try {
+    claims = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'))
+  }
+  catch {
+    throw new UserFacingError('Run the preview again. Nothing was deleted.')
+  }
+  if (nowMs - claims.issuedAt > PREVIEW_TTL_MS)
+    throw new UserFacingError('That preview is more than 15 minutes old. Run it again. Nothing was deleted.')
+  const same = claims.scope === expected.scope
+    && claims.olderThanDays === expected.olderThanDays
+    && [...claims.providers].sort().join(',') === [...expected.providers].sort().join(',')
+  if (!same)
+    throw new UserFacingError('The selection changed since the preview. Run the preview again. Nothing was deleted.')
+  return claims
+}
 
 /** Providers whose API can delete a post the account authored. */
 export const PURGEABLE_PROVIDERS: SocialProvider[] = ['bluesky', 'twitter', 'mastodon', 'linkedin']
@@ -60,6 +139,8 @@ export interface PurgeInput {
   providers?: SocialProvider[]
   scope?: PurgeScope
   confirmation?: string
+  /** The token the preview returned; a manual run needs it. */
+  previewToken?: string
   dryRun?: boolean
   /**
    * Only posts published more than this many days ago. A post whose age
@@ -94,6 +175,8 @@ export interface PurgeResult {
   /** ISO time posts must predate to match, when olderThanDays is set. */
   cutoff: string | null
   confirmation: string
+  /** On a preview: what a run of exactly this selection must send back. */
+  previewToken?: string
   matched: number
   deleted: number
   failed: number
@@ -121,6 +204,12 @@ interface RunContext {
   cutoff: Date | null
   olderThanDays: number | null
   trigger: PurgeTrigger
+  /** Deletions left in this run: a manual run stops at the count its preview showed. */
+  budget: { left: number }
+  /** A background run's progress, updated after each deletion. */
+  progress?: PurgeProgress
+  /** True once the owner asked a background run to stop. */
+  cancelled?: () => boolean
 }
 
 /** One post queued for deletion, with the local rows it maps back to. */
@@ -190,10 +279,92 @@ export class PurgeService {
    * throws before a single delete is issued.
    */
   async purge(input: PurgeInput): Promise<PurgeResult> {
-    if (String(input.confirmation || '').trim() !== PURGE_CONFIRMATION) {
-      throw new Error(`Type "${PURGE_CONFIRMATION}" to confirm. Nothing was deleted.`)
+    const limit = this.confirmedLimit(input)
+    return await this.run({ ...input, dryRun: false, limit })
+  }
+
+  /**
+   * Start a confirmed run in the background and return at once. Deleting up
+   * to 2,000 posts a quarter second apart takes minutes, and it used to hold
+   * the request open for all of them. The page polls `progress(runId)`, and
+   * `cancel(runId)` stops it after the deletion in hand.
+   */
+  start(input: PurgeInput): PurgeProgress {
+    const limit = this.confirmedLimit(input)
+    // Taken here, before answering, so a second run is refused straight away
+    // rather than discovered by polling.
+    const release = acquirePurgeLock()
+    if (!release)
+      throw new UserFacingError('A deletion run is already in progress. Wait for it to finish, then try again.')
+
+    const progress: PurgeProgress = {
+      runId: crypto.randomUUID(),
+      status: 'running',
+      limit,
+      deleted: 0,
+      failed: 0,
+      startedAt: new Date().toISOString(),
+      finishedAt: null,
+      result: null,
+      error: null,
     }
-    return await this.run({ ...input, dryRun: false })
+    this.runs.set(progress.runId, progress)
+    // Keep the last few finished runs for the page to read; drop the rest.
+    for (const [id, run] of [...this.runs].slice(0, Math.max(0, this.runs.size - 10))) {
+      if (run.status !== 'running') this.runs.delete(id)
+    }
+
+    void this.runUnlocked({ ...input, dryRun: false, limit }, progress, () => this.cancelRequested.has(progress.runId))
+      .then((result) => {
+        progress.result = result
+        progress.status = this.cancelRequested.has(progress.runId) ? 'cancelled' : 'completed'
+      })
+      .catch((error) => {
+        progress.status = 'failed'
+        progress.error = error instanceof Error ? error.message : String(error)
+      })
+      .finally(() => {
+        progress.finishedAt = new Date().toISOString()
+        this.cancelRequested.delete(progress.runId)
+        release()
+      })
+
+    return progress
+  }
+
+  /** A background run's progress, or null when this process does not know it. */
+  progress(runId: string): PurgeProgress | null {
+    return this.runs.get(runId) ?? null
+  }
+
+  /** Stop a background run after the deletion in hand. Returns false when it is not running. */
+  cancel(runId: string): boolean {
+    const run = this.runs.get(runId)
+    if (!run || run.status !== 'running') return false
+    this.cancelRequested.add(runId)
+    return true
+  }
+
+  private readonly runs = new Map<string, PurgeProgress>()
+  private readonly cancelRequested = new Set<string>()
+
+  /**
+   * A run acts on a preview the owner has seen: the same selection, at most
+   * as many posts as it showed, confirmed by typing that number. Returns that
+   * number; throws, deleting nothing, when anything does not match.
+   */
+  private confirmedLimit(input: PurgeInput): number {
+    const claims = readPreviewToken(input.previewToken, {
+      scope: input.scope === 'all' ? 'all' : 'tracked',
+      providers: this.resolveProviders(input.providers),
+      olderThanDays: cutoffFor(input.olderThanDays) ? Math.floor(Number(input.olderThanDays)) : null,
+    })
+    const phrase = purgeConfirmationFor(claims.matched)
+    if (String(input.confirmation || '').trim() !== phrase)
+      throw new UserFacingError(`Type "${phrase}" to confirm. Nothing was deleted.`)
+    if (claims.matched === 0)
+      throw new UserFacingError('The preview matched no posts. Nothing was deleted.')
+    return claims.matched
   }
 
   /**
@@ -207,7 +378,7 @@ export class PurgeService {
     return await this.run({ ...input, dryRun: false, trigger: 'schedule' })
   }
 
-  private async run(input: PurgeInput & { dryRun: boolean, trigger?: PurgeTrigger }): Promise<PurgeResult> {
+  private async run(input: PurgeInput & { dryRun: boolean, trigger?: PurgeTrigger, limit?: number }): Promise<PurgeResult> {
     // A preview deletes nothing and may overlap anything. A real run may not
     // overlap another: the manual purge runs in the API process and the daily
     // one in the scheduler, and two at once would each page through the same
@@ -226,7 +397,7 @@ export class PurgeService {
     }
   }
 
-  private async runUnlocked(input: PurgeInput & { dryRun: boolean, trigger?: PurgeTrigger }): Promise<PurgeResult> {
+  private async runUnlocked(input: PurgeInput & { dryRun: boolean, trigger?: PurgeTrigger, limit?: number }, progress?: PurgeProgress, cancelled?: () => boolean): Promise<PurgeResult> {
     const scope: PurgeScope = input.scope === 'all' ? 'all' : 'tracked'
     const providers = this.resolveProviders(input.providers)
     const cutoff = cutoffFor(input.olderThanDays)
@@ -236,6 +407,9 @@ export class PurgeService {
       cutoff,
       olderThanDays: cutoff ? Math.floor(Number(input.olderThanDays)) : null,
       trigger: input.trigger || 'manual',
+      budget: { left: input.limit ?? Number.POSITIVE_INFINITY },
+      progress,
+      cancelled,
     }
     const results: PurgeProviderResult[] = []
 
@@ -243,6 +417,7 @@ export class PurgeService {
     // purged on both. A network with none still gets one pass, which records
     // why it was skipped.
     for (const provider of providers) {
+      if (context.cancelled?.()) break
       const accounts = await this.accountsFor(provider)
       if (!accounts.length) {
         results.push(await this.runProvider(provider, context))
@@ -253,13 +428,15 @@ export class PurgeService {
       }
     }
 
+    const matched = results.reduce((total, result) => total + result.matched, 0)
     return {
       scope,
       dryRun: input.dryRun,
       olderThanDays: context.olderThanDays,
       cutoff: cutoff ? cutoff.toISOString() : null,
-      confirmation: PURGE_CONFIRMATION,
-      matched: results.reduce((total, result) => total + result.matched, 0),
+      confirmation: purgeConfirmationFor(matched),
+      ...(input.dryRun ? { previewToken: signClaims({ scope, providers, olderThanDays: context.olderThanDays, matched, issuedAt: Date.now() }) } : {}),
+      matched,
       deleted: results.reduce((total, result) => total + result.deleted, 0),
       failed: results.reduce((total, result) => total + result.failed, 0),
       providers: results,
@@ -368,14 +545,23 @@ export class PurgeService {
     const affectedPostIds = new Set<number>()
 
     for (const [index, candidate] of candidates.entries()) {
+      // Never more than the preview showed: history can grow between the
+      // preview and the run, and those posts were not in what was confirmed.
+      if (context.budget.left <= 0 || context.cancelled?.()) {
+        result.truncated = true
+        break
+      }
+      context.budget.left -= 1
       try {
         await adapter.deletePost({ uri: candidate.uri, cid: candidate.cid })
         result.deleted += 1
+        if (context.progress) context.progress.deleted += 1
         if (candidate.targetId) deletedTargetIds.push(candidate.targetId)
         if (candidate.postId) affectedPostIds.add(candidate.postId)
       }
       catch (error) {
         result.failed += 1
+        if (context.progress) context.progress.failed += 1
         if (result.errors.length < MAX_RECORDED_ERRORS) {
           result.errors.push(`${candidate.uri}: ${messageOf(error)}`)
         }
@@ -388,7 +574,9 @@ export class PurgeService {
     // sweep every one of this provider's targets — not just the ones this run
     // happened to match — but only when nothing failed. An age-limited run
     // deliberately left the newer posts up, so it keeps their rows too.
-    if (scope === 'all' && !cutoff && result.failed === 0) {
+    // Not after a list that was cut short either: the posts past the cut
+    // are still up, and their rows must stay to say so.
+    if (scope === 'all' && !cutoff && result.failed === 0 && !result.truncated) {
       const remaining = await this.collectTracked(provider, adapter.identityId, account?.isDefault ?? true)
       for (const target of remaining) {
         if (target.targetId) deletedTargetIds.push(target.targetId)

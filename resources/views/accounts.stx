@@ -267,11 +267,12 @@
 
         <div class="grid gap-2 p-3 bg-danger-soft border border-danger-line rounded-xl">
           <label class="grid gap-1.5">
-            <span class="font-semibold text-danger text-xs">Type <code class="px-1 py-0.5 text-xs bg-panel rounded">DELETE ALL POSTS</code> to confirm</span>
-            <input class="px-3 h-10 text-ink text-sm bg-panel border border-danger-line outline-none rounded-xl focus:border-danger-solid focus:ring-2 focus:ring-danger-soft" type="text" autocomplete="off" placeholder="DELETE ALL POSTS" aria-label="Deletion confirmation phrase" data-purge-confirmation>
+            <span class="font-semibold text-danger text-xs">Type <code class="px-1 py-0.5 text-xs bg-panel rounded" data-purge-phrase>the phrase the preview shows</code> to confirm</span>
+            <input class="px-3 h-10 text-ink text-sm bg-panel border border-danger-line outline-none rounded-xl focus:border-danger-solid focus:ring-2 focus:ring-danger-soft" type="text" autocomplete="off" placeholder="Run a preview first" aria-label="Deletion confirmation phrase" data-purge-confirmation>
           </label>
           <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-solid text-sm bg-danger-solid hover:bg-danger-solid-hover rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" disabled data-purge-run>Delete permanently</button>
-          <p class="m-0 text-danger text-xs" data-purge-hint>Run a preview first, then type the phrase to enable deletion.</p>
+          <button class="hidden items-center justify-center px-4 h-10 font-semibold text-danger text-sm bg-panel hover:bg-hover border border-danger-line rounded-xl transition-colors" type="button" data-purge-cancel>Stop deleting</button>
+          <p class="m-0 text-danger text-xs" data-purge-hint>Run a preview first, then type the phrase it shows to enable deletion.</p>
         </div>
       </div>
     </details>
@@ -965,11 +966,23 @@
       const purgeConfirmation = root.querySelector('[data-purge-confirmation]')
       const purgeSummary = root.querySelector('[data-purge-summary]')
       const purgeHint = root.querySelector('[data-purge-hint]')
-      const PURGE_PHRASE = 'DELETE ALL POSTS'
+      const purgePhraseLabel = root.querySelector('[data-purge-phrase]')
+      const purgeCancel = root.querySelector('[data-purge-cancel]')
+      let purgeRunId = ''
 
       // A preview is only valid for the selection it ran against — changing
-      // scope or accounts invalidates it and re-locks the delete button.
+      // scope or accounts invalidates it and re-locks the delete button. The
+      // phrase names the count it showed ("DELETE 42 POSTS"), and its token
+      // goes back with the run, so nothing beyond what was shown is deleted.
       let previewedSelection = null
+      let previewPhrase = ''
+      let previewToken = ''
+      const setPreview = (phrase, token) => {
+        previewPhrase = phrase || ''
+        previewToken = token || ''
+        if (purgePhraseLabel) purgePhraseLabel.textContent = previewPhrase || 'the phrase the preview shows'
+        if (purgeConfirmation) purgeConfirmation.placeholder = previewPhrase || 'Run a preview first'
+      }
 
       const purgeScope = () => root.querySelector('[data-purge-scope]:checked')?.value || 'tracked'
       const purgeProviders = () => Array.from(root.querySelectorAll('[data-purge-provider]:checked')).map(input => input.value)
@@ -978,24 +991,30 @@
       const renderPurgeResults = (data) => purgeResultRows.set(data?.providers || [])
 
       const syncPurgeButton = () => {
-        const phraseOk = purgeConfirmation?.value === PURGE_PHRASE
+        const phraseOk = Boolean(previewPhrase) && purgeConfirmation?.value === previewPhrase
         const previewOk = previewedSelection === purgeSelection()
-        const enabled = Boolean(phraseOk && previewOk && purgeProviders().length)
+        const nothingToDelete = previewOk && previewPhrase === 'DELETE 0 POSTS'
+        const enabled = Boolean(phraseOk && previewOk && !nothingToDelete && purgeProviders().length)
         if (purgeRun) purgeRun.disabled = !enabled
         if (purgeHint) {
           purgeHint.textContent = !purgeProviders().length
             ? 'Pick at least one account.'
             : !previewOk
               ? 'Run a preview for this selection first.'
+              : nothingToDelete
+                ? 'The preview matched no posts, so there is nothing to delete.'
               : !phraseOk
-                ? `Type ${PURGE_PHRASE} exactly to enable deletion.`
+                ? `Type ${previewPhrase} exactly to enable deletion.`
                 : 'This permanently deletes the posts listed above.'
         }
       }
 
       purgeCard?.addEventListener('change', (event) => {
         // Any change to scope or accounts stales the preview.
-        if (event.target?.matches('[data-purge-scope], [data-purge-provider]')) previewedSelection = null
+        if (event.target?.matches('[data-purge-scope], [data-purge-provider]')) {
+          previewedSelection = null
+          setPreview('', '')
+        }
         syncPurgeButton()
       })
       purgeConfirmation?.addEventListener('input', syncPurgeButton)
@@ -1017,10 +1036,12 @@
 
           renderPurgeResults(payload.data)
           previewedSelection = purgeSelection()
+          setPreview(payload.data.confirmation, payload.data.previewToken)
           if (purgeSummary) purgeSummary.textContent = `${payload.data.matched} post${payload.data.matched === 1 ? '' : 's'} matched.`
         }
         catch (error) {
           previewedSelection = null
+          setPreview('', '')
           if (purgeSummary) purgeSummary.textContent = 'Preview failed.'
           notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Danger zone' })
         }
@@ -1032,37 +1053,82 @@
 
       purgeRun?.addEventListener('click', async () => {
         const scope = purgeScope()
-        const label = scope === 'all' ? 'every post on the selected accounts' : 'every post Postline published'
-        // Last stop before an irreversible action.
-        if (!window.confirm(`Permanently delete ${label}? This cannot be undone.`)) return
+        // Last stop before an irreversible action, with the number it is about.
+        const count = Number((previewPhrase.match(/\d+/) || ['0'])[0])
+        const where = scope === 'all' ? 'from the selected accounts' : 'that Postline published'
+        if (!window.confirm(`Permanently delete ${count} post${count === 1 ? '' : 's'} ${where}? This cannot be undone.`)) return
 
         purgeRun.disabled = true
-        notify('Deleting posts…', 'info', { title: 'Danger zone' })
         try {
           const body = new FormData()
           body.set('scope', scope)
           body.set('providers', purgeProviders().join(','))
           body.set('confirmation', purgeConfirmation?.value || '')
+          body.set('preview_token', previewToken)
 
           const response = await fetch('/api/postline/purge', { method: 'POST', body })
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Deletion failed.')
 
-          renderPurgeResults(payload.data)
+          // The deleting carries on in the background; follow it here.
+          purgeRunId = payload.data.runId
           previewedSelection = null
+          setPreview('', '')
           if (purgeConfirmation) purgeConfirmation.value = ''
-          if (purgeSummary) purgeSummary.textContent = `${payload.data.deleted} deleted, ${payload.data.failed} failed.`
-          notify(
-            `Deleted ${payload.data.deleted} post${payload.data.deleted === 1 ? '' : 's'}.${payload.data.failed ? ` ${payload.data.failed} failed.` : ''}`,
-            payload.data.failed ? 'error' : 'success',
-            { title: 'Danger zone' },
-          )
+          showPurgeRunning(true)
+          await followPurge(purgeRunId)
         }
         catch (error) {
           notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Deletion failed' })
         }
         finally {
+          showPurgeRunning(false)
+          purgeRunId = ''
           syncPurgeButton()
+        }
+      })
+
+      const showPurgeRunning = (running) => {
+        purgeCancel?.classList.toggle('hidden', !running)
+        purgeCancel?.classList.toggle('inline-flex', running)
+        if (purgeCancel) purgeCancel.disabled = false
+        if (running && purgeRun) purgeRun.disabled = true
+      }
+
+      /** Poll a background run until it finishes, showing how far it has got. */
+      const followPurge = async (runId) => {
+        for (;;) {
+          const response = await fetch(`/api/postline/purge/status?run=${encodeURIComponent(runId)}`)
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Lost track of the deletion run.')
+          const run = payload.data
+          if (purgeSummary) purgeSummary.textContent = `${run.deleted} of ${run.limit} deleted${run.failed ? `, ${run.failed} failed` : ''}${run.status === 'running' ? '…' : '.'}`
+          if (run.status !== 'running') {
+            if (run.result) renderPurgeResults(run.result)
+            if (run.status === 'failed') throw new Error(run.error || 'Deletion failed.')
+            const stopped = run.status === 'cancelled' ? ' Stopped before the end.' : ''
+            notify(
+              `Deleted ${run.deleted} post${run.deleted === 1 ? '' : 's'}.${run.failed ? ` ${run.failed} failed.` : ''}${stopped}`,
+              run.failed ? 'error' : 'success',
+              { title: 'Danger zone' },
+            )
+            return
+          }
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+      }
+
+      purgeCancel?.addEventListener('click', async () => {
+        if (!purgeRunId) return
+        purgeCancel.disabled = true
+        const body = new FormData()
+        body.set('run', purgeRunId)
+        try {
+          await fetch('/api/postline/purge/cancel', { method: 'POST', body })
+          if (purgeSummary) purgeSummary.textContent = 'Stopping after the post in hand…'
+        }
+        catch {
+          purgeCancel.disabled = false
         }
       })
 
