@@ -69,6 +69,7 @@ declare global {
   const KeywordMonitor: typeof import('../../../app/Models/KeywordMonitor')['default']
   const LaunchCampaign: typeof import('../../../app/Models/LaunchCampaign')['default']
   const MediaAsset: typeof import('../../../app/Models/MediaAsset')['default']
+  const NetworkApp: typeof import('../../../app/Models/NetworkApp')['default']
   const Post: typeof import('../../../app/Models/Post')['default']
   const PostTarget: typeof import('../../../app/Models/PostTarget')['default']
   const PurgeRun: typeof import('../../../app/Models/PurgeRun')['default']

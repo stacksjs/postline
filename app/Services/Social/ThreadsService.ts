@@ -10,6 +10,8 @@ import { refreshOnce } from '../../Support/Social/token-refresh'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, expiresAt, now, uuid } from './support'
 import { explainNetworkError } from '../../Support/Social/network-errors'
+import { networkApps } from '../NetworkAppService'
+import { UserFacingError } from '../../Support/Http/user-error'
 import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
@@ -54,14 +56,20 @@ export class ThreadsService {
   private pending = new PendingOAuthStates()
 
   constructor() {
-    this.driver = new ThreadsDriver({ graphVersion: this.config().graphVersion })
+    this.driver = new ThreadsDriver({ graphVersion: String(env.THREADS_GRAPH_VERSION || 'v1.0').trim() })
   }
 
-  private config(): ThreadsConfig {
+  /**
+   * The owner's Threads app (client id, secret, redirect address): from
+   * Settings, else the environment. Read each time, so a change in Settings
+   * applies without a restart, in every process.
+   */
+  private async config(): Promise<ThreadsConfig> {
+    const app = await networkApps.credentials('threads')
     return {
-      clientId: String(env.THREADS_CLIENT_ID || '').trim(),
-      clientSecret: String(env.THREADS_CLIENT_SECRET || '').trim(),
-      redirectUrl: String(env.THREADS_REDIRECT_URL || '').trim(),
+      clientId: app.clientId,
+      clientSecret: app.clientSecret,
+      redirectUrl: app.redirectUrl,
       graphVersion: String(env.THREADS_GRAPH_VERSION || 'v1.0').trim(),
       accessToken: String(env.THREADS_ACCESS_TOKEN || '').trim(),
       userId: String(env.THREADS_USER_ID || '').trim(),
@@ -77,7 +85,7 @@ export class ThreadsService {
   async status() {
     const rows = await listIdentityRows<SocialIdentityRow>('threads')
     const identity = pickDefaultIdentity(rows)
-    const cfg = this.config()
+    const cfg = (await this.config())
     const connected = identity?.auth_status === 'connected' && Boolean(identity.access_token)
 
     return {
@@ -112,13 +120,13 @@ export class ThreadsService {
     return toPublicAccount(await revokeIdentityRow('threads', identityId))
   }
 
-  getAuthUrl(): string {
-    const cfg = this.config()
+  async getAuthUrl(): Promise<string> {
+    const cfg = (await this.config())
     if (!cfg.clientId || !cfg.clientSecret) {
-      throw new Error('Set THREADS_CLIENT_ID and THREADS_CLIENT_SECRET to connect Threads.')
+      throw new UserFacingError('Add your Threads app under Settings, Channels first: its client id and secret.')
     }
     if (!cfg.redirectUrl) {
-      throw new Error('Set THREADS_REDIRECT_URL to connect Threads.')
+      throw new UserFacingError('Postline could not work out its address for the Threads redirect. Set it under Settings, Channels.')
     }
 
     return this.driver.getAuthUrl({
@@ -130,7 +138,7 @@ export class ThreadsService {
   }
 
   async handleCallback(code: string, state: string) {
-    const cfg = this.config()
+    const cfg = (await this.config())
     if (!code) throw new Error('Threads did not return an authorization code.')
     // Strict: a callback is honoured only for a state this process issued and
     // has not yet consumed. A restart mid-consent costs one retry.
@@ -175,7 +183,7 @@ export class ThreadsService {
    * bring back an account the user disconnected.
    */
   async connectFromEnv(options: { revive?: boolean } = {}) {
-    const cfg = this.config()
+    const cfg = (await this.config())
     if (!cfg.accessToken) {
       throw new Error('Set THREADS_ACCESS_TOKEN (or connect via OAuth) before using Threads.')
     }
@@ -305,7 +313,7 @@ export class ThreadsService {
     const existing = await findIdentityRow<SocialIdentityRow>('threads')
     if (isUsableIdentity(existing)) return await this.refreshIfExpiring(existing!)
 
-    if (this.config().accessToken) {
+    if ((await this.config()).accessToken) {
       const connected = await this.connectFromEnv({ revive: false })
       const identity = connected.id ? await findIdentityRow<SocialIdentityRow>('threads', connected.id) : undefined
       if (identity?.access_token) return identity

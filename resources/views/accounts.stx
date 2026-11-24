@@ -202,6 +202,57 @@
       </div>
     </section>
 
+    {{--
+      Bring your own keys: X, LinkedIn, Instagram and Threads sign in through a
+      developer app the owner registers on each network. Its client id and
+      secret are entered here (the secret is stored sealed), so no file has to
+      be edited, which the Mac app cannot do at all.
+    --}}
+    <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" aria-label="Your network apps" data-network-apps>
+      <header class="px-4 py-3.5 border-b border-line">
+        <h2 class="m-0 font-semibold text-ink text-sm">Your network apps</h2>
+        <p class="m-0 mt-1 text-muted text-xs">X, LinkedIn, Instagram and Threads connect through an app you register on each network. Postline has no keys of its own: yours stay in this workspace.</p>
+      </header>
+      <div class="divide-line divide-y">
+        <details class="group" x-for="app in appRows()" data-network-app>
+          <summary class="flex gap-3 items-center justify-between px-4 py-3 list-none hover:bg-panel-2 cursor-pointer">
+            <span class="font-medium text-ink text-ui" :text="app.label"></span>
+            <span class="flex gap-2 items-center">
+              <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="app.configured ? 'text-success bg-success-soft' : 'text-muted bg-panel-2'" :text="app.status"></span>
+              <span class="h-4 w-4 text-muted transition-transform group-open:rotate-180 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
+            </span>
+          </summary>
+          <div class="grid gap-3 pb-4 px-4">
+            <ol class="grid gap-1 m-0 pl-5 text-body text-xs">
+              <li x-for="step in app.steps" :text="step"></li>
+            </ol>
+            <div class="grid gap-1">
+              <span class="font-medium text-muted text-xs">Redirect address to give the network</span>
+              <div class="flex gap-2 items-center">
+                <code class="flex-1 px-2.5 py-1.5 min-w-0 text-ink text-xs truncate bg-panel-2 border border-line rounded-lg" :text="app.redirectUrl" :title="app.redirectUrl"></code>
+                <button class="shrink-0 px-2.5 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" type="button" @click="copyRedirect(app.provider)">Copy</button>
+              </div>
+            </div>
+            <form class="grid gap-2 sm:grid-cols-2" @submit.prevent="saveApp(app.provider)">
+              <label class="grid gap-1 text-muted text-xs">
+                <span>Client id</span>
+                <input class="px-3 h-9 text-ink text-ui bg-panel border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" autocomplete="off" spellcheck="false" :value="app.clientId" @input="setAppField(app.provider, 'clientId', $event)" data-app-client-id>
+              </label>
+              <label class="grid gap-1 text-muted text-xs">
+                <span>Client secret</span>
+                <input class="px-3 h-9 text-ink text-ui bg-panel border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="password" autocomplete="off" :placeholder="app.secretPlaceholder" :value="app.clientSecret" @input="setAppField(app.provider, 'clientSecret', $event)" data-app-client-secret>
+              </label>
+              <div class="flex flex-wrap gap-2 items-center sm:col-span-2">
+                <p class="m-0 mr-auto text-muted text-xs" :text="app.note"></p>
+                <button class="px-3 h-8 font-medium text-danger text-xs bg-panel hover:bg-danger-soft border border-line rounded-lg disabled:opacity-50" type="button" x-show="app.removable" :disabled="appBusy() === app.provider" @click="clearApp(app.provider)">Remove</button>
+                <button class="px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="submit" :disabled="appBusy() === app.provider">Save</button>
+              </div>
+            </form>
+          </div>
+        </details>
+      </div>
+    </section>
+
     <details class="overflow-hidden bg-panel border border-line rounded-2xl open:border-danger-line shadow-sm group" data-purge-card>
       <summary class="flex gap-3 items-center justify-between p-4 list-none hover:bg-panel-2 transition-colors cursor-pointer">
         <div class="flex gap-3 items-center"><span class="grid place-items-center h-9 w-9 text-danger text-lg bg-danger-soft rounded-xl" aria-hidden="true"><span class="i-lucide-triangle-alert"></span></span><div>
@@ -288,6 +339,75 @@
     // Rendered declaratively from these signals into each card's list; the
     // per-network status renderers below still own the card header.
     const accountList = state([])
+
+    // --- Your network apps (bring your own keys) ---
+    const networkApps = state([])
+    const appDrafts = state({})
+    const appBusy = state('')
+    const APP_GUIDES = {
+      twitter: {
+        label: 'X',
+        steps: [
+          'Open developer.x.com, sign in, and open your project\'s app (create one if you have none).',
+          'Under User authentication settings, choose Set up: OAuth 2.0, app type Web App.',
+          'Paste the redirect address below as the Callback URI, and your site as the Website URL.',
+          'Under Keys and tokens, copy the OAuth 2.0 Client ID and Client Secret into the fields below.',
+        ],
+      },
+      linkedin: {
+        label: 'LinkedIn',
+        steps: [
+          'Open linkedin.com/developers/apps and create an app, linked to a LinkedIn Page you manage.',
+          'Under Products, add "Sign In with LinkedIn using OpenID Connect" and "Share on LinkedIn".',
+          'Under Auth, add the redirect address below as an Authorized redirect URL.',
+          'Copy the Client ID and Primary Client Secret from the Auth tab into the fields below.',
+        ],
+      },
+      instagram: {
+        label: 'Instagram',
+        steps: [
+          'Your Instagram account must be a Business or Creator account linked to a Facebook Page.',
+          'Open developers.facebook.com/apps, create a Business app, and add Facebook Login for Business and the Instagram Graph API.',
+          'Under Facebook Login settings, add the redirect address below as a Valid OAuth Redirect URI.',
+          'Under App settings, Basic, copy the App ID and App Secret into the fields below.',
+        ],
+      },
+      threads: {
+        label: 'Threads',
+        steps: [
+          'Open developers.facebook.com/apps and create an app with the "Access the Threads API" use case.',
+          'In the Threads API settings, add the redirect address below as a Redirect Callback URL.',
+          'Add your Threads account as a Threads tester and accept the invite in the Threads app.',
+          'Copy the Threads App ID and Threads App Secret into the fields below.',
+        ],
+      },
+    }
+    const appRows = derived(() => networkApps().map((app) => {
+      const guide = APP_GUIDES[app.provider] || { label: app.provider, steps: [] }
+      const draft = appDrafts()[app.provider] || {}
+      return {
+        provider: app.provider,
+        label: guide.label,
+        steps: guide.steps,
+        configured: app.configured,
+        status: app.configured ? (app.source === 'environment' ? 'Set in .env' : 'Set up') : 'Not set up',
+        redirectUrl: app.redirectUrl,
+        clientId: draft.clientId ?? app.clientId,
+        clientSecret: draft.clientSecret ?? '',
+        secretPlaceholder: app.hasSecret ? 'Stored. Leave blank to keep it.' : 'Paste the client secret',
+        removable: app.source === 'settings',
+        note: app.source === 'environment' ? 'Read from .env. Saving here takes over from it.' : app.configured ? 'Saved. Connect the account in its card above.' : '',
+      }
+    }))
+    const setAppField = (provider, field, event) => {
+      const drafts = { ...appDrafts() }
+      drafts[provider] = { ...(drafts[provider] || {}), [field]: String(event?.target?.value || '') }
+      appDrafts.set(drafts)
+    }
+    const appHandlers = { load: null, save: null, clear: null, copy: null }
+    const saveApp = provider => appHandlers.save?.(provider)
+    const clearApp = provider => appHandlers.clear?.(provider)
+    const copyRedirect = provider => appHandlers.copy?.(provider)
     const disconnectingId = state(0)
 
     const accountName = (account) => {
@@ -487,7 +607,7 @@
               ? 'Connect with LinkedIn to crosspost member shares.'
               : data?.configuredFromEnv
                 ? 'Token found in .env. Connect to start crossposting.'
-                : 'Add LinkedIn API keys to .env, then connect.'
+                : 'Set up your LinkedIn app below, then connect.'
         }
         if (linkedinStatusPill) {
           linkedinStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
@@ -596,7 +716,7 @@
               ? 'Connect X to crosspost tweets. X bills per post, and a post with a link costs far more.'
               : data?.configuredFromEnv
                 ? 'Token found in .env. Connect to start crossposting.'
-                : 'Add X (Twitter) API keys to .env, then connect.'
+                : 'Set up your X app below, then connect.'
         }
         if (twitterStatusPill) {
           twitterStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
@@ -681,7 +801,7 @@
               ? 'Connect an Instagram Business account to crosspost. Posts require an image.'
               : data?.configuredFromEnv
                 ? 'Token found in .env. Connect to start crossposting.'
-                : 'Add Instagram Graph API keys to .env, then connect.'
+                : 'Set up your Instagram app below, then connect.'
         }
         if (instagramStatusPill) {
           instagramStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
@@ -764,7 +884,7 @@
               ? 'Connect a Threads account to crosspost.'
               : data?.configuredFromEnv
                 ? 'Token found in .env. Connect to start crossposting.'
-                : 'Add Threads API keys to .env, then connect.'
+                : 'Set up your Threads app below, then connect.'
         }
         if (threadsStatusPill) {
           threadsStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
@@ -958,6 +1078,72 @@
 
       const startAccounts = () => void refreshAccounts()
       onMount(startAccounts)
+
+      appHandlers.load = async () => {
+        try {
+          const response = await fetch('/api/postline/network-apps')
+          const payload = await response.json()
+          if (response.ok && payload.ok) networkApps.set(payload.data.apps || [])
+        }
+        catch {}
+      }
+      appHandlers.save = async (provider) => {
+        const row = appRows().find(entry => entry.provider === provider)
+        if (!row) return
+        appBusy.set(provider)
+        try {
+          const body = new FormData()
+          body.set('provider', provider)
+          body.set('client_id', row.clientId || '')
+          body.set('client_secret', row.clientSecret || '')
+          const response = await fetch('/api/postline/network-apps', { method: 'POST', body })
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save the app.')
+          const drafts = { ...appDrafts() }
+          delete drafts[provider]
+          appDrafts.set(drafts)
+          await appHandlers.load()
+          await Promise.all([refreshNetwork[provider]?.()])
+          notify(`${row.label} app saved. Connect the account in its card.`, 'success', { title: row.label })
+        }
+        catch (error) {
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: row.label })
+        }
+        finally {
+          appBusy.set('')
+        }
+      }
+      appHandlers.clear = async (provider) => {
+        const row = appRows().find(entry => entry.provider === provider)
+        if (!row || !window.confirm(`Remove your ${row.label} app from Postline? Connected ${row.label} accounts stop renewing until an app is set up again.`)) return
+        appBusy.set(provider)
+        try {
+          const body = new FormData()
+          body.set('provider', provider)
+          const response = await fetch('/api/postline/network-apps/clear', { method: 'POST', body })
+          const payload = await response.json()
+          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not remove the app.')
+          networkApps.set(payload.data.apps || [])
+        }
+        catch (error) {
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: row.label })
+        }
+        finally {
+          appBusy.set('')
+        }
+      }
+      appHandlers.copy = async (provider) => {
+        const row = appRows().find(entry => entry.provider === provider)
+        if (!row) return
+        try {
+          await navigator.clipboard.writeText(row.redirectUrl)
+          notify('Redirect address copied.', 'success', { title: row.label })
+        }
+        catch {
+          notify(row.redirectUrl, 'info', { title: 'Copy this address' })
+        }
+      }
+      onMount(() => void appHandlers.load())
 
       // --- Danger zone: bulk post deletion ---
       const purgeCard = root.querySelector('[data-purge-card]')

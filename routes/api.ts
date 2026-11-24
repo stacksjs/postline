@@ -101,6 +101,10 @@ route.group({ prefix: '/postline' }, () => {
   // Disconnecting drops the tokens but keeps the row, so post history stays
   // attributed; throttled like the other single-row writes.
   route.get('/accounts', 'Actions/Postline/AccountListAction').middleware('auth')
+  // The owner's own developer app per OAuth network (bring your own keys).
+  route.get('/network-apps', 'Actions/Postline/NetworkAppListAction').middleware('auth')
+  route.post('/network-apps', 'Actions/Postline/NetworkAppSaveAction').middleware('auth').rateLimit(30, 'minute')
+  route.post('/network-apps/clear', 'Actions/Postline/NetworkAppClearAction').middleware('auth').rateLimit(30, 'minute')
   route.post('/accounts/disconnect', 'Actions/Postline/AccountDisconnectAction').middleware('auth').rateLimit(30, 'minute')
   route.post('/accounts/default', 'Actions/Postline/AccountDefaultAction').middleware('auth').rateLimit(30, 'minute')
   route.post('/publish', 'Actions/Postline/CrosspostPublishAction').middleware('auth').rateLimit(30, 'minute')

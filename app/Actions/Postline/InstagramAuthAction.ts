@@ -10,7 +10,7 @@ export default new Action({
 
   async handle() {
     try {
-      return response.redirect(instagram.getAuthUrl())
+      return response.redirect(await instagram.getAuthUrl())
     }
     catch (error) {
       const message = publicMessage(error)

@@ -2564,10 +2564,89 @@
             "type": "index"
           }
         ]
+      },
+      {
+        "table": "network_apps",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "provider",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "twitter",
+              "linkedin",
+              "instagram",
+              "threads"
+            ]
+          },
+          {
+            "name": "client_id",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 255
+          },
+          {
+            "name": "client_secret",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "redirect_url",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 500
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "UTC_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "network_apps_provider_unique",
+            "columns": [
+              "provider"
+            ],
+            "type": "unique"
+          }
+        ]
       }
     ]
   },
-  "hash": "135b38557e8fff7745e4717fb3ce3e175e86305ce363a9991d457a50dc34351f",
+  "hash": "9c9cb513acfab853dcf61078a4901b6fdb1456f2aa1244f78dc07fcdb9404f21",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-24T22:08:49.628Z"
+  "updatedAt": "2026-11-24T22:23:23.232Z"
 }

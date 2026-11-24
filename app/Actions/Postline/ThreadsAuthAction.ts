@@ -10,7 +10,7 @@ export default new Action({
 
   async handle() {
     try {
-      return response.redirect(threads.getAuthUrl())
+      return response.redirect(await threads.getAuthUrl())
     }
     catch (error) {
       const message = publicMessage(error)

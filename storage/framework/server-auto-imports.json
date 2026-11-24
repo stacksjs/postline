@@ -81,6 +81,7 @@
     "Menu": true,
     "MenuItem": true,
     "Middleware": true,
+    "NetworkApp": true,
     "Notification": true,
     "NotificationDelivery": true,
     "OptimizeStorageImageJob": true,

@@ -11,6 +11,8 @@ import { refreshOnce } from '../../Support/Social/token-refresh'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, expiresAt, now, uuid } from './support'
 import { explainNetworkError } from '../../Support/Social/network-errors'
+import { networkApps } from '../NetworkAppService'
+import { UserFacingError } from '../../Support/Http/user-error'
 import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
@@ -54,14 +56,20 @@ export class LinkedInService {
   private pending = new PendingOAuthStates()
 
   constructor() {
-    this.driver = new LinkedInDriver({ apiVersion: this.config().apiVersion })
+    this.driver = new LinkedInDriver({ apiVersion: resolveLinkedInVersion(env.LINKEDIN_API_VERSION) })
   }
 
-  private config(): LinkedInConfig {
+  /**
+   * The owner's LinkedIn app (client id, secret, redirect address): from
+   * Settings, else the environment. Read each time, so a change in Settings
+   * applies without a restart, in every process.
+   */
+  private async config(): Promise<LinkedInConfig> {
+    const app = await networkApps.credentials('linkedin')
     return {
-      clientId: String(env.LINKEDIN_CLIENT_ID || '').trim(),
-      clientSecret: String(env.LINKEDIN_CLIENT_SECRET || '').trim(),
-      redirectUrl: String(env.LINKEDIN_REDIRECT_URL || '').trim(),
+      clientId: app.clientId,
+      clientSecret: app.clientSecret,
+      redirectUrl: app.redirectUrl,
       apiVersion: resolveLinkedInVersion(env.LINKEDIN_API_VERSION),
       accessToken: String(env.LINKEDIN_ACCESS_TOKEN || '').trim(),
       authorUrn: String(env.LINKEDIN_AUTHOR_URN || '').trim(),
@@ -76,7 +84,7 @@ export class LinkedInService {
   async status() {
     const rows = await listIdentityRows<SocialIdentityRow>('linkedin')
     const identity = pickDefaultIdentity(rows)
-    const cfg = this.config()
+    const cfg = (await this.config())
     const connected = identity?.auth_status === 'connected' && Boolean(identity.access_token)
 
     return {
@@ -111,13 +119,13 @@ export class LinkedInService {
   }
 
   /** Build the LinkedIn consent URL and remember the CSRF state. */
-  getAuthUrl(): string {
-    const cfg = this.config()
+  async getAuthUrl(): Promise<string> {
+    const cfg = (await this.config())
     if (!cfg.clientId || !cfg.clientSecret) {
-      throw new Error('Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET to connect with LinkedIn.')
+      throw new UserFacingError('Add your LinkedIn app under Settings, Channels first: its client id and secret.')
     }
     if (!cfg.redirectUrl) {
-      throw new Error('Set LINKEDIN_REDIRECT_URL to connect with LinkedIn.')
+      throw new UserFacingError('Postline could not work out its address for the LinkedIn redirect. Set it under Settings, Channels.')
     }
 
     return this.driver.getAuthUrl({
@@ -130,7 +138,7 @@ export class LinkedInService {
 
   /** Handle the OAuth redirect: exchange the code and store the token. */
   async handleCallback(code: string, state: string) {
-    const cfg = this.config()
+    const cfg = (await this.config())
     if (!code) throw new Error('LinkedIn did not return an authorization code.')
     // Strict: a callback is honoured only for a state this process issued and
     // has not yet consumed. A restart mid-consent costs one retry.
@@ -166,7 +174,7 @@ export class LinkedInService {
    * bring back an account the user disconnected.
    */
   async connectFromEnv(options: { revive?: boolean } = {}) {
-    const cfg = this.config()
+    const cfg = (await this.config())
     if (!cfg.accessToken) {
       throw new Error('Set LINKEDIN_ACCESS_TOKEN (or connect via OAuth) before using LinkedIn.')
     }
@@ -320,7 +328,7 @@ export class LinkedInService {
     if (isUsableIdentity(existing)) return await this.refreshIfExpiring(existing!)
 
     // Fall back to an env-configured token if one is available.
-    if (this.config().accessToken) {
+    if ((await this.config()).accessToken) {
       const connected = await this.connectFromEnv({ revive: false })
       const identity = connected.id ? await findIdentityRow<SocialIdentityRow>('linkedin', connected.id) : undefined
       if (identity?.access_token) return identity
@@ -336,7 +344,7 @@ export class LinkedInService {
    * token in place so a real auth failure still surfaces at publish time.
    */
   private async refreshIfExpiring(identity: SocialIdentityRow): Promise<SocialIdentityRow> {
-    const cfg = this.config()
+    const cfg = (await this.config())
     if (!identity.refresh_token || !cfg.clientId || !cfg.clientSecret) return identity
 
     return await refreshOnce(identity, {

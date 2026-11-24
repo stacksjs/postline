@@ -10,6 +10,8 @@ import { refreshOnce } from '../../Support/Social/token-refresh'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, expiresAt, now, uuid } from './support'
 import { explainNetworkError } from '../../Support/Social/network-errors'
+import { networkApps } from '../NetworkAppService'
+import { UserFacingError } from '../../Support/Http/user-error'
 import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
@@ -50,11 +52,17 @@ export class TwitterService {
   // callback. Keyed by state so two accounts can be connected concurrently.
   private pending = new PendingOAuthStates<{ codeVerifier: string }>()
 
-  private config(): TwitterConfig {
+  /**
+   * The owner's Twitter app (client id, secret, redirect address): from
+   * Settings, else the environment. Read each time, so a change in Settings
+   * applies without a restart, in every process.
+   */
+  private async config(): Promise<TwitterConfig> {
+    const app = await networkApps.credentials('twitter')
     return {
-      clientId: String(env.TWITTER_CLIENT_ID || '').trim(),
-      clientSecret: String(env.TWITTER_CLIENT_SECRET || '').trim(),
-      redirectUrl: String(env.TWITTER_REDIRECT_URL || '').trim(),
+      clientId: app.clientId,
+      clientSecret: app.clientSecret,
+      redirectUrl: app.redirectUrl,
       accessToken: String(env.TWITTER_ACCESS_TOKEN || '').trim(),
       scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
     }
@@ -67,7 +75,7 @@ export class TwitterService {
   async status() {
     const rows = await listIdentityRows<SocialIdentityRow>('twitter')
     const identity = pickDefaultIdentity(rows)
-    const cfg = this.config()
+    const cfg = (await this.config())
     const connected = identity?.auth_status === 'connected' && Boolean(identity.access_token)
 
     return {
@@ -109,9 +117,9 @@ export class TwitterService {
    * adds it alongside the first rather than replacing it.
    */
   async getAuthUrl(): Promise<string> {
-    const cfg = this.config()
-    if (!cfg.clientId) throw new Error('Set TWITTER_CLIENT_ID to connect X/Twitter.')
-    if (!cfg.redirectUrl) throw new Error('Set TWITTER_REDIRECT_URL to connect X/Twitter.')
+    const cfg = (await this.config())
+    if (!cfg.clientId) throw new UserFacingError('Add your X app under Settings, Channels first: its client id and secret.')
+    if (!cfg.redirectUrl) throw new UserFacingError('Postline could not work out its address for the X redirect. Set it under Settings, Channels.')
 
     const state = randomOAuthState()
     const { url, codeVerifier } = await this.driver.createAuthorization({
@@ -126,7 +134,7 @@ export class TwitterService {
 
   /** Handle the OAuth redirect: exchange the code and store the tokens. */
   async handleCallback(code: string, state: string) {
-    const cfg = this.config()
+    const cfg = (await this.config())
     if (!code) throw new Error('X/Twitter did not return an authorization code.')
     const pending = this.pending.take(state)
     // Strict either way: without the verifier minted for this exact state the
@@ -163,7 +171,7 @@ export class TwitterService {
    * bring back an account the user disconnected.
    */
   async connectFromEnv(options: { revive?: boolean } = {}) {
-    const cfg = this.config()
+    const cfg = (await this.config())
     if (!cfg.accessToken) {
       throw new Error('Set TWITTER_ACCESS_TOKEN (or connect via OAuth) before using X/Twitter.')
     }
@@ -333,7 +341,7 @@ export class TwitterService {
     const existing = await findIdentityRow<SocialIdentityRow>('twitter')
     if (isUsableIdentity(existing)) return await this.refreshIfExpiring(existing!)
 
-    if (this.config().accessToken) {
+    if ((await this.config()).accessToken) {
       const connected = await this.connectFromEnv({ revive: false })
       const identity = connected.id ? await findIdentityRow<SocialIdentityRow>('twitter', connected.id) : undefined
       if (identity?.access_token) return identity
@@ -349,7 +357,7 @@ export class TwitterService {
    * auth failure still surfaces at publish time.
    */
   private async refreshIfExpiring(identity: SocialIdentityRow): Promise<SocialIdentityRow> {
-    const cfg = this.config()
+    const cfg = (await this.config())
     if (!identity.refresh_token || !cfg.clientId) return identity
 
     return await refreshOnce(identity, {

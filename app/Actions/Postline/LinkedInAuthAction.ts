@@ -10,7 +10,7 @@ export default new Action({
 
   async handle() {
     try {
-      return response.redirect(linkedin.getAuthUrl())
+      return response.redirect(await linkedin.getAuthUrl())
     }
     catch (error) {
       const message = publicMessage(error)

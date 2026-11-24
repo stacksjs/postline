@@ -10,6 +10,8 @@ import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityR
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, expiresAt, now, uuid } from './support'
 import { explainNetworkError } from '../../Support/Social/network-errors'
+import { networkApps } from '../NetworkAppService'
+import { UserFacingError } from '../../Support/Http/user-error'
 import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
@@ -54,14 +56,20 @@ export class InstagramService {
   private pending = new PendingOAuthStates()
 
   constructor() {
-    this.driver = new InstagramDriver({ graphVersion: this.config().graphVersion })
+    this.driver = new InstagramDriver({ graphVersion: String(env.INSTAGRAM_GRAPH_VERSION || 'v21.0').trim() })
   }
 
-  private config(): InstagramConfig {
+  /**
+   * The owner's Instagram app (client id, secret, redirect address): from
+   * Settings, else the environment. Read each time, so a change in Settings
+   * applies without a restart, in every process.
+   */
+  private async config(): Promise<InstagramConfig> {
+    const app = await networkApps.credentials('instagram')
     return {
-      clientId: String(env.INSTAGRAM_CLIENT_ID || '').trim(),
-      clientSecret: String(env.INSTAGRAM_CLIENT_SECRET || '').trim(),
-      redirectUrl: String(env.INSTAGRAM_REDIRECT_URL || '').trim(),
+      clientId: app.clientId,
+      clientSecret: app.clientSecret,
+      redirectUrl: app.redirectUrl,
       graphVersion: String(env.INSTAGRAM_GRAPH_VERSION || 'v21.0').trim(),
       accessToken: String(env.INSTAGRAM_ACCESS_TOKEN || '').trim(),
       userId: String(env.INSTAGRAM_USER_ID || '').trim(),
@@ -88,7 +96,7 @@ export class InstagramService {
   async status() {
     const rows = await listIdentityRows<SocialIdentityRow>('instagram')
     const identity = pickDefaultIdentity(rows)
-    const cfg = this.config()
+    const cfg = (await this.config())
     const connected = identity?.auth_status === 'connected' && Boolean(identity.access_token)
 
     return {
@@ -123,13 +131,13 @@ export class InstagramService {
     return toPublicAccount(await revokeIdentityRow('instagram', identityId))
   }
 
-  getAuthUrl(): string {
-    const cfg = this.config()
+  async getAuthUrl(): Promise<string> {
+    const cfg = (await this.config())
     if (!cfg.clientId || !cfg.clientSecret) {
-      throw new Error('Set INSTAGRAM_CLIENT_ID and INSTAGRAM_CLIENT_SECRET to connect Instagram.')
+      throw new UserFacingError('Add your Instagram app under Settings, Channels first: its client id and secret.')
     }
     if (!cfg.redirectUrl) {
-      throw new Error('Set INSTAGRAM_REDIRECT_URL to connect Instagram.')
+      throw new UserFacingError('Postline could not work out its address for the Instagram redirect. Set it under Settings, Channels.')
     }
 
     return this.driver.getAuthUrl({
@@ -141,7 +149,7 @@ export class InstagramService {
   }
 
   async handleCallback(code: string, state: string) {
-    const cfg = this.config()
+    const cfg = (await this.config())
     if (!code) throw new Error('Facebook did not return an authorization code.')
     // Strict: a callback is honoured only for a state this process issued and
     // has not yet consumed. A restart mid-consent costs one retry.
@@ -190,7 +198,7 @@ export class InstagramService {
    * bring back an account the user disconnected.
    */
   async connectFromEnv(options: { revive?: boolean } = {}) {
-    const cfg = this.config()
+    const cfg = (await this.config())
     if (!cfg.accessToken) {
       throw new Error('Set INSTAGRAM_ACCESS_TOKEN (or connect via OAuth) before using Instagram.')
     }
@@ -323,7 +331,7 @@ export class InstagramService {
       accessToken: String(identity.access_token),
       igUserId: String(identity.external_id),
       handle: identity.handle,
-      graphVersion: this.config().graphVersion,
+      graphVersion: (await this.config()).graphVersion,
     }
   }
 
@@ -341,7 +349,7 @@ export class InstagramService {
     const existing = await findIdentityRow<SocialIdentityRow>('instagram')
     if (isUsableIdentity(existing)) return existing!
 
-    if (this.config().accessToken) {
+    if ((await this.config()).accessToken) {
       const connected = await this.connectFromEnv({ revive: false })
       const identity = connected.id ? await findIdentityRow<SocialIdentityRow>('instagram', connected.id) : undefined
       if (identity?.access_token) return identity
