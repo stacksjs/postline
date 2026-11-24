@@ -167,7 +167,7 @@
             <p class="my-1.5 text-body text-ui">Built into Postline</p>
             <p class="m-0 text-muted text-xs">Publish long-form posts to your site without another account.</p>
           </div>
-          <a class="inline-flex items-center justify-center h-9 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl" href="/blog" data-stx-link>Open Blog</a>
+          <a class="inline-flex items-center justify-center h-9 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl" href="/writing" data-stx-link>Open Blog</a>
         </article>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="mastodon">
           <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-info text-xl bg-info-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-mastodon"></span></span><span class="px-2.5 py-1 font-semibold text-muted text-xs whitespace-nowrap border border-line rounded-full" data-mastodon-channel-status>Setup</span></div>

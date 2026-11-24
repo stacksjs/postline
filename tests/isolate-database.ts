@@ -66,6 +66,9 @@ copyFileSync(template, database)
 process.env.DB_CONNECTION = 'sqlite'
 process.env.DB_DATABASE_PATH = database
 process.env.POSTLINE_TEST_DATABASE = database
+// Publishing to the blog writes Markdown files; keep them out of the project.
+const blogDir = join(tmpdir(), `postline-test-blog-${process.pid}-${Date.now()}`)
+process.env.POSTLINE_BLOG_DIR = blogDir
 // Stacks' `bootTestEnvironment()` (called from tests/setup.ts) makes an empty
 // throwaway database of its own unless told one is already configured. This
 // one is, and is migrated, so it keeps it. The path also tells the framework's
@@ -81,4 +84,5 @@ if (!process.env.APP_KEY)
 process.on('exit', () => {
   for (const suffix of ['', '-wal', '-shm'])
     rmSync(`${database}${suffix}`, { force: true })
+  rmSync(blogDir, { recursive: true, force: true })
 })

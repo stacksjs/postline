@@ -1,19 +1,57 @@
 import type { CrosspostTargetResult, PublishContent } from '../../Support/Social/types'
-import { mkdir } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { db } from '@stacksjs/database'
 import { ensureAccount, now, uuid } from './support'
 import { classifyFailure } from '../../Support/Social/retry'
+import { safeMarkdown } from '../../Support/Social/safe-markdown'
+import { UserFacingError } from '../../Support/Http/user-error'
 
 const database = db as any
 
 // The framework's BunPress blog renders markdown from content/blog/*.md at
 // /blog/<slug> — publishing a file there makes the post immediately live.
-const CONTENT_DIR = join(process.cwd(), 'content/blog')
+// `POSTLINE_BLOG_DIR` exists for the test suite, which must not write into
+// the project's own blog.
+function contentDir(): string {
+  return process.env.POSTLINE_BLOG_DIR || join(process.cwd(), 'content/blog')
+}
 
 /** Postline's own blog has no external character ceiling worth enforcing. */
 const BLOG_CHARACTER_LIMIT = 10000
+
+function fileFor(slug: string): string {
+  return join(contentDir(), `${slug}.md`)
+}
+
+/** The Markdown file the blog renders: front matter, then the body, made safe. */
+async function writePostFile(slug: string, title: string, date: string, body: string): Promise<void> {
+  await mkdir(contentDir(), { recursive: true })
+  await Bun.write(fileFor(slug), [
+    '---',
+    `title: ${JSON.stringify(title)}`,
+    `date: ${date.slice(0, 10)}`,
+    'author: Postline',
+    '---',
+    '',
+    safeMarkdown(body),
+    '',
+  ].join('\n'))
+}
+
+export interface BlogPostView {
+  id: number
+  title: string
+  slug: string
+  excerpt: string | null
+  body: string
+  status: 'published' | 'draft'
+  publishedAt: string | null
+  /** Where it can be read, while it is published. */
+  url: string | null
+}
 
 function slugify(value: string): string {
   return value
@@ -27,6 +65,10 @@ function slugify(value: string): string {
     .replace(/^-+|-+$/g, '') || 'post'
 }
 
+/**
+ * A slug no post uses, in the database or on disk. Checking the database
+ * alone let a new post overwrite a Markdown file put there some other way.
+ */
 async function uniqueSlug(base: string): Promise<string> {
   let candidate = base
   for (let attempt = 2; attempt < 50; attempt++) {
@@ -35,7 +77,7 @@ async function uniqueSlug(base: string): Promise<string> {
       .select(['id'])
       .where('slug', '=', candidate)
       .executeTakeFirst()
-    if (!existing) return candidate
+    if (!existing && !existsSync(fileFor(candidate))) return candidate
     candidate = `${base}-${attempt}`
   }
   return `${base}-${uuid().slice(0, 8)}`
@@ -95,17 +137,7 @@ export class BlogService {
         ? body
         : post.body.split('\n').slice(firstContentIndex + 1).join('\n').trim() || body
 
-      await mkdir(CONTENT_DIR, { recursive: true })
-      await Bun.write(join(CONTENT_DIR, `${slug}.md`), [
-        '---',
-        `title: ${JSON.stringify(title)}`,
-        `date: ${publishedAt.slice(0, 10)}`,
-        'author: Postline',
-        '---',
-        '',
-        markdownBody,
-        '',
-      ].join('\n'))
+      await writePostFile(slug, title, publishedAt, markdownBody)
 
       await database.insertInto('blog_posts').values({
         uuid: uuid(),
@@ -143,24 +175,82 @@ export class BlogService {
     }
   }
 
-  /** Published blog posts, newest first. */
-  async list(limit = 50): Promise<Array<{ id: number, title: string, slug: string, excerpt: string | null, body: string, publishedAt: string | null }>> {
+  /** Blog posts, newest first: published ones, and ones taken down. */
+  async list(limit = 50): Promise<BlogPostView[]> {
     const rows = await database
       .selectFrom('blog_posts')
       .selectAll()
-      .where('status', '=', 'published')
-      .orderBy('published_at', 'desc')
+      .where('status', 'in', ['published', 'draft'])
+      .orderBy('id', 'desc')
       .limit(limit)
       .execute()
+    return rows.map(toView)
+  }
 
-    return rows.map((row: any) => ({
-      id: Number(row.id),
-      title: String(row.title),
-      slug: String(row.slug),
-      excerpt: row.excerpt || null,
-      body: String(row.body),
-      publishedAt: row.published_at || null,
-    }))
+  /**
+   * Change a post's title or text. A published post's page changes with it;
+   * its address does not, so links to it keep working.
+   */
+  async update(id: number, input: { title: string, body: string }): Promise<BlogPostView> {
+    const row = await this.find(id)
+    const title = input.title.trim().slice(0, 200)
+    const body = input.body.trim()
+    if (!title) throw new UserFacingError('A blog post needs a title.')
+    if (!body) throw new UserFacingError('A blog post needs some text.')
+
+    const updatedAt = now()
+    if (row.status === 'published') await writePostFile(String(row.slug), title, String(row.published_at || updatedAt), body)
+    await database.updateTable('blog_posts')
+      .set({ title, body, excerpt: body.slice(0, 280), updated_at: updatedAt })
+      .where('id', '=', row.id)
+      .execute()
+    return toView({ ...row, title, body, excerpt: body.slice(0, 280) })
+  }
+
+  /** Take a post off the site. It stays here, and can be published again. */
+  async unpublish(id: number): Promise<BlogPostView> {
+    const row = await this.find(id)
+    await rm(fileFor(String(row.slug)), { force: true })
+    await database.updateTable('blog_posts').set({ status: 'draft', updated_at: now() }).where('id', '=', row.id).execute()
+    return toView({ ...row, status: 'draft' })
+  }
+
+  /** Put a taken-down post back on the site, at the address it had. */
+  async republish(id: number): Promise<BlogPostView> {
+    const row = await this.find(id)
+    if (row.status !== 'published' && existsSync(fileFor(String(row.slug))))
+      throw new UserFacingError(`Another file already uses /blog/${row.slug}. Rename it, then try again.`)
+    const publishedAt = row.published_at || now()
+    await writePostFile(String(row.slug), String(row.title), String(publishedAt), String(row.body))
+    await database.updateTable('blog_posts').set({ status: 'published', published_at: publishedAt, updated_at: now() }).where('id', '=', row.id).execute()
+    return toView({ ...row, status: 'published', published_at: publishedAt })
+  }
+
+  /** Delete a post for good: its page and its record. */
+  async remove(id: number): Promise<void> {
+    const row = await this.find(id)
+    await rm(fileFor(String(row.slug)), { force: true })
+    await database.deleteFrom('blog_posts').where('id', '=', row.id).execute()
+  }
+
+  private async find(id: number): Promise<any> {
+    const row = await database.selectFrom('blog_posts').selectAll().where('id', '=', id).executeTakeFirst()
+    if (!row || !['published', 'draft'].includes(String(row.status))) throw new UserFacingError('That blog post no longer exists.')
+    return row
+  }
+}
+
+function toView(row: any): BlogPostView {
+  const published = String(row.status) === 'published'
+  return {
+    id: Number(row.id),
+    title: String(row.title),
+    slug: String(row.slug),
+    excerpt: row.excerpt || null,
+    body: String(row.body),
+    status: published ? 'published' : 'draft',
+    publishedAt: row.published_at || null,
+    url: published ? `/blog/${row.slug}` : null,
   }
 }
 

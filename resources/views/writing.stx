@@ -1,0 +1,229 @@
+@extends('layouts/app')
+
+@section('title', 'Postline - Blog')
+
+@section('content')
+  @meta('description', 'Manage long-form posts published through Postline.')
+  <section class="grid gap-4" data-postline-page="blog" data-testid="blog-page">
+    <header class="flex flex-col gap-4 items-stretch justify-between sm:flex-row sm:items-center min-h-11">
+      <div>
+        <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Blog</p>
+        <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Long-form publishing</h1>
+        <p class="mb-0 mt-1.5 text-muted text-ui">Write once in Composer, publish to your site at <a class="underline hover:text-ink" href="/blog" target="_blank" rel="noopener">/blog</a>, and keep every article easy to find.</p>
+      </div>
+      <a class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors" href="/composer" data-stx-link data-no-window-drag x-show="!loaded() || items().length > 0">
+        <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>
+        Write a post
+      </a>
+    </header>
+
+    <div class="grid gap-3 sm:grid-cols-3">
+      <article class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="font-semibold text-muted text-xs tracking-wider uppercase">Published</span>
+        <strong class="block mt-2 text-2xl text-ink" :text="String(publishedCount())">0</strong>
+      </article>
+      <article class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="font-semibold text-muted text-xs tracking-wider uppercase">Latest</span>
+        <strong class="block mt-2 text-ink text-sm truncate" :text="latestTitle()">No posts yet</strong>
+      </article>
+      <article class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
+        <span class="font-semibold text-muted text-xs tracking-wider uppercase">Workflow</span>
+        <strong class="block mt-2 text-ink text-sm">Composer → Blog</strong>
+      </article>
+    </div>
+
+    <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" aria-label="Published blog posts">
+      <header class="flex gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
+        <div>
+          <h2 class="m-0 font-semibold text-ink text-sm">Posts</h2>
+          <p class="m-0 mt-1 text-muted text-xs" :text="summaryText()">Loading your blog…</p>
+        </div>
+        <button class="inline-flex gap-2 items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg disabled:opacity-50 transition-colors" type="button" :disabled="loading()" @click="loadPosts">
+          <span class="h-3.5 w-3.5 i-hugeicons-refresh" aria-hidden="true"></span>
+          Refresh
+        </button>
+      </header>
+
+      <div class="grid gap-3 place-items-center px-6 py-16 text-center" x-show="loading()">
+        <span class="h-7 w-7 text-muted animate-spin i-hugeicons-loading-03" aria-hidden="true"></span>
+        <p class="m-0 text-muted text-sm">Loading published posts…</p>
+      </div>
+
+      <div class="grid gap-3 place-items-center px-6 py-16 text-center" x-show="showEmpty()">
+        <span class="grid place-items-center h-12 w-12 text-muted text-xl bg-panel-2 rounded-2xl" aria-hidden="true"><span class="i-hugeicons-quill-write-02"></span></span>
+        <div>
+          <h2 class="m-0 font-semibold text-base text-ink">Your first article starts in Composer</h2>
+          <p class="m-0 mt-1 max-w-md text-muted text-sm">Choose Blog as a channel, add a title, and publish. It will appear here without leaving the app shell.</p>
+        </div>
+        <a class="inline-flex items-center justify-center px-4 h-9 font-semibold text-ink text-sm bg-panel-2 hover:bg-raised border border-line rounded-xl" href="/composer" data-stx-link>Open Composer</a>
+      </div>
+
+      <div class="divide-line divide-y" x-show="!loading() && items().length">
+        <article class="grid gap-3 p-4" x-for="item in rows()" data-blog-row>
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" x-show="!item.editing">
+            <div class="min-w-0">
+              <div class="flex gap-2 items-center mb-1.5">
+                <span class="px-2 py-0.5 font-semibold text-xs border rounded-full" :class="item.published ? 'text-success bg-success-soft border-success-line' : 'text-muted bg-panel-2 border-line'" :text="item.published ? 'Published' : 'Taken down'"></span>
+                <time class="text-muted text-xs" :datetime="item.publishedAt" :text="item.date"></time>
+              </div>
+              <h3 class="m-0 font-semibold text-ink text-sm" :text="item.title"></h3>
+              <p class="m-0 mt-1 line-clamp-2 text-muted text-ui" :text="item.excerpt"></p>
+            </div>
+            <div class="flex flex-wrap gap-1.5 items-center justify-end">
+              <a class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" x-show="item.published" :href="item.url" target="_blank" rel="noopener noreferrer">
+                View live
+                <span class="h-3.5 w-3.5 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span>
+              </a>
+              <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :disabled="busyId() === item.id" @click="startEdit(item.id)">Edit</button>
+              <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :disabled="busyId() === item.id" @click="toggleLive(item.id)" :text="item.published ? 'Take down' : 'Put back'"></button>
+              <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-danger text-xs bg-panel hover:bg-danger-soft border border-line rounded-lg disabled:opacity-50" type="button" :disabled="busyId() === item.id" @click="removePost(item.id)">Delete</button>
+            </div>
+          </div>
+          <form class="grid gap-2" x-show="item.editing" @submit.prevent="saveEdit(item.id)">
+            <input class="px-3 h-9 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="200" aria-label="Title" :value="item.draftTitle" @input="setDraft(item.id, 'title', $event)" data-blog-edit-title>
+            <textarea class="px-3 py-2 min-h-40 text-ink text-ui bg-panel border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft resize-y" aria-label="Text" :value="item.draftBody" @input="setDraft(item.id, 'body', $event)" data-blog-edit-body></textarea>
+            <div class="flex gap-2 justify-end">
+              <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" type="button" @click="cancelEdit()">Cancel</button>
+              <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="submit" :disabled="busyId() === item.id">Save</button>
+            </div>
+          </form>
+        </article>
+      </div>
+
+      <p class="m-0 px-4 py-3 text-danger text-sm bg-danger-soft border-danger-line border-t" x-show="errorMessage()" :text="errorMessage()"></p>
+    </section>
+  </section>
+
+  <script client>
+    const items = state([])
+    const loading = state(true)
+    const loaded = state(false)
+    const errorMessage = state('')
+
+    const busyId = state(0)
+    const editingId = state(0)
+    const drafts = state({ title: '', body: '' })
+
+    const publishedCount = derived(() => items().filter(item => item.status === 'published').length)
+    const latestTitle = derived(() => items().find(item => item.status === 'published')?.title || 'No posts yet')
+    const showEmpty = derived(() => loaded() && !loading() && !errorMessage() && items().length === 0)
+    const summaryText = derived(() => {
+      if (errorMessage()) return errorMessage()
+      const down = items().length - publishedCount()
+      return `${publishedCount()} published${down ? `, ${down} taken down` : ''}`
+    })
+
+    const dateLabel = (value: string | null | undefined): string => {
+      const date = new Date(value)
+      return Number.isNaN(date.getTime())
+        ? 'Published'
+        : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    }
+
+    const loadPosts = async () => {
+      loading.set(true)
+      errorMessage.set('')
+      try {
+        const response = await fetch('/api/postline/blog')
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load blog posts.')
+        items.set(Array.isArray(payload.data?.items) ? payload.data.items : [])
+      }
+      catch (error) {
+        items.set([])
+        errorMessage.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        loading.set(false)
+        loaded.set(true)
+      }
+    }
+
+    const rows = derived(() => items().map(item => ({
+      ...item,
+      published: item.status === 'published',
+      excerpt: item.excerpt || item.body,
+      date: dateLabel(item.publishedAt),
+      editing: editingId() === item.id,
+      draftTitle: editingId() === item.id ? drafts().title : item.title,
+      draftBody: editingId() === item.id ? drafts().body : item.body,
+    })))
+
+    const toast = (message: string, tone: 'success' | 'error' = 'success'): void => {
+      window.postlineToast?.show?.({ message, tone, title: tone === 'error' ? 'Blog' : 'Done' })
+    }
+
+    const send = async (path: string, fields: Record<string, string>) => {
+      const body = new FormData()
+      for (const [key, value] of Object.entries(fields)) body.set(key, value)
+      const response = await fetch(`/api/postline/blog/${path}`, { method: 'POST', body })
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'That did not work.')
+      return payload.data
+    }
+
+    const startEdit = (id: number) => {
+      const item = items().find(entry => entry.id === id)
+      if (!item) return
+      drafts.set({ title: item.title, body: item.body })
+      editingId.set(id)
+    }
+    const cancelEdit = () => editingId.set(0)
+    const setDraft = (id: number, field: 'title' | 'body', event: Event) => {
+      if (editingId() !== id) return
+      drafts.set({ ...drafts(), [field]: String((event.target as HTMLInputElement | null)?.value || '') })
+    }
+
+    const saveEdit = async (id: number) => {
+      busyId.set(id)
+      try {
+        await send('update', { id: String(id), title: drafts().title, body: drafts().body })
+        editingId.set(0)
+        await loadPosts()
+        toast('Saved. A published post changes on the site too.')
+      }
+      catch (error) {
+        toast(error instanceof Error ? error.message : String(error), 'error')
+      }
+      finally {
+        busyId.set(0)
+      }
+    }
+
+    const toggleLive = async (id: number) => {
+      const item = items().find(entry => entry.id === id)
+      if (!item) return
+      busyId.set(id)
+      try {
+        await send(item.status === 'published' ? 'unpublish' : 'republish', { id: String(id) })
+        await loadPosts()
+        toast(item.status === 'published' ? 'Taken off the site. It is still here.' : 'Back on the site.')
+      }
+      catch (error) {
+        toast(error instanceof Error ? error.message : String(error), 'error')
+      }
+      finally {
+        busyId.set(0)
+      }
+    }
+
+    const removePost = async (id: number) => {
+      const item = items().find(entry => entry.id === id)
+      if (!item || !window.confirm(`Delete "${item.title}" for good? Its page goes too. This cannot be undone.`)) return
+      busyId.set(id)
+      try {
+        await send('delete', { id: String(id) })
+        await loadPosts()
+        toast('Deleted.')
+      }
+      catch (error) {
+        toast(error instanceof Error ? error.message : String(error), 'error')
+      }
+      finally {
+        busyId.set(0)
+      }
+    }
+
+    onMount(() => void loadPosts())
+  </script>
+@endsection
