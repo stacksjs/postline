@@ -20,6 +20,7 @@ export default new Action({
         name: field('name'),
         workspaceName: field('workspaceName'),
         timezone: field('timezone'),
+        shareMediaByTunnel: field('shareMediaByTunnel') === undefined ? undefined : ['1', 'true', 'on'].includes(String(field('shareMediaByTunnel')).toLowerCase()),
       })
       return response.json({ ok: true, data })
     }

@@ -21,6 +21,8 @@ export interface WorkspaceProfile {
   name: string
   workspaceName: string
   timezone: string
+  /** Share images for Instagram and Threads through a temporary public link. */
+  shareMediaByTunnel: boolean
 }
 
 /** The zone a new workspace starts in: `TZ` when it names a real zone, else this machine's. */
@@ -40,7 +42,7 @@ export class WorkspaceService {
     const id = await ensureAccount()
     const row = await database
       .selectFrom('accounts')
-      .select(['name', 'workspace_name', 'timezone'])
+      .select(['name', 'workspace_name', 'timezone', 'share_media_by_tunnel'])
       .where('id', '=', id)
       .executeTakeFirst()
 
@@ -50,6 +52,7 @@ export class WorkspaceService {
       // A zone the runtime does not know is replaced on read, so one bad
       // value in the row cannot break every schedule.
       timezone: isValidTimeZone(row?.timezone) ? String(row.timezone) : defaultTimeZone(),
+      shareMediaByTunnel: Boolean(row?.share_media_by_tunnel),
     }
     this.cached = { profile, at: Date.now() }
     return profile
@@ -59,7 +62,7 @@ export class WorkspaceService {
     return (await this.profile()).timezone
   }
 
-  async save(input: { name?: string, workspaceName?: string, timezone?: string }): Promise<WorkspaceProfile> {
+  async save(input: { name?: string, workspaceName?: string, timezone?: string, shareMediaByTunnel?: boolean }): Promise<WorkspaceProfile> {
     const values: Record<string, unknown> = {}
 
     if (input.name !== undefined) {
@@ -77,6 +80,8 @@ export class WorkspaceService {
       if (!isValidTimeZone(timezone)) throw new UserFacingError(`"${timezone}" is not a time zone Postline knows. Pick one from the list, such as Europe/Berlin.`)
       values.timezone = timezone
     }
+
+    if (input.shareMediaByTunnel !== undefined) values.share_media_by_tunnel = Boolean(input.shareMediaByTunnel)
 
     if (Object.keys(values).length > 0) {
       const id = await ensureAccount()

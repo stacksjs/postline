@@ -40,10 +40,17 @@ describe('the workspace profile', () => {
     const before = await workspace.profile()
     const saved = await workspace.save({ timezone: 'Asia/Tokyo', workspaceName: 'Field Notes', name: 'Sam Rivera' })
 
-    expect(saved).toEqual({ name: 'Sam Rivera', workspaceName: 'Field Notes', timezone: 'Asia/Tokyo' })
+    expect(saved).toEqual({ name: 'Sam Rivera', workspaceName: 'Field Notes', timezone: 'Asia/Tokyo', shareMediaByTunnel: false })
     expect(await workspace.timezone()).toBe('Asia/Tokyo')
 
     await workspace.save(before.name.length >= 2 ? before : { ...before, name: 'Workspace owner' })
+  })
+
+  test('the temporary image link is off until the owner turns it on', async () => {
+    const before = await workspace.profile()
+    expect((await workspace.save({ shareMediaByTunnel: true })).shareMediaByTunnel).toBe(true)
+    expect((await workspace.save({ shareMediaByTunnel: false })).shareMediaByTunnel).toBe(false)
+    await workspace.save({ shareMediaByTunnel: before.shareMediaByTunnel })
   })
 
   test('an unknown zone and a one-letter name are refused with a reason', async () => {

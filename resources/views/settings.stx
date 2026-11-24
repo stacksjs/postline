@@ -58,6 +58,17 @@
             <Select variant="mac" v-model:value="workspaceZone" placeholder="" :options="zoneOptions()" data-workspace-timezone />
           </SettingsRow>
         </SettingsGroup>
+        {{--
+          Instagram and Threads fetch each image from an address on the
+          internet. Without a public address of its own (the Mac app, a server
+          at home), Postline can lend the image one for as long as the network
+          takes to fetch it.
+        --}}
+        <SettingsGroup title="Images" footer="For Instagram and Threads when Postline has no public address. The image is relayed through localtunnel.dev, the Stacks tunnel service, for the few seconds the network takes to fetch it, then the link is closed.">
+          <SettingsRow label="Share images through a temporary link" setting="share-media" keywords="instagram threads image tunnel public address">
+            <Switch variant="mac" v-model:checked="shareMediaByTunnel" data-share-media />
+          </SettingsRow>
+        </SettingsGroup>
         <div class="flex gap-2 items-center justify-end mt-3">
           <p class="m-0 mr-auto text-xs" :data-tone="workspaceTone()" x-show="workspaceMessage()" :text="workspaceMessage()" role="status" aria-live="polite" data-workspace-message></p>
           <Button appearance="mac" variant="primary" :disabled="!canSaveWorkspace()" @click="saveWorkspace">Save</Button>
@@ -319,7 +330,8 @@
     const workspaceName = state('')
     const ownerName = state('')
     const workspaceZone = state('')
-    const savedWorkspace = state({ name: '', workspaceName: '', timezone: '' })
+    const shareMediaByTunnel = state(false)
+    const savedWorkspace = state({ name: '', workspaceName: '', timezone: '', shareMediaByTunnel: false })
     const workspaceMessage = state('')
     const workspaceTone = state('')
 
@@ -345,13 +357,15 @@
       && Boolean(workspaceZone())
       && (workspaceName().trim() !== savedWorkspace().workspaceName
         || ownerName().trim() !== savedWorkspace().name
-        || workspaceZone() !== savedWorkspace().timezone))
+        || workspaceZone() !== savedWorkspace().timezone
+        || shareMediaByTunnel() !== savedWorkspace().shareMediaByTunnel))
 
-    const applyWorkspace = (profile: { name: string, workspaceName: string, timezone: string }): void => {
-      savedWorkspace.set(profile)
+    const applyWorkspace = (profile: { name: string, workspaceName: string, timezone: string, shareMediaByTunnel?: boolean }): void => {
+      savedWorkspace.set({ ...profile, shareMediaByTunnel: Boolean(profile.shareMediaByTunnel) })
       workspaceName.set(profile.workspaceName)
       ownerName.set(profile.name)
       workspaceZone.set(profile.timezone)
+      shareMediaByTunnel.set(Boolean(profile.shareMediaByTunnel))
     }
 
     const loadWorkspace = async (): Promise<void> => {
@@ -376,6 +390,7 @@
         body.set('workspaceName', workspaceName().trim())
         body.set('name', ownerName().trim())
         body.set('timezone', workspaceZone())
+        body.set('shareMediaByTunnel', shareMediaByTunnel() ? '1' : '0')
         const response = await fetch('/api/postline/settings/workspace', { method: 'POST', body })
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save.')

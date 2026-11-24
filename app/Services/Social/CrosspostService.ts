@@ -1,3 +1,4 @@
+import process from 'node:process'
 import type { PublishTarget } from '../../Support/Social/targets'
 import type { ThreadChain } from '../../Support/Social/threads'
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
@@ -15,6 +16,8 @@ import { twitter } from './TwitterService'
 import { workspace } from '../WorkspaceService'
 import { fitImage, suits } from '../../Support/Social/image-fit'
 import { persistTempMedia, removeTempMedia } from '../../Support/Social/uploads'
+import type { MediaShare } from '../../Support/Social/media-share'
+import { openMediaShare } from '../../Support/Social/media-share'
 import { MEDIA_RULES } from '../../Support/Social/media-rules'
 import { ensureAccount, now, uuid } from './support'
 
@@ -48,6 +51,17 @@ const publishers: Partial<Record<SocialProvider, ProviderPublisher>> = {
 
 export function crosspostProviders(): SocialProvider[] {
   return Object.keys(publishers) as SocialProvider[]
+}
+
+/** Whether the owner allowed temporary image links, in Settings or with POSTLINE_MEDIA_TUNNEL=1. */
+async function mediaSharingAllowed(): Promise<boolean> {
+  if (['1', 'true', 'on'].includes(String(process.env.POSTLINE_MEDIA_TUNNEL || '').toLowerCase())) return true
+  try {
+    return (await workspace.profile()).shareMediaByTunnel
+  }
+  catch {
+    return false
+  }
 }
 
 const NETWORK_NAMES: Record<string, string> = { bluesky: 'Bluesky', twitter: 'X', mastodon: 'Mastodon', linkedin: 'LinkedIn', instagram: 'Instagram', threads: 'Threads' }
@@ -99,7 +113,11 @@ export class CrosspostService {
    * The publisher registry is injectable so tests can drive target resolution,
    * de-duplication and per-account thread chains without touching a network.
    */
-  constructor(private registry: Partial<Record<SocialProvider, ProviderPublisher>> = publishers) {}
+  constructor(
+    private registry: Partial<Record<SocialProvider, ProviderPublisher>> = publishers,
+    private readonly shareMedia: typeof openMediaShare = openMediaShare,
+    private readonly mayShareMedia: () => Promise<boolean> = mediaSharingAllowed,
+  ) {}
 
   /**
    * Normalise whatever the caller passed into concrete, de-duplicated targets.
@@ -325,6 +343,38 @@ export class CrosspostService {
   }
 
   /**
+   * Give every image a public address for a network that fetches by address,
+   * through a temporary link, or say why that cannot happen and what fixes it.
+   */
+  private async reachableMedia(provider: string, content: PublishContent): Promise<{ ok: true, content: PublishContent, share: MediaShare } | { ok: false, error: string }> {
+    const name = NETWORK_NAMES[provider] || provider
+    const media = content.media ?? []
+    if (media.some(item => !item.url && !item.bytes?.length))
+      return { ok: false, error: `${name} could not be sent an image: it has neither a file nor an address.` }
+    if (!(await this.mayShareMedia())) {
+      return {
+        ok: false,
+        error: `${name} fetches images from an address on the internet, and this Postline has none. Turn on "Share images through a temporary link" in Settings, General, or set STORAGE_PUBLIC_URL to a public address that serves Postline.`,
+      }
+    }
+
+    const needing = media.filter(item => !item.url)
+    let share: MediaShare
+    try {
+      share = await this.shareMedia(needing.map(item => ({ bytes: item.bytes!, mimeType: item.mimeType || 'image/jpeg' })))
+    }
+    catch (error) {
+      return { ok: false, error: `${error instanceof Error ? error.message : String(error)} Try again, or set STORAGE_PUBLIC_URL to a public address that serves Postline.` }
+    }
+    let next = 0
+    return {
+      ok: true,
+      share,
+      content: { ...content, media: media.map(item => item.url ? item : { ...item, url: share.urls[next++] }) },
+    }
+  }
+
+  /**
    * One target, one result — labelled with the account it was meant for even
    * when the publisher failed before resolving one, so callers can match each
    * result back to the target that produced it.
@@ -349,14 +399,29 @@ export class CrosspostService {
       return { provider: target.provider, ok: false, error: error instanceof Error ? error.message : String(error), target: targetKey(target), identityId: target.identityId ?? undefined }
     }
 
+    // Instagram and Threads fetch each image from an address. Without one
+    // they cannot be sent an image at all, so either a temporary link is
+    // opened (when the owner allowed it) or the post is refused with the fix.
+    let share: MediaShare | undefined
+    if (FETCHES_BY_ADDRESS.has(target.provider) && fitted.content?.media?.some(item => !item.url)) {
+      const reachable = await this.reachableMedia(target.provider, fitted.content)
+      if (!reachable.ok) {
+        for (const file of fitted.tempFiles) await removeTempMedia(file)
+        return { provider: target.provider, ok: false, error: reachable.error, target: targetKey(target), identityId: target.identityId ?? undefined, retry: { kind: 'permanent' } }
+      }
+      fitted.content = reachable.content
+      share = reachable.share
+    }
+
     let result: CrosspostTargetResult
     try {
       result = await publisher.publishToPost(post, fitted.content, target.identityId)
     }
     finally {
       // The network fetches the image while the post is created, so the
-      // converted copies are no longer needed once it answers.
+      // converted copies and the temporary link are done with once it answers.
       for (const file of fitted.tempFiles) await removeTempMedia(file)
+      await share?.close()
     }
     const identityId = result.identityId ?? target.identityId ?? undefined
     return {

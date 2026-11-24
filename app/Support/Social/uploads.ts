@@ -1,6 +1,8 @@
 import { mkdir, unlink } from 'node:fs/promises'
 import { isAbsolute, join, resolve } from 'node:path'
 import process from 'node:process'
+import { isIP } from 'node:net'
+import { isPrivateAddress } from '../Http/safe-fetch'
 import { env } from '@stacksjs/env'
 
 /**
@@ -96,13 +98,46 @@ export function buildMediaUrl(base: string, filename: string): string | null {
  * byte-upload providers only.
  */
 export function publicMediaUrl(filename: string): string | null {
-  return buildMediaUrl(String(env.STORAGE_PUBLIC_URL || env.APP_URL || ''), filename)
+  const base = configuredMediaBase()
+  return isPublicBase(base) ? buildMediaUrl(base, filename) : null
 }
 
-/** Whether a public base is configured — i.e. whether URL-only providers can be
- *  handed a fetchable image URL at all. */
+/**
+ * Whether URL-only providers can be handed a fetchable image URL at all: a
+ * base is configured AND it is an address the internet can reach. This used
+ * to check presence only, so the default `APP_URL=postline.localhost` passed,
+ * Meta was handed an address it could not fetch, and every Instagram post
+ * failed with an error that pointed at Meta instead of at the address.
+ */
 export function hasPublicMediaBase(): boolean {
-  return Boolean(String(env.STORAGE_PUBLIC_URL || env.APP_URL || '').trim())
+  return isPublicBase(configuredMediaBase())
+}
+
+function configuredMediaBase(): string {
+  return String(env.STORAGE_PUBLIC_URL || env.APP_URL || '').trim()
+}
+
+/**
+ * Whether a base address could be fetched from the public internet, judged
+ * from the address alone: a name that only resolves on this machine or a
+ * local network (`localhost`, `*.localhost`, `*.test`, `*.local`,
+ * `*.internal`, a single-label name) or a private IP is not. A public-looking
+ * name that is not actually served is not caught here; Meta's error says so.
+ */
+export function isPublicBase(base: string): boolean {
+  const raw = String(base || '').trim()
+  if (!raw) return false
+  let host: string
+  try {
+    host = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).hostname.toLowerCase().replace(/^\[|\]$/g, '')
+  }
+  catch {
+    return false
+  }
+  if (!host) return false
+  if (isIP(host)) return !isPrivateAddress(host)
+  if (!host.includes('.')) return false
+  return !/(?:^|\.)(?:localhost|test|local|internal|lan|home|example|invalid)$/.test(host)
 }
 
 /**

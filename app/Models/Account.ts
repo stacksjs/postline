@@ -35,6 +35,17 @@ export default defineModel({
       validation: { rule: schema.string().required().max(80) },
       factory: () => 'America/Los_Angeles',
     },
+    // Whether images for Instagram and Threads may be shared through a
+    // short-lived public link when Postline has no public address of its own
+    // (see app/Support/Social/media-share.ts). Off by default: the link is
+    // relayed through a third-party server.
+    shareMediaByTunnel: {
+      required: false,
+      fillable: true,
+      default: false,
+      validation: { rule: schema.boolean().optional() },
+      factory: () => false,
+    },
     defaultAudience: {
       required: true,
       fillable: true,

@@ -119,6 +119,15 @@
               "tracked",
               "all"
             ]
+          },
+          {
+            "name": "share_media_by_tunnel",
+            "type": "boolean",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": true,
+            "defaultValue": false
           }
         ],
         "indexes": [
@@ -2558,7 +2567,7 @@
       }
     ]
   },
-  "hash": "0a56d655dec0641a96f690d9ae84e5a9e907e70ff9ed40245c1a9392fcccf3df",
+  "hash": "2a791ce0944f6aeecdaf6c0e330e826abba893c189aaa97ab50a94f79c603e18",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-23T03:50:07.459Z"
+  "updatedAt": "2026-11-24T19:52:23.068Z"
 }

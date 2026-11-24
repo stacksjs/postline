@@ -1,5 +1,14 @@
 # Plan: Media upload — closing out issue #18
 
+> **Status (2026-11-24):** the presence check described below is fixed.
+> `hasPublicMediaBase()` now asks whether the address can be reached from the
+> internet (`isPublicBase` in `app/Support/Social/uploads.ts`), so a local
+> `APP_URL` no longer hands Meta an address it cannot fetch. Without a public
+> address, Instagram and Threads either get each image through a temporary
+> link (`app/Support/Social/media-share.ts`, when "Share images through a
+> temporary link" is on in Settings) or the post is refused with both fixes
+> named.
+>
 > Supersedes the scope in issue #18, which is stale. Design + architecture review.
 > Verified against the code and `bun test` on 2026-07-29.
 
