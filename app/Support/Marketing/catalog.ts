@@ -37,7 +37,7 @@ export const FEATURES: MarketingEntry[] = [
     intro: 'The same update has to reach people on whichever network they use. Postline takes one draft, checks it against each network, and publishes to all of them at once, to as many accounts on each as you have connected.',
     sections: [
       { heading: 'Publish in one pass', body: 'Pick the accounts you want, write the post, and send it. Each target is published independently, so one network failing never blocks the rest.' },
-      { heading: 'Failures stay visible', body: 'A rejected post is recorded against the network that rejected it, with the network\'s own error text. Nothing fails silently and nothing is retried behind your back.' },
+      { heading: 'Failures stay visible', body: 'A rejected post is recorded against the network that rejected it, with the network\'s own error text. Nothing fails silently. Rate limits and short outages are retried automatically, up to five times, and the queue shows when the next try is; any other failure waits for you.' },
       { heading: 'Several accounts per network', body: 'Connect a personal and a company account on the same network and choose, per post, which of them it goes out from.' },
     ],
     points: [
@@ -103,15 +103,15 @@ export const FEATURES: MarketingEntry[] = [
     slug: 'inbox',
     nav: 'Inbox',
     title: 'Answer everyone from one inbox',
-    summary: 'Read and reply to direct messages from Bluesky, X, Mastodon and Instagram without switching apps.',
+    summary: 'Read and reply to direct messages from Mastodon, Instagram and Bluesky without switching apps.',
     icon: 'message-01',
     intro: 'Posting to six networks means conversations start in six places. The inbox pulls your direct messages into one list, so replying is one habit and not a round of tabs.',
     sections: [
       { heading: 'One list, every network', body: 'Sync pulls the latest conversations from each connected account. Filter by network, open a thread, reply in place, and archive what is done.' },
-      { heading: 'Honest about what a network allows', body: 'Threads has no public messaging API and LinkedIn limits its own to approved partners. Postline says so in the inbox and does not pretend those messages are there.' },
+      { heading: 'Honest about what a network allows', body: 'Bluesky messages need an app password created with direct-message access. X messages are not supported yet. Threads has no public messaging API and LinkedIn limits its own to approved partners. Postline says so in the inbox and does not pretend those messages are there.' },
     ],
     points: [
-      'Direct messages from four networks in one place',
+      'Direct messages from Mastodon, Instagram and Bluesky',
       'Reply, mark read and archive',
       'Unsupported networks are named, not hidden',
     ],
@@ -137,16 +137,16 @@ export const FEATURES: MarketingEntry[] = [
     slug: 'analytics',
     nav: 'Analytics',
     title: 'What actually landed',
-    summary: 'Publishing activity and per-network engagement, stored against the posts that earned it.',
+    summary: 'Publishing activity across every network, and engagement for Bluesky posts, stored against the posts that earned it.',
     icon: 'chart-line-data-01',
-    intro: 'Every network shows you its own numbers in its own app. Postline keeps them together, against the post, so one piece of writing that went to three networks can be compared with itself.',
+    intro: 'Every network shows you its own numbers in its own app. Postline keeps what it publishes in one place, and syncs likes, reposts and replies for Bluesky posts against the post that earned them. Engagement from the other networks is not synced yet.',
     sections: [
-      { heading: 'Counts, attached to your posts', body: 'Likes, reposts and replies are stored per published target. A post that went to three networks keeps three sets of numbers, not one blended total.' },
+      { heading: 'Counts, attached to your posts', body: 'Likes, reposts and replies are stored per published target, never blended into one total. Today they are synced for Bluesky; the other networks are on the way.' },
       { heading: 'When and where you publish', body: 'See how much went out over the last thirty days, which channels carried it, and which posting windows you actually use.' },
-      { heading: 'Batched and rate-aware', body: 'Syncs run in batches against each network\'s API, and posts deleted upstream are skipped and not reported as errors.' },
+      { heading: 'Batched and rate-aware', body: 'The Bluesky sync runs in batches, and posts deleted upstream are skipped and not reported as errors.' },
     ],
     points: [
-      'Likes, reposts and replies per network',
+      'Bluesky likes, reposts and replies per post',
       'Channel mix and posting windows',
       'History survives an account going away',
     ],
@@ -177,9 +177,9 @@ export const FEATURES: MarketingEntry[] = [
     icon: 'key-01',
     intro: 'Every hosted scheduler holds the one thing that matters: permission to post as you, on every account you connected. Postline is the same kind of tool with that permission kept on hardware you control.',
     sections: [
-      { heading: 'Tokens stay where you put them', body: 'OAuth tokens and app passwords are encrypted with a key your instance generates. Nobody else has a copy, because there is nobody else.' },
-      { heading: 'Your history is a database', body: 'Every post, target and metric is a row you can query, back up and export. Dropping a network does not erase what you published there.' },
-      { heading: 'Run it wherever suits you', body: 'It is one Bun process and a SQLite file. That runs on a laptop, and on a small server when you want the queue publishing while the laptop is shut.' },
+      { heading: 'Tokens stay where you put them', body: 'Access and refresh tokens are stored encrypted with a key your instance generates. Nobody else has a copy, because there is nobody else.' },
+      { heading: 'Your history is a database', body: 'Every post, target and metric is a row in a SQLite file you can query and copy. Dropping a network does not erase what you published there.' },
+      { heading: 'Run it wherever suits you', body: 'It runs on Bun with a SQLite file: on a Mac as one app, or on a small server when you want the queue publishing while the laptop is shut. Instagram and Threads fetch images from a public address, so on a laptop they need the temporary image links switch in Settings.' },
     ],
     points: [
       'Tokens encrypted with a key only you hold',
@@ -221,7 +221,7 @@ export const USE_CASES: MarketingEntry[] = [
     points: [
       'Cover fragmented developer communities',
       'Adjust tone per network',
-      'Per-network engagement, not a blended average',
+      'Engagement per post, not a blended average (Bluesky today)',
     ],
   },
   {
@@ -245,15 +245,15 @@ export const USE_CASES: MarketingEntry[] = [
     slug: 'agencies',
     nav: 'Agencies',
     title: 'Accounts you actually control',
-    summary: 'Manage posting for client accounts without a per-seat subscription or a vendor holding their tokens.',
+    summary: 'One person posting for several client accounts, without a vendor holding their tokens.',
     icon: 'building-03',
-    intro: 'Scheduling tools price by seat and by account, and hold the access tokens for clients you are responsible for. Running the tool yourself removes both problems at once.',
+    intro: 'Scheduling tools price by account and hold the access tokens for clients you are responsible for. Running the tool yourself removes both. Postline has one owner and no team seats, so it suits a person handling several clients, not a team sharing one workspace.',
     sections: [
-      { heading: 'No per-seat pricing', body: 'Cost does not change with the number of accounts connected, because there is no vendor in the middle metering it.' },
-      { heading: 'Clean handover', body: 'When an engagement ends, revoke the tokens and hand over the posting history. Nothing stays locked inside a platform the client cannot reach.' },
+      { heading: 'No per-account pricing', body: 'Cost does not change with the number of accounts connected, because there is no vendor in the middle metering it.' },
+      { heading: 'Clean handover', body: 'When an engagement ends, disconnect the account to delete its tokens from Postline, have the client remove the app in that network\'s settings, and give them a copy of the database with the posting history.' },
     ],
     points: [
-      'Cost does not scale per seat',
+      'Cost does not scale with accounts',
       'Client tokens stay on hardware you control',
       'Bulk cleanup for a clean account handover',
     ],

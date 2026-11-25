@@ -55,7 +55,7 @@
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-message-01"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">Inbox</span>
-            <span class="leading-relaxed text-[14.5px] text-body">Read and reply to direct messages from Bluesky, X, Mastodon and Instagram without switching apps.</span>
+            <span class="leading-relaxed text-[14.5px] text-body">Read and reply to direct messages from Mastodon, Instagram and Bluesky without switching apps.</span>
           </span>
         </a>
       </li>
@@ -73,7 +73,7 @@
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-chart-line-data-01"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">Analytics</span>
-            <span class="leading-relaxed text-[14.5px] text-body">Publishing activity and per-network engagement, stored against the posts that earned it.</span>
+            <span class="leading-relaxed text-[14.5px] text-body">Publishing activity across every network, and engagement for Bluesky posts, stored against the posts that earned it.</span>
           </span>
         </a>
       </li>

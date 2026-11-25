@@ -26,15 +26,15 @@
       <div class="grid gap-10">
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">Tokens stay where you put them</h2>
-          <p class="m-0 leading-relaxed text-[16px] text-body">OAuth tokens and app passwords are encrypted with a key your instance generates. Nobody else has a copy, because there is nobody else.</p>
+          <p class="m-0 leading-relaxed text-[16px] text-body">Access and refresh tokens are stored encrypted with a key your instance generates. Nobody else has a copy, because there is nobody else.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">Your history is a database</h2>
-          <p class="m-0 leading-relaxed text-[16px] text-body">Every post, target and metric is a row you can query, back up and export. Dropping a network does not erase what you published there.</p>
+          <p class="m-0 leading-relaxed text-[16px] text-body">Every post, target and metric is a row in a SQLite file you can query and copy. Dropping a network does not erase what you published there.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">Run it wherever suits you</h2>
-          <p class="m-0 leading-relaxed text-[16px] text-body">It is one Bun process and a SQLite file. That runs on a laptop, and on a small server when you want the queue publishing while the laptop is shut.</p>
+          <p class="m-0 leading-relaxed text-[16px] text-body">It runs on Bun with a SQLite file: on a Mac as one app, or on a small server when you want the queue publishing while the laptop is shut. Instagram and Threads fetch images from a public address, so on a laptop they need the temporary image links switch in Settings.</p>
         </div>
       </div>
 

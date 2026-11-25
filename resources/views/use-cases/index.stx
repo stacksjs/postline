@@ -46,7 +46,7 @@
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-building-03"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">Agencies</span>
-            <span class="leading-relaxed text-[14.5px] text-body">Manage posting for client accounts without a per-seat subscription or a vendor holding their tokens.</span>
+            <span class="leading-relaxed text-[14.5px] text-body">One person posting for several client accounts, without a vendor holding their tokens.</span>
           </span>
         </a>
       </li>

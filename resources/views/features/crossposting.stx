@@ -30,7 +30,7 @@
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">Failures stay visible</h2>
-          <p class="m-0 leading-relaxed text-[16px] text-body">A rejected post is recorded against the network that rejected it, with the network's own error text. Nothing fails silently and nothing is retried behind your back.</p>
+          <p class="m-0 leading-relaxed text-[16px] text-body">A rejected post is recorded against the network that rejected it, with the network's own error text. Nothing fails silently. Rate limits and short outages are retried automatically, up to five times, and the queue shows when the next try is; any other failure waits for you.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">Several accounts per network</h2>
