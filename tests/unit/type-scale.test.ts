@@ -12,7 +12,10 @@ import { join, resolve } from 'node:path'
  */
 const root = resolve(import.meta.dir, '../..')
 const appViews = [
-  ...readdirSync(join(root, 'resources/views')).filter(name => name.endsWith('.stx') && name !== 'index.stx').map(name => `resources/views/${name}`),
+  // A marketing page is one that extends the marketing layout, wherever it sits.
+  ...readdirSync(join(root, 'resources/views'))
+    .filter(name => name.endsWith('.stx') && !readFileSync(join(root, 'resources/views', name), 'utf8').includes(`@extends('layouts/marketing')`))
+    .map(name => `resources/views/${name}`),
   'resources/components/AppSidebar.stx',
   'resources/layouts/app.stx',
   'resources/layouts/settings.stx',
