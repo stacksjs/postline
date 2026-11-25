@@ -182,6 +182,11 @@
             <Button appearance="mac" variant="danger" @click="signOut">Sign Out</Button>
           </SettingsRow>
         </SettingsGroup>
+        <SettingsGroup footer="Ends every session and revokes every token, on every browser and device, this one included. Use it if a device is lost or a token may have leaked.">
+          <SettingsRow label="Sign out everywhere" setting="sign-out-everywhere" keywords="sessions devices revoke tokens">
+            <Button appearance="mac" variant="danger" @click="signOutEverywhere">Sign Out Everywhere</Button>
+          </SettingsRow>
+        </SettingsGroup>
       </SettingsPane>
     </SettingsWindow>
   </section>
@@ -326,9 +331,9 @@
      * Deliberately a hard navigation rather than stx `navigate()` — signing out
      * should drop all in-memory state, which an SPA transition would preserve.
      */
-    const signOut = async (): Promise<void> => {
+    const endSession = async (endpoint: string): Promise<void> => {
       try {
-        await fetch('/api/logout', { method: 'POST' })
+        await fetch(endpoint, { method: 'POST' })
       }
       catch {}
       signedInMarker.set('')
@@ -337,6 +342,15 @@
       // behind the login screen.
       // stx-strict-ignore-next-line location.assign
       location.assign('/login')
+    }
+
+    const signOut = (): Promise<void> => endSession('/api/logout')
+
+    /** Every session and token, everywhere; then this browser leaves like a normal sign-out. */
+    const signOutEverywhere = async (): Promise<void> => {
+      // stx-strict-ignore-next-line window.confirm
+      if (!window.confirm('Sign out on every browser and device, this one included?')) return
+      await endSession('/api/logout-all')
     }
 
     // --- Automatic deletion ---------------------------------------------

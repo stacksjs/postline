@@ -33,6 +33,9 @@ route.post('/register', 'Actions/Postline/RegisterFirstUserAction').rateLimit(3,
 // would make "sign out" mean "hide the key". Unauthenticated on purpose: a
 // logout carrying a dead cookie should still clear it rather than answer 401.
 route.post('/logout', 'Actions/Auth/LogoutAction')
+// Every session and token the owner has, this browser included (#93). Needs a
+// session: there is nobody to sign out of everywhere without one.
+route.post('/logout-all', 'Actions/Auth/LogoutAllAction').middleware('auth').rateLimit(10, 'minute')
 
 // Hands a browser its CSRF cookie. Every write made with the session cookie
 // has to echo that cookie's value in a header (see CsrfScripts.stx). Pages and
