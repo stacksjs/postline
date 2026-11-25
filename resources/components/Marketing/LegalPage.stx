@@ -1,0 +1,27 @@
+<script server>
+// The frame for the plain-text pages: privacy, what leaves your machine,
+// trademarks. A heading, a date, and the page's own sections in the slot.
+const heading = props.heading || ''
+const updated = props.updated || ''
+const intro = props.intro || ''
+</script>
+
+<template>
+  <article class="mx-auto pb-20 px-5 sm:px-8 max-w-[46rem]">
+    <header class="grid gap-4 pb-10 pt-14 sm:pt-20">
+      <nav class="flex gap-2 items-center text-[13px] text-muted" aria-label="Breadcrumb">
+        <a class="hover:text-ink transition-colors" href="/" data-stx-link>Postline</a>
+      </nav>
+      <h1 class="m-0 leading-[1.06] text-4xl text-ink sm:text-5xl">{{ heading }}</h1>
+      @if (intro)
+        <p class="m-0 leading-relaxed text-[17px] text-body">{{ intro }}</p>
+      @endif
+      @if (updated)
+        <p class="m-0 text-[13px] text-muted">Last updated {{ updated }}</p>
+      @endif
+    </header>
+    <div class="grid gap-8 pt-10 border-line border-t">
+      <slot />
+    </div>
+  </article>
+</template>

@@ -1,0 +1,40 @@
+@extends('layouts/marketing')
+
+@section('title', 'Privacy - Postline')
+@section('description', 'What this website collects, which is one email address if you join the waitlist, and what Postline itself sends anywhere.')
+@section('canonical', 'https://postline.stacksjs.com/privacy')
+
+<script server>
+// Who answers privacy questions. A no-reply sender address is no use here, so
+// this is its own setting; without it the page points at GitHub issues.
+const contact = String(process.env.PRIVACY_CONTACT_EMAIL || '').trim()
+</script>
+
+@section('content')
+  <LegalPage heading="Privacy" updated="24 November 2026" intro="This page covers two things: this website, and the Postline app you run yourself. They are different, so they are described apart.">
+    <section class="grid gap-3">
+      <h2 class="m-0 text-2xl text-ink">This website</h2>
+      <p class="m-0 leading-relaxed text-[16px] text-body">Reading these pages collects nothing about you: no analytics, no advertising, no tracking, and no scripts from other companies. The one cookie it sets, <code class="font-mono text-[14px]">X-CSRF-Token</code>, is a random value that stops other sites from submitting its forms in your name; it says nothing about you. Like any web server, the one hosting this site sees your network address and the page you asked for, and uses them only to send you the page.</p>
+    </section>
+
+    <section class="grid gap-3">
+      <h2 class="m-0 text-2xl text-ink">The waitlist</h2>
+      <p class="m-0 leading-relaxed text-[16px] text-body">If you join the waitlist for the hosted plan we keep your email address, when you joined, and that it came from this site. We send one email to confirm the address. Until you click its link you are not on the list and get nothing else.</p>
+      <p class="m-0 leading-relaxed text-[16px] text-body">Once confirmed, we use the address for one thing: telling you when the hosted plan opens, and what it costs. It is not sold, shared, or added to any other list. Every email has a one-click unsubscribe link; unsubscribing stops all email from us. To have the address deleted outright, ask at the contact below and it is removed within 30 days.</p>
+    </section>
+
+    <section class="grid gap-3">
+      <h2 class="m-0 text-2xl text-ink">The Postline app</h2>
+      <p class="m-0 leading-relaxed text-[16px] text-body">The app runs on your own computer or server. Your posts, accounts, keys and history are stored there, in its database, and we never receive them. What the app sends, and to whom, is listed on <a class="text-ink underline underline-offset-4" href="/your-data" data-stx-link>What leaves your machine</a>.</p>
+    </section>
+
+    <section class="grid gap-3">
+      <h2 class="m-0 text-2xl text-ink">Contact</h2>
+      @if (contact)
+        <p class="m-0 leading-relaxed text-[16px] text-body">Questions or deletion requests: <a class="text-ink underline underline-offset-4" href="mailto:{{ contact }}">{{ contact }}</a>, or an issue on <a class="text-ink underline underline-offset-4" href="https://github.com/stacksjs/postline/issues">GitHub</a> for anything that need not be private.</p>
+      @else
+        <p class="m-0 leading-relaxed text-[16px] text-body">Questions: open an issue on <a class="text-ink underline underline-offset-4" href="https://github.com/stacksjs/postline/issues">GitHub</a>. For a deletion request, reply to any email we sent you.</p>
+      @endif
+    </section>
+  </LegalPage>
+@endsection

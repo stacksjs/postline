@@ -1,0 +1,15 @@
+@extends('layouts/marketing')
+
+@section('title', 'Trademarks - Postline')
+@section('description', 'The network names and logos on this site belong to their owners. Postline is not affiliated with or endorsed by them.')
+@section('canonical', 'https://postline.stacksjs.com/trademarks')
+
+@section('content')
+  <LegalPage heading="Trademarks" updated="24 November 2026">
+    <section class="grid gap-3">
+      <p class="m-0 leading-relaxed text-[16px] text-body">Bluesky, X, LinkedIn, Instagram, Threads, Mastodon and the other names and logos shown on this site and in the app are trademarks of their respective owners. They are used only to say which networks Postline can publish to.</p>
+      <p class="m-0 leading-relaxed text-[16px] text-body">Postline is an independent open-source project. It is not affiliated with, sponsored by, or endorsed by any of those companies or projects.</p>
+      <p class="m-0 leading-relaxed text-[16px] text-body">Postline's own code is MIT licensed; see the <a class="text-ink underline underline-offset-4" href="https://github.com/stacksjs/postline/blob/main/LICENSE.md">license</a>.</p>
+    </section>
+  </LegalPage>
+@endsection

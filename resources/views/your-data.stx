@@ -1,0 +1,33 @@
+@extends('layouts/marketing')
+
+@section('title', 'What leaves your machine - Postline')
+@section('description', 'Every place the Postline app sends data: the networks you connect, an AI provider if you add a key, and nothing else unless you turn it on.')
+@section('canonical', 'https://postline.stacksjs.com/your-data')
+
+@section('content')
+  <LegalPage heading="What leaves your machine" updated="24 November 2026" intro="Postline keeps your data in its own database on the computer it runs on. This is the complete list of what it sends elsewhere, and when. Nothing goes to us.">
+    <section class="grid gap-3">
+      <h2 class="m-0 text-2xl text-ink">Always, when you use them</h2>
+      <ul class="grid gap-3 m-0 pl-5 leading-relaxed list-disc text-[16px] text-body marker:text-muted">
+        <li><span class="text-ink">The networks you connect.</span> Bluesky, X, LinkedIn, Instagram, Threads and Mastodon receive what you publish to them, through their own APIs, using the app keys and sign-ins you set up. Postline also asks them for your posts' engagement, your messages, and the results of keyword searches you create.</li>
+        <li><span class="text-ink">Pages you link to.</span> When a post contains a link, Postline fetches that page once to show a preview card.</li>
+      </ul>
+    </section>
+
+    <section class="grid gap-3">
+      <h2 class="m-0 text-2xl text-ink">Only if you turn them on</h2>
+      <ul class="grid gap-3 m-0 pl-5 leading-relaxed list-disc text-[16px] text-body marker:text-muted">
+        <li><span class="text-ink">An AI provider.</span> If you add an Anthropic, OpenAI or other provider key for campaign planning, the brief you write and the channels it is for are sent to that provider when you ask for a plan. Without a key nothing is sent and plans come from templates.</li>
+        <li><span class="text-ink">Temporary image links.</span> Instagram and Threads fetch images from a public address. If you switch on temporary image links in Settings, an image is reachable through a short-lived tunnel for the minutes it takes them to fetch it, then the link closes.</li>
+        <li><span class="text-ink">An alert webhook.</span> If you set <code class="font-mono text-[14px]">POSTLINE_ALERT_WEBHOOK_URL</code>, problems that need your attention (a failed post, an account that needs reconnecting) are sent to that address.</li>
+        <li><span class="text-ink">Email.</span> If you configure a mail server, the emails Postline sends go through it.</li>
+      </ul>
+    </section>
+
+    <section class="grid gap-3">
+      <h2 class="m-0 text-2xl text-ink">Never</h2>
+      <p class="m-0 leading-relaxed text-[16px] text-body">No analytics, crash reports or usage data are sent to us or anyone else. Your network keys and tokens are stored encrypted in your database and only ever sent to the network they belong to. Disconnecting an account deletes its tokens from Postline; to cut off access at the network as well, remove the app in that network's own settings.</p>
+      <p class="m-0 leading-relaxed text-[16px] text-body">The source is open, so each line above can be checked: <a class="text-ink underline underline-offset-4" href="https://github.com/stacksjs/postline">github.com/stacksjs/postline</a>.</p>
+    </section>
+  </LegalPage>
+@endsection

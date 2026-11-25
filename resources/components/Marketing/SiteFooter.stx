@@ -50,6 +50,11 @@ const year = new Date().getFullYear()
     <div class="border-line border-t">
       <div class="flex flex-wrap gap-x-6 gap-y-2 items-center justify-between mx-auto px-5 py-6 sm:px-8 max-w-[1200px] text-[13px] text-muted">
         <p class="m-0">&copy; {{ year }} Postline. MIT licensed.</p>
+        <nav class="flex flex-wrap gap-x-5 gap-y-2" aria-label="Legal">
+          <a class="hover:text-ink transition-colors" href="/privacy" data-stx-link>Privacy</a>
+          <a class="hover:text-ink transition-colors" href="/your-data" data-stx-link>What leaves your machine</a>
+          <a class="hover:text-ink transition-colors" href="/trademarks" data-stx-link>Trademarks</a>
+        </nav>
         <p class="m-0">Built with <a class="text-body underline underline-offset-4 hover:text-ink" href="https://stacksjs.com">Stacks</a>.</p>
       </div>
     </div>
