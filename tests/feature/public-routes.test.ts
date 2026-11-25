@@ -33,6 +33,9 @@ const APP_PUBLIC = [
 
 /** Registered by the framework itself, whatever the app's route files say. */
 const FRAMEWORK_PUBLIC = [
+  // The button in the waitlist's double opt-in email. Its token is the
+  // pending membership's own, so it confirms that address and nothing else.
+  'GET /api/email/confirm',
   'GET /_stacks/email/unsubscribe/{token}',
   'POST /_stacks/email/unsubscribe/{token}',
   'GET /_stacks/mail/preview',
