@@ -1,5 +1,5 @@
 import type { PublicAccount } from '../../Support/Social/accounts'
-import type { CrosspostTargetResult, PublishContent } from '../../Support/Social/types'
+import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { log } from '@stacksjs/logging'
 import { env } from '@stacksjs/env'
@@ -301,6 +301,32 @@ export class ThreadsService {
       }).where('id', '=', target.id).execute()
 
       return { provider: 'threads', ok: false, error: message, targetId: Number(target.id), retry: classifyFailure(error), ...account }
+    }
+  }
+
+  /**
+   * Deleting for cleanup (#133). Threads can delete a post, but it has no
+   * endpoint that lists an account's whole history to Postline, so cleanup
+   * works on the posts Postline published (the default scope), not on
+   * everything ever posted. Threads allows 100 deletions a day per profile;
+   * PurgeService keeps under that.
+   */
+  async purgeAdapter(identityId?: number | null): Promise<ProviderPurgeAdapter> {
+    const identity = await this.requireIdentity(identityId)
+    const credentials = {
+      handle: identity.handle,
+      did: identity.external_id || undefined,
+      accessToken: identity.access_token || undefined,
+    }
+
+    return {
+      provider: 'threads',
+      identityId: Number(identity.id),
+      handle: identity.handle,
+      listPage: async () => {
+        throw new Error('Threads cannot list your whole post history to Postline. Choose "Posts Postline published" to remove those.')
+      },
+      deletePost: ref => this.driver.deletePost(credentials, ref),
     }
   }
 

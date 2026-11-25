@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { db } from '@stacksjs/database'
 import { PurgeService, postPurge, PURGEABLE_PROVIDERS, purgeConfirmationFor, readPreviewToken } from '../../app/Services/Social/PurgeService'
 
 /**
@@ -11,10 +12,9 @@ import { PurgeService, postPurge, PURGEABLE_PROVIDERS, purgeConfirmationFor, rea
 
 describe('purge safeguards', () => {
   test('only providers whose API can delete are purgeable', () => {
-    expect(PURGEABLE_PROVIDERS).toEqual(['bluesky', 'twitter', 'mastodon', 'linkedin'])
+    expect(PURGEABLE_PROVIDERS).toEqual(['bluesky', 'twitter', 'mastodon', 'linkedin', 'threads'])
     // Neither can delete a feed post through its API at all.
     expect(PURGEABLE_PROVIDERS).not.toContain('instagram')
-    expect(PURGEABLE_PROVIDERS).not.toContain('threads')
   })
 
   test('the blog is never purgeable', () => {
@@ -55,13 +55,14 @@ describe('purge safeguards', () => {
 
 
 /** A connected account with `count` posts, which records what was deleted. */
-function fakeNetwork(count: number) {
+function fakeNetwork(count: number, provider = 'bluesky') {
   const posts = Array.from({ length: count }, (_, index) => ({ uri: `at://me/post/${index}`, cid: `c${index}`, postedAt: '2020-01-01T00:00:00Z' }))
   const deleted: string[] = []
   const service = new PurgeService() as any
+  service.deleteDelayMs = 0
   service.accountsFor = async () => [{ id: 1, isDefault: true }]
   service.adapterFor = async () => ({
-    provider: 'bluesky',
+    provider,
     identityId: 1,
     handle: 'me.example.com',
     listPage: async (cursor?: string) => cursor ? { posts: [] } : { posts: posts.filter(post => !deleted.includes(post.uri)), cursor: 'next' },
@@ -152,6 +153,8 @@ describe('a run in the background', () => {
 
   test('stopping it leaves the rest of the posts alone', async () => {
     const { service, deleted } = fakeNetwork(6)
+    // The real pause between deletes, so there is time to stop after the first.
+    ;(service as any).deleteDelayMs = 250
     const preview = await service.preview({ providers: ['bluesky'], scope: 'all' })
     const started = service.start({ providers: ['bluesky'], scope: 'all', confirmation: preview.confirmation, previewToken: preview.previewToken })
 
@@ -168,5 +171,34 @@ describe('a run in the background', () => {
   test('a run with the wrong phrase never starts', () => {
     const { service } = fakeNetwork(1)
     expect(() => service.start({ providers: ['bluesky'], scope: 'all', confirmation: 'DELETE ALL POSTS' })).toThrow('Run a preview first')
+  })
+})
+
+describe('a network with a daily cap', () => {
+  test('Threads deletes no more than what is left of its 100 a day, and says so', async () => {
+    await (db as any).insertInto('purge_runs').values({
+      uuid: crypto.randomUUID(),
+      provider: 'threads',
+      handle: 'me.example.com',
+      scope: 'tracked',
+      mode: 'execute',
+      status: 'completed',
+      matched_count: 30,
+      deleted_count: 30,
+      failed_count: 0,
+      created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+    }).execute()
+
+    const network = fakeNetwork(150, 'threads')
+    const preview = await network.service.preview({ providers: ['threads'], scope: 'all' })
+    const row = preview.providers[0]!
+
+    expect(row.dailyLimit).toEqual({ limit: 100, remaining: 70 })
+    expect(row.matched).toBe(70)
+    expect(row.truncated).toBe(true)
+
+    const result = await network.service.purge({ providers: ['threads'], scope: 'all', confirmation: purgeConfirmationFor(70), previewToken: preview.previewToken })
+    expect(result.deleted).toBe(70)
+    expect(network.deleted).toHaveLength(70)
   })
 })

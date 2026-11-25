@@ -40,8 +40,10 @@ describe('the deletion lock', () => {
   })
 
   test('sits beside the database, where the API and the scheduler both look', () => {
-    expect(purgeLockPath({ DB_DATABASE_PATH: '/var/lib/postline/postline.sqlite' }, '/srv/app/releases/7')).toBe('/var/lib/postline/postline-purge.lock')
-    expect(purgeLockPath({ DB_DATABASE_PATH: 'database/postline.sqlite' }, '/srv/app')).toBe('/srv/app/database/postline-purge.lock')
+    expect(purgeLockPath({ DB_DATABASE_PATH: '/var/lib/postline/postline.sqlite' }, '/srv/app/releases/7')).toBe('/var/lib/postline/postline.sqlite.purge.lock')
+    expect(purgeLockPath({ DB_DATABASE_PATH: 'database/postline.sqlite' }, '/srv/app')).toBe('/srv/app/database/postline.sqlite.purge.lock')
+    // Two databases in one folder (test databases in the temp folder) never share a lock.
+    expect(purgeLockPath({ DB_DATABASE_PATH: '/tmp/a.sqlite' }, '/')).not.toBe(purgeLockPath({ DB_DATABASE_PATH: '/tmp/b.sqlite' }, '/'))
     expect(purgeLockPath({}, '/srv/app')).toBe('/srv/app/storage/framework/runtime/postline-purge.lock')
   })
 })

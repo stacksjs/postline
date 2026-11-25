@@ -7,6 +7,7 @@ import { acquirePurgeLock } from '../../Support/Social/purge-lock'
 import { bluesky } from './BlueskyService'
 import { linkedin } from './LinkedInService'
 import { mastodon } from './MastodonService'
+import { threads } from './ThreadsService'
 import { ensureAccount, now, uuid } from './support'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { twitter } from './TwitterService'
@@ -99,7 +100,7 @@ export function readPreviewToken(token: unknown, expected: { scope: PurgeScope, 
 }
 
 /** Providers whose API can delete a post the account authored. */
-export const PURGEABLE_PROVIDERS: SocialProvider[] = ['bluesky', 'twitter', 'mastodon', 'linkedin']
+export const PURGEABLE_PROVIDERS: SocialProvider[] = ['bluesky', 'twitter', 'mastodon', 'linkedin', 'threads']
 
 /**
  * Why the remaining providers can't take part, shown verbatim in the UI.
@@ -111,10 +112,18 @@ export const PURGEABLE_PROVIDERS: SocialProvider[] = ['bluesky', 'twitter', 'mas
  */
 const UNSUPPORTED_REASONS: Partial<Record<SocialProvider, string>> = {
   instagram: 'The Instagram Graph API cannot delete feed posts — remove them in the Instagram app.',
-  threads: 'The Threads API cannot delete posts — remove them in the Threads app.',
   facebook: 'Facebook is not a connected publishing target.',
   tiktok: 'TikTok is not a connected publishing target.',
   blog: 'Blog posts are managed from the blog, not the purge tool.',
+}
+
+/**
+ * Networks that cap deletions per day. Threads allows 100 in 24 hours per
+ * profile (#133); past that it refuses, so a run trims itself to what is
+ * left and the preview says so.
+ */
+export const DAILY_DELETE_LIMITS: Partial<Record<SocialProvider, number>> = {
+  threads: 100,
 }
 
 /** Hard ceiling on one run, so a runaway loop can't delete unboundedly. */
@@ -166,6 +175,8 @@ export interface PurgeProviderResult {
   sample: Array<{ uri: string, text?: string, postedAt?: string }>
   errors: string[]
   skippedReason?: string
+  /** For a network with a daily cap: the cap, and how many deletions are left in the last 24 hours. */
+  dailyLimit?: { limit: number, remaining: number }
 }
 
 export interface PurgeResult {
@@ -265,6 +276,9 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 export class PurgeService {
+  /** The pause between deletes. Tests set it to 0. */
+  deleteDelayMs = DELETE_DELAY_MS
+
   /**
    * Dry run: what a purge *would* delete, per provider, without touching
    * anything remote. Safe to call freely — it still writes a `preview` audit
@@ -529,6 +543,16 @@ export class PurgeService {
       candidates = candidates.slice(0, MAX_DELETIONS_PER_RUN)
     }
 
+    const dailyCap = DAILY_DELETE_LIMITS[provider]
+    if (dailyCap) {
+      const remaining = Math.max(0, dailyCap - await this.deletedInLastDay(provider, result.handle))
+      result.dailyLimit = { limit: dailyCap, remaining }
+      if (candidates.length > remaining) {
+        result.truncated = true
+        candidates = candidates.slice(0, remaining)
+      }
+    }
+
     result.matched = candidates.length
     result.sample = candidates.slice(0, 5).map(candidate => ({
       uri: candidate.uri,
@@ -567,7 +591,7 @@ export class PurgeService {
         }
       }
 
-      if (index < candidates.length - 1) await sleep(DELETE_DELAY_MS)
+      if (index < candidates.length - 1) await sleep(this.deleteDelayMs)
     }
 
     // In `all` scope the local targets are gone remotely by definition, so
@@ -596,6 +620,7 @@ export class PurgeService {
     if (provider === 'twitter') return await twitter.purgeAdapter(identityId)
     if (provider === 'mastodon') return await mastodon.purgeAdapter(identityId)
     if (provider === 'linkedin') return await linkedin.purgeAdapter(identityId)
+    if (provider === 'threads') return await threads.purgeAdapter(identityId)
     throw new Error(`${provider} cannot delete posts through its API.`)
   }
 
@@ -738,6 +763,18 @@ export class PurgeService {
   }
 
   /** Write the audit row. Never throws — a logging failure must not mask a purge. */
+  /** Deletions this account made on a network in the last 24 hours, from the run log. */
+  private async deletedInLastDay(provider: SocialProvider, handle: string | null): Promise<number> {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+    let query = database.selectFrom('purge_runs').select(['deleted_count'])
+      .where('provider', '=', provider)
+      .where('mode', '=', 'execute')
+      .where('created_at', '>=', since)
+    if (handle) query = query.where('handle', '=', handle)
+    const rows = await query.execute()
+    return rows.reduce((total: number, row: { deleted_count: unknown }) => total + (Number(row.deleted_count) || 0), 0)
+  }
+
   private async recordRun(
     result: PurgeProviderResult,
     context: RunContext,

@@ -468,6 +468,18 @@
 
     const purgeResultRows = state([])
 
+    /**
+     * Why a run stops short. A network's daily cap (Threads: 100 a day) is
+     * named with what is left, so a short run does not look like a bug.
+     */
+    const purgeCapNote = (row) => {
+      if (row.dailyLimit && row.truncated)
+        return ` now; ${row.provider} allows ${row.dailyLimit.limit} deletions a day, ${row.dailyLimit.remaining} left today, so run again tomorrow for the rest`
+      if (row.dailyLimit)
+        return ` (${row.provider} allows ${row.dailyLimit.limit} deletions a day; ${row.dailyLimit.remaining} left today)`
+      return row.truncated ? ' (capped at 2000 per run — run again for the rest)' : ''
+    }
+
     /** One purge-result row flattened to exactly what the template renders. */
     const purgeRows = derived(() => purgeResultRows().map((row) => ({
       heading: row.handle ? `${row.provider} — ${row.handle}` : row.provider,
@@ -477,7 +489,7 @@
         ? row.skippedReason
         : !row.supported || !row.connected
             ? 'Not available.'
-            : `${row.matched} post${row.matched === 1 ? '' : 's'} would be deleted${row.truncated ? ' (capped at 2000 per run — run again for the rest)' : ''}.`,
+            : `${row.matched} post${row.matched === 1 ? '' : 's'} would be deleted${purgeCapNote(row)}.`,
     })))
 
     ;(() => {

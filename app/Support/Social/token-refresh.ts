@@ -16,7 +16,7 @@
  * any other reason (the network is down) is logged and tried again later.
  */
 import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from 'node:fs'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import process from 'node:process'
 import { log } from '@stacksjs/logging'
 
@@ -79,12 +79,12 @@ export function isRefusedRefresh(error: unknown): boolean {
   return /invalid_grant|invalid_token|token (?:has )?(?:expired|been revoked)/i.test(message)
 }
 
+/** Beside the database and named after it, so two databases never share a lock (see purge-lock.ts). */
 function lockPath(identityId: number): string {
   const database = String(process.env.DB_DATABASE_PATH || '').trim()
-  const folder = database
-    ? dirname(isAbsolute(database) ? database : resolve(process.cwd(), database))
-    : join(process.cwd(), 'storage/framework/runtime')
-  return join(folder, `postline-token-${identityId}.lock`)
+  if (!database) return join(process.cwd(), 'storage/framework/runtime', `postline-token-${identityId}.lock`)
+  const file = isAbsolute(database) ? database : resolve(process.cwd(), database)
+  return join(dirname(file), `${basename(file)}.token-${identityId}.lock`)
 }
 
 function takeLock(path: string): (() => void) | null {

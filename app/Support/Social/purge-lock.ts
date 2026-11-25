@@ -8,18 +8,23 @@
  * as left behind by a process that died.
  */
 import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from 'node:fs'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import process from 'node:process'
 
 /** Longer than a full run: 2,000 deletions per account at a quarter second each, with room to spare. */
 export const PURGE_LOCK_STALE_MS = 2 * 60 * 60 * 1000
 
+/**
+ * One lock per database, beside it and named after it. A fixed name in the
+ * database's folder made every database in one folder share a lock: test
+ * databases all live in the temp folder, so one interrupted test run blocked
+ * deleting for the next two hours.
+ */
 export function purgeLockPath(env: Record<string, string | undefined> = process.env, cwd: string = process.cwd()): string {
   const database = String(env.DB_DATABASE_PATH || '').trim()
-  const folder = database
-    ? dirname(isAbsolute(database) ? database : resolve(cwd, database))
-    : join(cwd, 'storage/framework/runtime')
-  return join(folder, 'postline-purge.lock')
+  if (!database) return join(cwd, 'storage/framework/runtime', 'postline-purge.lock')
+  const file = isAbsolute(database) ? database : resolve(cwd, database)
+  return join(dirname(file), `${basename(file)}.purge.lock`)
 }
 
 /**
