@@ -527,36 +527,65 @@ export class CampaignService {
     }
   }
 
+  /**
+   * Queue a campaign's ready posts, all of them or none.
+   *
+   * Every post is checked first and every problem is reported together: one
+   * still an idea, a time already past, Instagram without an image. With any
+   * problem nothing is queued, so a campaign is never half on the calendar.
+   * The writes then run one after another; if one fails anyway, the posts
+   * queued before it are taken back off the queue and the campaign is left
+   * as it was.
+   */
   async activate(id: number): Promise<{ queued: number, skipped: number, errors: string[] }> {
     const { campaign, posts } = await this.get(id)
-    let queued = 0
     let skipped = 0
     const errors: string[] = []
+    const ready: Array<{ item: (typeof posts)[number], schedule: string }> = []
 
     for (const item of posts) {
       if (item.postId || item.status === 'skipped') {
         skipped++
         continue
       }
-      try {
-        const schedule = zonedTimestampToUtc(sqliteTimestamp(item.scheduledAt), campaign.timezone)
-        if (schedule <= now()) throw new Error('time is in the past')
-        // Instagram rejects a post without an image, and a planned post
-        // cannot carry one yet. Queued, it would sit there until its time and
-        // then fail. Better to say so now, while the plan can still change.
-        if (item.providers.some(provider => String(provider).split(':')[0] === 'instagram'))
-          throw new Error('Instagram needs an image, which a planned post cannot have yet. Remove Instagram from this post, or schedule it from the composer.')
-        const result = await postQueue.save({ text: item.body, title: item.title, providers: item.providers, scheduledAt: schedule })
-        await database.updateTable('campaign_posts').set({ post_id: result.postId, status: 'queued', updated_at: now() }).where('id', '=', item.id).execute()
-        queued++
-      }
-      catch (error) {
-        errors.push(`${item.title}: ${error instanceof Error ? error.message : String(error)}`)
-      }
+      const problems: string[] = []
+      if (item.status !== 'ready')
+        problems.push('still an idea; mark it ready to queue it')
+      const schedule = zonedTimestampToUtc(sqliteTimestamp(item.scheduledAt), campaign.timezone)
+      if (schedule <= now())
+        problems.push('its time has already passed')
+      // Instagram rejects a post without an image, and a planned post cannot
+      // carry one yet. Queued, it would sit there until its time and then fail.
+      if (item.providers.some(provider => String(provider).split(':')[0] === 'instagram'))
+        problems.push('Instagram needs an image, which a planned post cannot have yet; remove Instagram from it, or schedule it from the composer')
+      if (problems.length)
+        errors.push(`${item.title}: ${problems.join('; ')}`)
+      else
+        ready.push({ item, schedule })
     }
 
-    if (queued) await this.update(id, { status: 'active' })
-    return { queued, skipped, errors }
+    if (errors.length || !ready.length)
+      return { queued: 0, skipped, errors }
+
+    const done: Array<{ campaignPostId: number, postId: number }> = []
+    try {
+      for (const { item, schedule } of ready) {
+        const result = await postQueue.save({ text: item.body, title: item.title, providers: item.providers, scheduledAt: schedule })
+        done.push({ campaignPostId: item.id, postId: result.postId })
+        await database.updateTable('campaign_posts').set({ post_id: result.postId, status: 'queued', updated_at: now() }).where('id', '=', item.id).execute()
+      }
+    }
+    catch (error) {
+      for (const entry of done.reverse()) {
+        await postQueue.remove(entry.postId).catch(() => {})
+        await database.updateTable('campaign_posts').set({ post_id: null, status: 'ready', updated_at: now() }).where('id', '=', entry.campaignPostId).execute().catch(() => {})
+      }
+      const message = error instanceof Error ? error.message : String(error)
+      return { queued: 0, skipped, errors: [`Nothing was queued: ${message}`] }
+    }
+
+    await this.update(id, { status: 'active' })
+    return { queued: done.length, skipped, errors }
   }
 }
 

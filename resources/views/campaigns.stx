@@ -210,7 +210,7 @@
           </div>
 
           <div class="campaign-schedule-box" x-show="unqueuedCount()">
-            <div><strong>Ready for the queue?</strong><p>This creates scheduled posts. Future edits move to Queue.</p></div>
+            <div><strong>Ready for the queue?</strong><p>Every post must be marked ready and dated in the future. Scheduling is all or nothing; future edits move to Queue.</p></div>
             <button type="button" :disabled="busy()" @click="activateCampaign">
               <span class="i-hugeicons-calendar-check-in-01" aria-hidden="true"></span>
               <span :text="busyAction() === 'activate' ? 'Scheduling...' : `Schedule ${unqueuedCount()} posts`"></span>
@@ -736,8 +736,12 @@
       try {
         const data = await api('/api/postline/campaigns/activate', { campaign_id: campaign().id })
         await loadCampaigns(campaign().id)
-        const detail = data.errors.length ? `${data.queued} scheduled. ${data.errors.length} need attention.` : `${data.queued} posts are now in Queue.`
-        showNotice(data.errors.length ? 'Campaign partly scheduled' : 'Campaign scheduled', detail, data.errors.length ? 'error' : 'success')
+        // Activation is all or nothing: with any problem, nothing was queued,
+        // and every problem is listed so they can be fixed in one pass.
+        if (data.errors.length)
+          showNotice('Nothing was scheduled', data.errors.join(' · '), 'error')
+        else
+          showNotice('Campaign scheduled', `${data.queued} posts are now in Queue.`, 'success')
       }
       catch (error) {
         showNotice('Could not schedule campaign', error instanceof Error ? error.message : String(error), 'error')
