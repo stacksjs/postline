@@ -76,7 +76,7 @@ describe('retention settings', () => {
 
   test('by default a schedule touches every network that can delete, never the blog', () => {
     expect(DEFAULT_RETENTION_PROVIDERS).not.toContain('blog')
-    expect(DEFAULT_RETENTION_PROVIDERS).toEqual(['bluesky', 'twitter', 'mastodon', 'linkedin'])
+    expect(DEFAULT_RETENTION_PROVIDERS).toEqual(['bluesky', 'twitter', 'mastodon', 'linkedin', 'threads'])
   })
 })
 
