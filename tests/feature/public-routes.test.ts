@@ -37,6 +37,12 @@ const FRAMEWORK_PUBLIC = [
   // The button in the waitlist's double opt-in email. Its token is the
   // pending membership's own, so it confirms that address and nothing else.
   'GET /api/email/confirm',
+  // The framework's newsletter signup and unsubscribe. Mounted on every
+  // deployment for now; the next step turns them off outside the marketing
+  // site, as the waitlist already is.
+  'POST /api/email/subscribe',
+  'GET /api/email/unsubscribe',
+  'POST /api/email/unsubscribe',
   'GET /_stacks/email/unsubscribe/{token}',
   'POST /_stacks/email/unsubscribe/{token}',
   'GET /_stacks/mail/preview',

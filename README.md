@@ -98,6 +98,14 @@ else depends on it, so start with one.
 
 OAuth callbacks are `https://<your host>/api/postline/<network>/callback`.
 
+### AI for campaign planning
+
+Optional. Campaign planning drafts posts with Anthropic, OpenAI or a local
+Ollama model when one is set up, and with a built-in planner otherwise. Set it
+in **Settings > AI** (the key is stored encrypted), or in `.env` with
+`AI_PROVIDER`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `OLLAMA_HOST`. Settings
+wins when both are set. The Mac app reads no `.env`, so it uses Settings.
+
 ## Commands
 
 | Command | What it does |

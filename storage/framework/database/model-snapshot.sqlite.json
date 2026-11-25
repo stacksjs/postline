@@ -128,6 +128,37 @@
             "isNullable": true,
             "hasDefault": true,
             "defaultValue": false
+          },
+          {
+            "name": "ai_provider",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "enumValues": [
+              "",
+              "anthropic",
+              "openai",
+              "ollama"
+            ]
+          },
+          {
+            "name": "ai_api_key",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "ai_model",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 120
           }
         ],
         "indexes": [
@@ -2646,7 +2677,7 @@
       }
     ]
   },
-  "hash": "9c9cb513acfab853dcf61078a4901b6fdb1456f2aa1244f78dc07fcdb9404f21",
+  "hash": "6124c0a2f74369a30652c2164725606fd88f2b7b93ffb44625e5a95cca2e5b51",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-24T22:23:23.232Z"
+  "updatedAt": "2026-11-25T23:06:40.400Z"
 }

@@ -46,6 +46,29 @@ export default defineModel({
       validation: { rule: schema.boolean().optional() },
       factory: () => false,
     },
+    // The AI provider for campaign planning, chosen in Settings (#138). Empty
+    // means the environment's AI_PROVIDER / ANTHROPIC_API_KEY / OPENAI_API_KEY
+    // decide, as before; the Mac app has no environment, so it needs these.
+    aiProvider: {
+      required: false,
+      fillable: true,
+      validation: { rule: schema.enum(['', 'anthropic', 'openai', 'ollama']).optional() },
+      factory: () => '',
+    },
+    // Sealed with the instance key (token-vault), never returned to the browser.
+    aiApiKey: {
+      required: false,
+      fillable: true,
+      hidden: true,
+      validation: { rule: schema.string().max(4096).optional() },
+      factory: () => '',
+    },
+    aiModel: {
+      required: false,
+      fillable: true,
+      validation: { rule: schema.string().max(120).optional() },
+      factory: () => '',
+    },
     defaultAudience: {
       required: true,
       fillable: true,

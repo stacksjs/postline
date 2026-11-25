@@ -163,6 +163,8 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/alerts/read', 'Actions/Postline/AlertReadAction').middleware('auth').rateLimit(60, 'minute')
   route.get('/settings/workspace', 'Actions/Postline/WorkspaceGetAction').middleware('auth')
   route.post('/settings/workspace', 'Actions/Postline/WorkspaceSaveAction').middleware('auth').rateLimit(30, 'minute')
+  route.get('/settings/ai', 'Actions/Postline/AISettingsGetAction').middleware('auth')
+  route.post('/settings/ai', 'Actions/Postline/AISettingsSaveAction').middleware('auth').rateLimit(30, 'minute')
   route.get('/settings/retention', 'Actions/Postline/RetentionGetAction').middleware('auth')
   route.post('/settings/retention', 'Actions/Postline/RetentionSaveAction').middleware('auth').rateLimit(30, 'minute')
 })

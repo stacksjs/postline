@@ -8,7 +8,7 @@ export default new Action({
   method: 'GET',
 
   async handle() {
-    const configuration = campaignAI.configuration()
+    const configuration = await campaignAI.configuration()
     return response.json({
       ok: true,
       data: {

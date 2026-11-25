@@ -26,6 +26,7 @@
         <SettingsSidebarGroup>
           <SettingsSidebarItem id="channels" label="Channels" icon="i-lucide-share-2" tone="blue" keywords="accounts networks bluesky linkedin mastodon threads instagram" />
           <SettingsSidebarItem id="composer" label="Composer" icon="i-lucide-pen-line" tone="orange" />
+          <SettingsSidebarItem id="ai" label="AI" icon="i-lucide-sparkles" tone="purple" keywords="anthropic openai ollama claude api key campaign planner" />
           <SettingsSidebarItem id="deletion" label="Automatic Deletion" icon="i-lucide-trash-2" tone="red" keywords="retention delete cleanup" />
         </SettingsSidebarGroup>
         <div x-show="!ownWindow()">
@@ -89,6 +90,35 @@
             <Button appearance="mac" @click="manageChannels">Manage Channels…</Button>
           </SettingsRow>
         </SettingsGroup>
+      </SettingsPane>
+
+      {{--
+        The AI provider campaign planning uses (#138). Saved here, it wins over
+        the environment, which is the only way the Mac app can have one. The
+        key is sealed on the server and never sent back to this page.
+      --}}
+      <SettingsPane id="ai" title="AI">
+        <SettingsGroup footer="Campaign planning sends your brief and the channels it is for to this provider. Without one, plans come from Postline's built-in planner and are labelled that way.">
+          <SettingsRow label="Provider" setting="ai-provider" keywords="anthropic openai ollama">
+            <Select variant="mac" v-model:value="aiProvider" placeholder="" :options="aiProviderOptions" data-ai-provider />
+          </SettingsRow>
+          <div x-show="aiProvider() === 'anthropic' || aiProvider() === 'openai'">
+            <SettingsRow label="API key" :description="aiKeyDescription()" setting="ai-key" keywords="api key secret">
+              <TextInput variant="mac" type="password" autocomplete="off" v-model:value="aiKey" :placeholder="aiHasKey() ? 'Saved' : 'Paste a key'" data-ai-key />
+            </SettingsRow>
+          </div>
+          <div x-show="aiProvider()">
+            <SettingsRow label="Model" description="Leave empty for the default." setting="ai-model" keywords="model claude gpt llama">
+              <TextInput variant="mac" v-model:value="aiModel" maxlength="120" :placeholder="aiModelPlaceholder()" data-ai-model />
+            </SettingsRow>
+          </div>
+          <SettingsRow label="Planning uses" setting="ai-active"><span :text="aiActiveText()" data-ai-active>—</span></SettingsRow>
+        </SettingsGroup>
+        <div class="flex gap-2 items-center justify-end mt-3">
+          <p class="m-0 mr-auto text-xs" :data-tone="aiTone()" x-show="aiMessage()" :text="aiMessage()" role="status" aria-live="polite" data-ai-message></p>
+          <div x-show="aiHasKey()"><Button appearance="mac" :disabled="aiSaving()" @click="removeAiKey">Remove key</Button></div>
+          <Button appearance="mac" variant="primary" :disabled="aiSaving()" @click="saveAi">Save</Button>
+        </div>
       </SettingsPane>
 
       <SettingsPane id="composer" title="Composer">
@@ -407,6 +437,77 @@
       }
     }
 
+    // AI provider for campaign planning (#138). The key field starts empty and
+    // stays empty after saving: the saved key never comes back to the page.
+    const aiProviderOptions = [
+      { value: '', label: 'From the environment' },
+      { value: 'anthropic', label: 'Anthropic' },
+      { value: 'openai', label: 'OpenAI' },
+      { value: 'ollama', label: 'Ollama (on this machine)' },
+    ]
+    const aiProvider = state('')
+    const aiKey = state('')
+    const aiModel = state('')
+    const aiHasKey = state(false)
+    const aiActive = state<{ provider?: string, model?: string, configured?: boolean } | null>(null)
+    const aiSaving = state(false)
+    const aiMessage = state('')
+    const aiTone = state('neutral')
+    const aiKeyDescription = derived(() => aiHasKey() ? 'A key is saved. Paste a new one to replace it.' : 'Stored encrypted on this machine.')
+    const aiModelPlaceholder = derived(() => aiProvider() === 'anthropic' ? 'claude-sonnet-5-5' : aiProvider() === 'openai' ? 'gpt-5.6-terra' : aiProvider() === 'ollama' ? 'llama3.2' : '')
+    const aiActiveText = derived(() => {
+      const active = aiActive()
+      if (!active) return '—'
+      if (!active.configured) return 'The built-in planner (no provider set up)'
+      const name = active.provider === 'openai' ? 'OpenAI' : active.provider === 'ollama' ? 'Ollama' : active.provider === 'anthropic' ? 'Anthropic' : String(active.provider)
+      return active.model ? `${name}, ${active.model}` : name
+    })
+
+    const applyAi = (data: { provider: string, model: string, hasKey: boolean, active?: { provider?: string, model?: string, configured?: boolean } }): void => {
+      aiProvider.set(data.provider || '')
+      aiModel.set(data.model || '')
+      aiHasKey.set(Boolean(data.hasKey))
+      aiActive.set(data.active || null)
+      aiKey.set('')
+    }
+
+    const loadAi = async (): Promise<void> => {
+      try {
+        const response = await fetch('/api/postline/settings/ai')
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the AI settings.')
+        applyAi(payload.data)
+      }
+      catch (error) {
+        aiMessage.set(error instanceof Error ? error.message : String(error))
+        aiTone.set('error')
+      }
+    }
+
+    const sendAi = async (fields: Record<string, string>, done: string): Promise<void> => {
+      aiSaving.set(true)
+      try {
+        const body = new FormData()
+        for (const [key, value] of Object.entries(fields)) body.set(key, value)
+        const response = await fetch('/api/postline/settings/ai', { method: 'POST', body })
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save.')
+        applyAi(payload.data)
+        aiMessage.set(done)
+        aiTone.set('success')
+      }
+      catch (error) {
+        aiMessage.set(error instanceof Error ? error.message : String(error))
+        aiTone.set('error')
+      }
+      finally {
+        aiSaving.set(false)
+      }
+    }
+
+    const saveAi = (): Promise<void> => sendAi({ provider: aiProvider(), model: aiModel().trim(), apiKey: aiKey().trim() }, 'Saved.')
+    const removeAiKey = (): Promise<void> => sendAi({ clearKey: '1' }, 'Key removed.')
+
     const retentionLoaded = state(false)
     const savedEnabled = state(false)
     const savedDays = state(7)
@@ -565,6 +666,7 @@
     onMount(() => {
       void loadWorkspace()
       void loadRetention()
+      void loadAi()
       onDestroy(() => workspace?.close())
 
       // A window with a hidden titlebar moves only when the page hands the
