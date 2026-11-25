@@ -50,6 +50,7 @@
     "make:stack": "./buddy make:stack",
     "key:generate": "./buddy key:generate",
     "commit": "./buddy commit",
+    "publication:check": "bun scripts/publication-check.ts",
     "release": "./buddy release",
     "release:patch": "./buddy release --bump patch",
     "release:minor": "./buddy release --bump minor",
