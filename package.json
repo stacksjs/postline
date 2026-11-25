@@ -66,12 +66,12 @@
     "stx": "./buddy"
   },
   "dependencies": {
-    "@stacksjs/ai": "^0.75.685",
-    "@stacksjs/payments": "0.75.685",
-    "@stacksjs/socials": "^0.75.685",
+    "@stacksjs/ai": "^0.75.687",
+    "@stacksjs/payments": "0.75.687",
+    "@stacksjs/socials": "^0.75.687",
     "@stacksjs/stx": "^0.2.941",
     "@stacksjs/ts-cloud": "^0.16.152",
-    "stacks": "^0.75.685",
+    "stacks": "^0.75.687",
     "ts-images": "^0.2.35",
     "ts-medium-editor": "^0.2.0"
   },

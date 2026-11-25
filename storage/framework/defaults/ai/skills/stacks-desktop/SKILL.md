@@ -565,10 +565,23 @@ applied with `migrateCompiledDatabase` and `DB_CONNECTION`/`DB_DATABASE_PATH` po
 newer version changed, or a migration that fails (the backup is put back), stops the launch with the reason in the
 app's log.
 
+A launch that fails once the instance lock is held (the database, config, the agent module or its `start`) says why in
+a small window of its own as well as the log, since nobody reads the log of an app opened from Finder or a desktop
+entry. The agent is stopped first. The page is static and escaped, served from loopback only while the window is open,
+and names the log file when the log goes to one. The window keeps its titlebar whatever `window.titlebarHidden` says.
+Closing it quits with exit code 1 and releases the lock (`showFailureWindow`, `renderFailurePage`).
+
 `buddy build:desktop` also bundles the project's own scripts that pages load as `src="/assets/....ts"` (every `.stx`
 under `resources/` is read for them): each is built for the browser with what it imports (`appClientScripts`) and
 embedded at the URL the page asks for, served as JavaScript. A page naming a script that is not in `resources/assets`
-fails the build. Config is not bundled yet (stacksjs/stacks#3368).
+fails the build.
+
+`agent.config: true` compiles the project's `config/*.ts` into the app: every file the config loader reads that the
+project has (`appConfigFiles`), each named in a static `import()`. At launch, after the database and before the agent
+module, they are registered with `registerBundledConfig` and loaded, so a built app runs on its own config rather
+than the framework defaults. A file that throws stops the launch with the reason in the log. Either way the app logs
+which config it booted with (`[App] config: app.ts, database.ts compiled into the app; framework defaults for the
+rest`, or `no config/*.ts under <root>` when a built app has none). Off by default.
 
 **Views.** `buddy dev:desktop` serves `agent.views` live through stx (`bun-plugin-stx/serve`, with the gate and the
 agent module in its `onRequest`). `buddy build:desktop` builds them to static pages with stx's `buildStaticSite`
