@@ -127,6 +127,19 @@ unprotected HTTP server. Web middleware declarations are refused by this native
 adapter instead of silently skipped. Writes use the model's validation, fillable
 allowlist and hidden-field serialization; index requests have bounded pagination.
 
+### Migrating a compiled app's own database
+
+A build that ships the framework's generated `.sql` migrations (rather than the
+native model planner above) applies them at launch with
+`migrateCompiledDatabase({ databasePath, migrations, backupDir?, keepBackups? })`
+from `@stacksjs/database/compiled-migrations`, before any framework module loads.
+It runs table rebuilds (`PRAGMA foreign_keys=OFF; BEGIN; ... COMMIT;`) as written,
+backs up with `VACUUM INTO` so writes still in the WAL are kept, refuses a
+database a newer build changed (`NewerSchemaError`, nothing touched), restores the
+backup when a file fails (`MigrationRestoredError`), keeps three backups, and
+records the framework's `migrations` ledger plus `PRAGMA user_version`. Show the
+user the error's message: it says the data was put back and where the copy is.
+
 The launcher Stacks compiles opens a Craft window on the URL in `desktop.json`,
 which is what a hosted Stacks application wants. An app whose subject is the
 machine it runs on - a disk cleaner, a log viewer, a device tool - has no such
@@ -538,6 +551,24 @@ What the launcher (`runWebviewApp`) does, the same on every platform:
 
 `agent.publicPaths` opens paths to callers without the cookie (an MCP endpoint behind its own bearer token). The
 app's handler must authenticate those itself; the views are never served there.
+
+`agent.appRoutes: true` serves the project's own routes from the agent: the route files `app/Routes.ts` registers,
+the actions they name by string and every middleware, imported statically by the generated entry so a built app
+carries them (`appBundleFiles`, the same collector the macOS agent uses). They answer after `agent.entry`; a path no
+route matches (`isUnmatchedRouteResponse` from `@stacksjs/router`) goes on to the views, while a route's own 404 is
+still the app's answer. Off by default.
+
+`agent.database: true` gives the app its own SQLite file, `database.sqlite` in its data directory. The build runs
+`buddy migrate --no-generate` against a scratch file and compiles in exactly the migrations it applied
+(`appMigrationFiles`); at every launch, once the instance lock is held and before the agent module loads, they are
+applied with `migrateCompiledDatabase` and `DB_CONNECTION`/`DB_DATABASE_PATH` point the app at the file. A database a
+newer version changed, or a migration that fails (the backup is put back), stops the launch with the reason in the
+app's log.
+
+`buddy build:desktop` also bundles the project's own scripts that pages load as `src="/assets/....ts"` (every `.stx`
+under `resources/` is read for them): each is built for the browser with what it imports (`appClientScripts`) and
+embedded at the URL the page asks for, served as JavaScript. A page naming a script that is not in `resources/assets`
+fails the build. Config is not bundled yet (stacksjs/stacks#3368).
 
 **Views.** `buddy dev:desktop` serves `agent.views` live through stx (`bun-plugin-stx/serve`, with the gate and the
 agent module in its `onRequest`). `buddy build:desktop` builds them to static pages with stx's `buildStaticSite`

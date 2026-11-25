@@ -8,6 +8,7 @@ export { default as SyncEngagementMetrics } from '../../../app/Jobs/SyncEngageme
 export { default as ExampleJob } from '@stacksjs/defaults/app/Jobs/ExampleJob.ts'
 export { default as ExampleTwoJob } from '@stacksjs/defaults/app/Jobs/ExampleTwoJob.ts'
 export { default as GenerateStoragePreviewJob } from '@stacksjs/defaults/app/Jobs/GenerateStoragePreviewJob.ts'
+export { default as Inspire } from '@stacksjs/defaults/app/Jobs/Inspire.ts'
 export { default as OptimizeStorageImageJob } from '@stacksjs/defaults/app/Jobs/OptimizeStorageImageJob.ts'
 export { default as PruneModelsJob } from '@stacksjs/defaults/app/Jobs/PruneModelsJob.ts'
 export { default as PruneQueryLogsJob } from '@stacksjs/defaults/app/Jobs/PruneQueryLogsJob.ts'

@@ -5,13 +5,13 @@
 // resolves. Values are paths rather than import thunks on purpose: thunks
 // would make every compilation that touches a name resolve every module.
 export const emails = {
+  'subscription-confirm': '../../../resources/emails/subscription-confirm.stx',
   'subscription-confirmation': '../../../resources/emails/subscription-confirmation.stx',
   'email-verification': '@stacksjs/defaults/resources/emails/email-verification.stx',
   'license': '@stacksjs/defaults/resources/emails/license.stx',
   'notification': '@stacksjs/defaults/resources/emails/notification.stx',
   'password-changed': '@stacksjs/defaults/resources/emails/password-changed.stx',
   'password-reset': '@stacksjs/defaults/resources/emails/password-reset.stx',
-  'subscription-confirm': '../../../resources/emails/subscription-confirm.stx',
   'team-invitation': '@stacksjs/defaults/resources/emails/team-invitation.stx',
   'welcome': '@stacksjs/defaults/resources/emails/welcome.stx',
   'layouts/base': '@stacksjs/defaults/resources/emails/layouts/base.html',

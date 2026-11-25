@@ -125,7 +125,23 @@ given by URL is downloaded through fetchPostImage (the outbound guard in
 @stacksjs/security) and a URL that gives no image throws PostImageError; tests
 replace a driver's fetchImage. Mastodon's publish takes a third argument
 (idempotencyKey, visibility, spoilerText, language) and reads the instance's
-limits. Bluesky uploads external.thumb for link cards. PublishedPost.warnings
+limits. Bluesky uploads external.thumb for link cards, and its publish takes a
+third argument too: { rkey } from blueskyRecordKey(), kept per post, so a retry
+answers with the post that already went out instead of posting twice. Bluesky
+hashtags take letters from any script (#café, #日本), and images leave a link
+card out with a warning, since a post holds one attachment. A Bluesky account on
+its own PDS signs in there: when no service is configured and bsky.social refuses
+the password, createSession looks the account's PDS up from its DID document
+(resolveBlueskyService), and the session's service is where its posts go.
+Instagram waits for
+each media container to be FINISHED before publishing it (containerTimeoutMs,
+five minutes by default), sends alt text on images and carousel items, refuses an
+image whose mimeType is not JPEG, and looks through every page of the user's
+Facebook Pages for the linked account. Threads deletes with deletePost (the
+threads_delete permission, 100 a day). LinkedIn posts as a company Page when the
+identity's did (the memberUrn setting) is an urn:li:organization URN, with the
+w_organization_social scope; listOrganizations(accessToken) lists the Pages the
+member may post for (rw_organization_admin). PublishedPost.warnings
 lists what went out without failing the post. The LinkedIn version is
 LINKEDIN_API_VERSION unless a configured one is still supported.
 

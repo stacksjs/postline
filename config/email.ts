@@ -329,5 +329,10 @@ export default {
     complaints: true,
   },
 
+  // The hosted-plan waitlist confirms each address by email before it joins
+  // (resources/emails/subscription-confirm.stx). Read when the first signup
+  // creates the default list.
+  newsletter: { doubleOptIn: true },
+
   default: (env.MAIL_MAILER || env.MAIL_DRIVER || 'log') as 'ses' | 'sendgrid' | 'mailgun' | 'mailtrap' | 'smtp' | 'log',
 } satisfies EmailConfig

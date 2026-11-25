@@ -1,7 +1,9 @@
-@extends('layouts/default')
+@extends('layouts/settings')
 
 @section('content')
 @title('Dashboard - Appearance')
 
-<AppearanceSettingsDashboard />
+<DashboardSettingsFrame pane="appearance">
+  <AppearanceSettingsDashboard />
+</DashboardSettingsFrame>
 @endsection

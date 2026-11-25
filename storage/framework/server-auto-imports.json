@@ -61,6 +61,7 @@
     "GiftCard": true,
     "HttpError": true,
     "I18n": true,
+    "Inspire": true,
     "Job": true,
     "JobHeartbeat": true,
     "KeepTokensAlive": true,

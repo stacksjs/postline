@@ -1,3 +1,21 @@
+<script server>
+// What the form shows before its client script has run. Rendered here, so an
+// island (`client="interaction"`) or a page whose script has not loaded yet
+// still has a labelled field and a button that says what it does, and a plain
+// form post carries its source and return address.
+const props = defineProps()
+const initial = {
+  label: props.label || 'Subscribe',
+  placeholder: props.placeholder || 'you@example.com',
+  intro: props.intro || '',
+  fine: props.fine || '',
+  source: props.source || 'website',
+  list: props.list || '',
+  returnTo: props.returnTo || '',
+  buttonClass: `${props.tone === 'outline' ? 'subscribe-form__button--outline ' : ''}${props.buttonClass || ''}`.trim(),
+}
+</script>
+
 <script client>
 /*
  * A newsletter signup, answered in place. Drop it on any page:
@@ -62,6 +80,8 @@ const messages = {
 const outcomes = ['subscribed', 'pending', 'already', 'invalid', 'busy', 'error']
 
 const email = state('')
+// The honeypot. People never see the field; a bot that fills it is answered as if it worked.
+const website = state('')
 const sending = state(false)
 const outcome = state<Outcome | ''>(outcomes.includes(loadedWith()) ? loadedWith() as Outcome : '')
 const tonePositive = derived(() => outcome() === 'subscribed' || outcome() === 'pending' || outcome() === 'already')
@@ -102,7 +122,7 @@ async function send(): Promise<Outcome> {
     const response = await fetch('/api/email/subscribe', {
       method: 'POST',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ email: email(), source: source(), list: list(), return: returnTo() }).toString(),
+      body: new URLSearchParams({ email: email(), source: source(), list: list(), return: returnTo(), website: website() }).toString(),
     })
     let body: { success?: unknown, pending?: unknown, message?: unknown } | null = null
     try {
@@ -140,15 +160,16 @@ async function submit(): Promise<void> {
   :aria-busy="sending() ? 'true' : 'false'"
   @submit.prevent="submit()"
 >
-  <input type="hidden" name="source" :value="source()">
-  <input type="hidden" name="list" :value="list()">
-  <input type="hidden" name="return" :value="returnTo()">
-  <label class="subscribe-form__intro" :class="intro() ? '' : 'subscribe-form__sr'" for="subscribe-email">{{ intro() || 'Email address' }}</label>
+  <input type="hidden" name="source" value="{{ initial.source }}" :value="source()">
+  <input type="hidden" name="list" value="{{ initial.list }}" :value="list()">
+  <input type="hidden" name="return" value="{{ initial.returnTo }}" :value="returnTo()">
+  <input class="subscribe-form__sr" type="text" name="website" value="" tabindex="-1" autocomplete="off" aria-hidden="true" x-model="website">
+  <label class="subscribe-form__intro {{ initial.intro ? '' : 'subscribe-form__sr' }}" :class="intro() ? '' : 'subscribe-form__sr'" for="subscribe-email" :text="intro() || 'Email address'">{{ initial.intro || 'Email address' }}</label>
   <div class="subscribe-form__row">
-    <input id="subscribe-email" ref="emailInput" class="subscribe-form__field" type="email" name="email" :placeholder="placeholder()" autocomplete="email" required x-model.trim="email">
-    <button type="submit" class="subscribe-form__button" :class="(tone() === 'outline' ? 'subscribe-form__button--outline ' : '') + buttonClass()" :disabled="sending()">
+    <input id="subscribe-email" ref="emailInput" class="subscribe-form__field" type="email" name="email" placeholder="{{ initial.placeholder }}" :placeholder="placeholder()" autocomplete="email" required x-model.trim="email">
+    <button type="submit" class="subscribe-form__button {{ initial.buttonClass }}" :class="(tone() === 'outline' ? 'subscribe-form__button--outline ' : '') + buttonClass()" :disabled="sending()">
       <span class="subscribe-form__spinner" aria-hidden="true"></span>
-      <span>{{ label() }}</span>
+      <span :text="label()">{{ initial.label }}</span>
     </button>
   </div>
   <p class="subscribe-form__notice" :class="noticeClass()" role="status" aria-live="polite">

@@ -1,6 +1,6 @@
 ---
 name: stacks-dashboard
-description: Use when building or customizing the Stacks admin dashboard, including dashboard pages, model management views, analytics widgets, commerce dashboards, content management, settings panels, deployment monitoring, job/queue management, or the 447 built-in dashboard components. Covers the dashboard system at storage/framework/defaults/.
+description: Use when building or customizing the Stacks admin dashboard, including dashboard pages, model management views, analytics widgets, commerce dashboards, content management, settings panels, deployment monitoring, job/queue management, or the 452 built-in dashboard components. Covers the dashboard system at storage/framework/defaults/.
 license: MIT
 compatibility: Bun >= 1.3.0, TypeScript
 allowed-tools: Read Edit Write Bash Grep Glob
@@ -8,7 +8,7 @@ allowed-tools: Read Edit Write Bash Grep Glob
 
 # Stacks Dashboard
 
-The Stacks admin dashboard provides a full-featured admin panel with 100+ route views, 447 components, and a multi-section layout.
+The Stacks admin dashboard provides a full-featured admin panel with 100+ route views, 452 components, and a multi-section layout.
 
 ## Key Paths
 - Dashboard components: `storage/framework/defaults/resources/components/Dashboard/`
@@ -549,6 +549,13 @@ and reusable styling in `styles/dashboard-theme.css`. Extend shared components
 with semantic styling hooks or dashboard theme CSS variables so every theme
 can use the same STX navigation, controls and page markup. Use fallbacks that
 match The Original when referencing optional theme variables.
+
+For the `sections` navigation style, build the sidebar links and home cards
+from the same enabled dashboard sections. Each link opens
+`/sections/{section}` with cards for its existing routes, including model
+destinations nested in the expandable sidebar. Apply the same viewer role
+requirements to the cards and sidebar links. Keep mobile navigation on the
+shared sidebar instance.
 
 Both dashboard servers expose the same theme stylesheet and synchronous
 bootstrap. The bootstrap and the appearance picker share the same manifest

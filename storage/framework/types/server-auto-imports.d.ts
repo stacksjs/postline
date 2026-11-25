@@ -149,6 +149,7 @@ declare global {
   const ExampleJob: typeof import('@stacksjs/defaults/app/Jobs/ExampleJob.ts')['default']
   const ExampleTwoJob: typeof import('@stacksjs/defaults/app/Jobs/ExampleTwoJob.ts')['default']
   const GenerateStoragePreviewJob: typeof import('@stacksjs/defaults/app/Jobs/GenerateStoragePreviewJob.ts')['default']
+  const Inspire: typeof import('@stacksjs/defaults/app/Jobs/Inspire.ts')['default']
   const OptimizeStorageImageJob: typeof import('@stacksjs/defaults/app/Jobs/OptimizeStorageImageJob.ts')['default']
   const PruneModelsJob: typeof import('@stacksjs/defaults/app/Jobs/PruneModelsJob.ts')['default']
   const PruneQueryLogsJob: typeof import('@stacksjs/defaults/app/Jobs/PruneQueryLogsJob.ts')['default']

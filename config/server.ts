@@ -10,4 +10,12 @@ import type { ServerConfig } from '@stacksjs/types'
  */
 export default {
   maxRequestBodySize: 12 * 1024 * 1024,
+
+  // Headers on every rendered page: HSTS on a real https host, an opener
+  // policy that still lets OAuth popups report back, and a permissions policy.
+  // The Content-Security-Policy only reports for now, so the browser console
+  // shows what enforcing it would break before it is switched on (#90).
+  security: {
+    csp: 'report-only',
+  },
 } satisfies ServerConfig

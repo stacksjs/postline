@@ -1,0 +1,19 @@
+@extends('layouts/default')
+
+<script server>
+import { buildDashboardSectionHubs } from '@stacksjs/defaults/resources/functions/dashboard/section-navigation'
+import { buildWebSidebarSections } from '@stacksjs/defaults/resources/functions/dashboard/sidebar'
+
+export const hub = buildDashboardSectionHubs(buildWebSidebarSections())
+  .find(section => section.id === (typeof params !== 'undefined' ? params.section : undefined))
+export const sectionTitle = hub ? `Dashboard - ${hub.label}` : 'Section not found'
+</script>
+
+@section('content')
+@title(sectionTitle)
+@if(hub)
+  <DashboardSectionLanding :hub="hub" />
+@else
+  <NotFoundDashboard />
+@endif
+@endsection

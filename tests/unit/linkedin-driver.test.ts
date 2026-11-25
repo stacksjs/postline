@@ -156,10 +156,10 @@ describe('LinkedInDriver.publish', () => {
     expect(cap).toHaveLength(0)
   })
 
-  test('rejects when the identity has no member URN', async () => {
+  test('rejects when the identity has no author URN', async () => {
     const cap: Captured[] = []; mockLinkedInApi(cap)
     const driver = new LinkedInDriver()
-    await expect(driver.publish({ handle: 'glenn', accessToken: 'tok' }, { text: 'hi' })).rejects.toThrow(/member URN/)
+    await expect(driver.publish({ handle: 'glenn', accessToken: 'tok' }, { text: 'hi' })).rejects.toThrow(/URN is required/)
     expect(cap).toHaveLength(0)
   })
 

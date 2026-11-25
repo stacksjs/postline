@@ -14,6 +14,7 @@ declare module '@stacksjs/database' {
       name: string
       workspace_name: string
       timezone: string
+      share_media_by_tunnel: number
       default_audience: "public" | "followers" | "private"
       auto_delete_enabled: number
       auto_delete_days: number
@@ -34,6 +35,18 @@ declare module '@stacksjs/database' {
       properties: string
       ip_address: string
       user_id: number
+    }
+    alerts: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      kind: "post-failed" | "post-missed" | "account-expired"
+      title: string
+      body: string
+      link: string
+      dedupe_key: string
+      read_at: string
     }
     analytics_events: {
       // columns
@@ -878,6 +891,19 @@ declare module '@stacksjs/database' {
       template_id: string
       customer_id: number
     }
+    job_heartbeats: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      job: string
+      last_started_at: string
+      last_finished_at: string
+      last_duration_ms: number
+      last_status: "running" | "ok" | "failed"
+      last_error: string
+      runs: number
+    }
     jobs: {
       // columns
       id: number
@@ -1132,6 +1158,16 @@ declare module '@stacksjs/database' {
       handle: string
       name: string
       site_id: number
+    }
+    network_apps: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      provider: "twitter" | "linkedin" | "instagram" | "threads"
+      client_id: string
+      client_secret: string
+      redirect_url: string
     }
     notification_deliveries: {
       // columns
@@ -1415,6 +1451,8 @@ declare module '@stacksjs/database' {
       remote_uri: string
       remote_cid: string
       failure_reason: string
+      attempts: number
+      next_attempt_at: string
       metrics: unknown
       post_id: number
       social_driver_id: number
@@ -1434,6 +1472,7 @@ declare module '@stacksjs/database' {
       timezone: string
       thread_key: string
       source: "composer" | "import" | "api"
+      content: string
       notes: string
       account_id: number
     }
@@ -1854,6 +1893,7 @@ declare module '@stacksjs/database' {
       display_name: string
       provider: "bluesky" | "twitter" | "mastodon" | "facebook" | "instagram" | "tiktok" | "linkedin" | "threads"
       external_id: string
+      is_default: number
       auth_status: "connected" | "expired" | "revoked" | "missing"
       access_token: string
       refresh_token: string
