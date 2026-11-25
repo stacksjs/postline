@@ -5,10 +5,8 @@
 @section('content')
   @meta('description', 'Sign in to your Postline workspace.')
   @meta('robots', 'noindex, nofollow')
-  {{-- The theme bootstrap that used to live here is now `app.colorMode` in
-      config/ui.ts, so this page gets the same pre-paint stamp as every layout
-      without carrying its own copy. stacksjs/stx#1788, the reason it was
-      hand-rolled, is closed. --}}
+  {{-- The theme is stamped before paint by `app.colorMode` in config/ui.ts,
+      as on every layout. --}}
   <main class="grid place-items-center px-4 min-h-screen bg-bg" data-testid="login-page">
     <section class="grid gap-5 p-6 max-w-sm w-full bg-panel border border-line rounded-2xl shadow-sm">
       <header class="grid gap-2 justify-items-center text-center">

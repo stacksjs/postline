@@ -259,11 +259,6 @@
      * are read off the published config rather than written out again here, so
      * this can no longer drift from config/ui.ts. The literals are only the
      * fallback for the window before the boot script has run.
-     *
-     * Both reasons this view hand-rolled the whole thing are closed:
-     * stacksjs/stx#1788 (class and attribute together, and `autoValue` keeps
-     * this app's 'system' spelling instead of rewriting it to 'auto') and
-     * stacksjs/stx#1794 (there is a pre-paint story now).
      */
     const applyTheme = (pref: ThemePreference): void => {
       const boot = window.__STX_COLOR_MODE__

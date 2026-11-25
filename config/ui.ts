@@ -74,13 +74,8 @@ export default {
      * would leave `data-theme="dark"` on `<html>`, no class, and the entire
      * dark palette silently inert.
      *
-     * Both blockers the old comments cite are closed and shipped:
-     *   - stacksjs/stx#1788 — applyDOM set EITHER darkClass OR attribute, and
-     *     persisted only light|dark|auto. `stamp()` now sets both, and
-     *     `autoValue: 'system'` keeps this app's existing stored vocabulary, so
-     *     nobody's saved preference is rewritten.
-     *   - stacksjs/stx#1794 — useColorMode had no pre-paint story. This boot
-     *     script IS the pre-paint story.
+     * `autoValue: 'system'` keeps this app's stored vocabulary, so nobody's
+     * saved preference is rewritten.
      *
      * Scope, so nobody expects more than it does: the generated script stamps
      * ONCE, before paint, and publishes `window.__STX_COLOR_MODE__` with the
@@ -105,16 +100,10 @@ export default {
     },
   },
 
-  // Surface prohibited DOM access in client scripts. Left as warn-only.
-  // `failOnViolation` MUST stay false until stacksjs/stx#2097 ships: `true`
-  // does not harden this gate, it hides it. validateClientScript throws a
-  // plain Error, which processDirectives catches at process.js:417 — that line
-  // rethrows only StxValidationError, a class the package never constructs —
-  // so the violation lands in createFallbackContent. Measured on 0.2.605: one
-  // prohibited call took a marketing page from 38329 bytes to 9396, no <h1>,
-  // no footer, the body replaced by an error string leaking source paths, at
-  // HTTP 200, with nothing in the server log. With `false` the same violation
-  // prints a warning and the page renders.
+  // Surface prohibited DOM access in client scripts, as warnings for now. The
+  // composer, Channels and the app shell still reach into the DOM directly;
+  // failOnViolation turns on once they are rebuilt on signals (#155, #162,
+  // #172), and until then it would fail those pages.
   strict: {
     enabled: true,
     failOnViolation: false,

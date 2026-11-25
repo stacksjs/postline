@@ -698,11 +698,9 @@ export class QueueService {
     // published because some other network succeeded. Matched per account, so
     // one Bluesky account's row does not hide another's missing one.
     // The provider services insert fresh result rows, so the placeholders have
-    // done their job. (Deleted one-by-one — the query builder mis-compiles
-    // `where in` on DELETE statements.)
-    for (const placeholderId of placeholderIds) {
-      await database.deleteFrom('post_targets').where('id', '=', placeholderId).execute()
-    }
+    // done their job.
+    if (placeholderIds.size)
+      await database.deleteFrom('post_targets').where('id', 'in', [...placeholderIds]).execute()
 
     const written = await database
       .selectFrom('post_targets')
