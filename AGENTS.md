@@ -37,7 +37,7 @@ team (and every agent) sees the same rules.
 
 ### Requirements
 
-Bun >= 1.3.0, SQLite >= 3.47.2, TypeScript throughout.
+Bun >= 1.3.14, SQLite >= 3.47.2, TypeScript throughout.
 
 ---
 

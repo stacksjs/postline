@@ -27,7 +27,7 @@ it post as you never leave it.
 
 ## Requirements
 
-- [Bun](https://bun.sh) 1.3 or newer (`./bootstrap` installs the pinned version through Pantry)
+- [Bun](https://bun.sh) 1.3.14 or newer (`./bootstrap` installs the pinned version through Pantry)
 - SQLite 3.47.2 or newer
 
 ## Getting started
