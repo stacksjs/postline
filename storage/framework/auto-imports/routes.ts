@@ -6,7 +6,12 @@
 // anything that needs to resolve a name without loading the route table.
 //
 // For more information, please visit: https://stacksjs.com/docs
-export const routeNames = {} as const
+export const routeNames = {
+  'email.confirm': '/api/email/confirm',
+  'email.subscribe': '/api/email/subscribe',
+  'email.unsubscribe': '/api/email/unsubscribe',
+  'email.unsubscribe.oneclick': '/api/email/unsubscribe',
+} as const
 
 // Every `route.redirect()` and `route.permanentRedirect()` on a page path. The
 // views server answers these before it looks for a page: it never loads the

@@ -175,6 +175,8 @@ declare module '@stacksjs/database' {
       published_at: string
       post_id: number
       account_id: number
+      access: string
+      preview_chars: number
     }
     board_columns: {
       // columns
@@ -556,6 +558,8 @@ declare module '@stacksjs/database' {
       started_at: string
       completed_at: string
       courier_id: number
+      driver: string
+      driver_id: number | null
     }
     delivery_stops: {
       // columns

@@ -5,12 +5,12 @@
     "": {
       "name": "postline",
       "dependencies": {
-        "@stacksjs/ai": "^0.75.687",
-        "@stacksjs/payments": "0.75.687",
-        "@stacksjs/socials": "^0.75.687",
-        "@stacksjs/stx": "^0.2.941",
+        "@stacksjs/ai": "^0.75.690",
+        "@stacksjs/payments": "0.75.690",
+        "@stacksjs/socials": "^0.75.690",
+        "@stacksjs/stx": "^0.2.944",
         "@stacksjs/ts-cloud": "^0.16.152",
-        "stacks": "^0.75.687",
+        "stacks": "^0.75.690",
         "ts-images": "^0.2.35",
         "ts-medium-editor": "^0.2.0"
       },
@@ -34,7 +34,7 @@
       "name": "hello-world-fx",
       "version": "0.70.40",
       "devDependencies": {
-        "stacks": "^0.75.687"
+        "stacks": "^0.75.690"
       }
     }
   },

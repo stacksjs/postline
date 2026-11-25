@@ -149,6 +149,30 @@ A driver error's isAuthError is narrow; classifySocialError in
 publish-errors.ts sorts any failure by status and body, and only `expired`
 means the account must sign in again (a duplicate post on X is a 403).
 
+Every driver error (BlueskyApiError, TwitterApiError, ...) is a SocialApiError
+from errors.ts: `network`, `status`, the raw `body`, `kind` (the
+classification), `reason` (the network's own sentence) and `retryAfterMs`. Its
+message is the network's reason or the status text, never the raw body.
+`retryAfterMs` reads Retry-After on any answer and, on a rate limit, X's
+`x-rate-limit-reset`, Bluesky's `ratelimit-reset`, Mastodon's
+`x-ratelimit-reset` and Meta's `estimated_time_to_regain_access`. Meta answers
+a rate limit with a 400 ("(#4) Application request limit reached"), which still
+classifies as `rate-limited`.
+
+Engagement is a separate capability, like deletion: `supportsMetrics(driver)`,
+then `driver.metrics(identity, uris)` with any number of `PublishedPost.uri`s,
+answering `PostMetrics` (`likes`, `reposts`, `replies`, `quotes`, `views`,
+`shares`). A count the network does not report is absent, not zero, and a post
+that is gone is left out. Bluesky batches 25 a request (no views). Mastodon
+batches 40 with `GET /api/v1/statuses?id[]=` and falls back to one status at a
+time before 4.3 (no views; quotes from 4.5). Threads asks one post at a time
+(`/{id}/insights`, the threads_manage_insights permission). Instagram asks one
+post at a time too (`/{id}/insights`, instagram_manage_insights) and adds
+`reach` and `saves`. LinkedIn batches 20 through Social Metadata: `likes` is
+every reaction together, and it needs r_organization_social_feed for a Page
+(r_member_social_feed for a member, granted to select developers only). X has
+no metrics driver; its counts come with the session driver (#3372).
+
 ## Authorization and operational limits
 
 The native terminal consent helper in authorize.ts currently supports X only.
