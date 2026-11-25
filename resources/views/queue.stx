@@ -193,20 +193,28 @@
     const nextCursor = state(0)
     const loadingMore = state(false)
     const busyId = state(0)
-    const calMonthStart = state(monthStart(new Date()))
+    // The workspace's time zone, which every schedule is set in. The calendar
+    // groups posts by the day it is there, not on this browser's clock, so a
+    // laptop travelling with its owner shows the same calendar (#106).
+    // Undefined until loaded: Intl then uses the browser's zone.
+    const zone = state<string | undefined>(undefined)
+
+    /** A moment's calendar date in the workspace zone, as YYYY-MM-DD. */
+    function dayKey(date: Date): string {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: zone(), year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
+    }
+
+    function monthOf(date: Date): { year: number, month: number } {
+      const [year, month] = dayKey(date).split('-').map(Number)
+      return { year, month: month - 1 }
+    }
+
+    const calMonth = state(monthOf(new Date()))
 
     // A fresh key, not the legacy 'postline.queue.view': useLocalStorage
     // JSON.parses whatever is already stored, and the old value was a bare
     // string ("list"), which would throw and take the whole script down.
     const view = useLocalStorage('postline.queue.view.v2', 'list')
-
-    function monthStart(date: Date): Date {
-      return new Date(date.getFullYear(), date.getMonth(), 1)
-    }
-
-    function localDayKey(date: Date): string {
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-    }
 
     // Server timestamps are UTC "YYYY-MM-DD HH:MM:SS" — render in local time.
     const parseUtc = (value: string | null | undefined): Date | null => {
@@ -218,7 +226,7 @@
     const formatTime = (value: string | null | undefined): string => {
       const date = parseUtc(value)
       if (!date) return value || ''
-      return date.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+      return date.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: zone() })
     }
 
     const providerLabel = (provider: string): string => postlineSocial?.providerLabel(provider) || provider
@@ -322,30 +330,29 @@
     })
 
     const calTitle = derived(() =>
-      calMonthStart().toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))
+      new Date(Date.UTC(calMonth().year, calMonth().month, 1)).toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' }))
 
     /**
      * The month grid as plain data. Derived rather than painted, so changing
      * month or reloading the queue rebuilds it with no manual repaint call.
      */
     const calCells = derived(() => {
-      const start = calMonthStart()
-      const year = start.getFullYear()
-      const month = start.getMonth()
+      const { year, month } = calMonth()
 
       const byDay = new Map()
       for (const row of rows()) {
         const date = parseUtc(row.scheduledAt || row.publishedAt)
         if (!date) continue
-        const key = localDayKey(date)
+        const key = dayKey(date)
         if (!byDay.has(key)) byDay.set(key, [])
         byDay.get(key).push({ row, date })
       }
 
       const cells = []
-      const startOffset = new Date(year, month, 1).getDay()
-      const daysInMonth = new Date(year, month + 1, 0).getDate()
-      const todayKey = localDayKey(new Date())
+      // The grid itself is plain calendar arithmetic, the same in every zone.
+      const startOffset = new Date(Date.UTC(year, month, 1)).getUTCDay()
+      const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+      const todayKey = dayKey(new Date())
 
       for (let i = 0; i < startOffset; i++) cells.push({ blank: true, chips: [] })
 
@@ -360,7 +367,7 @@
           chips: dayItems.slice(0, 3).map(({ row, date }) => ({
             status: row.status,
             href: row.actionable ? row.editUrl : row.liveUrl || row.editUrl,
-            label: `${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} ${(row.title || row.body || '').slice(0, 22) || 'post'}`,
+            label: `${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: zone() })} ${(row.title || row.body || '').slice(0, 22) || 'post'}`,
           })),
           more: dayItems.length > 3 ? `+${dayItems.length - 3} more` : '',
         })
@@ -371,9 +378,28 @@
     })
 
     const setView = next => view.set(next === 'calendar' ? 'calendar' : 'list')
-    const prevMonth = () => calMonthStart.set(new Date(calMonthStart().getFullYear(), calMonthStart().getMonth() - 1, 1))
-    const nextMonth = () => calMonthStart.set(new Date(calMonthStart().getFullYear(), calMonthStart().getMonth() + 1, 1))
-    const goToday = () => calMonthStart.set(monthStart(new Date()))
+    const shiftMonth = (by: number) => {
+      const at = new Date(Date.UTC(calMonth().year, calMonth().month + by, 1))
+      calMonth.set({ year: at.getUTCFullYear(), month: at.getUTCMonth() })
+    }
+    const prevMonth = () => shiftMonth(-1)
+    const nextMonth = () => shiftMonth(1)
+    const goToday = () => calMonth.set(monthOf(new Date()))
+
+    const loadZone = async () => {
+      try {
+        const response = await fetch('/api/postline/settings/workspace')
+        const payload = await response.json()
+        const timezone = payload?.data?.timezone
+        if (response.ok && typeof timezone === 'string' && timezone) {
+          zone.set(timezone)
+          calMonth.set(monthOf(new Date()))
+        }
+      }
+      catch {
+        // The browser's own zone stays in use; the queue still works.
+      }
+    }
 
     const refresh = async () => {
       try {
@@ -510,6 +536,7 @@
     }
 
     onMount(() => {
+      void loadZone()
       void refresh()
       void refreshScheduler()
       void refreshAlerts()

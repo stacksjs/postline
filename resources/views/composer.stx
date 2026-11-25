@@ -1030,11 +1030,33 @@
         else publishLabel.textContent = 'Publish'
       }
 
+      // Schedule times are wall-clock times in the workspace's zone, the one
+      // the queue calendar and analytics use (#106), not this browser's.
+      // Undefined until loaded, and then Intl falls back to the browser zone.
+      let workspaceZone
+      // Awaited before a saved post's time is shown, so it is never read in
+      // one zone and saved in another.
+      const zoneReady = fetch('/api/postline/settings/workspace')
+        .then(response => response.ok ? response.json() : null)
+        .then((payload) => {
+          const timezone = payload?.data?.timezone
+          if (typeof timezone !== 'string' || !timezone) return
+          workspaceZone = timezone
+          if (scheduleInput) scheduleInput.title = `Time in ${timezone}`
+        })
+        .catch(() => {})
+
+      // A moment as the datetime-local value it reads as in the workspace zone.
+      const wallTime = (date) => {
+        const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: workspaceZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).map(part => [part.type, part.value]))
+        return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
+      }
+
       // Convert a UTC "YYYY-MM-DD HH:MM:SS" to the datetime-local input value.
       const utcToLocalInput = (utc) => {
         const date = new Date(`${utc.replace(' ', 'T')}Z`)
         if (Number.isNaN(date.getTime())) return ''
-        return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+        return wallTime(date)
       }
 
       const enterEditMode = (item) => {
@@ -1099,6 +1121,7 @@
           const response = await fetch(`/api/postline/queue/item?id=${encodeURIComponent(id)}`)
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the post.')
+          await zoneReady
           enterEditMode(payload.data)
         }
         catch (error) {
@@ -1156,8 +1179,20 @@
         }
       }
 
+      // A datetime-local value, read as wall time in the workspace zone, as UTC.
+      // Guess it as UTC, see how far the zone's clock is from that, and step
+      // back by the difference; a second pass settles a daylight-saving edge.
       const toUtcTimestamp = (localValue) => {
-        const date = new Date(localValue)
+        const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(localValue || ''))
+        if (!match) throw new Error('Pick a valid schedule time.')
+        const wanted = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]))
+        let at = wanted
+        for (let pass = 0; pass < 2; pass++) {
+          const shown = wallTime(new Date(at))
+          const shownMs = Date.UTC(Number(shown.slice(0, 4)), Number(shown.slice(5, 7)) - 1, Number(shown.slice(8, 10)), Number(shown.slice(11, 13)), Number(shown.slice(14, 16)))
+          at += wanted - shownMs
+        }
+        const date = new Date(at)
         if (Number.isNaN(date.getTime())) throw new Error('Pick a valid schedule time.')
         return date.toISOString().slice(0, 19).replace('T', ' ')
       }
@@ -1435,10 +1470,8 @@
         if (!scheduleInput) return
         const showing = scheduleInput.classList.toggle('hidden') === false
         if (showing) {
-          // Local-time floor so the picker can't select the past.
-          const soon = new Date(Date.now() + 5 * 60 * 1000)
-          soon.setSeconds(0, 0)
-          scheduleInput.min = new Date(soon.getTime() - soon.getTimezoneOffset() * 60 * 1000).toISOString().slice(0, 16)
+          // A floor in the workspace zone so the picker can't select the past.
+          scheduleInput.min = wallTime(new Date(Date.now() + 5 * 60 * 1000))
           scheduleInput.focus()
         }
         else {
