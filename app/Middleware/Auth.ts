@@ -1,30 +1,24 @@
-import { Auth, requestToken, sessionUser } from '@stacksjs/auth'
-import { HttpError } from '@stacksjs/error-handling'
 import { log } from '@stacksjs/logging'
 import { Middleware } from '@stacksjs/router'
+import FrameworkAuth from '@stacksjs/defaults/app/Middleware/Auth.ts'
 import { allowsNativeAppWithoutLogin } from '../Support/Auth/native'
 
 /**
- * The fields the framework's own Auth middleware stamps on the request, so an
- * action can reach the caller through `request.user()` without re-resolving a
- * credential that is no longer in scope.
- */
-interface StampedRequest {
-  _authenticatedUser?: unknown
-  _currentAccessToken?: unknown
-}
-
-/**
- * Authenticate the request.
+ * Authenticate the request: the framework's own middleware, plus one check.
  *
- * This exists as an app override for exactly one reason — the desktop agent
- * check below, which looks at how the process was started and never at the
- * request. Everything after it should stay in step with
- * `storage/framework/defaults/app/Middleware/Auth.ts`, because drift here is
- * not a style difference: this file used to read the bearer header and the
- * `session_id` cookie and nothing else, which made signing in through a
- * browser impossible (#45). The server issued a correct session as an httpOnly
- * `auth-token` cookie, and the one place that had to honour it never looked.
+ * The Mac app runs Postline for the one person at the keyboard and has no
+ * sign-in, so its agent process skips authentication. That check looks at how
+ * the process was started, never at the request. Every request on a server
+ * goes through the framework's middleware unchanged.
+ *
+ * This file used to carry a copy of the framework's logic, and the copy
+ * drifted: it once read only the bearer header and the `session_id` cookie,
+ * which made signing in through a browser impossible (#45). Delegating means
+ * a framework fix reaches Postline on upgrade.
+ *
+ * Reviewed against the framework default; re-review when this fingerprint
+ * stops matching (the framework warns at boot).
+ * stacks-reviewed-default: 3bacd277969cbd05
  */
 export default new Middleware({
   name: 'Auth',
@@ -32,48 +26,9 @@ export default new Middleware({
 
   async handle(request) {
     if (allowsNativeAppWithoutLogin()) {
-      log.debug(`[middleware:auth] Desktop agent process: no sign-in`)
+      log.debug('[middleware:auth] Desktop agent process: no sign-in')
       return
     }
-
-    // `requestToken`, not `request.bearerToken()`. The framework's resolver
-    // reads the Authorization header AND falls back to the httpOnly auth
-    // cookie, which is the only form a browser session can take: JavaScript
-    // cannot read an httpOnly cookie, so no client bridge can ever turn it
-    // into a bearer header. It also accepts a lowercase `bearer` scheme, which
-    // the CSRF check already treats as token-authenticated.
-    const token = requestToken(request)
-
-    if (token) {
-      log.debug(`[middleware:auth] Validating token`)
-      const user = await Auth.getUserFromToken(token)
-      if (!user)
-        throw new HttpError(401, 'Unauthorized. Invalid or expired token.')
-
-      // Resolve the caller here or nowhere. Past this middleware the
-      // request-scoped credential is gone, so an action that asks who is
-      // calling gets nothing back.
-      const stamped = request as typeof request & StampedRequest
-      Auth.setUser(user)
-      stamped._authenticatedUser = user
-      stamped._currentAccessToken = await Auth.currentAccessToken()
-      return
-    }
-
-    const sessionId = request.cookie('session_id')
-
-    if (sessionId) {
-      log.debug(`[middleware:auth] Validating session`)
-      const user = await sessionUser(sessionId)
-      if (!user)
-        throw new HttpError(401, 'Unauthorized. Session expired.')
-
-      const stamped = request as typeof request & StampedRequest
-      Auth.setUser(user)
-      stamped._authenticatedUser = user
-      return
-    }
-
-    throw new HttpError(401, 'Unauthorized. No token or session provided.')
+    return await FrameworkAuth.handle(request)
   },
 })
