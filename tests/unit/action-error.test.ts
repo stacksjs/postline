@@ -45,3 +45,23 @@ describe('publicMessage', () => {
     expect(publicMessage(new TypeError('nope'), 'Could not save the post.')).toBe('Could not save the post.')
   })
 })
+
+describe('actionFailure', () => {
+  test('a message written for the owner keeps its status and gets a stable code', async () => {
+    const { actionFailure } = await import('../../app/Support/Http/action-error')
+    const { UserFacingError } = await import('../../app/Support/Http/user-error')
+    const plain = actionFailure(new UserFacingError('Pick a time in the future.'), 422) as Response
+    expect(plain.status).toBe(422)
+    expect(await plain.json()).toEqual({ ok: false, error: 'Pick a time in the future.', code: 'request_failed' })
+
+    const named = actionFailure(new UserFacingError('That account is not connected.', 'account_not_connected'), 409) as Response
+    expect((await named.json()).code).toBe('account_not_connected')
+  })
+
+  test('a withheld error is a server fault: 500 and internal_error', async () => {
+    const { actionFailure, GENERIC_FAILURE } = await import('../../app/Support/Http/action-error')
+    const failure = actionFailure(new TypeError('Cannot read properties of undefined'), 422) as Response
+    expect(failure.status).toBe(500)
+    expect(await failure.json()).toEqual({ ok: false, error: GENERIC_FAILURE, code: 'internal_error' })
+  })
+})

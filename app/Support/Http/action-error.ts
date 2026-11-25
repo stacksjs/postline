@@ -48,7 +48,24 @@ export function publicMessage(error: unknown, fallback = GENERIC_FAILURE): strin
 
 type FailureStatus = Extract<Parameters<typeof response.json>[1], number>
 
-/** The JSON failure every Postline action returns. */
+/** Whether a caught error's own message can be shown, as publicMessage decides. */
+function isShowable(error: unknown): boolean {
+  return writtenForPeople(error) && Boolean(error.message) && !INTERNAL.test(error.message)
+}
+
+/**
+ * The JSON failure every Postline action returns: `{ ok: false, error, code }`.
+ *
+ * `code` is stable for a client to branch on: the error's own code when it
+ * was written for the owner (`request_failed` unless it names one), and
+ * `internal_error` when its message was withheld. A withheld error with no
+ * fallback of the action's own is a fault on the server, so it answers 500.
+ */
 export function actionFailure(error: unknown, status: FailureStatus = 422, fallback = GENERIC_FAILURE): ReturnType<typeof response.json> {
-  return response.json({ ok: false, error: publicMessage(error, fallback) }, { status })
+  // With its own fallback, the action has said what went wrong and chosen the
+  // status for it; only the generic one means an unexplained server fault.
+  if (!isShowable(error))
+    return response.json({ ok: false, error: publicMessage(error, fallback), code: 'internal_error' }, { status: fallback === GENERIC_FAILURE ? 500 : status })
+  const code = error instanceof UserFacingError ? error.code : 'request_failed'
+  return response.json({ ok: false, error: publicMessage(error, fallback), code }, { status })
 }

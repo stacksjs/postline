@@ -6,4 +6,12 @@
  * is for the cases that want a class of their own, so the code that catches
  * them can tell them apart, without losing that.
  */
-export class UserFacingError extends Error {}
+export class UserFacingError extends Error {
+  /** A stable name for this failure, for a client to branch on. Defaults to `request_failed`. */
+  readonly code: string
+
+  constructor(message: string, code = 'request_failed') {
+    super(message)
+    this.code = code
+  }
+}
