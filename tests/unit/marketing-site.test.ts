@@ -37,4 +37,10 @@ describe('the marketing site is served only where asked for (#222)', () => {
     expect(readFileSync(join(root, 'config/server.ts'), 'utf8')).toContain('redirects: marketingRedirects()')
     expect(readFileSync(join(root, 'routes/api.ts'), 'utf8')).toMatch(/if \(isMarketingSite\(\)\)\s*\n\s*route\.post\('\/subscribe'/)
   })
+
+  test('the Mac app builds no marketing page', () => {
+    const build = readFileSync(join(root, 'app/Desktop/build-views.ts'), 'utf8')
+    expect(build).toContain(`excludeDirs: ['features', 'use-cases']`)
+    expect(build).toContain('for (const path of marketingPaths())')
+  })
 })
