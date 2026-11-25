@@ -1,0 +1,39 @@
+<script server>
+// The waitlist's confirmation email (double opt-in), sent when someone types
+// an address into the hosted-plan waitlist on the home page. Until the button
+// is clicked the address gets nothing else.
+//
+// MAIL_POSTAL_ADDRESS, when set, is printed in the footer: the anti-spam laws
+// of several countries ask for a postal address in email like this.
+const email = props.email || ''
+const confirmUrl = props.confirmUrl || '#'
+const appName = props.appName || 'Postline'
+const appUrl = props.appUrl || ''
+const year = props.year || new Date().getFullYear()
+const postalAddress = String(process.env.MAIL_POSTAL_ADDRESS || '').trim()
+const subject = `Confirm your place on the ${appName} waitlist`
+</script>
+
+<EmailLayout title="{{ subject }}" preheader="One click and we will tell you when hosted {{ appName }} opens." brand="{{ appName }}" brandUrl="{{ appUrl }}" accent="#0a0a0b">
+  <EmailText size="heading">Confirm your email</EmailText>
+  <EmailText>Someone, hopefully you, asked to hear when hosted {{ appName }} opens, at {{ email }}. Confirm and you are on the waitlist.</EmailText>
+
+  <EmailButton href="{{ confirmUrl }}" bg="#0a0a0b">Yes, add me</EmailButton>
+
+  <EmailText>We will write once, when it opens, with the price. Nothing else.</EmailText>
+
+  <EmailDivider />
+  <EmailText size="sm" spacing="8px">If this was not you, ignore this email: without the click you will not hear from us again.</EmailText>
+  <EmailText size="sm" spacing="0">If the button does not work, open this link: <a href="{{ confirmUrl }}" style="color:#0a0a0b;word-break:break-all;">{{ confirmUrl }}</a></EmailText>
+
+  <template #footer>
+    <tr>
+      <td class="email-muted" style="padding:16px 40px 20px;border-top:1px solid #e4e4e7;color:#a1a1aa;font-size:11px;text-align:center;">
+        &copy; {{ year }} {{ appName }}
+        @if (postalAddress)
+          <br>{{ postalAddress }}
+        @endif
+      </td>
+    </tr>
+  </template>
+</EmailLayout>
