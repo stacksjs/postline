@@ -22,6 +22,7 @@ const text = sources.map(path => [path, readFileSync(join(root, path), 'utf8')] 
 const retired: Array<[RegExp, string]> = [
   [/retried behind your back/i, 'failures are retried automatically (retry.ts)'],
   [/Bluesky, X, Mastodon and Instagram/, 'X direct messages are not supported'],
+  [/Mastodon, Instagram and Bluesky|One list, every network/, 'Instagram messages need Meta app review (#129)'],
   [/per-network engagement|replies per network|stored per network/i, 'only Bluesky engagement is synced'],
   [/app passwords are encrypted/i, 'app passwords in .env stay plain text'],
   [/back up and export/i, 'there is no export'],

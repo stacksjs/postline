@@ -37,8 +37,9 @@ Last checked 24 November 2026.
 
 | Claim | Evidence |
 |---|---|
-| Direct messages from Mastodon, Instagram, Bluesky (app password with message access) | `app/Services/Social/DirectMessages/*.ts`, `InstagramService.ts:84` |
-| X messages not supported yet | `TwitterService.ts:67` (no `dm.*` scope) |
+| Direct messages from Bluesky (app password with message access) and Mastodon | `app/Support/Social/direct-messages.ts` (`DM_PROVIDERS`), `app/Services/Social/DirectMessages/*.ts` |
+| Instagram messages not supported (Meta app review) | `direct-messages.ts` (`DM_UNAVAILABLE.instagram`) |
+| X messages not supported yet | `direct-messages.ts` (`DM_UNAVAILABLE.twitter`) |
 | Keyword listening on Bluesky, X, Mastodon, every five minutes, up to 20 keywords | `app/Jobs/ScanKeywordMonitors.ts:13`, `KeywordMonitoringService.ts:48` |
 | Engagement synced for Bluesky posts only | `app/Jobs/SyncEngagementMetrics.ts:17` |
 | Thirty days of activity, channel mix, posting windows | `app/Actions/Postline/AnalyticsAction.ts` |
@@ -48,7 +49,7 @@ Last checked 24 November 2026.
 ## Not on the site until they are true
 
 - Engagement for X, LinkedIn, Instagram, Threads and Mastodon.
-- X direct messages.
+- X and Instagram direct messages.
 - Revoking a token at the network on disconnect.
 - An export of posts and metrics.
 - Team seats.

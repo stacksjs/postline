@@ -310,24 +310,6 @@ export class TwitterService {
   }
 
   /**
-   * The credentials the DM transport needs, with the same pre-expiry refresh
-   * publishing gets. `userId` is what decides whether a `dm_event` was sent by
-   * us or to us, so it is required rather than optional here.
-   */
-  async dmIdentity(identityId?: number | null): Promise<{ identityId: number, accessToken: string, userId: string, handle: string }> {
-    const identity = await this.requireIdentity(identityId)
-    if (!identity.external_id)
-      throw new Error('Reconnect X on the Accounts page — Postline needs your user id to tell your own replies apart.')
-
-    return {
-      identityId: Number(identity.id),
-      accessToken: String(identity.access_token),
-      userId: String(identity.external_id),
-      handle: identity.handle,
-    }
-  }
-
-  /**
    * The account to act as. A named account must be usable as-is; without a
    * name this is the default account, falling back to the `.env` token.
    */

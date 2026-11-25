@@ -113,7 +113,9 @@ export class DirectMessageService {
 
   /** The inbox list, newest activity first. Reads the local mirror only. */
   async list(options: { status?: string, provider?: string } = {}) {
-    let query = database.selectFrom('dm_conversations').selectAll()
+    // Only networks the inbox can still read: conversations synced from X or
+    // Instagram before those were dropped (#129) stay stored, not listed.
+    let query = database.selectFrom('dm_conversations').selectAll().where('provider', 'in', [...DM_PROVIDERS])
     query = query.where('status', '=', options.status === 'archived' ? 'archived' : 'open')
     if (isDmProvider(options.provider)) query = query.where('provider', '=', options.provider)
 
@@ -243,7 +245,7 @@ export class DirectMessageService {
     const transport = getDmTransport(provider)
 
     if (text.length > transport.characterLimit)
-      throw new Error(`${provider === 'twitter' ? 'X' : provider} messages must be ${transport.characterLimit} characters or fewer.`)
+      throw new Error(`${provider.charAt(0).toUpperCase()}${provider.slice(1)} messages must be ${transport.characterLimit} characters or fewer.`)
 
     const sent = await transport.sendMessage(String(conversation.remote_id), text)
     await this.storeMessages(conversationId, provider, [{ ...sent, direction: 'outgoing' }], 'sent')
@@ -275,7 +277,8 @@ export class DirectMessageService {
       : await database.selectFrom('dm_conversations').selectAll().where('status', '=', 'open').execute()
 
     for (const conversation of targets) {
-      const transport = getDmTransport(String(conversation.provider) as DmProvider)
+      if (!isDmProvider(conversation.provider)) continue
+      const transport = getDmTransport(conversation.provider)
       if (!transport.markRead) continue
       try {
         await transport.markRead(String(conversation.remote_id))

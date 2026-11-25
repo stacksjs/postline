@@ -55,7 +55,7 @@
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-message-01"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">Inbox</span>
-            <span class="leading-relaxed text-[14.5px] text-body">Read and reply to direct messages from Mastodon, Instagram and Bluesky without switching apps.</span>
+            <span class="leading-relaxed text-[14.5px] text-body">Read and reply to direct messages from Bluesky and Mastodon without switching apps.</span>
           </span>
         </a>
       </li>

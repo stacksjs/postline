@@ -74,17 +74,14 @@ export class InstagramService {
       accessToken: String(env.INSTAGRAM_ACCESS_TOKEN || '').trim(),
       userId: String(env.INSTAGRAM_USER_ID || '').trim(),
       username: String(env.INSTAGRAM_USERNAME || '').trim(),
-      // `instagram_manage_messages` and `pages_messaging` are what the DM inbox
-      // runs on. They are requested on every connect rather than behind a flag,
-      // because Meta only grants scopes at consent time — a connection made
-      // without them cannot gain them later without reconnecting.
+      // Publishing only. The messaging permissions are not asked for: the
+      // inbox cannot read Instagram without Meta's app review (#129), and a
+      // permission nothing uses is one more thing to explain at consent.
       scopes: [
         'instagram_basic',
         'instagram_content_publish',
-        'instagram_manage_messages',
         'pages_show_list',
         'pages_read_engagement',
-        'pages_messaging',
       ],
     }
   }
@@ -313,25 +310,6 @@ export class InstagramService {
       }).where('id', '=', target.id).execute()
 
       return { provider: 'instagram', ok: false, error: message, targetId: Number(target.id), retry: classifyFailure(error), ...account }
-    }
-  }
-
-  /**
-   * The credentials the DM transport needs. `igUserId` is both the node every
-   * messaging call is addressed to and the participant id that marks a message
-   * as ours, so it is required rather than optional here.
-   */
-  async dmIdentity(identityId?: number | null): Promise<{ identityId: number, accessToken: string, igUserId: string, handle: string, graphVersion: string }> {
-    const identity = await this.requireIdentity(identityId)
-    if (!identity.external_id)
-      throw new Error('Reconnect Instagram on the Accounts page — Postline needs your Instagram account id to read DMs.')
-
-    return {
-      identityId: Number(identity.id),
-      accessToken: String(identity.access_token),
-      igUserId: String(identity.external_id),
-      handle: identity.handle,
-      graphVersion: (await this.config()).graphVersion,
     }
   }
 

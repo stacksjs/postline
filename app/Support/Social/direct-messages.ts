@@ -16,7 +16,7 @@
 import type { SocialProvider } from './types'
 
 /** Networks Postline can currently read and answer DMs on. */
-export const DM_PROVIDERS = ['bluesky', 'twitter', 'mastodon', 'instagram'] as const
+export const DM_PROVIDERS = ['bluesky', 'mastodon'] as const
 
 export type DmProvider = typeof DM_PROVIDERS[number]
 
@@ -28,6 +28,15 @@ export type DmProvider = typeof DM_PROVIDERS[number]
  */
 export const DM_UNAVAILABLE: Partial<Record<SocialProvider, string>> = {
   threads: 'Threads has no public messaging API — its inbox is app-only.',
+  // Meta serves Instagram messages through the connected Facebook Page, and
+  // only to apps with Advanced Access, which takes Meta's app review: an app
+  // in development mode sees only people with a role on it. A self-hosted
+  // app made for one person cannot reasonably get there (#129).
+  instagram: 'Instagram messages need Meta\'s app review (Advanced Access), which an app you made for yourself does not have.',
+  // X charges for its message endpoints, and Postline does not ask for the
+  // message permissions. Messages will come with signing in to X inside
+  // Postline (#121).
+  twitter: 'X messages are not supported yet; they will come with signing in to X inside Postline.',
   linkedin: 'LinkedIn messaging is limited to partner-approved apps.',
   facebook: 'Facebook Page messaging needs the pages_messaging permission, which Postline does not request yet.',
   tiktok: 'TikTok has no public messaging API.',
