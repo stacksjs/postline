@@ -9,12 +9,13 @@ import { env } from '@stacksjs/env'
  * you have any questions, feel free to reach out via Discord or GitHub Discussions.
  */
 export default {
-  default: env.DB_CONNECTION as SupportedDialect || 'mysql',
+  default: env.DB_CONNECTION as SupportedDialect || 'sqlite',
 
   connections: {
     sqlite: {
       // SQLite requires a file path, not a database name
-      database: env.DB_DATABASE_PATH || 'database/stacks.sqlite',
+      // One name everywhere (#71): the Mac app keeps its own copy in its data folder.
+      database: env.DB_DATABASE_PATH || 'database/postline.sqlite',
       prefix: '',
     },
 

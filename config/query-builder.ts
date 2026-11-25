@@ -5,7 +5,7 @@ const dialect = (env.DB_CONNECTION as SupportedDialect) || 'sqlite'
 
 // For SQLite, use file path; for other databases, use connection params
 const databaseConfig = dialect === 'sqlite'
-  ? { database: env.DB_DATABASE_PATH || 'database/stacks.sqlite' }
+  ? { database: env.DB_DATABASE_PATH || 'database/postline.sqlite' }
   : {
       database: env.DB_DATABASE || 'stacks',
       username: env.DB_USERNAME || '',

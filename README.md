@@ -48,6 +48,15 @@ cp .env.example .env
 ./buddy migrate
 ```
 
+The database is `database/postline.sqlite`. A checkout from before the rename
+may still have `database/opentimes.sqlite`. With Postline stopped, move it
+together with its `-wal` and `-shm` files (the most recent writes live there)
+and point `.env` at the new name; nothing else changes.
+
+```bash
+for f in database/opentimes.sqlite*; do mv "$f" "${f/opentimes/postline}"; done && sed -i '' 's#database/opentimes.sqlite#database/postline.sqlite#' .env
+```
+
 ```bash
 ./buddy seed
 ```
