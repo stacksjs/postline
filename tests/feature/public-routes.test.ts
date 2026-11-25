@@ -27,8 +27,9 @@ const APP_PUBLIC = [
   'GET /api/postline/media',
   // Health for a load balancer: database and scheduler state, nothing else.
   'GET /api/postline/health',
-  // The marketing site's email capture.
-  'POST /api/subscribe',
+  // The waitlist, 'POST /api/subscribe', is mounted only on the marketing
+  // deployment (POSTLINE_SITE=marketing), never on an install; see
+  // tests/unit/marketing-site.test.ts.
 ]
 
 /** Registered by the framework itself, whatever the app's route files say. */

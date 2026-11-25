@@ -1,5 +1,6 @@
 import { route } from '@stacksjs/router'
 import { csrfSeedResponse } from '../app/Support/Http/csrf-cookie'
+import { isMarketingSite } from '../app/Support/Marketing/site'
 import { assertSafeDeployment } from '../app/Support/Http/deployment-guard'
 
 /**
@@ -40,10 +41,12 @@ route.post('/logout', 'Actions/Auth/LogoutAction')
 // and changes nothing else.
 route.get('/csrf', request => csrfSeedResponse(request as unknown as Request))
 
-// Marketing email capture. The framework action owns rate limiting, dedupe and
-// the confirmation mail; this just exposes it. Unauthenticated by necessity, so
-// the action's per-IP throttle is the guard.
-route.post('/subscribe', 'Actions/SubscriberEmailAction')
+// The hosted-plan waitlist on the marketing site. The framework action owns
+// rate limiting, the honeypot and the confirmation mail; this just exposes it.
+// Unauthenticated by necessity, so the action's per-IP throttle is the guard.
+// Only the marketing deployment mounts it: an install has no waitlist.
+if (isMarketingSite())
+  route.post('/subscribe', 'Actions/SubscriberEmailAction')
 
 // Public: Instagram/Threads fetch a queued post's image server-side, so this
 // route is intentionally unauthenticated. The filename is an unguessable

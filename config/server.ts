@@ -1,4 +1,5 @@
 import type { ServerConfig } from '@stacksjs/types'
+import { marketingRedirects } from '../app/Support/Marketing/site'
 
 /**
  * **Server Configuration**
@@ -10,6 +11,11 @@ import type { ServerConfig } from '@stacksjs/types'
  */
 export default {
   maxRequestBodySize: 12 * 1024 * 1024,
+
+  // A self-hosted install opens the workspace at `/`. The marketing pages are
+  // served only by the deployment started with POSTLINE_SITE=marketing; on any
+  // other they redirect to the workspace (app/Support/Marketing/site.ts).
+  redirects: marketingRedirects(),
 
   // Headers on every rendered page: HSTS on a real https host, an opener
   // policy that still lets OAuth popups report back, and a permissions policy.

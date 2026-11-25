@@ -76,6 +76,12 @@ app has no sign-in, so there is nothing to recover there.
 next free one and says so. Run `./buddy setup:ssl` once to get
 `https://postline.localhost` in place of a localhost port.
 
+`/` opens the workspace (or the sign-in page). The pages that describe
+Postline, its landing page, features, use cases and the hosted-plan waitlist,
+belong to the public site and redirect to the workspace on your install. To
+work on them, start the site with `POSTLINE_SITE=marketing ./buddy dev`; the
+deployment that serves postline.stacksjs.com runs with that setting too.
+
 ## Connecting networks
 
 Each network needs credentials of its own, and `.env.example` documents every
