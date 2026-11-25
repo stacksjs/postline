@@ -17,17 +17,6 @@
         "dev:api"
       ],
       "port": 3008
-    },
-    {
-      "name": "api-signup",
-      "runtimeExecutable": "env",
-      "runtimeArgs": [
-        "DB_DATABASE_PATH=/private/tmp/claude-501/-Users-chris-Code-Apps-postline/17620952-ba03-42ac-8d8c-14418d4c09f8/scratchpad/signup.sqlite",
-        "MAIL_MAILER=log",
-        "./buddy",
-        "dev:api"
-      ],
-      "port": 3008
     }
   ]
 }
