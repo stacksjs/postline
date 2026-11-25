@@ -7,7 +7,7 @@
  * run that stops halfway.
  */
 import type { ProviderPublisher } from '../../app/Services/Social/CrosspostService'
-import type { CrosspostTargetResult } from '../../app/Support/Social/types'
+import type { CrosspostTargetResult, PublishContent } from '../../app/Support/Social/types'
 import { existsSync, rmSync } from 'node:fs'
 import process from 'node:process'
 import { describe, expect, test } from 'bun:test'
@@ -625,7 +625,7 @@ describe('a post with several images', () => {
     return {
       media,
       publisher: {
-        async publishToPost(post, content): Promise<CrosspostTargetResult> {
+        async publishToPost(post: { id: number }, content?: PublishContent): Promise<CrosspostTargetResult> {
           media.push((content?.media || []).map(item => ({ altText: item.altText, bytes: item.bytes })))
           await database.insertInto('post_targets').values({ uuid: crypto.randomUUID(), provider: 'blog', status: 'published', post_id: post.id }).execute()
           return { provider: 'blog', ok: true, target: 'blog' } as CrosspostTargetResult
@@ -682,7 +682,7 @@ describe('a post\'s options', () => {
     let received: unknown
     const queue = new QueueService(new CrosspostService({
       blog: {
-        async publishToPost(post, content): Promise<CrosspostTargetResult> {
+        async publishToPost(post: { id: number }, content?: PublishContent): Promise<CrosspostTargetResult> {
           received = content?.options
           await database.insertInto('post_targets').values({ uuid: crypto.randomUUID(), provider: 'blog', status: 'published', post_id: post.id }).execute()
           return { provider: 'blog', ok: true, target: 'blog' } as CrosspostTargetResult

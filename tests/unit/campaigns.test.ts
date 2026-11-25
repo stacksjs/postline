@@ -54,7 +54,7 @@ describe('campaign planning helpers', () => {
     const bodies = result.map(post => post.body.toLowerCase())
 
     expect(new Set(bodies).size).toBe(8)
-    expect(bodies).not.toContain(existing[0].body.toLowerCase())
+    expect(bodies).not.toContain(existing[0]!.body.toLowerCase())
   })
 
   test('gives the Stacks launch playbook a proof-led local fallback', () => {

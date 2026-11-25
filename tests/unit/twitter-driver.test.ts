@@ -96,7 +96,7 @@ describe('TwitterDriver tokens', () => {
     const cap: Captured[] = []; mockTwitterApi(cap)
     const driver = new TwitterDriver()
     const profile = await driver.getProfile('AT')
-    expect(cap[0].url).toContain('/2/users/me')
+    expect(cap[0]!.url).toContain('/2/users/me')
     expect(profile).toEqual({ id: '77', username: 'glenn', name: 'Glenn' })
   })
 })

@@ -45,7 +45,7 @@ describe('MastodonPublishingDriver', () => {
     const cap: Captured[] = []; mockApi(cap)
     const driver = new MastodonPublishingDriver()
     const account = await driver.verifyCredentials(creds)
-    expect(cap[0].url).toContain('/api/v1/accounts/verify_credentials')
+    expect(cap[0]!.url).toContain('/api/v1/accounts/verify_credentials')
     expect(account).toEqual({ accountId: '42', username: 'glenn', displayName: 'Glenn', url: 'https://mastodon.social/@glenn' })
   })
 
@@ -57,7 +57,7 @@ describe('MastodonPublishingDriver', () => {
     expect(post?.body.status).toBe('hello fediverse')
     expect(post?.body.visibility).toBe('public')
     expect(post?.body.media_ids).toBeUndefined()
-    expect(result.uri).toBe(result.cid) // status id doubles as both
+    expect(result.uri).toBe(result.cid as string) // status id doubles as both
     expect(result.url).toContain('mastodon.social/@glenn')
   })
 

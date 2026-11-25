@@ -54,7 +54,7 @@ describe('advanceChain', () => {
 
   test('a failed segment does not become the parent of the next one', () => {
     const chain = advanceChain(undefined, chained('at://1', 'cid1'))
-    const after = advanceChain(chain, { provider: 'bluesky', ok: false, uri: 'at://2', cid: 'cid2' })
+    const after = advanceChain(chain, { ok: false, uri: 'at://2', cid: 'cid2' })
 
     // Otherwise segment 3 would reply to a post that was never created.
     expect(after).toEqual(chain!)
@@ -106,7 +106,7 @@ describe('chains stay per account', () => {
     const chains = new Map<string, ThreadChain>()
     chains.set('bluesky:1', advanceChain(undefined, chained('at://a1', 'cidA1'))!)
 
-    const failed = advanceChain(chains.get('bluesky:2'), { provider: 'bluesky', ok: false, error: 'session expired' })
+    const failed = advanceChain(chains.get('bluesky:2'), { ok: false })
     expect(failed).toBeUndefined()
     expect(chains.get('bluesky:1')).toBeDefined()
   })

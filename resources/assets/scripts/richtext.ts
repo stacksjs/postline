@@ -35,8 +35,8 @@ function markdownToHtml(markdown: string): string {
     .map((block) => {
       const heading = block.match(/^(#{1,6})\s+(.*)$/)
       if (heading) {
-        const level = heading[1].length
-        return `<h${level}>${escape(heading[2])}</h${level}>`
+        const level = heading[1]!.length
+        return `<h${level}>${escape(heading[2]!)}</h${level}>`
       }
       if (block.startsWith('> ')) {
         return `<blockquote><p>${escape(block.replace(/^>\s?/gm, ''))}</p></blockquote>`

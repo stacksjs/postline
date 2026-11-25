@@ -57,7 +57,6 @@
     "release:major": "./buddy release --bump major",
     "changelog": "./buddy changelog",
     "generate": "./buddy generate",
-    "typecheck": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false",
     "typecheck:app": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false",
     "types:check": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false",
     "types:fix": "./buddy types:fix",

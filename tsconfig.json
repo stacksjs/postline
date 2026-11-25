@@ -26,7 +26,12 @@
     "*.d.ts",
     "app/**/*.ts",
     "config/**/*.ts",
-    "routes/**/*.ts"
+    "routes/**/*.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "database/**/*.ts",
+    "resources/assets/scripts/**/*.ts",
+    "resources/functions/**/*.ts"
   ],
   "exclude": [
     "cloud/**",
@@ -34,6 +39,6 @@
     "node_modules/**",
     "pantry/**",
     "storage/framework/**",
-    "resources/assets/**"
+    "resources/assets/styles/**"
   ]
 }

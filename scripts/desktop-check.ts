@@ -49,7 +49,7 @@ async function call(method: string, path: string, form?: Record<string, string>)
     headers.cookie = `X-CSRF-Token=${csrfToken}`
     headers['x-csrf-token'] = csrfToken
   }
-  const response = await agent.fetch!(new Request(`${origin}${path}`, { method, body, headers }), context as never) as Response | undefined
+  const response = await agent.fetch!(new Request(`${origin}${path}`, { method, body, headers })) as Response | undefined
   const issued = response?.headers.get('set-cookie')?.match(/X-CSRF-Token=([0-9a-f]+)/)?.[1]
   if (issued)
     csrfToken = issued

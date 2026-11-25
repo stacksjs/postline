@@ -124,7 +124,7 @@ describe('LinkedInDriver.publish', () => {
     // and checks the bytes are an image, so it is replaced here rather than
     // reached through the mocked `fetch`.
     const fetched: string[] = []
-    driver.fetchImage = async (url) => {
+    driver.fetchImage = async (url: string) => {
       fetched.push(url)
       return { bytes: new Uint8Array([0x89, 0x50, 0x4E, 0x47]), mimeType: 'image/png' }
     }
@@ -212,8 +212,8 @@ describe('LinkedInDriver token exchange + refresh', () => {
 
     const token = await driver.exchangeCode({ clientId: 'c', clientSecret: 's', redirectUrl: 'https://app/cb', code: 'abc' })
 
-    expect(cap[0].url).toContain('/oauth/v2/accessToken')
-    expect(cap[0].body).toContain('grant_type=authorization_code')
+    expect(cap[0]!.url).toContain('/oauth/v2/accessToken')
+    expect(cap[0]!.body).toContain('grant_type=authorization_code')
     expect(token.accessToken).toBe('AT1')
     expect(token.refreshToken).toBe('RT1')
     expect(token.expiresIn).toBe(5184000)
@@ -226,8 +226,8 @@ describe('LinkedInDriver token exchange + refresh', () => {
 
     const token = await driver.refreshAccessToken({ clientId: 'c', clientSecret: 's', refreshToken: 'RT1' })
 
-    expect(cap[0].body).toContain('grant_type=refresh_token')
-    expect(cap[0].body).toContain('refresh_token=RT1')
+    expect(cap[0]!.body).toContain('grant_type=refresh_token')
+    expect(cap[0]!.body).toContain('refresh_token=RT1')
     expect(token.accessToken).toBe('AT2')
     expect(token.refreshToken).toBe('RT2')
   })

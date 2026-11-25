@@ -59,9 +59,9 @@ describe('BlueskyPublishingDriver.publish', () => {
     const result = await driver.publish(identity, { text: 'hello world' })
 
     expect(captured).toHaveLength(1)
-    expect(captured[0].url).toContain('/xrpc/com.atproto.repo.createRecord')
-    expect(captured[0].body.record.text).toBe('hello world')
-    expect(captured[0].body.record.reply).toBeUndefined()
+    expect(captured[0]!.url).toContain('/xrpc/com.atproto.repo.createRecord')
+    expect(captured[0]!.body.record.text).toBe('hello world')
+    expect(captured[0]!.body.record.reply).toBeUndefined()
     expect(result.uri).toBe('at://did:plc:test/app.bsky.feed.post/rec1')
     expect(result.cid).toBe('cid1')
   })
@@ -78,7 +78,7 @@ describe('BlueskyPublishingDriver.publish', () => {
     const driver = new BlueskyPublishingDriver()
     await driver.publish(identity, { text: 'second segment', reply })
 
-    expect(captured[0].body.record.reply).toEqual(reply)
+    expect(captured[0]!.body.record.reply).toEqual(reply)
   })
 
   test('attaches an external link card when provided', async () => {
@@ -91,7 +91,7 @@ describe('BlueskyPublishingDriver.publish', () => {
       external: { uri: 'https://example.com', title: 'Example', description: 'Desc' },
     })
 
-    expect(captured[0].body.record.embed).toEqual({
+    expect(captured[0]!.body.record.embed).toEqual({
       $type: 'app.bsky.embed.external',
       external: { uri: 'https://example.com', title: 'Example', description: 'Desc' },
     })
@@ -177,7 +177,7 @@ describe('BlueskyPublishingDriver.publish', () => {
       'at://did:plc:test/app.bsky.feed.post/bbb',
     ])
 
-    expect(captured[0].url).toContain('app.bsky.feed.getPosts')
+    expect(captured[0]!.url).toContain('app.bsky.feed.getPosts')
     expect(metrics).toEqual([
       { uri: 'at://did:plc:test/app.bsky.feed.post/aaa', likeCount: 7, repostCount: 2, replyCount: 3 },
     ])
@@ -205,7 +205,7 @@ describe('BlueskyPublishingDriver.publish', () => {
 describe('detectFacetCandidates', () => {
   test('computes UTF-8 byte offsets, not character offsets', () => {
     const text = '🦋 fly to https://bsky.app now'
-    const [link] = detectFacetCandidates(text)
+    const [link] = detectFacetCandidates(text) as [ReturnType<typeof detectFacetCandidates>[number]]
     // '🦋 fly to ' is 4 (emoji) + 8 = 12 bytes
     expect(link.byteStart).toBe(12)
     expect(link.byteEnd).toBe(12 + 'https://bsky.app'.length)
@@ -213,7 +213,7 @@ describe('detectFacetCandidates', () => {
   })
 
   test('trims trailing punctuation from links', () => {
-    const [link] = detectFacetCandidates('see https://example.com/docs.')
+    const [link] = detectFacetCandidates('see https://example.com/docs.') as [ReturnType<typeof detectFacetCandidates>[number]]
     expect(link.value).toBe('https://example.com/docs')
   })
 

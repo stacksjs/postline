@@ -126,7 +126,7 @@ wins when both are set. The Mac app reads no `.env`, so it uses Settings.
 | `./buddy seed` | Seed the workspace account and sample posts |
 | `./buddy test` | Run the suite |
 | `./buddy lint` | Lint; `./buddy lint:fix` fixes what it can |
-| `bun run typecheck` | Type check `app/`, `config/` and `routes/` |
+| `bun run typecheck:app` | Type check everything that ships: `app/`, `config/`, `routes/`, `scripts/`, `tests/`, `database/` and the client scripts |
 | `./buddy upgrade` | Move to the latest Stacks release |
 | `bun scripts/marketing-build.ts` | Regenerate the feature and use-case pages from `app/Support/Marketing/catalog.ts` |
 | `bun scripts/marketing-og.ts` | Regenerate the Open Graph cards |
@@ -200,7 +200,7 @@ Run these before opening a pull request:
 ```
 
 ```bash
-bun run typecheck
+bun run typecheck:app
 ```
 
 ```bash

@@ -116,7 +116,7 @@ function renderAnalyticsChart(): void {
       `<line x1="${inset.left}" x2="${width - inset.right}" y1="${baseline}" y2="${baseline}" stroke="${rule}" stroke-width="1"></line>`,
       ...xTickIndexes.map((index) => {
         const xx = x(index)
-        return `<g transform="translate(${xx} 0)"><line y1="${baseline}" y2="${baseline + 5}" stroke="${rule}" stroke-width="1"></line><text y="${baseline + 22}" text-anchor="middle" fill="${muted}" font-size="10">${escapeHtml(points[index].label)}</text></g>`
+        return `<g transform="translate(${xx} 0)"><line y1="${baseline}" y2="${baseline + 5}" stroke="${rule}" stroke-width="1"></line><text y="${baseline + 22}" text-anchor="middle" fill="${muted}" font-size="10">${escapeHtml(points[index]!.label)}</text></g>`
       }),
     ].join('')
   }
@@ -154,6 +154,7 @@ function renderAnalyticsChart(): void {
   const showHover = (index: number): void => {
     activeIndex = Math.max(0, Math.min(points.length - 1, index))
     const point = points[activeIndex]
+    if (!point) return
     const xx = x(activeIndex)
     const yy = y(point.value)
     const tooltipWidth = 154

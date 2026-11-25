@@ -1,3 +1,4 @@
+import type { IdentityAuthStatus } from '../../app/Support/Social/accounts'
 /**
  * Network tokens are stored sealed, and everything outside the identities
  * module still sees them plain.
@@ -9,7 +10,7 @@ import { isSealed, openToken, sealToken } from '../../app/Support/Social/token-v
 
 const database = db as any
 
-interface Row { id: number, handle: string, auth_status: string, access_token: string | null, refresh_token: string | null }
+interface Row { id: number, provider: string, handle: string, auth_status: IdentityAuthStatus, access_token: string | null, refresh_token: string | null }
 
 async function stored(id: number): Promise<{ access_token: string | null, refresh_token: string | null }> {
   return await database.selectFrom('social_identities').select(['access_token', 'refresh_token']).where('id', '=', id).executeTakeFirstOrThrow()

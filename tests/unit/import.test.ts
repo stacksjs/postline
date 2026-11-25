@@ -10,18 +10,18 @@ describe('csv parsing', () => {
 
   test('quoted fields may contain commas', () => {
     const rows = parseCsv('email,name\nreader@example.com,"Reader, A"')
-    expect(rows[0].name).toBe('Reader, A')
+    expect(rows[0]!.name).toBe('Reader, A')
   })
 
   test('a doubled quote inside a quoted field is a literal quote', () => {
     const rows = parseCsv('email,name\nreader@example.com,"He said ""hi"""')
-    expect(rows[0].name).toBe('He said "hi"')
+    expect(rows[0]!.name).toBe('He said "hi"')
   })
 
   test('quoted fields may contain newlines', () => {
     const rows = parseCsv('email,note\nreader@example.com,"line one\nline two"')
     expect(rows).toHaveLength(1)
-    expect(rows[0].note).toBe('line one\nline two')
+    expect(rows[0]!.note).toBe('line one\nline two')
   })
 
   test('headers are lowercased and values trimmed, so column case does not matter', () => {
@@ -31,7 +31,7 @@ describe('csv parsing', () => {
 
   test('windows line endings parse the same as unix ones', () => {
     const rows = parseCsv('email,name\r\nreader@example.com,A Reader')
-    expect(rows[0].name).toBe('A Reader')
+    expect(rows[0]!.name).toBe('A Reader')
   })
 
   test('blank lines are dropped rather than becoming empty rows', () => {
@@ -46,6 +46,6 @@ describe('csv parsing', () => {
 
   test('a short row does not read undefined into later columns', () => {
     const rows = parseCsv('email,name,plan\nreader@example.com,A Reader')
-    expect(rows[0].plan).toBe('')
+    expect(rows[0]!.plan).toBe('')
   })
 })
