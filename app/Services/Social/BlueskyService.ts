@@ -379,7 +379,7 @@ export class BlueskyService {
 
     const targets = await database
       .selectFrom('post_targets')
-      .select(['id', 'remote_uri', 'social_identity_id'])
+      .select(['id', 'remote_uri', 'social_identity_id', 'metrics'])
       .where('provider', '=', 'bluesky')
       .where('status', '=', 'published')
       .where('remote_uri', 'like', 'at://%')
@@ -433,7 +433,12 @@ export class BlueskyService {
       const byUri = new Map(metrics.map(item => [item.uri, item]))
       for (const target of chunk) {
         const counts = byUri.get(String(target.remote_uri))
-        if (!counts) continue
+        // Bluesky answers only for posts that still exist. One missing from
+        // the answer was deleted, so its numbers leave the totals (#116).
+        if (!counts) {
+          if (target.metrics) await database.updateTable('post_targets').set({ metrics: null }).where('id', '=', target.id).execute()
+          continue
+        }
         await database.updateTable('post_targets').set({
           metrics: JSON.stringify({
             likes: counts.likeCount,

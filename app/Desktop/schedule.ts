@@ -33,6 +33,7 @@ export function startSchedule(jobs: {
   syncDirectMessages: Runnable
   autoDeletePosts: Runnable
   keepTokensAlive: Runnable
+  pruneLocalData: Runnable
 }, options: { say?: (line: string) => void } = {}): Schedule {
   const entries: Entry[] = [
     { job: jobs.publishScheduledPosts, everyMs: MINUTE },
@@ -41,6 +42,7 @@ export function startSchedule(jobs: {
     { job: jobs.syncEngagementMetrics, everyMs: 30 * MINUTE },
     { job: jobs.autoDeletePosts, everyMs: 24 * 60 * MINUTE },
     { job: jobs.keepTokensAlive, everyMs: 24 * 60 * MINUTE },
+    { job: jobs.pruneLocalData, everyMs: 24 * 60 * MINUTE },
   ]
 
   const running = new Set<string>()

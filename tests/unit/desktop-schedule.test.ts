@@ -16,6 +16,7 @@ const idle = {
   syncDirectMessages: job('SyncDirectMessages'),
   autoDeletePosts: job('AutoDeletePosts'),
   keepTokensAlive: job('KeepTokensAlive'),
+  pruneLocalData: job('PruneLocalData'),
 }
 
 let stop: (() => void) | null = null

@@ -33,4 +33,5 @@ export declare function jobs(): Promise<{
   syncDirectMessages: Runnable
   autoDeletePosts: Runnable
   keepTokensAlive: Runnable
+  pruneLocalData: Runnable
 }>

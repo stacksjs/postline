@@ -106,6 +106,7 @@
     "Product": true,
     "ProductUnit": true,
     "ProductVariant": true,
+    "PruneLocalData": true,
     "PruneModelsJob": true,
     "PruneQueryLogsJob": true,
     "PruneRetainedDataJob": true,

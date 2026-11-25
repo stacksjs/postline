@@ -51,6 +51,13 @@ export default function () {
     .daily()
     .withoutOverlapping(30)
 
+  // Trim old local copies (mentions, timeline, read alerts, messages, logs)
+  // so a long-running install stops growing (#116).
+  schedule
+    .job('PruneLocalData')
+    .daily()
+    .withoutOverlapping(30)
+
   // Remove sign-in tokens that have expired or been revoked. Every sign-in
   // mints one and nothing else deletes them, so the table only ever grew.
   schedule
