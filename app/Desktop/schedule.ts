@@ -34,7 +34,16 @@ export function startSchedule(jobs: {
   autoDeletePosts: Runnable
   keepTokensAlive: Runnable
   pruneLocalData: Runnable
-}, options: { say?: (line: string) => void } = {}): Schedule {
+}, options: {
+  say?: (line: string) => void
+  /**
+   * When each job last started, by job name (ISO time), from the heartbeats
+   * the jobs record. A job whose last run is older than its interval, or
+   * that never ran, runs at launch.
+   */
+  lastRuns?: () => Promise<Record<string, string | null>>
+  now?: () => number
+} = {}): Schedule {
   const entries: Entry[] = [
     { job: jobs.publishScheduledPosts, everyMs: MINUTE },
     { job: jobs.scanKeywordMonitors, everyMs: 5 * MINUTE },
@@ -72,8 +81,30 @@ export function startSchedule(jobs: {
   void run(jobs.publishScheduledPosts)
 
   // A desktop app is rarely open for a whole day, so a daily timer alone
-  // would never renew a token. Renewing is cheap and skips fresh tokens.
-  void run(jobs.keepTokensAlive)
+  // would never fire. Every other job that is overdue (its last run older
+  // than its interval, or none recorded) runs now (#197). Without a record of
+  // last runs, the daily jobs run, as they always did for tokens.
+  void (async () => {
+    const now = options.now?.() ?? Date.now()
+    let lastRuns: Record<string, string | null> | null = null
+    try {
+      lastRuns = await options.lastRuns?.() ?? null
+    }
+    catch {}
+    for (const entry of entries) {
+      if (entry.job === jobs.publishScheduledPosts) continue
+      if (isOverdue(entry, lastRuns, now)) void run(entry.job)
+    }
+  })()
 
   return { stop: () => timers.forEach(timer => clearInterval(timer)) }
+}
+
+/** Whether a job should run at launch: it never ran, or its last run is older than its interval. */
+export function isOverdue(entry: Entry, lastRuns: Record<string, string | null> | null, now: number): boolean {
+  if (!lastRuns) return entry.everyMs >= 24 * 60 * MINUTE
+  const last = lastRuns[entry.job.name]
+  if (!last) return true
+  const at = Date.parse(last)
+  return Number.isNaN(at) || now - at >= entry.everyMs
 }

@@ -42,7 +42,12 @@ async function boot(dataDir: string, origin: string): Promise<void> {
 
   const { startSchedule } = await import('./schedule')
   const jobs = await bundle.jobs()
-  schedule = startSchedule(jobs, { say: line => console.error(line) })
+  const { readHeartbeats } = await import('../Support/heartbeat')
+  schedule = startSchedule(jobs, {
+    say: line => console.error(line),
+    // When each job last started, so overdue ones run at launch (#197).
+    lastRuns: async () => Object.fromEntries((await readHeartbeats()).map(beat => [beat.job, beat.lastStartedAt])),
+  })
 }
 
 export default {
