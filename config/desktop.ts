@@ -20,7 +20,8 @@ export default {
     appName: 'Postline',
     appId: 'org.stacksjs.postline',
     description: 'Write once, publish to every network.',
-    publisher: 'Stacks',
+    // The holder named in LICENSE.md, so the app's About box and the licence agree.
+    publisher: 'Open Web Foundation',
     homepage: 'https://github.com/stacksjs/postline',
     icon: 'app/Desktop/AppIcon.icns',
     window: {

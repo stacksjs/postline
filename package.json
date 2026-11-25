@@ -11,6 +11,9 @@
   "license": "MIT",
   "funding": "https://github.com/sponsors/chrisbbreuer",
   "homepage": "https://github.com/stacksjs/postline#readme",
+  "engines": {
+    "bun": ">=1.3.14"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/stacksjs/postline.git"
@@ -31,7 +34,6 @@
     "build": "./buddy build",
     "build:frontend": "./buddy build:frontend && bun scripts/bundle-client-scripts.ts",
     "prod": "./buddy build",
-    "deploy": "./buddy deploy",
     "lint": "./buddy lint",
     "lint:fix": "./buddy lint:fix",
     "format": "./buddy format",
