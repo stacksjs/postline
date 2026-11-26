@@ -191,3 +191,26 @@ declare global {
 }
 
 window.postlineToast = { show: showPostlineToast, dismiss: dismissToastById }
+
+/**
+ * Say so when the connection drops (#157). Anything done while offline fails
+ * with an error of its own; posts already scheduled are unaffected, because
+ * they go out from the machine Postline runs on, not from this page.
+ */
+const OFFLINE_ID = 'postline-offline'
+if (!(window as unknown as { __postlineOfflineBound?: boolean }).__postlineOfflineBound) {
+  ;(window as unknown as { __postlineOfflineBound?: boolean }).__postlineOfflineBound = true
+  const offline = (): void => showPostlineToast({
+    id: OFFLINE_ID,
+    tone: 'info',
+    durationMs: 0,
+    title: 'You are offline',
+    message: 'Changes made now will not save until the connection is back. Scheduled posts still go out on time.',
+  })
+  window.addEventListener('offline', offline)
+  window.addEventListener('online', () => {
+    dismissToastById(OFFLINE_ID)
+    showPostlineToast({ tone: 'success', durationMs: 3000, title: 'Back online', message: 'Postline is connected again.' })
+  })
+  if (navigator.onLine === false) offline()
+}

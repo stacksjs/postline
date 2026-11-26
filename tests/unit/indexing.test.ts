@@ -19,7 +19,7 @@ describe('what search engines may index', () => {
 
   test('every app view uses a noindex layout', () => {
     // The public pages: the home page, sign-in (noindex by its own meta), and the plain pages the footer links to.
-    const publicViews = ['index.stx', 'login.stx', 'privacy.stx', 'your-data.stx', 'trademarks.stx', 'changelog.stx', 'roadmap.stx', 'download.stx']
+    const publicViews = ['index.stx', 'login.stx', 'privacy.stx', 'your-data.stx', 'trademarks.stx', 'changelog.stx', 'roadmap.stx', 'download.stx', '404.stx']
     const views = readdirSync(join(root, 'resources/views')).filter(name => name.endsWith('.stx') && !publicViews.includes(name))
     for (const view of views)
       expect(read(`resources/views/${view}`)).toMatch(/@extends\('layouts\/(app|settings)'\)/)

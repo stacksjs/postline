@@ -1,0 +1,23 @@
+@extends('layouts/default')
+
+@section('title', 'Postline - Page not found')
+
+@section('content')
+  @meta('description', 'This page is not part of Postline.')
+  @meta('robots', 'noindex, nofollow')
+  {{-- Postline's own not-found page (#157): stx serves it for any URL no view
+      answers, and the static build writes it as 404.html. --}}
+  <main class="grid place-items-center px-4 min-h-screen bg-bg" data-testid="not-found-page">
+    <section class="grid gap-5 p-6 max-w-sm w-full text-center bg-panel border border-line rounded-2xl shadow-sm">
+      <span class="justify-self-center h-11 w-11 brand-mark" aria-hidden="true"></span>
+      <div class="grid gap-2">
+        <h1 class="m-0 font-semibold text-ink text-xl">This page does not exist</h1>
+        <p class="m-0 text-muted text-ui">The address may have a typo, or the page moved. Nothing you wrote is lost.</p>
+      </div>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors" href="/composer" data-stx-link>Open the composer</a>
+        <a class="inline-flex items-center justify-center px-4 h-10 font-semibold text-ink text-sm bg-panel hover:bg-hover border border-line rounded-xl transition-colors" href="/queue" data-stx-link>See the queue</a>
+      </div>
+    </section>
+  </main>
+@endsection
