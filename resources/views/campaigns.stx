@@ -24,10 +24,10 @@
           <option x-for="option in campaignsList()" :value="option.id" :selected="option.id === campaign()?.id">{{ option.name }}</option>
         </select>
         <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Campaign view" x-show="campaign()">
-          <button class="campaign-view-toggle" type="button" :data-active="view() === 'calendar'" @click="view.set('calendar')">
+          <button class="campaign-view-toggle" type="button" :data-active="view() === 'calendar'" :aria-pressed="view() === 'calendar'" @click="view.set('calendar')">
             <span class="h-3.5 w-3.5 i-hugeicons-calendar-03" aria-hidden="true"></span><span>Calendar</span>
           </button>
-          <button class="campaign-view-toggle" type="button" :data-active="view() === 'list'" @click="view.set('list')">
+          <button class="campaign-view-toggle" type="button" :data-active="view() === 'list'" :aria-pressed="view() === 'list'" @click="view.set('list')">
             <span class="h-3.5 w-3.5 i-hugeicons-menu-01" aria-hidden="true"></span><span>List</span>
           </button>
         </div>
