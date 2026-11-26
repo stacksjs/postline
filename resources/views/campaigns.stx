@@ -43,7 +43,7 @@
 
     <div class="campaign-loading" x-show="loading()" aria-live="polite">
       <div></div><div></div><div></div>
-      <p>Opening your campaign workspace...</p>
+      <p>Opening your campaign workspace…</p>
     </div>
 
     <section class="campaign-empty" x-show="!loading() && !campaign() && panelMode() !== 'campaign'">
@@ -165,7 +165,7 @@
             </article>
             <article class="campaign-assistant-thinking" x-show="busyAction() === 'generate'" data-role="assistant">
               <span class="i-hugeicons-ai-beautify" aria-hidden="true"></span>
-              <p><span>Reading the brief, checking the calendar, and shaping the sequence...</span></p>
+              <p><span>Reading the brief, checking the calendar, and shaping the sequence…</span></p>
             </article>
           </div>
 
@@ -184,7 +184,7 @@
               </button>
             </div>
             <a class="campaign-connect-link" href="/accounts" data-stx-link x-show="providersLoaded() && connectedProviders().length === 0">Connect a social account before planning posts.</a>
-            <small x-show="!providersLoaded()">Checking connected accounts...</small>
+            <small x-show="!providersLoaded()">Checking connected accounts…</small>
           </label>
 
           <label class="campaign-assistant-composer campaign-field">
@@ -200,7 +200,7 @@
 
           <button class="campaign-ai-button" type="button" :disabled="busy() || plannerProviders().length === 0" @click="generatePlan">
             <span class="i-hugeicons-ai-beautify" aria-hidden="true"></span>
-            <span :text="busyAction() === 'generate' ? 'Building your plan...' : posts().length ? 'Ask for another sequence' : 'Build campaign plan'"></span>
+            <span :text="busyAction() === 'generate' ? 'Building your plan…' : posts().length ? 'Ask for another sequence' : 'Build campaign plan'"></span>
           </button>
           <p class="campaign-ai-note" x-show="lastPlanMode()" :text="lastPlanMode() === 'ai' ? 'Generated with Stacks AI and your configured provider.' : 'Generated with Postline\'s local planning engine.'"></p>
 
@@ -213,7 +213,7 @@
             <div><strong>Ready for the queue?</strong><p>Every post must be marked ready and dated in the future. Scheduling is all or nothing; future edits move to Queue.</p></div>
             <button type="button" :disabled="busy()" @click="activateCampaign">
               <span class="i-hugeicons-calendar-check-in-01" aria-hidden="true"></span>
-              <span :text="busyAction() === 'activate' ? 'Scheduling...' : `Schedule ${unqueuedCount()} posts`"></span>
+              <span :text="busyAction() === 'activate' ? 'Scheduling…' : `Schedule ${unqueuedCount()} posts`"></span>
             </button>
           </div>
         </section>
@@ -240,7 +240,7 @@
             </div>
             <div class="campaign-form__footer">
               <button class="campaign-secondary-button" type="button" @click="closePanel">Cancel</button>
-              <button class="campaign-primary-button" type="submit" :disabled="busy()"><span :text="busyAction() === 'campaign' ? 'Saving...' : 'Save campaign'"></span></button>
+              <button class="campaign-primary-button" type="submit" :disabled="busy()"><span :text="busyAction() === 'campaign' ? 'Saving…' : 'Save campaign'"></span></button>
             </div>
           </form>
         </section>
@@ -256,7 +256,7 @@
             <div class="campaign-queued-notice" x-show="queuedPostId()"><span class="i-hugeicons-checkmark-circle-02" aria-hidden="true"></span><p><strong>{{ postTitle() }}</strong><span>{{ postBody() }}</span><small>Publishing owns this post now. Open it in Queue to edit or reschedule.</small></p></div>
             <div class="grid gap-4" x-show="!queuedPostId()">
               <label class="campaign-field"><span>Working title</span><input ref="postTitleInput" required maxlength="160" placeholder="The first signal" x-model="postTitle"></label>
-              <label class="campaign-field"><span>Post copy</span><textarea ref="postBodyInput" required rows="8" maxlength="4000" placeholder="Write the post..." x-model="postBody"></textarea><small>{{ postBody().length }} characters</small></label>
+              <label class="campaign-field"><span>Post copy</span><textarea ref="postBodyInput" required rows="8" maxlength="4000" placeholder="Write the post…" x-model="postBody"></textarea><small>{{ postBody().length }} characters</small></label>
               <div class="campaign-form__dates">
                 <label class="campaign-field"><span>Date and time</span><input ref="postScheduledAtInput" required type="datetime-local" x-model="postScheduledAt"></label>
                 <label class="campaign-field"><span>Pillar</span><select ref="postPillarInput" x-model="postPillar"><option value="teaser">Teaser</option><option value="story">Story</option><option value="education">Education</option><option value="proof">Proof</option><option value="launch">Launch</option><option value="follow-up">Follow-up</option></select></label>
@@ -268,7 +268,7 @@
               <button class="campaign-danger-button" type="button" x-show="postDraftId() && !queuedPostId()" @click="deletePost">Delete</button>
               <button class="campaign-secondary-button" type="button" @click="closePanel">Close</button>
               <a class="campaign-primary-button" x-show="queuedPostId()" :href="`/composer?edit=${queuedPostId()}`" data-stx-link>Edit in Composer</a>
-              <button class="campaign-primary-button" type="submit" x-show="!queuedPostId()" :disabled="busy()"><span :text="busyAction() === 'post' ? 'Saving...' : 'Save post'"></span></button>
+              <button class="campaign-primary-button" type="submit" x-show="!queuedPostId()" :disabled="busy()"><span :text="busyAction() === 'post' ? 'Saving…' : 'Save post'"></span></button>
             </div>
           </form>
         </section>

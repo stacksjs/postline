@@ -14,31 +14,31 @@
     <SettingsWindow id="postline-settings" title="Settings" storageKey="postline" v-model:pane="pane">
       <template #account>
         <a class="inline-flex gap-1.5 items-center px-2 py-1 text-muted text-ui hover:text-ink" href="/composer" x-show="!ownWindow()" data-settings-back>
-          <span class="h-3.5 w-3.5 i-lucide-chevron-left" aria-hidden="true"></span>
+          <span class="h-3.5 w-3.5 i-hugeicons-arrow-left-01" aria-hidden="true"></span>
           Back to Postline
         </a>
       </template>
       <template #sidebar>
         <SettingsSidebarGroup>
-          <SettingsSidebarItem id="general" label="General" icon="i-lucide-settings" tone="grey" />
-          <SettingsSidebarItem id="appearance" label="Appearance" icon="i-lucide-sun-moon" tone="ink" />
+          <SettingsSidebarItem id="general" label="General" icon="i-hugeicons-settings-01" tone="grey" />
+          <SettingsSidebarItem id="appearance" label="Appearance" icon="i-hugeicons-sun-moon" tone="ink" />
         </SettingsSidebarGroup>
         <SettingsSidebarGroup>
-          <SettingsSidebarItem id="channels" label="Channels" icon="i-lucide-share-2" tone="blue" keywords="accounts networks bluesky linkedin mastodon threads instagram" />
-          <SettingsSidebarItem id="composer" label="Composer" icon="i-lucide-pen-line" tone="orange" />
-          <SettingsSidebarItem id="ai" label="AI" icon="i-lucide-sparkles" tone="purple" keywords="anthropic openai ollama claude api key campaign planner" />
-          <SettingsSidebarItem id="deletion" label="Automatic Deletion" icon="i-lucide-trash-2" tone="red" keywords="retention delete cleanup" />
-          <SettingsSidebarItem id="data" label="Data" icon="i-lucide-hard-drive" tone="grey" keywords="export import backup move delete everything archive" />
+          <SettingsSidebarItem id="channels" label="Channels" icon="i-hugeicons-share-08" tone="blue" keywords="accounts networks bluesky linkedin mastodon threads instagram" />
+          <SettingsSidebarItem id="composer" label="Composer" icon="i-hugeicons-pencil-edit-02" tone="orange" />
+          <SettingsSidebarItem id="ai" label="AI" icon="i-hugeicons-sparkles" tone="purple" keywords="anthropic openai ollama claude api key campaign planner" />
+          <SettingsSidebarItem id="deletion" label="Automatic Deletion" icon="i-hugeicons-delete-02" tone="red" keywords="retention delete cleanup" />
+          <SettingsSidebarItem id="data" label="Data" icon="i-hugeicons-hard-drive" tone="grey" keywords="export import backup move delete everything archive" />
         </SettingsSidebarGroup>
         <div x-show="!ownWindow()">
           <SettingsSidebarGroup>
-            <SettingsSidebarItem id="account" label="Account" icon="i-lucide-user" tone="indigo" keywords="sign out log out passkey two-factor 2fa authenticator recovery codes security" />
+            <SettingsSidebarItem id="account" label="Account" icon="i-hugeicons-user" tone="indigo" keywords="sign out log out passkey two-factor 2fa authenticator recovery codes security" />
           </SettingsSidebarGroup>
         </div>
       </template>
 
       <SettingsPane id="general" title="General" active>
-        <SettingsPaneHeader icon="i-lucide-send" tone="red" title="Postline" description="Draft once, then publish to every connected account." />
+        <SettingsPaneHeader icon="i-hugeicons-sent" tone="red" title="Postline" description="Draft once, then publish to every connected account." />
         <SettingsGroup>
           <SettingsRow label="Channels" setting="channels-summary" to="channels" :value="channelPill()" />
           <SettingsRow label="Automatic deletion" setting="deletion-summary" to="deletion" :value="statusPill()" />

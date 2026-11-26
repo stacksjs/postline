@@ -48,7 +48,7 @@
       </form>
 
       <button class="gap-2 items-center justify-center px-4 h-10 font-semibold text-ink text-sm bg-panel hover:bg-hover border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :class="passkeysOffered() ? 'inline-flex' : 'hidden'" :disabled="busy()" @click="signInWithPasskey" data-passkey-sign-in>
-        <span class="h-4 w-4 i-lucide-key-round" aria-hidden="true"></span>
+        <span class="h-4 w-4 i-hugeicons-key-01" aria-hidden="true"></span>
         Sign in with a passkey
       </button>
       <button class="text-muted text-xs underline hover:text-body transition-colors" type="button" :class="challenge() ? '' : 'hidden'" @click="cancelChallenge">Use a different account</button>
