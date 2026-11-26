@@ -98,7 +98,7 @@
                 <div class="flex flex-wrap gap-x-2 gap-y-1 items-center">
                   <strong class="text-ink text-ui" :text="mention.authorName || `@${mention.authorHandle}`"></strong>
                   <span class="text-muted text-xs" :text="`@${mention.authorHandle}`" x-show="mention.authorName"></span>
-                  <span class="text-muted text-xs">·</span><time class="text-muted text-xs" :datetime="mention.postedAt" :text="relativeTime(mention.postedAt)"></time>
+                  <span class="text-muted text-xs">·</span><time class="text-muted text-xs" :datetime="mention.postedAt" :text="relativeTime(mention.postedAt, { fallback: 'Not yet' })"></time>
                   <span class="h-2 w-2 bg-info-solid rounded-full" x-show="mention.status === 'unread'" aria-label="Unread"></span>
                 </div>
                 <p class="m-0 mt-2 leading-5 text-body text-ui whitespace-pre-line" :text="mention.body"></p>
@@ -169,30 +169,12 @@
     const inboxSummary = derived(() => `${filteredMentions().length} mention${filteredMentions().length === 1 ? '' : 's'}, ${filteredMentions().filter(item => item.status === 'unread').length} unread`)
     const lastCheckedLabel = derived(() => {
       const values = monitors().map(item => item.lastCheckedAt).filter(Boolean).sort().reverse()
-      return values.length ? relativeTime(values[0]) : 'Not yet'
+      return values.length ? relativeTime(values[0], { fallback: 'Not yet' }) : 'Not yet'
     })
 
     const providerLabel = (provider: string): string => providerOptions.find(item => item.id === provider)?.label || provider
     const providerInitial = (provider: string): string => provider === 'twitter' ? 'X' : provider.slice(0, 1).toUpperCase()
     const providerColor = (provider: string): string => provider === 'twitter' ? 'bg-net-x' : provider === 'mastodon' ? 'bg-net-mastodon' : 'bg-net-bluesky'
-    const relativeTime = (value: string | null | undefined): string => {
-      const date = new Date(String(value || '').replace(' ', 'T') + (String(value || '').includes('Z') ? '' : 'Z'))
-      if (Number.isNaN(date.getTime())) return 'Not yet'
-      const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000))
-      if (seconds < 60) return 'just now'
-      if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
-      if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
-      if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`
-      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-    }
-
-    const requestJson = async (url: string, options: RequestInit = {}) => {
-      const response = await fetch(url, options)
-      const payload = await response.json()
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Listening request failed.')
-      return payload
-    }
-
     const loadData = async ({ quiet = false } = {}) => {
       if (!quiet) loading.set(true)
       errorMessage.set('')

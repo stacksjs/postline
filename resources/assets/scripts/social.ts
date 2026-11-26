@@ -226,33 +226,6 @@ export async function fetchProviders(): Promise<ProviderStatus[]> {
   })
 }
 
-/** Every connected account, across networks. */
-export async function fetchAccounts(): Promise<AccountStatus[]> {
-  return await cached('accounts', async () => {
-    const response = await fetch('/api/postline/accounts')
-    const payload = await response.json()
-    if (!response.ok || !payload.ok) {
-      throw new Error(payload.error || 'Could not load connected accounts.')
-    }
-    return (payload.data?.accounts || []) as AccountStatus[]
-  })
-}
-
-/**
- * Disconnect one account. Its tokens are dropped server-side; posts it already
- * published keep their history.
- */
-export async function disconnectAccount(id: number): Promise<AccountStatus> {
-  const body = new FormData()
-  body.set('id', String(id))
-  const response = await fetch('/api/postline/accounts/disconnect', { method: 'POST', body })
-  const payload = await response.json()
-  if (!response.ok || !payload.ok) {
-    throw new Error(payload.error || 'Could not disconnect the account.')
-  }
-  return payload.data as AccountStatus
-}
-
 export async function publishCrosspost(input: CrosspostInput): Promise<{ postId: number, results: CrosspostResultItem[] }> {
   const body = new FormData()
   body.set('text', input.text)
@@ -297,8 +270,6 @@ declare global {
       fetchLinkPreview: typeof fetchLinkPreview
       fetchStatus: typeof fetchStatus
       fetchProviders: typeof fetchProviders
-      fetchAccounts: typeof fetchAccounts
-      disconnectAccount: typeof disconnectAccount
       publishCrosspost: typeof publishCrosspost
       providerLabel: typeof providerLabel
       providerIcon: typeof providerIcon
@@ -314,8 +285,6 @@ window.postlineSocial = {
   fetchLinkPreview,
   fetchStatus,
   fetchProviders,
-  fetchAccounts,
-  disconnectAccount,
   publishCrosspost,
   providerLabel,
   providerIcon,

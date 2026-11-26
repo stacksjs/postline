@@ -1,3 +1,5 @@
+import { escapeHtml } from '../../functions/postline-client'
+
 type Point = {
   label: string
   value: number
@@ -55,14 +57,6 @@ const blue = '#2563eb'
 const text = '#18181b'
 const muted = '#71717a'
 const rule = '#e4e4e7'
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-}
 
 function formatTick(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)

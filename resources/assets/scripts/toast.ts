@@ -1,3 +1,4 @@
+import { escapeHtml } from '../../functions/postline-client'
 import { openLabel } from './lib/open-label'
 
 export type PostlineToastTone = 'neutral' | 'success' | 'error' | 'info'
@@ -82,14 +83,6 @@ function host(): HTMLElement {
     document.body.append(element)
   }
   return element
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
 }
 
 function formatUrlLabel(url: string): string {

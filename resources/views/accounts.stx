@@ -535,10 +535,7 @@
 
       const refreshAccounts = async () => {
         try {
-          const response = await fetch('/api/postline/accounts')
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load connected accounts.')
-          accountList.set(Array.isArray(payload.data?.accounts) ? payload.data.accounts : [])
+          accountList.set(await fetchAccounts())
         }
         catch (error) {
           // Same as the status cards: degrade quietly on load.
@@ -1055,11 +1052,7 @@
 
         disconnectingId.set(id)
         try {
-          const body = new FormData()
-          body.set('id', String(id))
-          const response = await fetch('/api/postline/accounts/disconnect', { method: 'POST', body })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not disconnect the account.')
+          await disconnectSocialAccount(id)
           await Promise.all([refreshAccounts(), refreshNetwork[account.provider]?.()])
           notify(`${name} is disconnected.`, 'success', { title: 'Disconnected' })
         }

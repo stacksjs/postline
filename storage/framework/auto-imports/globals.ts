@@ -10,6 +10,11 @@ Object.assign(globalThis, autoImports)
 
 // TypeScript declarations
 declare global {
+  const requestJson: typeof autoImports.requestJson
+  const fetchAccounts: typeof autoImports.fetchAccounts
+  const disconnectSocialAccount: typeof autoImports.disconnectSocialAccount
+  const escapeHtml: typeof autoImports.escapeHtml
+  const relativeTime: typeof autoImports.relativeTime
 }
 
 export {}

@@ -782,13 +782,6 @@
       const activePreview = () => previewFor(activePost)
       const firstUrl = value => value.match(urlPattern)?.[0]?.replace(/[),.;]+$/, '')
 
-      const escapeHtml = value => String(value || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;')
-
       const postTemplate = (number, text = '') => `
         <header class="flex gap-3 items-center justify-between">
           <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel-3 rounded-lg" type="button" data-select-post>

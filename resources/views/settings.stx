@@ -569,17 +569,6 @@
       securityTone.set(tone)
     }
 
-    const requestJson = async (path: string, init?: RequestInit): Promise<any> => {
-      const response = await fetch(path, {
-        ...init,
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...(init?.headers ?? {}) },
-      })
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok || payload.ok === false)
-        throw new Error(payload.error || payload.message || (response.status === 404 ? 'Not found.' : 'That did not work.'))
-      return payload
-    }
-
     const loadSecurity = async (): Promise<void> => {
       try {
         const [keys, factor] = await Promise.all([

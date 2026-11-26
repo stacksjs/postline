@@ -153,31 +153,11 @@
     const notConnected = state(false)
     const showEmpty = derived(() => loaded() && !feedError() && !notConnected() && items().length === 0)
 
-    const escapeHtml = value => String(value || '')
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll('\'', '&#039;')
-
     const formatCount = (value: number | null | undefined): string => {
       const n = Number(value) || 0
       if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
       if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`
       return String(n)
-    }
-
-    const formatRelativeTime = (iso: string | null | undefined): string => {
-      const date = new Date(iso)
-      if (Number.isNaN(date.getTime())) return ''
-      const minutes = Math.floor((Date.now() - date.getTime()) / 60000)
-      if (minutes < 1) return 'now'
-      if (minutes < 60) return `${minutes}m`
-      const hours = Math.floor(minutes / 60)
-      if (hours < 24) return `${hours}h`
-      const days = Math.floor(hours / 24)
-      if (days < 7) return `${days}d`
-      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
     }
 
     const avatarGradient = (handle: string): string => {
@@ -227,7 +207,7 @@
         initials: initialsFor(handle, name),
         gradient: avatarGradient(handle),
         postedAt: item.postedAt || '',
-        relativeTime: formatRelativeTime(item.postedAt),
+        relativeTime: relativeTime(item.postedAt, { compact: true }),
         bodyHtml: linkifyBody(item.body || ''),
         replies: formatCount(item.replyCount),
         reposts: formatCount(item.repostCount),
