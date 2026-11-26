@@ -2,7 +2,9 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import process from 'node:process'
-import { BackupType, createBackup } from 'ts-backups'
+import type { S3Destination } from 'ts-backups'
+import { backupDirectory, backupFile, backupSQLite, BackupType, uploadToS3 } from 'ts-backups'
+import { captureRecoveryMedia } from '../Support/Recovery/media'
 import { mediaDirectory } from '../Support/Social/uploads'
 
 const RECOVERY_KEY_ENV = 'POSTLINE_BACKUP_RECOVERY_KEY'
@@ -38,23 +40,30 @@ export async function backupWorkspace(collection: 'snapshots' | 'rehearsals' = '
     await mkdir(media, { recursive: true })
     await writeFile(keyPath, appKey, { flag: 'wx', mode: 0o600 })
 
+    const output = join(temporary, 'artifacts')
+    await mkdir(output, { mode: 0o700 })
+    const database = await backupSQLite({ type: BackupType.SQLITE, name: 'database', path: process.env.DB_DATABASE_PATH, mode: 'file', compress: false }, output)
+    if (!database.success) throw new Error('The SQLite backup could not be created.')
+
+    // Queue media filenames are immutable. Stage the bytes once, then verify
+    // them against the snapshot before creating or uploading any archive.
+    const stagedMedia = join(temporary, 'media')
+    await captureRecoveryMedia(join(output, database.filename), media, stagedMedia)
+    const artifacts = {
+      database,
+      media: await backupDirectory({ name: 'media', path: stagedMedia, compress: true, followSymlinks: false }, output),
+      key: await backupFile({ name: 'key', path: keyPath, compress: false }, output),
+    }
+
     const credentials = { accessKeyId, secretAccessKey }
-    const backup = await createBackup({
-      verbose: false,
-      outputPath: join(temporary, 'artifacts'),
-      databases: [{ type: BackupType.SQLITE, name: 'database', path: process.env.DB_DATABASE_PATH, mode: 'file', compress: false }],
-      files: [
-        { name: 'media', path: media, compress: true, followSymlinks: false },
-        { name: 'key', path: keyPath, compress: false },
-      ],
-      destinations: [{ type: 's3', bucket, prefix, region, credentials, optional: false, encryption: { keyEnv: RECOVERY_KEY_ENV } }],
-    })
+    const destination: S3Destination = { type: 's3', bucket, prefix, region, credentials, optional: false, encryption: { keyEnv: RECOVERY_KEY_ENV } }
 
     const files = {} as RecoveryManifest['files']
     for (const name of Object.keys(RECOVERY_FILES) as RecoveryFile[]) {
-      const artifact = backup.results.find(result => result.name === name && result.success)
-      const upload = artifact && backup.uploads?.find(result => result.filename === basename(artifact.filename))
-      if (!upload?.success || upload.skipped || !upload.bytes)
+      const artifact = artifacts[name]
+      if (!artifact.success) throw new Error(`The ${name} backup could not be created.`)
+      const upload = await uploadToS3(destination, join(output, artifact.filename))
+      if (!upload.success || upload.skipped || !upload.bytes)
         throw new Error(`The ${name} backup could not be verified in S3.`)
       files[name] = { filename: basename(upload.target), bytes: upload.bytes }
     }

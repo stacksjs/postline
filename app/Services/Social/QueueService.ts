@@ -1,6 +1,7 @@
 import { log } from '@stacksjs/logging'
 import { mediaObjections } from '../../Support/Social/media-rules'
 import type { PostOptions } from '../../Support/Social/post-options'
+import type { StoredContent } from '../../Support/Social/stored-content'
 import { sanitizePostOptions } from '../../Support/Social/post-options'
 import { isDue, MAX_ATTEMPTS, nextAttemptAt } from '../../Support/Social/retry'
 import type { PublishTarget } from '../../Support/Social/targets'
@@ -15,7 +16,8 @@ import { env } from '@stacksjs/env'
 import { raw } from '@stacksjs/query-builder'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { dedupeTargets, isAccountProvider, parseTargets, targetKey, targetProviders } from '../../Support/Social/targets'
-import { MEDIA_DIR, publicMediaUrl } from '../../Support/Social/uploads'
+import { parseStoredContent } from '../../Support/Social/stored-content'
+import { isSafeMediaFilename, MEDIA_DIR, publicMediaUrl } from '../../Support/Social/uploads'
 import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/variants'
 import { crosspost, crosspostProviders } from './CrosspostService'
 import { findIdentityRow, unavailableAccountError } from './identities'
@@ -78,35 +80,6 @@ async function storedContentOf(post: any): Promise<unknown> {
   return post?.[await contentColumn()]
 }
 
-/** Serialized into the stored-content column — everything beyond the text itself. */
-interface StoredContent {
-  /** Only set when the composer provided an explicit title. */
-  title?: string
-  external?: { uri: string, title: string, description?: string }
-  media?: Array<{ url?: string, path?: string, mimeType?: string, altText?: string }>
-  /**
-   * Per-provider body overrides. Lives here rather than on `post_targets`
-   * because those rows are a results ledger: `save` writes placeholders that
-   * `publishAt` deletes immediately before publishing, so an override stored
-   * there would be destroyed exactly when it is needed.
-   */
-  variants?: VariantMap
-  /** Language, and Mastodon's visibility and content warning. */
-  options?: PostOptions
-}
-
-function parseStoredContent(raw: unknown): StoredContent | null {
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(String(raw))
-    return parsed && typeof parsed === 'object' ? parsed as StoredContent : null
-  }
-  catch {
-    return null
-  }
-}
-
-/** Post statuses a user may still act on (publish now, delete). */
 /** Posts per page of the queue, and the most one request may ask for. */
 export const QUEUE_PAGE_SIZE = 50
 export const MAX_QUEUE_PAGE_SIZE = 500
@@ -550,9 +523,9 @@ export class QueueService {
   /** Delete a draft, scheduled, or failed post along with its targets. */
   async remove(id: number): Promise<void> {
     const post = await this.findActionable(id)
-    await this.removeStoredMedia(post)
     await database.deleteFrom('post_targets').where('post_id', '=', post.id).execute()
     await database.deleteFrom('posts').where('id', '=', post.id).execute()
+    await this.removeStoredMedia(post)
   }
 
   /**
@@ -629,7 +602,6 @@ export class QueueService {
 
     // Media: replace / remove / keep. Replacing or removing drops the old files.
     if (images !== undefined) {
-      await this.removeStoredMedia(post)
       if (images.length) stored.media = await storeImages(String(post.uuid), images)
     }
     else if (existing?.media?.length) {
@@ -649,6 +621,7 @@ export class QueueService {
     // Rebuild placeholder targets to match the new target set.
     await database.deleteFrom('post_targets').where('post_id', '=', post.id).execute()
     await this.writePlaceholders(Number(post.id), targets, status, scheduledAt, updatedAt)
+    if (images !== undefined) await this.removeStoredMedia(post)
 
     return { postId: Number(post.id), status }
   }
@@ -908,6 +881,7 @@ export class QueueService {
       const media: NonNullable<PublishContent['media']> = []
       for (const item of stored.media) {
         if (item.path) {
+          if (!isSafeMediaFilename(item.path)) throw new MissingMediaError()
           const file = Bun.file(join(MEDIA_DIR, item.path))
           // A post saved with an image must not go out without it. This used
           // to be skipped silently, which is how a deploy that wiped the
@@ -938,7 +912,7 @@ export class QueueService {
   private async removeStoredMedia(post: any): Promise<void> {
     const stored = parseStoredContent(await storedContentOf(post))
     for (const item of stored?.media || []) {
-      if (!item.path) continue
+      if (!item.path || !isSafeMediaFilename(item.path)) continue
       await unlink(join(MEDIA_DIR, item.path)).catch(() => {})
     }
   }

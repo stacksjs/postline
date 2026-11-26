@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { decryptBackupFile, restoreFromConfig } from 'ts-backups'
 import { RECOVERY_FILES } from '../app/Services/RecoveryBackupService'
+import { verifyRecoveryMedia } from '../app/Support/Recovery/media'
 
 const [set, destination] = process.argv.slice(2)
 if (!set || !destination)
@@ -49,6 +50,7 @@ try {
   await mkdir(media, { mode: 0o700 })
   const restored = await restoreFromConfig({ verbose: false, outputPath: output, databases: [], files: [{ name: 'media', path: media }] }, { snapshot: RECOVERY_FILES.media })
   if (restored.successCount !== 1) throw new Error('The recovered media archive could not be expanded.')
+  await verifyRecoveryMedia(join(output, RECOVERY_FILES.database), media)
   await rm(join(output, RECOVERY_FILES.media))
 }
 catch (error) {

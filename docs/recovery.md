@@ -10,7 +10,8 @@ sets.
 Each recovery set contains a transactionally consistent SQLite snapshot,
 the uploaded media, and the original application key. The three files are
 encrypted before leaving the server. A `complete.json` object appears only
-after S3 confirms all three uploads. The production bucket keeps daily sets
+after Postline confirms the queued images referenced by the snapshot are
+present and S3 verifies all three uploads. The production bucket keeps daily sets
 for 90 days and expires rehearsal sets after seven days.
 
 To run the same job on the production scheduler host with its usual
@@ -52,9 +53,13 @@ in the scheduler log if a run fails.
    its `DB_DATABASE_PATH` and `POSTLINE_MEDIA_DIR`. Install the recovered
    `app-key` as `APP_KEY` in its secret store. Keep that value across upgrades
    so Postline can open the encrypted network sign-ins in the database.
-4. Start Postline with scheduled publishing paused while verifying the
-   workspace. Check that it opens, that a queued image loads, and that
-   `/api/postline/health` reports the database and migrations are healthy.
-   Transfer scheduling to the replacement server once the original scheduler
-   has stopped. Check the [upgrade guide](upgrading.md) before opening an
-   older backup with newer Postline code.
+4. Start the replacement web and API services with the scheduler disabled.
+   Sign in and enable **Settings > General > Pause scheduled publishing**.
+   Check that the workspace opens and a queued image loads. In
+   `/api/postline/health`, verify that `database` and `migrations` both report
+   `ok` while the scheduler is stopped. Check the [upgrade guide](upgrading.md)
+   before opening an older backup with newer Postline code.
+5. Stop the original scheduler before starting the replacement scheduler.
+   Review **Queue > Needs attention** and the schedule on the replacement.
+   Verify that its health endpoint reports the scheduler as `ok`, then resume
+   scheduled publishing in Settings when ready.

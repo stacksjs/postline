@@ -64,4 +64,14 @@ describe('workspace archive', () => {
   test('something that is not an export is refused', async () => {
     await expect(workspaceArchive.import({ hello: 'world' })).rejects.toThrow('not a Postline workspace export')
   })
+
+  test('invalid attachment references are rejected before any post is imported', async () => {
+    const uuid = crypto.randomUUID()
+    await expect(workspaceArchive.import({
+      format: 'postline-workspace',
+      version: 1,
+      posts: [{ uuid, content: JSON.stringify({ media: [{ path: 'nested/image.jpg' }] }) }],
+    })).rejects.toThrow('invalid stored image reference')
+    expect(await database.selectFrom('posts').select(['id']).where('uuid', '=', uuid).executeTakeFirst()).toBeUndefined()
+  })
 })

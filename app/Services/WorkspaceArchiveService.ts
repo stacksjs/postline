@@ -15,10 +15,11 @@
  */
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, rm } from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import { join } from 'node:path'
 import { db } from '@stacksjs/database'
 import { UserFacingError } from '../Support/Http/user-error'
-import { MEDIA_DIR } from '../Support/Social/uploads'
+import { referencedMediaFiles } from '../Support/Social/stored-content'
+import { isSafeMediaFilename, MEDIA_DIR } from '../Support/Social/uploads'
 import { blog } from './Social/BlogService'
 import { ensureAccount, now } from './Social/support'
 
@@ -71,17 +72,6 @@ function pick(row: Record<string, unknown>, columns: readonly string[]): Record<
   return Object.fromEntries(columns.map(column => [column, row[column] ?? null]))
 }
 
-/** The image files a post's stored content points at. */
-function mediaFiles(content: unknown): string[] {
-  try {
-    const parsed = JSON.parse(String(content || '{}'))
-    return (Array.isArray(parsed?.media) ? parsed.media : []).map((item: any) => item?.path).filter((path: unknown): path is string => typeof path === 'string' && Boolean(path))
-  }
-  catch {
-    return []
-  }
-}
-
 export class WorkspaceArchiveService {
   async export(): Promise<WorkspaceArchive> {
     const accountId = await ensureAccount()
@@ -99,8 +89,7 @@ export class WorkspaceArchiveService {
 
     const media: Record<string, string> = {}
     for (const post of posts) {
-      for (const file of mediaFiles(post.content)) {
-        const name = basename(file)
+      for (const name of referencedMediaFiles(post.content)) {
         const path = join(MEDIA_DIR, name)
         if (existsSync(path)) media[name] = Buffer.from(await readFile(path)).toString('base64')
       }
@@ -135,6 +124,14 @@ export class WorkspaceArchiveService {
       throw new UserFacingError('That is not a Postline workspace export.')
     if (Number(archive.version) > ARCHIVE_VERSION)
       throw new UserFacingError('That export is from a newer Postline. Update this one, then import it.')
+    const media = Object.entries(archive.media || {})
+    try {
+      for (const post of archive.posts || []) referencedMediaFiles(post.content)
+      if (media.some(([name]) => !isSafeMediaFilename(name))) throw new Error('Invalid image filename')
+    }
+    catch {
+      throw new UserFacingError('That export contains an invalid stored image reference.')
+    }
 
     const report: ImportReport = { posts: 0, targets: 0, campaigns: 0, campaignPosts: 0, blogPosts: 0, monitors: 0, media: 0, skipped: 0 }
     const accountId = await ensureAccount()
@@ -197,10 +194,9 @@ export class WorkspaceArchiveService {
     }
 
     await mkdir(MEDIA_DIR, { recursive: true })
-    for (const [name, data] of Object.entries(archive.media || {})) {
-      const safe = basename(name)
-      const path = join(MEDIA_DIR, safe)
-      if (safe !== name || existsSync(path)) continue
+    for (const [name, data] of media) {
+      const path = join(MEDIA_DIR, name)
+      if (existsSync(path)) continue
       await Bun.write(path, Buffer.from(String(data), 'base64'))
       report.media++
     }
