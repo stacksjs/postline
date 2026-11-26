@@ -71,7 +71,7 @@
   "dependencies": {
     "@stacksjs/ai": "^0.75.692",
     "@stacksjs/socials": "^0.75.692",
-    "@stacksjs/stx": "^0.2.945",
+    "@stacksjs/stx": "^0.2.946",
     "@stacksjs/ts-cloud": "^0.16.152",
     "stacks": "^0.75.692",
     "ts-images": "^0.2.35",
