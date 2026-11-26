@@ -20,7 +20,7 @@ useHead(marketingHead('/use-cases/developer-advocates', '/images/og/use-case-dev
       </nav>
       <span class="grid place-items-center h-12 w-12 text-ink text-xl bg-panel border border-line rounded-2xl" aria-hidden="true"><span class="i-hugeicons-user-group"></span></span>
       <h1 class="m-0 leading-[1.04] text-4xl text-ink sm:text-6xl">Reach every community</h1>
-      <p class="m-0 max-w-[60ch] leading-relaxed text-[17px] text-body sm:text-lg">Developer communities gather on different networks. Reach the channels you use with copy suited to each audience.</p>
+      <p class="m-0 max-w-[60ch] leading-relaxed text-[17px] text-body sm:text-lg">Developer communities gather on different networks. Write for each community in the language its audience uses.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/download" data-stx-link>Get started<span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span></a>
         <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline"><span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>Read the source</a>

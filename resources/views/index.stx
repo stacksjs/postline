@@ -43,7 +43,7 @@ const queue = [
 ]
 
 const faqs = [
-  { q: 'Is Postline free?', a: 'Yes. Postline is MIT licensed and free to run yourself, with no limit on accounts or posts. A hosted plan, for people who would rather not run it, is on the way; leave your address below to hear when it opens.' },
+  { q: 'Is Postline free?', a: 'Yes. Postline is MIT licensed and free to run yourself, with no limit on accounts or posts. A hosted plan is in development. Leave your address below to hear when it opens.' },
   { q: 'Which networks does it publish to?', a: 'Bluesky, X, LinkedIn, Instagram, Threads and Mastodon, plus long-form posts to a blog on your own site. You can connect several accounts on the same network.' },
   { q: 'Where are my access tokens kept?', a: 'In your own database, encrypted with a key your instance generates. Postline has no service in the middle, so there is nobody else who could hold a copy.' },
   { q: 'Do I need a server?', a: 'No. It runs on a laptop. Scheduled posts go out while Postline is running, so put it on a small always-on server when you want the queue to publish overnight. Instagram and Threads fetch images from a public address, so on a laptop switch on temporary image links in Settings.' },
@@ -206,7 +206,7 @@ useHead({
     <div class="max-w-[44rem] reveal">
       <p class="m-0 eyebrow">Features</p>
       <h2 id="features-heading" class="m-0 mt-4 leading-[1.08] text-3xl text-ink sm:text-5xl">Everything that happens after the draft.</h2>
-      <p class="m-0 mt-5 leading-relaxed text-[17px] text-body">Publishing is the easy part. Postline also holds the schedule, the launch plan, the replies and the numbers, so a post is one job and not six.</p>
+      <p class="m-0 mt-5 leading-relaxed text-[17px] text-body">Postline keeps the publishing schedule, launch plan, replies, and results in one workspace.</p>
     </div>
 
     <ul class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 m-0 mt-12 p-0 list-none">

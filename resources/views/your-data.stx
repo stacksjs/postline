@@ -22,7 +22,7 @@ useHead(marketingHead('/your-data'))
     <section class="grid gap-3">
       <h2 class="m-0 text-2xl text-ink">Only if you turn them on</h2>
       <ul class="grid gap-3 m-0 pl-5 leading-relaxed list-disc text-[16px] text-body marker:text-muted">
-        <li><span class="text-ink">An AI provider.</span> If you add an Anthropic, OpenAI or other provider key for campaign planning, the brief you write and the channels it is for are sent to that provider when you ask for a plan. Without a key nothing is sent and plans come from templates.</li>
+        <li><span class="text-ink">An AI provider.</span> If you add an Anthropic, OpenAI or other provider key for campaign planning, the brief you write and the selected networks are sent to that provider when you ask for a plan. Without a key nothing is sent and plans come from templates.</li>
         <li><span class="text-ink">Temporary image links.</span> Instagram and Threads fetch images from a public address. If you switch on temporary image links in Settings, an image is reachable through a short-lived tunnel for the minutes it takes them to fetch it, then the link closes.</li>
         <li><span class="text-ink">An alert webhook.</span> If you set <code class="font-mono text-[14px]">POSTLINE_ALERT_WEBHOOK_URL</code>, problems that need your attention (a failed post, an account that needs reconnecting) are sent to that address.</li>
         <li><span class="text-ink">Email.</span> If you configure a mail server, the emails Postline sends go through it.</li>

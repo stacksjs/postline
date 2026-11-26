@@ -31,7 +31,7 @@ useHead(marketingHead('/features/campaigns', '/images/og/feature-campaigns.png')
       <div class="grid gap-10">
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">A calendar for the whole arc</h2>
-          <p class="m-0 leading-relaxed text-[16px] text-body">Set the window, drop posts onto days, and drag them when the plan changes. Each post names the channels it is going to, so a gap in the plan is something you can see.</p>
+          <p class="m-0 leading-relaxed text-[16px] text-body">Set the window, drop posts onto days, and drag them when the plan changes. Each post shows its networks so you can spot gaps in the plan.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">An assistant that drafts the sequence</h2>

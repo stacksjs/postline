@@ -89,7 +89,7 @@ export const FEATURES: MarketingEntry[] = [
     icon: 'flowchart-01',
     intro: 'A launch is a sequence: the teaser, the announcement, the follow-ups, the lesson learned. Campaigns give that sequence a calendar of its own, so you shape the story first and schedule it second.',
     sections: [
-      { heading: 'A calendar for the whole arc', body: 'Set the window, drop posts onto days, and drag them when the plan changes. Each post names the channels it is going to, so a gap in the plan is something you can see.' },
+      { heading: 'A calendar for the whole arc', body: 'Set the window, drop posts onto days, and drag them when the plan changes. Each post shows its networks so you can spot gaps in the plan.' },
       { heading: 'An assistant that drafts the sequence', body: 'Describe the goal, the audience and the tone, and the assistant proposes a sequence you can edit. It works with an OpenAI or Anthropic key, with a local Ollama model, or with the built-in planner when you have no key at all.' },
       { heading: 'Activate when the plan is ready', body: 'A campaign is a plan until you activate it. Activating moves its posts into the publishing queue, scheduled in the campaign\'s own timezone.' },
     ],
@@ -142,12 +142,12 @@ export const FEATURES: MarketingEntry[] = [
     intro: 'Compare publishing activity across the networks you use. Postline syncs likes, reposts, and replies for Bluesky and shows the interactions earned by measured posts.',
     sections: [
       { heading: 'Counts, attached to your posts', body: 'Postline stores interactions with each measured Bluesky post. Recommendations require enough measured posts and a clear leader.' },
-      { heading: 'When and where you publish', body: 'See how much went out over the last thirty days, which channels carried it, and which posting windows you actually use.' },
+      { heading: 'When and where you publish', body: 'See how much went out over the last thirty days, which networks carried it, and which posting windows you use.' },
       { heading: 'Batched and rate-aware', body: 'The Bluesky sync runs in batches and skips posts that have been deleted.' },
     ],
     points: [
       'Bluesky likes, reposts and replies per post',
-      'Channel mix and posting windows',
+      'Publishing by network and posting window',
       'History survives an account going away',
     ],
   },
@@ -213,7 +213,7 @@ export const USE_CASES: MarketingEntry[] = [
     title: 'Reach every community',
     summary: 'Share updates with developer communities on Bluesky, X, and Mastodon.',
     icon: 'user-group',
-    intro: 'Developer communities gather on different networks. Reach the channels you use with copy suited to each audience.',
+    intro: 'Developer communities gather on different networks. Write for each community in the language its audience uses.',
     sections: [
       { heading: 'Tuned per network', body: 'Mastodon and Bluesky reward a different register than LinkedIn. Per-network variants let one post read naturally on each without maintaining separate drafts.' },
       { heading: 'Hear the replies you were not tagged in', body: 'Listening rules catch a project name or an error message people post without mentioning you, on the networks developers actually use.' },

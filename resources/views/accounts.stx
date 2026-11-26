@@ -28,7 +28,7 @@
     <div class="grid gap-3 sm:grid-cols-3">
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
         <span class="grid place-items-center shrink-0 h-10 w-10 text-info text-lg bg-info-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-share-08"></span></span>
-        <div><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Destinations</span><strong class="block mt-1 text-ink text-sm">7 publishing channels</strong></div>
+        <div><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Publishing</span><strong class="block mt-1 text-ink text-sm">Six networks and Blog</strong></div>
       </article>
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
         <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-success bg-success-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-shield-key"></span></span>
@@ -42,8 +42,8 @@
 
     <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" data-bluesky-channel-card>
       <header class="flex gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
-        <div><strong class="text-ink text-sm">Publishing destinations</strong><p class="m-0 mt-1 text-muted text-xs">Connect only the channels you actually use.</p></div>
-        <span class="px-2.5 py-1 font-semibold text-muted text-xs bg-panel-2 border border-line rounded-full">7 destinations</span>
+        <div><strong class="text-ink text-sm">Publishing channels</strong><p class="m-0 mt-1 text-muted text-xs">Connect accounts for the networks you use.</p></div>
+        <span class="px-2.5 py-1 font-semibold text-muted text-xs bg-panel-2 border border-line rounded-full">7 channels</span>
       </header>
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" data-bluesky-channels>
         <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="bluesky">
@@ -294,7 +294,7 @@
               <input type="checkbox" value="bluesky" checked data-purge-provider> Bluesky
             </label>
             <label class="inline-flex gap-2 items-center text-ui">
-              <input type="checkbox" value="twitter" checked data-purge-provider> X (Twitter)
+              <input type="checkbox" value="twitter" checked data-purge-provider> X
             </label>
             <label class="inline-flex gap-2 items-center text-ui">
               <input type="checkbox" value="mastodon" checked data-purge-provider> Mastodon

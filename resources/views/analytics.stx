@@ -30,7 +30,7 @@
         <span class="text-muted text-xs" data-analytics-engagement-trend>Loading…</span>
       </article>
       <article class="grid gap-2 p-3.5 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="text-muted text-xs">Best channel</span>
+        <span class="text-muted text-xs">Best network</span>
         <strong class="text-2xl" data-analytics-best-channel>Not available</strong>
         <span class="text-muted text-xs" data-analytics-best-channel-trend>Loading…</span>
       </article>
@@ -68,7 +68,7 @@
       <aside class="grid content-start gap-3.5">
         <section class="bg-panel border border-line rounded-2xl shadow-sm">
           <header class="p-3.5 border-b border-line">
-            <strong class="text-ui">Channel mix</strong>
+            <strong class="text-ui">Publishing by network</strong>
           </header>
           <div class="grid gap-3 p-3.5" data-analytics-channel-mix>
             <p class="m-0 text-muted text-xs">Loading…</p>

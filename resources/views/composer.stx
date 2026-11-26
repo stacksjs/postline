@@ -488,7 +488,7 @@
             title: !connected
               ? `Opens Channels, where ${network} is connected.`
               : over
-                ? `Too long for ${network} — this target would be rejected.`
+                ? `Too long for ${network}. Shorten this version before publishing.`
                 : target.multi ? full : '',
           }
         })

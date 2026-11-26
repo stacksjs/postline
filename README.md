@@ -214,12 +214,7 @@ bun run typecheck:app
 Commits follow [Conventional Commits](https://www.conventionalcommits.org).
 `AGENTS.md` records the project rules for people and coding agents alike.
 
-### Product terms
-
-- A **network** is a social service such as Bluesky or Mastodon.
-- An **account** is a sign-in connected to a network. The **workspace owner** signs in to Postline itself.
-- A **channel** is a publishing destination. A connected account and the built-in Blog are both channels.
-- **Cleanup** removes posts from connected accounts. **Automatic Cleanup** runs that removal on a schedule.
+See [product terms](docs/index.md#product-terms) for the language used in Postline and its documentation.
 
 ## License
 

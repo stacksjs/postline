@@ -180,7 +180,7 @@
 
         <SettingsGroup header="Networks" footer="Every connected account on a network that is on is included. Instagram and Threads can't delete posts through their APIs.">
           <SettingsRow label="Bluesky" setting="auto-delete-bluesky"><Switch variant="mac" size="mini" v-model:checked="onBluesky" /></SettingsRow>
-          <SettingsRow label="X (Twitter)" setting="auto-delete-twitter"><Switch variant="mac" size="mini" v-model:checked="onTwitter" /></SettingsRow>
+          <SettingsRow label="X" setting="auto-delete-twitter"><Switch variant="mac" size="mini" v-model:checked="onTwitter" /></SettingsRow>
           <SettingsRow label="Mastodon" setting="auto-delete-mastodon"><Switch variant="mac" size="mini" v-model:checked="onMastodon" /></SettingsRow>
           <SettingsRow label="LinkedIn" setting="auto-delete-linkedin"><Switch variant="mac" size="mini" v-model:checked="onLinkedin" /></SettingsRow>
         </SettingsGroup>
