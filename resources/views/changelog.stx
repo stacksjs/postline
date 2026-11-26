@@ -16,7 +16,7 @@ const releases = parseChangelog(readFileSync(join(process.cwd(), 'CHANGELOG.md')
 @section('content')
   <LegalPage heading="Changelog" intro="Every release and what changed in it. Downloads are on the GitHub releases page.">
     @foreach (releases as release)
-      <section class="grid gap-4">
+      <section class="grid gap-4 min-w-0">
         <div class="flex flex-wrap gap-3 items-baseline justify-between">
           <h2 class="m-0 text-2xl text-ink">{{ release.version }}</h2>
           @if (release.compare)
@@ -24,9 +24,9 @@ const releases = parseChangelog(readFileSync(join(process.cwd(), 'CHANGELOG.md')
           @endif
         </div>
         @foreach (release.groups as group)
-          <div class="grid gap-2">
+          <div class="grid gap-2 min-w-0">
             <h3 class="m-0 font-semibold text-[15px] text-ink">{{ group.title }}</h3>
-            <ul class="grid gap-1.5 m-0 pl-5 leading-relaxed text-[15px] text-body">
+            <ul class="grid grid-cols-[minmax(0,1fr)] gap-1.5 m-0 pl-5 min-w-0 leading-relaxed text-[15px] text-body break-words">
               @foreach (group.items as item)
                 <li>
                   @if (item.scope)

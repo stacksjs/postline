@@ -30,7 +30,7 @@ export const CEILINGS: Record<string, Partial<typeof BUDGETS>> = {
   composer: { script: 156 * KB },
   campaigns: { script: 151 * KB },
   accounts: { script: 153 * KB },
-  settings: { css: 32 * KB },
+  settings: { css: 31.5 * KB },
 }
 
 /** The workspace pages, which carry the app's scripts. */

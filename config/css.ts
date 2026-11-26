@@ -475,125 +475,8 @@ html.dark [data-retention-message][data-tone="success"] { color: rgb(110 231 183
 html.dark [data-retention-message][data-tone="error"] { color: rgb(252 165 165); }
 `
 
-/**
- * The marketing site.
- *
- * Scoped under `html.marketing` so none of it reaches the workspace, which
- * shares this stylesheet. Only what a utility class cannot say lives here:
- * the type ramp, the page backdrop, motion, and the few composed pieces
- * (eyebrow, grid backdrop, product frame) that would otherwise be a dozen
- * utilities repeated on thirty elements.
- */
-const MARKETING_BASE: string = `
-html.marketing {
-  font-family: var(--font-body);
-  scroll-behavior: smooth;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-}
-
-html.marketing body { background-color: var(--bg); color: var(--ink); }
-
-html.marketing :where(h1, h2, h3, h4) {
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  text-wrap: balance;
-}
-
-html.marketing :where(p) { text-wrap: pretty; }
-
-html.marketing .font-mono { font-family: var(--font-mono); }
-
-html.marketing ::selection { background: var(--ink); color: var(--bg); }
-
-html.marketing :where(a, button, summary):focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 3px;
-  border-radius: 8px;
-}
-
-/* A section eyebrow: small, mono, with the brand dot that says "this is live". */
-html.marketing .eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-}
-html.marketing .eyebrow::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
-  background: var(--brand);
-}
-
-html.marketing .text-brand { color: var(--brand); }
-html.marketing .bg-brand { background-color: var(--brand); }
-
-/*
-  The hero backdrop: a hairline grid that fades out toward the fold, so the
-  first screen has structure without a picture to download.
-*/
-html.marketing .grid-backdrop {
-  background-image:
-    linear-gradient(to right, rgb(10 10 11 / 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(10 10 11 / 0.05) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 35%, transparent 100%);
-  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 35%, transparent 100%);
-}
-
-/* The frame around a product shot: a window, lifted off the page. */
-html.marketing .product-frame {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  box-shadow:
-    0 1px 0 rgb(255 255 255 / 0.8) inset,
-    0 1px 2px rgb(10 10 11 / 0.04),
-    0 24px 60px -20px rgb(10 10 11 / 0.18);
-}
-
-@keyframes reveal-up {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    html.marketing .reveal {
-      opacity: 0;
-      animation: reveal-up linear both;
-      animation-timeline: view();
-      animation-range: entry 0% cover 24%;
-    }
-  }
-}
-
-/* Networks marquee: the track holds two identical halves, so -50% loops seamlessly. */
-@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-html.marketing .marquee-track { animation: marquee 36s linear infinite; }
-html.marketing .marquee-mask {
-  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
-}
-
-/* The pulse on a "live" dot. */
-@keyframes live-pulse {
-  0% { box-shadow: 0 0 0 0 rgb(240 68 30 / 0.45); }
-  100% { box-shadow: 0 0 0 8px rgb(240 68 30 / 0); }
-}
-html.marketing .live-dot { animation: live-pulse 1.8s ease-out infinite; }
-
-@media (prefers-reduced-motion: reduce) {
-  html.marketing { scroll-behavior: auto; }
-  html.marketing .marquee-track,
-  html.marketing .live-dot { animation: none; }
-}
-`
+// The marketing site's own rules live in resources/assets/styles/marketing.css,
+// linked from the marketing layout, so the workspace does not download them.
 
 export default {
   content: [
@@ -719,6 +602,5 @@ export default {
     { getCSS: (): string => QUEUE_STATUS },
     { getCSS: (): string => SETTINGS_STATUS },
     { getCSS: (): string => COMPOSER_CHIPS },
-    { getCSS: (): string => MARKETING_BASE },
   ],
 } satisfies CrosswindOptions
