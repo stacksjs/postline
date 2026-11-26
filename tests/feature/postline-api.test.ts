@@ -71,6 +71,17 @@ describe('postline api — reads', () => {
     expect(Array.isArray(body.data.items)).toBe(true)
   })
 
+  test('the menu-bar status says paused or not, the next post and unread alerts', async () => {
+    const response = await featureTest().actingAs(await actingUser()).get('/api/postline/desktop/status')
+
+    response.assertStatus(200)
+    const body = await response.json<{ ok: boolean, data: { paused: boolean, nextPostAt: string | null, unread: number } }>()
+    expect(body.ok).toBe(true)
+    expect(typeof body.data.paused).toBe('boolean')
+    expect(body.data.nextPostAt === null || !Number.isNaN(Date.parse(body.data.nextPostAt))).toBe(true)
+    expect(typeof body.data.unread).toBe('number')
+  })
+
   test('analytics answers with stats and a series', async () => {
     const response = await featureTest().actingAs(await actingUser()).get('/api/postline/analytics')
 

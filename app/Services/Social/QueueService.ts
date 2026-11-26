@@ -997,6 +997,8 @@ export class QueueService {
    * the rest.
    */
   async publishDue(graceMinutes = LATE_GRACE_MINUTES): Promise<{ published: number, failed: number, missed: number }> {
+    // Paused by the owner (#195): due posts stay queued until resumed.
+    if ((await workspace.profile()).publishingPaused) return { published: 0, failed: 0, missed: 0 }
     await contentColumn()
     await this.recoverStranded()
 

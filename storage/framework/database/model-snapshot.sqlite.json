@@ -159,6 +159,15 @@
             "isNullable": true,
             "hasDefault": false,
             "maxLength": 120
+          },
+          {
+            "name": "publishing_paused",
+            "type": "boolean",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": true,
+            "defaultValue": false
           }
         ],
         "indexes": [
@@ -2687,7 +2696,7 @@
       }
     ]
   },
-  "hash": "27356533b4fb6dbf1c9353c8bf38adace0b40a740269c9d50f605e6be05947d0",
+  "hash": "41b6d7ca1cfd9d990064ec0e662187408543e4c93fb4c2e2dda6f2eb1577260c",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-26T01:28:39.346Z"
+  "updatedAt": "2026-11-26T03:04:33.897Z"
 }

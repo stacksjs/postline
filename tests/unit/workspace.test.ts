@@ -40,7 +40,7 @@ describe('the workspace profile', () => {
     const before = await workspace.profile()
     const saved = await workspace.save({ timezone: 'Asia/Tokyo', workspaceName: 'Field Notes', name: 'Sam Rivera' })
 
-    expect(saved).toEqual({ name: 'Sam Rivera', workspaceName: 'Field Notes', timezone: 'Asia/Tokyo', shareMediaByTunnel: false })
+    expect(saved).toEqual({ name: 'Sam Rivera', workspaceName: 'Field Notes', timezone: 'Asia/Tokyo', shareMediaByTunnel: false, publishingPaused: false })
     expect(await workspace.timezone()).toBe('Asia/Tokyo')
 
     await workspace.save(before.name.length >= 2 ? before : { ...before, name: 'Workspace owner' })
@@ -67,5 +67,25 @@ describe('the workspace profile', () => {
     expect(isValidTimeZone(await workspace.timezone())).toBe(true)
 
     await workspace.save({ timezone: before.timezone })
+  })
+})
+
+describe('pausing scheduled publishing (#195)', () => {
+  test('a paused workspace publishes nothing on the scheduler\'s run, and resumes', async () => {
+    const { postQueue } = await import('../../app/Services/Social/QueueService')
+    const { db } = await import('@stacksjs/database')
+    const database = db as any
+    const uuid = crypto.randomUUID()
+    const due = new Date(Date.now() - 60_000).toISOString().slice(0, 19).replace('T', ' ')
+    await database.insertInto('posts').values({ uuid, title: 'paused', body: 'held while paused', status: 'scheduled', scheduled_at: due, source: 'composer', timezone: 'UTC' }).execute()
+
+    await workspace.save({ publishingPaused: true })
+    expect((await workspace.profile()).publishingPaused).toBe(true)
+    expect(await postQueue.publishDue()).toEqual({ published: 0, failed: 0, missed: 0 })
+    const held = await database.selectFrom('posts').select(['status']).where('uuid', '=', uuid).executeTakeFirst()
+    expect(held.status).toBe('scheduled')
+    await database.deleteFrom('posts').where('uuid', '=', uuid).execute()
+    await workspace.save({ publishingPaused: false })
+    expect((await workspace.profile()).publishingPaused).toBe(false)
   })
 })

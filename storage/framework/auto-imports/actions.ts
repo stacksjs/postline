@@ -34,6 +34,7 @@ export const actions = {
   'Actions/Postline/CampaignSaveAction': '../../../app/Actions/Postline/CampaignSaveAction.ts',
   'Actions/Postline/CrosspostPublishAction': '../../../app/Actions/Postline/CrosspostPublishAction.ts',
   'Actions/Postline/DesktopRevealLogAction': '../../../app/Actions/Postline/DesktopRevealLogAction.ts',
+  'Actions/Postline/DesktopStatusAction': '../../../app/Actions/Postline/DesktopStatusAction.ts',
   'Actions/Postline/HealthAction': '../../../app/Actions/Postline/HealthAction.ts',
   'Actions/Postline/ImportPostsAction': '../../../app/Actions/Postline/ImportPostsAction.ts',
   'Actions/Postline/InboxArchiveAction': '../../../app/Actions/Postline/InboxArchiveAction.ts',

@@ -46,6 +46,15 @@ export default defineModel({
       validation: { rule: schema.boolean().optional() },
       factory: () => false,
     },
+    // Scheduled publishing held by the owner (#195): due posts stay queued
+    // until it is resumed. Publishing by hand is unaffected.
+    publishingPaused: {
+      required: false,
+      fillable: true,
+      default: false,
+      validation: { rule: schema.boolean().optional() },
+      factory: () => false,
+    },
     // The AI provider for campaign planning, chosen in Settings (#138). Empty
     // means the environment's AI_PROVIDER / ANTHROPIC_API_KEY / OPENAI_API_KEY
     // decide, as before; the Mac app has no environment, so it needs these.

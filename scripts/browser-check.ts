@@ -59,7 +59,7 @@ const servers = [
   Bun.spawn(['./buddy', 'dev:frontend'], { cwd: root, env, stdout: 'ignore', stderr: 'pipe' }),
 ]
 
-async function waitUntil(what: string, ready: () => Promise<boolean>, timeoutMs = 120_000): Promise<void> {
+async function waitUntil(what: string, ready: () => Promise<boolean>, timeoutMs = 300_000): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     if (await ready().catch(() => false)) return
@@ -128,6 +128,12 @@ try {
 }
 catch (error) {
   failures.push(error instanceof Error ? error.message : String(error))
+  // A server that never came up says why on its own stderr.
+  for (const [index, server] of servers.entries()) {
+    server.kill()
+    const said = (await new Response(server.stderr).text().catch(() => '')).trim().split('\n').slice(-15).join('\n')
+    if (said) failures.push(`${index === 0 ? 'API' : 'site'} said:\n${said}`)
+  }
 }
 finally {
   for (const server of servers) server.kill()

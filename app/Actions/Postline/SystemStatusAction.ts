@@ -2,6 +2,7 @@ import { Action } from '@stacksjs/actions'
 import { config } from '@stacksjs/config'
 import { response } from '@stacksjs/router'
 import { actionFailure } from '../../Support/Http/action-error'
+import { workspace } from '../../Services/WorkspaceService'
 import { readHeartbeats, schedulerState } from '../../Support/heartbeat'
 
 export default new Action({
@@ -16,7 +17,9 @@ export default new Action({
       // log. Said plainly in Settings rather than reported as sent (#213).
       const driver = String(config.email?.default || 'log')
       const mail = { configured: driver !== 'log' && driver !== 'capture', driver, from: String(config.email?.from?.address || '') }
-      return response.json({ ok: true, data: { scheduler: schedulerState(jobs), jobs, mail } })
+      // Paused by the owner (#195) is its own state: the scheduler runs, and holds.
+      const paused = (await workspace.profile()).publishingPaused
+      return response.json({ ok: true, data: { scheduler: schedulerState(jobs), jobs, mail, paused } })
     }
     catch (error) {
       return actionFailure(error, 500)

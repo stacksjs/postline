@@ -23,6 +23,8 @@ export interface WorkspaceProfile {
   timezone: string
   /** Share images for Instagram and Threads through a temporary public link. */
   shareMediaByTunnel: boolean
+  /** Scheduled posts are held until this is turned off again. */
+  publishingPaused: boolean
 }
 
 /** The zone a new workspace starts in: `TZ` when it names a real zone, else this machine's. */
@@ -42,7 +44,7 @@ export class WorkspaceService {
     const id = await ensureAccount()
     const row = await database
       .selectFrom('accounts')
-      .select(['name', 'workspace_name', 'timezone', 'share_media_by_tunnel'])
+      .select(['name', 'workspace_name', 'timezone', 'share_media_by_tunnel', 'publishing_paused'])
       .where('id', '=', id)
       .executeTakeFirst()
 
@@ -53,6 +55,7 @@ export class WorkspaceService {
       // value in the row cannot break every schedule.
       timezone: isValidTimeZone(row?.timezone) ? String(row.timezone) : defaultTimeZone(),
       shareMediaByTunnel: Boolean(row?.share_media_by_tunnel),
+      publishingPaused: Boolean(Number(row?.publishing_paused ?? 0)),
     }
     this.cached = { profile, at: Date.now() }
     return profile
@@ -62,7 +65,7 @@ export class WorkspaceService {
     return (await this.profile()).timezone
   }
 
-  async save(input: { name?: string, workspaceName?: string, timezone?: string, shareMediaByTunnel?: boolean }): Promise<WorkspaceProfile> {
+  async save(input: { name?: string, workspaceName?: string, timezone?: string, shareMediaByTunnel?: boolean, publishingPaused?: boolean }): Promise<WorkspaceProfile> {
     const values: Record<string, unknown> = {}
 
     if (input.name !== undefined) {
@@ -82,6 +85,7 @@ export class WorkspaceService {
     }
 
     if (input.shareMediaByTunnel !== undefined) values.share_media_by_tunnel = Boolean(input.shareMediaByTunnel)
+    if (input.publishingPaused !== undefined) values.publishing_paused = Boolean(input.publishingPaused)
 
     if (Object.keys(values).length > 0) {
       const id = await ensureAccount()

@@ -435,7 +435,9 @@
     // A stopped scheduler fails nothing: posts just stay scheduled. The
     // heartbeat of the every-minute publish job is the only sign.
     const schedulerStatus = state({ state: 'ok', lastRunAt: null })
+    const publishingPaused = state(false)
     const schedulerWarning = derived(() => {
+      if (publishingPaused()) return 'Scheduled publishing is paused: nothing goes out on its own until you resume it in Settings or from the menu bar.'
       const status = schedulerStatus()
       if (status.state === 'ok') return ''
       if (status.state === 'never') return 'Scheduled posts are not going out: the scheduler has not run yet. Start it with ./buddy schedule:run.'
@@ -465,7 +467,10 @@
       try {
         const response = await fetch('/api/postline/system')
         const payload = await response.json()
-        if (response.ok && payload.ok) schedulerStatus.set(payload.data.scheduler)
+        if (response.ok && payload.ok) {
+          schedulerStatus.set(payload.data.scheduler)
+          publishingPaused.set(Boolean(payload.data.paused))
+        }
       }
       catch {
         // Unknown is not the same as stopped: say nothing rather than alarm.

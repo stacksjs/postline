@@ -21,6 +21,7 @@ export default new Action({
         workspaceName: field('workspaceName'),
         timezone: field('timezone'),
         shareMediaByTunnel: field('shareMediaByTunnel') === undefined ? undefined : ['1', 'true', 'on'].includes(String(field('shareMediaByTunnel')).toLowerCase()),
+        publishingPaused: field('publishingPaused') === undefined ? undefined : ['1', 'true', 'on'].includes(String(field('publishingPaused')).toLowerCase()),
       })
       return response.json({ ok: true, data })
     }

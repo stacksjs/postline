@@ -72,6 +72,11 @@
             <Switch variant="mac" v-model:checked="shareMediaByTunnel" data-share-media />
           </SettingsRow>
         </SettingsGroup>
+        <SettingsGroup title="Publishing" footer="While paused, scheduled posts stay in the queue and nothing goes out on its own. Publishing by hand still works. A post that comes due more than its grace period before you resume is held as missed.">
+          <SettingsRow label="Pause scheduled publishing" setting="publishing-paused" keywords="pause hold stop scheduler queue resume">
+            <Switch variant="mac" v-model:checked="publishingPaused" data-publishing-paused />
+          </SettingsRow>
+        </SettingsGroup>
         <div class="flex gap-2 items-center justify-end mt-3">
           <p class="m-0 mr-auto text-xs" :data-tone="workspaceTone()" x-show="workspaceMessage()" :text="workspaceMessage()" role="status" aria-live="polite" data-workspace-message></p>
           <Button appearance="mac" variant="primary" :disabled="!canSaveWorkspace()" @click="saveWorkspace">Save</Button>
@@ -670,7 +675,8 @@
     const ownerName = state('')
     const workspaceZone = state('')
     const shareMediaByTunnel = state(false)
-    const savedWorkspace = state({ name: '', workspaceName: '', timezone: '', shareMediaByTunnel: false })
+    const publishingPaused = state(false)
+    const savedWorkspace = state({ name: '', workspaceName: '', timezone: '', shareMediaByTunnel: false, publishingPaused: false })
     const workspaceMessage = state('')
     const workspaceTone = state('')
 
@@ -697,10 +703,12 @@
       && (workspaceName().trim() !== savedWorkspace().workspaceName
         || ownerName().trim() !== savedWorkspace().name
         || workspaceZone() !== savedWorkspace().timezone
-        || shareMediaByTunnel() !== savedWorkspace().shareMediaByTunnel))
+        || shareMediaByTunnel() !== savedWorkspace().shareMediaByTunnel
+        || publishingPaused() !== savedWorkspace().publishingPaused))
 
-    const applyWorkspace = (profile: { name: string, workspaceName: string, timezone: string, shareMediaByTunnel?: boolean }): void => {
-      savedWorkspace.set({ ...profile, shareMediaByTunnel: Boolean(profile.shareMediaByTunnel) })
+    const applyWorkspace = (profile: { name: string, workspaceName: string, timezone: string, shareMediaByTunnel?: boolean, publishingPaused?: boolean }): void => {
+      savedWorkspace.set({ ...profile, shareMediaByTunnel: Boolean(profile.shareMediaByTunnel), publishingPaused: Boolean(profile.publishingPaused) })
+      publishingPaused.set(Boolean(profile.publishingPaused))
       workspaceName.set(profile.workspaceName)
       ownerName.set(profile.name)
       workspaceZone.set(profile.timezone)
@@ -730,6 +738,7 @@
         body.set('name', ownerName().trim())
         body.set('timezone', workspaceZone())
         body.set('shareMediaByTunnel', shareMediaByTunnel() ? '1' : '0')
+        body.set('publishingPaused', publishingPaused() ? '1' : '0')
         const response = await fetch('/api/postline/settings/workspace', { method: 'POST', body })
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save.')
