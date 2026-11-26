@@ -1,6 +1,7 @@
 /**
- * The release gate (#234). `buddy release` runs this (`publication:check`)
- * before it bumps or tags anything, and stops when it fails.
+ * Stacks runs `publication:check` before shipping. Website deployment requires
+ * the checked commit's CI verdict. Desktop and GitHub releases also rerun the
+ * local checks before publishing an artifact or creating a tag (#234).
  *
  * Two things must hold:
  *
@@ -47,11 +48,28 @@ export function ciState(statuses: Array<{ context?: string, state?: string }>): 
   return ours?.state || 'missing'
 }
 
+async function checkWebCi(sha: string): Promise<void> {
+  const response = await fetch(`https://api.github.com/repos/${REPOSITORY}/commits/${sha}/status`, {
+    headers: { accept: 'application/vnd.github+json' },
+    signal: AbortSignal.timeout(10_000),
+  })
+  if (!response.ok) fail(`GitHub could not return the status for ${sha.slice(0, 9)} (HTTP ${response.status}).`)
+  const data = await response.json() as { statuses?: Array<{ context?: string, state?: string }> }
+  const state = ciState(data.statuses ?? [])
+  if (state !== 'success') fail(`ReviewOS CI on ${sha.slice(0, 9)} is ${state}. Deploy a commit CI passed.`)
+  console.log(`▸ CI status: ${CI_CONTEXT} passed on ${sha.slice(0, 9)}`)
+}
+
 if (import.meta.main) {
   const sha = output('git', ['rev-parse', 'HEAD'])
 
   if (output('git', ['status', '--porcelain', '--untracked-files=no']))
     fail('the working tree has uncommitted changes. Release a commit, not a working tree.')
+
+  if (process.env.STACKS_PUBLICATION_CHANNEL === 'web') {
+    await checkWebCi(sha)
+    process.exit(0)
+  }
 
   if (process.env.POSTLINE_RELEASE_SKIP_CI_STATUS === '1') {
     console.log('▸ CI status: skipped (POSTLINE_RELEASE_SKIP_CI_STATUS=1)')
