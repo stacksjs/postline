@@ -40,6 +40,7 @@ const config: BunPressOptions = {
             { text: 'Install the Mac app', link: '/install-mac' },
             { text: 'Run it on a server', link: '/self-hosting' },
             { text: 'First run', link: '/first-run' },
+            { text: 'Upgrading', link: '/upgrading' },
           ],
         },
         {
@@ -64,6 +65,7 @@ const config: BunPressOptions = {
           text: 'Contributing',
           items: [
             { text: 'CI and releases', link: '/ci' },
+            { text: 'Release checklist', link: '/releasing' },
           ],
         },
       ],
