@@ -354,8 +354,15 @@ function showAnalyticsError(message: string): void {
   }
 }
 
+/** How long one fetch of the numbers serves repeat visits before it is asked for again (#182). */
+const ANALYTICS_FRESH_MS = 60_000
+let analyticsFetchedAt = 0
+
 async function loadAnalytics(): Promise<void> {
+  if (analyticsPromise && Date.now() - analyticsFetchedAt > ANALYTICS_FRESH_MS)
+    analyticsPromise = null
   if (!analyticsPromise) {
+    analyticsFetchedAt = Date.now()
     analyticsPromise = fetch('/api/postline/analytics')
       .then(async (response) => {
         const payload = await response.json()
@@ -393,27 +400,24 @@ function scheduleAnalyticsRender(): void {
   })
 }
 
-function watchAnalyticsChartMounts(): void {
-  if (document.querySelector('[data-analytics-chart]')) void loadAnalytics()
+/**
+ * Load and draw when the analytics view is on the page: at first load and
+ * after each client-side navigation. It used to watch the whole document with
+ * a MutationObserver for the life of the session, on every page (#182); the
+ * router says when the page changed, so nothing needs watching.
+ */
+function mountAnalyticsIfShown(): void {
+  if (!document.querySelector('[data-analytics-chart]')) return
+  void loadAnalytics()
   scheduleAnalyticsRender()
-
-  const target = document.body || document.documentElement
-  if (!target) return
-
-  const observer = new MutationObserver(() => {
-    if (document.querySelector('[data-analytics-chart]:not([data-rendered="true"])')) {
-      void loadAnalytics()
-      scheduleAnalyticsRender()
-    }
-  })
-
-  observer.observe(target, { childList: true, subtree: true })
 }
 
 if (document.readyState === 'loading')
-  document.addEventListener('DOMContentLoaded', watchAnalyticsChartMounts, { once: true })
+  document.addEventListener('DOMContentLoaded', mountAnalyticsIfShown, { once: true })
 else
-  watchAnalyticsChartMounts()
+  mountAnalyticsIfShown()
 
-window.addEventListener('stx:load', scheduleAnalyticsRender)
-document.addEventListener('stx:load', scheduleAnalyticsRender)
+// The router fires `stx:load` on window once a navigated-to page is in place.
+window.addEventListener('stx:load', mountAnalyticsIfShown)
+
+

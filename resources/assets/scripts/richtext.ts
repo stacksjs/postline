@@ -48,8 +48,9 @@ function markdownToHtml(markdown: string): string {
 }
 
 function setupRichText(): void {
-  const root = document.querySelector('[data-postline-page="composer"]')
-  if (!root) return
+  const root = document.querySelector<HTMLElement>('[data-postline-page="composer"]')
+  if (!root || root.dataset.richtextBound === 'true') return
+  root.dataset.richtextBound = 'true'
 
   const textarea = root.querySelector<HTMLTextAreaElement>('[data-bluesky-text]')
   const host = root.querySelector<HTMLElement>('[data-richtext-host]')
@@ -127,7 +128,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 else setupRichText()
 
 // Re-run after client-side navigation, since the composer is swapped in by the
-// stx router rather than reloaded.
-document.addEventListener('stx:navigated', setupRichText)
+// stx router rather than reloaded. The router fires `stx:load` on window once a navigated-to page is in place;
+// `stx:navigated` was never an event, so a client-side visit got no editor.
+window.addEventListener('stx:load', setupRichText)
 
 export { markdownToHtml, setupRichText }
