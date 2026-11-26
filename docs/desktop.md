@@ -122,11 +122,9 @@ bun run release:minor
 ```
 
 That bumps `package.json`, writes the changelog, commits, tags `vX.Y.Z` and
-pushes. `.reviewos/workflows/release.yml` builds the app on Postline's Mac
-runner, makes `Postline-X.Y.Z-macos-arm64.dmg`, and publishes the GitHub
-release through the [Pantry](https://github.com/pantry-pm/pantry) action. It
-needs the secret `GH_RELEASE_TOKEN` on the repository in ReviewOS; see
-[ci.md](ci.md).
+pushes. After CI passes, dispatch the approved tag. ReviewOS builds
+`Postline-X.Y.Z-macos-arm64.dmg` on the Mac runner and publishes it to GitHub
+through Pantry. [Release checklist](releasing.md).
 
 The app is signed with the certificate named by the repository variable
 `DESKTOP_SIGNING_IDENTITY` (a Developer ID Application identity). Without it

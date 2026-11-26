@@ -9,7 +9,7 @@ fetches, and posts the verdict back to the commit as the status
 | File | Runs |
 |---|---|
 | `.reviewos/workflows/ci.yml` | lint, type check, test, on every push and pull request |
-| `.reviewos/workflows/release.yml` | builds the DMG and publishes the GitHub release, on a `v*` tag |
+| `.reviewos/workflows/release.yml` | builds and publishes the DMG for an approved `v*` tag with passing CI, on manual dispatch |
 | `.reviewos/workflows/deploy.yml` | deploys a passing `main` commit or rolls back Postline's server, on manual dispatch |
 
 Every job runs on Postline's own Mac runner, labelled

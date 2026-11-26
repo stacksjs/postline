@@ -146,16 +146,16 @@ with `./buddy serve` and the scheduler beside it with `./buddy schedule:run`.
 
 ## CI
 
-CI runs on [ReviewOS](https://reviewos.org) from `.reviewos/workflows`: lint,
-type check, the test suite, the compiled Mac app's agent and a static build of
-the site on every push, and the desktop release on a `v*` tag. A manual
-workflow deploys a passing `main` commit to the public site.
+CI runs on [ReviewOS](https://reviewos.org) from `.reviewos/workflows`. On
+every push it runs lint, type check, the tests, the compiled Mac agent, the site
+build, and browser checks. Manual workflows deploy passing `main` commits and
+publish approved desktop tags after CI passes.
 [docs/ci.md](docs/ci.md) covers setup, deployments, and how to read a run.
 
 ## Releasing
 
-Follow the [release checklist](docs/releasing.md) when preparing a desktop
-release. ReviewOS builds the DMG and publishes it to GitHub for each version tag.
+Follow the [release checklist](docs/releasing.md) to prepare and publish a
+desktop release for an approved version tag.
 
 ## Contributing
 

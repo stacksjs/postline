@@ -24,18 +24,25 @@ Used for every release. Each step either passes or stops the release.
 
 ## Cutting it
 
-4. Bump, tag and push with the release script, never by hand:
+4. After the owner approves the version, bump, tag and push it with the release script.
 
    ```bash
    bun run release:patch
    ```
 
-   (`release:minor` or `release:major` as appropriate.) The tag starts
-   `.reviewos/workflows/release.yml`, which builds the DMG with a build number
-and attaches it to the GitHub release with `checksums.txt` and its Ed25519
-signature, `checksums.txt.sig`. The release runner uses the `main` key from
-its `postline-desktop-updates` Keychain service or an injected
-`DESKTOP_UPDATE_PRIVATE_KEY` that matches the published key in `config/desktop.ts`.
+   Use `release:minor` or `release:major` for the corresponding version change.
+   Wait for ReviewOS CI to pass on the new tag's commit, then dispatch the
+   release workflow with that tag. Substitute the approved version for `vX.Y.Z`.
+
+   ```bash
+   reviewos run release.yml --repo stacks/postline --ref main --input tag=vX.Y.Z --watch
+   ```
+
+   The workflow checks the tag's CI verdict, builds the DMG, and attaches it
+   with `checksums.txt` and its Ed25519 signature, `checksums.txt.sig`. The
+   runner uses the `main` key from its `postline-desktop-updates` Keychain
+   service or the injected `DESKTOP_UPDATE_PRIVATE_KEY`. The key must match
+   the published public key in `config/desktop.ts`.
 
 ## After
 

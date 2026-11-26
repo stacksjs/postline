@@ -11,8 +11,6 @@
  * 2. The checks CI runs pass here too, plus the compiled desktop check that
  *    the release builds: lint, the stx checks, the type check, the tests.
  *
- * `POSTLINE_RELEASE_SKIP_CI_STATUS=1` skips only the first, for a release cut
- * while the CI runner is offline (docs/ci.md); the local checks always run.
  */
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -38,7 +36,7 @@ function output(command: string, args: string[]): string {
 }
 
 function fail(message: string): never {
-  console.error(`\n✗ Release refused: ${message}`)
+  console.error(`\n✗ Publication refused: ${message}`)
   process.exit(1)
 }
 
@@ -48,7 +46,7 @@ export function ciState(statuses: Array<{ context?: string, state?: string }>): 
   return ours?.state || 'missing'
 }
 
-async function checkWebCi(sha: string): Promise<void> {
+async function checkCi(sha: string): Promise<void> {
   const response = await fetch(`https://api.github.com/repos/${REPOSITORY}/commits/${sha}/status`, {
     headers: { accept: 'application/vnd.github+json' },
     signal: AbortSignal.timeout(10_000),
@@ -56,35 +54,24 @@ async function checkWebCi(sha: string): Promise<void> {
   if (!response.ok) fail(`GitHub could not return the status for ${sha.slice(0, 9)} (HTTP ${response.status}).`)
   const data = await response.json() as { statuses?: Array<{ context?: string, state?: string }> }
   const state = ciState(data.statuses ?? [])
-  if (state !== 'success') fail(`ReviewOS CI on ${sha.slice(0, 9)} is ${state}. Deploy a commit CI passed.`)
+  if (state !== 'success') fail(`ReviewOS CI on ${sha.slice(0, 9)} is ${state}. Publish a commit CI passed.`)
   console.log(`▸ CI status: ${CI_CONTEXT} passed on ${sha.slice(0, 9)}`)
 }
 
 if (import.meta.main) {
   const sha = output('git', ['rev-parse', 'HEAD'])
+  const ciOnly = process.env.STACKS_PUBLICATION_CHANNEL === 'web' || process.argv[2] === '--ci-only'
 
   if (output('git', ['status', '--porcelain', '--untracked-files=no']))
     fail('the working tree has uncommitted changes. Release a commit, not a working tree.')
 
-  if (process.env.STACKS_PUBLICATION_CHANNEL === 'web') {
-    await checkWebCi(sha)
-    process.exit(0)
-  }
-
-  if (process.env.POSTLINE_RELEASE_SKIP_CI_STATUS === '1') {
-    console.log('▸ CI status: skipped (POSTLINE_RELEASE_SKIP_CI_STATUS=1)')
-  }
-  else {
+  if (!ciOnly) {
     output('git', ['fetch', '--quiet', 'origin'])
     if (!output('git', ['branch', '-r', '--contains', sha]))
       fail(`${sha.slice(0, 9)} is not on GitHub yet. Push it and let CI run first.`)
-
-    const statuses = JSON.parse(output('gh', ['api', `repos/${REPOSITORY}/commits/${sha}/statuses`, '--paginate', '--slurp'])).flat()
-    const state = ciState(statuses)
-    if (state !== 'success')
-      fail(`CI on ${sha.slice(0, 9)} is ${state === 'missing' ? 'not reported yet' : state}. Release only a commit CI passed.`)
-    console.log(`▸ CI status: ${CI_CONTEXT} passed on ${sha.slice(0, 9)}`)
   }
+  await checkCi(sha)
+  if (ciOnly) process.exit(0)
 
   run('Lint', 'bun', ['run', 'lint'])
   run('Lint stx templates', './buddy', ['lint', '--stx'])
