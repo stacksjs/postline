@@ -177,7 +177,21 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
       && document.querySelector('#postline-toast-host .is-visible')?.textContent.includes('Back online')`), 5_000)
 
   await evaluate(cdp, `(() => {
-    const calls = window.postlineShellCalls = { collapsed: [], settings: [], drags: 0, focus: 0, appearance: '' }
+    const calls = window.postlineShellCalls = {
+      collapsed: [], settings: [], drags: 0, focus: 0, appearance: '',
+      notifications: [], badge: 0, menu: [], login: false, loginChanges: 0,
+    }
+    localStorage.setItem('postline:alerts:last-seen', '101')
+    const send = window.fetch.bind(window)
+    window.fetch = (input, options) => {
+      if (new URL(input instanceof Request ? input.url : input, location.href).pathname === '/api/postline/alerts')
+        return Promise.resolve(Response.json({ ok: true, data: { unread: 2, alerts: [
+          { id: 103, title: 'Already read', body: null, read: true },
+          { id: 102, title: 'Scheduled post failed', body: 'Review the queue.', read: false },
+          { id: 101, title: 'Already seen', body: null, read: false },
+        ] } }))
+      return send(input, options)
+    }
     window.craft = {
       window: {
         setWebSidebarCollapsed: async value => calls.collapsed.push(value),
@@ -192,6 +206,15 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
           return () => { delete calls.openSettingsFromMenu }
         },
       },
+      app: {
+        notify: async notification => calls.notifications.push(notification),
+        setBadge: async count => { calls.badge = count },
+      },
+      tray: { setMenu: async items => { calls.menu = items } },
+      autoLaunch: {
+        isEnabled: async () => calls.login,
+        enable: async () => { calls.login = true; calls.loginChanges++; return calls.login },
+      },
     }
     window.dispatchEvent(new Event('craft:ready'))
   })()`)
@@ -199,6 +222,21 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
     ${shell}.dataset.shellNative === 'true'
       && getComputedStyle(${collapse}.parentElement).display === 'none'
       && Boolean(window.postlineShellCalls.openSettingsFromMenu)`), 5_000)
+  await waitUntil('The dock badge, new notification and tray menu', () => evaluate<boolean>(cdp, `
+    (() => {
+      const { badge, menu, notifications } = window.postlineShellCalls
+      return badge === 2 && notifications.length === 1 && notifications[0].title === 'Scheduled post failed'
+        && notifications[0].body === 'Review the queue.'
+        && menu.some(item => item.label === 'Pause Publishing' && item.action === 'toggle-publishing')
+        && localStorage.getItem('postline:alerts:last-seen') === '103'
+    })()`), 5_000)
+  const trayAction = (action: string): string => `window.dispatchEvent(new CustomEvent('craft:tray:menuAction', { detail: { action: ${JSON.stringify(action)} } }))`
+  await evaluate(cdp, trayAction('toggle-publishing'))
+  await waitUntil('Publishing can be paused from the Craft tray', () => evaluate<boolean>(cdp, `
+    window.postlineShellCalls.menu.some(item => item.label === 'Resume Publishing')`), 5_000)
+  await evaluate(cdp, trayAction('toggle-publishing'))
+  await waitUntil('Publishing can be resumed from the Craft tray', () => evaluate<boolean>(cdp, `
+    window.postlineShellCalls.menu.some(item => item.label === 'Pause Publishing')`), 5_000)
   await evaluate(cdp, `${collapse}.click()`)
   await waitUntil('The Craft titlebar toggle collapses the sidebar', () => evaluate<boolean>(cdp, `
     ${shell}.dataset.sidebarCollapsed === 'true'
@@ -235,6 +273,10 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
     settings.close()
   })()`)
   await waitUntil('The system theme is restored', () => evaluate<boolean>(cdp, 'window.postlineShellCalls.appearance === "system"'), 5_000)
+  await evaluate(cdp, trayAction('toggle-login'))
+  await waitUntil('The tray stays connected across navigation', () => evaluate<boolean>(cdp, `
+    window.postlineShellCalls.loginChanges === 1
+      && window.postlineShellCalls.menu.some(item => item.action === 'toggle-login' && item.checked === true)`), 5_000)
 }
 
 async function checkQueueKeyboard(cdp: Cdp): Promise<void> {

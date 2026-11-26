@@ -10,6 +10,7 @@ Object.assign(globalThis, autoImports)
 
 // TypeScript declarations
 declare global {
+  const bindDesktopAlerts: typeof autoImports.bindDesktopAlerts
   const providerLabel: typeof autoImports.providerLabel
   const providerInitial: typeof autoImports.providerInitial
   const providerColor: typeof autoImports.providerColor
