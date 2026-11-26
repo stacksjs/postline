@@ -10,6 +10,7 @@ fetches, and posts the verdict back to the commit as the status
 |---|---|
 | `.reviewos/workflows/ci.yml` | lint, type check, test, on every push and pull request |
 | `.reviewos/workflows/release.yml` | builds the DMG and publishes the GitHub release, on a `v*` tag |
+| `.reviewos/workflows/deploy.yml` | deploys a passing `main` commit or rolls back Postline's server, on manual dispatch |
 
 Every job runs on Postline's own Mac runner, labelled
 `[self-hosted, macos-arm64, postline]`. A runner takes a job only when it
@@ -86,6 +87,24 @@ tail -f ~/.local/share/reviewos/postline/runner.log
 "Waiting for work" is healthy. "Runner capacity hold" names what it is short
 of. The runner needs 8 GB of free disk before it takes a job, and this Mac has
 run close to that.
+
+## Deploying the public site
+
+The production environment uses the Postline runner's SSH identity for the
+shared Hetzner server. ReviewOS also needs the site's
+`DOTENV_PRIVATE_KEY_PRODUCTION` and a Hetzner token that can read the attached
+server's inventory. The production environment is limited to `main`. DNS for
+both Postline hostnames is managed in Porkbun.
+
+```bash
+reviewos run deploy.yml --repo stacks/postline --ref main --input operation=deploy --watch
+```
+
+This workflow checks the selected commit's `ReviewOS / CI` verdict before
+deploying. It probes the public API and the short hostname after deployment.
+If deployment or verification fails, it asks Stacks to roll back only sites
+that switched to the failed release. To request the previous release manually,
+dispatch the same workflow with `operation=rollback`.
 
 ## The Mac runner and load
 

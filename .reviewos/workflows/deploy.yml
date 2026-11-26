@@ -1,0 +1,94 @@
+name: Deploy Postline
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Deploy the checked main commit or restore the previous release
+        type: choice
+        options: [deploy, rollback]
+        default: deploy
+
+concurrency:
+  group: postline-production
+  cancel-in-progress: false
+
+jobs:
+  production:
+    environment: production
+    runs-on: [self-hosted, macos-arm64, postline]
+    timeout-minutes: 30
+    reviewos:
+      secrets: [POSTLINE_HETZNER_TOKEN, DOTENV_PRIVATE_KEY_PRODUCTION]
+    steps:
+      - name: Require the checked main commit
+        env:
+          DEPLOY_REF: ${{ github.ref }}
+          DEPLOY_SHA: ${{ github.sha }}
+          DEPLOY_OPERATION: ${{ inputs.operation }}
+        run: |
+          set -eu
+          test "$DEPLOY_REF" = refs/heads/main
+          test "$DEPLOY_SHA" = "$(git rev-parse HEAD)"
+          case "$DEPLOY_OPERATION" in deploy|rollback) ;; *) exit 1 ;; esac
+
+      - name: Set up Bun
+        uses: pantry-pm/pantry/packages/action@be9f7a5b0af91351f5c0b7ea3b2fa98e267753a8 # v0.11.207
+        with:
+          version: 0.11.207
+          install: 'false'
+          packages: bun.sh@1.4.4
+
+      - name: Require passing CI before deploying
+        if: ${{ inputs.operation == 'deploy' }}
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          curl --fail --silent --show-error "https://api.github.com/repos/stacksjs/postline/commits/$DEPLOY_SHA/status" \
+            | bun -e '
+                const { statuses } = await Bun.stdin.json()
+                if (statuses?.find(status => status.context === "ReviewOS / CI")?.state !== "success")
+                  throw new Error("This commit has no passing ReviewOS CI status.")
+              '
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Deploy
+        id: deploy
+        if: ${{ inputs.operation == 'deploy' }}
+        env:
+          HCLOUD_TOKEN: ${{ secrets.POSTLINE_HETZNER_TOKEN }}
+          DOTENV_PRIVATE_KEY_PRODUCTION: ${{ secrets.DOTENV_PRIVATE_KEY_PRODUCTION }}
+        run: ./buddy deploy production --yes
+
+      - name: Check public HTTPS and the short hostname
+        id: verify
+        if: ${{ inputs.operation == 'deploy' }}
+        run: |
+          set -eu
+          curl --fail --silent --show-error --retry 6 --retry-all-errors --max-time 20 https://postline.theopentimes.org/api/postline/health \
+            | bun -e '
+                const health = await Bun.stdin.json()
+                if (!health.ok || health.database !== "ok" || health.migrations !== "ok")
+                  throw new Error("Postline did not pass its public health check.")
+              '
+          primary=$(curl --fail --silent --show-error --max-time 20 https://postline.theopentimes.org/)
+          printf '%s\n' "$primary" | grep -F 'https://postline.theopentimes.org/' > /dev/null
+          redirect=$(curl --fail --silent --show-error --max-time 20 -o /dev/null -w '%{redirect_url}' 'https://postline.theot.org/download?source=deploy')
+          test "$redirect" = 'https://postline.theopentimes.org/download?source=deploy'
+
+      - name: Roll back sites switched by a failed deployment
+        if: ${{ failure() && (steps.deploy.outcome == 'failure' || steps.verify.outcome == 'failure') }}
+        env:
+          HCLOUD_TOKEN: ${{ secrets.POSTLINE_HETZNER_TOKEN }}
+          DOTENV_PRIVATE_KEY_PRODUCTION: ${{ secrets.DOTENV_PRIVATE_KEY_PRODUCTION }}
+        run: ./buddy deploy:rollback --env production --all --only-if-live "$(git rev-parse --short=7 HEAD)"
+
+      - name: Restore the previous release
+        if: ${{ inputs.operation == 'rollback' }}
+        env:
+          HCLOUD_TOKEN: ${{ secrets.POSTLINE_HETZNER_TOKEN }}
+          DOTENV_PRIVATE_KEY_PRODUCTION: ${{ secrets.DOTENV_PRIVATE_KEY_PRODUCTION }}
+        run: ./buddy deploy:rollback --env production --all

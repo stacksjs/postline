@@ -183,9 +183,9 @@ with `./buddy serve` and the scheduler beside it with `./buddy schedule:run`.
 
 CI runs on [ReviewOS](https://reviewos.org) from `.reviewos/workflows`: lint,
 type check, the test suite, the compiled Mac app's agent and a static build of
-the site on every push, and the desktop release on a `v*` tag.
-[docs/ci.md](docs/ci.md) covers the setup and how to read a run. Nothing
-deploys the hosted site from CI yet.
+the site on every push, and the desktop release on a `v*` tag. A manual
+workflow deploys a passing `main` commit to the public site.
+[docs/ci.md](docs/ci.md) covers setup, deployments, and how to read a run.
 
 ## Releasing
 
