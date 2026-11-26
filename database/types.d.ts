@@ -15,6 +15,9 @@ declare module '@stacksjs/database' {
       workspace_name: string
       timezone: string
       share_media_by_tunnel: number
+      ai_provider: "" | "anthropic" | "openai" | "ollama"
+      ai_api_key: string
+      ai_model: string
       default_audience: "public" | "followers" | "private"
       auto_delete_enabled: number
       auto_delete_days: number

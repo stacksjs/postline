@@ -36,6 +36,8 @@ describe('the marketing site is served only where asked for (#222)', () => {
   test('the server config and the waitlist route both ask', () => {
     expect(readFileSync(join(root, 'config/server.ts'), 'utf8')).toContain('redirects: marketingRedirects()')
     expect(readFileSync(join(root, 'routes/api.ts'), 'utf8')).toMatch(/if \(isMarketingSite\(\)\)\s*\n\s*route\.post\('\/subscribe'/)
+    // The framework's own newsletter signup follows the same setting.
+    expect(readFileSync(join(root, 'config/email.ts'), 'utf8')).toContain('signup: isMarketingSite()')
   })
 
   test('the Mac app builds no marketing page', () => {

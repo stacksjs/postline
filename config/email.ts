@@ -1,6 +1,7 @@
 import type { EmailConfig } from '@stacksjs/types'
 import { APEX, FALLBACK_MAIL_DOMAIN, url as siteUrl } from '~/config/domains'
 import { env } from '@stacksjs/env'
+import { isMarketingSite } from '../app/Support/Marketing/site'
 
 /**
  * **Email Configuration**
@@ -332,7 +333,9 @@ export default {
   // The hosted-plan waitlist confirms each address by email before it joins
   // (resources/emails/subscription-confirm.stx). Read when the first signup
   // creates the default list.
-  newsletter: { doubleOptIn: true },
+  // The signup and its confirmation link exist only on the marketing site; an
+  // install has no waitlist (#222). Unsubscribe links always work.
+  newsletter: { doubleOptIn: true, signup: isMarketingSite() },
 
   default: (env.MAIL_MAILER || env.MAIL_DRIVER || 'log') as 'ses' | 'sendgrid' | 'mailgun' | 'mailtrap' | 'smtp' | 'log',
 } satisfies EmailConfig
