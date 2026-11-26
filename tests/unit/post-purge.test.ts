@@ -202,3 +202,12 @@ describe('a network with a daily cap', () => {
     expect(network.deleted).toHaveLength(70)
   })
 })
+
+describe('delete pacing per network (#136)', () => {
+  test('X is paced to its 50 deletes per 15 minutes; others keep the default pause', async () => {
+    const { deletePause } = await import('../../app/Services/Social/PurgeService')
+    expect(deletePause('twitter')).toBe(18_000)
+    expect(deletePause('bluesky')).toBe(250)
+    expect(deletePause('mastodon', 400)).toBe(400)
+  })
+})

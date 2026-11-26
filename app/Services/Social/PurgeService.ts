@@ -133,6 +133,20 @@ const MAX_DELETIONS_PER_RUN = 2000
 /** Pause between deletes — providers rate-limit destructive endpoints hard. */
 const DELETE_DELAY_MS = 250
 
+/**
+ * Networks whose delete limit is tighter than the pause above (#136). X allows
+ * 50 deletes per 15 minutes for each user, one every 18 seconds; going faster
+ * only earns refusals partway through a run.
+ */
+export const DELETE_PACING_MS: Partial<Record<SocialProvider, number>> = {
+  twitter: 18_000,
+}
+
+/** The pause between two deletes on `provider`: its own pacing, never less than the default. */
+export function deletePause(provider: SocialProvider, base: number = DELETE_DELAY_MS): number {
+  return Math.max(base, DELETE_PACING_MS[provider] ?? 0)
+}
+
 /** Most per-post errors kept in the audit row; the count is always exact. */
 const MAX_RECORDED_ERRORS = 25
 
@@ -588,7 +602,7 @@ export class PurgeService {
         }
       }
 
-      if (index < candidates.length - 1) await sleep(this.deleteDelayMs)
+      if (index < candidates.length - 1) await sleep(this.deleteDelayMs === 0 ? 0 : deletePause(provider, this.deleteDelayMs))
     }
 
     // In `all` scope the local targets are gone remotely by definition, so
