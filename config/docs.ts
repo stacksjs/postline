@@ -38,6 +38,7 @@ const config: BunPressOptions = {
           text: 'Running Postline',
           items: [
             { text: 'The Mac app', link: '/desktop' },
+            { text: 'On a server', link: '/self-hosting' },
           ],
         },
         {
