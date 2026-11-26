@@ -14,7 +14,6 @@ import type { MarketingEntry } from '../app/Support/Marketing/catalog'
 import { FEATURES, USE_CASES } from '../app/Support/Marketing/catalog'
 
 const root = join(import.meta.dir, '..')
-const SITE = 'https://postline.stacksjs.com'
 const REPO = 'https://github.com/stacksjs/postline'
 
 /** Escape for a single-quoted stx `@section` argument. */
@@ -36,9 +35,13 @@ function page(entry: MarketingEntry, kind: 'feature' | 'use-case', siblings: Mar
 
 @section('title', '${q(entry.nav)}: ${q(entry.title)} - Postline')
 @section('description', '${q(entry.summary)}')
-@section('canonical', '${SITE}${base}/${entry.slug}')
-@section('ogImage', '${SITE}/images/og/${kind}-${entry.slug}.png')
 @section('ogImageAlt', '${q(`Postline ${kind === 'feature' ? 'feature' : 'use case'}: ${entry.nav}. ${entry.title}.`)}')
+
+<script server>
+import { marketingHead } from '../../../app/Support/Marketing/head'
+
+useHead(marketingHead('${base}/${entry.slug}', '/images/og/${kind}-${entry.slug}.png'))
+</script>
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">
@@ -106,9 +109,13 @@ function indexPage(kind: 'feature' | 'use-case', entries: MarketingEntry[]): str
 
 @section('title', '${label} - Postline')
 @section('description', '${q(`${kind === 'feature' ? 'Postline features' : 'Postline use cases'}: ${entries.map(e => e.nav).join(', ')}.`)}')
-@section('canonical', '${SITE}${base}')
-@section('ogImage', '${SITE}/images/og/${kind}-index.png')
 @section('ogImageAlt', '${q(kind === 'feature' ? 'Postline features: what each part does.' : 'Postline use cases: who runs it, and for what.')}')
+
+<script server>
+import { marketingHead } from '../../../app/Support/Marketing/head'
+
+useHead(marketingHead('${base}', '/images/og/${kind}-index.png'))
+</script>
 
 @section('content')
   <div class="mx-auto px-5 sm:px-8 max-w-[1200px]">

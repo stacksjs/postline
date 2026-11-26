@@ -20,7 +20,8 @@ function section(source: string, name: string): string | undefined {
 
 const meta = pages.map((page) => {
   const source = readFileSync(join(root, page), 'utf8')
-  return { page, title: section(source, 'title'), description: section(source, 'description'), ogImage: section(source, 'ogImage'), ogImageAlt: section(source, 'ogImageAlt') }
+  const ogImage = source.match(/marketingHead\('[^']+', '([^']+)'\)/)?.[1]
+  return { page, title: section(source, 'title'), description: section(source, 'description'), ogImage, ogImageAlt: section(source, 'ogImageAlt') }
 })
 
 describe('marketing page details', () => {
@@ -47,7 +48,7 @@ describe('marketing page details', () => {
 
   test('the home page carries SoftwareApplication and FAQPage data', () => {
     const home = readFileSync(join(root, 'resources/views/index.stx'), 'utf8')
-    expect(home).toContain('@structuredData(structuredData)')
+    expect(home).toContain("type: 'application/ld+json', content: jsonLd")
     expect(home).toContain('\'@type\': \'SoftwareApplication\'')
     expect(home).toContain('\'@type\': \'FAQPage\'')
   })

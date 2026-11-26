@@ -2,9 +2,13 @@
 
 @section('title', 'Campaigns: Plan the launch, not just the post - Postline')
 @section('description', 'Lay a whole launch out across weeks on a calendar, then move the finished plan into the queue in one step.')
-@section('canonical', 'https://postline.stacksjs.com/features/campaigns')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/feature-campaigns.png')
 @section('ogImageAlt', 'Postline feature: Campaigns. Plan the launch, not just the post.')
+
+<script server>
+import { marketingHead } from '../../../app/Support/Marketing/head'
+
+useHead(marketingHead('/features/campaigns', '/images/og/feature-campaigns.png'))
+</script>
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">

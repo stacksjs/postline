@@ -2,9 +2,12 @@
 
 @section('title', 'Privacy - Postline')
 @section('description', 'What this website collects, which is one email address if you join the waitlist, and what Postline itself sends anywhere.')
-@section('canonical', 'https://postline.stacksjs.com/privacy')
 
 <script server>
+import { marketingHead } from '../../app/Support/Marketing/head'
+
+useHead(marketingHead('/privacy'))
+
 // Who answers privacy questions. A no-reply sender address is no use here, so
 // this is its own setting; without it the page points at GitHub issues.
 const contact = String(process.env.PRIVACY_CONTACT_EMAIL || '').trim()

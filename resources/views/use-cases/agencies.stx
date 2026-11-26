@@ -2,9 +2,13 @@
 
 @section('title', 'Agencies: Accounts you actually control - Postline')
 @section('description', 'One person posting for several client accounts, without a vendor holding their tokens.')
-@section('canonical', 'https://postline.stacksjs.com/use-cases/agencies')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-agencies.png')
 @section('ogImageAlt', 'Postline use case: Agencies. Accounts you actually control.')
+
+<script server>
+import { marketingHead } from '../../../app/Support/Marketing/head'
+
+useHead(marketingHead('/use-cases/agencies', '/images/og/use-case-agencies.png'))
+</script>
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">

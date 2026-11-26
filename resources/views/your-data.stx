@@ -2,7 +2,12 @@
 
 @section('title', 'What leaves your machine - Postline')
 @section('description', 'Every place the Postline app sends data: the networks you connect, an AI provider if you add a key, and nothing else unless you turn it on.')
-@section('canonical', 'https://postline.stacksjs.com/your-data')
+
+<script server>
+import { marketingHead } from '../../app/Support/Marketing/head'
+
+useHead(marketingHead('/your-data'))
+</script>
 
 @section('content')
   <LegalPage heading="What leaves your machine" updated="24 November 2026" intro="Postline keeps your data in its own database on the computer it runs on. This is the complete list of what it sends elsewhere, and when. Nothing goes to us.">

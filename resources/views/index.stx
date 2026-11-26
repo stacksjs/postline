@@ -2,11 +2,11 @@
 
 @section('title', 'Postline — write once, publish everywhere')
 @section('description', 'Postline publishes one draft to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Queue, campaigns, inbox and analytics in one open-source app that runs with your keys.')
-@section('canonical', 'https://postline.stacksjs.com/')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/home.png')
 
 <script server>
 import { FEATURES, USE_CASES } from '../../app/Support/Marketing/catalog'
+import { marketingHead } from '../../app/Support/Marketing/head'
+import { urlTo } from '../../config/domains'
 
 const features = FEATURES
 const useCases = USE_CASES
@@ -50,9 +50,7 @@ const faqs = [
   { q: 'What do the networks charge?', a: 'Most of them nothing. X bills API access per use, and that cost is between you and X: Postline adds nothing on top and tells you which network a failed post was rejected by.' },
 ]
 
-// Structured data for search engines (#224): what Postline is, and the FAQ
-// below, from the same list the page renders. stx's @structuredData writes
-// the JSON-LD tag and escapes it.
+// Structured data for the application and the FAQ visible on this page.
 const structuredData = [
   {
     '@type': 'SoftwareApplication',
@@ -60,7 +58,7 @@ const structuredData = [
     'applicationCategory': 'BusinessApplication',
     'operatingSystem': 'macOS, Linux, Windows',
     'description': 'Write a post once and publish it to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, and it runs with your own keys.',
-    'url': 'https://postline.stacksjs.com/',
+    'url': urlTo('/'),
     'license': 'https://opensource.org/licenses/MIT',
     'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
   },
@@ -69,10 +67,14 @@ const structuredData = [
     'mainEntity': faqs.map(faq => ({ '@type': 'Question', 'name': faq.q, 'acceptedAnswer': { '@type': 'Answer', 'text': faq.a } })),
   },
 ]
+const jsonLd = JSON.stringify({ '@context': 'https://schema.org', '@graph': structuredData }).replaceAll('<', '\\u003c')
+useHead({
+  ...marketingHead('/', '/images/og/home.png'),
+  script: [{ type: 'application/ld+json', content: jsonLd }],
+})
 </script>
 
 @section('content')
-  @structuredData(structuredData)
   {{-- Hero --}}
   <section class="overflow-hidden relative">
     <div class="absolute inset-0 grid-backdrop pointer-events-none" aria-hidden="true"></div>

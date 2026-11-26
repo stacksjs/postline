@@ -2,9 +2,13 @@
 
 @section('title', 'Analytics: What actually landed - Postline')
 @section('description', 'Publishing activity across every network, and engagement for Bluesky posts, stored against the posts that earned it.')
-@section('canonical', 'https://postline.stacksjs.com/features/analytics')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/feature-analytics.png')
 @section('ogImageAlt', 'Postline feature: Analytics. What actually landed.')
+
+<script server>
+import { marketingHead } from '../../../app/Support/Marketing/head'
+
+useHead(marketingHead('/features/analytics', '/images/og/feature-analytics.png'))
+</script>
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">

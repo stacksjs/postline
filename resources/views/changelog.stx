@@ -2,12 +2,14 @@
 
 @section('title', 'Changelog - Postline')
 @section('description', 'Every Postline release and what changed in it, from the release notes.')
-@section('canonical', 'https://postline.stacksjs.com/changelog')
 
 <script server>
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseChangelog } from '../../app/Support/Marketing/changelog'
+import { marketingHead } from '../../app/Support/Marketing/head'
+
+useHead(marketingHead('/changelog'))
 
 // Read at build time from the release script's own notes.
 const releases = parseChangelog(readFileSync(join(process.cwd(), 'CHANGELOG.md'), 'utf8'))

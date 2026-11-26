@@ -2,9 +2,13 @@
 
 @section('title', 'Founders: Ship the update everywhere - Postline')
 @section('description', 'Post launches, changelogs and build notes to every network without doing it six times.')
-@section('canonical', 'https://postline.stacksjs.com/use-cases/founders')
-@section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-founders.png')
 @section('ogImageAlt', 'Postline use case: Founders. Ship the update everywhere.')
+
+<script server>
+import { marketingHead } from '../../../app/Support/Marketing/head'
+
+useHead(marketingHead('/use-cases/founders', '/images/og/use-case-founders.png'))
+</script>
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">

@@ -2,7 +2,12 @@
 
 @section('title', 'Trademarks - Postline')
 @section('description', 'The network names and logos on this site belong to their owners. Postline is not affiliated with or endorsed by them.')
-@section('canonical', 'https://postline.stacksjs.com/trademarks')
+
+<script server>
+import { marketingHead } from '../../app/Support/Marketing/head'
+
+useHead(marketingHead('/trademarks'))
+</script>
 
 @section('content')
   <LegalPage heading="Trademarks" updated="24 November 2026">

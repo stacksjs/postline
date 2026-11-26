@@ -148,6 +148,8 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Build the site
         run: bun run build:frontend
+      - name: Marketing metadata and sitemap
+        run: bun scripts/marketing-check.ts
       - name: No TypeScript in the build
         run: |
           LEFT="$(find dist -name '*.ts')"

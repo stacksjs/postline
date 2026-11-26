@@ -1,4 +1,5 @@
 import type { StxOptions as UiOptions } from '@stacksjs/stx'
+import { url } from './domains'
 
 /**
  * STX Configuration for Stacks
@@ -26,6 +27,8 @@ import type { StxOptions as UiOptions } from '@stacksjs/stx'
  */
 
 export default {
+  site: { url },
+
   // Project root. Pinned so directory keys are never double-prefixed.
   root: '.',
 

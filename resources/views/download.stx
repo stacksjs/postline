@@ -2,11 +2,13 @@
 
 @section('title', 'Download Postline for Mac, or run it from source')
 @section('description', 'Get Postline: the Mac app, free and open source, or the source to run on your own server.')
-@section('canonical', 'https://postline.stacksjs.com/download')
 
 <script server>
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { marketingHead } from '../../app/Support/Marketing/head'
+
+useHead(marketingHead('/download'))
 
 // The site is built from the same commit as the release it offers, so the
 // app's own version names the file to download.
