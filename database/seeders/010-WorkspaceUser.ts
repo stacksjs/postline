@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto'
+import process from 'node:process'
 import { Seeder } from '@stacksjs/database'
 import { db } from '@stacksjs/database'
 import { log } from '@stacksjs/logging'
@@ -13,8 +15,7 @@ import { hashMake } from '@stacksjs/security'
  * because that directory is not empty, never touches a framework model like
  * `User`.
  *
- * Credentials come from the environment when it is set, so a shared dev box
- * can differ from a laptop, and fall back to a deliberately well-known pair.
+ * The development owner can supply a password or receive a random one.
  */
 export default class WorkspaceUser extends Seeder {
   static order = 10
@@ -29,7 +30,7 @@ export default class WorkspaceUser extends Seeder {
 
     const email = process.env.SEED_USER_EMAIL ?? 'dev@postline.test'
     const name = process.env.SEED_USER_NAME ?? 'Postline Dev'
-    const password = process.env.SEED_USER_PASSWORD ?? 'password'
+    const requestedPassword = process.env.SEED_USER_PASSWORD
 
     const existing = await db
       .selectFrom('users')
@@ -52,6 +53,7 @@ export default class WorkspaceUser extends Seeder {
     }
 
     const now = new Date().toISOString()
+    const password = requestedPassword || randomBytes(18).toString('base64url')
 
     await db
       .insertInto('users')
@@ -68,7 +70,7 @@ export default class WorkspaceUser extends Seeder {
       .execute()
 
     log.success(`WorkspaceUser: seeded ${email}`)
-    if (password === 'password')
-      log.info('  Password is "password" — override with SEED_USER_PASSWORD.')
+    if (!requestedPassword)
+      log.info(`  Generated development password: ${password}`)
   }
 }

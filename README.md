@@ -54,9 +54,15 @@ APP_URL=localhost ./buddy dev --browser --with-localhost
 
 Open the address it prints and create the workspace account (**First run?
 Create the workspace account**); see [docs/first-run.md](docs/first-run.md).
-For sample data while developing, `./buddy seed` adds an account
-(`dev@postline.test`, password printed, or set `SEED_USER_PASSWORD`) and a few
-posts instead.
+For sample data on a fresh development workspace, run the seeder before
+creating an account. It adds `dev@postline.test` and a few posts. It prints
+the generated password, or you can set `SEED_USER_PASSWORD` yourself.
+
+<!-- readme-seed -->
+```bash
+./buddy seed
+```
+<!-- /readme-seed -->
 
 The dev command prints the address it is serving. If a port is taken it moves
 to the next free one. The [first-run guide](docs/first-run.md) covers password

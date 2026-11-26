@@ -5,7 +5,7 @@ import { url, urlTo } from '../config/domains'
 const root = join(import.meta.dir, '..')
 const dist = join(root, 'dist')
 const paths = marketingPaths(join(root, 'resources/views'))
-const expected = paths.map(urlTo).sort()
+const expected = [...paths, '/blog'].map(urlTo).sort()
 const sitemap = await Bun.file(join(dist, 'sitemap.xml')).text()
 const listed = Array.from(sitemap.matchAll(/<loc>([^<]+)<\/loc>/g), match => match[1]).sort()
 if (JSON.stringify(listed) !== JSON.stringify(expected))

@@ -72,7 +72,8 @@ Recorded so it can be repeated on another machine. All of it is done.
 
 The release publishes with the repository secret `GH_RELEASE_TOKEN` in
 ReviewOS, a GitHub token with `contents: write` on `stacksjs/postline`. It is
-set; v0.1.0 and v0.1.1 were released with it.
+set and was used for v0.1.0 and v0.1.1. Repository-only permissions are tracked
+in [#235](https://github.com/stacksjs/postline/issues/235).
 
 ## Linux container check
 

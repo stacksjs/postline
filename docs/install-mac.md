@@ -15,9 +15,9 @@ create. The person at the Mac is the owner.
    [GitHub releases](https://github.com/stacksjs/postline/releases/latest).
    `checksums.txt` on the release lists each file's SHA-256.
 2. Open the disk image and drag **Postline** into **Applications**.
-3. Open Postline. Until releases are notarized by Apple (#191), macOS says it
-   cannot check the app. Open **System Settings > Privacy & Security** and
-   choose **Open Anyway** next to Postline. You do this once.
+3. Open Postline from **Applications**. If macOS cannot verify the download,
+   check GitHub Releases for a signed and notarized build. Notarization for
+   public builds is tracked in [#191](https://github.com/stacksjs/postline/issues/191).
 
 The app opens on the composer. Connect a network next:
 [Connecting networks](./networks/index.md).
