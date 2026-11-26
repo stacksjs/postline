@@ -9,8 +9,7 @@ import { listRegisteredRoutes } from '@stacksjs/router'
 import { featureTest } from '@stacksjs/testing'
 import User from '../../storage/framework/defaults/app/Models/User'
 
-// Typed to just the id until the Stacks testing fix (actingAs accepts a model record) ships.
-async function owner(): Promise<{ id: number }> {
+async function owner() {
   return await User.first() ?? await User.create({
     name: 'Csrf Test',
     email: `csrf-${Date.now()}@postline.test`,

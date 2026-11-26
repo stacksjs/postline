@@ -19,8 +19,7 @@ import { featureTest } from '@stacksjs/testing'
 import User from '../../storage/framework/defaults/app/Models/User'
 
 /** Every Postline endpoint below is behind `middleware('auth')`. */
-// Typed to just the id until the Stacks testing fix (actingAs accepts a model record) ships.
-async function actingUser(): Promise<{ id: number }> {
+async function actingUser() {
   const existing = await User.first()
   if (existing) return existing
 

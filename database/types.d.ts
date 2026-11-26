@@ -44,7 +44,7 @@ declare module '@stacksjs/database' {
       id: number
       created_at: string
       updated_at: string | null
-      kind: "post-failed" | "post-missed" | "account-expired"
+      kind: "post-failed" | "post-missed" | "account-expired" | "keyword-match"
       title: string
       body: string
       link: string
@@ -1175,6 +1175,7 @@ declare module '@stacksjs/database' {
       client_id: string
       client_secret: string
       redirect_url: string
+      organization_pages: number
     }
     notification_deliveries: {
       // columns

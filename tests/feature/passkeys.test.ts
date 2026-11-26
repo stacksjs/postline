@@ -63,8 +63,11 @@ describe('passkeys', () => {
     expect(login.headers.get('set-cookie') ?? '').toContain('auth-token=')
 
     const id = encodeURIComponent(listed.passkeys[0]!.id)
-    // A wrong password is not proof of another way in, so the last passkey stays.
-    expect((await signedIn.delete(`/api/auth/passkeys/${id}`, { password: 'wrong' })).status).toBe(400)
+    // A wrong password is not proof of another way in, so the last passkey
+    // stays, and the answer says the password was wrong.
+    const wrong = await signedIn.delete(`/api/auth/passkeys/${id}`, { password: 'wrong' })
+    expect(wrong.status).toBe(422)
+    expect(await wrong.json()).toMatchObject({ error: 'The password is not right.' })
     expect((await signedIn.delete(`/api/auth/passkeys/${id}`, { password: PASSWORD })).status).toBe(200)
     expect((await (await signedIn.get('/api/auth/passkeys')).json<{ passkeys: unknown[] }>()).passkeys).toHaveLength(0)
   })
