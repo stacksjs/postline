@@ -1,9 +1,10 @@
 @extends('layouts/marketing')
 
-@section('title', 'Nobody else can post as you - Postline')
+@section('title', 'Own your keys: Nobody else can post as you - Postline')
 @section('description', 'Your posts, your history and your access tokens live in a database you run. There is no vendor in the middle.')
 @section('canonical', 'https://postline.stacksjs.com/features/own-your-keys')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/feature-own-your-keys.png')
+@section('ogImageAlt', 'Postline feature: Own your keys. Nobody else can post as you.')
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">

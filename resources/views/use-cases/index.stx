@@ -1,9 +1,10 @@
 @extends('layouts/marketing')
 
 @section('title', 'Use cases - Postline')
-@section('description', 'Who runs Postline, and what they use it for.')
+@section('description', 'Postline use cases: Founders, Developer advocates, Maintainers, Agencies, Publications.')
 @section('canonical', 'https://postline.stacksjs.com/use-cases')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-index.png')
+@section('ogImageAlt', 'Postline use cases: who runs it, and for what.')
 
 @section('content')
   <div class="mx-auto px-5 sm:px-8 max-w-[1200px]">

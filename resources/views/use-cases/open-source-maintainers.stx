@@ -1,9 +1,10 @@
 @extends('layouts/marketing')
 
-@section('title', 'Release notes that travel - Postline')
+@section('title', 'Maintainers: Release notes that travel - Postline')
 @section('description', 'Announce releases across networks from a tool you can read, fork and audit before it touches your accounts.')
 @section('canonical', 'https://postline.stacksjs.com/use-cases/open-source-maintainers')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-open-source-maintainers.png')
+@section('ogImageAlt', 'Postline use case: Maintainers. Release notes that travel.')
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">

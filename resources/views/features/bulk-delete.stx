@@ -1,9 +1,10 @@
 @extends('layouts/marketing')
 
-@section('title', 'Take it all back down - Postline')
+@section('title', 'Cleanup: Take it all back down - Postline')
 @section('description', 'Delete old posts automatically after a set number of days, or clear a whole account in one run, with a preview first.')
 @section('canonical', 'https://postline.stacksjs.com/features/bulk-delete')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/feature-bulk-delete.png')
+@section('ogImageAlt', 'Postline feature: Cleanup. Take it all back down.')
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">

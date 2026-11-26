@@ -49,9 +49,30 @@ const faqs = [
   { q: 'Do I need a server?', a: 'No. It runs on a laptop. Scheduled posts go out while Postline is running, so put it on a small always-on server when you want the queue to publish overnight. Instagram and Threads fetch images from a public address, so on a laptop switch on temporary image links in Settings.' },
   { q: 'What do the networks charge?', a: 'Most of them nothing. X bills API access per use, and that cost is between you and X: Postline adds nothing on top and tells you which network a failed post was rejected by.' },
 ]
+
+// Structured data for search engines (#224): what Postline is, and the FAQ
+// below, from the same list the page renders. stx's @structuredData writes
+// the JSON-LD tag and escapes it.
+const structuredData = [
+  {
+    '@type': 'SoftwareApplication',
+    'name': 'Postline',
+    'applicationCategory': 'BusinessApplication',
+    'operatingSystem': 'macOS, Linux, Windows',
+    'description': 'Write a post once and publish it to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, and it runs with your own keys.',
+    'url': 'https://postline.stacksjs.com/',
+    'license': 'https://opensource.org/licenses/MIT',
+    'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
+  },
+  {
+    '@type': 'FAQPage',
+    'mainEntity': faqs.map(faq => ({ '@type': 'Question', 'name': faq.q, 'acceptedAnswer': { '@type': 'Answer', 'text': faq.a } })),
+  },
+]
 </script>
 
 @section('content')
+  @structuredData(structuredData)
   {{-- Hero --}}
   <section class="overflow-hidden relative">
     <div class="absolute inset-0 grid-backdrop pointer-events-none" aria-hidden="true"></div>

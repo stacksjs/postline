@@ -1,9 +1,10 @@
 @extends('layouts/marketing')
 
-@section('title', 'Answer everyone from one inbox - Postline')
+@section('title', 'Inbox: Answer everyone from one inbox - Postline')
 @section('description', 'Read and reply to direct messages from Bluesky and Mastodon without switching apps.')
 @section('canonical', 'https://postline.stacksjs.com/features/inbox')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/feature-inbox.png')
+@section('ogImageAlt', 'Postline feature: Inbox. Answer everyone from one inbox.')
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">

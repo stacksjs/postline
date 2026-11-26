@@ -1,9 +1,10 @@
 @extends('layouts/marketing')
 
 @section('title', 'Features - Postline')
-@section('description', 'Everything Postline does, and how each part works.')
+@section('description', 'Postline features: Crossposting, Scheduling, Per-network variants, Campaigns, Inbox, Listening, Analytics, Cleanup, Own your keys.')
 @section('canonical', 'https://postline.stacksjs.com/features')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/feature-index.png')
+@section('ogImageAlt', 'Postline features: what each part does.')
 
 @section('content')
   <div class="mx-auto px-5 sm:px-8 max-w-[1200px]">

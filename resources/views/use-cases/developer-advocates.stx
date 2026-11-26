@@ -1,9 +1,10 @@
 @extends('layouts/marketing')
 
-@section('title', 'Reach every community - Postline')
+@section('title', 'Developer advocates: Reach every community - Postline')
 @section('description', 'Developers are split across Bluesky, X and Mastodon. Reach all of them without choosing a favourite.')
 @section('canonical', 'https://postline.stacksjs.com/use-cases/developer-advocates')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-developer-advocates.png')
+@section('ogImageAlt', 'Postline use case: Developer advocates. Reach every community.')
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">

@@ -34,10 +34,11 @@ function page(entry: MarketingEntry, kind: 'feature' | 'use-case', siblings: Mar
 
   return `@extends('layouts/marketing')
 
-@section('title', '${q(entry.title)} - Postline')
+@section('title', '${q(entry.nav)}: ${q(entry.title)} - Postline')
 @section('description', '${q(entry.summary)}')
 @section('canonical', '${SITE}${base}/${entry.slug}')
 @section('ogImage', '${SITE}/images/og/${kind}-${entry.slug}.png')
+@section('ogImageAlt', '${q(`Postline ${kind === 'feature' ? 'feature' : 'use case'}: ${entry.nav}. ${entry.title}.`)}')
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">
@@ -104,9 +105,10 @@ function indexPage(kind: 'feature' | 'use-case', entries: MarketingEntry[]): str
   return `@extends('layouts/marketing')
 
 @section('title', '${label} - Postline')
-@section('description', '${q(blurb)}')
+@section('description', '${q(`${kind === 'feature' ? 'Postline features' : 'Postline use cases'}: ${entries.map(e => e.nav).join(', ')}.`)}')
 @section('canonical', '${SITE}${base}')
 @section('ogImage', '${SITE}/images/og/${kind}-index.png')
+@section('ogImageAlt', '${q(kind === 'feature' ? 'Postline features: what each part does.' : 'Postline use cases: who runs it, and for what.')}')
 
 @section('content')
   <div class="mx-auto px-5 sm:px-8 max-w-[1200px]">

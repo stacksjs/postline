@@ -1,9 +1,10 @@
 @extends('layouts/marketing')
 
-@section('title', 'Distribution for a publication - Postline')
+@section('title', 'Publications: Distribution for a publication - Postline')
 @section('description', 'Announce every story on every network. The Open Times, an independent publishing platform, uses Postline for exactly this.')
 @section('canonical', 'https://postline.stacksjs.com/use-cases/publications')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-publications.png')
+@section('ogImageAlt', 'Postline use case: Publications. Distribution for a publication.')
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">

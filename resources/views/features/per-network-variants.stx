@@ -1,9 +1,10 @@
 @extends('layouts/marketing')
 
-@section('title', 'Different limits, same idea - Postline')
+@section('title', 'Per-network variants: Different limits, same idea - Postline')
 @section('description', 'Override the text for any single network without maintaining six separate drafts of the same post.')
 @section('canonical', 'https://postline.stacksjs.com/features/per-network-variants')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/feature-per-network-variants.png')
+@section('ogImageAlt', 'Postline feature: Per-network variants. Different limits, same idea.')
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">

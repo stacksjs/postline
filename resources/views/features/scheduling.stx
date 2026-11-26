@@ -1,9 +1,10 @@
 @extends('layouts/marketing')
 
-@section('title', 'Queue it now, publish it later - Postline')
+@section('title', 'Scheduling: Queue it now, publish it later - Postline')
 @section('description', 'Schedule posts ahead in your own timezone and let the queue publish them, or send immediately.')
 @section('canonical', 'https://postline.stacksjs.com/features/scheduling')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/feature-scheduling.png')
+@section('ogImageAlt', 'Postline feature: Scheduling. Queue it now, publish it later.')
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">

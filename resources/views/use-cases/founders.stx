@@ -1,9 +1,10 @@
 @extends('layouts/marketing')
 
-@section('title', 'Ship the update everywhere - Postline')
+@section('title', 'Founders: Ship the update everywhere - Postline')
 @section('description', 'Post launches, changelogs and build notes to every network without doing it six times.')
 @section('canonical', 'https://postline.stacksjs.com/use-cases/founders')
 @section('ogImage', 'https://postline.stacksjs.com/images/og/use-case-founders.png')
+@section('ogImageAlt', 'Postline use case: Founders. Ship the update everywhere.')
 
 @section('content')
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">
