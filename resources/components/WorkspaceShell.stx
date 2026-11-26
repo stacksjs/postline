@@ -16,6 +16,7 @@ const bridge = state<WorkspaceBridge | null>(desktop() as WorkspaceBridge | null
 const colorMode = useColorMode()
 let settingsChannel: BroadcastChannel | null = null
 let unbindSettingsMenu: (() => void) | undefined
+let unbindWorkspaceChanges: (() => void) | undefined
 
 function toggleSidebar() {
   collapsed.set(!collapsed())
@@ -95,12 +96,14 @@ desktop.onReady((host) => {
 })
 
 onMount(() => {
+  unbindWorkspaceChanges = bindWorkspaceChanges()
   if (typeof BroadcastChannel !== 'function') return
   settingsChannel = new BroadcastChannel('postline:settings')
   settingsChannel.addEventListener('message', receiveSettings)
 })
 
 onDestroy(() => {
+  unbindWorkspaceChanges?.()
   unbindSettingsMenu?.()
   settingsChannel?.close()
 })

@@ -150,6 +150,8 @@
 
 
   <script client>
+    import { fetchWorkspace, targetLabel } from '../functions/social-client'
+
     /**
      * Wire shapes for `/api/postline/queue/*`, declared where they are used.
      *
@@ -275,7 +277,7 @@
     const channelLabels = (targets: QueueApiTarget[]): string[] => targets.map((target) => {
       const shared = targets.filter(other => other.provider === target.provider).length > 1
       return shared && target.handle
-        ? postlineSocial?.targetLabel(target.provider, target.handle) || `${providerLabel(target.provider)} ${target.handle}`
+        ? targetLabel(target.provider, target.handle)
         : providerLabel(target.provider)
     })
 
@@ -483,9 +485,7 @@
 
     const loadZone = async () => {
       try {
-        const workspace = postlineSocial
-          ? await postlineSocial.fetchWorkspace()
-          : await fetch('/api/postline/settings/workspace').then(response => response.json()).then(payload => payload?.data ?? null)
+        const workspace = await fetchWorkspace()
         const timezone = workspace?.timezone
         if (typeof timezone === 'string' && timezone) {
           zone.set(timezone)

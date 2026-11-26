@@ -1,5 +1,5 @@
 /**
- * The browser half of passkeys (#95), handed to the sign-in and Settings pages.
+ * The browser half of passkeys, used by the sign-in and Settings pages.
  *
  * The WebAuthn calls and the credential encoding come from the framework's
  * browser entry; this only runs the two round trips each ceremony takes. A
@@ -60,13 +60,4 @@ async function register(): Promise<boolean> {
   return true
 }
 
-const passkeys = { supported: browserSupportsWebAuthn, signIn, register }
-
-declare global {
-  interface Window {
-    postlinePasskeys?: typeof passkeys
-  }
-}
-
-window.postlinePasskeys = passkeys
-window.dispatchEvent(new Event('postline:passkeys'))
+export const passkeys = { supported: browserSupportsWebAuthn, signIn, register }

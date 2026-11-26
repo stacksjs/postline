@@ -189,6 +189,10 @@
   </section>
 
   <script client>
+    import { countText } from '../../app/Support/Social/count-text'
+    import { mediaObjections } from '../../app/Support/Social/media-rules'
+    import { fetchLinkPreview, fetchProviders, fetchWorkspace, formatHandle, publishCrosspost, targetLabel } from '../functions/social-client'
+
     // What the template reads lives at the top level: stx binds `x-for`,
     // `:class` and `@click` to top-level declarations, so the chips stayed on
     // "Loading accounts…" while their signals were declared inside the IIFE
@@ -363,9 +367,6 @@
         console.log(`[postline] ${message}`)
       }
 
-      const formatHandle = (provider, handle) => window.postlineSocial?.formatHandle(provider, handle) || handle || ''
-      const targetLabel = (provider, handle) => window.postlineSocial?.targetLabel(provider, handle) || providerLabel(provider)
-
       /**
        * Publish targets, flattened from the network statuses.
        *
@@ -428,13 +429,12 @@
 
       /**
        * A text's length as `provider` measures it: graphemes on Bluesky, a
-       * weighted count on X, links as 23 on X and Mastodon. The same function
-       * the server checks with (app/Support/Social/count-text.ts). Resolved
-       * at call time because the module loads after this script parses.
+       * weighted count on X, links as 23 on X and Mastodon. These are the
+       * same rules the server uses.
        */
       const lengthFor = (provider, text) => {
         const value = String(text || '')
-        return window.postlineCountText ? window.postlineCountText(provider, value) : value.length
+        return countText(provider, value)
       }
 
       /** The selected network with the tightest limit: the one the counter counts for. */
@@ -753,8 +753,7 @@
       const refreshConnection = async () => {
         providersFailed.set(false)
         try {
-          const list = await window.postlineSocial?.fetchProviders()
-          applyConnection(list || [])
+          applyConnection(await fetchProviders())
         }
         catch (error) {
           // Inline, not a toast: a toast on every load would be noise, and an
@@ -955,10 +954,7 @@
 
         try {
           // Shared and cached, so a redraw or a second visit does not ask again.
-          const preview = window.postlineSocial
-            ? await window.postlineSocial.fetchLinkPreview(url)
-            : await fetch(`/api/postline/bluesky/link-preview?url=${encodeURIComponent(url)}`).then(response => response.json()).then(payload => payload?.ok ? payload.data : null)
-          if (!preview) throw new Error('Could not render link preview.')
+          const preview = await fetchLinkPreview(url)
           renderLinkPreview(post, preview)
         }
         catch {
@@ -1074,9 +1070,7 @@
       let workspaceZone
       // Awaited before a saved post's time is shown, so it is never read in
       // one zone and saved in another.
-      // The shared client when it has loaded; the endpoint itself otherwise.
-      const zoneReady = (window.postlineSocial?.fetchWorkspace()
-        ?? fetch('/api/postline/settings/workspace').then(response => response.ok ? response.json() : null).then(payload => payload?.data ?? null))
+      const zoneReady = fetchWorkspace()
         .then((workspace) => {
           const timezone = workspace?.timezone
           if (typeof timezone !== 'string' || !timezone) return
@@ -1379,8 +1373,6 @@
       }
 
       const publishOne = async (post, targetProviders) => {
-        const social = window.postlineSocial
-        if (!social) throw new Error('Publishing is still loading. Try again in a moment.')
         const textarea = textareaFor(post)
         if (!textarea) throw new Error('Missing post body.')
         const text = textarea.value.trim()
@@ -1394,7 +1386,7 @@
           : undefined
         const imageUrl = composeImage?.value.trim()
         const image = imageUrl ? { url: imageUrl } : undefined
-        return await social.publishCrosspost({ text, title: composedTitle(), providers: targetProviders, external, image, imageFiles: attachedFiles(), variants: variantsPayload(), options: postOptions() })
+        return await publishCrosspost({ text, title: composedTitle(), providers: targetProviders, external, image, imageFiles: attachedFiles(), variants: variantsPayload(), options: postOptions() })
       }
 
       const publish = async () => {
@@ -1454,15 +1446,13 @@
           if (targets.length > 1) {
             // Threads go up in one request so the server can reply-chain the
             // segments on providers that support it (Bluesky).
-            const social = window.postlineSocial
-            if (!social) throw new Error('Publishing is still loading. Try again in a moment.')
             const first = targets[0]
             const external = (first?.dataset.externalUri && first.dataset.externalTitle)
               ? { uri: first.dataset.externalUri, title: first.dataset.externalTitle, description: first.dataset.externalDescription || '' }
               : undefined
             const imageUrl = composeImage?.value.trim()
             const thread = targets.map(post => textareaFor(post)?.value.trim() || '')
-            collect(await social.publishCrosspost({
+            collect(await publishCrosspost({
               text: thread[0],
               title: composedTitle(),
               thread,
@@ -1583,10 +1573,10 @@
         // Each network has its own count, size and format rules; Bluesky's
         // 1 MB cap used to be applied to all of them. The server runs the same
         // check on save, so a network added afterwards is still caught.
-        const objections = window.postlineMediaObjections?.(
+        const objections = mediaObjections(
           selectedConnected().map(target => target.provider),
           next.map(image => ({ bytes: image.file.size, mimeType: image.file.type })),
-        ) || []
+        )
         if (objections.length) {
           setStatus(`${objections.join(' ')} Use a different image, or leave that network out.`, 'error', { title: 'Attachment' })
           return
@@ -1685,8 +1675,6 @@
       selectPost(allPosts()[savedActiveIndex] || activePost, { skipSave: true })
       updateCount()
       void updateLinkPreview(activePost)
-      // Wait for the social module (a deferred `type=module` script) before the
-      // first provider fetch so window.postlineSocial is guaranteed to exist.
       // Load the edit post only after connection so provider toggles resolve.
       // /composer?schedule=YYYY-MM-DD (from the queue calendar) opens the schedule
       // input pre-set to 09:00 local on that day.

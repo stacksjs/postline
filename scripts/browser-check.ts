@@ -307,13 +307,21 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
       { id: 1, provider: 'bluesky', participantName: 'Alice Example', participantHandle: 'alice.example', lastMessageAt: postedAt, lastMessagePreview: 'Hello' },
       { id: 2, provider: 'mastodon', participantName: 'Morgan Example', participantHandle: 'morgan.example', lastMessageAt: postedAt, lastMessagePreview: 'Hello' },
     ]
+    const account = { id: 101, provider: 'bluesky', handle: 'alice.example', connected: true, canPublish: true, isDefault: true }
     window.fetch = (input, options) => {
       const request = new Request(input, options)
       const path = new URL(request.url).pathname
       if (path === '/api/postline/bootstrap') return actualFetch(input, options).then(async response => {
         if (!response.ok) return response
         const payload = await response.json()
-        return Response.json({ ...payload, data: { ...payload.data, unread: { inbox: inboxUnread, listening: 106 } } })
+        const providers = payload.data.providers.map(provider => provider.provider === 'bluesky'
+          ? { ...provider, ...account, accounts: [account], characterLimit: 300 }
+          : provider)
+        return Response.json({ ...payload, data: { ...payload.data, providers, unread: { inbox: inboxUnread, listening: 106 } } })
+      })
+      if (path === '/api/postline/publish') return request.formData().then(body => {
+        window.composerPublish = { text: body.get('text'), providers: body.get('providers') }
+        return Response.json({ ok: true, data: { postId: 1, results: [{ provider: 'bluesky', ok: true }] } })
       })
       if (path === '/api/postline/inbox') return Promise.resolve(Response.json({ ok: true, data: { conversations } }))
       if (path === '/api/postline/inbox/read') inboxUnread = 2
@@ -352,6 +360,22 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
     await waitUntil('Timeline initials and image from their own rows', () => evaluate<boolean>(cdp, `
       document.querySelector('.postline-feed-post__avatar[aria-label="Alice Example"]')?.textContent.trim() === 'AE'
       && document.querySelector('.postline-feed-post__avatar[aria-label="Morgan Example"] img')?.naturalWidth === 1`), 5_000)
+
+    await auditPage(`${site}/composer`, { cdp })
+    const target = `document.querySelector('[data-provider-toggle="bluesky:101"]')`
+    await waitUntil('The imported Composer connection data', () => evaluate<boolean>(cdp, `Boolean(${target}?.getClientRects().length)`), 5_000)
+    const text = '👨‍👩‍👧‍👦'
+    await evaluate(cdp, `(() => {
+      for (const other of document.querySelectorAll('[data-provider-toggle][aria-pressed=true]')) if (other !== ${target}) other.click()
+      if (${target}.getAttribute('aria-pressed') !== 'true') ${target}.click()
+      const editor = document.querySelector('[data-bluesky-text]')
+      editor.value = ${JSON.stringify(text)}
+      editor.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    await waitUntil('The shared grapheme counter', () => evaluate<boolean>(cdp, "document.querySelector('[data-bluesky-count]').textContent.includes('1 / 300')"), 5_000)
+    await evaluate(cdp, "document.querySelector('[data-bluesky-publish]').click()")
+    await waitUntil('The imported publish function', () => evaluate<boolean>(cdp, `
+      window.composerPublish?.text === ${JSON.stringify(text)} && window.composerPublish.providers === 'bluesky:101'`), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
@@ -445,6 +469,39 @@ async function checkChannels(cdp: Cdp): Promise<void> {
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+  }
+}
+
+async function checkBrowserPasskey(cdp: Cdp): Promise<void> {
+  await cdp.send('WebAuthn.enable')
+  const { authenticatorId } = await cdp.send<{ authenticatorId: string }>('WebAuthn.addVirtualAuthenticator', {
+    options: {
+      protocol: 'ctap2',
+      transport: 'internal',
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+      automaticPresenceSimulation: true,
+    },
+  })
+  try {
+    const addPasskey = "document.querySelector('[data-setting=passkey-add] button')"
+    await auditPage(`${site}/settings`, { cdp })
+    await waitUntil('The Account pane', () => evaluate<boolean>(cdp, `Boolean(document.querySelector('[data-settings-item=account]')?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, "document.querySelector('[data-settings-item=account]').click()")
+    await waitUntil('The Add Passkey button', () => evaluate<boolean>(cdp, `Boolean(${addPasskey}?.getClientRects().length) && !${addPasskey}.disabled`), 5_000)
+    await evaluate(cdp, `${addPasskey}.click()`)
+    await waitUntil('The new passkey in Settings', () => evaluate<boolean>(cdp, "Boolean(document.querySelector('[data-passkey-row]')?.getClientRects().length)"), 10_000)
+    await evaluate(cdp, "document.querySelector('[data-setting=sign-out] button').click()")
+    await waitUntil('The passkey sign-in button after signing out', () => evaluate<boolean>(cdp, `
+      location.pathname === '/login' && Boolean(document.querySelector('[data-passkey-sign-in]')?.getClientRects().length)`), 15_000)
+    await evaluate(cdp, "document.querySelector('[data-passkey-sign-in]').click()")
+    await waitUntil('Passkey sign-in returns to the workspace', () => evaluate<boolean>(cdp, `
+      location.pathname === '/composer' && !!document.querySelector('[data-postline-page=composer]')`), 15_000)
+  }
+  finally {
+    await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId })
+    await cdp.send('WebAuthn.disable')
   }
 }
 
@@ -568,6 +625,7 @@ try {
     await checkWorkspaceBootstrap(cdp)
     await checkChannels(cdp)
     await checkNetworkComponents(cdp)
+    await checkBrowserPasskey(cdp)
     await checkPhoneNavigation(cdp)
   }
   finally {

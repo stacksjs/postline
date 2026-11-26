@@ -1,6 +1,6 @@
 import type { NetworkAppSummary } from '../../app/Services/NetworkAppService'
 import type { WorkspaceProfile } from '../../app/Services/WorkspaceService'
-import type { AccountStatus, ProviderStatus } from '../assets/scripts/social'
+import type { AccountStatus, ProviderStatus } from './social-client'
 
 interface WorkspaceBootstrap {
   workspace: WorkspaceProfile
@@ -103,6 +103,20 @@ export async function refreshWorkspaceBootstrap(): Promise<void> {
 
 export function announceWorkspaceChange(): void {
   window.dispatchEvent(new Event('postline:workspace-changed'))
+}
+
+export function bindWorkspaceChanges(): () => void {
+  if (typeof BroadcastChannel !== 'function') return () => {}
+  const channel = new BroadcastChannel('postline:workspace')
+  const publish = () => channel.postMessage('changed')
+  channel.addEventListener('message', (event) => {
+    if (event.data === 'changed') void refreshWorkspaceBootstrap()
+  })
+  window.addEventListener('postline:workspace-changed', publish)
+  return () => {
+    window.removeEventListener('postline:workspace-changed', publish)
+    channel.close()
+  }
 }
 
 export async function disconnectSocialAccount(id: number): Promise<void> {

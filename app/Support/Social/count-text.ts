@@ -7,8 +7,7 @@
  * here though Bluesky would take it, and an X post in Japanese passed here
  * and was refused by X.
  *
- * This module has no imports, so the composer and the server run the same
- * code (`resources/assets/scripts/count-text.ts` hands it to the page).
+ * The composer and the server both import these rules.
  *
  * - Bluesky counts graphemes: one emoji, however it is built, is one.
  * - X counts a weighted length: most Latin text is one each, CJK and emoji

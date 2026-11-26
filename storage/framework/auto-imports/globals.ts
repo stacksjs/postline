@@ -14,6 +14,7 @@ declare global {
   const providerInitial: typeof autoImports.providerInitial
   const providerColor: typeof autoImports.providerColor
   const providerIcon: typeof autoImports.providerIcon
+  const passkeys: typeof autoImports.passkeys
   const requestJson: typeof autoImports.requestJson
   const fetchWorkspaceBootstrap: typeof autoImports.fetchWorkspaceBootstrap
   const refreshWorkspaceBootstrap: typeof autoImports.refreshWorkspaceBootstrap
@@ -22,6 +23,13 @@ declare global {
   const relativeTime: typeof autoImports.relativeTime
   const workspaceBootstrapQuery: typeof autoImports.workspaceBootstrapQuery
   const announceWorkspaceChange: typeof autoImports.announceWorkspaceChange
+  const bindWorkspaceChanges: typeof autoImports.bindWorkspaceChanges
+  const fetchWorkspace: typeof autoImports.fetchWorkspace
+  const fetchLinkPreview: typeof autoImports.fetchLinkPreview
+  const fetchProviders: typeof autoImports.fetchProviders
+  const publishCrosspost: typeof autoImports.publishCrosspost
+  const formatHandle: typeof autoImports.formatHandle
+  const targetLabel: typeof autoImports.targetLabel
   const workspaceCommands: typeof autoImports.workspaceCommands
   const runWorkspaceCommand: typeof autoImports.runWorkspaceCommand
 }

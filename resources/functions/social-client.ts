@@ -1,5 +1,5 @@
-import { providerIcon, providerLabel } from '../../functions/networks'
-import { fetchWorkspaceBootstrap, refreshWorkspaceBootstrap } from '../../functions/postline-client'
+import { providerLabel } from './networks'
+import { fetchWorkspaceBootstrap, requestJson } from './postline-client'
 
 /** One connected account on a network. Several per network are allowed. */
 export interface AccountStatus {
@@ -96,24 +96,6 @@ export function targetLabel(provider: string, handle?: string | null): string {
   return formatted ? `${providerLabel(provider)} ${formatted}` : providerLabel(provider)
 }
 
-/**
- * Link previews are keyed by URL. They can be reused independently of
- * workspace state. A failed read is retried the next time it is needed.
- */
-const FRESH_MS = 30_000
-const cache = new Map<string, { at: number, value: Promise<unknown> }>()
-
-function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
-  const hit = cache.get(key)
-  if (hit && Date.now() - hit.at < FRESH_MS) return hit.value as Promise<T>
-  const value = load().catch((error) => {
-    cache.delete(key)
-    throw error
-  })
-  cache.set(key, { at: Date.now(), value })
-  return value
-}
-
 /** The workspace profile (its name and time zone), which most views read. */
 export async function fetchWorkspace() {
   return (await fetchWorkspaceBootstrap()).workspace
@@ -121,12 +103,15 @@ export async function fetchWorkspace() {
 
 /** A link's preview card, asked for once however often the composer redraws it. */
 export async function fetchLinkPreview(url: string): Promise<Record<string, unknown>> {
-  return await cached(`preview:${url}`, async () => {
-    const response = await fetch(`/api/postline/bluesky/link-preview?url=${encodeURIComponent(url)}`)
-    const payload = await response.json()
-    if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not render link preview.')
-    return payload.data
+  const endpoint = `/api/postline/bluesky/link-preview?url=${encodeURIComponent(url)}`
+  const preview = window.stx.cachedQuery<Record<string, unknown> | null>(endpoint, {
+    scope: false,
+    staleTime: 30_000,
+    load: async ({ signal }) => (await requestJson(endpoint, { signal }, 'Could not render link preview.')).data,
   })
+  const data = await preview.load()
+  if (!data) throw new Error(preview.error() || 'Could not render link preview.')
+  return data
 }
 
 export async function fetchProviders(): Promise<ProviderStatus[]> {
@@ -167,37 +152,4 @@ export async function publishCrosspost(input: CrosspostInput): Promise<{ postId:
     throw new Error(payload?.error || 'Publish failed.')
   }
   return payload.data as { postId: number, results: CrosspostResultItem[] }
-}
-
-// The desktop Settings window and the workspace have separate JS contexts.
-const workspaceChanges = typeof BroadcastChannel === 'function' ? new BroadcastChannel('postline:workspace') : null
-workspaceChanges?.addEventListener('message', (event) => {
-  if (event.data === 'changed') void refreshWorkspaceBootstrap()
-})
-window.addEventListener('postline:workspace-changed', () => workspaceChanges?.postMessage('changed'))
-
-declare global {
-  interface Window {
-    postlineSocial?: {
-      fetchWorkspace: typeof fetchWorkspace
-      fetchLinkPreview: typeof fetchLinkPreview
-      fetchProviders: typeof fetchProviders
-      publishCrosspost: typeof publishCrosspost
-      providerLabel: typeof providerLabel
-      providerIcon: typeof providerIcon
-      formatHandle: typeof formatHandle
-      targetLabel: typeof targetLabel
-    }
-  }
-}
-
-window.postlineSocial = {
-  fetchWorkspace,
-  fetchLinkPreview,
-  fetchProviders,
-  publishCrosspost,
-  providerLabel,
-  providerIcon,
-  formatHandle,
-  targetLabel,
 }

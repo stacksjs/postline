@@ -27,8 +27,6 @@
     </WorkspaceShell>
     <div id="postline-toast-host" class="flex bottom-6 fixed right-6 z-[100] sm:right-6 flex-col-reverse gap-2.5 max-w-[22rem] w-[calc(100%-2rem)] pointer-events-none" aria-live="polite" aria-relevant="additions"></div>
     <script type="module" src="/assets/scripts/toast.ts"></script>
-    <script type="module" src="/assets/scripts/count-text.ts"></script>
-    <script type="module" src="/assets/scripts/social.ts"></script>
     {{-- The editor and the analytics chart load with the view that uses them. --}}
     <script type="module" src="/assets/scripts/view-code.ts"></script>
     {{-- Alerts as Mac notifications and a dock badge; does nothing in a browser. --}}

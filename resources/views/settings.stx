@@ -315,6 +315,9 @@
 
 
   <script client>
+    import { passkeys } from '../functions/passkeys'
+    import { fetchProviders } from '../functions/social-client'
+
     /**
      * The stored theme preference.
      *
@@ -517,7 +520,6 @@
     }
 
     // --- Passkeys and two-factor sign-in (#95) -------------------------
-    // The ceremonies are in resources/assets/scripts/passkeys.ts; this pane
     // lists, adds and removes, and walks the authenticator setup.
 
     interface PasskeyView { id: string, device: string, created_at: unknown, last_used_at: unknown }
@@ -538,7 +540,7 @@
     const securityMessage = state('')
     const securityTone = state('muted')
     // stx-strict-ignore-next-line PublicKeyCredential
-    const passkeysSupported = state(typeof PublicKeyCredential !== 'undefined')
+    const passkeysSupported = state(passkeys.supported())
 
     const shortDate = (value: unknown): string => {
       const date = value ? new Date(String(value).replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(String(value)) ? '' : 'Z')) : null
@@ -603,9 +605,6 @@
     }
 
     const addPasskey = (): Promise<void> => busyWhile(async () => {
-      // stx-strict-ignore-next-line window.postlinePasskeys
-      const passkeys = window.postlinePasskeys
-      if (!passkeys) throw new Error('Passkeys are still loading. Try again in a moment.')
       if (await passkeys.register()) {
         await loadSecurity()
         saySecurity('Passkey added. Use it next time you sign in.', 'success')
@@ -1082,6 +1081,7 @@
       void loadMail()
       if (ownWindow()) void requestDesktopUpdate()
       onDestroy(() => workspace?.close())
+      onDestroy(bindWorkspaceChanges())
 
       // A window with a hidden titlebar moves only when the page hands the
       // press to AppKit: WebKit ignores -webkit-app-region.
@@ -1114,50 +1114,42 @@
        * Counting them would report channels ready that the Channels page
        * cannot show.
        */
-      const social = window.postlineSocial
-      if (!social) {
+      void fetchProviders().then((all) => {
+        const channels = all.filter(entry => entry.provider !== 'blog')
+        const ready = channels.filter(entry => entry.canPublish)
+        // Connected but not publishable: a token that lapsed, or a row whose
+        // credential never arrived. Worth separating from "nothing here
+        // yet", because the fix is a different one.
+        const pending = channels.filter(entry => !entry.canPublish && entry.handle)
+
+        channelSummary.set(
+          ready.length > 0
+            ? `${ready.length} of ${channels.length} ready: ${ready.map(entry => providerLabel(entry.provider)).join(', ')}.`
+            : pending.length > 0
+              ? `${pending.length} of ${channels.length} connected, none able to publish yet.`
+              : 'No channels connected yet.',
+        )
+        channelPill.set(ready.length > 0 ? `${ready.length}/${channels.length}` : 'Setup')
+
+        // The binding limit is the tightest among the channels that can
+        // actually publish: with Bluesky on, 300 constrains the post however
+        // much room X would allow. Naming the network it came from is the
+        // point — an unattributed number reads as a global setting rather
+        // than one network's rule.
+        const limited = ready.filter(entry => entry.characterLimit > 0)
+        if (limited.length > 0) {
+          const tightest = limited.reduce((a, b) => (b.characterLimit < a.characterLimit ? b : a))
+          charLimitText.set(String(tightest.characterLimit))
+          charLimitSource.set(providerLabel(tightest.provider))
+        }
+        else {
+          charLimitText.set('—')
+          charLimitSource.set('No channels connected')
+        }
+      }).catch(() => {
         channelSummary.set('Could not load channel status.')
         channelPill.set('Unknown')
-      }
-      else {
-        const label = social.providerLabel
-        void social.fetchProviders().then((all) => {
-          const channels = all.filter(entry => entry.provider !== 'blog')
-          const ready = channels.filter(entry => entry.canPublish)
-          // Connected but not publishable: a token that lapsed, or a row whose
-          // credential never arrived. Worth separating from "nothing here
-          // yet", because the fix is a different one.
-          const pending = channels.filter(entry => !entry.canPublish && entry.handle)
-
-          channelSummary.set(
-            ready.length > 0
-              ? `${ready.length} of ${channels.length} ready: ${ready.map(entry => label(entry.provider)).join(', ')}.`
-              : pending.length > 0
-                ? `${pending.length} of ${channels.length} connected, none able to publish yet.`
-                : 'No channels connected yet.',
-          )
-          channelPill.set(ready.length > 0 ? `${ready.length}/${channels.length}` : 'Setup')
-
-          // The binding limit is the tightest among the channels that can
-          // actually publish: with Bluesky on, 300 constrains the post however
-          // much room X would allow. Naming the network it came from is the
-          // point — an unattributed number reads as a global setting rather
-          // than one network's rule.
-          const limited = ready.filter(entry => entry.characterLimit > 0)
-          if (limited.length > 0) {
-            const tightest = limited.reduce((a, b) => (b.characterLimit < a.characterLimit ? b : a))
-            charLimitText.set(String(tightest.characterLimit))
-            charLimitSource.set(label(tightest.provider))
-          }
-          else {
-            charLimitText.set('—')
-            charLimitSource.set('No channels connected')
-          }
-        }).catch(() => {
-          channelSummary.set('Could not load channel status.')
-          channelPill.set('Unknown')
-        })
-      }
+      })
     })
   </script>
 @endsection

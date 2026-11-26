@@ -68,6 +68,8 @@ const allowsFirstRun = !isMarketingSite()
   </main>
 
   <script client>
+    import { passkeys } from '../functions/passkeys'
+
     const registering = state(false)
     const errorMessage = state('')
     const busy = state(false)
@@ -86,8 +88,7 @@ const allowsFirstRun = !isMarketingSite()
       if (challenge()) void nextTick(() => codeInput.current?.focus())
     })
 
-    // stx-strict-ignore-next-line PublicKeyCredential
-    const webAuthn = typeof PublicKeyCredential !== 'undefined'
+    const webAuthn = passkeys.supported()
     const passkeysOffered = derived(() => webAuthn && !registering() && !challenge())
 
     const heading = derived(() => registering() ? 'Set up Postline' : 'Sign in to Postline')
@@ -183,17 +184,10 @@ const allowsFirstRun = !isMarketingSite()
     }
 
     /**
-     * Sign in with a passkey (#95). The ceremony lives in
-     * resources/assets/scripts/passkeys.ts; a dismissed prompt just returns.
+     * Sign in with a passkey. A dismissed prompt leaves the sign-in form open.
      */
     const signInWithPasskey = async () => {
       errorMessage.set('')
-      // stx-strict-ignore-next-line window.postlinePasskeys
-      const passkeys = window.postlinePasskeys
-      if (!passkeys) {
-        errorMessage.set('Passkeys are still loading. Try again in a moment.')
-        return
-      }
       busy.set(true)
       try {
         const session = await passkeys.signIn()
