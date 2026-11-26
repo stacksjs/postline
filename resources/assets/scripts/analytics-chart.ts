@@ -1,3 +1,4 @@
+import { providerLabel } from '../../functions/networks'
 import { escapeHtml } from '../../functions/postline-client'
 
 type Point = {
@@ -220,15 +221,6 @@ function renderAnalyticsChart(): void {
   chart.dataset.rendered = 'true'
 }
 
-const providerNames: Record<string, string> = {
-  bluesky: 'Bluesky',
-  linkedin: 'LinkedIn',
-  instagram: 'Instagram',
-  threads: 'Threads',
-  twitter: 'Twitter/X',
-  mastodon: 'Mastodon',
-}
-
 /**
  * An hour of the day as the reader's locale writes it. The hour is already
  * on the workspace's clock (the server buckets in its time zone), so it is
@@ -270,7 +262,7 @@ function fillStats(payload: AnalyticsPayload): void {
   const engagement = stats.engagement
   const interactions = engagement ? engagement.likes + engagement.reposts + engagement.replies : 0
   set('[data-analytics-engagement]', engagement?.syncedTargets ? String(interactions) : 'Not available')
-  const measuredNetworks = engagement?.providers?.map(provider => providerNames[provider] || provider).join(', ')
+  const measuredNetworks = engagement?.providers?.map(providerLabel).join(', ')
   set(
     '[data-analytics-engagement-trend]',
     engagement?.syncedTargets
@@ -279,7 +271,7 @@ function fillStats(payload: AnalyticsPayload): void {
   )
   const sampleLabel = ({ average, count }: { average: number, count: number }): string =>
     `${average.toLocaleString(undefined, { maximumFractionDigits: 1 })} interactions per post across ${count} posts`
-  set('[data-analytics-best-channel]', stats.bestChannel ? (providerNames[stats.bestChannel.provider] || stats.bestChannel.provider) : 'No recommendation')
+  set('[data-analytics-best-channel]', stats.bestChannel ? providerLabel(stats.bestChannel.provider) : 'No recommendation')
   set('[data-analytics-best-channel-trend]', stats.bestChannel ? sampleLabel(stats.bestChannel) : `Needs a clear leader and ${stats.minSample} measured posts on each of two channels`)
   set('[data-analytics-best-window]', stats.bestHour ? formatHour(stats.bestHour.hour) : 'No recommendation')
   set('[data-analytics-best-window-trend]', stats.bestHour ? sampleLabel(stats.bestHour) : `Needs a clear leader and ${stats.minSample} measured posts in each of two hours`)
@@ -290,7 +282,7 @@ function fillStats(payload: AnalyticsPayload): void {
       ? (payload.channelMix ?? []).map(channel => `
           <div class="grid gap-1.5">
             <div class="flex items-center justify-between text-xs">
-              <span class="font-bold">${providerNames[channel.provider] || channel.provider}</span>
+              <span class="font-bold">${escapeHtml(providerLabel(channel.provider))}</span>
               <span class="text-muted">${channel.share}%</span>
             </div>
             <div class="overflow-hidden h-2 bg-panel-2 rounded-full">

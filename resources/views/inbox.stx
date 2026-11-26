@@ -45,7 +45,7 @@
             </div>
             <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-field-line rounded-lg" aria-label="Network" @change="setProviderFilter($event.target.value)">
               <option value="">All networks</option>
-              <option x-for="provider in providerOptions" :value="provider.id" :text="provider.label"></option>
+              <option x-for="provider in providerOptions" :value="provider" :text="providerLabel(provider)"></option>
             </select>
             {{-- Each connected account has its own inbox (#136); shown once there is more than one. --}}
             <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-field-line rounded-lg" :class="accountOptions().length > 1 ? '' : 'hidden'" aria-label="Account" @change="setAccountFilter($event.target.value)">
@@ -70,7 +70,7 @@
           <div class="overflow-y-auto max-h-[32rem] divide-line divide-y" x-show="!loading() && conversations().length">
             <button class="grid gap-1.5 p-3 w-full text-left hover:bg-panel-2 transition-colors" type="button" x-for="conversation in conversations()" :aria-current="conversation.id === activeId() ? 'true' : 'false'" @click="openConversation(conversation.id)" :class="conversation.id === activeId() ? 'bg-panel-2' : conversation.unreadCount ? 'bg-info-soft' : ''">
               <div class="flex gap-2 items-center">
-                <span class="grid place-items-center shrink-0 h-8 w-8 font-semibold text-on-solid text-xs rounded-xl" :class="providerColor(conversation.provider)" :text="providerInitial(conversation.provider)"></span>
+                <NetworkChip :provider="conversation.provider" size="small" />
                 <div class="flex-1 min-w-0">
                   <div class="flex gap-2 items-center justify-between">
                     <strong class="text-ink text-ui truncate" :text="conversation.participantName || conversation.participantHandle"></strong>
@@ -109,7 +109,7 @@
         <div class="contents" x-show="activeId()">
           <header class="flex flex-wrap gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
             <div class="flex gap-3 items-center min-w-0">
-              <span class="grid place-items-center shrink-0 h-9 w-9 font-semibold text-on-solid text-xs rounded-xl" :class="providerColor(activeProvider())" :text="providerInitial(activeProvider())"></span>
+              <NetworkChip :provider="activeProvider()" />
               <div class="min-w-0">
                 <h2 class="m-0 font-semibold text-ink text-sm truncate" :text="activeTitle()"></h2>
                 <p class="m-0 mt-0.5 text-muted text-xs truncate" :text="activeSubtitle()"></p>
@@ -183,8 +183,7 @@
 
     // The networks the inbox reads. Why the others are missing comes from the
     // server and is shown above the list.
-    const providerOptions = [{ id: 'bluesky', label: 'Bluesky' }, { id: 'mastodon', label: 'Mastodon' }]
-    const PROVIDER_NAMES: Record<string, string> = { twitter: 'X', instagram: 'Instagram', threads: 'Threads', linkedin: 'LinkedIn' }
+    const providerOptions = ['bluesky', 'mastodon']
 
     const conversations = state([])
     const messages = state([])
@@ -243,9 +242,6 @@
     })
     const characterLimit = derived(() => activeCharacterLimit())
     const remaining = derived(() => Math.max(0, characterLimit() - draftBody().length))
-    const providerLabel = (provider: string): string => providerOptions.find(item => item.id === provider)?.label || PROVIDER_NAMES[provider] || provider
-    const providerInitial = (provider: string): string => provider === 'twitter' ? 'X' : provider.slice(0, 1).toUpperCase()
-    const providerColor = (provider: string): string => provider === 'twitter' ? 'bg-net-x' : provider === 'mastodon' ? 'bg-net-mastodon' : provider === 'instagram' ? 'bg-net-instagram' : 'bg-net-bluesky'
     const previewFor = (conversation: InboxConversation): string => {
       const preview = conversation.lastMessagePreview || 'No messages yet'
       return conversation.lastMessageOutgoing ? `You: ${preview}` : preview

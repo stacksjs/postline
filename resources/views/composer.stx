@@ -14,9 +14,6 @@
         hidden to out-rank them would leave a visible empty block if the
         generated stylesheet ever ordered them the other way. --}}
     <div class="grid gap-2 mt-2 p-2 p-3 min-h-20 min-h-7 leading-relaxed text-danger text-ink text-muted text-muted text-muted text-on-accent text-sm text-success text-warning bg-accent bg-danger-solid bg-line-strong bg-panel bg-panel-2 bg-panel-3 bg-success-soft bg-success-solid bg-success-solid hover:bg-raised border-info-line border-ink border-line border-success-line outline-none rounded-lg rounded-xl shadow-sm cursor-not-allowed resize-none" style="display:none" aria-hidden="true"></div>
-    {{-- Network icons on per-account chips come from row.icon at runtime; listed
-        here so the Crosswind scanner emits them. --}}
-    <div class="i-hugeicons-news i-hugeicons-quill-write-02 i-hugeicons-share-08 i-simple-icons-bluesky i-simple-icons-instagram i-simple-icons-linkedin i-simple-icons-mastodon i-simple-icons-threads i-simple-icons-x" style="display:none" aria-hidden="true"></div>
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
         <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Composer</p>
@@ -366,7 +363,6 @@
         console.log(`[postline] ${message}`)
       }
 
-      const providerLabel = provider => window.postlineSocial?.providerLabel(provider) || provider
       const formatHandle = (provider, handle) => window.postlineSocial?.formatHandle(provider, handle) || handle || ''
       const targetLabel = (provider, handle) => window.postlineSocial?.targetLabel(provider, handle) || providerLabel(provider)
 
@@ -484,7 +480,7 @@
           return {
             key: target.key,
             provider: target.provider,
-            icon: target.multi ? window.postlineSocial?.providerIcon(target.provider) || '' : '',
+            icon: target.multi ? providerIcon(target.provider) : '',
             label,
             connected,
             selected: isSelected,

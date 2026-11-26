@@ -420,15 +420,6 @@
       return { id: 0, postId: null, title: '', body: '', providers: [...plannerProviders()], pillar: 'story', status: 'idea', scheduledAt: `${key}T09:00` }
     }
 
-    function providerLabel(provider) {
-      return postlineSocial?.providerLabel(provider) || `${provider.charAt(0).toUpperCase()}${provider.slice(1)}`
-    }
-
-    function providerInitial(provider) {
-      const initials = { bluesky: 'B', twitter: 'X', mastodon: 'M', instagram: 'I', linkedin: 'in', threads: 'T', blog: 'W' }
-      return initials[provider] || provider.charAt(0).toUpperCase()
-    }
-
     function timeLabel(value) {
       const raw = String(value || '')
       const parts = raw.slice(11, 16).split(':')

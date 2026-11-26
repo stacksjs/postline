@@ -247,7 +247,6 @@
       return date.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: zone() })
     }
 
-    const providerLabel = (provider: string): string => postlineSocial?.providerLabel(provider) || provider
 
     /**
      * A row's channels. A network appears once per account, so when one post

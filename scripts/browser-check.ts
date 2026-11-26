@@ -159,6 +159,50 @@ async function checkDesktopUpdateControls(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkNetworkComponents(cdp: Cdp): Promise<void> {
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const actualFetch = window.fetch.bind(window)
+    const postedAt = new Date().toISOString()
+    const conversations = [
+      { id: 1, provider: 'bluesky', participantName: 'Alice Example', participantHandle: 'alice.example', lastMessageAt: postedAt, lastMessagePreview: 'Hello' },
+      { id: 2, provider: 'mastodon', participantName: 'Morgan Example', participantHandle: 'morgan.example', lastMessageAt: postedAt, lastMessagePreview: 'Hello' },
+    ]
+    window.fetch = (input, options) => {
+      const request = new Request(input, options)
+      const path = new URL(request.url).pathname
+      if (path === '/api/postline/inbox') return Promise.resolve(Response.json({ ok: true, data: { conversations } }))
+      if (path === '/api/postline/inbox/thread' || path === '/api/postline/inbox/read') return Promise.resolve(Response.json({ ok: true, data: {} }))
+      if (path === '/api/postline/bluesky/timeline') return Promise.resolve(Response.json({ ok: true, data: {
+        connected: true,
+        items: [
+          { uri: 'post-1', authorHandle: 'alice.example', authorName: 'Alice Example', postedAt, body: 'First post' },
+          { uri: 'post-2', authorHandle: 'morgan.example', authorName: 'Morgan Example', postedAt, body: 'Second post', authorAvatar: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' },
+        ],
+      } }))
+      return actualFetch(input, options)
+    }
+  ` })
+  try {
+    await auditPage(`${site}/inbox`, { cdp })
+    await waitUntil('The inbox badges for two networks', () => evaluate<boolean>(cdp, `
+      ['Bluesky', 'Mastodon'].every(label => {
+        const chip = document.querySelector('button span[role="img"][aria-label="' + label + '"]')
+        return chip?.textContent === label.charAt(0) && getComputedStyle(chip).backgroundColor !== 'rgba(0, 0, 0, 0)'
+      })`), 5_000)
+    await evaluate(cdp, `document.querySelector('button span[role="img"][aria-label="Mastodon"]').closest('button').click()`)
+    await waitUntil('The selected network badge in the conversation', () => evaluate<boolean>(cdp, `
+      document.querySelector('section[aria-label="Conversation"] header [role="img"][aria-label="Mastodon"]')?.textContent === 'M'`), 5_000)
+
+    await auditPage(`${site}/timeline`, { cdp })
+    await waitUntil('Timeline initials and image from their own rows', () => evaluate<boolean>(cdp, `
+      document.querySelector('.postline-feed-post__avatar[aria-label="Alice Example"]')?.textContent.trim() === 'AE'
+      && document.querySelector('.postline-feed-post__avatar[aria-label="Morgan Example"] img')?.naturalWidth === 1`), 5_000)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+  }
+}
+
 let exitCode = 0
 try {
   await waitUntil('The API', async () => (await fetch(`http://localhost:${API_PORT}/api/postline/health`)).status < 500)
@@ -211,6 +255,7 @@ try {
       }
     }
     await checkDesktopUpdateControls(cdp)
+    await checkNetworkComponents(cdp)
   }
   finally {
     await close()

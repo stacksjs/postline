@@ -61,8 +61,7 @@
             {{-- @bind:style, not :style — the latter routes to bindStyle, which
                 expects an object; this is a raw custom-property declaration. --}}
             <a class="postline-feed-post__avatar" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer" @bind:style="item.gradient" :aria-label="item.name">
-              <img x-if="item.avatar" :src="item.avatar" alt="" loading="lazy" referrerpolicy="no-referrer">
-              <span x-else>{{ item.initials }}</span>
+              <Avatar :src="item.avatar" :name="item.name" :handle="item.handle" />
             </a>
             <div class="postline-feed-post__main">
               <div class="postline-feed-post__meta">
@@ -131,7 +130,6 @@
       name: string
       url: string
       avatar: string
-      initials: string
       gradient: string
       postedAt: string
       relativeTime: string
@@ -168,14 +166,6 @@
       return `--postline-avatar-a:hsl(${hue} 72% 58%);--postline-avatar-b:hsl(${hue} 68% 42%)`
     }
 
-    const initialsFor = (handle: string, name?: string | null): string => {
-      if (name) {
-        const parts = name.trim().split(/\s+/).slice(0, 2)
-        if (parts.length) return parts.map(part => part[0]?.toUpperCase() || '').join('')
-      }
-      return handle.replace(/[^a-z0-9]/gi, '').slice(0, 2).toUpperCase() || 'PL'
-    }
-
     const profileUrl = (handle: string): string => `https://bsky.app/profile/${encodeURIComponent(handle)}`
 
     const postUrl = (item: TimelineApiItem): string => {
@@ -204,7 +194,6 @@
         name,
         url: postUrl(item),
         avatar: item.authorAvatar || '',
-        initials: initialsFor(handle, name),
         gradient: avatarGradient(handle),
         postedAt: item.postedAt || '',
         relativeTime: relativeTime(item.postedAt, { compact: true }),

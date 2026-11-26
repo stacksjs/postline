@@ -526,6 +526,7 @@ export default {
     './resources/layouts/**/*.stx',
     './resources/components/**/*.stx',
     './resources/partials/**/*.stx',
+    './resources/functions/**/*.ts',
     './resources/assets/scripts/**/*.{ts,js}',
   ],
 

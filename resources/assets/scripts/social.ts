@@ -1,3 +1,5 @@
+import { providerIcon, providerLabel } from '../../functions/networks'
+
 /** One connected account on a network. Several per network are allowed. */
 export interface AccountStatus {
   id: number
@@ -72,22 +74,6 @@ export interface CrosspostInput {
   variants?: Record<string, string>
 }
 
-const PROVIDER_LABELS: Record<string, string> = {
-  bluesky: 'Bluesky',
-  linkedin: 'LinkedIn',
-  twitter: 'Twitter/X',
-  mastodon: 'Mastodon',
-  facebook: 'Facebook',
-  instagram: 'Instagram',
-  threads: 'Threads',
-  tiktok: 'TikTok',
-  blog: 'Blog',
-}
-
-export function providerLabel(provider: string): string {
-  return PROVIDER_LABELS[provider] || provider.charAt(0).toUpperCase() + provider.slice(1)
-}
-
 /**
  * An account's handle as people write it. Mastodon handles are stored as
  * `@user@host` already; LinkedIn's "handle" is a display name, which an @
@@ -104,21 +90,6 @@ export function formatHandle(provider: string, handle: string | null | undefined
 export function targetLabel(provider: string, handle?: string | null): string {
   const formatted = formatHandle(provider, handle)
   return formatted ? `${providerLabel(provider)} ${formatted}` : providerLabel(provider)
-}
-
-const PROVIDER_ICONS: Record<string, string> = {
-  bluesky: 'i-simple-icons-bluesky',
-  twitter: 'i-simple-icons-x',
-  mastodon: 'i-simple-icons-mastodon',
-  linkedin: 'i-simple-icons-linkedin',
-  instagram: 'i-simple-icons-instagram',
-  threads: 'i-simple-icons-threads',
-  blog: 'i-hugeicons-quill-write-02',
-}
-
-/** The Iconify class for a network. Pages list these statically for Crosswind. */
-export function providerIcon(provider: string): string {
-  return PROVIDER_ICONS[provider] || 'i-hugeicons-share-08'
 }
 
 /** A network whose connection the Accounts page shows. */

@@ -10,6 +10,10 @@ Object.assign(globalThis, autoImports)
 
 // TypeScript declarations
 declare global {
+  const providerLabel: typeof autoImports.providerLabel
+  const providerInitial: typeof autoImports.providerInitial
+  const providerColor: typeof autoImports.providerColor
+  const providerIcon: typeof autoImports.providerIcon
   const requestJson: typeof autoImports.requestJson
   const fetchAccounts: typeof autoImports.fetchAccounts
   const disconnectSocialAccount: typeof autoImports.disconnectSocialAccount

@@ -1,0 +1,13 @@
+<script client>
+  const source = useReactiveProp('src', '')
+  const name = useReactiveProp('name', '')
+  const handle = useReactiveProp('handle', '')
+  const initials = derived(() => {
+    const words = name().trim().split(/\s+/).filter(Boolean).slice(0, 2)
+    if (words.length) return words.map(part => part.charAt(0).toUpperCase()).join('')
+    return handle().replace(/[^a-z0-9]/gi, '').slice(0, 2).toUpperCase() || 'PL'
+  })
+</script>
+
+<img x-if="source()" :src="source()" alt="" loading="lazy" referrerpolicy="no-referrer">
+<span x-else aria-hidden="true" :text="initials()"></span>

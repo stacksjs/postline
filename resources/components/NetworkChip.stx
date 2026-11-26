@@ -1,0 +1,9 @@
+<script server>
+  const dimensions = $props.size === 'small' ? 'h-8 w-8' : 'h-9 w-9'
+</script>
+
+<script client>
+  const provider = useReactiveProp('provider', '')
+</script>
+
+<span class="grid place-items-center shrink-0 font-semibold text-on-solid text-xs rounded-xl {{ dimensions }}" role="img" :aria-label="providerLabel(provider())" :class="providerColor(provider())" :text="providerInitial(provider())"></span>
