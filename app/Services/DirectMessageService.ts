@@ -100,6 +100,12 @@ function participantLabel(handles: string[]): string {
   return rest.length ? `${first} +${rest.length}` : first
 }
 
+interface ConversationFilter {
+  status?: string
+  provider?: string
+  identityId?: number | null
+}
+
 export class DirectMessageService {
   /**
    * Which networks the inbox can use right now, and why the others cannot.
@@ -140,22 +146,29 @@ export class DirectMessageService {
     }
   }
 
-  /** The inbox list, newest activity first. Reads the local mirror only. */
-  async list(options: { status?: string, provider?: string, offset?: number, identityId?: number | null } = {}) {
-    // Only networks the inbox can still read: conversations synced from X or
-    // Instagram before those were dropped (#129) stay stored, not listed.
-    const scoped = (query: any) => {
-      query = query.where('provider', 'in', [...DM_PROVIDERS])
-      query = query.where('status', '=', options.status === 'archived' ? 'archived' : 'open')
-      if (isDmProvider(options.provider)) query = query.where('provider', '=', options.provider)
-      if (options.identityId) query = query.where('social_identity_id', '=', options.identityId)
-      return query
-    }
+  /** Count only conversations the selected Inbox tab can display. */
+  async unreadCount(options: ConversationFilter = {}): Promise<number> {
+    const row = await this.scopedInbox(database.selectFrom('dm_conversations'), options)
+      .selectRaw({ raw: 'sum(unread_count) as total' })
+      .executeTakeFirst()
+    return Number(row?.total || 0)
+  }
 
+  private scopedInbox(query: any, options: ConversationFilter) {
+    // Conversations from old connectors stay stored without appearing in Inbox.
+    query = query.where('provider', 'in', [...DM_PROVIDERS])
+      .where('status', '=', options.status === 'archived' ? 'archived' : 'open')
+    if (isDmProvider(options.provider)) query = query.where('provider', '=', options.provider)
+    if (options.identityId) query = query.where('social_identity_id', '=', options.identityId)
+    return query
+  }
+
+  /** The inbox list, newest activity first. Reads the local mirror only. */
+  async list(options: ConversationFilter & { offset?: number } = {}) {
     // A page at a time, one more than shown to know whether another follows.
     // It stopped at 200 conversations and said nothing of the rest (#105).
     const offset = pageOffset(options.offset)
-    const rows = await scoped(database.selectFrom('dm_conversations').selectAll())
+    const rows = await this.scopedInbox(database.selectFrom('dm_conversations').selectAll(), options)
       .orderBy('last_message_at', 'desc')
       .orderBy('id', 'desc')
       .limit(CONVERSATION_PAGE + 1)
@@ -163,13 +176,10 @@ export class DirectMessageService {
       .execute()
 
     const page = rows.slice(0, CONVERSATION_PAGE)
-    // The unread total is the whole inbox's, not this page's.
-    const unread = await scoped(database.selectFrom('dm_conversations').select(['unread_count'])).execute()
-
     return {
       conversations: page.map(conversationRow),
       nextOffset: rows.length > CONVERSATION_PAGE ? offset + CONVERSATION_PAGE : null,
-      unreadCount: unread.reduce((total: number, row: any) => total + (Number(row.unread_count) || 0), 0),
+      unreadCount: await this.unreadCount(options),
       providers: await this.providers(),
     }
   }

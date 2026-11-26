@@ -170,6 +170,7 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
     window.fetch = (input, options) => {
       const request = new Request(input, options)
       const path = new URL(request.url).pathname
+      if (path === '/api/postline/unread') return Promise.resolve(Response.json({ ok: true, data: { inbox: 3, listening: 106 } }))
       if (path === '/api/postline/inbox') return Promise.resolve(Response.json({ ok: true, data: { conversations } }))
       if (path === '/api/postline/inbox/thread' || path === '/api/postline/inbox/read') return Promise.resolve(Response.json({ ok: true, data: {} }))
       if (path === '/api/postline/bluesky/timeline') return Promise.resolve(Response.json({ ok: true, data: {
@@ -184,6 +185,13 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
   ` })
   try {
     await auditPage(`${site}/inbox`, { cdp })
+    await waitUntil('Distinct unread badges on Inbox and Listening', () => evaluate<boolean>(cdp, `
+      (() => {
+        const inbox = document.querySelector('[data-testid="postline-nav"] a[href="/inbox"]')
+        const listening = document.querySelector('[data-testid="postline-nav"] a[href="/listening"]')
+        return inbox.textContent.includes('3 unread messages') && inbox.querySelector('kbd').textContent.trim() === '7'
+          && listening.textContent.includes('106 unread mentions') && listening.textContent.includes('99+')
+      })()`), 5_000)
     await waitUntil('The inbox badges for two networks', () => evaluate<boolean>(cdp, `
       ['Bluesky', 'Mastodon'].every(label => {
         const chip = document.querySelector('button span[role="img"][aria-label="' + label + '"]')

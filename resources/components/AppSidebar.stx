@@ -41,6 +41,43 @@ const moreDialog = useRef('moreDialog')
 const moreOpen = state(false)
 const desktopWidth = useMediaQuery('(min-width: 1024px)')
 
+const unread = state({ inbox: 0, listening: 0 })
+let loadingUnread = false
+
+async function refreshUnread() {
+  if (loadingUnread) return
+  loadingUnread = true
+  try {
+    const payload = await requestJson('/api/postline/unread', { cache: 'no-store' })
+    unread.set({ inbox: Number(payload.data.inbox) || 0, listening: Number(payload.data.listening) || 0 })
+  }
+  catch {
+    // Keep the last counts while a request is unavailable.
+  }
+  finally {
+    loadingUnread = false
+  }
+}
+
+function unreadFor(href: string): number {
+  return href === '/inbox' ? unread().inbox : unread().listening
+}
+
+function unreadLabel(href: string): string {
+  const count = unreadFor(href)
+  const kind = href === '/inbox' ? 'message' : 'mention'
+  return `${count} unread ${kind}${count === 1 ? '' : 's'}`
+}
+
+function unreadBadge(href: string): string {
+  const count = unreadFor(href)
+  return count > 99 ? '99+' : String(count)
+}
+
+onMount(refreshUnread)
+useEventListener('stx:load', refreshUnread)
+useInterval(refreshUnread, 60_000, { whileVisible: true })
+
 function showMore() {
   moreDialog.current?.showModal()
   moreOpen.set(Boolean(moreDialog.current?.open))
@@ -68,11 +105,15 @@ effect(() => {
         data-stx-link
         data-stx-active-class="text-ink bg-nav-active"
         data-stx-exact-active-class="text-ink bg-nav-active"
-        class="grid justify-items-center content-center gap-0.5 mx-0.5 px-1 h-12 font-semibold text-xs rounded-xl {{ link.active ? 'bg-nav-active text-ink' : 'text-muted' }}"
+        class="grid relative justify-items-center content-center gap-0.5 mx-0.5 px-1 h-12 font-semibold text-xs rounded-xl {{ link.active ? 'bg-nav-active text-ink' : 'text-muted' }}"
         aria-current="{{ link.active ? 'page' : 'false' }}"
       >
         <span class="h-5 w-5 {{ link.icon }}" aria-hidden="true"></span>
         <span>{{ link.href === '/composer' ? 'Compose' : link.label }}</span>
+        @if(link.href === '/inbox')
+          <span class="absolute right-1 top-0.5 px-1 min-w-4 font-semibold text-center text-on-accent text-xs bg-accent rounded-full" x-cloak x-show="unreadFor('/inbox') > 0" :text="unreadBadge('/inbox')" aria-hidden="true"></span>
+          <span class="sr-only" x-show="unreadFor('/inbox') > 0" :text="unreadLabel('/inbox')"></span>
+        @endif
       </a>
     @endforeach
     <button class="grid content-center gap-0.5 justify-items-center mx-0.5 px-1 h-12 font-semibold text-muted text-xs rounded-xl" type="button" aria-controls="workspace-more" aria-haspopup="dialog" :aria-expanded="moreOpen()" @click="showMore">
@@ -100,7 +141,11 @@ effect(() => {
             @click="closeMore"
           >
             <span class="shrink-0 h-5 w-5 {{ link.icon }}" aria-hidden="true"></span>
-            <span class="truncate">{{ link.label }}</span>
+            <span class="flex-1 truncate">{{ link.label }}</span>
+            @if(link.href === '/listening')
+              <span class="px-1.5 min-w-5 font-semibold text-center text-on-accent text-xs bg-accent rounded-full" x-cloak x-show="unreadFor('/listening') > 0" :text="unreadBadge('/listening')" aria-hidden="true"></span>
+              <span class="sr-only" x-show="unreadFor('/listening') > 0" :text="unreadLabel('/listening')"></span>
+            @endif
           </a>
         @endforeach
       </nav>
@@ -152,7 +197,11 @@ effect(() => {
         >
           <span class="h-[18px] w-[18px] {{ link.icon }} {{ link.active ? 'text-ink' : 'text-muted' }}" aria-hidden="true"></span>
           <span class="flex-1 font-medium truncate" data-sidebar-expanded>{{ link.label }}</span>
-          <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-sans text-muted text-xs bg-glass rounded-full shadow-sm" data-sidebar-expanded aria-label="Shortcut {{ link.shortcut }}">{{ link.shortcut }}</kbd>
+          @if(link.href === '/inbox' || link.href === '/listening')
+            <span class="px-1.5 min-w-5 font-semibold text-center text-on-accent text-xs bg-accent rounded-full" data-sidebar-expanded x-cloak x-show="unreadFor('{{ link.href }}') > 0" :text="unreadBadge('{{ link.href }}')" aria-hidden="true"></span>
+            <span class="sr-only" x-show="unreadFor('{{ link.href }}') > 0" :text="unreadLabel('{{ link.href }}')"></span>
+          @endif
+          <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-mono text-muted text-xs bg-panel border border-b-2 border-line rounded-md" data-sidebar-expanded aria-label="Shortcut {{ link.shortcut }}">{{ link.shortcut }}</kbd>
         </a>
       @endforeach
     </nav>
@@ -170,7 +219,7 @@ effect(() => {
     >
       <span class="h-[18px] w-[18px] i-hugeicons-settings-02 {{ settingsActive ? 'text-ink' : 'text-muted' }}" aria-hidden="true"></span>
       <span class="flex-1 font-medium" data-sidebar-expanded>Settings</span>
-      <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-sans text-muted text-xs bg-glass rounded-full shadow-sm" data-sidebar-expanded aria-label="Shortcut comma">,</kbd>
+      <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-mono text-muted text-xs bg-panel border border-b-2 border-line rounded-md" data-sidebar-expanded aria-label="Shortcut comma">,</kbd>
     </a>
   </aside>
   </div>

@@ -134,6 +134,7 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/accounts/disconnect', 'Actions/Postline/AccountDisconnectAction').middleware('auth').rateLimit(30, 'minute')
   route.post('/accounts/default', 'Actions/Postline/AccountDefaultAction').middleware('auth').rateLimit(30, 'minute')
   route.post('/publish', 'Actions/Postline/CrosspostPublishAction').middleware('auth').rateLimit(30, 'minute')
+  route.get('/unread', 'Actions/Postline/UnreadCountsAction').middleware('auth')
   route.get('/analytics', 'Actions/Postline/AnalyticsAction').middleware('auth')
   route.get('/blog', 'Actions/Postline/BlogListAction').middleware('auth')
   route.post('/blog/update', 'Actions/Postline/BlogUpdateAction').middleware('auth').rateLimit(60, 'minute')

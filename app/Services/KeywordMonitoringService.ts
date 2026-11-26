@@ -231,6 +231,13 @@ async function searchMastodon(keywords: string[], mode: MatchMode): Promise<Ment
 export const MENTION_PAGE = 50
 
 export class KeywordMonitoringService {
+  async unreadCount(): Promise<number> {
+    const row = await database.selectFrom('keyword_mentions')
+      .selectRaw({ raw: 'count(*) as total' })
+      .where('status', '=', 'unread').executeTakeFirst()
+    return Number(row?.total || 0)
+  }
+
   async list(monitorId = 0, offset = 0) {
     const monitors = await database.selectFrom('keyword_monitors').selectAll().orderBy('updated_at', 'desc').execute()
     // A page at a time, one more than shown to know whether another follows.
