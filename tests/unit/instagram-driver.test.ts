@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test'
+import { networkApps } from '../../app/Services/NetworkAppService'
 import { InstagramApiError, InstagramDriver } from '../../app/Services/Social/Drivers/InstagramDriver'
+import { InstagramService } from '../../app/Services/Social/InstagramService'
 
 const realFetch = globalThis.fetch
 afterEach(() => { globalThis.fetch = realFetch })
@@ -46,6 +48,27 @@ describe('InstagramDriver.exchangeLongLivedUserToken', () => {
     await driver.exchangeLongLivedUserToken('c', 's', 'bad').catch((e) => { caught = e })
     expect(caught).toBeInstanceOf(InstagramApiError)
     expect((caught as InstagramApiError).status).toBe(400)
+  })
+})
+
+describe('Instagram connection', () => {
+  afterEach(async () => { await networkApps.clear('instagram') })
+
+  test('rejects the connection when Facebook cannot issue a long-lived token', async () => {
+    await networkApps.save('instagram', { clientId: 'test-app', clientSecret: 'test-secret' })
+    const service = new InstagramService()
+    const state = new URL(await service.getAuthUrl()).searchParams.get('state')!
+    const cap: Captured[] = []
+    mockGraphApi(cap, (url) => {
+      if (url.includes('fb_exchange_token'))
+        return Response.json({ error: { message: 'Provider refused exchange' } }, { status: 400 })
+      if (url.includes('code=valid-code')) return Response.json({ access_token: 'SHORT' })
+      return null
+    })
+
+    await expect(service.handleCallback('valid-code', state)).rejects.toMatchObject({ code: 'instagram_token_exchange_failed' })
+    expect(cap).toHaveLength(2)
+    expect(cap.every(call => call.url.includes('/oauth/access_token'))).toBe(true)
   })
 })
 

@@ -1,20 +1,20 @@
 import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
-import { log } from '@stacksjs/logging'
 import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
 import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { InstagramDriver } from './Drivers/InstagramDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { exceedsLimit } from '../../Support/Social/count-text'
-import { ensureAccount, expiresAt, now, uuid } from './support'
+import { ensureAccount, now, uuid } from './support'
 import { explainNetworkError } from '../../Support/Social/network-errors'
 import { networkApps } from '../NetworkAppService'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
+const DEFAULT_GRAPH_VERSION = 'v27.0'
 
 type SocialIdentityRow = {
   id: number
@@ -42,7 +42,6 @@ interface InstagramConfig {
   clientId: string
   clientSecret: string
   redirectUrl: string
-  graphVersion: string
   accessToken: string
   userId: string
   username: string
@@ -56,7 +55,7 @@ export class InstagramService {
   private pending = new PendingOAuthStates()
 
   constructor() {
-    this.driver = new InstagramDriver({ graphVersion: String(env.INSTAGRAM_GRAPH_VERSION || 'v21.0').trim() })
+    this.driver = new InstagramDriver({ graphVersion: String(env.INSTAGRAM_GRAPH_VERSION ?? '').trim() || DEFAULT_GRAPH_VERSION })
   }
 
   /**
@@ -70,7 +69,6 @@ export class InstagramService {
       clientId: app.clientId,
       clientSecret: app.clientSecret,
       redirectUrl: app.redirectUrl,
-      graphVersion: String(env.INSTAGRAM_GRAPH_VERSION || 'v21.0').trim(),
       accessToken: String(env.INSTAGRAM_ACCESS_TOKEN || '').trim(),
       userId: String(env.INSTAGRAM_USER_ID || '').trim(),
       username: String(env.INSTAGRAM_USERNAME || '').trim(),
@@ -162,21 +160,15 @@ export class InstagramService {
       code,
     })
 
-    // Exchange the short-lived user token for a long-lived (~60-day) one before
-    // resolving the Page — a Page token minted from a long-lived user token does
-    // not expire on its own, so there's no per-publish refresh grant to run.
-    // Best-effort: fall back to the short-lived token if the exchange fails.
-    let userToken = token.accessToken
-    let expiresIn: number | undefined
+    // Obtain the Page token from a long-lived user token. Otherwise the Page
+    // connection can expire before the first scheduled post is ready to send.
+    let userToken: string
     try {
       const longLived = await this.driver.exchangeLongLivedUserToken(cfg.clientId, cfg.clientSecret, token.accessToken)
       userToken = longLived.accessToken
-      expiresIn = longLived.expiresIn
     }
-    catch (error) {
-      // The account still connects, on a token that lasts about an hour.
-      // Say so: silently, the first sign of it was a failed post.
-      log.warn(`[postline] instagram: could not get a long-lived token, the connection will lapse within hours: ${error instanceof Error ? error.message : String(error)}`)
+    catch {
+      throw new UserFacingError('Facebook could not authorize a lasting Instagram connection. Check your Meta app settings, then try connecting again.', 'instagram_token_exchange_failed')
     }
 
     const account = await this.driver.resolveAccount(userToken)
@@ -184,7 +176,6 @@ export class InstagramService {
       accessToken: account.pageAccessToken,
       igUserId: account.igUserId,
       username: account.username,
-      expiresIn,
     })
     return this.publicIdentity(identity)
   }
@@ -341,7 +332,7 @@ export class InstagramService {
    * id: reconnecting an account refreshes its row, a different one is added.
    */
   private async saveSession(
-    input: { accessToken: string, igUserId: string, username?: string, expiresIn?: number },
+    input: { accessToken: string, igUserId: string, username?: string },
     options: { revive?: boolean } = {},
   ): Promise<SocialIdentityRow> {
     const accountId = await ensureAccount()
@@ -356,7 +347,7 @@ export class InstagramService {
       auth_status: 'connected',
       access_token: input.accessToken,
       refresh_token: null,
-      token_expires_at: expiresAt(input.expiresIn),
+      token_expires_at: null,
       account_id: accountId,
       social_driver_id: driver.id,
     }, { revive: options.revive, label: 'This Instagram' })
