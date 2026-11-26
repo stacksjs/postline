@@ -60,10 +60,7 @@
           Move one week later
         </button>
         <form class="flex flex-wrap gap-2 items-end" x-show="hasScheduledRows()" @submit.prevent="rescheduleSelection({ date: rescheduleDate() })">
-          <div class="grid gap-1">
-            <label class="font-semibold text-muted text-xs" for="queue-move-date">New date</label>
-            <input class="px-2 h-9 max-w-full text-ink text-ui bg-panel border border-field-line rounded-lg" id="queue-move-date" type="date" :min="dayKey(new Date())" :disabled="queueChanging()" x-model="rescheduleDate" required>
-          </div>
+          <PostlineSchedulePicker :value="rescheduleDate" :timeZone="zone" :dateOnly="true" label="New date" placeholder="Choose a date" @change="selectRescheduleDate" />
           <button class="px-3 h-9 font-semibold text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg disabled:opacity-50" type="submit" :disabled="!canReschedule() || !rescheduleDate() || queueChanging()">
             Move to date
           </button>
@@ -125,7 +122,7 @@
       </div>
     </section>
 
-    <section class="bg-panel border border-line rounded-2xl shadow-sm" x-cloak x-show="!activeSearch() && view() === 'calendar'">
+    <section class="bg-panel border border-line rounded-2xl shadow-sm" aria-label="Queue calendar" x-cloak x-show="!activeSearch() && view() === 'calendar'">
       <header class="flex flex-wrap gap-3 items-center justify-between p-3.5 border-b border-line">
         <div class="flex gap-2 items-center">
           <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" :aria-label="'Previous ' + calendarPeriod()" @click="shiftCalendar(-1)">
@@ -190,6 +187,7 @@
     import type { QueueRemovalReceipt } from '../../app/Services/Social/QueueService'
     import type { ScheduledSelection, ScheduleDestination } from '../../app/Support/Social/rescheduling'
     import { MAX_QUEUE_SELECTION } from '../../app/Support/Social/rescheduling'
+    import { systemTimeZone } from '../../app/Support/time'
     import { requestJson } from '../functions/postline-client'
     import { showPostlineToast } from '../functions/postline-toast'
     import { fetchWorkspace, targetLabel } from '../functions/social-client'
@@ -279,11 +277,12 @@
     const canReschedule = derived(() => selectedPosts().length > 0 && selectedPosts().every(post => post.scheduledAt !== null))
     const queueChanging = state(false)
     const rescheduleDate = state('')
+    const selectRescheduleDate = ({ value }: { value: string }) => rescheduleDate.set(value)
     // The workspace's time zone, which every schedule is set in. The calendar
     // groups posts by the day it is there, not on this browser's clock, so a
     // laptop travelling with its owner shows the same calendar (#106).
-    // Undefined until loaded: Intl then uses the browser's zone.
-    const zone = state<string | undefined>(undefined)
+    // The browser's own zone is used until the workspace is available.
+    const zone = state(systemTimeZone())
     const zoneReady = state(false)
 
     /** A moment's calendar date in the workspace zone, as YYYY-MM-DD. */

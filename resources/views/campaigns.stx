@@ -271,7 +271,10 @@
               <label class="campaign-field"><span>Working title</span><input ref="postTitleInput" required maxlength="160" placeholder="The first signal" x-model="postTitle"></label>
               <label class="campaign-field"><span>Post copy</span><textarea ref="postBodyInput" required rows="8" maxlength="4000" placeholder="Write the post…" x-model="postBody"></textarea><small>{{ postBody().length }} characters</small></label>
               <div class="campaign-form__dates">
-                <label class="campaign-field"><span>Date and time</span><input ref="postScheduledAtInput" required type="datetime-local" x-model="postScheduledAt"></label>
+                <div class="campaign-field">
+                  <span>Date and time</span>
+                  <PostlineSchedulePicker :value="postScheduledAt" :timeZone="postScheduleZone" label="Date and time" placeholder="Choose date and time" :allowPast="true" :clearable="false" @change="selectPostSchedule" />
+                </div>
                 <label class="campaign-field"><span>Pillar</span><select ref="postPillarInput" x-model="postPillar"><option value="teaser">Teaser</option><option value="story">Story</option><option value="education">Education</option><option value="proof">Proof</option><option value="launch">Launch</option><option value="follow-up">Follow-up</option></select></label>
               </div>
               <div class="campaign-field" role="group" aria-label="Channels"><span aria-hidden="true">Channels</span><div class="campaign-channel-picker"><button type="button" x-for="provider in connectedProviders()" :data-selected="postProviders().includes(provider.provider)" :aria-pressed="postProviders().includes(provider.provider)" @click="togglePostProvider(provider.provider)"><i>{{ providerInitial(provider.provider) }}</i><span>{{ providerLabel(provider.provider) }}</span></button></div></div>
@@ -281,7 +284,7 @@
               <button class="campaign-danger-button" type="button" x-show="postDraftId() && !queuedPostId()" :disabled="busy()" @click="deletePost"><span :text="busyAction() === 'delete' ? 'Removing…' : 'Delete'">Delete</span></button>
               <button class="campaign-secondary-button" type="button" @click="closePanel"><span :text="closeLabel('Close')">Close</span></button>
               <a class="campaign-primary-button" x-show="queuedPostId()" :href="`/composer?edit=${queuedPostId()}`" data-stx-link>Edit in Composer</a>
-              <button class="campaign-primary-button" type="submit" x-show="!queuedPostId()" :disabled="busy()"><span :text="busyAction() === 'post' ? 'Saving…' : 'Save post'"></span></button>
+              <button class="campaign-primary-button" type="submit" x-show="!queuedPostId()" :disabled="busy() || !postScheduledAt()"><span :text="busyAction() === 'post' ? 'Saving…' : 'Save post'"></span></button>
             </div>
           </form>
         </section>
@@ -297,6 +300,7 @@
   </section>
 
   <script client>
+    import { instantFromWallTime, systemTimeZone, wallTimeInZone } from '../../app/Support/time'
     import { fetchProviders } from '../functions/social-client'
 
     const campaignsList = state([])
@@ -334,7 +338,9 @@
     const postProviders = state([])
     const postPillar = state('story')
     const postStatus = state('idea')
-    const postScheduledAt = state('')
+    const postScheduledAt = state<string | null>(null)
+    const postScheduleZone = derived(() => campaign()?.timezone || systemTimeZone())
+    const selectPostSchedule = ({ value }: { value: string | null }) => postScheduledAt.set(value)
     // The campaigns could not be read: not the same as having none.
     const loadFailed = state(false)
     // Closing an edited form asks for a second click to discard its changes.
@@ -356,7 +362,6 @@
     const campaignEndDateInput = useRef('campaignEndDateInput')
     const postTitleInput = useRef('postTitleInput')
     const postBodyInput = useRef('postBodyInput')
-    const postScheduledAtInput = useRef('postScheduledAtInput')
     const postPillarInput = useRef('postPillarInput')
     const noticeTimeout = useTimeout(() => notice.set({ title: '', message: '', tone: 'success' }), 5200)
 
@@ -602,7 +607,7 @@
     function openPostForm(item, day) {
       if (!campaign()) return
       const draft = item
-        ? { ...item, scheduledAt: item.scheduledAt.replace(' ', 'T').slice(0, 16), providers: [...item.providers] }
+        ? item
         : emptyPostDraft(day)
       postDraftId.set(draft.id)
       queuedPostId.set(draft.postId || 0)
@@ -611,7 +616,9 @@
       postProviders.set([...draft.providers])
       postPillar.set(draft.pillar)
       postStatus.set(draft.status)
-      postScheduledAt.set(draft.scheduledAt)
+      const timestamp = draft.scheduledAt.replace('T', ' ')
+      const selected = instantFromWallTime(timestamp.length === 16 ? `${timestamp}:00` : timestamp, postScheduleZone())
+      postScheduledAt.set(selected?.toISOString() ?? null)
       panelMode.set('post')
       openedWith = formSnapshot()
       discardArmed.set(false)
@@ -619,7 +626,6 @@
         void nextTick(() => {
           if (postTitleInput.current) postTitleInput.current.value = draft.title
           if (postBodyInput.current) postBodyInput.current.value = draft.body
-          if (postScheduledAtInput.current) postScheduledAtInput.current.value = draft.scheduledAt
           if (postPillarInput.current) postPillarInput.current.value = draft.pillar
         })
       })
@@ -649,7 +655,7 @@
 
     // Escape closes the open form, through the same unsaved-edits check.
     useEventListener('keydown', (event) => {
-      if (event.key !== 'Escape' || (panelMode() !== 'campaign' && panelMode() !== 'post')) return
+      if (event.defaultPrevented || event.key !== 'Escape' || (panelMode() !== 'campaign' && panelMode() !== 'post')) return
       event.preventDefault()
       closePanel()
     })
@@ -695,7 +701,8 @@
 
     async function savePost(event) {
       event.preventDefault()
-      if (queuedPostId()) return
+      const scheduled = postScheduledAt()
+      if (queuedPostId() || !scheduled) return
       busyAction.set('post')
       try {
         await api('/api/postline/campaigns/post', {
@@ -706,7 +713,7 @@
           providers: postProviders(),
           pillar: postPillar(),
           status: postStatus(),
-          scheduled_at: postScheduledAt().replace('T', ' '),
+          scheduled_at: wallTimeInZone(new Date(scheduled), postScheduleZone()),
         })
         await loadCampaigns(campaign().id)
         panelMode.set('planner')

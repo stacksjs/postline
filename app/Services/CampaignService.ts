@@ -3,7 +3,7 @@ import { db } from '@stacksjs/database'
 import type { CampaignAIStrategy, CampaignAISuggestion } from './CampaignAIService'
 import { campaignAI } from './CampaignAIService'
 import { postQueue } from './Social/QueueService'
-import { isRealTimestamp, isValidTimeZone } from '../Support/time'
+import { instantFromWallTime, isRealTimestamp, isValidTimeZone } from '../Support/time'
 import { workspace } from './WorkspaceService'
 import { UserFacingError } from '../Support/Http/user-error'
 import { ensureAccount, now, uuid } from './Social/support'
@@ -126,38 +126,12 @@ export function normalizeProviders(values: unknown): SocialProvider[] {
  * used to be read as UTC, which scheduled every post hours off with no sign.
  */
 export function zonedTimestampToUtc(timestamp: string, timeZone: string): string {
-  const match = timestamp.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})(?::(\d{2}))?$/)
-  if (!match) throw new Error('Post time must include a date and time.')
-  const [, year, month, day, hour, minute, second] = match.map(Number)
-  const wallClock = Date.UTC(year!, month! - 1, day!, hour!, minute!, second || 0)
-
-  let format: Intl.DateTimeFormat
-  try {
-    format = new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      hourCycle: 'h23',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    })
-  }
-  catch {
+  const wallTime = sqliteTimestamp(timestamp)
+  if (!isValidTimeZone(timeZone))
     throw new UserFacingError(`"${timeZone}" is not a time zone Postline knows. Pick the campaign's time zone again.`)
-  }
-
-  // How far the zone is from UTC at a given instant.
-  const offsetAt = (instant: number): number => {
-    const parts = Object.fromEntries(format.formatToParts(new Date(instant)).map(part => [part.type, part.value]))
-    return Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), Number(parts.second)) - instant
-  }
-
-  // Twice: the first guess can land on the other side of a DST change.
-  let utc = wallClock - offsetAt(wallClock)
-  utc = wallClock - offsetAt(utc)
-  return new Date(utc).toISOString().slice(0, 19).replace('T', ' ')
+  const utc = instantFromWallTime(wallTime, timeZone)
+  if (!utc) throw new UserFacingError("That clock time does not exist in the campaign's time zone.")
+  return utc.toISOString().slice(0, 19).replace('T', ' ')
 }
 
 export function scheduleFromOffset(startDate: string, offsetDays: number, time = '09:00'): string {

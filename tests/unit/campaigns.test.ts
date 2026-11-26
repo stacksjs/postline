@@ -176,6 +176,7 @@ describe('campaign scheduling time zones', () => {
     // 2026-03-08 is the spring-forward day in the US; noon is already PDT.
     expect(zonedTimestampToUtc('2026-03-08 12:00:00', 'America/New_York')).toBe('2026-03-08 16:00:00')
     expect(zonedTimestampToUtc('2026-03-07 12:00:00', 'America/New_York')).toBe('2026-03-07 17:00:00')
+    expect(() => zonedTimestampToUtc('2026-03-08 02:30:00', 'America/New_York')).toThrow('does not exist')
   })
 
   test('an unknown zone is refused: read as UTC it scheduled every post hours off', () => {

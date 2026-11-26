@@ -118,7 +118,7 @@ async function checkWorkspaceCommands(cdp: Cdp): Promise<void> {
   if (!await evaluate<boolean>(cdp, `${option}?.textContent.includes('Calendar') && ${search}.getAttribute('aria-activedescendant') === ${option}.id`))
     fail('queue', 'commands', 'Arrow Down did not move the accessible selection to Calendar')
   await pressKey(cdp, 'Enter', 13)
-  await waitUntil('The existing Calendar action', () => evaluate<boolean>(cdp, `!${dialog}.open && Boolean(document.querySelector('[aria-label="Previous month"]')?.getClientRects().length)`), 5_000)
+  await waitUntil('The existing Calendar action', () => evaluate<boolean>(cdp, `!${dialog}.open && Boolean(document.querySelector('[aria-label="Queue calendar"] [aria-label="Previous month"]')?.getClientRects().length)`), 5_000)
 
   await pressKey(cdp, 'k', 75, 4)
   await fill('analytics')
@@ -624,7 +624,7 @@ async function checkPhoneNavigation(cdp: Cdp): Promise<void> {
   await waitUntil('The agenda replaces the month grid', () => evaluate<boolean>(cdp, `
     document.querySelector('[aria-label="Monthly agenda"]').getClientRects().length > 0
       && !document.querySelector('[data-cal-cell]')?.getClientRects().length`), 5_000)
-  await evaluate(cdp, `document.querySelector('button[aria-label="Next month"]').click()`)
+  await evaluate(cdp, `document.querySelector('[aria-label="Queue calendar"] button[aria-label="Next month"]').click()`)
   await waitUntil('All posts scheduled on the same day are available in the agenda', () => evaluate<boolean>(cdp, `
     [...document.querySelectorAll('[aria-label="Monthly agenda"] a')].filter(link => link.textContent.includes('Phone agenda fixture')).length === 4`), 5_000)
   await evaluate(cdp, `Array.from(document.querySelectorAll('[aria-label="Monthly agenda"] a')).find(link => link.textContent.includes('Phone agenda fixture')).scrollIntoView({ block: 'center' })`)
@@ -727,6 +727,44 @@ async function checkQueueRescheduling(cdp: Cdp): Promise<void> {
   await evaluate(cdp, `${undo}.click()`)
   await waitUntil('Undo restores the whole batch', () => evaluate<boolean>(cdp, `
     ${checkboxes}.length === 5 && document.querySelector('#postline-toast-host')?.textContent.includes('5 posts restored to the queue.')`), 5_000)
+
+  const day = await evaluate<{ key: string, label: string, zone: string }>(cdp, `(async () => {
+    const zone = (await (await fetch('/api/postline/bootstrap')).json()).data.workspace.timezone
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+    const day = new Date(today + 'T00:00:00Z')
+    day.setUTCDate(day.getUTCDate() + 7)
+    return { key: day.toISOString().slice(0, 10), label: day.toLocaleDateString('en-US', { timeZone: 'UTC' }), zone }
+  })()`)
+  const dayPicker = '[data-schedule-day-details]'
+  const chooseDay = `document.querySelector('${dayPicker} button[aria-label="${day.label}"]')`
+  await evaluate(cdp, `${select}.click()
+    document.querySelector('input[aria-label^="Select Bulk move fixture 1,"]').click()
+    document.querySelector('${dayPicker} summary').click()
+  `)
+  await waitUntil('The Queue date picker opens the shared Calendar', () => evaluate<boolean>(cdp, `
+    document.querySelector('${dayPicker}')?.open
+      && document.querySelector('${dayPicker}').textContent.includes(${JSON.stringify(day.zone)})
+      && !!document.querySelector('${dayPicker} button[aria-label="Next month"]')`), 5_000)
+  await evaluate(cdp, `if (!${chooseDay}) document.querySelector('${dayPicker} button[aria-label="Next month"]').click()`)
+  await waitUntil('The chosen workspace day is available', () => evaluate<boolean>(cdp, `Boolean(${chooseDay} && !${chooseDay}.disabled)`), 5_000)
+  await evaluate(cdp, `${chooseDay}.click()`)
+  const moveToDate = `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Move to date')`
+  await waitUntil('The selected calendar date is ready to submit', () => evaluate<boolean>(cdp, `
+    !document.querySelector('${dayPicker}').open && !${moveToDate}.disabled`), 5_000)
+  await evaluate(cdp, `${moveToDate}.click()`)
+  await waitUntil('The date move completes', () => evaluate<boolean>(cdp, `document.querySelector('#postline-toast-host')?.textContent.includes('Moved 1 post.')`), 5_000)
+  const preservesClock = await evaluate<boolean>(cdp, `(async () => {
+    const items = (await (await fetch('/api/postline/queue?limit=500')).json()).data.items
+    const post = items.find(item => item.id === ${fixtures[0]!.id})
+    const at = new Date(post.scheduledAt.replace(' ', 'T') + 'Z')
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: ${JSON.stringify(day.zone)}, year: 'numeric', month: '2-digit', day: '2-digit',
+    })
+    const time = instant => instant.toLocaleTimeString('en-GB', { timeZone: ${JSON.stringify(day.zone)} })
+    const original = new Date(${JSON.stringify(fixtures[0]!.scheduledAt.replace(' ', 'T') + 'Z')})
+    return formatter.format(at) === ${JSON.stringify(day.key)} && time(at) === time(original)
+  })()`)
+  if (!preservesClock) fail('queue', 'schedule picker', 'moving to a calendar day changed the post’s workspace clock time')
 }
 
 async function checkQueueCalendar(cdp: Cdp): Promise<void> {
@@ -784,6 +822,59 @@ async function checkQueueCalendar(cdp: Cdp): Promise<void> {
     return agenda?.getClientRects().length && agenda.querySelectorAll('[role=listitem]').length === 7
       && document.documentElement.scrollWidth - innerWidth <= 1
   })()`), 5_000)
+}
+
+async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
+  const fixture = await evaluate<{ campaignId: number, postId: number }>(cdp, `(async () => {
+    const write = async (path, body) => {
+      const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if (!response.ok) throw new Error('Could not create the campaign schedule fixture: ' + await response.text())
+      return (await response.json()).data
+    }
+    const day = new Date().toISOString().slice(0, 10)
+    const end = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10)
+    const { campaign } = await write('/api/postline/campaigns', {
+      name: 'Scheduling fixture campaign', timezone: 'America/New_York', start_date: day, end_date: end,
+    })
+    const { post } = await write('/api/postline/campaigns/post', {
+      campaign_id: campaign.id, title: 'Plan the scheduling fixture', body: 'Keep the campaign clock time.',
+      providers: ['blog'], scheduled_at: day + ' 09:00:00',
+    })
+    return { campaignId: campaign.id, postId: post.id }
+  })()`)
+  const recommendation = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const send = window.fetch.bind(window)
+    window.fetch = (input, options) => {
+      if (new URL(input instanceof Request ? input.url : input, location.href).pathname === '/api/postline/analytics')
+        return Promise.resolve(Response.json({ ok: true, data: { timezone: 'America/New_York', stats: { bestHour: { hour: 13 } } } }))
+      return send(input, options)
+    }
+  ` })
+  try {
+    await auditPage(`${site}/campaigns`, { cdp })
+    const post = `[...document.querySelectorAll('article[role=button]')].find(item => item.textContent.includes('Plan the scheduling fixture') && item.getClientRects().length > 0)`
+    await waitUntil('The planned campaign post', () => evaluate<boolean>(cdp, `Boolean(${post})`), 5_000)
+    await evaluate(cdp, `${post}.click()`)
+    const picker = `document.querySelector('[data-postline-schedule-picker] [data-date-time-trigger]')`
+    await waitUntil('The campaign scheduling picker is present', () => evaluate<boolean>(cdp, `Boolean(${picker}?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, `${picker}.click()`)
+    const suggested = `document.querySelector('[data-date-time-preset=suggested]')`
+    await waitUntil('The next best time in the campaign zone', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-date-time-clock]')?.value === '09:00'
+        && document.querySelector('[data-date-time-panel]')?.textContent.includes('America/New_York')
+        && Boolean(${suggested}?.getClientRects().length) && !${suggested}.disabled`), 5_000)
+    await evaluate(cdp, `${suggested}.click()`)
+    await evaluate(cdp, `[...document.querySelectorAll('button[type=submit]')].find(button => button.textContent.trim() === 'Save post' && button.getClientRects().length > 0).click()`)
+    await waitUntil('The chosen campaign time is saved', () => evaluate<boolean>(cdp, `(async () => {
+      const response = await fetch('/api/postline/campaigns?id=${fixture.campaignId}')
+      const posts = (await response.json()).data.selected.posts
+      return posts.find(post => post.id === ${fixture.postId})?.scheduledAt.endsWith('13:00:00')
+    })()`), 5_000)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: recommendation.identifier })
+  }
 }
 
 let exitCode = 0
@@ -853,6 +944,7 @@ try {
     await checkPhoneNavigation(cdp)
     await checkQueueRescheduling(cdp)
     await checkQueueCalendar(cdp)
+    await checkCampaignScheduling(cdp)
   }
   finally {
     await close()
