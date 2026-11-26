@@ -16,7 +16,7 @@
       </div>
       <div class="flex flex-wrap gap-2 items-center">
         <label class="sr-only" for="campaign-picker">Current campaign</label>
-        <select id="campaign-picker" class="px-3 h-9 min-w-44 text-ink text-ui bg-panel border border-line outline-none rounded-xl focus:ring-2 focus:ring-focus" x-show="campaignsList().length" @change="selectCampaign($event.target.value)">
+        <select id="campaign-picker" class="px-3 h-9 min-w-44 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus" x-show="campaignsList().length" @change="selectCampaign($event.target.value)">
           <option x-for="option in campaignsList()" :value="option.id" :selected="option.id === campaign()?.id">{{ option.name }}</option>
         </select>
         <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Campaign view" x-show="campaign()">

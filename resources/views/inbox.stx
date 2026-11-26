@@ -43,7 +43,7 @@
               <h2 class="m-0 font-semibold text-ink text-sm" :text="statusFilter() === 'archived' ? 'Archived' : 'Inbox'">Inbox</h2>
               <button class="px-2.5 h-7 font-semibold text-muted text-xs hover:text-ink bg-panel-2 hover:bg-raised border border-line rounded-lg transition-colors" type="button" @click="toggleStatusFilter" :text="statusFilter() === 'archived' ? 'Show inbox' : 'Show archived'">Show archived</button>
             </div>
-            <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-line rounded-lg" @change="setProviderFilter($event.target.value)">
+            <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-field-line rounded-lg" @change="setProviderFilter($event.target.value)">
               <option value="">All networks</option>
               <option x-for="provider in providerOptions" :value="provider.id" :text="provider.label"></option>
             </select>
@@ -135,7 +135,7 @@
           </div>
 
           <form class="grid gap-2 px-4 py-3 border-line border-t" @submit="sendReply($event)">
-            <textarea class="px-3 py-2.5 min-h-20 text-ink text-sm bg-bg border border-line outline-none rounded-xl focus:ring-2 focus:ring-focus resize-y" placeholder="Write a reply…" x-model="draftBody" :maxlength="String(characterLimit())" @keydown="maybeSend($event)"></textarea>
+            <textarea class="px-3 py-2.5 min-h-20 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus resize-y" placeholder="Write a reply…" x-model="draftBody" :maxlength="String(characterLimit())" @keydown="maybeSend($event)"></textarea>
             <div class="flex flex-wrap gap-2 items-center justify-between">
               <span class="text-muted text-xs" :text="`${remaining()} characters left · ⌘↵ to send`"></span>
               <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="sending() || !draftBody().trim()">

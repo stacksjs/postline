@@ -64,7 +64,7 @@ const APP_LIGHT: string = `
   --line: #e4e4e7;
   --ink: #0a0a0b;
   --body: #3f3f46;
-  --muted: #71717a;
+  --muted: #67676f;
   --accent: #0a0a0b;
   --on-accent: #fafafa;
   --brand: #f0441e;
@@ -72,6 +72,8 @@ const APP_LIGHT: string = `
   --nav-active: rgba(232, 232, 230, 0.9);
   --hover: #fafafa;
   --line-strong: #d4d4d8;
+  --field-line: #86868f;
+  --focus-ring: #2563eb;
   --accent-hover: #262626;
   --glass: rgba(255, 255, 255, 0.72);
   --glass-strong: rgba(255, 255, 255, 0.95);
@@ -122,6 +124,8 @@ const APP_DARK: string = `
   --nav-active: rgba(63, 63, 70, 0.6);
   --hover: #26262a;
   --line-strong: #52525b;
+  --field-line: #6e6e78;
+  --focus-ring: #60a5fa;
   --accent-hover: #d4d4d8;
   --glass: rgba(63, 63, 70, 0.72);
   --glass-strong: rgba(39, 39, 42, 0.95);
@@ -233,7 +237,7 @@ function overriding(css: string): string {
 const DARK_OVERRIDES: string = overriding(`
 
 .dark input, .dark textarea, .dark select { color: #f4f4f5; }
-.dark input::placeholder, .dark textarea::placeholder { color: #71717a; }
+.dark input::placeholder, .dark textarea::placeholder { color: #8b8b94; }
 .dark code { background-color: #26262a; color: #e4e4e7; }
 
 .dark [data-postline-content-shell],
@@ -328,10 +332,14 @@ html.postline-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fa
   [data-postline-mobile-nav]::-webkit-scrollbar { display: none; }
 }
 
-[data-postline-app] :is(a, button, [role='button']):focus-visible {
-  outline: 2px solid rgb(82 82 91 / 0.6);
+/* A focus ring every control shows, at 3:1 against the panels (#142). The
+   writing surfaces with no border of their own opt in with data-focus-outline. */
+[data-postline-app] :is(a, button, [role='button'], [data-focus-outline]):focus-visible {
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
+
+[data-postline-app] :is(input, textarea)::placeholder { color: var(--muted); }
 
 html.dark.has-native-sidebar [data-postline-content-shell],
 html.dark.has-native-sidebar [data-postline-workspace] {
@@ -656,6 +664,9 @@ export default {
         'nav-active': 'var(--nav-active)',
         'hover': 'var(--hover)',
         'line-strong': 'var(--line-strong)',
+        // Input borders and the focus ring, at 3:1 against the panels (#142).
+        'field-line': 'var(--field-line)',
+        'focus-ring': 'var(--focus-ring)',
         'accent-hover': 'var(--accent-hover)',
         'glass': 'var(--glass)',
         'glass-strong': 'var(--glass-strong)',

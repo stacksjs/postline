@@ -80,8 +80,8 @@
             </div>
           </div>
           <form class="grid gap-2" x-show="item.editing" @submit.prevent="saveEdit(item.id)">
-            <input class="px-3 h-9 text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="200" aria-label="Title" :value="item.draftTitle" @input="setDraft(item.id, 'title', $event)" data-blog-edit-title>
-            <textarea class="px-3 py-2 min-h-40 text-ink text-ui bg-panel border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft resize-y" aria-label="Text" :value="item.draftBody" @input="setDraft(item.id, 'body', $event)" data-blog-edit-body></textarea>
+            <input class="px-3 h-9 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="200" aria-label="Title" :value="item.draftTitle" @input="setDraft(item.id, 'title', $event)" data-blog-edit-title>
+            <textarea class="px-3 py-2 min-h-40 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft resize-y" aria-label="Text" :value="item.draftBody" @input="setDraft(item.id, 'body', $event)" data-blog-edit-body></textarea>
             <div class="flex gap-2 justify-end">
               <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" type="button" @click="cancelEdit()">Cancel</button>
               <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="submit" :disabled="busyId() === item.id">Save</button>

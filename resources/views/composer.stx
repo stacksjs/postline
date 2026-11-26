@@ -90,9 +90,9 @@
           </div>
           <label class="hidden gap-2 items-center mb-2.5" data-compose-image-row>
             <span class="h-4 w-4 text-muted i-hugeicons-image-01" aria-hidden="true"></span>
-            <input class="px-3 h-9 w-full text-ink text-sm bg-panel border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="url" inputmode="url" placeholder="Image URL (required for Instagram)" aria-label="Image URL for Instagram" data-compose-image>
+            <input class="px-3 h-9 w-full text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="url" inputmode="url" placeholder="Image URL (required for Instagram)" aria-label="Image URL for Instagram" data-compose-image>
           </label>
-          <input class="hidden mb-2 w-full font-semibold leading-snug text-2xl text-ink placeholder:text-muted bg-transparent border-0 outline-none" type="text" maxlength="200" placeholder="Post title" aria-label="Blog post title" data-compose-title>
+          <input class="hidden mb-2 w-full font-semibold leading-snug text-2xl text-ink placeholder:text-muted bg-transparent border-0 outline-none rounded-md" data-focus-outline type="text" maxlength="200" placeholder="Post title" aria-label="Blog post title" data-compose-title>
           <div class="grid overflow-y-auto content-start gap-4 pr-1 max-h-72" data-composer-posts>
             <article class="grid gap-2 pb-3 last:pb-0 border-b border-line last:border-b-0" data-composer-post data-active="true">
               <header class="flex gap-3 items-center justify-between">
@@ -104,7 +104,7 @@
                   <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
                 </button>
               </header>
-              <textarea class="min-h-36 w-full leading-relaxed text-ink text-xl placeholder:text-muted bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body 1" placeholder="What do you want to share?" data-bluesky-text></textarea>
+              <textarea class="min-h-36 w-full leading-relaxed text-ink text-xl placeholder:text-muted bg-transparent border-0 outline-none rounded-md resize-none" data-focus-outline spellcheck="true" aria-label="Post body 1" placeholder="What do you want to share?" data-bluesky-text></textarea>
               {{-- Long-form rich text mounts here and writes Markdown back into
                   the textarea above, which stays the source of truth. Hidden
                   until the blog is a target. --}}
@@ -125,7 +125,7 @@
           <div class="flex gap-2 items-center px-2.5 py-2 bg-panel-2 border border-line rounded-xl" x-for="image in imageRows()" data-attached-image>
             <span class="shrink-0 h-4 w-4 text-muted i-hugeicons-image-01" aria-hidden="true"></span>
             <span class="shrink-0 max-w-40 text-ink text-xs truncate" :text="image.name" :title="image.name"></span>
-            <input class="flex-1 px-2.5 h-8 min-w-0 text-ink text-ui bg-panel border border-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="1000" placeholder="Describe it for people who cannot see it" x-show="image.editable" :value="image.alt" :aria-label="image.altLabel" @input="setImageAlt(image.id, $event)" data-image-alt>
+            <input class="flex-1 px-2.5 h-8 min-w-0 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="1000" placeholder="Describe it for people who cannot see it" x-show="image.editable" :value="image.alt" :aria-label="image.altLabel" @input="setImageAlt(image.id, $event)" data-image-alt>
             <span class="flex-1 text-muted text-xs" x-show="!image.editable">Saved with the post. Attach new images to replace them.</span>
             <button class="inline-flex items-center justify-center shrink-0 h-6 w-6 text-muted hover:text-ink rounded-md transition-colors" type="button" :aria-label="image.removeLabel" @click="removeImage(image.id)">
               <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
@@ -141,20 +141,20 @@
         <div class="flex hidden flex-wrap gap-2 items-center pb-3 px-3" :class="{ 'hidden': !showPostOptions() }" data-post-options>
           <label class="inline-flex gap-1.5 items-center text-muted text-xs" x-show="showLanguage()">
             <span>Language</span>
-            <select class="px-2 h-8 text-ink text-ui bg-panel border border-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="postLanguage" data-post-language>
+            <select class="px-2 h-8 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="postLanguage" data-post-language>
               <option x-for="option in languageOptions" :value="option.value" :text="option.label"></option>
             </select>
           </label>
           <label class="inline-flex gap-1.5 items-center text-muted text-xs" x-show="showMastodonOptions()">
             <span>Mastodon</span>
-            <select class="px-2 h-8 text-ink text-ui bg-panel border border-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="mastodonVisibility" aria-label="Who can see it on Mastodon" data-mastodon-visibility>
+            <select class="px-2 h-8 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="mastodonVisibility" aria-label="Who can see it on Mastodon" data-mastodon-visibility>
               <option value="public">Public</option>
               <option value="unlisted">Quiet public</option>
               <option value="private">Followers only</option>
               <option value="direct">Mentioned people only</option>
             </select>
           </label>
-          <input class="flex-1 px-2.5 h-8 min-w-48 text-ink text-ui bg-panel border border-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="500" placeholder="Content warning on Mastodon (optional)" aria-label="Content warning on Mastodon" x-show="showMastodonOptions()" x-model="mastodonSpoiler" data-mastodon-spoiler>
+          <input class="flex-1 px-2.5 h-8 min-w-48 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="500" placeholder="Content warning on Mastodon (optional)" aria-label="Content warning on Mastodon" x-show="showMastodonOptions()" x-model="mastodonSpoiler" data-mastodon-spoiler>
         </div>
 
         <footer class="flex flex-col gap-3 items-stretch justify-between sm:flex-row sm:items-center p-3 border-line border-t">
@@ -166,7 +166,7 @@
             <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach images" title="Attach images (up to 4)" data-attach-button>
               <span class="h-4 w-4 i-hugeicons-image-01" aria-hidden="true"></span>
             </button>
-            <input class="hidden px-2 h-9 text-ink text-xs bg-panel border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="datetime-local" aria-label="Schedule time" data-compose-schedule>
+            <input class="hidden px-2 h-9 text-ink text-xs bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="datetime-local" aria-label="Schedule time" data-compose-schedule>
             <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Schedule post" title="Schedule post" data-schedule-toggle>
               <span class="h-4 w-4 i-hugeicons-calendar-03" aria-hidden="true"></span>
             </button>
@@ -575,7 +575,7 @@
         }
 
         const area = document.createElement('textarea')
-        area.className = 'p-2 min-h-20 w-full leading-relaxed text-ink text-sm bg-panel border border-line outline-none rounded-lg resize-none'
+        area.className = 'p-2 min-h-20 w-full leading-relaxed text-ink text-sm bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid resize-none'
         area.value = entry.text
         area.setAttribute('aria-label', `${label} post body`)
         area.dataset.variantInput = provider
@@ -777,7 +777,7 @@
             <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
           </button>
         </header>
-          <textarea class="min-h-36 w-full leading-relaxed text-ink text-xl bg-transparent border-0 outline-none resize-none" spellcheck="true" aria-label="Post body ${number}" data-bluesky-text>${escapeHtml(text)}</textarea>
+          <textarea class="min-h-36 w-full leading-relaxed text-ink text-xl bg-transparent border-0 outline-none rounded-md resize-none" data-focus-outline spellcheck="true" aria-label="Post body ${number}" data-bluesky-text>${escapeHtml(text)}</textarea>
         <div class="hidden overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview></div>
       `
 
