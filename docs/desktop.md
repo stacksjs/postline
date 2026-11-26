@@ -133,16 +133,17 @@ The Mac runner verifies the signed app before packaging the DMG.
 
 ## What is not done
 
-- **Notarization.** The release signs the app but does not notarize it. Until
-  it does, macOS refuses the first open of a downloaded copy: open it once,
-  then choose **Open Anyway** under System Settings > Privacy & Security.
-  (The right-click, then Open shortcut no longer works on current macOS.)
-  `buddy release:desktop` notarizes, staples and publishes signed update
-  manifests; moving the release onto it needs a Developer ID and an update
-  signing key.
+- **Notarization.** Apple accepted a Developer ID–signed test DMG, and
+  Gatekeeper verified the stapled image. The release workflow uses
+  `buddy release:desktop` with the approved notarytool profile to sign the
+  distribution and update feed.
+  [Release workflow tracking](https://github.com/stacksjs/postline/issues/191).
 - **The Mac App Store.** A web view app is built unsandboxed, because the
   agent is a server and a sandboxed app cannot be one this way. The Store
   requires the sandbox. Shipping there means the framework's `macos` desktop
   mode, which is a different app shape.
-- **In-app updates.** Not wired up; a new version is a new download.
+- **In-app updates.** Settings shows the installed version and can check the
+  signed feed. The stable feed gains an update after an approved release.
+  The install-time workspace backup and the two-version Mac rehearsal are
+  tracked in [#193](https://github.com/stacksjs/postline/issues/193).
 - **Apple Silicon only.** The release builds `arm64`.

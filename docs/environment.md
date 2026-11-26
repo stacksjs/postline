@@ -14,6 +14,8 @@ For a server install, start with `.env.example` in the project root and keep the
 | `POSTLINE_BACKUP_BUCKET`, `POSTLINE_BACKUP_REGION` | Private off-site S3 destination for server recovery sets. |
 | `POSTLINE_BACKUP_ACCESS_KEY_ID`, `POSTLINE_BACKUP_SECRET_ACCESS_KEY` | Scoped credentials for the backup scheduler. |
 | `POSTLINE_BACKUP_RECOVERY_KEY` | Separate secret for encrypting the recovery set. Store a recoverable copy outside the host. |
+| `POSTLINE_UPDATES_BUCKET`, `POSTLINE_UPDATES_REGION` | Private S3 storage used by the Postline desktop update feed. |
+| `POSTLINE_UPDATES_ACCESS_KEY_ID`, `POSTLINE_UPDATES_SECRET_ACCESS_KEY` | Read credentials for the feed server. The release runner uses a separate publishing credential. |
 | `MAIL_MAILER` and `MAIL_*` | Mail transport and sender configuration for email delivery. |
 | `POSTLINE_ALERT_EMAIL`, `POSTLINE_ALERT_WEBHOOK_URL` | Where to send publishing or account alerts. |
 | `POSTLINE_ERROR_WEBHOOK_URL` | Optional destination for aggregated server error alerts. |

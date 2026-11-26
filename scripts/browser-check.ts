@@ -24,8 +24,10 @@ import { auditPage, closeSharedBrowsers, launch } from '@stacksjs/testing/browse
 
 const root = join(import.meta.dir, '..')
 const out = join(root, 'storage/framework/browser-check')
-const API_PORT = Number(process.env.BROWSER_CHECK_API_PORT) || 3208
-const SITE_PORT = Number(process.env.BROWSER_CHECK_PORT) || 3200
+const ports = [0, 0].map(() => Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response() }))
+const API_PORT = Number(process.env.BROWSER_CHECK_API_PORT) || ports[0]!.port
+const SITE_PORT = Number(process.env.BROWSER_CHECK_PORT) || ports[1]!.port
+for (const port of ports) port.stop(true)
 const site = `http://localhost:${SITE_PORT}`
 
 /** The workspace views a signed-in owner opens. */
@@ -118,6 +120,45 @@ async function checkQueueKeyboard(cdp: Cdp): Promise<void> {
   await waitUntil('The post search result', () => evaluate<boolean>(cdp, `document.querySelector('#queue-results[aria-label="Matching posts"] article')?.textContent.includes('A draft for the keyboard smoke test')`), 5_000)
 }
 
+async function checkDesktopUpdateControls(cdp: Cdp): Promise<void> {
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    window.craft = { window: {}, capabilities: { nativePlatformControls: false } }
+    window.postlineUpdateTestActions = []
+    const actualFetch = window.fetch.bind(window)
+    window.fetch = async (input, options) => {
+      const request = new Request(input, options)
+      if (new URL(request.url).pathname !== '/__desktop/update') return actualFetch(input, options)
+      const action = request.method === 'POST' ? (await request.json()).action : null
+      window.postlineUpdateTestActions.push(action || 'status')
+      return Response.json({
+        currentVersion: '0.3.0', selfUpdating: true,
+        state: action === 'check' ? 'available' : action === 'install' ? 'installed' : 'idle',
+        ...(action ? { version: '0.4.0' } : {}),
+      })
+    }
+  ` })
+  try {
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
+    await auditPage(`${site}/settings`, { cdp })
+    await waitUntil('Settings displays the installed desktop version', () => evaluate<boolean>(cdp, `document.querySelector('[data-setting="desktop-version"]')?.innerText.includes('0.3.0')`), 5_000)
+    await evaluate(cdp, `document.querySelector('[data-setting="desktop-version"] button')?.click()`)
+    await waitUntil('Settings displays the available desktop update', () => evaluate<boolean>(cdp, `document.querySelector('[data-setting="desktop-install"]')?.innerText.includes('0.4.0')`), 5_000)
+    await evaluate(cdp, `document.querySelector('[data-setting="desktop-install"] button')?.click()`)
+    await waitUntil('Settings announces the installed update', () => evaluate<boolean>(cdp, `Array.from(document.querySelectorAll('[role="status"]')).some(node => node.textContent.includes('Update installed.'))`), 5_000)
+  }
+  catch (error) {
+    const details = await evaluate<unknown>(cdp, `({
+      requests: window.postlineUpdateTestActions,
+      version: document.querySelector('[data-setting="desktop-version"]')?.textContent,
+      update: document.querySelector('[data-setting="desktop-install"]')?.textContent,
+    })`)
+    throw new Error(`${String(error)} (${JSON.stringify(details)})`)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+  }
+}
+
 let exitCode = 0
 try {
   await waitUntil('The API', async () => (await fetch(`http://localhost:${API_PORT}/api/postline/health`)).status < 500)
@@ -169,6 +210,7 @@ try {
         if (view === 'queue' && mode.name === 'light') await checkQueueKeyboard(cdp)
       }
     }
+    await checkDesktopUpdateControls(cdp)
   }
   finally {
     await close()

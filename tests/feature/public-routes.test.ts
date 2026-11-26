@@ -51,6 +51,9 @@ const FRAMEWORK_PUBLIC = [
   'GET /_stacks/mail/preview',
   'GET /_stacks/mail/preview/{name}',
   'GET /_stacks/mail/preview/{name}/raw',
+  // Installed apps check for signed releases before anyone signs in.
+  'GET /api/updates/{platform}/{arch}',
+  'GET /api/updates/files/{channel}/{target}/{version}/{file}',
   'GET /locale/{locale}',
   'GET /robots.txt',
   'POST /webhooks/email/mailgun',

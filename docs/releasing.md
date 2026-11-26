@@ -38,11 +38,18 @@ Used for every release. Each step either passes or stops the release.
    reviewos run release.yml --repo stacks/postline --ref main --input tag=vX.Y.Z --watch
    ```
 
-   The workflow checks the tag's CI verdict, builds the DMG, and attaches it
-   with `checksums.txt` and its Ed25519 signature, `checksums.txt.sig`. The
-   runner uses the `main` key from its `postline-desktop-updates` Keychain
-   service or the injected `DESKTOP_UPDATE_PRIVATE_KEY`. The key must match
-   the published public key in `config/desktop.ts`.
+   The workflow checks the tag's CI verdict and builds on the Mac runner.
+   `buddy release:desktop` notarizes and staples the DMG, then publishes the
+   signed stable update through the Postline feed. The GitHub release includes
+   the DMG, `checksums.txt`, its `checksums.txt.sig` signature, and the signed
+   `release-manifest.json`.
+
+   The runner's `DESKTOP_NOTARY_PROFILE` variable must name an approved
+   notarytool Keychain profile. Its `postline-desktop-updates` Keychain
+   service must hold `main`, `storage-access-key-id`, and
+   `storage-secret-access-key`. The `main` key must match the public key in
+   `config/desktop.ts`. The storage credential can publish to the private
+   update bucket. The production feed uses its own read-only credential.
 
 ## After
 

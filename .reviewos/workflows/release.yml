@@ -12,6 +12,8 @@
 # NEEDED ON THE INSTANCE before the first release:
 #   secret   GH_RELEASE_TOKEN a GitHub token that may create releases on
 #                             stacksjs/postline (contents: write)
+#   variable DESKTOP_NOTARY_PROFILE name of the approved notarytool profile
+#   Keychain service postline-desktop-updates holds the signing and storage keys
 #
 # Why a token of its own: inside a ReviewOS job `GITHUB_TOKEN` and
 # `GITHUB_API_URL` are ReviewOS's, and ReviewOS answers no releases API there.
@@ -48,6 +50,7 @@ jobs:
         - storage/framework/desktop-dmg/*.dmg
         - storage/framework/desktop-dmg/checksums.txt
         - storage/framework/desktop-dmg/checksums.txt.sig
+        - storage/framework/desktop-dmg/release-manifest.json
     runs-on: [self-hosted, macos-arm64, postline]
     timeout-minutes: 30
     env:
@@ -71,33 +74,40 @@ jobs:
           packages: bun.sh@${{ env.BUN_VERSION }} git-scm.org@2.53.0
 
       # Start the artifact build from the tag after the runner sets up tools.
-      - name: Check out the tag
+      - name: Prepare the approved tag
         env:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
           git fetch --tags --force origin
-          git checkout --force --detach "refs/tags/$TAG"
+          git worktree add --detach "$RUNNER_TEMP/postline-release" "refs/tags/$TAG"
 
       - name: Check the tag matches package.json
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
+          cd "$RUNNER_TEMP/postline-release"
           declared=$(sed -n 's/^  "version": "\(.*\)",$/\1/p' package.json | head -1)
           test "$declared" = "$VERSION" || { echo "::error::Tag v$VERSION does not match package.json version $declared." >&2; exit 1; }
 
       - name: Require passing CI on the approved tag
-        run: bun scripts/publication-check.ts --ci-only
+        run: |
+          cd "$RUNNER_TEMP/postline-release"
+          bun scripts/publication-check.ts --ci-only
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: |
+          cd "$RUNNER_TEMP/postline-release"
+          bun install --frozen-lockfile
 
       # The routes, actions, middleware, migrations and a freshly migrated
       # empty database, written where the bundler can follow them. The agent
       # is one compiled binary and carries all of it.
       - name: Write what the agent carries
-        run: bun scripts/desktop-bundle.ts
+        run: |
+          cd "$RUNNER_TEMP/postline-release"
+          bun scripts/desktop-bundle.ts
 
       # The agent, compiled and run from an empty directory the way the app
       # runs it: every page left to the views, the API answering, a post
@@ -105,6 +115,7 @@ jobs:
       # cannot do that is not imaged.
       - name: Check the compiled agent
         run: |
+          cd "$RUNNER_TEMP/postline-release"
           CHECK_DIR="$(mktemp -d)"
           bun build --compile scripts/desktop-check.ts --outfile "$CHECK_DIR/postline-check"
           (cd "$CHECK_DIR" && ./postline-check)
@@ -115,8 +126,11 @@ jobs:
       # over a `craft` shim on the runner's PATH.
       #
       - name: Build the app
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
+          cd "$RUNNER_TEMP/postline-release"
           if [[ ! "${DESKTOP_SIGNING_IDENTITY:-}" =~ ^[[:xdigit:]]{40}$ && "${DESKTOP_SIGNING_IDENTITY:-}" != 'Developer ID Application: '* ]]; then
             echo '::error::Set DESKTOP_SIGNING_IDENTITY to the approved Developer ID certificate name or fingerprint.' >&2
             exit 1
@@ -126,36 +140,61 @@ jobs:
           DESKTOP_BUILD_NUMBER="$(git rev-list --count HEAD)"
           export DESKTOP_BUILD_NUMBER
           bun node_modules/@stacksjs/buddy/dist/cli.js build:desktop
+          app=storage/framework/desktop/webview/darwin-arm64/Postline.app
+          codesign --verify --deep --strict "$app"
+          codesign --display --verbose=4 "$app" 2>&1 | grep '^Authority=Developer ID Application:'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$VERSION"
 
-      # A disk image with the app and a link to Applications, which is what a
-      # person expects to open. Named for the platform it runs on, so a later
-      # Intel or Windows build can sit beside it in the same release.
-      - name: Make the disk image
+      - name: Notarize and publish the signed desktop update
+        env:
+          DESKTOP_NOTARY_PROFILE: ${{ vars.DESKTOP_NOTARY_PROFILE }}
+          POSTLINE_UPDATES_BUCKET: postline-desktop-updates-923076644019
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/postline-release"
+          test -n "$DESKTOP_NOTARY_PROFILE" || { echo '::error::Set DESKTOP_NOTARY_PROFILE to the approved notarytool profile.' >&2; exit 1; }
+
+          update_secret() {
+            bun -e '
+              const value = await Bun.secrets.get({ service: "postline-desktop-updates", name: Bun.argv[1] })
+              if (!value) throw new Error("A required release credential is missing from the runner’s Keychain.")
+              process.stdout.write(value)
+            ' "$1"
+          }
+          DESKTOP_UPDATE_PRIVATE_KEY=$(update_secret main)
+          POSTLINE_UPDATES_ACCESS_KEY_ID=$(update_secret storage-access-key-id)
+          POSTLINE_UPDATES_SECRET_ACCESS_KEY=$(update_secret storage-secret-access-key)
+          export DESKTOP_UPDATE_PRIVATE_KEY POSTLINE_UPDATES_ACCESS_KEY_ID POSTLINE_UPDATES_SECRET_ACCESS_KEY
+
+          bun scripts/desktop-feed-check.ts
+          ./buddy release:desktop --target darwin-arm64 --skip-build
+          bun scripts/desktop-feed-check.ts "$VERSION"
+
+      - name: Verify and collect the notarized disk image
         id: dmg
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          app=storage/framework/desktop/webview/darwin-arm64/Postline.app
-          test -d "$app"
-          codesign --verify --deep --strict "$app"
-          codesign --display --verbose=4 "$app" 2>&1 | grep '^Authority=Developer ID Application:'
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$VERSION"
-          stage="$RUNNER_TEMP/postline-dmg"
-          rm -rf "$stage"
-          mkdir -p "$stage" storage/framework/desktop-dmg
-          ditto "$app" "$stage/Postline.app"
-          ln -s /Applications "$stage/Applications"
-          dmg="storage/framework/desktop-dmg/Postline-$VERSION-macos-arm64.dmg"
-          rm -f "$dmg"
-          hdiutil create -volname "Postline $VERSION" -srcfolder "$stage" -format UDZO -ov "$dmg"
+          staged="$RUNNER_TEMP/postline-release/storage/framework/desktop/webview/release/darwin-arm64"
+          target=storage/framework/desktop-dmg
+          mkdir -p "$target"
+          dmg="$target/Postline-$VERSION-macos-arm64.dmg"
+          cp "$staged/Postline-$VERSION-arm64.dmg" "$dmg"
+          cp "$staged/latest.json" "$target/release-manifest.json"
           hdiutil verify "$dmg"
+          xcrun stapler validate "$dmg"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
           echo "path=$dmg" >> "$GITHUB_OUTPUT"
 
       - name: Sign and verify the checksums
         env:
           DMG: ${{ steps.dmg.outputs.path }}
-        run: bun scripts/release-checksums.ts sign "$DMG"
+        run: |
+          artifact="$(pwd)/$DMG"
+          cd "$RUNNER_TEMP/postline-release"
+          bun scripts/release-checksums.ts sign "$artifact"
 
       # Published on GitHub through the Pantry action: notes from this
       # version's section of CHANGELOG.md, the DMG and a checksums file. The
@@ -172,6 +211,7 @@ jobs:
             ${{ steps.dmg.outputs.path }}
             storage/framework/desktop-dmg/checksums.txt
             storage/framework/desktop-dmg/checksums.txt.sig
+            storage/framework/desktop-dmg/release-manifest.json
           release-changelog: CHANGELOG.md
           release-notes: Postline ${{ steps.version.outputs.version }} for macOS (Apple Silicon).
           release-token: ${{ secrets.GH_RELEASE_TOKEN }}

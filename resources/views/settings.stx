@@ -81,6 +81,17 @@
           <p class="m-0 mr-auto text-xs" :data-tone="workspaceTone()" x-show="workspaceMessage()" :text="workspaceMessage()" role="status" aria-live="polite" data-workspace-message></p>
           <Button appearance="mac" variant="primary" :disabled="!canSaveWorkspace()" @click="saveWorkspace">Save</Button>
         </div>
+        <div class="mt-4" :class="desktopUpdate() ? '' : 'hidden'">
+          <SettingsGroup title="Software updates">
+            <SettingsRow label="Postline version" setting="desktop-version" keywords="version update" :description="desktopUpdate()?.currentVersion || ''">
+              <Button appearance="mac" :disabled="checkingDesktopUpdate()" @click="checkDesktopUpdate">Check for updates</Button>
+            </SettingsRow>
+            <SettingsRow label="Update available" setting="desktop-install" :description="desktopUpdate()?.version || ''" x-show="desktopUpdate()?.state === 'available' && desktopUpdate()?.selfUpdating">
+              <Button appearance="mac" :disabled="checkingDesktopUpdate()" @click="installDesktopUpdate">Install update</Button>
+            </SettingsRow>
+          </SettingsGroup>
+          <p class="mt-2 text-muted text-xs" :text="desktopUpdateMessage()" role="status" aria-live="polite"></p>
+        </div>
         {{-- The Mac app's log, for a bug report (#202). Only the app has one. --}}
         <div class="mt-4" :class="ownWindow() ? '' : 'hidden'">
           <SettingsGroup title="Troubleshooting" footer="The log is private to your Mac account, holds no passwords or sign-in links, and is kept to a few megabytes.">
@@ -334,6 +345,44 @@
      * login). In a browser it is a page like any other.
      */
     const ownWindow = state(!!window.craft?.window)
+
+    const desktopUpdate = state(null as import('@stacksjs/desktop-build').DesktopUpdateStatus | null)
+    const checkingDesktopUpdate = state(false)
+    const desktopUpdateError = state('')
+    const desktopUpdateMessage = derived(() => {
+      const update = desktopUpdate()
+      if (checkingDesktopUpdate()) return 'Contacting the update service…'
+      if (desktopUpdateError()) return desktopUpdateError()
+      if (!update) return ''
+      if (update.state === 'current') return 'Postline is up to date.'
+      if (update.state === 'installed') return 'Update installed. Quit Postline to open the new version.'
+      if (update.state === 'available') return update.selfUpdating ? `Version ${update.version} is ready to install.` : `Version ${update.version} is available from the Postline download page.`
+      return update.error || update.message || ''
+    })
+
+    const requestDesktopUpdate = async (action?: 'check' | 'install'): Promise<void> => {
+      if (checkingDesktopUpdate()) return
+      checkingDesktopUpdate.set(true)
+      desktopUpdateError.set('')
+      try {
+        const response = await fetch('/__desktop/update', action ? {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action }),
+        } : undefined)
+        if (!response.ok) throw new Error('The update service could not be reached.')
+        desktopUpdate.set(await response.json())
+      }
+      catch (error) {
+        if (action) desktopUpdateError.set(error instanceof Error ? error.message : 'Could not check for a Postline update.')
+      }
+      finally {
+        checkingDesktopUpdate.set(false)
+      }
+    }
+
+    const checkDesktopUpdate = () => requestDesktopUpdate('check')
+    const installDesktopUpdate = () => requestDesktopUpdate('install')
 
     /**
      * What this window tells the workspace window.
@@ -1051,6 +1100,7 @@
       void loadRetention()
       void loadAi()
       void loadMail()
+      if (ownWindow()) void requestDesktopUpdate()
       onDestroy(() => workspace?.close())
 
       // A window with a hidden titlebar moves only when the page hands the

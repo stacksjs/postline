@@ -1,4 +1,6 @@
 import type { DesktopConfig } from '@stacksjs/types'
+import process from 'node:process'
+import { urlTo } from './domains'
 
 export const RELEASE_UPDATE_PUBLIC_KEY = 'ed25519-public:MCowBQYDK2VwAyEA1IU_iC3XzydzrT8_VxIeWe8BCAzErUk9Psc5nbxK4gw'
 
@@ -49,6 +51,11 @@ export default {
       // The window opens on the workspace. `/` is the marketing site, which
       // is drawn for a browser and has no business inside the app.
       startPath: '/composer',
+    },
+    updates: {
+      feedUrl: urlTo('/api/updates'),
+      publicKeys: { main: RELEASE_UPDATE_PUBLIC_KEY },
+      disk: process.env.POSTLINE_UPDATES_BUCKET ? 's3' : 'local',
     },
     macos: {
       minimumSystemVersion: '13.0',
