@@ -35,7 +35,11 @@ export default {
       // Craft's default is a store per window that is emptied on quit: the
       // Settings window would open without the workspace's session, and the
       // theme, the sidebar and unsent drafts would be forgotten every launch.
-      arguments: ['--persistent-storage'],
+      //
+      // A menu-bar item, and the app stays running when its window closes
+      // (#195): the agent and the scheduler live as long as Craft does, so a
+      // post scheduled for later still goes out with the window closed.
+      arguments: ['--persistent-storage', '--system-tray', '--keep-running'],
     },
     agent: {
       entry: 'app/Desktop/Agent.ts',

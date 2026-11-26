@@ -1,5 +1,6 @@
 /**
- * Alerts as Mac notifications and a dock badge (#112, #200).
+ * Alerts as Mac notifications and a dock badge (#112, #200), and the
+ * menu-bar item (#195).
  *
  * Only in the Mac app, where `window.craft` is the native bridge; a browser
  * tab has the Activity page and the alert email instead. The shell polls the
@@ -14,12 +15,42 @@ interface CraftApp {
   notify?: (options: { title: string, body?: string }) => Promise<void>
   setBadge?: (count: number) => Promise<void>
 }
+interface CraftTray {
+  setIcon?: (icon: string) => Promise<void>
+  setTitle?: (title: string) => Promise<void>
+  setTooltip?: (tooltip: string) => Promise<void>
+  setMenu?: (items: Array<{ label?: string, action?: string, type?: 'separator' | 'normal', enabled?: boolean }>) => Promise<void>
+}
 
 const SEEN_KEY = 'postline:alerts:last-seen'
 const POLL_MS = 60_000
 
 function craftApp(): CraftApp | undefined {
   return (window as unknown as { craft?: { app?: CraftApp } }).craft?.app
+}
+
+function craftTray(): CraftTray | undefined {
+  return (window as unknown as { craft?: { tray?: CraftTray } }).craft?.tray
+}
+
+/**
+ * The menu-bar item (#195). The app keeps running when its window closes, so
+ * the scheduler still publishes; this is the way back to the window and the
+ * way to quit. `show` and `quit` are actions Craft carries out itself.
+ */
+async function setUpTray(unread = 0): Promise<void> {
+  const tray = craftTray()
+  if (!tray) return
+  await tray.setIcon?.('paperplane').catch(() => {})
+  // The icon alone, as menu-bar items go; Craft titles it with the app name.
+  await tray.setTitle?.('').catch(() => {})
+  await tray.setTooltip?.(unread ? `Postline: ${unread} need${unread === 1 ? 's' : ''} attention` : 'Postline').catch(() => {})
+  await tray.setMenu?.([
+    { label: 'Open Postline', action: 'show' },
+    ...(unread ? [{ label: `${unread} alert${unread === 1 ? '' : 's'} need${unread === 1 ? 's' : ''} attention`, enabled: false }] : []),
+    { type: 'separator' },
+    { label: 'Quit Postline', action: 'quit' },
+  ]).catch(() => {})
 }
 
 function lastSeen(): number | null {
@@ -61,7 +92,9 @@ async function check(): Promise<void> {
       await app.notify?.({ title: alert.title, ...(alert.body ? { body: alert.body } : {}) }).catch(() => {})
   }
   if (newest > (seen ?? -1)) remember(newest)
-  await app.setBadge?.(Math.max(0, Number(payload.data?.unread) || 0)).catch(() => {})
+  const unread = Math.max(0, Number(payload.data?.unread) || 0)
+  await app.setBadge?.(unread).catch(() => {})
+  await setUpTray(unread)
 }
 
 declare global {
@@ -73,6 +106,7 @@ declare global {
 // Once per window, however many pages the router swaps in.
 if (craftApp() && !window.__postlineAlertsPolling) {
   window.__postlineAlertsPolling = true
+  void setUpTray()
   void check()
   setInterval(() => void check(), POLL_MS)
 }
