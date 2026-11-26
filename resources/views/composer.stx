@@ -52,7 +52,7 @@
               data-attributes and are styled in config/css.ts, because a
               class string composed in the browser is invisible to the
               Crosswind extractor. --}}
-          <div class="flex flex-wrap gap-2 mb-3" role="group" aria-label="Crosspost targets">
+          <div class="flex flex-wrap gap-2 mb-3" role="group" aria-label="Publishing channels">
             {{-- Object-form :class, rather than an inline display rule plus
                 x-show. The string form of :class MERGES with the static class
                 list, so a static hidden class would never come back off; the
@@ -88,7 +88,7 @@
           <div class="hidden mb-3" data-variant-section>
             <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg transition-colors" type="button" data-variant-toggle aria-expanded="false">
               <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
-              <span data-variant-toggle-label>Customise per network</span>
+              <span data-variant-toggle-label>Customize per network</span>
             </button>
             <div class="hidden gap-2 mt-2" data-variant-panel></div>
           </div>
@@ -573,7 +573,7 @@
         action.className = 'inline-flex items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel hover:bg-raised border border-line rounded-lg transition-colors'
         action.dataset.variantAction = entry ? 'reset' : 'fork'
         action.dataset.variantProvider = provider
-        action.textContent = entry ? 'Use shared text' : 'Customise'
+        action.textContent = entry ? 'Use shared text' : 'Customize'
 
         head.append(name, action)
         row.append(head)
@@ -652,8 +652,8 @@
         variantToggleLabel.textContent = variantsOpen
           ? 'Hide per-network text'
           : active
-            ? `Customise per network (${active})`
-            : 'Customise per network'
+            ? `Customize per network (${active})`
+            : 'Customize per network'
       }
 
       /**
@@ -1516,7 +1516,7 @@
             setStatus(`Publish failed. ${failures.join('; ')}`, 'error', { title: 'Publish failed' })
           }
           else if (failures.length) {
-            setStatus(`Published, but some targets failed. ${failures.join('; ')}`, 'info', { title: 'Partially published', url: lastUrl })
+            setStatus(`Published to some channels. ${failures.join('; ')}`, 'info', { title: 'Partially published', url: lastUrl })
           }
           else {
             setStatus(

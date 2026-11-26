@@ -55,12 +55,10 @@ export function marketingPaths(viewsDir: string = join(process.cwd(), 'resources
   return paths.sort()
 }
 
-/**
- * The redirects an install applies, or none on the marketing site. 302, not
- * 301: the same path is a real page on the marketing deployment, and a
- * browser must not remember the redirect across the two.
- */
+/** The public site redirects retired URLs. Workspace installs redirect marketing pages temporarily. */
 export function marketingRedirects(env: Record<string, string | undefined> = process.env, viewsDir?: string): Record<string, { to: string, status: number, preserveQuery: boolean }> {
-  if (isMarketingSite(env)) return {}
-  return Object.fromEntries(marketingPaths(viewsDir).map(path => [path, { to: WORKSPACE_PATH, status: 302, preserveQuery: false }]))
+  const formerCleanupPath = '/features/bulk-delete'
+  if (isMarketingSite(env)) return { [formerCleanupPath]: { to: '/features/cleanup', status: 301, preserveQuery: true } }
+  const paths = [...marketingPaths(viewsDir), formerCleanupPath]
+  return Object.fromEntries(paths.map(path => [path, { to: WORKSPACE_PATH, status: 302, preserveQuery: false }]))
 }

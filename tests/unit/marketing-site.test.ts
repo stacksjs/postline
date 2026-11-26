@@ -24,13 +24,15 @@ describe('the marketing site is served only where asked for (#222)', () => {
 
   test('an install sends each one to the workspace with a temporary redirect', () => {
     const redirects = marketingRedirects({}, join(root, 'resources/views'))
-    expect(Object.keys(redirects)).toEqual(marketingPaths(join(root, 'resources/views')))
+    expect(Object.keys(redirects)).toEqual([...marketingPaths(join(root, 'resources/views')), '/features/bulk-delete'])
     for (const rule of Object.values(redirects))
       expect(rule).toEqual({ to: WORKSPACE_PATH, status: 302, preserveQuery: false })
   })
 
-  test('the marketing site redirects nothing', () => {
-    expect(marketingRedirects({ POSTLINE_SITE: 'marketing' }, join(root, 'resources/views'))).toEqual({})
+  test('the marketing site redirects the retired Cleanup URL', () => {
+    expect(marketingRedirects({ POSTLINE_SITE: 'marketing' }, join(root, 'resources/views'))).toEqual({
+      '/features/bulk-delete': { to: '/features/cleanup', status: 301, preserveQuery: true },
+    })
   })
 
   test('the server config and the waitlist route both ask', () => {

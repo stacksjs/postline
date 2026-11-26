@@ -4,7 +4,7 @@ Open **Composer** and select the connected accounts you want to publish to. If y
 
 ## Shared text and network variants
 
-Write the shared text in **Single** mode. The character count reflects the selected networks. If one network's copy needs a shorter version, different wording, or a different link, open **Customise per network** and enter its text. A variant applies to every selected account on that network. Review the variants again after changing the shared text. Removing a variant restores the shared text for that network.
+Write the shared text in **Single** mode. The character count reflects the selected networks. If one network's copy needs a shorter version, different wording, or a different link, open **Customize per network** and enter its text. A variant applies to every selected account on that network. Review the variants again after changing the shared text. Removing a variant restores the shared text for that network.
 
 ## Threads
 

@@ -27,7 +27,7 @@
           <SettingsSidebarItem id="channels" label="Channels" icon="i-hugeicons-share-08" tone="blue" keywords="accounts networks bluesky linkedin mastodon threads instagram" />
           <SettingsSidebarItem id="composer" label="Composer" icon="i-hugeicons-pencil-edit-02" tone="orange" />
           <SettingsSidebarItem id="ai" label="AI" icon="i-hugeicons-sparkles" tone="purple" keywords="anthropic openai ollama claude api key campaign planner" />
-          <SettingsSidebarItem id="deletion" label="Automatic Deletion" icon="i-hugeicons-delete-02" tone="red" keywords="retention delete cleanup" />
+          <SettingsSidebarItem id="deletion" label="Automatic Cleanup" icon="i-hugeicons-delete-02" tone="red" keywords="retention delete cleanup" />
           <SettingsSidebarItem id="data" label="Data" icon="i-hugeicons-hard-drive" tone="grey" keywords="export import backup move delete everything archive" />
         </SettingsSidebarGroup>
         <div x-show="!ownWindow()">
@@ -151,7 +151,7 @@
         by the AutoDeletePosts job through the same purge engine as the manual
         tool under Channels, so it has the same caps and audit trail.
       --}}
-      <SettingsPane id="deletion" title="Automatic Deletion">
+      <SettingsPane id="deletion" title="Automatic Cleanup">
         <SettingsGroup footer="Checked once a day. A post whose date can't be read is always kept.">
           <SettingsRow label="Delete my posts automatically" :description="statusPill()" setting="auto-delete" keywords="retention cleanup">
             <Switch variant="mac" v-model:checked="autoEnabled" data-retention-enabled />

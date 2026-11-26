@@ -30,7 +30,7 @@ useHead(marketingHead('/features/listening', '/images/og/feature-listening.png')
     <section class="grid gap-10 lg:gap-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] py-14 border-line border-t">
       <div class="grid gap-10">
         <div class="grid gap-3 max-w-[62ch]">
-          <h2 class="m-0 text-2xl text-ink">Rules, not searches you rerun</h2>
+          <h2 class="m-0 text-2xl text-ink">Automatic keyword checks</h2>
           <p class="m-0 leading-relaxed text-[16px] text-body">Give a rule up to twenty keywords and choose whether any or all of them must appear. Postline checks active rules every five minutes while it is running.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
@@ -74,7 +74,7 @@ useHead(marketingHead('/features/listening', '/images/og/feature-listening.png')
           <a class="grid content-start gap-3 p-5 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/scheduling" data-stx-link>
             <span class="grid place-items-center h-9 w-9 text-ink bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-calendar-03"></span></span>
             <span class="font-semibold text-[15px] text-ink">Scheduling</span>
-            <span class="leading-relaxed text-[13.5px] text-muted">Schedule posts ahead in your own timezone and let the queue publish them, or send immediately.</span>
+            <span class="leading-relaxed text-[13.5px] text-muted">Schedule posts in your time zone, or publish them right away.</span>
           </a>
         </li>
         <li>

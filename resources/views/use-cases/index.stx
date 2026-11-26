@@ -33,7 +33,7 @@ useHead(marketingHead('/use-cases', '/images/og/use-case-index.png'))
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-user-group"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">Developer advocates</span>
-            <span class="leading-relaxed text-[14.5px] text-body">Developers are split across Bluesky, X and Mastodon. Reach all of them without choosing a favourite.</span>
+            <span class="leading-relaxed text-[14.5px] text-body">Share updates with developer communities on Bluesky, X, and Mastodon.</span>
           </span>
         </a>
       </li>

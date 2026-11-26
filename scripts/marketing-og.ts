@@ -87,7 +87,7 @@ function fit(text: string, max = 58): string {
   const clause = text.split(/,|\. /)[0] ?? text
   if (clause.length <= max)
     return clause
-  return `${clause.slice(0, clause.lastIndexOf(' ', max)).trimEnd()}...`
+  return `${clause.slice(0, clause.lastIndexOf(' ', max)).trimEnd()}…`
 }
 
 interface Card {

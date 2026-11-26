@@ -36,13 +36,13 @@ export const FEATURES: MarketingEntry[] = [
     icon: 'share-08',
     intro: 'The same update has to reach people on whichever network they use. Postline takes one draft, checks it against each network, and publishes to all of them at once, to as many accounts on each as you have connected.',
     sections: [
-      { heading: 'Publish in one pass', body: 'Pick the accounts you want, write the post, and send it. Each target is published independently, so one network failing never blocks the rest.' },
+      { heading: 'Publish in one pass', body: 'Pick the accounts you want, write the post, and send it. Postline sends to each selected account independently, so the other accounts can still publish if one fails.' },
       { heading: 'Failures stay visible', body: 'A rejected post is recorded against the network that rejected it, with the network\'s own error text. Nothing fails silently. Rate limits and short outages are retried automatically, up to five times, and the queue shows when the next try is; any other failure waits for you.' },
       { heading: 'Several accounts per network', body: 'Connect a personal and a company account on the same network and choose, per post, which of them it goes out from.' },
     ],
     points: [
       'Six networks from one composer',
-      'Per-target status, not a single success flag',
+      'Publishing status for each account',
       'Threads chain automatically where the network supports replies',
     ],
   },
@@ -50,16 +50,16 @@ export const FEATURES: MarketingEntry[] = [
     slug: 'scheduling',
     nav: 'Scheduling',
     title: 'Queue it now, publish it later',
-    summary: 'Schedule posts ahead in your own timezone and let the queue publish them, or send immediately.',
+    summary: 'Schedule posts in your time zone, or publish them right away.',
     icon: 'calendar-03',
     intro: 'The queue is a plain list of what is going out and when. Drafts, scheduled posts and failures live in the same view, as a list or on a calendar, so there is one place to look before a launch.',
     sections: [
-      { heading: 'Your timezone, not the server\'s', body: 'Each post carries the timezone it was written in, so a 9am slot stays 9am regardless of where Postline runs.' },
+      { heading: 'Set your time zone', body: 'The queue uses the time zone you choose in Settings. A 9 a.m. slot follows that time zone wherever Postline runs.' },
       { heading: 'Publish now when plans change', body: 'Anything in the queue can be edited or sent immediately without rewriting it. The scheduled entry becomes a published one and keeps its history.' },
       { heading: 'What the queue needs', body: 'A scheduled post fires when Postline is running. On a laptop that means while the app is open; on a small always-on server the queue keeps publishing overnight.' },
     ],
     points: [
-      'Drafts, scheduled, publishing and failed in one list',
+      'Scheduled, Drafts, Published, and Needs attention tabs',
       'List and calendar views',
       'Publish now without losing the draft',
     ],
@@ -73,7 +73,7 @@ export const FEATURES: MarketingEntry[] = [
     intro: 'X gives you 280 characters. Bluesky gives you 300, Mastodon 500, LinkedIn 3000. Writing to the tightest limit makes every post worse. Variants let one network differ without forking the draft.',
     sections: [
       { heading: 'Override only what needs it', body: 'The shared body is the default. Any network you give a variant to publishes that instead, and the rest keep inheriting, so a small tweak stays a small tweak.' },
-      { heading: 'Counted against the right limit', body: 'The composer counts each variant against the character limit of the network it belongs to, so you find out before publishing and not after.' },
+      { heading: 'Counted against the right limit', body: 'The composer checks each variant against its network’s limit before publishing.' },
     ],
     points: [
       'One shared body, optional per-network overrides',
@@ -84,14 +84,14 @@ export const FEATURES: MarketingEntry[] = [
   {
     slug: 'campaigns',
     nav: 'Campaigns',
-    title: 'Plan the launch, not just the post',
+    title: 'Plan a launch across weeks',
     summary: 'Lay a whole launch out across weeks on a calendar, then move the finished plan into the queue in one step.',
     icon: 'flowchart-01',
     intro: 'A launch is a sequence: the teaser, the announcement, the follow-ups, the lesson learned. Campaigns give that sequence a calendar of its own, so you shape the story first and schedule it second.',
     sections: [
       { heading: 'A calendar for the whole arc', body: 'Set the window, drop posts onto days, and drag them when the plan changes. Each post names the channels it is going to, so a gap in the plan is something you can see.' },
       { heading: 'An assistant that drafts the sequence', body: 'Describe the goal, the audience and the tone, and the assistant proposes a sequence you can edit. It works with an OpenAI or Anthropic key, with a local Ollama model, or with the built-in planner when you have no key at all.' },
-      { heading: 'Nothing publishes until you say so', body: 'A campaign is a plan until you activate it. Activating moves its posts into the publishing queue, scheduled in the campaign\'s own timezone.' },
+      { heading: 'Activate when the plan is ready', body: 'A campaign is a plan until you activate it. Activating moves its posts into the publishing queue, scheduled in the campaign\'s own timezone.' },
     ],
     points: [
       'Calendar and list views of a launch',
@@ -105,15 +105,15 @@ export const FEATURES: MarketingEntry[] = [
     title: 'Answer everyone from one inbox',
     summary: 'Read and reply to direct messages from Bluesky and Mastodon without switching apps.',
     icon: 'message-01',
-    intro: 'Posting to six networks means conversations start in six places. The inbox pulls your direct messages into one list, so replying is one habit and not a round of tabs.',
+    intro: 'See direct messages from Bluesky and Mastodon together. Open a conversation, reply, or archive it from the same inbox.',
     sections: [
       { heading: 'One list for Bluesky and Mastodon', body: 'Sync pulls the latest conversations from each connected account. Filter by network, open a thread, reply in place, and archive what is done.' },
-      { heading: 'Honest about what a network allows', body: 'Bluesky messages need an app password created with direct-message access. X messages are not supported yet, and Instagram messages need Meta\'s app review, which an app you made for yourself does not have. Threads has no public messaging API and LinkedIn limits its own to approved partners. Postline says so in the inbox and does not pretend those messages are there.' },
+      { heading: 'Bluesky message permissions', body: 'To read and reply to Bluesky direct messages, connect with an app password that includes direct-message access.' },
     ],
     points: [
       'Direct messages from Bluesky and Mastodon',
       'Reply, mark read and archive',
-      'Unsupported networks are named, not hidden',
+      'Filter by network and account',
     ],
   },
   {
@@ -124,7 +124,7 @@ export const FEATURES: MarketingEntry[] = [
     icon: 'radar-02',
     intro: 'Most mentions never tag you. A listening rule is a set of keywords and the networks to watch them on, checked on a schedule, with every match collected where you will read it.',
     sections: [
-      { heading: 'Rules, not searches you rerun', body: 'Give a rule up to twenty keywords and choose whether any or all of them must appear. Postline checks active rules every five minutes while it is running.' },
+      { heading: 'Automatic keyword checks', body: 'Give a rule up to twenty keywords and choose whether any or all of them must appear. Postline checks active rules every five minutes while it is running.' },
       { heading: 'A mention inbox', body: 'Matches arrive in one list, unread until you open them, filterable by rule. Scan now when you do not want to wait for the next check.' },
     ],
     points: [
@@ -139,11 +139,11 @@ export const FEATURES: MarketingEntry[] = [
     title: 'What actually landed',
     summary: 'Publishing activity across every network, and engagement for Bluesky posts, stored against the posts that earned it.',
     icon: 'chart-line-data-01',
-    intro: 'Every network shows you its own numbers in its own app. Postline keeps what it publishes in one place, and syncs likes, reposts and replies for Bluesky posts against the post that earned them. Engagement from the other networks is not synced yet.',
+    intro: 'Compare publishing activity across the networks you use. Postline syncs likes, reposts, and replies for Bluesky and shows the interactions earned by measured posts.',
     sections: [
-      { heading: 'Counts, attached to your posts', body: 'Likes, reposts and replies are stored per published target, never blended into one total. Today they are synced for Bluesky; the other networks are on the way.' },
+      { heading: 'Counts, attached to your posts', body: 'Postline stores interactions with each measured Bluesky post. Recommendations require enough measured posts and a clear leader.' },
       { heading: 'When and where you publish', body: 'See how much went out over the last thirty days, which channels carried it, and which posting windows you actually use.' },
-      { heading: 'Batched and rate-aware', body: 'The Bluesky sync runs in batches, and posts deleted upstream are skipped and not reported as errors.' },
+      { heading: 'Batched and rate-aware', body: 'The Bluesky sync runs in batches and skips posts that have been deleted.' },
     ],
     points: [
       'Bluesky likes, reposts and replies per post',
@@ -152,7 +152,7 @@ export const FEATURES: MarketingEntry[] = [
     ],
   },
   {
-    slug: 'bulk-delete',
+    slug: 'cleanup',
     nav: 'Cleanup',
     title: 'Take it all back down',
     summary: 'Delete old posts automatically after a set number of days, or clear a whole account in one run, with a preview first.',
@@ -177,8 +177,8 @@ export const FEATURES: MarketingEntry[] = [
     icon: 'key-01',
     intro: 'Every hosted scheduler holds the one thing that matters: permission to post as you, on every account you connected. Postline is the same kind of tool with that permission kept on hardware you control.',
     sections: [
-      { heading: 'Tokens stay where you put them', body: 'Access and refresh tokens are stored encrypted with a key your instance generates. Nobody else has a copy, because there is nobody else.' },
-      { heading: 'Your history is a database', body: 'Every post, target and metric is a row in a SQLite file you can query, copy, or export from Settings as one file that another install can import. Dropping a network does not erase what you published there.' },
+      { heading: 'Tokens stay where you put them', body: 'Postline encrypts access and refresh tokens with a key your installation generates. The connected network receives the credential when Postline uses its API.' },
+      { heading: 'Your history is a database', body: 'Postline stores posts, publishing results, and metrics in SQLite. Export your workspace from Settings to move that history to another install.' },
       { heading: 'Run it wherever suits you', body: 'It runs on Bun with a SQLite file: on a Mac as one app, or on a small server when you want the queue publishing while the laptop is shut. Instagram and Threads fetch images from a public address, so on a laptop they need the temporary image links switch in Settings.' },
     ],
     points: [
@@ -196,7 +196,7 @@ export const USE_CASES: MarketingEntry[] = [
     title: 'Ship the update everywhere',
     summary: 'Post launches, changelogs and build notes to every network without doing it six times.',
     icon: 'rocket-01',
-    intro: 'Building in public means the same update has to reach people on whichever network they happen to use. That is repetitive work that scales with the number of networks, not with the value of the post.',
+    intro: 'Write an update once and reach the people following your work across networks.',
     sections: [
       { heading: 'Launch days stop being copy and paste', body: 'Plan the launch as a campaign, write each post once, and activate it. Follow-ups through the week are already in the queue.' },
       { heading: 'Keep the record', body: 'Every published post and its engagement stays in your own database. A year of building in public stays readable even if you stop using a network.' },
@@ -211,9 +211,9 @@ export const USE_CASES: MarketingEntry[] = [
     slug: 'developer-advocates',
     nav: 'Developer advocates',
     title: 'Reach every community',
-    summary: 'Developers are split across Bluesky, X and Mastodon. Reach all of them without choosing a favourite.',
+    summary: 'Share updates with developer communities on Bluesky, X, and Mastodon.',
     icon: 'user-group',
-    intro: 'Technical audiences fragmented across networks, and no single one of them is where everyone is. Posting to only one means writing off part of your community.',
+    intro: 'Developer communities gather on different networks. Reach the channels you use with copy suited to each audience.',
     sections: [
       { heading: 'Tuned per network', body: 'Mastodon and Bluesky reward a different register than LinkedIn. Per-network variants let one post read naturally on each without maintaining separate drafts.' },
       { heading: 'Hear the replies you were not tagged in', body: 'Listening rules catch a project name or an error message people post without mentioning you, on the networks developers actually use.' },
@@ -221,7 +221,7 @@ export const USE_CASES: MarketingEntry[] = [
     points: [
       'Cover fragmented developer communities',
       'Adjust tone per network',
-      'Engagement per post, not a blended average (Bluesky today)',
+      'Per-post engagement on Bluesky',
     ],
   },
   {
@@ -233,12 +233,12 @@ export const USE_CASES: MarketingEntry[] = [
     intro: 'Giving a closed service permission to post as you is a bigger ask than it looks. Postline is MIT licensed and runs on your own machine, so you can read exactly what it does before it gets that permission.',
     sections: [
       { heading: 'Announce a release once', body: 'Version announcements go to every network in one action, so shipping a release does not turn into a marketing chore.' },
-      { heading: 'Software you can inspect', body: 'The whole codebase is readable and MIT licensed. If it does not do what you need, the fix is a pull request and not a support ticket.' },
+      { heading: 'Software you can inspect', body: 'The codebase is MIT licensed. Inspect it or submit a pull request to change how it works.' },
     ],
     points: [
       'MIT licensed, auditable end to end',
       'Runs on your machine',
-      'No vendor holding publish rights',
+      'Account credentials stay with your workspace',
     ],
   },
   {
@@ -247,7 +247,7 @@ export const USE_CASES: MarketingEntry[] = [
     title: 'Accounts you actually control',
     summary: 'One person posting for several client accounts, without a vendor holding their tokens.',
     icon: 'building-03',
-    intro: 'Scheduling tools price by account and hold the access tokens for clients you are responsible for. Running the tool yourself removes both. Postline has one owner and no team seats, so it suits a person handling several clients, not a team sharing one workspace.',
+    intro: 'One workspace owner can publish for several clients. Connect each client account and choose which ones receive a post.',
     sections: [
       { heading: 'No per-account pricing', body: 'Cost does not change with the number of accounts connected, because there is no vendor in the middle metering it.' },
       { heading: 'Clean handover', body: 'When an engagement ends, disconnect the account to delete its tokens from Postline, have the client remove the app in that network\'s settings, and give them an export of the workspace with the posting history.' },

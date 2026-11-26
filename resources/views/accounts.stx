@@ -261,7 +261,7 @@
     <details class="overflow-hidden bg-panel border border-line rounded-2xl open:border-danger-line shadow-sm group" data-purge-card>
       <summary class="flex gap-3 items-center justify-between p-4 list-none hover:bg-panel-2 transition-colors cursor-pointer">
         <div class="flex gap-3 items-center"><span class="grid place-items-center h-9 w-9 text-danger text-lg bg-danger-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-alert-02"></span></span><div>
-          <strong class="text-ink text-ui">Post removal tools</strong>
+          <strong class="text-ink text-ui">Cleanup</strong>
           <p class="mb-0 mt-1 text-muted text-xs">Preview or permanently remove posts from connected accounts.</p>
         </div></div>
         <span class="h-4 w-4 text-muted transition-transform group-open:rotate-180 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
