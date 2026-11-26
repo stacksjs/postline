@@ -185,7 +185,14 @@ jobs:
           install: 'false'
           packages: bun.sh@${{ env.BUN_VERSION }} git-scm.org@2.53.0
       - name: Follow the README on the clean checkout
-        run: bun scripts/readme-check.ts
+        run: |
+          set -eu
+          README_SOURCE="$(mktemp -d "$RUNNER_TEMP/postline-readme.XXXXXX")"
+          git worktree add --detach "$README_SOURCE" HEAD
+          trap 'git worktree remove --force "$README_SOURCE"' EXIT
+          (cd "$README_SOURCE" && bun scripts/readme-check.ts)
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
       - name: Write the migrated database the check starts from
         run: bun scripts/desktop-bundle.ts
       - name: Open every view
