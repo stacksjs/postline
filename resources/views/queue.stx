@@ -29,68 +29,56 @@
       </div>
     </header>
 
-    <div class="grid gap-5" x-show="view() === 'list'">
-      <section class="bg-panel border border-line rounded-2xl shadow-sm">
-        <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
-          <strong class="text-ui">Upcoming &amp; drafts</strong>
-          <span class="text-muted text-xs" :text="metaText()">Loading…</span>
-        </header>
-        <div class="grid gap-2.5 p-3">
-          <p class="m-0 p-3 text-muted text-ui" x-show="loadError()" :text="loadError()"></p>
-          <p class="m-0 p-3 text-muted text-ui" x-show="showPendingEmpty()">Nothing queued yet. Schedule a post from the composer and it will show up here.</p>
-          <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl" x-for="row in pending()">
-            <header class="flex gap-3 items-center justify-between">
-              <div class="grid gap-1">
-                <span class="font-semibold text-xs">{{ row.when }}</span>
-                <span class="text-muted text-xs">{{ row.channels }}</span>
+    {{-- x-cloak on both views: neither paints before the stored choice is
+        read, so a queue left on Calendar no longer flashes the list first. --}}
+    <section class="bg-panel border border-line rounded-2xl shadow-sm" x-cloak x-show="view() === 'list'">
+      <header class="flex flex-wrap gap-3 items-center justify-between p-2.5 border-b border-line">
+        <div class="flex flex-wrap gap-1" role="tablist" aria-label="Queue">
+          <button class="inline-flex gap-1.5 items-center px-3 h-8 font-semibold text-xs rounded-lg transition-colors" type="button" role="tab" x-for="entry in tabs()" :aria-selected="tab() === entry.id" :data-active="tab() === entry.id" :data-tone="entry.tone" data-queue-tab @click="setTab(entry.id)">
+            <span :text="entry.label"></span>
+            <span class="px-1.5 min-w-5 text-center text-xs rounded-full" data-queue-tab-count :text="entry.count"></span>
+          </button>
+        </div>
+        <span class="pr-1 text-muted text-xs" :text="metaText()">Loading…</span>
+      </header>
+      <div class="grid gap-2.5 p-3">
+        <p class="m-0 p-3 text-muted text-ui" x-show="loadError()" :text="loadError()"></p>
+        <p class="m-0 p-3 text-muted text-ui" x-show="showEmpty()" :text="emptyText()"></p>
+        <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl" x-for="row in visible()">
+          <header class="flex gap-3 items-start justify-between">
+            <div class="grid gap-1.5">
+              <span class="font-semibold text-xs">{{ row.when }}</span>
+              {{-- One chip per network: sent, failed (the reason on hover and
+                  below), or still to go. --}}
+              <div class="flex flex-wrap gap-1.5 items-center">
+                <span class="inline-flex gap-1 items-center px-2 py-0.5 text-xs border rounded-full" x-for="target in row.targets" data-target-chip :data-state="target.state" :title="target.title">
+                  <span class="h-1.5 w-1.5 rounded-full" data-target-dot aria-hidden="true"></span>
+                  <span :text="target.label"></span>
+                </span>
+                <span class="text-muted text-xs" x-show="row.meta" :text="row.meta"></span>
               </div>
-              <span class="px-2 py-1 font-semibold text-xs whitespace-nowrap border rounded-full" data-status-pill :data-status="row.pill">{{ row.statusLabel }}</span>
-            </header>
-            <p class="m-0 leading-normal text-body text-ui">{{ row.body }}</p>
-            <p class="m-0 text-danger text-xs" x-show="row.failure" :text="row.failure"></p>
-            <footer class="flex flex-wrap gap-2 items-center justify-end">
-              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
-              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.actionable" :href="row.editUrl" data-stx-link>Edit</a>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg transition-colors" type="button" x-show="row.actionable && !row.resumeLabel" :disabled="busyId() === row.id" @click="publishItem(row.id)">Publish now</button>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg transition-colors" type="button" x-show="row.actionable && row.resumeLabel" :disabled="busyId() === row.id" @click="resumeItem(row.id)" :text="row.resumeLabel">Resume thread</button>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-danger text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="deleteItem(row.id)">Delete</button>
-            </footer>
-          </article>
-        </div>
-      </section>
+            </div>
+            <span class="px-2 py-1 font-semibold text-xs whitespace-nowrap border rounded-full" data-status-pill :data-status="row.pill">{{ row.statusLabel }}</span>
+          </header>
+          <p class="m-0 leading-normal text-body text-ui">{{ row.body }}</p>
+          <p class="m-0 text-danger text-xs" x-show="row.failure" :text="row.failure"></p>
+          <footer class="flex flex-wrap gap-1.5 items-center justify-end">
+            <a class="inline-flex items-center justify-center px-2 h-7 font-medium text-muted text-xs hover:text-ink rounded-lg disabled:opacity-50 transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View post</a>
+            <a class="inline-flex items-center justify-center px-2 h-7 font-medium text-muted text-xs hover:text-ink rounded-lg disabled:opacity-50 transition-colors" x-show="row.actionable" :href="row.editUrl" data-stx-link>Edit</a>
+            <button class="inline-flex items-center justify-center px-2 h-7 font-medium text-muted text-xs hover:text-danger hover:text-ink rounded-lg disabled:opacity-50 transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="deleteItem(row.id)">Delete</button>
+            <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.resumeLabel" :disabled="busyId() === row.id" @click="resumeItem(row.id)" :text="row.resumeLabel"></button>
+            <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.partial && !row.resumeLabel" :disabled="busyId() === row.id" @click="retryItem(row.id)">Retry failed networks</button>
+            <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50 transition-colors" type="button" x-show="row.actionable && !row.partial && !row.resumeLabel" :disabled="busyId() === row.id" @click="publishItem(row.id)" :text="row.status === 'failed' ? 'Try again now' : 'Publish now'">Publish now</button>
+          </footer>
+        </article>
+      </div>
+      {{-- The list is paged; this fetches the page of older posts. --}}
+      <div class="flex justify-center p-3" x-show="tab() === 'published' && nextCursor()">
+        <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" :disabled="loadingMore()" @click="loadMore" :text="loadingMore() ? 'Loading…' : 'Load older posts'">Load older posts</button>
+      </div>
+    </section>
 
-      <section class="bg-panel border border-line rounded-2xl shadow-sm">
-        <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
-          <strong class="text-ui">Recent</strong>
-          <span class="text-muted text-xs" :text="recentMetaText()"></span>
-        </header>
-        <div class="grid gap-2.5 p-3">
-          <p class="m-0 p-3 text-muted text-ui" x-show="showRecentEmpty()">No published posts yet.</p>
-          <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl" x-for="row in recent()">
-            <header class="flex gap-3 items-center justify-between">
-              <div class="grid gap-1">
-                <span class="font-semibold text-xs">{{ row.when }}</span>
-                <span class="text-muted text-xs">{{ row.channels }}</span>
-              </div>
-              <span class="px-2 py-1 font-semibold text-xs whitespace-nowrap border rounded-full" data-status-pill :data-status="row.pill">{{ row.statusLabel }}</span>
-            </header>
-            <p class="m-0 leading-normal text-body text-ui">{{ row.body }}</p>
-            <p class="m-0 text-danger text-xs" x-show="row.failure" :text="row.failure"></p>
-            <footer class="flex flex-wrap gap-2 items-center justify-end">
-              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.partial && !row.resumeLabel" :disabled="busyId() === row.id" @click="retryItem(row.id)">Retry failed</button>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.resumeLabel" :disabled="busyId() === row.id" @click="resumeItem(row.id)" :text="row.resumeLabel">Resume thread</button>
-            </footer>
-          </article>
-        </div>
-        {{-- The list is paged; this fetches the page of older posts. --}}
-        <div class="flex justify-center p-3" x-show="nextCursor()">
-          <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" :disabled="loadingMore()" @click="loadMore()" x-text="loadingMore() ? 'Loading…' : 'Load older posts'">Load older posts</button>
-        </div>
-      </section>
-    </div>
-
-    <section class="bg-panel border border-line rounded-2xl shadow-sm" style="display:none" x-show="view() === 'calendar'">
+    <section class="bg-panel border border-line rounded-2xl shadow-sm" x-cloak x-show="view() === 'calendar'">
       <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
         <div class="flex gap-2 items-center">
           <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Previous month" @click="prevMonth">
@@ -166,7 +154,12 @@
       status: string
       body: string
       when: string
-      channels: string
+      /** One chip per network the post went to, or will go to. */
+      targets: Array<{ label: string, state: 'sent' | 'failed' | 'waiting', title: string }>
+      /** "image · link card · thread · post 2 of 3", or ''. */
+      meta: string
+      /** Failed outright or on some networks: the "Needs attention" tab. */
+      attention: boolean
       failure: string
       liveUrl: string
       editUrl: string
@@ -188,7 +181,6 @@
       message: string
     }
 
-    const PENDING = new Set(['draft', 'scheduled', 'publishing', 'failed'])
     const ACTIONABLE = new Set(['draft', 'scheduled', 'failed'])
 
     const items = state([])
@@ -289,17 +281,30 @@
         ? `Scheduled · ${formatTime(item.scheduledAt)}`
         : item.status === 'published'
           ? `Published · ${formatTime(item.publishedAt || item.createdAt)}`
-          : `${item.status[0].toUpperCase()}${item.status.slice(1)} · ${formatTime(item.createdAt)}`
+          : item.status === 'draft'
+            ? `Draft · saved ${formatTime(item.createdAt)}`
+            : `${item.status[0].toUpperCase()}${item.status.slice(1)} · ${formatTime(item.createdAt)}`
       const extras = [item.hasImage ? 'image' : '', item.hasLink ? 'link card' : ''].filter(Boolean).join(' · ')
       const thread = item.thread ? `thread · post ${item.thread.position} of ${item.thread.length}` : ''
-      const channels = (channelLabels(item.providers).join(', ') || 'No channel')
-        + (extras ? ` · ${extras}` : '') + (thread ? ` · ${thread}` : '')
+      const labels = channelLabels(item.providers)
+      const targets = item.providers.map((target, index) => {
+        const failed = target.status === 'failed' || Boolean(target.failureReason)
+        const sent = !failed && (target.status === 'published' || Boolean(target.remoteUri))
+        const label = labels[index] || target.provider
+        return {
+          label,
+          state: failed ? 'failed' as const : sent ? 'sent' as const : 'waiting' as const,
+          title: failed ? `${label}: ${target.failureReason || 'failed'}${retryNote(target)}` : sent ? `Sent to ${label}` : `Not sent to ${label} yet`,
+        }
+      })
       return {
         id: item.id,
         status: item.status,
         body: item.body,
         when,
-        channels,
+        targets,
+        meta: [extras, thread].filter(Boolean).join(' · '),
+        attention: item.status === 'failed' || Boolean(item.partial),
         failure: failureText(item),
         liveUrl: liveUrlFor(item.providers.find(target => target.remoteUri)?.remoteUri),
         editUrl: `/composer?edit=${item.id}`,
@@ -317,22 +322,41 @@
     }
 
     const rows = derived(() => items().map(toRow))
-    const pending = derived(() => rows().filter(row => PENDING.has(row.status)))
-    const recent = derived(() => rows().filter(row => !PENDING.has(row.status)).slice(0, 10))
 
-    const showPendingEmpty = derived(() => loaded() && !loadError() && pending().length === 0)
-    const showRecentEmpty = derived(() => loaded() && !loadError() && recent().length === 0)
+    // One list, four tabs (#168). A post that failed anywhere is under "Needs
+    // attention" and nowhere else, so it cannot hide among the published.
+    type QueueTab = 'scheduled' | 'drafts' | 'published' | 'attention'
+    const tab = useLocalStorage('postline.queue.tab', 'scheduled')
+    const setTab = (next: QueueTab) => tab.set(next)
+    const inTab = (row: QueueRow, which: string): boolean => {
+      if (which === 'attention') return row.attention
+      if (row.attention) return false
+      if (which === 'drafts') return row.status === 'draft'
+      if (which === 'published') return row.status === 'published'
+      return row.status === 'scheduled' || row.status === 'publishing'
+    }
+    const tabs = derived(() => {
+      const count = (which: string) => rows().filter(row => inTab(row, which)).length
+      return [
+        { id: 'scheduled', label: 'Scheduled', count: count('scheduled'), tone: '' },
+        { id: 'drafts', label: 'Drafts', count: count('drafts'), tone: '' },
+        { id: 'published', label: 'Published', count: count('published'), tone: '' },
+        { id: 'attention', label: 'Needs attention', count: count('attention'), tone: count('attention') ? 'danger' : '' },
+      ]
+    })
+    const visible = derived(() => rows().filter(row => inTab(row, tab())))
+    const showEmpty = derived(() => loaded() && !loadError() && visible().length === 0)
+    const emptyText = derived(() => ({
+      scheduled: 'Nothing scheduled. Pick a time in the composer and the post waits here.',
+      drafts: 'No drafts. Save one from the composer to finish it later.',
+      published: 'Nothing published yet.',
+      attention: 'Nothing needs attention. A post that fails on any network shows up here.',
+    } as Record<string, string>)[tab()] || '')
 
     const metaText = derived(() => {
       if (!loaded()) return 'Loading…'
       if (loadError()) return 'Could not load'
-      const scheduled = pending().filter(row => row.status === 'scheduled').length
-      const drafts = pending().filter(row => row.status === 'draft').length
-      return `${scheduled} scheduled · ${drafts} draft${drafts === 1 ? '' : 's'}`
-    })
-
-    const recentMetaText = derived(() => {
-      const n = recent().length
+      const n = visible().length
       return `${n} post${n === 1 ? '' : 's'}`
     })
 

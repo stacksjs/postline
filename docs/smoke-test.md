@@ -38,3 +38,12 @@ cannot see. Add a step when a fix can only be confirmed by using the app.
    could not be loaded and offers Try again, not "Create a campaign".
 4. **Local dates.** In the evening west of Greenwich, start a new campaign:
    the start date is tomorrow by your own calendar.
+
+## Queue
+
+1. **A failed network.** Publish to two networks with one of them broken (a
+   revoked token). The post moves to "Needs attention" with a red chip for
+   the broken network; hovering it gives the reason. "Retry failed
+   networks" sends only that one again.
+2. **The stored view.** Switch to Calendar and reload: the calendar appears
+   without the list flashing first.

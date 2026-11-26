@@ -406,6 +406,17 @@ const APP_UI: string = `
 const QUEUE_STATUS: string = `
 [data-view-toggle] { color: var(--muted); }
 [data-view-toggle][data-active]:not([data-active="false"]) { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+/* Queue tabs and per-network chips (#168). */
+[data-queue-tab] { color: var(--muted); }
+[data-queue-tab]:hover { color: var(--ink); background: var(--panel-2); }
+[data-queue-tab][data-active]:not([data-active="false"]) { color: var(--ink); background: var(--panel-3); }
+[data-queue-tab] [data-queue-tab-count] { background: var(--panel-3); color: var(--muted); }
+[data-queue-tab][data-tone="danger"] [data-queue-tab-count] { background: var(--danger-soft); color: var(--danger); }
+[data-target-chip] { color: var(--body); border-color: var(--line); background: var(--panel-2); }
+[data-target-chip] [data-target-dot] { background: var(--line-strong); }
+[data-target-chip][data-state="sent"] [data-target-dot] { background: var(--success); }
+[data-target-chip][data-state="failed"] { color: var(--danger); border-color: var(--danger-line); background: var(--danger-soft); }
+[data-target-chip][data-state="failed"] [data-target-dot] { background: var(--danger); }
 
 [data-status-pill] { color: var(--muted); background: var(--panel-3); border-color: var(--line); }
 [data-status-pill][data-status="published"] { color: rgb(4 120 87); background: rgb(236 253 245); border-color: rgb(167 243 208); }

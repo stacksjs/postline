@@ -14,7 +14,7 @@ export default {
       // they are rebuilt on signals (#155, #162, #172).
       'dom-guard': 32,
       // Pre-hydration display:none on a few panels.
-      'inline-style-attr': 5,
+      'inline-style-attr': 4,
       'style-block': 1,
       // Marketing links that are plain anchors.
       'plain-internal-anchor': 4,
