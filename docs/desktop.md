@@ -126,10 +126,9 @@ pushes. After CI passes, dispatch the approved tag. ReviewOS builds
 `Postline-X.Y.Z-macos-arm64.dmg` on the Mac runner and publishes it to GitHub
 through Pantry. [Release checklist](releasing.md).
 
-The app is signed with the certificate named by the repository variable
-`DESKTOP_SIGNING_IDENTITY` (a Developer ID Application identity). Without it
-the build uses a development certificate, and Gatekeeper asks before the
-first open.
+The release requires the `DESKTOP_SIGNING_IDENTITY` repository variable to
+name the approved Developer ID Application identity. The Mac runner verifies
+the signed app before packaging the DMG.
 
 ## What is not done
 

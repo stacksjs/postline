@@ -51,9 +51,6 @@ jobs:
     runs-on: [self-hosted, macos-arm64, postline]
     timeout-minutes: 30
     env:
-      # Optional Developer ID signing, picked up by build:desktop when set.
-      # Unset, the app is signed with whatever development certificate the
-      # runner has, and Gatekeeper asks on first open.
       DESKTOP_SIGNING_IDENTITY: ${{ vars.DESKTOP_SIGNING_IDENTITY }}
     steps:
       - name: Resolve tag and version
@@ -117,16 +114,12 @@ jobs:
       # the installed craft-native version: the build fetches it, and passes
       # over a `craft` shim on the runner's PATH.
       #
-      # ReviewOS leaves an expression it cannot resolve as written, where
-      # GitHub would make it empty. With no DESKTOP_SIGNING_IDENTITY variable on
-      # the instance the build would be told to sign as that literal text, so
-      # an unresolved one is dropped and the build signs with the runner's own
-      # development certificate.
       - name: Build the app
         run: |
           set -euo pipefail
           case "${DESKTOP_SIGNING_IDENTITY:-}" in
-            ''|*vars.DESKTOP_SIGNING_IDENTITY*) unset DESKTOP_SIGNING_IDENTITY ;;
+            'Developer ID Application: '*) ;;
+            *) echo '::error::Set DESKTOP_SIGNING_IDENTITY to the approved Developer ID Application identity.' >&2; exit 1 ;;
           esac
           # CFBundleVersion, so two builds of one version can be told apart
           # (#203): the number of commits behind this one, which only grows.
@@ -145,6 +138,8 @@ jobs:
           set -euo pipefail
           app=storage/framework/desktop/webview/darwin-arm64/Postline.app
           test -d "$app"
+          codesign --verify --deep --strict "$app"
+          codesign --display --verbose=4 "$app" 2>&1 | grep '^Authority=Developer ID Application:'
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$VERSION"
           stage="$RUNNER_TEMP/postline-dmg"
           rm -rf "$stage"
