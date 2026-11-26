@@ -16,6 +16,7 @@ import { db } from '@stacksjs/database'
 import { CrosspostService } from '../../app/Services/Social/CrosspostService'
 import { AlreadyPublishingError, MISSED_PREFIX, MissingMediaError, QueueService, STRANDED_REASON } from '../../app/Services/Social/QueueService'
 import { publicMessage } from '../../app/Support/Http/action-error'
+import { moveScheduledTime } from '../../app/Support/Social/rescheduling'
 import { MEDIA_DIR } from '../../app/Support/Social/uploads'
 
 const database = db as any
@@ -116,6 +117,25 @@ describe('publishing a post once', () => {
     expect(blog.sends.filter(id => id === second.postId)).toHaveLength(1)
   })
 
+  test('a post moved after the scheduler read its due list stays queued', async () => {
+    const blog = fakeNetwork('blog')
+    let move: { id: number, scheduledAt: string }
+    const publisher = new CrosspostService({ blog: {
+      async publishToPost(post: Parameters<ProviderPublisher['publishToPost']>[0]) {
+        if (post.id !== move.id) await queue.reschedule([move], { days: 7 })
+        return blog.publisher.publishToPost(post)
+      },
+    } } as never)
+    const queue = new QueueService(publisher)
+    const first = await saveDue(queue, 'Due first')
+    const id = await saveDue(queue, 'Moved during the first post')
+    move = { id, scheduledAt: (await queue.get(id))!.scheduledAt! }
+    await queue.publishDue()
+    expect(blog.sends).toEqual([first])
+    expect(await status(id)).toBe('scheduled')
+    expect((await queue.get(id))?.scheduledAt).not.toBe(move.scheduledAt)
+  })
+
   test('a published post cannot be published again', async () => {
     const blog = fakeNetwork('blog')
     const queue = queueWith({ blog })
@@ -139,6 +159,23 @@ describe('publishing a post once', () => {
 
     expect(await status(postId)).toBe('published')
     expect(working.sends).toEqual([postId])
+  })
+})
+
+describe('moving a scheduled time', () => {
+  test('keeps the workspace clock time across daylight saving', () => {
+    const zone = 'America/Los_Angeles'
+    expect(moveScheduledTime('2026-03-01 18:30:15', { days: 7 }, zone)).toBe('2026-03-08 17:30:15')
+    expect(() => moveScheduledTime('2026-03-01 10:30:00', { date: '2026-03-08' }, zone)).toThrow('does not exist')
+  })
+
+  test('moves all scheduled segments of a thread with one selected segment', async () => {
+    const queue = new QueueService()
+    const scheduledAt = '2099-02-01 15:00:00'
+    const { postIds } = await queue.saveThread({ texts: ['First', 'Second'], providers: ['blog'], scheduledAt })
+    expect(await queue.reschedule([{ id: postIds[1]!, scheduledAt }], { days: 7 })).toEqual({ count: 2 })
+    for (const id of postIds)
+      expect((await queue.get(id))?.scheduledAt).toBe('2099-02-08 15:00:00')
   })
 })
 

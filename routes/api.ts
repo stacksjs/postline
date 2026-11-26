@@ -146,6 +146,7 @@ route.group({ prefix: '/postline' }, () => {
   route.get('/queue/item', 'Actions/Postline/QueueGetAction').middleware('auth')
   route.post('/queue', 'Actions/Postline/QueueSaveAction').middleware('auth').rateLimit(60, 'minute')
   route.post('/queue/update', 'Actions/Postline/QueueUpdateAction').middleware('auth').rateLimit(60, 'minute')
+  route.post('/queue/reschedule', 'Actions/Postline/QueueRescheduleAction').middleware('auth').rateLimit(60, 'minute')
   route.post('/queue/delete', 'Actions/Postline/QueueDeleteAction').middleware('auth').rateLimit(60, 'minute')
   route.post('/queue/publish-now', 'Actions/Postline/QueuePublishNowAction').middleware('auth').rateLimit(30, 'minute')
   route.post('/metrics/sync', 'Actions/Postline/MetricsSyncAction').middleware('auth').rateLimit(20, 'hour')

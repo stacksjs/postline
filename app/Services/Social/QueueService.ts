@@ -1,9 +1,11 @@
 import { log } from '@stacksjs/logging'
 import { mediaObjections } from '../../Support/Social/media-rules'
 import type { PostOptions } from '../../Support/Social/post-options'
+import type { ScheduledSelection, ScheduleDestination } from '../../Support/Social/rescheduling'
 import type { StoredContent } from '../../Support/Social/stored-content'
 import { sanitizePostOptions } from '../../Support/Social/post-options'
 import { isDue, MAX_ATTEMPTS, nextAttemptAt } from '../../Support/Social/retry'
+import { moveScheduledTime } from '../../Support/Social/rescheduling'
 import type { PublishTarget } from '../../Support/Social/targets'
 import type { CrosspostService } from './CrosspostService'
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
@@ -207,6 +209,13 @@ export interface QueueItemView {
    * every segment went out everywhere (#100).
    */
   thread: { position: number, length: number, resumeFrom: number | null } | null
+}
+
+interface ScheduledRow {
+  id: number
+  status: string
+  scheduled_at: string | null
+  thread_key: string | null
 }
 
 export interface SaveQueueInput {
@@ -626,6 +635,49 @@ export class QueueService {
     return { postId: Number(post.id), status }
   }
 
+  /** Apply the entire selection or leave its schedule untouched. */
+  async reschedule(selection: readonly ScheduledSelection[], destination: ScheduleDestination): Promise<{ count: number }> {
+    const timeZone = await workspace.timezone()
+    return database.transaction((tx: typeof database) => {
+      const at = now()
+      const selected = tx.selectFrom('posts').select(['id', 'status', 'scheduled_at', 'thread_key'])
+        .where('id', 'in', selection.map(post => post.id)).execute() as ScheduledRow[]
+      const byId = new Map(selected.map(post => [Number(post.id), post]))
+      const moves = new Map<number, string>()
+      const threads = new Map<string, string>()
+      const scheduleChanged = () => new UserFacingError('The queue changed. Refresh the list and select the scheduled posts again.', 'queue_schedule_changed')
+
+      for (const { id, scheduledAt } of selection) {
+        const post = byId.get(id)
+        if (!post || post.status !== 'scheduled' || !post.scheduled_at) throw scheduleChanged()
+        const next = moveScheduledTime(scheduledAt, destination, timeZone)
+        if (next <= at) throw new UserFacingError('All the new scheduled times must be in the future.')
+        if (post.scheduled_at !== scheduledAt && post.scheduled_at !== next) throw scheduleChanged()
+
+        if (!post.thread_key) {
+          moves.set(id, next)
+          continue
+        }
+        const threadTime = threads.get(post.thread_key)
+        if (threadTime && threadTime !== next)
+          throw new UserFacingError('Select one segment to move a thread with different scheduled times.')
+        if (threadTime) continue
+        threads.set(post.thread_key, next)
+        const segments = tx.selectFrom('posts').select(['id', 'status', 'scheduled_at'])
+          .where('thread_key', '=', post.thread_key).execute() as ScheduledRow[]
+        if (segments.some(segment => segment.status !== 'scheduled' || !segment.scheduled_at)) throw scheduleChanged()
+        for (const segment of segments) moves.set(Number(segment.id), next)
+      }
+
+      for (const [id, scheduledAt] of moves) {
+        const values = { scheduled_at: scheduledAt, updated_at: at }
+        tx.updateTable('posts').set(values).where('id', '=', id).execute()
+        tx.updateTable('post_targets').set(values).where('post_id', '=', id).where('status', '=', 'scheduled').execute()
+      }
+      return { count: moves.size }
+    })
+  }
+
   /**
    * Narrow submitted targets to ones that can be queued: known networks, and
    * accounts that exist on that network and are still connected.
@@ -683,13 +735,15 @@ export class QueueService {
    * statement changed a row. SQLite runs one write at a time, so exactly one
    * caller sees 1.
    */
-  private async claim(post: { id: number | string, status: string }): Promise<void> {
+  private async claim(post: { id: number | string, status: string }, expectedScheduledAt?: string): Promise<void> {
     // From the exact state that was read: anything else means another run
     // moved the post in between.
-    const changed = affected(await database.updateTable('posts').set({
+    let claim = database.updateTable('posts').set({
       status: 'publishing',
       updated_at: now(),
-    }).where('id', '=', post.id).where('status', '=', post.status).execute())
+    }).where('id', '=', post.id).where('status', '=', post.status)
+    if (expectedScheduledAt) claim = claim.where('scheduled_at', '=', expectedScheduledAt)
+    const changed = affected(await claim.execute())
 
     if (changed !== 1)
       throw new AlreadyPublishingError()
@@ -701,16 +755,22 @@ export class QueueService {
    * pending or failed are published, so a network that already has the post
    * never gets it twice.
    */
-  async publishNow(id: number, options: { retriesOnly?: boolean } = {}): Promise<{ postId: number, results: CrosspostTargetResult[] }> {
-    const post = await this.findPublishable(id)
+  async publishNow(id: number, options: { retriesOnly?: boolean, expectedScheduledAt?: string } = {}): Promise<{ postId: number, results: CrosspostTargetResult[] }> {
+    const expected = options.expectedScheduledAt
+    const post = await this.findPublishable(id, expected)
     // A segment of a thread is never sent on its own: it would land outside
     // the thread. A scheduled thread is claimed whole and sent in order; one
     // that went out in part resumes from where each account stopped (#100, #255).
     if (post.thread_key) {
       const threadKey = String(post.thread_key)
       if (String(post.status) === 'scheduled' || String(post.status) === 'draft') {
-        const claimed = affected(await database.updateTable('posts').set({ status: 'publishing', updated_at: now() })
-          .where('thread_key', '=', threadKey).where('status', 'in', ['scheduled', 'draft']).execute())
+        const claimed = await database.transaction((tx: typeof database) => {
+          if (expected && !tx.selectFrom('posts').select('id').where('id', '=', post.id)
+            .where('status', '=', 'scheduled').where('scheduled_at', '=', expected).executeTakeFirst())
+            return 0
+          return affected(tx.updateTable('posts').set({ status: 'publishing', updated_at: now() })
+            .where('thread_key', '=', threadKey).where('status', 'in', ['scheduled', 'draft']).execute())
+        })
         if (claimed === 0) throw new AlreadyPublishingError()
       }
       const { results } = await this.publisher.resumeThread(threadKey)
@@ -723,7 +783,7 @@ export class QueueService {
     // Read before the claim: a post whose image is gone is refused here, with
     // nothing changed, instead of being claimed and then failing halfway.
     const content = await this.hydrateContent(post)
-    await this.claim(post)
+    await this.claim(post, expected)
 
     const pending: any[] = await database
       .selectFrom('post_targets')
@@ -989,7 +1049,7 @@ export class QueueService {
     await contentColumn()
     await this.recoverStranded()
 
-    const due = await database
+    const due: Pick<ScheduledRow, 'id' | 'scheduled_at' | 'thread_key'>[] = await database
       .selectFrom('posts')
       .select(['id', 'scheduled_at', 'thread_key'])
       .where('status', '=', 'scheduled')
@@ -1005,21 +1065,27 @@ export class QueueService {
     let failed = 0
     let missed = 0
     for (const post of due) {
+      const scheduledAt = post.scheduled_at
+      if (!scheduledAt) continue
       if (post.thread_key) {
         if (threadsSent.has(String(post.thread_key))) continue
         threadsSent.add(String(post.thread_key))
       }
-      if (String(post.scheduled_at) < tooLate) {
+      if (scheduledAt < tooLate) {
         // Too late for a thread is too late for every segment of it.
-        const ids = post.thread_key
-          ? (await database.selectFrom('posts').select(['id']).where('thread_key', '=', post.thread_key).where('status', '=', 'scheduled').execute()).map((row: any) => Number(row.id))
-          : [Number(post.id)]
-        for (const id of ids) missed += await this.setAside(id, missedReason(String(post.scheduled_at)))
+        const segments: Pick<ScheduledRow, 'id' | 'scheduled_at'>[] = post.thread_key
+          ? await database.selectFrom('posts').select(['id', 'scheduled_at']).where('thread_key', '=', post.thread_key).where('status', '=', 'scheduled').execute()
+          : [post]
+        if (!segments.some(segment => segment.id === post.id && segment.scheduled_at === scheduledAt)) continue
+        for (const segment of segments) {
+          if (segment.scheduled_at)
+            missed += await this.setAside(Number(segment.id), missedReason(scheduledAt), segment.scheduled_at)
+        }
         continue
       }
 
       try {
-        const { results } = await this.publishNow(Number(post.id))
+        const { results } = await this.publishNow(Number(post.id), { expectedScheduledAt: scheduledAt })
         if (results.some(result => result.ok)) published += 1
         else failed += 1
       }
@@ -1030,8 +1096,8 @@ export class QueueService {
         // Refused before anything was claimed or sent. Left as it was it
         // would be picked up and refused again every minute, so it is set
         // aside with the reason for the owner to fix.
-        if (error instanceof MissingMediaError)
-          await this.setAside(Number(post.id), error.message)
+        if (error instanceof MissingMediaError && !await this.setAside(Number(post.id), error.message, scheduledAt))
+          continue
         // Swallowed so one post cannot stop the rest, but never silently.
         log.error(`[postline] scheduled post ${post.id} could not be published: ${error instanceof Error ? error.message : String(error)}`)
         failed += 1
@@ -1069,13 +1135,13 @@ export class QueueService {
    * which the owner can publish now, edit, or delete; its targets carry the
    * reason. Nothing is sent.
    */
-  private async setAside(postId: number, reason: string): Promise<number> {
+  private async setAside(postId: number, reason: string, scheduledAt: string): Promise<number> {
     const at = now()
-    // Only if it is still waiting: a "publish now" may have taken it.
+    // A publish or reschedule may have moved the post since the due list was read.
     const held = affected(await database.updateTable('posts').set({
       status: 'failed',
       updated_at: at,
-    }).where('id', '=', postId).where('status', '=', 'scheduled').execute())
+    }).where('id', '=', postId).where('status', '=', 'scheduled').where('scheduled_at', '=', scheduledAt).execute())
     if (held !== 1)
       return 0
 
@@ -1100,7 +1166,7 @@ export class QueueService {
    * A post that can be sent: one that is still actionable, or one that is
    * published but has networks that failed.
    */
-  private async findPublishable(id: number): Promise<any> {
+  private async findPublishable(id: number, expectedScheduledAt?: string): Promise<any> {
     // Before any row is read: content an older version parked in `notes`
     // has to be in place first.
     await contentColumn()
@@ -1110,6 +1176,8 @@ export class QueueService {
       .where('id', '=', id)
       .executeTakeFirst()
 
+    if (expectedScheduledAt && (post?.status !== 'scheduled' || post.scheduled_at !== expectedScheduledAt))
+      throw new AlreadyPublishingError()
     if (!post)
       throw new Error('Post not found.')
     if (ACTIONABLE.has(String(post.status)))

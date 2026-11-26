@@ -647,6 +647,51 @@ async function checkPhoneNavigation(cdp: Cdp): Promise<void> {
     })()`), 5_000)
 }
 
+async function checkQueueRescheduling(cdp: Cdp): Promise<void> {
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
+  await auditPage(`${site}/queue`, { cdp })
+  const fixtures = await evaluate<Array<{ id: number, scheduledAt: string }>>(cdp, `(async () => {
+    const posts = []
+    for (let day = 1; day <= 5; day++) {
+      const scheduledAt = '2099-02-0' + day + ' 15:00:00'
+      const response = await fetch('/api/postline/queue', { method: 'POST', body: new URLSearchParams({
+        text: 'Bulk move fixture ' + day,
+        providers: 'bluesky',
+        scheduled_at: scheduledAt,
+      }) })
+      if (!response.ok) throw new Error('Could not save a bulk move fixture.')
+      posts.push({ id: (await response.json()).data.postId, scheduledAt })
+    }
+    return posts
+  })()`)
+  await auditPage(`${site}/queue`, { cdp })
+  await evaluate(cdp, `
+    [...document.querySelectorAll('[data-view-toggle]')].find(button => button.textContent.trim() === 'List').click()
+    document.getElementById('queue-tab-scheduled').click()
+  `)
+  const select = `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Select posts')`
+  const checkboxes = `[...document.querySelectorAll('#queue-results input[type=checkbox][aria-label^="Select Bulk move fixture"]')]`
+  await waitUntil('Five scheduled posts with the selection control', () => evaluate<boolean>(cdp, `
+    ${checkboxes}.length === 5 && ${select}.getClientRects().length > 0`), 5_000)
+  await evaluate(cdp, `${select}.click(); ${checkboxes}.forEach(checkbox => checkbox.click())`)
+  const move = `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Move one week later')`
+  await waitUntil('Five posts selected for one move', () => evaluate<boolean>(cdp, `
+    ${checkboxes}.every(checkbox => checkbox.checked) && !${move}.disabled
+      && [...document.querySelectorAll('[role=status]')].some(status => status.textContent === '5 selected')`), 5_000)
+  await evaluate(cdp, `${move}.click()`)
+  await waitUntil('The bulk rescheduling success notice', () => evaluate<boolean>(cdp, `
+    document.querySelector('#postline-toast-host')?.textContent.includes('Moved 5 posts.')`), 5_000)
+  const moved = await evaluate<Array<{ id: number, scheduledAt: string }>>(cdp, `(async () => {
+    const response = await fetch('/api/postline/queue?limit=500')
+    return (await response.json()).data.items
+  })()`)
+  if (!fixtures.every(post => {
+    const expected = new Date(Date.parse(`${post.scheduledAt.replace(' ', 'T')}Z`) + 7 * 86_400_000)
+      .toISOString().slice(0, 19).replace('T', ' ')
+    return moved.some(item => item.id === post.id && item.scheduledAt === expected)
+  })) fail('queue', 'rescheduling', 'one bulk action did not move all five dates by one week')
+}
+
 let exitCode = 0
 try {
   await waitUntil('The API', async () => (await fetch(`http://localhost:${API_PORT}/api/postline/health`)).status < 500)
@@ -712,6 +757,7 @@ try {
     await checkNetworkComponents(cdp)
     await checkBrowserPasskey(cdp)
     await checkPhoneNavigation(cdp)
+    await checkQueueRescheduling(cdp)
   }
   finally {
     await close()

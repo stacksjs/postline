@@ -144,6 +144,45 @@ describe('postline api — reads', () => {
   })
 })
 
+describe('rescheduling the queue', () => {
+  test('moves five posts and their targets by one week in a single authenticated request', async () => {
+    const posts = []
+    for (let day = 1; day <= 5; day++) {
+      const scheduledAt = `2099-02-0${day} 15:00:00`
+      const { postId } = await postQueue.save({ text: `Post ${day}`, providers: ['bluesky'], scheduledAt })
+      posts.push({ id: postId, scheduledAt })
+    }
+    const request = { posts, days: 7 }
+    const path = '/api/postline/queue/reschedule'
+    const guest = await featureTest().post(path, request)
+    guest.assertStatus(401)
+    const client = featureTest().actingAs(await actingUser())
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await client.post(path, request)
+      response.assertStatus(200)
+      expect(await response.json()).toMatchObject({ ok: true, data: { count: 5 } })
+    }
+    const database = db as any
+    for (const { id, scheduledAt } of posts) {
+      const moved = new Date(Date.parse(scheduledAt.replace(' ', 'T') + 'Z') + 7 * 86_400_000).toISOString().slice(0, 19).replace('T', ' ')
+      const post = await database.selectFrom('posts').select(['scheduled_at', 'status']).where('id', '=', id).executeTakeFirst()
+      const targets = await database.selectFrom('post_targets').select(['scheduled_at', 'status']).where('post_id', '=', id).execute()
+      expect(post).toEqual({ scheduled_at: moved, status: 'scheduled' })
+      expect(targets).toEqual([{ scheduled_at: moved, status: 'scheduled' }])
+    }
+  })
+
+  test('a stale selection leaves the entire batch untouched', async () => {
+    const scheduledAt = '2099-02-01 15:00:00'
+    const first = await postQueue.save({ text: 'First', providers: ['bluesky'], scheduledAt })
+    const other = await postQueue.save({ text: 'Already a draft', providers: ['bluesky'] })
+    const posts = [first, other].map(post => ({ id: post.postId, scheduledAt }))
+    const response = await featureTest().actingAs(await actingUser()).post('/api/postline/queue/reschedule', { posts, days: 7 })
+    response.assertStatus(409)
+    expect((await postQueue.get(first.postId))?.scheduledAt).toBe(scheduledAt)
+  })
+})
+
 describe('postline api — the endpoints that had no table', () => {
   /**
    * The regression guard for the migration gap. Before the pending migrations

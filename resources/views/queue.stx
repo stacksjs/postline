@@ -47,15 +47,43 @@
           </button>
         </div>
         <h2 class="m-0 px-1 font-semibold text-ui" x-show="activeSearch()">Search results</h2>
-        <span class="pr-1 text-muted text-xs" aria-live="polite" :text="metaText()">Loading…</span>
+        <div class="flex gap-2 items-center">
+          <span class="pr-1 text-muted text-xs" aria-live="polite" :text="metaText()">Loading…</span>
+          <button class="px-2.5 h-8 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg disabled:opacity-50" type="button" x-show="hasScheduledRows() || selectionOpen()" :aria-pressed="selectionOpen()" :disabled="rescheduling()" @click="toggleSelection">
+            Select posts
+          </button>
+        </div>
       </header>
+      <div class="flex flex-wrap gap-2 items-end p-3 border-b border-line" x-show="selectionOpen()">
+        <div class="grid gap-1">
+          <span class="font-semibold text-muted text-xs" role="status" :text="selectedPosts().length + ' selected'"></span>
+          <button class="px-3 h-9 font-semibold text-on-accent text-ui bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="button" :disabled="!selectedPosts().length || rescheduling()" @click="rescheduleSelection({ days: 7 })">
+            Move one week later
+          </button>
+        </div>
+        <form class="flex flex-wrap gap-2 items-end" @submit.prevent="rescheduleSelection({ date: rescheduleDate() })">
+          <div class="grid gap-1">
+            <label class="font-semibold text-muted text-xs" for="queue-move-date">New date</label>
+            <input class="px-2 h-9 max-w-full text-ink text-ui bg-panel border border-field-line rounded-lg" id="queue-move-date" type="date" :min="dayKey(new Date())" :disabled="rescheduling()" x-model="rescheduleDate" required>
+          </div>
+          <button class="px-3 h-9 font-semibold text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg disabled:opacity-50" type="submit" :disabled="!selectedPosts().length || !rescheduleDate() || rescheduling()">
+            Move to date
+          </button>
+        </form>
+        <button class="px-3 h-9 font-semibold text-muted text-ui hover:text-ink rounded-lg disabled:opacity-50" type="button" :disabled="!selectedPosts().length || rescheduling()" @click="clearSelection">
+          Clear selection
+        </button>
+      </div>
       <div class="grid gap-2.5 p-3" id="queue-results" :role="activeSearch() ? 'region' : 'tabpanel'" :aria-label="activeSearch() ? 'Matching posts' : null" :aria-labelledby="activeSearch() ? null : 'queue-tab-' + tab()">
         <p class="m-0 p-3 text-muted text-ui" x-show="loadError()" :text="loadError()"></p>
         <p class="m-0 p-3 text-muted text-ui" x-show="showEmpty()" :text="emptyText()"></p>
         <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl group" x-for="row in visible()" :data-command-context="row.body">
           <header class="flex gap-3 items-start justify-between">
-            <div class="grid gap-1.5">
-              <span class="font-semibold text-xs">{{ row.when }}</span>
+            <div class="grid gap-1.5 min-w-0">
+              <div class="flex gap-2 items-center">
+                <input class="shrink-0 h-4 w-4 accent-accent disabled:opacity-50 cursor-pointer" type="checkbox" x-show="selectionOpen() && row.status === 'scheduled' && row.scheduledAt" :checked="isSelected(row.id)" :disabled="rescheduling() || (selectedPosts().length >= MAX_QUEUE_SELECTION && !isSelected(row.id))" :aria-label="'Select ' + (row.title || row.body).slice(0, 80) + ', ' + row.when" @change="selectPost(row)">
+                <span class="font-semibold text-xs">{{ row.when }}</span>
+              </div>
               {{-- One chip per network: sent, failed (the reason on hover and
                   below), or still to go. --}}
               <div class="flex flex-wrap gap-1.5 items-center">
@@ -150,6 +178,9 @@
 
 
   <script client>
+    import type { ScheduledSelection, ScheduleDestination } from '../../app/Support/Social/rescheduling'
+    import { MAX_QUEUE_SELECTION } from '../../app/Support/Social/rescheduling'
+    import { requestJson } from '../functions/postline-client'
     import { showPostlineToast } from '../functions/postline-toast'
     import { fetchWorkspace, targetLabel } from '../functions/social-client'
 
@@ -233,6 +264,10 @@
     const nextCursor = state(0)
     const loadingMore = state(false)
     const busyId = state(0)
+    const selectionOpen = state(false)
+    const selectedPosts = state<ScheduledSelection[]>([])
+    const rescheduling = state(false)
+    const rescheduleDate = state('')
     // The workspace's time zone, which every schedule is set in. The calendar
     // groups posts by the day it is there, not on this browser's clock, so a
     // laptop travelling with its owner shows the same calendar (#106).
@@ -377,7 +412,10 @@
     // attention" and nowhere else, so it cannot hide among the published.
     type QueueTab = 'scheduled' | 'drafts' | 'published' | 'attention'
     const tab = useLocalStorage('postline.queue.tab', 'scheduled')
-    const setTab = (next: QueueTab) => tab.set(next)
+    const setTab = (next: QueueTab) => {
+      if (next !== tab()) closeSelection()
+      tab.set(next)
+    }
 
     function moveTab(event, id: QueueTab) {
       const entries = tabs()
@@ -475,7 +513,10 @@
       return cells
     })
 
-    const setView = next => view.set(next === 'calendar' ? 'calendar' : 'list')
+    const setView = (next: 'calendar' | 'list') => {
+      if (next !== view()) closeSelection()
+      view.set(next)
+    }
     const shiftMonth = (by: number) => {
       const at = new Date(Date.UTC(calMonth().year, calMonth().month + by, 1))
       calMonth.set({ year: at.getUTCFullYear(), month: at.getUTCMonth() })
@@ -537,6 +578,7 @@
     function searchPosts() {
       const term = searchText().trim()
       if (activeSearch() !== term) {
+        closeSelection()
         activeSearch.set(term)
         loaded.set(false)
         loadError.set('')
@@ -623,6 +665,52 @@
       const payload = await response.json()
       if (!response.ok || !payload.ok) throw new Error(payload.error || 'Request failed.')
       return payload.data
+    }
+
+    const hasScheduledRows = derived(() => visible().some(row => row.status === 'scheduled' && row.scheduledAt))
+    const isSelected = (id: number): boolean => selectedPosts().some(post => post.id === id)
+    const clearSelection = () => selectedPosts.set([])
+
+    function closeSelection() {
+      selectionOpen.set(false)
+      clearSelection()
+      rescheduleDate.set('')
+    }
+
+    function toggleSelection() {
+      selectionOpen.set(!selectionOpen())
+      if (!selectionOpen()) clearSelection()
+    }
+
+    function selectPost(row: QueueRow) {
+      if (rescheduling() || row.status !== 'scheduled' || !row.scheduledAt) return
+      if (isSelected(row.id)) selectedPosts.set(selectedPosts().filter(post => post.id !== row.id))
+      else if (selectedPosts().length < MAX_QUEUE_SELECTION) selectedPosts.set([...selectedPosts(), { id: row.id, scheduledAt: row.scheduledAt }])
+    }
+
+    async function rescheduleSelection(destination: ScheduleDestination) {
+      const posts = selectedPosts()
+      if (!posts.length || rescheduling()) return
+      rescheduling.set(true)
+      try {
+        const { data } = await requestJson('/api/postline/queue/reschedule', { method: 'POST', body: JSON.stringify({ posts, ...destination }) })
+        clearSelection()
+        rescheduleDate.set('')
+        showPostlineToast({
+          title: 'Schedule updated',
+          message: `Moved ${data.count} post${data.count === 1 ? '' : 's'}.`,
+          tone: 'success',
+        })
+      }
+      catch (error) {
+        showPostlineToast({ title: 'Could not move posts', message: error instanceof Error ? error.message : String(error), tone: 'error' })
+      }
+      finally {
+        await refresh()
+        const current = new Map(items().filter(item => item.status === 'scheduled').map(item => [item.id, item.scheduledAt]))
+        selectedPosts.set(selectedPosts().filter(post => current.get(post.id) === post.scheduledAt))
+        rescheduling.set(false)
+      }
     }
 
     const runAction = async (id: number, path: string, success: QueueActionCopy, failure: string): Promise<void> => {
