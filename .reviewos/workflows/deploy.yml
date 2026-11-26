@@ -100,6 +100,9 @@ jobs:
           redirect=$(public_request -o /dev/null -w '%{http_code} %{redirect_url}' 'https://postline.theot.org/download?source=deploy')
           test "$redirect" = '301 https://postline.theopentimes.org/download?source=deploy'
 
+          cd "$RUNNER_TEMP/postline-deploy"
+          bun scripts/desktop-feed-check.ts
+
       - name: Roll back sites switched by a failed deployment
         if: ${{ failure() && (steps.deploy.outcome == 'failure' || steps.verify.outcome == 'failure') }}
         env:

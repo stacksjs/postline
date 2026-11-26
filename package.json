@@ -74,7 +74,7 @@
     "@stacksjs/ai": "^0.75.695",
     "@stacksjs/socials": "^0.75.695",
     "@stacksjs/stx": "^0.2.953",
-    "@stacksjs/ts-cloud": "^0.16.152",
+    "@stacksjs/ts-cloud": "^0.16.157",
     "stacks": "^0.75.695",
     "ts-backups": "https://github.com/stacksjs/ts-backups/releases/download/v0.1.6/ts-backups-0.1.6.tgz",
     "ts-images": "^0.2.35",
