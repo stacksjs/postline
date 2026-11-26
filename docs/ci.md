@@ -74,6 +74,12 @@ The release publishes with the repository secret `GH_RELEASE_TOKEN` in
 ReviewOS, a GitHub token with `contents: write` on `stacksjs/postline`. It is
 set; v0.1.0 and v0.1.1 were released with it.
 
+## Linux container check
+
+GitHub Actions runs the [container workflow](https://github.com/stacksjs/postline/actions/workflows/container.yml)
+on Linux. It builds the self-hosting image and verifies first run, scheduler
+health, and data retention after replacing the container.
+
 ## Checking on the runner
 
 ```bash

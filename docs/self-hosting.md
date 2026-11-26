@@ -4,6 +4,29 @@ The Mac app is the simplest way to run Postline: it needs no server, no
 domain and no certificate. Run it on a server when you want it reachable from
 more than one machine, or running while your Mac sleeps.
 
+## Run with Docker
+
+From a Postline checkout, build the image and start a container with one named
+volume.
+
+```bash
+docker build --file cloud/Dockerfile --tag postline .
+docker run --detach --name postline --restart unless-stopped \
+  --publish 127.0.0.1:3000:3000 \
+  --volume postline-data:/var/lib/postline postline
+```
+
+Open <http://localhost:3000> to create the workspace account. The image runs
+the web server, API and scheduler together, and applies migrations on startup.
+The volume holds SQLite, media, published Blog Markdown, and the application
+key. Reuse that volume when replacing the container. For a restored workspace,
+put the original key in the volume as `app-key` before the first start. If you
+supply `APP_KEY`, it must match the stored key when the volume already has one.
+
+For remote access, set `APP_URL` to the public HTTPS address and use a reverse
+proxy for TLS. Run one Postline container per volume so one scheduler owns the
+queue.
+
 ## The address it answers on
 
 Set `APP_URL` to the address people type, for example

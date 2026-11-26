@@ -1,0 +1,91 @@
+name: Container
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Build the container
+        run: docker build --file cloud/Dockerfile --tag postline:container-check .
+
+      - name: Check the image excludes workspace secrets
+        run: |
+          docker run --rm --entrypoint /bin/sh postline:container-check -ec '
+            test ! -e /app/.env
+            test ! -e /app/.env.keys
+            test ! -e /app/.env.production
+            test ! -e /app/database/postline.sqlite
+          '
+
+      - name: Verify first run and data persistence
+        run: |
+          set -euo pipefail
+          name="postline-container-check-$$"
+          volume="$name-data"
+          cleanup() {
+            docker stop --time 10 "$name" >/dev/null 2>&1 || true
+            docker rm "$name" >/dev/null 2>&1 || true
+            docker volume rm "$volume" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          set -E
+          trap 'docker logs --tail 60 "$name" >&2' ERR
+
+          docker volume create "$volume"
+
+          start() {
+            docker run --detach --name "$name" --publish 127.0.0.1::3000 \
+              --volume "$volume:/var/lib/postline" postline:container-check >/dev/null
+            origin="http://$(docker port "$name" 3000/tcp)"
+            local health attempt
+            for ((attempt = 0; attempt < 45; attempt++)); do
+              if health=$(curl --silent --fail --max-time 5 "$origin/api/postline/health") \
+                && jq -e '.ok and .database == "ok" and .migrations == "ok" and .scheduler == "ok" and .disk == "ok"' <<< "$health" >/dev/null; then
+                printf '%s\n' "$health"
+                return 0
+              fi
+              test "$(docker inspect --format '{{.State.Running}}' "$name")" = true || return 1
+              sleep 2
+            done
+            printf 'The container did not report a live scheduler within 90 seconds.\n' >&2
+            return 1
+          }
+
+          print_key_digest() {
+            docker exec "$name" bun -e 'const key = Bun.file("/var/lib/postline/app-key"); console.log(Bun.SHA256.hash(await key.arrayBuffer(), "hex"))'
+          }
+
+          start
+          login=$(curl --fail --silent --show-error "$origin/login")
+          grep -Fq 'Create the workspace account' <<< "$login"
+          before=$(print_key_digest)
+          docker exec "$name" bun -e '
+            import { Database } from "bun:sqlite"
+            using database = new Database(process.env.DB_DATABASE_PATH)
+            database.run("CREATE TABLE container_check (value TEXT)")
+            database.query("INSERT INTO container_check VALUES (?)").run("retained")
+            await Bun.write("/var/lib/postline/media/check.txt", "retained")
+          '
+          docker stop --time 10 "$name" >/dev/null
+          docker rm "$name" >/dev/null
+
+          start
+          test "$before" = "$(print_key_digest)"
+          docker exec "$name" bun -e '
+            import { Database } from "bun:sqlite"
+            using database = new Database(process.env.DB_DATABASE_PATH, { readonly: true })
+            if (database.query("SELECT value FROM container_check").get()?.value !== "retained" || await Bun.file("/var/lib/postline/media/check.txt").text() !== "retained")
+              throw new Error("The container did not retain the workspace and media.")
+          '
