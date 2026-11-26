@@ -7,8 +7,6 @@
 //
 // For more information, please visit: https://stacksjs.com/docs
 export const routeNames = {
-  'email.confirm': '/api/email/confirm',
-  'email.subscribe': '/api/email/subscribe',
   'email.unsubscribe': '/api/email/unsubscribe',
   'email.unsubscribe.oneclick': '/api/email/unsubscribe',
 } as const
