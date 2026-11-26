@@ -81,7 +81,7 @@ export default {
   },
 
   // Which of the two hosting shapes config/domains.ts should resolve:
-  // 'subdomain' -> postline.stacksjs.com, 'domain' -> the apex in
+  // 'subdomain' -> postline.theopentimes.org, 'domain' -> the apex in
   // config/domains.ts (ignored until one is set).
   // Written by `buddy domain:use`; read by config/domains.ts and nothing else.
   DOMAIN_MODE: {

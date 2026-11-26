@@ -30,11 +30,8 @@ import { env } from '@stacksjs/env'
  * deploys, but only per-site: `main` and `api` deploy to separate directories
  * and would each get their own copy of a database they are supposed to share.
  *
- * SPLIT NOTE: the publication product was split out of this repo and kept the
- * shared box's existing tenant, ports and data directory. Postline has not
- * been deployed since, so nothing exists at this path yet — the first Postline
- * deploy creates it. It also needs its own ports and secrets first; see the
- * `deploy-production` job in .github/workflows/ci.yml.
+ * The Open Times has separate ports and a separate data directory on the same
+ * box. The first Postline deploy creates its own data directory.
  */
 const DATA_DIR = '/var/lib/postline'
 const DB_DATABASE_PATH = `${DATA_DIR}/postline.sqlite`
@@ -42,6 +39,17 @@ const DB_DATABASE_PATH = `${DATA_DIR}/postline.sqlite`
 // release directory: a deploy replaces the release, and the API (which stores
 // an upload) and the scheduler (which publishes it) run from different ones.
 const POSTLINE_MEDIA_DIR = `${DATA_DIR}/media`
+const PORT_WEB = 3320
+const PORT_API = 3321
+const SITE_ENV = {
+  APP_ENV: 'production',
+  APP_URL: domains.canonical,
+  NODE_ENV: 'production',
+  POSTLINE_SITE: 'marketing',
+  DB_CONNECTION: 'sqlite',
+  DB_DATABASE_PATH,
+  POSTLINE_MEDIA_DIR,
+}
 
 /**
  * The release tarball is packed from the working tree, not from git — so
@@ -339,7 +347,7 @@ export const tsCloud: TsCloudConfig = {
      */
     ssl: {
       enabled: true,
-      provider: 'acm', // 'acm' | 'letsencrypt'
+      provider: 'letsencrypt',
       /**
        * Every host we answer on needs a certificate — including the ones that
        * only redirect, because a browser validates TLS *before* it ever sees
@@ -358,19 +366,8 @@ export const tsCloud: TsCloudConfig = {
       },
     },
 
-    /**
-     * DNS Configuration
-     *
-     * `domain` is the canonical host, so the zone this resolves against follows
-     * `DOMAIN_MODE` with everything else. The Route53 hosted zone only covers
-     * stacksjs.com, which is where the subdomain lives. An apex registered
-     * elsewhere is discovered by ts-cloud from that provider's credentials in
-     * the environment (see config/dns.ts).
-     */
-    dns: {
-      domain: domains.canonical,
-      hostedZoneId: env.AWS_HOSTED_ZONE_ID || 'Z01455702Q7952O6RCY37', // Route53 hosted zone ID
-    },
+    // Porkbun manages both web zones. The deploy reconciles exact site hosts.
+    dns: { domain: domains.canonical },
 
     /**
      * Storage Configuration
@@ -645,10 +642,7 @@ export const tsCloud: TsCloudConfig = {
    * For multi-site deployments
    */
   sites: {
-    // The canonical host — `postline.stacksjs.com` until Postline has an apex
-    // of its own (config/domains.ts). Either way it is a host of its own rather than a
-    // path on stacksjs.com, so it never competes with the apex app's `/` route
-    // in the gateway's longest-prefix routing.
+    // The publication keeps its own virtual hosts and processes.
     main: {
       root: '.',
       path: '/',
@@ -657,9 +651,7 @@ export const tsCloud: TsCloudConfig = {
       // an equivalent from `core/buddy/src/serve-entry.ts` during deploy, but a
       // consumer app has no framework source to build from — it has the package.
       start: 'bun node_modules/@stacksjs/buddy/dist/serve-entry.js',
-      // Distinct from the apex app's :3000 — both processes share this box and
-      // the gateway proxies each subdomain to its own loopback port.
-      port: 3100,
+      port: PORT_WEB,
       /*
        * Sized to the workload, now that it is allowed to be.
        *
@@ -686,7 +678,7 @@ export const tsCloud: TsCloudConfig = {
         // The database lives outside the release tree (see DB_DATABASE_PATH) so
         // it survives deploys; create it before migrating into it.
         `mkdir -p ${DATA_DIR}`,
-        'bun install --production',
+        'bun install --production --frozen-lockfile',
         // Deliberately not `--force`. The pending drop of `categorizable_models`
         // and `taggable_models` needed it once, on 2026-08-14, and it was
         // reverted the moment that deploy landed: a deploy that applies
@@ -698,7 +690,7 @@ export const tsCloud: TsCloudConfig = {
       // port explicitly: the framework default (3008) is already owned by a
       // *different* tenant on this shared box, and an unconfigured proxy would
       // post Postline's form submissions into that app instead.
-      env: { PORT_API: '3101', DB_DATABASE_PATH, POSTLINE_MEDIA_DIR },
+      env: { ...SITE_ENV, PORT_API: String(PORT_API) },
       exclude: RELEASE_EXCLUDES,
     },
 
@@ -709,7 +701,7 @@ export const tsCloud: TsCloudConfig = {
     api: {
       root: '.',
       start: 'bun node_modules/@stacksjs/actions/dist/serve/api.js',
-      port: 3101,
+      port: PORT_API,
       /*
        * The API serves JSON off the same database and holds flat — it renders
        * no views, so it never touches the component path that makes `main`
@@ -723,16 +715,13 @@ export const tsCloud: TsCloudConfig = {
       memoryMax: '768M',
       preStart: [
         `mkdir -p ${DATA_DIR}`,
-        'bun install --production',
+        'bun install --production --frozen-lockfile',
       ],
       // Same database file as the main site — the API is where every write
       // actually lands, so the two must not drift onto separate copies.
       env: {
         HOST: '127.0.0.1',
-        APP_ENV: 'production',
-        NODE_ENV: 'production',
-        DB_DATABASE_PATH,
-        POSTLINE_MEDIA_DIR,
+        ...SITE_ENV,
         // String(): the env proxy coerces values that look numeric or boolean,
         // so these are typed string|number|boolean while a site's env map takes
         // strings only.

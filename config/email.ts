@@ -16,11 +16,8 @@ import { isMarketingSite } from '../app/Support/Marketing/site'
  * DKIM and DMARC records from it, and registers the tenant with the shared mail
  * daemon under it.
  *
- * Postline has no domain of its own yet, so the sending domain falls back to
- * `stacksjs.com`, the parent zone of the `postline.stacksjs.com` subdomain the
- * app is served from. TODO: once a real Postline domain is registered, set
- * `APEX` in config/domains.ts (or `MAIL_DOMAIN` in the env) and mail moves to
- * it with everything else.
+ * The default sending zone is stacksjs.com. Postline’s web hosts have
+ * independent DNS and TLS configuration.
  *
  * NOTE: mail DNS is the one part of the deploy that is single-provider.
  * `reconcileMailDns` in @stacksjs/buddy reads PORKBUN_API_KEY directly, so a
@@ -77,8 +74,8 @@ export default {
   /**
    * The origin templated into mail links (confirmation, unsubscribe).
    *
-   * `APP_URL` is a bare host everywhere in this project — `postline.stacksjs.com`,
-   * not `https://postline.stacksjs.com` — while this field is concatenated with
+   * `APP_URL` can be a bare host such as `postline.theopentimes.org`, while this
+   * field is concatenated with
    * a path to build a link. Taking it raw produced `<host>/confirm/…`,
    * which a mail client renders as relative text rather than a link. The
    * scaffold's fallback had a scheme and the env value did not, so the bug only

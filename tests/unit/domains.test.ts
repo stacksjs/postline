@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { APEX, FALLBACK_MAIL_DOMAIN, OWNED, redirectSites, resolveDomains, SUBDOMAIN } from '../../config/domains'
+import { APEX, OWNED, redirectSites, resolveDomains, SHORT_SUBDOMAIN, SUBDOMAIN } from '../../config/domains'
 
 /**
  * The domain model is the one piece of config that four other config files and
@@ -22,7 +22,8 @@ describe('canonical host', () => {
   })
 
   test('the subdomain is the Postline host', () => {
-    expect(SUBDOMAIN).toBe('postline.stacksjs.com')
+    expect(SUBDOMAIN).toBe('postline.theopentimes.org')
+    expect(SHORT_SUBDOMAIN).toBe('postline.theot.org')
   })
 
   test('DOMAIN_MODE=domain is ignored while there is no apex', () => {
@@ -44,6 +45,7 @@ describe('canonical host', () => {
 
     expect(resolved.canonical).toBe('staging.example.com')
     expect(resolved.mode).toBe('domain')
+    expect(resolved.all).toEqual(['staging.example.com'])
   })
 
   test('an empty or whitespace APP_DOMAIN is not an override', () => {
@@ -61,25 +63,24 @@ describe('canonical host', () => {
 
 describe('owned hosts', () => {
   test('the declared set matches the apex setting', () => {
-    expect(OWNED).toEqual(APEX ? [APEX, SUBDOMAIN] : [SUBDOMAIN])
+    expect(OWNED).toEqual([...(APEX ? [APEX] : []), SUBDOMAIN, SHORT_SUBDOMAIN])
   })
 
-  test('none of them belongs to the publication product that was split out', () => {
-    for (const host of [...OWNED, ...resolveDomains({}).all, FALLBACK_MAIL_DOMAIN])
-      expect(host === 'stacksjs.com' || host.endsWith('.stacksjs.com') || host === APEX || host === `www.${APEX}`).toBe(true)
+  test('only Postline hostnames are given to the publication gateway', () => {
+    expect(resolveDomains({}).all).toEqual([SUBDOMAIN, SHORT_SUBDOMAIN])
   })
 })
 
 describe('redirects', () => {
-  test('nothing redirects while the subdomain is the only host', () => {
-    expect(resolveDomains({}, null).redirects).toEqual([])
+  test('the short domain redirects to the full subdomain by default', () => {
+    expect(resolveDomains({}, null).redirects).toEqual([SHORT_SUBDOMAIN])
   })
 
   test('every owned host that is not canonical redirects', () => {
     for (const mode of ['domain', 'subdomain'] as const) {
       const { canonical, redirects } = resolveDomains({ DOMAIN_MODE: mode }, FUTURE_APEX)
 
-      for (const host of [FUTURE_APEX, SUBDOMAIN]) {
+      for (const host of [FUTURE_APEX, SUBDOMAIN, SHORT_SUBDOMAIN]) {
         if (host === canonical)
           expect(redirects).not.toContain(host)
         else
@@ -129,8 +130,8 @@ describe('redirect sites handed to ts-cloud', () => {
     }
   })
 
-  test('there are none while the subdomain is the only host', () => {
-    expect(redirectSites(resolveDomains({}, null))).toEqual({})
+  test('previews do not take over live redirects', () => {
+    expect(redirectSites(resolveDomains({ APP_DOMAIN: 'staging.example.com' }))).toEqual({})
   })
 
   test('site keys are unique and safe to use as systemd/gateway identifiers', () => {

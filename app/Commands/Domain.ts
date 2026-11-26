@@ -5,14 +5,14 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import process from 'node:process'
 import { encryptEnv, parse, resolveEnvFile } from '@stacksjs/env'
 import { ExitCode } from '@stacksjs/types'
-import { APEX, LOCAL_HOST, resolveDomains, SUBDOMAIN } from '~/config/domains'
+import { APEX, LOCAL_HOST, resolveDomains, SHORT_SUBDOMAIN, SUBDOMAIN } from '~/config/domains'
 
 /**
  * `buddy domain` — move the app between hosting shapes without hand-editing
  * config.
  *
  * The app can live at a subdomain of the shared Stacks box
- * (`postline.stacksjs.com`) or at an apex domain of its own, once `APEX` is set
+ * (`postline.theopentimes.org`) or at an apex domain of its own, once `APEX` is set
  * in config/domains.ts (Postline has none yet). Which one is canonical is a
  * single env value, `DOMAIN_MODE`, that config/domains.ts
  * resolves and config/app.ts, config/dns.ts and config/cloud.ts all read. This
@@ -172,6 +172,7 @@ export default function (cli: CLI) {
       else
         console.log(`  ${'(none yet)'.padEnd(28)} apex · set APEX in config/domains.ts`)
       console.log(`  ${SUBDOMAIN.padEnd(28)} shared-box tenant${canonical === SUBDOMAIN ? ' · canonical' : ''}`)
+      console.log(`  ${SHORT_SUBDOMAIN.padEnd(28)} short hostname${canonical === SHORT_SUBDOMAIN ? ' · canonical' : ''}`)
       console.log(`  ${LOCAL_HOST.padEnd(28)} development only`)
       console.log('')
       console.log(`  ${redirects.length} of them redirect to https://${canonical}`)
@@ -182,7 +183,7 @@ export default function (cli: CLI) {
   cli
     .command('domain:use [target]', 'Serve on the apex domain, the shared subdomain, or a specific host')
     .option('--file [file]', 'Write to a specific env file instead of the one --env implies', { default: '' })
-    .example('buddy domain:use subdomain              # postline.stacksjs.com')
+    .example('buddy domain:use subdomain              # postline.theopentimes.org')
     .example('buddy domain:use domain                 # the apex, once config/domains.ts has one')
     .example('buddy domain:use staging.example.com    # any other host')
     .example('buddy domain:use domain --env production')

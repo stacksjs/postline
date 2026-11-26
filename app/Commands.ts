@@ -27,7 +27,7 @@ export type CommandRegistry = Record<string, string | CommandConfig>
  * },
  */
 export default {
-  // Moves the app between `postline.stacksjs.com` and an apex of its own by
+  // Moves the app between its public subdomain and an apex of its own by
   // writing DOMAIN_MODE into an env file. Registers `domain`, `domain:list` and
   // `domain:use`; `dns` is the framework's own record-listing command and is
   // deliberately left alone.

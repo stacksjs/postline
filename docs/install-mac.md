@@ -11,7 +11,7 @@ create. The person at the Mac is the owner.
 ## Install
 
 1. Download the latest `Postline-<version>-macos-arm64.dmg` from
-   [the download page](https://postline.stacksjs.com/download) or
+   [the download page](https://postline.theopentimes.org/download) or
    [GitHub releases](https://github.com/stacksjs/postline/releases/latest).
    `checksums.txt` on the release lists each file's SHA-256.
 2. Open the disk image and drag **Postline** into **Applications**.

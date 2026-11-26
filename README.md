@@ -92,7 +92,7 @@ it has stopped.
 Postline, its landing page, features, use cases and the hosted-plan waitlist,
 belong to the public site and redirect to the workspace on your install. To
 work on them, start the site with `POSTLINE_SITE=marketing ./buddy dev`; the
-deployment that serves postline.stacksjs.com runs with that setting too.
+production deployment for `postline.theopentimes.org` uses that setting too.
 
 ## Connecting networks
 
@@ -185,7 +185,7 @@ CI runs on [ReviewOS](https://reviewos.org) from `.reviewos/workflows`: lint,
 type check, the test suite, the compiled Mac app's agent and a static build of
 the site on every push, and the desktop release on a `v*` tag.
 [docs/ci.md](docs/ci.md) covers the setup and how to read a run. Nothing
-deploys the hosted site from CI yet: it waits for Postline's own host.
+deploys the hosted site from CI yet.
 
 ## Releasing
 

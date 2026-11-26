@@ -8,17 +8,8 @@ import { redirects } from '~/config/domains'
  * may hover any of the options below and the definitions will be provided. In case you
  * have any questions, feel free to reach out via Discord or GitHub Discussions.
  *
- * WHERE THE ZONES ACTUALLY LIVE
- *
- * Postline has no domain of its own yet: it is served from
- * `postline.stacksjs.com`, and the `nameservers` below belong to the
- * stacksjs.com zone in Route53 that hosts that subdomain.
- *
- * When a Postline domain is registered (set `APEX` in config/domains.ts),
- * ts-cloud picks its DNS provider up from the environment — e.g.
- * `PORKBUN_API_KEY` / `PORKBUN_SECRET_KEY` (see `loadFromEnv` in its DNS
- * registry) — and asks each configured provider which domain it can manage, so
- * there is no driver to name here.
+ * The web hosts are in the Porkbun zones for theopentimes.org and theot.org.
+ * Deployment reconciles the Postline hostnames declared in cloud.ts.
  */
 export default {
   /**
@@ -36,8 +27,6 @@ export default {
   cname: [],
   mx: [],
   txt: [],
-
-  nameservers: ['ns-1731.awsdns-24.co.uk', 'ns-355.awsdns-44.com', 'ns-536.awsdns-03.net', 'ns-1395.awsdns-46.org'],
 
   /**
    * Hosts that resolve to the box but only ever answer with a 301. Derived from

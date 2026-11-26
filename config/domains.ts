@@ -12,15 +12,9 @@ import { env } from '@stacksjs/env'
  *
  * TWO MODES, ONE CANONICAL HOST
  *
- * The app can live at a subdomain of the shared Stacks box
- * (`postline.stacksjs.com`) or at an apex domain of its own. Exactly one of
- * them is canonical at a time, and every other owned host redirects to
- * whichever one that is — including the subdomain once an apex takes over, so
- * links handed out before the move keep working instead of 404ing.
- *
- * Postline has no domain of its own yet, so `APEX` is `null` and the subdomain
- * is the only mode that resolves. Registering a domain is a one-line change
- * here (`APEX`), after which `buddy domain:use domain` flips to it.
+ * Postline uses `postline.theopentimes.org` as its canonical public host and
+ * `postline.theot.org` as its short redirect. The two publication apex hosts
+ * stay outside Postline's gateway and TLS configuration.
  */
 
 export type DomainMode = 'subdomain' | 'domain'
@@ -38,11 +32,11 @@ export const APEX: string | null = null
  * The tenant hostname on the shared `stacks` box. The canonical production
  * host until Postline has a domain of its own; a redirect afterwards.
  */
-export const SUBDOMAIN = 'postline.stacksjs.com'
+export const SUBDOMAIN = 'postline.theopentimes.org'
+export const SHORT_SUBDOMAIN = 'postline.theot.org'
 
 /**
- * The zone mail is sent from while there is no apex. It is the parent zone of
- * `SUBDOMAIN`; config/email.ts prefers `MAIL_DOMAIN`, then `APEX`, then this.
+ * The existing mail zone. Web hosts and mail routing are independent.
  */
 export const FALLBACK_MAIL_DOMAIN = 'stacksjs.com'
 
@@ -54,7 +48,7 @@ export const FALLBACK_MAIL_DOMAIN = 'stacksjs.com'
 export const LOCAL_HOST = 'postline.localhost'
 
 /** Every host this project owns, canonical or not, in preference order. */
-export const OWNED: readonly string[] = [...(APEX ? [APEX] : []), SUBDOMAIN]
+export const OWNED: readonly string[] = [...(APEX ? [APEX] : []), SUBDOMAIN, SHORT_SUBDOMAIN]
 
 export interface ResolvedDomains {
   mode: DomainMode
@@ -80,8 +74,8 @@ export interface ResolvedDomains {
  * then both modes resolve to the subdomain rather than to an empty host.
  *
  * `redirects` is derived rather than listed, so it can never disagree with
- * `canonical` — it is every owned host that is not canonical, plus the `www.`
- * form of the apex when there is one.
+ * `canonical` — it is every other owned host and the `www.` form of any future
+ * apex. A preview host does not publish production redirects.
  */
 export function resolveDomains(
   source: { APP_DOMAIN?: string | null, DOMAIN_MODE?: string | null } = {},
@@ -92,8 +86,8 @@ export function resolveDomains(
   const mode: DomainMode = override || wantsApex ? 'domain' : 'subdomain'
 
   const canonical = override || (wantsApex && apex ? apex : SUBDOMAIN)
-  const owned = [...(apex ? [apex, `www.${apex}`] : []), SUBDOMAIN]
-  const redirects = owned.filter(d => d !== canonical)
+  const owned = [...(apex ? [apex, `www.${apex}`] : []), SUBDOMAIN, SHORT_SUBDOMAIN]
+  const redirects = owned.includes(canonical) ? owned.filter(host => host !== canonical) : []
 
   return { mode, canonical, redirects, all: [canonical, ...redirects], url: `https://${canonical}` }
 }
@@ -120,7 +114,6 @@ export function urlTo(path: string): string {
  * ts-cloud treats a site with a `redirect` and no `start`/`root` as a gateway
  * rule rather than a deployment, so these cost no process and no release
  * directory — just a server block each. `preservePath` keeps a deep link deep.
- * Empty while the subdomain is the only owned host.
  */
 export function redirectSites(from: ResolvedDomains = resolved): Record<string, { domain: string, redirect: { to: string, status: number, preservePath: boolean } }> {
   return Object.fromEntries(
