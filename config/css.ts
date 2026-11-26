@@ -381,6 +381,7 @@ html.postline-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fa
 
 [data-command-dialog] { width: min(36rem, calc(100% - 2rem)); }
 [data-postline-mobile-menu]::backdrop,
+[data-channel-confirmation]::backdrop,
 [data-command-dialog]::backdrop { background: rgb(15 23 42 / 48%); }
 
 /* A focus ring every control shows, at 3:1 against the panels (#142). The

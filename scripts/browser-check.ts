@@ -299,6 +299,74 @@ async function checkWorkspaceBootstrap(cdp: Cdp): Promise<void> {
   await waitUntil('The bootstrap after a change in another window', () => evaluate<boolean>(cdp, `${reads}.length === ${requests.length + 1}`), 5_000)
 }
 
+async function checkChannels(cdp: Cdp): Promise<void> {
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const send = window.fetch.bind(window)
+    const gate = new Promise(resolve => { window.releaseChannels = resolve })
+    const status = { provider: 'bluesky', connected: true, canPublish: true, authStatus: 'connected' }
+    let accounts = [
+      { ...status, id: 101, handle: 'news.example', isDefault: true, expiresSoon: true, expiresAt: new Date(Date.now() + 172800000).toISOString() },
+      { ...status, id: 102, handle: 'radio.example', isDefault: false, expiresSoon: false },
+    ]
+    window.channelReads = []
+    window.fetch = async (input, options) => {
+      const request = new Request(input, options)
+      const path = new URL(request.url).pathname
+      if (request.method === 'GET' && (path === '/api/postline/bootstrap' || path === '/api/postline/network-apps' || path.endsWith('/status') && path.startsWith('/api/postline/'))) window.channelReads.push(path)
+      if (path === '/api/postline/accounts/default' || path === '/api/postline/accounts/disconnect') {
+        const id = Number((await request.formData()).get('id'))
+        accounts = path.endsWith('/default') ? accounts.map(account => ({ ...account, isDefault: account.id === id })) : accounts.filter(account => account.id !== id)
+        return Response.json({ ok: true })
+      }
+      if (path !== '/api/postline/bootstrap') return send(input, options)
+      await gate
+      const response = await send(input, options)
+      if (!response.ok) return response
+      const payload = await response.json()
+      payload.data.accounts = accounts
+      payload.data.providers = payload.data.providers.map(provider => provider.provider === 'bluesky'
+        ? { ...provider, ...status, handle: accounts.find(account => account.isDefault)?.handle, accounts }
+        : provider)
+      return Response.json(payload)
+    }
+  ` })
+  try {
+    await auditPage(`${site}/accounts`, { cdp })
+    await waitUntil('Channels loading without a disconnected flash', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-channels-loading]')?.getClientRects().length > 0
+      && !document.querySelector('[data-channel]')`), 5_000)
+    await evaluate(cdp, 'window.releaseChannels()')
+    const card = "document.querySelector('[data-channel=bluesky]')"
+    await waitUntil('The shared channel cards and account health', () => evaluate<boolean>(cdp, `
+      document.querySelectorAll('[data-channel]').length === 7
+      && ${card}?.innerText.includes('@news.example')
+      && ${card}.innerText.includes('Expires in')
+      && document.querySelectorAll('[data-network-app]').length === 4`), 5_000)
+    const requests = await evaluate<string[]>(cdp, 'window.channelReads')
+    if (requests.length !== 1 || requests[0] !== '/api/postline/bootstrap')
+      fail('accounts', 'channels', `expected one bootstrap request, saw ${requests.join(', ')}`)
+
+    await evaluate(cdp, `${card}.querySelector('[aria-label="Publish to @radio.example by default"]').click()`)
+    await waitUntil('The new default channel account', () => evaluate<boolean>(cdp, `
+      [...${card}.querySelectorAll('li')].find(row => row.innerText.includes('@radio.example'))?.innerText.includes('Default')
+      && !${card}.querySelector('[aria-label="Publish to @radio.example by default"]').getClientRects().length`), 5_000)
+
+    const disconnect = `${card}.querySelector('[aria-label="Disconnect @news.example"]')`
+    await evaluate(cdp, `${disconnect}.focus(); ${disconnect}.click()`)
+    await waitUntil('Disconnect confirmation', () => evaluate<boolean>(cdp, `
+      ${card}.querySelector('dialog').open && ${card}.querySelector('dialog h3').innerText.includes('@news.example')`), 5_000)
+    await pressKey(cdp, 'Escape', 27)
+    if (!await evaluate<boolean>(cdp, `!${card}.querySelector('dialog').open && document.activeElement === ${disconnect}`))
+      fail('accounts', 'channels', 'closing confirmation did not restore focus')
+    await evaluate(cdp, `${disconnect}.click(); ${card}.querySelector('dialog button[type=button]').click()`)
+    await waitUntil('The disconnected account is removed from its card', () => evaluate<boolean>(cdp, `
+      !${disconnect} && ${card}.innerText.includes('@radio.example') && !${card}.querySelector('dialog').open`), 5_000)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+  }
+}
+
 async function checkPhoneNavigation(cdp: Cdp): Promise<void> {
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 1, mobile: true })
   await auditPage(`${site}/queue`, { cdp })
@@ -416,6 +484,7 @@ try {
     await checkDesktopUpdateControls(cdp)
     await checkWorkspaceCommands(cdp)
     await checkWorkspaceBootstrap(cdp)
+    await checkChannels(cdp)
     await checkNetworkComponents(cdp)
     await checkPhoneNavigation(cdp)
   }

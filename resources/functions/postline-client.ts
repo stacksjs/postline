@@ -1,3 +1,4 @@
+import type { NetworkAppSummary } from '../../app/Services/NetworkAppService'
 import type { WorkspaceProfile } from '../../app/Services/WorkspaceService'
 import type { AccountStatus, ProviderStatus } from '../assets/scripts/social'
 
@@ -5,6 +6,7 @@ interface WorkspaceBootstrap {
   workspace: WorkspaceProfile
   providers: ProviderStatus[]
   accounts: AccountStatus[]
+  networkApps: NetworkAppSummary[]
   unread: { inbox: number, listening: number }
 }
 
@@ -69,7 +71,7 @@ export async function requestJson(url: string, options: RequestInit = {}, errorM
     throw new Error(payload?.error || payload?.message || errorMessage || (response.status === 404 ? 'Not found.' : 'That did not work.'))
   if (options.method && !/^(?:get|head)$/i.test(options.method) && workspaceWrites.has(url)) {
     void refreshWorkspaceBootstrap()
-    window.dispatchEvent(new Event('postline:workspace-changed'))
+    announceWorkspaceChange()
   }
   return payload
 }
@@ -99,8 +101,8 @@ export async function refreshWorkspaceBootstrap(): Promise<void> {
   await query.refresh()
 }
 
-export async function fetchAccounts(): Promise<AccountStatus[]> {
-  return (await fetchWorkspaceBootstrap()).accounts
+export function announceWorkspaceChange(): void {
+  window.dispatchEvent(new Event('postline:workspace-changed'))
 }
 
 export async function disconnectSocialAccount(id: number): Promise<void> {

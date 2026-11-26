@@ -5,9 +5,6 @@
 @section('content')
   @meta('description', 'Connect and manage publishing channels in Postline settings.')
   <section class="grid gap-4" data-postline-page="accounts" data-testid="accounts-page">
-    {{-- Crosswind safelist: connection status-pill colors are set dynamically
-        via JS, so list them in static markup for the CSS scanner. --}}
-    <div class="hidden text-muted text-success text-warning bg-success-soft bg-warning-soft border-line border-success-line border-warning-line" aria-hidden="true"></div>
     <header class="flex flex-col gap-4 items-stretch justify-between sm:flex-row sm:items-end min-h-11">
       <div>
         <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Settings</p>
@@ -25,11 +22,7 @@
       <a class="inline-flex items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel border border-line rounded-lg shadow-sm" href="/accounts" data-stx-link aria-current="page">Channels</a>
     </nav>
 
-    <div class="grid gap-3 sm:grid-cols-3">
-      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-info text-lg bg-info-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-share-08"></span></span>
-        <div><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Publishing</span><strong class="block mt-1 text-ink text-sm">Six networks and Blog</strong></div>
-      </article>
+    <div class="grid gap-3 sm:grid-cols-2">
       <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
         <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-success bg-success-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-shield-key"></span></span>
         <div><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Credentials</span><strong class="block mt-1 text-ink text-sm">Stored in your workspace</strong></div>
@@ -40,165 +33,33 @@
       </article>
     </div>
 
-    <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" data-bluesky-channel-card>
-      <header class="flex gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
-        <div><strong class="text-ink text-sm">Publishing channels</strong><p class="m-0 mt-1 text-muted text-xs">Connect accounts for the networks you use.</p></div>
-        <span class="px-2.5 py-1 font-semibold text-muted text-xs bg-panel-2 border border-line rounded-full">7 channels</span>
+    <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" aria-labelledby="publishing-channels-title" :aria-busy="!channelsReady() && !bootstrap.error()">
+      <header class="flex gap-3 items-start justify-between px-4 py-3.5 border-b border-line">
+        <div>
+          <h2 class="m-0 font-semibold text-ink text-sm" id="publishing-channels-title">Publishing channels</h2>
+          <p class="m-0 mt-1 text-muted text-xs">Connect accounts for the networks you use.</p>
+        </div>
+        <span class="px-2.5 py-1 font-semibold text-muted text-xs bg-panel-2 border border-line rounded-full" x-cloak x-show="channelsReady()" :text="channelProviders().length + ' channels'"></span>
       </header>
-      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" data-bluesky-channels>
-        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="bluesky">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-info text-xl bg-info-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-bluesky"></span></span><span class="px-2.5 py-1 font-semibold text-muted text-xs whitespace-nowrap border border-line rounded-full" data-bluesky-channel-status>Setup</span></div>
-            <h2 class="mb-0 mt-4 font-semibold text-sm">Bluesky</h2>
-            <p class="my-1.5 text-body text-ui" data-bluesky-channel-handle>Not connected</p>
-            <p class="m-0 text-muted text-xs" data-bluesky-channel-detail>Add an app password to publish and sync your timeline.</p>
-            {{-- Every connected Bluesky account, from the blueskyAccounts() signal. --}}
-            <ul class="grid hidden gap-1.5 m-0 mt-3 p-0 list-none" :class="{ 'hidden': blueskyAccounts().length === 0 }" data-account-list="bluesky">
-              <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in blueskyAccounts()">
-                <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
-                <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="hidden text-muted text-xs underline hover:text-ink disabled:opacity-50 transition-colors" :class="{ 'hidden': !account.canBeDefault }" type="button" :disabled="account.busy" :aria-label="account.defaultLabel" @click="makeDefaultAccount(account.id)">Make default</button>
-                  <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
-                </span>
-              </li>
-            </ul>
+      <p class="m-0 pt-3 px-4 text-sm" role="status" x-cloak x-show="oauthFeedback()" :class="oauthFailed() ? 'text-danger' : 'text-success'" :text="oauthFeedback()"></p>
+      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" x-show="!channelsReady() && !bootstrap.error()" data-channels-loading>
+        <span class="sr-only" role="status">Loading publishing channels</span>
+        @for(i = 0; i < 3; i++)
+          <div class="grid gap-4 p-4 min-h-52 border border-line rounded-2xl" aria-hidden="true">
+            <Skeleton variant="avatar" className="bg-panel-2" />
+            <Skeleton variant="text" className="w-3/4 bg-panel-2" />
+            <Skeleton variant="text" className="w-1/2 bg-panel-2" />
           </div>
-          <details class="group">
-            <summary class="inline-flex items-center justify-center h-9 w-full font-semibold list-none text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl transition-colors cursor-pointer">Manage Bluesky</summary>
-            <form id="bluesky-connect-form" class="grid gap-2 pt-3" data-bluesky-connect-form>
-              <input class="px-3 h-9 text-ink text-xs bg-raised border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="identifier" placeholder="name.bsky.social" autocomplete="username" aria-label="Bluesky handle" data-bluesky-identifier required>
-              <input class="px-3 h-9 text-ink text-xs bg-raised border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password" type="password" autocomplete="current-password" placeholder="App password" aria-label="Bluesky app password" data-bluesky-password required>
-              <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" data-bluesky-connect-submit>Connect Bluesky</button>
-              <p class="m-0 text-muted text-xs">Use an app password from Bluesky Settings, never your account password. Sign in with another handle to add a second account.</p>
-            </form>
-          </details>
-        </article>
-        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="linkedin">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-[#0a66c2] text-xl bg-info-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-linkedin"></span></span><span class="px-2.5 py-1 font-semibold text-muted text-xs whitespace-nowrap border border-line rounded-full" data-linkedin-channel-status>Setup</span></div>
-            <h2 class="mb-0 mt-4 font-semibold text-sm">LinkedIn</h2>
-            <p class="my-1.5 text-body text-ui" data-linkedin-channel-handle>Not connected</p>
-            <p class="m-0 text-muted text-xs" data-linkedin-channel-detail>Connect with LinkedIn to crosspost member shares.</p>
-            {{-- Every connected LinkedIn account, from the linkedinAccounts() signal. --}}
-            <ul class="grid hidden gap-1.5 m-0 mt-3 p-0 list-none" :class="{ 'hidden': linkedinAccounts().length === 0 }" data-account-list="linkedin">
-              <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in linkedinAccounts()">
-                <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
-                <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="hidden text-muted text-xs underline hover:text-ink disabled:opacity-50 transition-colors" :class="{ 'hidden': !account.canBeDefault }" type="button" :disabled="account.busy" :aria-label="account.defaultLabel" @click="makeDefaultAccount(account.id)">Make default</button>
-                  <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
-                </span>
-              </li>
-            </ul>
-          </div>
-          <div class="grid gap-2">
-            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" data-linkedin-connect>Connect LinkedIn</button>
-            <button class="hidden text-muted text-xs underline hover:text-ink transition-colors" type="button" data-linkedin-connect-env>Use configured token</button>
-          </div>
-        </article>
-        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="instagram">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-note text-xl bg-note-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-instagram"></span></span><span class="px-2.5 py-1 font-semibold text-muted text-xs whitespace-nowrap border border-line rounded-full" data-instagram-channel-status>Setup</span></div>
-            <h2 class="mb-0 mt-4 font-semibold text-sm">Instagram</h2>
-            <p class="my-1.5 text-body text-ui" data-instagram-channel-handle>Not connected</p>
-            <p class="m-0 text-muted text-xs" data-instagram-channel-detail>Connect an Instagram Business account to crosspost. Posts require an image.</p>
-            {{-- Every connected Instagram account, from the instagramAccounts() signal. --}}
-            <ul class="grid hidden gap-1.5 m-0 mt-3 p-0 list-none" :class="{ 'hidden': instagramAccounts().length === 0 }" data-account-list="instagram">
-              <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in instagramAccounts()">
-                <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
-                <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="hidden text-muted text-xs underline hover:text-ink disabled:opacity-50 transition-colors" :class="{ 'hidden': !account.canBeDefault }" type="button" :disabled="account.busy" :aria-label="account.defaultLabel" @click="makeDefaultAccount(account.id)">Make default</button>
-                  <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
-                </span>
-              </li>
-            </ul>
-          </div>
-          <div class="grid gap-2">
-            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" data-instagram-connect>Connect Instagram</button>
-            <button class="hidden text-muted text-xs underline hover:text-ink transition-colors" type="button" data-instagram-connect-env>Use configured token</button>
-          </div>
-        </article>
-        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="threads">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-simple-icons-threads"></span></span><span class="px-2.5 py-1 font-semibold text-muted text-xs whitespace-nowrap border border-line rounded-full" data-threads-channel-status>Setup</span></div>
-            <h2 class="mb-0 mt-4 font-semibold text-sm">Threads</h2>
-            <p class="my-1.5 text-body text-ui" data-threads-channel-handle>Not connected</p>
-            <p class="m-0 text-muted text-xs" data-threads-channel-detail>Connect a Threads account to crosspost.</p>
-            {{-- Every connected Threads account, from the threadsAccounts() signal. --}}
-            <ul class="grid hidden gap-1.5 m-0 mt-3 p-0 list-none" :class="{ 'hidden': threadsAccounts().length === 0 }" data-account-list="threads">
-              <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in threadsAccounts()">
-                <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
-                <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="hidden text-muted text-xs underline hover:text-ink disabled:opacity-50 transition-colors" :class="{ 'hidden': !account.canBeDefault }" type="button" :disabled="account.busy" :aria-label="account.defaultLabel" @click="makeDefaultAccount(account.id)">Make default</button>
-                  <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
-                </span>
-              </li>
-            </ul>
-          </div>
-          <div class="grid gap-2">
-            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" data-threads-connect>Connect Threads</button>
-            <button class="hidden text-muted text-xs underline hover:text-ink transition-colors" type="button" data-threads-connect-env>Use configured token</button>
-          </div>
-        </article>
-        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="twitter">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-simple-icons-x"></span></span><span class="px-2.5 py-1 font-semibold text-muted text-xs whitespace-nowrap border border-line rounded-full" data-twitter-channel-status>Setup</span></div>
-            <h2 class="mb-0 mt-4 font-semibold text-sm">X</h2>
-            <p class="my-1.5 text-body text-ui" data-twitter-channel-handle>Not connected</p>
-            <p class="m-0 text-muted text-xs" data-twitter-channel-detail>Connect X to crosspost tweets. X bills per post, and a post with a link costs far more.</p>
-            {{-- Every connected X account, from the twitterAccounts() signal. --}}
-            <ul class="grid hidden gap-1.5 m-0 mt-3 p-0 list-none" :class="{ 'hidden': twitterAccounts().length === 0 }" data-account-list="twitter">
-              <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in twitterAccounts()">
-                <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
-                <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="hidden text-muted text-xs underline hover:text-ink disabled:opacity-50 transition-colors" :class="{ 'hidden': !account.canBeDefault }" type="button" :disabled="account.busy" :aria-label="account.defaultLabel" @click="makeDefaultAccount(account.id)">Make default</button>
-                  <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
-                </span>
-              </li>
-            </ul>
-          </div>
-          <div class="grid gap-2">
-            <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" data-twitter-connect>Connect X</button>
-            <button class="hidden text-muted text-xs underline hover:text-ink transition-colors" type="button" data-twitter-connect-env>Use configured token</button>
-          </div>
-        </article>
-        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="blog">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-ink text-xl bg-panel-2 rounded-xl" aria-hidden="true"><span class="i-hugeicons-quill-write-02"></span></span><span class="px-2.5 py-1 font-semibold text-success text-xs bg-success-soft border border-success-line rounded-full">Ready</span></div>
-            <h2 class="mb-0 mt-4 font-semibold text-sm">Blog</h2>
-            <p class="my-1.5 text-body text-ui">Built into Postline</p>
-            <p class="m-0 text-muted text-xs">Publish long-form posts to your site without another account.</p>
-          </div>
-          <a class="inline-flex items-center justify-center h-9 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl" href="/writing" data-stx-link>Open Blog</a>
-        </article>
-        <article class="flex flex-col gap-4 justify-between p-4 min-h-52 bg-panel border border-line rounded-2xl hover:border-line-strong hover:shadow-sm transition-all" data-channel="mastodon">
-          <div><div class="flex gap-3 items-start justify-between"><span class="grid place-items-center h-10 w-10 text-info text-xl bg-info-soft rounded-xl" aria-hidden="true"><span class="i-simple-icons-mastodon"></span></span><span class="px-2.5 py-1 font-semibold text-muted text-xs whitespace-nowrap border border-line rounded-full" data-mastodon-channel-status>Setup</span></div>
-            <h2 class="mb-0 mt-4 font-semibold text-sm">Mastodon</h2>
-            <p class="my-1.5 text-body text-ui" data-mastodon-channel-handle>Not connected</p>
-            <p class="m-0 text-muted text-xs" data-mastodon-channel-detail>Connect any Mastodon instance with an access token to crosspost.</p>
-            {{-- Every connected Mastodon account, from the mastodonAccounts() signal. --}}
-            <ul class="grid hidden gap-1.5 m-0 mt-3 p-0 list-none" :class="{ 'hidden': mastodonAccounts().length === 0 }" data-account-list="mastodon">
-              <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-xl" x-for="account in mastodonAccounts()">
-                <span class="min-w-0 text-ink text-xs truncate" :text="account.label" :title="account.title"></span>
-                <span class="flex gap-1.5 items-center shrink-0">
-                  <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.ok ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="account.status" :title="account.statusTitle"></span>
-                  <button class="hidden text-muted text-xs underline hover:text-ink disabled:opacity-50 transition-colors" :class="{ 'hidden': !account.canBeDefault }" type="button" :disabled="account.busy" :aria-label="account.defaultLabel" @click="makeDefaultAccount(account.id)">Make default</button>
-                  <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50 transition-colors" type="button" :disabled="account.busy" :aria-label="account.disconnectLabel" @click="disconnectAccount(account.id)">Disconnect</button>
-                </span>
-              </li>
-            </ul>
-          </div>
-          <details class="group">
-            <summary class="inline-flex items-center justify-center h-9 w-full font-semibold list-none text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl transition-colors cursor-pointer">Manage Mastodon</summary>
-            <form class="grid gap-2 pt-3" data-mastodon-connect-form>
-              <input class="px-3 h-9 text-ink text-xs bg-raised border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="instance" placeholder="mastodon.social" autocomplete="url" aria-label="Mastodon instance" data-mastodon-instance required>
-              <input class="px-3 h-9 text-ink text-xs bg-raised border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="access_token" type="password" placeholder="Access token" autocomplete="off" aria-label="Mastodon access token" data-mastodon-token required>
-              <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" data-mastodon-connect-submit>Connect Mastodon</button>
-              {{-- read:accounts is not optional: connecting verifies the token
-                  against /api/v1/accounts/verify_credentials before it is saved,
-                  so a write-only token fails at connect, not at publish. --}}
-              <p class="m-0 text-muted text-xs">Create a token in your instance settings with the read:accounts, write:statuses and write:media scopes. A token for another account, on any instance, adds it alongside.</p>
-            </form>
-          </details>
-        </article>
+        @endfor
+      </div>
+      <div class="grid gap-2 justify-items-start p-4" x-cloak x-show="bootstrap.error() && !channelsReady()" data-channels-error>
+        <p class="m-0 text-danger text-sm" role="alert" :text="bootstrap.error()"></p>
+        <button class="px-3 h-9 font-semibold text-ink text-xs bg-panel-2 border border-line rounded-xl" type="button" @click="bootstrap.refresh()">Try again</button>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" x-cloak x-show="channelsReady()" data-publishing-channels>
+        <div class="min-w-0" x-for="provider in channelProviders()" :key="provider">
+          <NetworkChannelCard :provider="provider" />
+        </div>
       </div>
     </section>
 
@@ -208,7 +69,7 @@
       secret are entered here (the secret is stored sealed), so no file has to
       be edited, which the Mac app cannot do at all.
     --}}
-    <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" aria-label="Your network apps" data-network-apps>
+    <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" aria-label="Your network apps" x-cloak x-show="channelsReady()" data-network-apps>
       <header class="px-4 py-3.5 border-b border-line">
         <h2 class="m-0 font-semibold text-ink text-sm">Your network apps</h2>
         <p class="m-0 mt-1 text-muted text-xs">X, LinkedIn, Instagram and Threads connect through an app you register on each network. Postline has no keys of its own: yours stay in this workspace.</p>
@@ -335,18 +196,16 @@
   </section>
 
   <script client>
-    // Template-bound state lives at the top level of the script: stx binds
-    // `:text`, `x-for` and `@click` expressions to top-level declarations, and
-    // signals declared inside the IIFE below were invisible to the template,
-    // so these lists never rendered.
+    const bootstrap = workspaceBootstrapQuery()
+    const channelsReady = derived(() => Boolean(bootstrap.data()))
+    const channelProviders = derived(() => bootstrap.data()?.providers.map(status => status.provider) ?? [])
+    const networkApps = derived(() => bootstrap.data()?.networkApps ?? [])
+    const oauthFeedback = state('')
+    const oauthFailed = state(false)
 
-    // --- Connected accounts (several per network) ---
-    // Rendered declaratively from these signals into each card's list; the
-    // per-network status renderers below still own the card header.
-    const accountList = state([])
+    onMount(() => void bootstrap.load())
 
-    // --- Your network apps (bring your own keys) ---
-    const networkApps = state([])
+    // Network app forms keep unsaved credentials in this view only.
     const appDrafts = state({})
     const appBusy = state('')
     const APP_GUIDES = {
@@ -416,67 +275,10 @@
       drafts[provider] = { ...(drafts[provider] || {}), organizationPages: Boolean(event?.target?.checked) }
       appDrafts.set(drafts)
     }
-    const appHandlers = { load: null, save: null, clear: null, copy: null }
+    const appHandlers = { save: null, clear: null, copy: null }
     const saveApp = provider => appHandlers.save?.(provider)
     const clearApp = provider => appHandlers.clear?.(provider)
     const copyRedirect = provider => appHandlers.copy?.(provider)
-    const disconnectingId = state(0)
-
-    const accountName = (account) => {
-      const handle = String(account?.handle || '')
-      if (account?.provider === 'linkedin' || handle.startsWith('@')) return handle
-      return `@${handle}`
-    }
-
-    /** "Expires in 3 days", from an ISO time. */
-    const expiryLabel = (expiresAt) => {
-      const hours = Math.round((Date.parse(String(expiresAt)) - Date.now()) / 3_600_000)
-      if (!Number.isFinite(hours)) return 'Expires soon'
-      if (hours <= 0) return 'Expired'
-      if (hours < 48) return `Expires in ${hours} hour${hours === 1 ? '' : 's'}`
-      return `Expires in ${Math.round(hours / 24)} days`
-    }
-
-    /** One account row flattened to exactly what the template renders. */
-    const accountRowsFor = (provider) => {
-      const rows = accountList().filter(account => account.provider === provider)
-      return rows.map((account) => {
-        const name = accountName(account)
-        return {
-          id: account.id,
-          label: name,
-          title: account.displayName && account.displayName !== account.handle ? `${account.displayName} (${name})` : name,
-          connected: Boolean(account.connected),
-          // "Default" only means something once there is a choice: it is the
-          // account a campaign or a plain network target publishes through.
-          // A token nothing can renew, or one whose renewal keeps failing,
-          // is said here a week ahead and not by a failed post.
-          ok: Boolean(account.connected) && !account.expiresSoon,
-          status: !account.connected ? 'Reconnect' : account.expiresSoon ? expiryLabel(account.expiresAt) : rows.length > 1 && account.isDefault ? 'Default' : 'Connected',
-          statusTitle: account.connected && account.expiresSoon
-            ? 'This sign-in is about to lapse. Connect the account again to keep publishing.'
-            : '',
-          busy: disconnectingId() === account.id,
-          // Offered only where it changes something: a connected account that
-          // is not already the default, on a network with more than one.
-          canBeDefault: Boolean(account.connected) && !account.isDefault && rows.length > 1,
-          defaultLabel: `Publish to ${name} by default`,
-          disconnectLabel: `Disconnect ${name}`,
-        }
-      })
-    }
-
-    const blueskyAccounts = derived(() => accountRowsFor('bluesky'))
-    const linkedinAccounts = derived(() => accountRowsFor('linkedin'))
-    const instagramAccounts = derived(() => accountRowsFor('instagram'))
-    const threadsAccounts = derived(() => accountRowsFor('threads'))
-    const twitterAccounts = derived(() => accountRowsFor('twitter'))
-    const mastodonAccounts = derived(() => accountRowsFor('mastodon'))
-
-    // Filled in by the IIFE below, which owns the DOM and the status refreshers.
-    const accountHandlers = { disconnect: null, makeDefault: null }
-    const disconnectAccount = id => accountHandlers.disconnect?.(id)
-    const makeDefaultAccount = id => accountHandlers.makeDefault?.(id)
 
     const purgeResultRows = state([])
 
@@ -508,13 +310,6 @@
       const root = document.querySelector('[data-testid="accounts-page"]')
       if (!root) return
 
-      const form = root.querySelector('[data-bluesky-connect-form]')
-      const identifier = root.querySelector('[data-bluesky-identifier]')
-      const password = root.querySelector('[data-bluesky-password]')
-      const submit = root.querySelector('[data-bluesky-connect-submit]')
-      const handle = root.querySelector('[data-bluesky-channel-handle]')
-      const detail = root.querySelector('[data-bluesky-channel-detail]')
-      const status = root.querySelector('[data-bluesky-channel-status]')
       const notify = (message, tone = 'neutral', options = {}) => {
         // Resolve the toast helper at call time — it's a deferred module that
         // loads after this inline script parses, so an eager capture is
@@ -524,566 +319,26 @@
         else console.log(message)
       }
 
-      /**
-       * The card's handle line. With one account it names it, as it always
-       * has; with several, the list under it names each one and this counts.
-       */
-      const handleLine = (data, single) => {
-        const total = (data?.accounts || []).length
-        return total > 1 ? `${total} accounts connected` : single
-      }
-
-      const refreshAccounts = async () => {
-        try {
-          accountList.set(await fetchAccounts())
-        }
-        catch (error) {
-          // Same as the status cards: degrade quietly on load.
-          accountList.set([])
-          console.warn('[postline] account list failed:', error)
-        }
-      }
-
-      const renderStatus = (data) => {
-        const connected = Boolean(data?.canPublish)
-        const label = data?.handle ? `@${data.handle}` : 'Not connected'
-        // The form adds accounts as well as reconnecting them, so it is no
-        // longer prefilled with the connected handle.
-        if (handle) handle.textContent = handleLine(data, label)
-        if (detail) {
-          detail.textContent = connected
-            ? 'Ready to publish and sync timeline from Postline.'
-            : data?.handle
-              ? 'Saved handle found. Add a valid app password to publish.'
-              : 'Add an app password to publish and sync your timeline.'
-        }
-        if (status) {
-          status.textContent = connected ? 'Connected' : data?.handle ? 'Needs password' : 'Setup'
-          status.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
-            connected
-              ? 'border-success-line bg-success-soft text-success'
-              : data?.handle
-                ? 'border-warning-line bg-warning-soft text-warning'
-                : 'border-line text-muted'
-          }`
-        }
-        if (submit) submit.textContent = connected ? 'Add or reconnect account' : 'Connect Bluesky'
-      }
-
-      const refreshStatus = async () => {
-        try {
-          const data = await window.postlineSocial?.fetchStatus('bluesky')
-          renderStatus(data)
-        }
-        catch (error) {
-          // Inline status ("Setup" / "Not connected") communicates the failure;
-          // no toast on load so an expired session can't spam one each visit.
-          renderStatus(null)
-          console.warn('[postline] bluesky status failed:', error)
-        }
-      }
-
-      form?.addEventListener('submit', async (event) => {
-        event.preventDefault()
-        submit?.setAttribute('disabled', 'disabled')
-        notify('Connecting to Bluesky…', 'info', { title: 'Channels' })
-
-        try {
-          const payload = await requestJson('/api/postline/bluesky/connect', {
-            method: 'POST',
-            body: new FormData(form),
-          }, 'Bluesky connect failed.')
-          if (password) password.value = ''
-          if (identifier) identifier.value = ''
-          await Promise.all([refreshStatus(), refreshAccounts()])
-          notify(`${payload.data.handle} is connected. You can publish from the composer.`, 'success', { title: 'Connected' })
-        }
-        catch (error) {
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Connect failed' })
-        }
-        finally {
-          submit?.removeAttribute('disabled')
-        }
-      })
-
-      // --- LinkedIn ---
-      const linkedinHandle = root.querySelector('[data-linkedin-channel-handle]')
-      const linkedinDetail = root.querySelector('[data-linkedin-channel-detail]')
-      const linkedinStatusPill = root.querySelector('[data-linkedin-channel-status]')
-      const linkedinConnect = root.querySelector('[data-linkedin-connect]')
-      const linkedinConnectEnv = root.querySelector('[data-linkedin-connect-env]')
-
-      const renderLinkedIn = (data) => {
-        const connected = Boolean(data?.canPublish)
-        const label = data?.displayName || data?.handle || 'Not connected'
-        if (linkedinHandle) {
-          linkedinHandle.textContent = handleLine(data, connected ? label : (data?.handle ? `${label}, reconnect` : 'Not connected'))
-        }
-        if (linkedinDetail) {
-          linkedinDetail.textContent = connected
-            ? 'Ready to crosspost. To add another account, sign in to it on LinkedIn first.'
-            : data?.oauthConfigured
-              ? 'Connect with LinkedIn to crosspost member shares.'
-              : data?.configuredFromEnv
-                ? 'Token found in .env. Connect to start crossposting.'
-                : 'Set up your LinkedIn app below, then connect.'
-        }
-        if (linkedinStatusPill) {
-          linkedinStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
-          linkedinStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
-            connected
-              ? 'border-success-line bg-success-soft text-success'
-              : data?.handle
-                ? 'border-warning-line bg-warning-soft text-warning'
-                : 'border-line text-muted'
-          }`
-        }
-        if (linkedinConnect) {
-          linkedinConnect.textContent = connected ? 'Connect another account' : data?.handle ? 'Reconnect LinkedIn' : 'Connect with LinkedIn'
-          if (data && !data.oauthConfigured) linkedinConnect.setAttribute('disabled', 'disabled')
-          else linkedinConnect.removeAttribute('disabled')
-        }
-        if (linkedinConnectEnv) linkedinConnectEnv.classList.toggle('hidden', !data?.configuredFromEnv)
-      }
-
-      const refreshLinkedIn = async () => {
-        try {
-          const data = await window.postlineSocial?.fetchStatus('linkedin')
-          renderLinkedIn(data)
-        }
-        catch (error) {
-          renderLinkedIn(null)
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'LinkedIn' })
-        }
-      }
-
-      linkedinConnect?.addEventListener('click', () => {
-        notify('Redirecting to LinkedIn…', 'info', { title: 'LinkedIn' })
-        navigate('/api/postline/linkedin/auth', true)
-      })
-
-      linkedinConnectEnv?.addEventListener('click', async () => {
-        linkedinConnectEnv.setAttribute('disabled', 'disabled')
-        notify('Connecting LinkedIn from .env…', 'info', { title: 'LinkedIn' })
-        try {
-          await requestJson('/api/postline/linkedin/connect', { method: 'POST' }, 'LinkedIn connect failed.')
-          await Promise.all([refreshLinkedIn(), refreshAccounts()])
-          notify('LinkedIn connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
-        }
-        catch (error) {
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Connect failed' })
-        }
-        finally {
-          linkedinConnectEnv.removeAttribute('disabled')
-        }
-      })
-
-      /**
-       * Read a provider's OAuth callback result, then strip it from the URL.
-       *
-       * Reads the query FRESH on every call. The previous code built one
-       * URLSearchParams for LinkedIn and mutated it with delete(); Instagram and
-       * Threads then read from that already-mutated object, so a callback
-       * carrying both a provider key and a message could lose the message.
-       *
-       * replaceState, not navigate(): navigate() pushes a history entry, so Back
-       * would land on a URL still carrying the callback params and re-run this
-       * handler. The runtime offers no replace-mode navigation, which is why
-       * this one raw history call survives.
-       */
-      const consumeOAuthResult = (provider) => {
-        const route = useRoute()
-        const value = route.query[provider]
-        if (!value) return null
+      const route = useRoute()
+      for (const provider of ['linkedin', 'twitter', 'instagram', 'threads']) {
+        const result = route.query[provider]
+        if (result !== 'connected' && result !== 'error') continue
         const params = new URLSearchParams(route.fullPath.split('?')[1] || '')
         const message = params.get('message')
         params.delete(provider)
         params.delete('message')
         const query = params.toString()
         window.history.replaceState({}, '', `${route.path}${query ? `?${query}` : ''}`)
-        return { value, message }
+        oauthFailed.set(result === 'error')
+        oauthFeedback.set(result === 'connected' ? `${providerLabel(provider)} connected.` : message || `Could not connect ${providerLabel(provider)}.`)
+        if (result === 'connected') {
+          // The redirected page reads the fresh account as it mounts.
+          // Notify any existing workspace windows as well.
+          onMount(() => announceWorkspaceChange())
+        }
+        break
       }
 
-      const linkedinCallback = consumeOAuthResult('linkedin')
-      if (linkedinCallback?.value === 'connected')
-        notify('LinkedIn connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
-      else if (linkedinCallback?.value === 'error')
-        notify(linkedinCallback.message || 'LinkedIn connection failed.', 'error', { title: 'LinkedIn' })
-
-      const startLinkedIn = () => void refreshLinkedIn()
-      onMount(startLinkedIn)
-
-      // --- X (Twitter) ---
-      const twitterHandle = root.querySelector('[data-twitter-channel-handle]')
-      const twitterDetail = root.querySelector('[data-twitter-channel-detail]')
-      const twitterStatusPill = root.querySelector('[data-twitter-channel-status]')
-      const twitterConnect = root.querySelector('[data-twitter-connect]')
-      const twitterConnectEnv = root.querySelector('[data-twitter-connect-env]')
-
-      const renderTwitter = (data) => {
-        const connected = Boolean(data?.canPublish)
-        const label = data?.handle ? `@${data.handle}` : 'Not connected'
-        if (twitterHandle) {
-          twitterHandle.textContent = handleLine(data, connected ? label : (data?.handle ? `${label}, reconnect` : 'Not connected'))
-        }
-        if (twitterDetail) {
-          twitterDetail.textContent = connected
-            ? 'Ready to crosspost. To add another account, switch to it on x.com first.'
-            : data?.oauthConfigured
-              ? 'Connect X to crosspost tweets. X bills per post, and a post with a link costs far more.'
-              : data?.configuredFromEnv
-                ? 'Token found in .env. Connect to start crossposting.'
-                : 'Set up your X app below, then connect.'
-        }
-        if (twitterStatusPill) {
-          twitterStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
-          twitterStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
-            connected
-              ? 'border-success-line bg-success-soft text-success'
-              : data?.handle
-                ? 'border-warning-line bg-warning-soft text-warning'
-                : 'border-line text-muted'
-          }`
-        }
-        if (twitterConnect) {
-          twitterConnect.textContent = connected ? 'Connect another account' : data?.handle ? 'Reconnect X' : 'Connect with X'
-          if (data && !data.oauthConfigured) twitterConnect.setAttribute('disabled', 'disabled')
-          else twitterConnect.removeAttribute('disabled')
-        }
-        if (twitterConnectEnv) twitterConnectEnv.classList.toggle('hidden', !data?.configuredFromEnv)
-      }
-
-      const refreshTwitter = async () => {
-        try {
-          renderTwitter(await window.postlineSocial?.fetchStatus('twitter'))
-        }
-        catch (error) {
-          renderTwitter(null)
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'X/Twitter' })
-        }
-      }
-
-      twitterConnect?.addEventListener('click', () => {
-        notify('Redirecting to X…', 'info', { title: 'X/Twitter' })
-        navigate('/api/postline/twitter/auth', true)
-      })
-
-      twitterConnectEnv?.addEventListener('click', async () => {
-        twitterConnectEnv.setAttribute('disabled', 'disabled')
-        notify('Connecting X from .env…', 'info', { title: 'X/Twitter' })
-        try {
-          await requestJson('/api/postline/twitter/connect', { method: 'POST' }, 'X connect failed.')
-          await Promise.all([refreshTwitter(), refreshAccounts()])
-          notify('X connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
-        }
-        catch (error) {
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Connect failed' })
-        }
-        finally {
-          twitterConnectEnv.removeAttribute('disabled')
-        }
-      })
-
-      const twitterCallback = consumeOAuthResult('twitter')
-      if (twitterCallback?.value === 'connected')
-        notify('X connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
-      else if (twitterCallback?.value === 'error')
-        notify(twitterCallback.message || 'X connection failed.', 'error', { title: 'X/Twitter' })
-
-      const startTwitter = () => void refreshTwitter()
-      onMount(startTwitter)
-
-      // --- Instagram ---
-      const instagramHandle = root.querySelector('[data-instagram-channel-handle]')
-      const instagramDetail = root.querySelector('[data-instagram-channel-detail]')
-      const instagramStatusPill = root.querySelector('[data-instagram-channel-status]')
-      const instagramConnect = root.querySelector('[data-instagram-connect]')
-      const instagramConnectEnv = root.querySelector('[data-instagram-connect-env]')
-
-      const renderInstagram = (data) => {
-        const connected = Boolean(data?.canPublish)
-        const label = data?.handle ? `@${data.handle}` : 'Not connected'
-        if (instagramHandle) {
-          instagramHandle.textContent = handleLine(data, connected ? label : (data?.handle ? `${label}, reconnect` : 'Not connected'))
-        }
-        if (instagramDetail) {
-          instagramDetail.textContent = connected
-            ? 'Ready to crosspost. Remember Instagram posts need an image.'
-            : data?.oauthConfigured
-              ? 'Connect an Instagram Business account to crosspost. Posts require an image.'
-              : data?.configuredFromEnv
-                ? 'Token found in .env. Connect to start crossposting.'
-                : 'Set up your Instagram app below, then connect.'
-        }
-        if (instagramStatusPill) {
-          instagramStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
-          instagramStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
-            connected
-              ? 'border-success-line bg-success-soft text-success'
-              : data?.handle
-                ? 'border-warning-line bg-warning-soft text-warning'
-                : 'border-line text-muted'
-          }`
-        }
-        if (instagramConnect) {
-          instagramConnect.textContent = connected ? 'Connect another account' : data?.handle ? 'Reconnect Instagram' : 'Connect with Instagram'
-          if (data && !data.oauthConfigured) instagramConnect.setAttribute('disabled', 'disabled')
-          else instagramConnect.removeAttribute('disabled')
-        }
-        if (instagramConnectEnv) instagramConnectEnv.classList.toggle('hidden', !data?.configuredFromEnv)
-      }
-
-      const refreshInstagram = async () => {
-        try {
-          const data = await window.postlineSocial?.fetchStatus('instagram')
-          renderInstagram(data)
-        }
-        catch (error) {
-          renderInstagram(null)
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Instagram' })
-        }
-      }
-
-      instagramConnect?.addEventListener('click', () => {
-        notify('Redirecting to Instagram…', 'info', { title: 'Instagram' })
-        navigate('/api/postline/instagram/auth', true)
-      })
-
-      instagramConnectEnv?.addEventListener('click', async () => {
-        instagramConnectEnv.setAttribute('disabled', 'disabled')
-        notify('Connecting Instagram from .env…', 'info', { title: 'Instagram' })
-        try {
-          await requestJson('/api/postline/instagram/connect', { method: 'POST' }, 'Instagram connect failed.')
-          await Promise.all([refreshInstagram(), refreshAccounts()])
-          notify('Instagram connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
-        }
-        catch (error) {
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Connect failed' })
-        }
-        finally {
-          instagramConnectEnv.removeAttribute('disabled')
-        }
-      })
-
-      const instagramCallback = consumeOAuthResult('instagram')
-      if (instagramCallback?.value === 'connected')
-        notify('Instagram connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
-      else if (instagramCallback?.value === 'error')
-        notify(instagramCallback.message || 'Instagram connection failed.', 'error', { title: 'Instagram' })
-
-      const startInstagram = () => void refreshInstagram()
-      onMount(startInstagram)
-
-      // --- Threads ---
-      const threadsHandle = root.querySelector('[data-threads-channel-handle]')
-      const threadsDetail = root.querySelector('[data-threads-channel-detail]')
-      const threadsStatusPill = root.querySelector('[data-threads-channel-status]')
-      const threadsConnect = root.querySelector('[data-threads-connect]')
-      const threadsConnectEnv = root.querySelector('[data-threads-connect-env]')
-
-      const renderThreads = (data) => {
-        const connected = Boolean(data?.canPublish)
-        const label = data?.handle ? `@${data.handle}` : 'Not connected'
-        if (threadsHandle) {
-          threadsHandle.textContent = handleLine(data, connected ? label : (data?.handle ? `${label}, reconnect` : 'Not connected'))
-        }
-        if (threadsDetail) {
-          threadsDetail.textContent = connected
-            ? 'Ready to crosspost from Postline.'
-            : data?.oauthConfigured
-              ? 'Connect a Threads account to crosspost.'
-              : data?.configuredFromEnv
-                ? 'Token found in .env. Connect to start crossposting.'
-                : 'Set up your Threads app below, then connect.'
-        }
-        if (threadsStatusPill) {
-          threadsStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
-          threadsStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
-            connected
-              ? 'border-success-line bg-success-soft text-success'
-              : data?.handle
-                ? 'border-warning-line bg-warning-soft text-warning'
-                : 'border-line text-muted'
-          }`
-        }
-        if (threadsConnect) {
-          threadsConnect.textContent = connected ? 'Connect another account' : data?.handle ? 'Reconnect Threads' : 'Connect with Threads'
-          if (data && !data.oauthConfigured) threadsConnect.setAttribute('disabled', 'disabled')
-          else threadsConnect.removeAttribute('disabled')
-        }
-        if (threadsConnectEnv) threadsConnectEnv.classList.toggle('hidden', !data?.configuredFromEnv)
-      }
-
-      const refreshThreads = async () => {
-        try {
-          const data = await window.postlineSocial?.fetchStatus('threads')
-          renderThreads(data)
-        }
-        catch (error) {
-          renderThreads(null)
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Threads' })
-        }
-      }
-
-      threadsConnect?.addEventListener('click', () => {
-        notify('Redirecting to Threads…', 'info', { title: 'Threads' })
-        navigate('/api/postline/threads/auth', true)
-      })
-
-      threadsConnectEnv?.addEventListener('click', async () => {
-        threadsConnectEnv.setAttribute('disabled', 'disabled')
-        notify('Connecting Threads from .env…', 'info', { title: 'Threads' })
-        try {
-          await requestJson('/api/postline/threads/connect', { method: 'POST' }, 'Threads connect failed.')
-          await Promise.all([refreshThreads(), refreshAccounts()])
-          notify('Threads connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
-        }
-        catch (error) {
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Connect failed' })
-        }
-        finally {
-          threadsConnectEnv.removeAttribute('disabled')
-        }
-      })
-
-      const threadsCallback = consumeOAuthResult('threads')
-      if (threadsCallback?.value === 'connected')
-        notify('Threads connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
-      else if (threadsCallback?.value === 'error')
-        notify(threadsCallback.message || 'Threads connection failed.', 'error', { title: 'Threads' })
-
-      const startThreads = () => void refreshThreads()
-      onMount(startThreads)
-
-      // --- Mastodon ---
-      const mastodonForm = root.querySelector('[data-mastodon-connect-form]')
-      const mastodonInstance = root.querySelector('[data-mastodon-instance]')
-      const mastodonToken = root.querySelector('[data-mastodon-token]')
-      const mastodonSubmit = root.querySelector('[data-mastodon-connect-submit]')
-      const mastodonHandle = root.querySelector('[data-mastodon-channel-handle]')
-      const mastodonDetail = root.querySelector('[data-mastodon-channel-detail]')
-      const mastodonStatusPill = root.querySelector('[data-mastodon-channel-status]')
-
-      const renderMastodon = (data) => {
-        const connected = Boolean(data?.canPublish)
-        if (mastodonHandle) mastodonHandle.textContent = handleLine(data, connected ? data.handle : (data?.handle ? `${data.handle}, reconnect` : 'Not connected'))
-        if (mastodonInstance && data?.instance) mastodonInstance.value = data.instance
-        if (mastodonDetail) {
-          mastodonDetail.textContent = connected
-            ? 'Ready to crosspost from Postline.'
-            : data?.configuredFromEnv
-              ? 'Token found in .env. Connect to start crossposting.'
-              : 'Connect any Mastodon instance with an access token to crosspost.'
-        }
-        if (mastodonStatusPill) {
-          mastodonStatusPill.textContent = connected ? 'Connected' : (data?.handle ? 'Reconnect' : 'Setup')
-          mastodonStatusPill.className = `whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${
-            connected
-              ? 'border-success-line bg-success-soft text-success'
-              : data?.handle
-                ? 'border-warning-line bg-warning-soft text-warning'
-                : 'border-line text-muted'
-          }`
-        }
-        if (mastodonSubmit) mastodonSubmit.textContent = connected ? 'Add or reconnect account' : 'Connect'
-      }
-
-      const refreshMastodon = async () => {
-        try {
-          renderMastodon(await window.postlineSocial?.fetchStatus('mastodon'))
-        }
-        catch (error) {
-          renderMastodon(null)
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Mastodon' })
-        }
-      }
-
-      mastodonForm?.addEventListener('submit', async (event) => {
-        event.preventDefault()
-        mastodonSubmit?.setAttribute('disabled', 'disabled')
-        notify('Connecting to Mastodon…', 'info', { title: 'Mastodon' })
-        try {
-          const payload = await requestJson('/api/postline/mastodon/connect', { method: 'POST', body: new FormData(mastodonForm) }, 'Mastodon connect failed.')
-          if (mastodonToken) mastodonToken.value = ''
-          await Promise.all([refreshMastodon(), refreshAccounts()])
-          notify(`${payload.data.handle} is connected. You can crosspost from the composer.`, 'success', { title: 'Connected' })
-        }
-        catch (error) {
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Connect failed' })
-        }
-        finally {
-          mastodonSubmit?.removeAttribute('disabled')
-        }
-      })
-
-      const startMastodon = () => void refreshMastodon()
-      onMount(startMastodon)
-
-      // Disconnect refreshes the account list and that network's card, since
-      // the card's default account may be the one that just went away.
-      const refreshNetwork = {
-        bluesky: () => refreshStatus(),
-        linkedin: () => refreshLinkedIn(),
-        twitter: () => refreshTwitter(),
-        instagram: () => refreshInstagram(),
-        threads: () => refreshThreads(),
-        mastodon: () => refreshMastodon(),
-      }
-
-      accountHandlers.disconnect = async (id) => {
-        const account = accountList().find(entry => entry.id === id)
-        if (!account || disconnectingId()) return
-        const name = accountName(account)
-        // Reversible (connect it again), but it stops scheduled posts that
-        // target this account, so it still asks first.
-        if (!window.confirm(`Disconnect ${name}? Scheduled posts for this account will fail until it is connected again. Its published posts are kept.`)) return
-
-        disconnectingId.set(id)
-        try {
-          await disconnectSocialAccount(id)
-          await Promise.all([refreshAccounts(), refreshNetwork[account.provider]?.()])
-          notify(`${name} is disconnected.`, 'success', { title: 'Disconnected' })
-        }
-        catch (error) {
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Disconnect failed' })
-        }
-        finally {
-          disconnectingId.set(0)
-        }
-      }
-
-      accountHandlers.makeDefault = async (id) => {
-        const account = accountList().find(entry => entry.id === id)
-        if (!account || disconnectingId()) return
-        const name = accountName(account)
-
-        disconnectingId.set(id)
-        try {
-          const body = new FormData()
-          body.set('id', String(id))
-          await requestJson('/api/postline/accounts/default', { method: 'POST', body }, 'Could not change the default account.')
-          await Promise.all([refreshAccounts(), refreshNetwork[account.provider]?.()])
-          notify(`Posts to this network now go to ${name} unless you pick another account.`, 'success', { title: 'Default changed' })
-        }
-        catch (error) {
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Could not change the default' })
-        }
-        finally {
-          disconnectingId.set(0)
-        }
-      }
-
-      const startAccounts = () => void refreshAccounts()
-      onMount(startAccounts)
-
-      appHandlers.load = async () => {
-        try {
-          const response = await fetch('/api/postline/network-apps')
-          const payload = await response.json()
-          if (response.ok && payload.ok) networkApps.set(payload.data.apps || [])
-        }
-        catch {}
-      }
       appHandlers.save = async (provider) => {
         const row = appRows().find(entry => entry.provider === provider)
         if (!row) return
@@ -1098,8 +353,7 @@
           const drafts = { ...appDrafts() }
           delete drafts[provider]
           appDrafts.set(drafts)
-          await appHandlers.load()
-          await Promise.all([refreshNetwork[provider]?.()])
+          await bootstrap.load()
           notify(`${row.label} app saved. Connect the account in its card.`, 'success', { title: row.label })
         }
         catch (error) {
@@ -1116,9 +370,8 @@
         try {
           const body = new FormData()
           body.set('provider', provider)
-          const payload = await requestJson('/api/postline/network-apps/clear', { method: 'POST', body }, 'Could not remove the app.')
-          networkApps.set(payload.data.apps || [])
-          await refreshNetwork[provider]?.()
+          await requestJson('/api/postline/network-apps/clear', { method: 'POST', body }, 'Could not remove the app.')
+          await bootstrap.load()
         }
         catch (error) {
           notify(error instanceof Error ? error.message : String(error), 'error', { title: row.label })
@@ -1138,7 +391,6 @@
           notify(row.redirectUrl, 'info', { title: 'Copy this address' })
         }
       }
-      onMount(() => void appHandlers.load())
 
       // --- Danger zone: bulk post deletion ---
       const purgeCard = root.querySelector('[data-purge-card]')
@@ -1315,12 +567,6 @@
 
       syncPurgeButton()
 
-      // Gate the initial status fetch on DOMContentLoaded so the deferred
-      // postline-bluesky module has loaded — otherwise a connected account
-      // renders "Not connected" on a full page load. (Mirrors the other
-      // providers.)
-      const startBluesky = () => void refreshStatus()
-      onMount(startBluesky)
     })()
   </script>
 @endsection

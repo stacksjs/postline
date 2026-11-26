@@ -17,11 +17,11 @@ declare global {
   const requestJson: typeof autoImports.requestJson
   const fetchWorkspaceBootstrap: typeof autoImports.fetchWorkspaceBootstrap
   const refreshWorkspaceBootstrap: typeof autoImports.refreshWorkspaceBootstrap
-  const fetchAccounts: typeof autoImports.fetchAccounts
   const disconnectSocialAccount: typeof autoImports.disconnectSocialAccount
   const escapeHtml: typeof autoImports.escapeHtml
   const relativeTime: typeof autoImports.relativeTime
   const workspaceBootstrapQuery: typeof autoImports.workspaceBootstrapQuery
+  const announceWorkspaceChange: typeof autoImports.announceWorkspaceChange
   const workspaceCommands: typeof autoImports.workspaceCommands
   const runWorkspaceCommand: typeof autoImports.runWorkspaceCommand
 }

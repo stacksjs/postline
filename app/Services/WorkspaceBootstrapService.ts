@@ -1,6 +1,7 @@
 import { ACCOUNT_PROVIDERS } from '../Support/Social/targets'
 import { directMessages } from './DirectMessageService'
 import { keywordMonitoring } from './KeywordMonitoringService'
+import { networkApps } from './NetworkAppService'
 import { blog } from './Social/BlogService'
 import { bluesky } from './Social/BlueskyService'
 import { instagram } from './Social/InstagramService'
@@ -29,12 +30,13 @@ export async function workspaceUnreadCounts() {
 }
 
 export async function workspaceBootstrap() {
-  const [profile, providers, unread] = await Promise.all([
+  const [profile, providers, unread, apps] = await Promise.all([
     workspace.profile(),
     providerStatuses(),
     workspaceUnreadCounts(),
+    networkApps.summary(),
   ])
   const byProvider = new Map(providers.map(provider => [provider.provider, 'accounts' in provider ? provider.accounts : []]))
   const accounts = ACCOUNT_PROVIDERS.flatMap(provider => byProvider.get(provider) ?? [])
-  return { workspace: profile, providers, accounts, unread }
+  return { workspace: profile, providers, accounts, unread, networkApps: apps }
 }

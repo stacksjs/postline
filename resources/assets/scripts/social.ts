@@ -14,6 +14,8 @@ export interface AccountStatus {
   isDefault: boolean
   instance?: string | null
   avatar: string | null
+  expiresAt: string | null
+  expiresSoon: boolean
 }
 
 /**
@@ -29,6 +31,7 @@ export interface ProviderStatus {
   id?: number | null
   handle: string | null
   displayName?: string | null
+  instance?: string | null
   characterLimit: number
   authStatus: string
   configuredFromEnv?: boolean
@@ -93,29 +96,6 @@ export function targetLabel(provider: string, handle?: string | null): string {
   return formatted ? `${providerLabel(provider)} ${formatted}` : providerLabel(provider)
 }
 
-/** A network whose connection the Accounts page shows. */
-export type StatusNetwork = 'bluesky' | 'linkedin' | 'instagram' | 'threads' | 'twitter' | 'mastodon'
-
-/**
- * One network's connection, as `/api/postline/<network>/status` answers it.
- * The fields every network sends, and the ones only some do.
- */
-export interface NetworkStatus {
-  connected: boolean
-  provider: string
-  id: number | null
-  handle: string | null
-  displayName: string | null
-  canPublish: boolean
-  characterLimit: number
-  configuredFromEnv: boolean
-  authStatus: string
-  oauthConfigured?: boolean
-  requiresMedia?: boolean
-  accounts?: AccountStatus[]
-  [key: string]: unknown
-}
-
 /**
  * Link previews are keyed by URL. They can be reused independently of
  * workspace state. A failed read is retried the next time it is needed.
@@ -132,14 +112,6 @@ function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
   })
   cache.set(key, { at: Date.now(), value })
   return value
-}
-
-/** A channel card reads from the same workspace query as the composer. */
-export async function fetchStatus(network: StatusNetwork): Promise<NetworkStatus> {
-  const { providers } = await fetchWorkspaceBootstrap()
-  const provider = providers.find(entry => entry.provider === network)
-  if (!provider) throw new Error(`Could not load ${providerLabel(network)} status.`)
-  return provider as NetworkStatus
 }
 
 /** The workspace profile (its name and time zone), which most views read. */
@@ -209,7 +181,6 @@ declare global {
     postlineSocial?: {
       fetchWorkspace: typeof fetchWorkspace
       fetchLinkPreview: typeof fetchLinkPreview
-      fetchStatus: typeof fetchStatus
       fetchProviders: typeof fetchProviders
       publishCrosspost: typeof publishCrosspost
       providerLabel: typeof providerLabel
@@ -223,7 +194,6 @@ declare global {
 window.postlineSocial = {
   fetchWorkspace,
   fetchLinkPreview,
-  fetchStatus,
   fetchProviders,
   publishCrosspost,
   providerLabel,

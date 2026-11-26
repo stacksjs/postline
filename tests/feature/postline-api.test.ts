@@ -59,13 +59,15 @@ describe('postline api — reads', () => {
     response.assertStatus(200)
     const body = await response.json<{
       ok: boolean
-      data: { workspace: unknown, providers: { provider: string }[], accounts: unknown[], unread: unknown }
+      data: { workspace: unknown, providers: { provider: string }[], accounts: unknown[], unread: unknown, networkApps: { provider: string }[] }
     }>()
     expect(body.ok).toBe(true)
     expect(body.data.workspace).toMatchObject({ workspaceName: expect.any(String), timezone: expect.any(String) })
     expect(body.data.providers.map(provider => provider.provider)).toEqual(['bluesky', 'twitter', 'linkedin', 'instagram', 'threads', 'mastodon', 'blog'])
     expect(Array.isArray(body.data.accounts)).toBe(true)
     expect(body.data.unread).toEqual({ inbox: expect.any(Number), listening: expect.any(Number) })
+    expect(body.data.networkApps.map(app => app.provider)).toEqual(['twitter', 'linkedin', 'instagram', 'threads'])
+    expect(body.data.networkApps.every(app => !Object.hasOwn(app, 'clientSecret'))).toBe(true)
   })
 
   test('providers answers with the connected-channel list', async () => {
