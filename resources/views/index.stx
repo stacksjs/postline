@@ -294,13 +294,13 @@ useHead({
           <span class="h-2.5 w-2.5 bg-white/15 rounded-full" aria-hidden="true"></span>
           <span class="h-2.5 w-2.5 bg-white/15 rounded-full" aria-hidden="true"></span>
           <span class="h-2.5 w-2.5 bg-white/15 rounded-full" aria-hidden="true"></span>
-          <span class="ml-2 font-mono text-[12px] text-white/40">Terminal</span>
+          <span class="ml-2 font-mono text-[12px] text-white/55">Terminal</span>
         </div>
-        <pre class="overflow-x-auto m-0 p-5 font-mono leading-7 text-[13px] text-white/85"><code><span class="text-white/40">$</span> git clone https://github.com/stacksjs/postline
-<span class="text-white/40">$</span> cd postline
-<span class="text-white/40">$</span> ./bootstrap
-<span class="text-white/40">$</span> ./buddy dev
-<span class="text-white/40">  ➜</span> <span class="text-brand">App</span>   http://localhost:3000/composer</code></pre>
+        <pre class="overflow-x-auto m-0 p-5 font-mono leading-7 text-[13px] text-white/85"><code><span class="text-white/55">$</span> git clone https://github.com/stacksjs/postline
+<span class="text-white/55">$</span> cd postline
+<span class="text-white/55">$</span> ./bootstrap
+<span class="text-white/55">$</span> ./buddy dev
+<span class="text-white/55">  ➜</span> <span class="text-brand">App</span>   http://localhost:3000/composer</code></pre>
       </div>
     </div>
   </section>

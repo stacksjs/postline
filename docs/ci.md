@@ -8,7 +8,7 @@ fetches, and posts the verdict back to the commit as the status
 
 | File | Runs |
 |---|---|
-| `.reviewos/workflows/ci.yml` | lint, type check, test, on every push and pull request |
+| `.reviewos/workflows/ci.yml` | lint, type checks, tests, desktop and site builds, and browser checks on every push and pull request |
 | `.reviewos/workflows/release.yml` | builds and publishes the DMG for an approved `v*` tag with passing CI, on manual dispatch |
 | `.reviewos/workflows/deploy.yml` | deploys a passing `main` commit or rolls back Postline's server, on manual dispatch |
 
@@ -38,6 +38,11 @@ reviewos run ci.yml --ref main --watch --repo stacks/postline
 ```
 
 `reviewos login` signs the CLI in once; the token is kept in the keychain.
+
+The site job checks the gzipped asset budgets and runs Lighthouse on the built
+marketing homepage through the same gateway used in production. The mobile
+and desktop profiles each need at least 95 in every category. The job retains
+the Lighthouse reports as artifacts.
 
 ## What the workflows assume
 

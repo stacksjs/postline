@@ -130,6 +130,8 @@ jobs:
   site:
     reviewos:
       secrets: []
+      artifact-paths:
+        - test-results/marketing-lighthouse/*
     runs-on: [self-hosted, macos-arm64, postline]
     timeout-minutes: 20
     # As for the tests: a runner has no `.env`, and anything the build reads
@@ -162,6 +164,8 @@ jobs:
       # another origin (#188).
       - name: Weight budgets
         run: bun scripts/budget-check.ts
+      - name: Marketing Lighthouse budgets
+        run: bun scripts/marketing-lighthouse.ts
 
   # Every workspace view in a real browser, signed in, light, dark and on a
   # phone (#80): fails on console errors, failed requests and pages wider than
