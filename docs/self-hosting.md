@@ -27,6 +27,31 @@ For remote access, set `APP_URL` to the public HTTPS address and use a reverse
 proxy for TLS. Run one Postline container per volume so one scheduler owns the
 queue.
 
+## Run from source
+
+Follow the [README setup commands](https://github.com/stacksjs/postline#getting-started)
+to install dependencies, generate an application key, and apply migrations.
+In `.env`, set `APP_ENV=production`, `DEBUG=false`, and `APP_URL` to the HTTPS
+address where people will open Postline. Set `PORT_API=3008` so the web server
+can find the API. Use the same `.env` and workspace database for each process.
+
+Start each command in its own service so it can restart after a reboot.
+
+```bash
+./buddy serve
+```
+
+```bash
+./buddy serve:api --port 3008
+```
+
+```bash
+./buddy schedule:run
+```
+
+Route public traffic to the web server on port `3000` and keep the API port
+private. The Queue and Activity pages report whether the scheduler is running.
+
 ## The address it answers on
 
 Set `APP_URL` to the address people type, for example

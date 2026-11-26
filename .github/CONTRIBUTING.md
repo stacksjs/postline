@@ -8,12 +8,13 @@ Thanks for helping. Postline is a social publishing app built on
 Follow "Getting started" in the [README](../README.md). You need Bun and
 SQLite; `./bootstrap` installs the pinned versions.
 
-`./buddy seed` creates a workspace account you can sign in with locally.
+Run `./buddy seed` on a fresh development database if you need sample posts
+and an owner account. It prints the password when it creates the account.
 
 ## Before you open a pull request
 
 ```bash
-bunx --bun pickier . --fix
+./buddy lint
 ```
 
 ```bash
@@ -21,7 +22,7 @@ bun run typecheck:app
 ```
 
 ```bash
-bun run test
+./buddy test
 ```
 
 The test suite runs on a database of its own, so it is safe to run next to

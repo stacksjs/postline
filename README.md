@@ -147,8 +147,10 @@ guide](docs/desktop.md) for building from source.
 ## Running it on a server
 
 [docs/self-hosting.md](docs/self-hosting.md) covers the address, HTTPS (needed
-beyond your own machine, also on a local network) and what to set. Run the app
-with `./buddy serve` and the scheduler beside it with `./buddy schedule:run`.
+beyond your own machine, also on a local network) and what to set. The Docker
+image starts all three services. For a source install, run the web server with
+`./buddy serve`, the API with `./buddy serve:api --port 3008`, and the scheduler with
+`./buddy schedule:run`.
 
 ## CI
 
