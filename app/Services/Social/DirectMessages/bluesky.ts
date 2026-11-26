@@ -121,7 +121,7 @@ export class BlueskyDmTransport implements DmTransport {
 
   private members = new Map<string, ConvoMember[]>()
 
-  async listConversations(limit: number): Promise<DmConversationCandidate[]> {
+  async listConversations(limit: number, identityId?: number | null): Promise<DmConversationCandidate[]> {
     return await bluesky.withSession(async (credentials) => {
       const payload = await chat<{ convos?: Convo[] }>(credentials, 'chat.bsky.convo.listConvos', {
         query: { limit: String(Math.min(Math.max(limit, 1), 100)) },
@@ -149,10 +149,10 @@ export class BlueskyDmTransport implements DmTransport {
           lastMessageOutgoing: Boolean(convo.lastMessage?.sender?.did && convo.lastMessage.sender.did === selfDid),
         }]
       })
-    })
+    }, identityId)
   }
 
-  async listMessages(conversationRemoteId: string, limit: number): Promise<DmMessageCandidate[]> {
+  async listMessages(conversationRemoteId: string, limit: number, identityId?: number | null): Promise<DmMessageCandidate[]> {
     return await bluesky.withSession(async (credentials) => {
       const payload = await chat<{ messages?: ConvoMessage[] }>(credentials, 'chat.bsky.convo.getMessages', {
         query: { convoId: conversationRemoteId, limit: String(Math.min(Math.max(limit, 1), 100)) },
@@ -164,10 +164,10 @@ export class BlueskyDmTransport implements DmTransport {
       return (payload.messages || [])
         .flatMap(message => messageFrom(conversationRemoteId, message, members, selfDid) || [])
         .reverse()
-    })
+    }, identityId)
   }
 
-  async sendMessage(conversationRemoteId: string, body: string): Promise<DmMessageCandidate> {
+  async sendMessage(conversationRemoteId: string, body: string, identityId?: number | null): Promise<DmMessageCandidate> {
     return await bluesky.withSession(async (credentials) => {
       const sent = await chat<ConvoMessage>(credentials, 'chat.bsky.convo.sendMessage', {
         body: { convoId: conversationRemoteId, message: { text: body } },
@@ -178,12 +178,12 @@ export class BlueskyDmTransport implements DmTransport {
       if (!candidate) throw new Error('Bluesky accepted the message but returned no id.')
 
       return candidate
-    })
+    }, identityId)
   }
 
-  async markRead(conversationRemoteId: string): Promise<void> {
+  async markRead(conversationRemoteId: string, identityId?: number | null): Promise<void> {
     await bluesky.withSession(credentials =>
       chat(credentials, 'chat.bsky.convo.updateRead', { body: { convoId: conversationRemoteId } }),
-    )
+    identityId)
   }
 }

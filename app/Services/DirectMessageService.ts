@@ -19,7 +19,9 @@
 import type { DmMessageCandidate, DmProvider } from '../Support/Social/direct-messages'
 import { db } from '@stacksjs/database'
 import { DM_PROVIDERS, DM_UNAVAILABLE, isDmProvider } from '../Support/Social/direct-messages'
+import { isUsableIdentity } from '../Support/Social/accounts'
 import { getDmTransport, listDmTransports } from './Social/DirectMessages'
+import { listIdentityRows } from './Social/identities'
 import { now, uuid } from './Social/support'
 import { describeNetworkError } from '../Support/Social/network-errors'
 
@@ -64,7 +66,14 @@ function conversationRow(row: any) {
     lastMessageOutgoing: Boolean(Number(row.last_message_outgoing || 0)),
     unreadCount: Number(row.unread_count || 0),
     status: row.status === 'archived' ? 'archived' : 'open',
+    /** The account this conversation belongs to (#136). */
+    identityId: row.social_identity_id ? Number(row.social_identity_id) : null,
   }
+}
+
+/** The account to act as for a stored conversation: its own, or the default when it has none. */
+function conversationIdentity(conversation: any): number | null {
+  return conversation?.social_identity_id ? Number(conversation.social_identity_id) : null
 }
 
 function messageRow(row: any) {
@@ -109,6 +118,10 @@ export class DirectMessageService {
       .filter((identity: any) => identity.auth_status === 'connected' && identity.access_token)
       .map((identity: any) => String(identity.provider)))
 
+    const accounts = await Promise.all(DM_PROVIDERS.map(async provider => (await listIdentityRows<any>(provider))
+      .filter(identity => isUsableIdentity(identity))
+      .map(identity => ({ id: Number(identity.id), provider, handle: String(identity.handle) }))))
+
     return {
       supported: DM_PROVIDERS.map(provider => ({
         provider,
@@ -116,18 +129,21 @@ export class DirectMessageService {
         handle: identities.find((identity: any) => identity.provider === provider)?.handle || null,
         characterLimit: getDmTransport(provider).characterLimit,
       })),
+      // Every connected account the inbox reads, for the account filter (#136).
+      accounts: accounts.flat(),
       unavailable: Object.entries(DM_UNAVAILABLE).map(([provider, reason]) => ({ provider, reason })),
     }
   }
 
   /** The inbox list, newest activity first. Reads the local mirror only. */
-  async list(options: { status?: string, provider?: string, offset?: number } = {}) {
+  async list(options: { status?: string, provider?: string, offset?: number, identityId?: number | null } = {}) {
     // Only networks the inbox can still read: conversations synced from X or
     // Instagram before those were dropped (#129) stay stored, not listed.
     const scoped = (query: any) => {
       query = query.where('provider', 'in', [...DM_PROVIDERS])
       query = query.where('status', '=', options.status === 'archived' ? 'archived' : 'open')
       if (isDmProvider(options.provider)) query = query.where('provider', '=', options.provider)
+      if (options.identityId) query = query.where('social_identity_id', '=', options.identityId)
       return query
     }
 
@@ -203,13 +219,23 @@ export class DirectMessageService {
 
     const result: DmSyncResult = { synced: 0, conversations: 0, messages: 0, errors: [] }
 
+    // Every connected account on each network has an inbox of its own (#136).
+    // A network with none connected still gets one pass, as its default
+    // account, so a `.env` token keeps working.
+    const runs: Array<{ transport: typeof transports[number], identityId: number | null }> = []
     for (const transport of transports) {
+      const usable = (await listIdentityRows<any>(transport.provider)).filter(identity => isUsableIdentity(identity))
+      if (usable.length) for (const identity of usable) runs.push({ transport, identityId: Number(identity.id) })
+      else runs.push({ transport, identityId: null })
+    }
+
+    for (const { transport, identityId } of runs) {
       try {
-        const candidates = await transport.listConversations(CONVERSATION_LIMIT)
+        const candidates = await transport.listConversations(CONVERSATION_LIMIT, identityId)
         result.synced += 1
 
         for (const candidate of candidates) {
-          const { id: conversationId, changed } = await this.upsertConversation(transport.provider, candidate)
+          const { id: conversationId, changed } = await this.upsertConversation(transport.provider, candidate, identityId)
           result.conversations += 1
           // Its newest message is the one already stored: nothing to fetch. A
           // sync with nothing new is then one call per network, the list,
@@ -217,7 +243,7 @@ export class DirectMessageService {
           if (!changed) continue
 
           try {
-            const messages = await transport.listMessages(candidate.remoteId, MESSAGE_LIMIT)
+            const messages = await transport.listMessages(candidate.remoteId, MESSAGE_LIMIT, identityId)
             result.messages += await this.storeMessages(conversationId, transport.provider, messages)
           }
           catch (error) {
@@ -245,7 +271,7 @@ export class DirectMessageService {
     const result: DmSyncResult = { synced: 1, conversations: 1, messages: 0, errors: [] }
 
     try {
-      const messages = await getDmTransport(provider).listMessages(String(conversation.remote_id), MESSAGE_LIMIT)
+      const messages = await getDmTransport(provider).listMessages(String(conversation.remote_id), MESSAGE_LIMIT, conversationIdentity(conversation))
       result.messages = await this.storeMessages(conversationId, provider, messages)
       await this.refreshPreview(conversationId)
     }
@@ -275,7 +301,8 @@ export class DirectMessageService {
     if (text.length > transport.characterLimit)
       throw new Error(`${provider.charAt(0).toUpperCase()}${provider.slice(1)} messages must be ${transport.characterLimit} characters or fewer.`)
 
-    const sent = await transport.sendMessage(String(conversation.remote_id), text)
+    // Replies go out from the account the conversation belongs to.
+    const sent = await transport.sendMessage(String(conversation.remote_id), text, conversationIdentity(conversation))
     await this.storeMessages(conversationId, provider, [{ ...sent, direction: 'outgoing' }], 'sent')
     await this.refreshPreview(conversationId)
 
@@ -309,7 +336,7 @@ export class DirectMessageService {
       const transport = getDmTransport(conversation.provider)
       if (!transport.markRead) continue
       try {
-        await transport.markRead(String(conversation.remote_id))
+        await transport.markRead(String(conversation.remote_id), conversationIdentity(conversation))
       }
       catch {}
     }
@@ -354,21 +381,21 @@ export class DirectMessageService {
     lastMessageAt?: string | null
     lastMessageText?: string | null
     lastMessageOutgoing?: boolean
-  }): Promise<{ id: number, changed: boolean }> {
-    const existing = await database
+  }, identityId: number | null = null): Promise<{ id: number, changed: boolean }> {
+    // Keyed on (provider, account, remote id): two of the owner's accounts in
+    // one conversation are two inbox rows, each answering as its own account.
+    // A row stored before conversations had an account is adopted by the
+    // first account that sees it.
+    const sameRemote = await database
       .selectFrom('dm_conversations')
       .selectAll()
       .where('provider', '=', provider)
       .where('remote_id', '=', candidate.remoteId)
-      .executeTakeFirst()
+      .execute()
+    const existing = sameRemote.find((row: any) => (row.social_identity_id ? Number(row.social_identity_id) : null) === identityId)
+      ?? (identityId ? sameRemote.find((row: any) => !row.social_identity_id) : undefined)
 
     const primary = candidate.participants[0]
-    const identity = await database
-      .selectFrom('social_identities')
-      .select(['id'])
-      .where('provider', '=', provider)
-      .orderBy('updated_at', 'desc')
-      .executeTakeFirst()
 
     const values: Record<string, unknown> = {
       provider,
@@ -380,7 +407,7 @@ export class DirectMessageService {
       last_message_at: candidate.lastMessageAt ? sqliteTimestamp(candidate.lastMessageAt) : existing?.last_message_at || null,
       last_message_preview: (candidate.lastMessageText || existing?.last_message_preview || '').slice(0, 500) || null,
       last_message_outgoing: candidate.lastMessageOutgoing ? 1 : 0,
-      social_identity_id: identity?.id || null,
+      social_identity_id: identityId,
       updated_at: now(),
     }
 

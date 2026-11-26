@@ -47,6 +47,11 @@
               <option value="">All networks</option>
               <option x-for="provider in providerOptions" :value="provider.id" :text="provider.label"></option>
             </select>
+            {{-- Each connected account has its own inbox (#136); shown once there is more than one. --}}
+            <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-field-line rounded-lg" :class="accountOptions().length > 1 ? '' : 'hidden'" aria-label="Account" @change="setAccountFilter($event.target.value)">
+              <option value="">All accounts</option>
+              <option x-for="account in accountOptions()" :value="account.id" :text="account.label"></option>
+            </select>
           </header>
 
           <div class="grid gap-3 place-items-center px-6 py-16 text-center" x-show="loading()">
@@ -194,6 +199,11 @@
     const activeId = state(0)
     const statusFilter = state('open')
     const providerFilter = state('')
+    const accountFilter = state('')
+    const accounts = state([])
+    const accountOptions = derived(() => accounts()
+      .filter(account => !providerFilter() || account.provider === providerFilter())
+      .map(account => ({ id: String(account.id), label: `@${String(account.handle).replace(/^@/, '')}` })))
     const draftBody = state('')
     const activeCharacterLimit = state(1000)
     let pollTimer = 0
@@ -250,7 +260,7 @@
       if (!quiet) loading.set(true)
       errorMessage.set('')
       try {
-        const query = new URLSearchParams({ status: statusFilter(), provider: providerFilter() })
+        const query = new URLSearchParams({ status: statusFilter(), provider: providerFilter(), identity_id: accountFilter() })
         const payload = await requestJson(`/api/postline/inbox?${query}`)
         const first = payload.data?.conversations || []
         // A quiet refresh updates the first page in place and keeps any pages
@@ -265,6 +275,7 @@
         }
         unreadCount.set(Number(payload.data?.unreadCount || 0))
         supported.set(payload.data?.providers?.supported || [])
+        accounts.set(payload.data?.providers?.accounts || [])
         unavailable.set(payload.data?.providers?.unavailable || [])
         // A thread that has been archived or filtered away should not stay open.
         if (activeId() && !conversations().some(item => item.id === activeId())) closeConversation()
@@ -322,7 +333,7 @@
       if (offset === null || loadingMore()) return
       loadingMore.set(true)
       try {
-        const query = new URLSearchParams({ status: statusFilter(), provider: providerFilter(), offset: String(offset) })
+        const query = new URLSearchParams({ status: statusFilter(), provider: providerFilter(), identity_id: accountFilter(), offset: String(offset) })
         const payload = await requestJson(`/api/postline/inbox?${query}`)
         const seen = new Set(conversations().map(item => item.id))
         conversations.set([...conversations(), ...(payload.data?.conversations || []).filter(item => !seen.has(item.id))])
@@ -365,6 +376,12 @@
 
     const setProviderFilter = async (value: string) => {
       providerFilter.set(value)
+      accountFilter.set('')
+      await loadConversations()
+    }
+
+    const setAccountFilter = async (value: string) => {
+      accountFilter.set(value)
       await loadConversations()
     }
 

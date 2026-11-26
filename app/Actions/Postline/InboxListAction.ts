@@ -15,6 +15,7 @@ export default new Action({
         status: String(request.get('status') || 'open'),
         provider: String(request.get('provider') || ''),
         offset: Number(request.get('offset') || 0),
+        identityId: Number(request.get('identity_id') || 0) || null,
       })
 
       return response.json({ ok: true, data })

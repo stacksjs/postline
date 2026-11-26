@@ -2211,14 +2211,6 @@
         ],
         "indexes": [
           {
-            "name": "dm_conversations_provider_remote_id_unique",
-            "columns": [
-              "provider",
-              "remote_id"
-            ],
-            "type": "unique"
-          },
-          {
             "name": "dm_conversations_status_last_message_at_index",
             "columns": [
               "status",
@@ -2230,6 +2222,15 @@
             "name": "dm_conversations_uuid_unique",
             "columns": [
               "uuid"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "dm_conversations_provider_identity_remote_id_unique",
+            "columns": [
+              "provider",
+              "social_identity_id",
+              "remote_id"
             ],
             "type": "unique"
           }
@@ -2696,7 +2697,7 @@
       }
     ]
   },
-  "hash": "41b6d7ca1cfd9d990064ec0e662187408543e4c93fb4c2e2dda6f2eb1577260c",
+  "hash": "54741d770d26d05be4534f5d270683b3799e25af7aa08967fe9c76e09b3c7d12",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-26T03:04:33.897Z"
+  "updatedAt": "2026-11-26T03:17:09.175Z"
 }

@@ -122,8 +122,8 @@ export class MastodonDmTransport implements DmTransport {
   readonly provider = 'mastodon' as const
   readonly characterLimit = CHARACTER_LIMIT
 
-  async listConversations(limit: number): Promise<DmConversationCandidate[]> {
-    const identity = await mastodon.dmIdentity()
+  async listConversations(limit: number, identityId?: number | null): Promise<DmConversationCandidate[]> {
+    const identity = await mastodon.dmIdentity(identityId)
     const conversations = await request<MastodonConversation[]>(identity, `/api/v1/conversations?limit=${Math.min(Math.max(limit, 1), 40)}`)
     const self = canonicalAcct(identity.handle, identity.instance)
 
@@ -147,8 +147,8 @@ export class MastodonDmTransport implements DmTransport {
     })
   }
 
-  async listMessages(conversationRemoteId: string, limit: number): Promise<DmMessageCandidate[]> {
-    const identity = await mastodon.dmIdentity()
+  async listMessages(conversationRemoteId: string, limit: number, identityId?: number | null): Promise<DmMessageCandidate[]> {
+    const identity = await mastodon.dmIdentity(identityId)
     const conversation = await this.findConversation(identity, conversationRemoteId)
     const last = conversation.last_status
     if (!last?.id) return []
@@ -164,8 +164,8 @@ export class MastodonDmTransport implements DmTransport {
       .slice(-Math.max(limit, 1))
   }
 
-  async sendMessage(conversationRemoteId: string, body: string): Promise<DmMessageCandidate> {
-    const identity = await mastodon.dmIdentity()
+  async sendMessage(conversationRemoteId: string, body: string, identityId?: number | null): Promise<DmMessageCandidate> {
+    const identity = await mastodon.dmIdentity(identityId)
     const conversation = await this.findConversation(identity, conversationRemoteId)
     const self = canonicalAcct(identity.handle, identity.instance)
     const mentions = (conversation.accounts || [])
@@ -191,8 +191,8 @@ export class MastodonDmTransport implements DmTransport {
     return { ...candidate, direction: 'outgoing' }
   }
 
-  async markRead(conversationRemoteId: string): Promise<void> {
-    const identity = await mastodon.dmIdentity()
+  async markRead(conversationRemoteId: string, identityId?: number | null): Promise<void> {
+    const identity = await mastodon.dmIdentity(identityId)
     await request(identity, `/api/v1/conversations/${encodeURIComponent(conversationRemoteId)}/read`, { method: 'POST' })
   }
 

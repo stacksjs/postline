@@ -91,16 +91,19 @@ export interface DmTransport {
   provider: DmProvider
   /** Longest body the network accepts in a single message. */
   characterLimit: number
-  /** Conversations, most recently active first. */
-  listConversations: (limit: number) => Promise<DmConversationCandidate[]>
+  /**
+   * Conversations, most recently active first. Every call takes the account to
+   * act as (#136); without one, the network's default account.
+   */
+  listConversations: (limit: number, identityId?: number | null) => Promise<DmConversationCandidate[]>
   /** Messages in one conversation, oldest first. */
-  listMessages: (conversationRemoteId: string, limit: number) => Promise<DmMessageCandidate[]>
+  listMessages: (conversationRemoteId: string, limit: number, identityId?: number | null) => Promise<DmMessageCandidate[]>
   /** Send a reply into an existing conversation and return what was created. */
-  sendMessage: (conversationRemoteId: string, body: string) => Promise<DmMessageCandidate>
+  sendMessage: (conversationRemoteId: string, body: string, identityId?: number | null) => Promise<DmMessageCandidate>
   /**
    * Clear the unread flag on the network too, so reading a thread in Postline
    * does not leave it bold in the official client. Optional — X has no such
    * endpoint.
    */
-  markRead?: (conversationRemoteId: string) => Promise<void>
+  markRead?: (conversationRemoteId: string, identityId?: number | null) => Promise<void>
 }

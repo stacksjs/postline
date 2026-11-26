@@ -9,7 +9,9 @@ export default defineModel({
   autoIncrement: true,
 
   indexes: [
-    { name: 'dm_conversations_provider_remote_id_unique', columns: ['provider', 'remote_id'], unique: true },
+    // One row per account in a conversation (#136): two of the owner's accounts
+    // talking to each other share a remote id.
+    { name: 'dm_conversations_provider_identity_remote_id_unique', columns: ['provider', 'social_identity_id', 'remote_id'], unique: true },
     { name: 'dm_conversations_status_last_message_at_index', columns: ['status', 'last_message_at'] },
   ],
 
