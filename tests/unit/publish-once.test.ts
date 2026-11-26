@@ -9,12 +9,14 @@
 import type { ProviderPublisher } from '../../app/Services/Social/CrosspostService'
 import type { CrosspostTargetResult, PublishContent } from '../../app/Support/Social/types'
 import { existsSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, test } from 'bun:test'
 import { db } from '@stacksjs/database'
 import { CrosspostService } from '../../app/Services/Social/CrosspostService'
 import { AlreadyPublishingError, MISSED_PREFIX, MissingMediaError, QueueService, STRANDED_REASON } from '../../app/Services/Social/QueueService'
 import { publicMessage } from '../../app/Support/Http/action-error'
+import { MEDIA_DIR } from '../../app/Support/Social/uploads'
 
 const database = db as any
 
@@ -290,7 +292,7 @@ describe('a post that went out on some networks and failed on others', () => {
 
     await queue.publishNow(postId)
     const stored = JSON.parse((await database.selectFrom('posts').selectAll().where('id', '=', postId).executeTakeFirstOrThrow()).content || '{}')
-    const path = `${process.cwd()}/storage/app/postline-media/${stored.media[0].path}`
+    const path = join(MEDIA_DIR, stored.media[0].path)
     expect(await edit()).toBe(true)
     expect(existsSync(path)).toBe(true)
 
@@ -369,7 +371,7 @@ describe('a queued post whose image has gone missing', () => {
       ...(scheduled ? { scheduledAt: stamp(3_600_000) } : {}),
     })
     const stored = JSON.parse((await database.selectFrom('posts').selectAll().where('id', '=', postId).executeTakeFirstOrThrow()).content || '{}')
-    rmSync(`${process.cwd()}/storage/app/postline-media/${stored.media[0].path}`, { force: true })
+    rmSync(join(MEDIA_DIR, stored.media[0].path), { force: true })
     return postId
   }
 

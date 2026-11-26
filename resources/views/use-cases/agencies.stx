@@ -30,7 +30,7 @@
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">Clean handover</h2>
-          <p class="m-0 leading-relaxed text-[16px] text-body">When an engagement ends, disconnect the account to delete its tokens from Postline, have the client remove the app in that network's settings, and give them a copy of the database with the posting history.</p>
+          <p class="m-0 leading-relaxed text-[16px] text-body">When an engagement ends, disconnect the account to delete its tokens from Postline, have the client remove the app in that network's settings, and give them an export of the workspace with the posting history.</p>
         </div>
       </div>
 

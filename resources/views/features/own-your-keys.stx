@@ -30,7 +30,7 @@
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">Your history is a database</h2>
-          <p class="m-0 leading-relaxed text-[16px] text-body">Every post, target and metric is a row in a SQLite file you can query and copy. Dropping a network does not erase what you published there.</p>
+          <p class="m-0 leading-relaxed text-[16px] text-body">Every post, target and metric is a row in a SQLite file you can query, copy, or export from Settings as one file that another install can import. Dropping a network does not erase what you published there.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">Run it wherever suits you</h2>

@@ -178,7 +178,7 @@ export const FEATURES: MarketingEntry[] = [
     intro: 'Every hosted scheduler holds the one thing that matters: permission to post as you, on every account you connected. Postline is the same kind of tool with that permission kept on hardware you control.',
     sections: [
       { heading: 'Tokens stay where you put them', body: 'Access and refresh tokens are stored encrypted with a key your instance generates. Nobody else has a copy, because there is nobody else.' },
-      { heading: 'Your history is a database', body: 'Every post, target and metric is a row in a SQLite file you can query and copy. Dropping a network does not erase what you published there.' },
+      { heading: 'Your history is a database', body: 'Every post, target and metric is a row in a SQLite file you can query, copy, or export from Settings as one file that another install can import. Dropping a network does not erase what you published there.' },
       { heading: 'Run it wherever suits you', body: 'It runs on Bun with a SQLite file: on a Mac as one app, or on a small server when you want the queue publishing while the laptop is shut. Instagram and Threads fetch images from a public address, so on a laptop they need the temporary image links switch in Settings.' },
     ],
     points: [
@@ -250,7 +250,7 @@ export const USE_CASES: MarketingEntry[] = [
     intro: 'Scheduling tools price by account and hold the access tokens for clients you are responsible for. Running the tool yourself removes both. Postline has one owner and no team seats, so it suits a person handling several clients, not a team sharing one workspace.',
     sections: [
       { heading: 'No per-account pricing', body: 'Cost does not change with the number of accounts connected, because there is no vendor in the middle metering it.' },
-      { heading: 'Clean handover', body: 'When an engagement ends, disconnect the account to delete its tokens from Postline, have the client remove the app in that network\'s settings, and give them a copy of the database with the posting history.' },
+      { heading: 'Clean handover', body: 'When an engagement ends, disconnect the account to delete its tokens from Postline, have the client remove the app in that network\'s settings, and give them an export of the workspace with the posting history.' },
     ],
     points: [
       'Cost does not scale with accounts',

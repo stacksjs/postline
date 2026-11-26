@@ -4,13 +4,14 @@ import { marketingRedirects } from '../app/Support/Marketing/site'
 /**
  * **Server Configuration**
  *
- * The largest thing Postline accepts is one image attached to a post, capped
- * at 10 MB in `app/Support/Social/image-input.ts`. The limit here leaves room
- * for the rest of the multipart form around it. Without it the runtime's
- * default applies, which is 128 MB per request.
+ * The largest things Postline accepts are a post with four images of up to
+ * 10 MB each (`app/Support/Social/image-input.ts`) and a workspace import,
+ * whose images travel inside it. 64 MB covers both with room for the form
+ * around them; it was 12 MB, which refused a post with two large images.
+ * Without a limit the runtime's default applies, which is 128 MB per request.
  */
 export default {
-  maxRequestBodySize: 12 * 1024 * 1024,
+  maxRequestBodySize: 64 * 1024 * 1024,
 
   // A self-hosted install opens the workspace at `/`. The marketing pages are
   // served only by the deployment started with POSTLINE_SITE=marketing; on any

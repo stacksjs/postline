@@ -166,6 +166,10 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/alerts/read', 'Actions/Postline/AlertReadAction').middleware('auth').rateLimit(60, 'minute')
   route.get('/settings/workspace', 'Actions/Postline/WorkspaceGetAction').middleware('auth')
   route.post('/settings/workspace', 'Actions/Postline/WorkspaceSaveAction').middleware('auth').rateLimit(30, 'minute')
+  // The workspace as one file, back in from one, or gone (#209).
+  route.get('/settings/export', 'Actions/Postline/WorkspaceExportAction').middleware('auth').rateLimit(10, 'minute')
+  route.post('/settings/import', 'Actions/Postline/WorkspaceImportAction').middleware('auth').rateLimit(5, 'minute')
+  route.post('/settings/delete-everything', 'Actions/Postline/WorkspaceDeleteAction').middleware('auth').rateLimit(5, 'hour')
   route.get('/settings/ai', 'Actions/Postline/AISettingsGetAction').middleware('auth')
   route.post('/settings/ai', 'Actions/Postline/AISettingsSaveAction').middleware('auth').rateLimit(30, 'minute')
   route.get('/settings/retention', 'Actions/Postline/RetentionGetAction').middleware('auth')

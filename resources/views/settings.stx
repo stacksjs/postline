@@ -28,6 +28,7 @@
           <SettingsSidebarItem id="composer" label="Composer" icon="i-lucide-pen-line" tone="orange" />
           <SettingsSidebarItem id="ai" label="AI" icon="i-lucide-sparkles" tone="purple" keywords="anthropic openai ollama claude api key campaign planner" />
           <SettingsSidebarItem id="deletion" label="Automatic Deletion" icon="i-lucide-trash-2" tone="red" keywords="retention delete cleanup" />
+          <SettingsSidebarItem id="data" label="Data" icon="i-lucide-hard-drive" tone="grey" keywords="export import backup move delete everything archive" />
         </SettingsSidebarGroup>
         <div x-show="!ownWindow()">
           <SettingsSidebarGroup>
@@ -175,6 +176,33 @@
 
         <p class="m-0 mt-3 text-xs" :data-tone="retentionTone()" x-show="retentionMessage()" :text="retentionMessage()" role="status" aria-live="polite" data-retention-message></p>
         <p class="m-0 mt-2 text-muted text-xs" x-show="lastRunText()" :text="lastRunText()" data-retention-last-run></p>
+      </SettingsPane>
+
+      {{--
+        The workspace as one file (#209): export it, bring it into another
+        install, or delete everything here. Sign-ins and keys never travel.
+      --}}
+      <SettingsPane id="data" title="Data">
+        <SettingsGroup footer="One JSON file with your posts and their results, threads, campaigns, blog posts, Listening rules, settings and the images on queued posts. Network sign-ins, app keys and the AI key stay here; connect them again on the other install.">
+          <SettingsRow label="Export this workspace" setting="export" keywords="download backup archive">
+            <a class="inline-flex items-center px-3 h-7 text-ink text-ui bg-panel border border-line rounded-md" href="/api/postline/settings/export" download data-no-router>Export…</a>
+          </SettingsRow>
+          <SettingsRow label="Import an export" description="From another Postline install, up to 64 MB. Anything already here is left as it is." setting="import" keywords="restore move">
+            <label class="inline-flex items-center px-3 h-7 text-ui bg-panel border border-line rounded-md cursor-pointer">
+              <span :text="dataBusy() ? 'Working…' : 'Choose a file…'">Choose a file…</span>
+              <input class="sr-only" type="file" accept=".json,application/json" @change="importWorkspace($event)">
+            </label>
+          </SettingsRow>
+        </SettingsGroup>
+        <SettingsGroup title="Delete everything" footer="Deletes every post, result, campaign, blog post, Listening rule, inbox copy, connected account, network app and image in this workspace, on this install. Your posts on the networks themselves are not touched. Export first if you may want any of it.">
+          <SettingsRow label="Type DELETE EVERYTHING" setting="delete-everything" keywords="wipe reset erase">
+            <TextInput variant="mac" v-model:value="deletePhrase" placeholder="DELETE EVERYTHING" autocomplete="off" data-delete-phrase />
+          </SettingsRow>
+        </SettingsGroup>
+        <div class="flex gap-2 items-center justify-end mt-3">
+          <p class="m-0 mr-auto text-xs" :data-tone="dataTone()" x-show="dataMessage()" :text="dataMessage()" role="status" aria-live="polite"></p>
+          <Button appearance="mac" variant="danger" :disabled="dataBusy() || deletePhrase() !== 'DELETE EVERYTHING'" @click="deleteEverything">Delete Everything</Button>
+        </div>
       </SettingsPane>
 
       <SettingsPane id="account" title="Account">
@@ -446,6 +474,52 @@
         workspaceSaving.set(false)
       }
     }
+
+    // Export, import, delete everything (#209).
+    const dataBusy = state(false)
+    const dataMessage = state('')
+    const dataTone = state('neutral')
+    const deletePhrase = state('')
+
+    const dataAction = async (work: () => Promise<string>): Promise<void> => {
+      dataBusy.set(true)
+      dataMessage.set('')
+      try {
+        dataMessage.set(await work())
+        dataTone.set('success')
+      }
+      catch (error) {
+        dataMessage.set(error instanceof Error ? error.message : String(error))
+        dataTone.set('error')
+      }
+      finally {
+        dataBusy.set(false)
+      }
+    }
+
+    const importWorkspace = (event: Event): Promise<void> => dataAction(async () => {
+      const file = (event.target as HTMLInputElement | null)?.files?.[0]
+      if (!file) return ''
+      const body = new FormData()
+      body.set('archive', await file.text())
+      const response = await fetch('/api/postline/settings/import', { method: 'POST', body })
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'The import failed.')
+      const r = payload.data.report
+      return `Imported ${r.posts} posts, ${r.campaigns} campaigns, ${r.blogPosts} blog posts, ${r.monitors} Listening rules and ${r.media} images${r.skipped ? `; ${r.skipped} already here were left alone` : ''}.`
+    })
+
+    const deleteEverything = (): Promise<void> => dataAction(async () => {
+      // stx-strict-ignore-next-line window.confirm
+      if (!window.confirm('Delete everything in this workspace? This cannot be undone.')) return ''
+      const body = new FormData()
+      body.set('confirmation', deletePhrase())
+      const response = await fetch('/api/postline/settings/delete-everything', { method: 'POST', body })
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Nothing was deleted.')
+      deletePhrase.set('')
+      return 'Everything in this workspace was deleted.'
+    })
 
     // Whether email actually leaves this machine (#213). Without a mailer it
     // is written to the log, which is fine until someone expects it to arrive.

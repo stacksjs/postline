@@ -29,7 +29,7 @@ Last checked 24 November 2026.
 | Access and refresh tokens stored encrypted with a key your instance generates | `app/Support/Social/token-vault.ts:18` (`enc:v1:`) |
 | Disconnecting deletes the tokens from Postline (not at the network) | `app/Services/Social/identities.ts:224-241` |
 | History survives an account going away | `identities.ts:12` (revoked rows are kept) |
-| History is a SQLite file you can query and copy (no export feature) | `config/database.ts` |
+| History is a SQLite file you can query and copy, and the workspace exports to one file another install imports | `config/database.ts`, `app/Services/WorkspaceArchiveService.ts`, `tests/unit/workspace-archive.test.ts` |
 | Instagram and Threads images need a public address, or temporary image links | `app/Support/Social/uploads.ts:112`, `media-share.ts`, `Account.shareMediaByTunnel` |
 | Runs wherever Bun 1.3 and SQLite 3.47 do | README requirements, `deps.yaml` |
 
@@ -51,5 +51,4 @@ Last checked 24 November 2026.
 - Engagement for X, LinkedIn, Instagram, Threads and Mastodon.
 - X and Instagram direct messages.
 - Revoking a token at the network on disconnect.
-- An export of posts and metrics.
 - Team seats.

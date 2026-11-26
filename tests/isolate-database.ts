@@ -69,6 +69,9 @@ process.env.POSTLINE_TEST_DATABASE = database
 // Publishing to the blog writes Markdown files; keep them out of the project.
 const blogDir = join(tmpdir(), `postline-test-blog-${process.pid}-${Date.now()}`)
 process.env.POSTLINE_BLOG_DIR = blogDir
+// Images attached to queued posts, too: tests store and delete them, and the
+// project's own storage/app/postline-media is the developer's.
+process.env.POSTLINE_MEDIA_DIR = join(tmpdir(), `postline-test-media-${process.pid}-${Date.now()}`)
 // Stacks' `bootTestEnvironment()` (called from tests/setup.ts) makes an empty
 // throwaway database of its own unless told one is already configured. This
 // one is, and is migrated, so it keeps it. The path also tells the framework's
