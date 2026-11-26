@@ -22,6 +22,9 @@ export declare const middleware: Record<string, Loader>
 /** Every migration the database template was made from: file name to SQL. */
 export declare const migrations: Record<string, string>
 
+/** Postline's config/ files by name, as the config loader reads them. */
+export declare const config: Record<string, () => Promise<unknown>>
+
 /** The workspace's client scripts as browser JavaScript, by the URL the pages ask for. */
 export declare const clientScripts: Record<string, string>
 

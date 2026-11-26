@@ -26,11 +26,25 @@ async function boot(dataDir: string, origin: string): Promise<void> {
   // static imports the bundler can follow. Written by scripts/desktop-bundle.ts.
   const bundle = await import('./bundle.generated.js')
 
+  // Postline's config/, compiled in, before anything loads config: the loader
+  // reads it once, and from disk it would find nothing here and fall back to
+  // the framework's defaults without a word (#196).
+  const { describeConfigSource, registerBundledConfig, settledConfigSource } = await import('@stacksjs/config/sources')
+  registerBundledConfig(bundle.config)
+
   clientScripts = bundle.clientScripts
 
   const prepared = prepareData({ dataDir, template: bundle.databaseTemplate, migrations: bundle.migrations, origin })
   if (prepared.created) console.log(`[postline] created ${prepared.databasePath}`)
   for (const name of prepared.applied) console.log(`[postline] migrated: ${name}`)
+
+  // Load it now and say which config this process runs on.
+  await (await import('@stacksjs/config')).overridesReady
+  const source = await settledConfigSource()
+  if (source) {
+    console.log(`[postline] ${describeConfigSource(source)}`)
+    if (source.failed.length) throw new Error(`config failed to load: ${source.failed.map(file => `config/${file.name}.ts: ${file.error}`).join('; ')}`)
+  }
 
   const { stacksAgentHandler } = await import('@stacksjs/desktop-build')
   handler = await stacksAgentHandler({

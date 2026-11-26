@@ -25,6 +25,7 @@ import { Database } from 'bun:sqlite'
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import process from 'node:process'
+import { userConfigFileNames } from '@stacksjs/config/sources'
 import { bundleClientScripts } from './lib/client-scripts'
 
 const root = join(import.meta.dir, '..')
@@ -155,6 +156,12 @@ const names = Object.keys(actions).sort()
 const middleware = middlewareFiles()
 const middlewareNames = Object.keys(middleware).sort()
 const migrations = buildDatabaseTemplate()
+// Postline's config/, by the file names the loader reads. The loader imports
+// config/ by a computed path the bundler cannot follow, so without these the
+// app ran on the framework's defaults and said nothing (#196).
+const configFiles = userConfigFileNames()
+  .map(name => [name, join(root, 'config', `${name}.ts`)] as const)
+  .filter(([, file]) => existsSync(file))
 
 const missing = migrations.filter(name => !existsSync(join(root, 'database/migrations', name)))
 if (missing.length > 0)
@@ -184,6 +191,11 @@ ${middlewareNames.map(name => `  ${JSON.stringify(name)}: () => import(${spec(mi
 
 export const migrations = {
 ${migrations.map((name, index) => `  ${JSON.stringify(name)}: migration${index},`).join('\n')}
+}
+
+/** Postline's config/ files, for registerBundledConfig before config first loads. */
+export const config = {
+${configFiles.map(([name, file]) => `  ${JSON.stringify(name)}: () => import(${spec(file)}),`).join('\n')}
 }
 
 /** The workspace's client scripts, bundled for the web view, by the URL the pages ask for. */
@@ -237,6 +249,9 @@ export declare const middleware: Record<string, Loader>
 /** Every migration the database template was made from: file name to SQL. */
 export declare const migrations: Record<string, string>
 
+/** Postline's config/ files by name, as the config loader reads them. */
+export declare const config: Record<string, () => Promise<unknown>>
+
 /** The workspace's client scripts as browser JavaScript, by the URL the pages ask for. */
 export declare const clientScripts: Record<string, string>
 
@@ -253,5 +268,5 @@ export declare function jobs(): Promise<{
 `)
 
 // eslint-disable-next-line no-console
-console.log(`Wrote ${relative(root, out)}: ${routes.length} route file(s), ${names.length} action(s), ${middlewareNames.length} middleware, ${migrations.length} migration(s), ${Object.keys(scripts).length} client script(s), and ${relative(root, template)}`)
+console.log(`Wrote ${relative(root, out)}: ${routes.length} route file(s), ${names.length} action(s), ${middlewareNames.length} middleware, ${migrations.length} migration(s), ${configFiles.length} config file(s), ${Object.keys(scripts).length} client script(s), and ${relative(root, template)}`)
 process.exit(0)

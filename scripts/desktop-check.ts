@@ -66,6 +66,16 @@ await agent.start!({ ...context, launch: { args: [], cwd: dataDir } } as never)
 check('the working directory is the data directory', existsSync(join(process.cwd(), 'app.key')))
 check('the app key is private', (statSync(join(dataDir, 'app.key')).mode & 0o777) === 0o600)
 
+// Postline's own config/, not the framework's defaults (#196). The framework
+// loads config/ by a dynamic import relative to the working directory, which
+// is the data directory here, so a silent fall-back would look like this:
+// passkeys off, a framework sender, the framework's mailbox server on.
+{
+  const { config } = await import('@stacksjs/config')
+  check('the app runs on Postline\'s config: passkeys', config.auth?.passkeys?.enabled === true && config.auth.passkeys.name === 'Postline', JSON.stringify(config.auth?.passkeys))
+  check('the app runs on Postline\'s config: mail', String(config.email?.from?.address || '').startsWith('no-reply@') && (config.email as { server?: { enabled?: boolean } }).server?.enabled === false, JSON.stringify(config.email?.from))
+}
+
 const page = await call('GET', '/composer')
 check('a page is left to the built views', page.status === null)
 
