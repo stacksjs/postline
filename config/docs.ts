@@ -35,10 +35,29 @@ const config: BunPressOptions = {
     sidebar: {
       '/': [
         {
-          text: 'Running Postline',
+          text: 'Getting started',
+          items: [
+            { text: 'Install the Mac app', link: '/install-mac' },
+            { text: 'Run it on a server', link: '/self-hosting' },
+            { text: 'First run', link: '/first-run' },
+          ],
+        },
+        {
+          text: 'Connecting networks',
+          items: [
+            { text: 'Overview', link: '/networks/' },
+            { text: 'Bluesky', link: '/networks/bluesky' },
+            { text: 'Mastodon', link: '/networks/mastodon' },
+            { text: 'LinkedIn', link: '/networks/linkedin' },
+            { text: 'Threads', link: '/networks/threads' },
+            { text: 'Instagram', link: '/networks/instagram' },
+            { text: 'X', link: '/networks/x' },
+          ],
+        },
+        {
+          text: 'How it is built',
           items: [
             { text: 'The Mac app', link: '/desktop' },
-            { text: 'On a server', link: '/self-hosting' },
           ],
         },
         {

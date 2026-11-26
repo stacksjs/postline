@@ -58,16 +58,14 @@ for f in database/opentimes.sqlite*; do mv "$f" "${f/opentimes/postline}"; done 
 ```
 
 ```bash
-./buddy seed
-```
-
-```bash
 ./buddy dev
 ```
 
-`./buddy seed` creates a workspace account you can sign in with
-(`dev@postline.test`; the seeder prints the password, and `SEED_USER_PASSWORD`
-overrides it) and a few sample posts.
+Open the address it prints and create the workspace account (**First run?
+Create the workspace account**); see [docs/first-run.md](docs/first-run.md).
+For sample data while developing, `./buddy seed` adds an account
+(`dev@postline.test`, password printed, or set `SEED_USER_PASSWORD`) and a few
+posts instead.
 
 ### If you lose the password
 
@@ -98,19 +96,22 @@ deployment that serves postline.stacksjs.com runs with that setting too.
 
 ## Connecting networks
 
-Each network needs credentials of its own, and `.env.example` documents every
-one inline. A network with no credentials shows as "not connected" and nothing
-else depends on it, so start with one.
+Each network has a page with the exact steps, the permissions Postline asks
+for, costs and limits, and what it cannot do: [docs/networks](docs/networks/index.md).
+A network with nothing connected shows as "not connected" and nothing else
+depends on it, so start with one.
 
 | Network | What you need |
 |---|---|
-| Bluesky | A handle and an app password. No developer account |
-| Mastodon | Your instance URL and an access token |
-| X | An OAuth 2.0 app. X bills API use per request |
-| LinkedIn | An app with the Share on LinkedIn product |
-| Instagram, Threads | A Meta app with the matching product |
+| [Bluesky](docs/networks/bluesky.md) | A handle and an app password. No developer account |
+| [Mastodon](docs/networks/mastodon.md) | Your instance URL and an access token |
+| [X](docs/networks/x.md) | An OAuth 2.0 app. X bills API use per post |
+| [LinkedIn](docs/networks/linkedin.md) | An app with Sign In with LinkedIn using OpenID Connect and Share on LinkedIn |
+| [Instagram](docs/networks/instagram.md) | A Meta app, a Business or Creator account and a Facebook Page |
+| [Threads](docs/networks/threads.md) | A Meta app with the Threads API |
 
-OAuth callbacks are `https://<your host>/api/postline/<network>/callback`.
+OAuth callbacks are `https://<your host>/api/postline/<network>/callback`, with
+`twitter` for X.
 
 ### AI for campaign planning
 
