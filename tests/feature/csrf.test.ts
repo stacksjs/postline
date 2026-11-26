@@ -5,6 +5,7 @@
  * only thing between a signed-in owner and a form on another site.
  */
 import { describe, expect, test } from 'bun:test'
+import process from 'node:process'
 import { listRegisteredRoutes } from '@stacksjs/router'
 import { featureTest } from '@stacksjs/testing'
 import User from '../../storage/framework/defaults/app/Models/User'
@@ -79,6 +80,24 @@ describe('csrf', () => {
     const response = await featureTest().post('/api/login', credentials)
 
     expect(response.status).toBe(403)
+  })
+
+  test('the marketing server refuses public workspace registration', async () => {
+    const previous = process.env.POSTLINE_SITE
+    process.env.POSTLINE_SITE = 'marketing'
+    try {
+      const response = await featureTest()
+        .withHeaders({ 'cookie': `X-CSRF-Token=${TOKEN}`, 'x-csrf-token': TOKEN })
+        .post('/api/register', { name: 'Visitor', email: 'visitor@postline.test', password: 'valid-password' })
+
+      expect(response.status).toBe(403)
+      const body = await response.json<{ error: string }>()
+      expect(body.error).toBe('Registration is available on your own Postline install.')
+    }
+    finally {
+      if (previous === undefined) delete process.env.POSTLINE_SITE
+      else process.env.POSTLINE_SITE = previous
+    }
   })
 
   test('the seeding route sets the cookie', async () => {

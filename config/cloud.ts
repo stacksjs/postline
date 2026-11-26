@@ -41,6 +41,8 @@ const DB_DATABASE_PATH = `${DATA_DIR}/postline.sqlite`
 const POSTLINE_MEDIA_DIR = `${DATA_DIR}/media`
 const PORT_WEB = 3320
 const PORT_API = 3321
+const API_HEALTH = '/api/postline/health'
+const KEEP_RELEASES = 4
 const SITE_ENV = {
   APP_ENV: 'production',
   APP_URL: domains.canonical,
@@ -652,6 +654,12 @@ export const tsCloud: TsCloudConfig = {
       // consumer app has no framework source to build from — it has the package.
       start: 'bun node_modules/@stacksjs/buddy/dist/serve-entry.js',
       port: PORT_WEB,
+      healthCheck: { path: '/' },
+      liveness: { path: '/' },
+      keepReleases: KEEP_RELEASES,
+      zeroDowntime: true,
+      sharedPaths: [{ path: 'storage/postline-data', target: DATA_DIR }],
+      scheduler: true,
       /*
        * Sized to the workload, now that it is allowed to be.
        *
@@ -702,6 +710,11 @@ export const tsCloud: TsCloudConfig = {
       root: '.',
       start: 'bun node_modules/@stacksjs/actions/dist/serve/api.js',
       port: PORT_API,
+      healthCheck: { path: API_HEALTH },
+      liveness: { path: API_HEALTH },
+      keepReleases: KEEP_RELEASES,
+      zeroDowntime: true,
+      sharedPaths: [{ path: 'storage/postline-data', target: DATA_DIR, seed: false }],
       /*
        * The API serves JSON off the same database and holds flat — it renders
        * no views, so it never touches the component path that makes `main`

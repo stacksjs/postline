@@ -2,6 +2,12 @@
 
 @section('title', 'Postline - Sign in')
 
+<script server>
+import { isMarketingSite } from '../../app/Support/Marketing/site'
+
+const allowsFirstRun = !isMarketingSite()
+</script>
+
 @section('content')
   @meta('description', 'Sign in to your Postline workspace.')
   @meta('robots', 'noindex, nofollow')
@@ -50,7 +56,9 @@
         Sign in with a passkey
       </button>
       <button class="text-muted text-xs underline hover:text-body transition-colors" type="button" :class="challenge() ? '' : 'hidden'" @click="cancelChallenge">Use a different account</button>
-      <button class="text-muted text-xs underline hover:text-body transition-colors" type="button" x-show="!challenge()" @click="toggleMode" :text="toggleLabel()">First run? Create the workspace account</button>
+      @if(allowsFirstRun)
+        <button class="text-muted text-xs underline hover:text-body transition-colors" type="button" x-show="!challenge()" @click="toggleMode" :text="toggleLabel()">First run? Create the workspace account</button>
+      @endif
       <p class="text-center text-muted text-xs" :class="registering() ? 'hidden' : ''">
         Lost the password? Reset it on the machine Postline runs on:
         <code class="block mt-1 text-body whitespace-nowrap">./buddy user:add you@example.com --update</code>

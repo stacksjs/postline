@@ -4,13 +4,14 @@ import { authCookieForBrowserSession, register } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { response } from '@stacksjs/router'
 import { actionFailure } from '../../Support/Http/action-error'
+import { isMarketingSite } from '../../Support/Marketing/site'
 
 const database = db as any
 
 /**
- * Postline is a single-user workspace: the register endpoint only works
- * while no account exists, so a deployed instance can't be signed up on
- * by strangers.
+ * First-run registration belongs to a self-hosted workspace. The public
+ * marketing server must keep its account unavailable to visitors even when
+ * its database is brand new.
  */
 export default new Action({
   name: 'Postline Register First User',
@@ -18,6 +19,13 @@ export default new Action({
   method: 'POST',
 
   async handle(request: RequestInstance) {
+    if (isMarketingSite()) {
+      return response.json({
+        ok: false,
+        error: 'Registration is available on your own Postline install.',
+      }, { status: 403 })
+    }
+
     const existing = await database
       .selectFrom('users')
       .select(['id'])
