@@ -70,11 +70,11 @@
     "typecheck": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false"
   },
   "dependencies": {
-    "@stacksjs/ai": "^0.75.693",
-    "@stacksjs/socials": "^0.75.693",
+    "@stacksjs/ai": "^0.75.694",
+    "@stacksjs/socials": "^0.75.694",
     "@stacksjs/stx": "^0.2.947",
     "@stacksjs/ts-cloud": "^0.16.152",
-    "stacks": "^0.75.693",
+    "stacks": "^0.75.694",
     "ts-images": "^0.2.35",
     "ts-medium-editor": "^0.2.0"
   },

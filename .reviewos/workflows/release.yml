@@ -128,6 +128,10 @@ jobs:
           case "${DESKTOP_SIGNING_IDENTITY:-}" in
             ''|*vars.DESKTOP_SIGNING_IDENTITY*) unset DESKTOP_SIGNING_IDENTITY ;;
           esac
+          # CFBundleVersion, so two builds of one version can be told apart
+          # (#203): the number of commits behind this one, which only grows.
+          DESKTOP_BUILD_NUMBER="$(git rev-list --count HEAD)"
+          export DESKTOP_BUILD_NUMBER
           bun node_modules/@stacksjs/buddy/dist/cli.js build:desktop
 
       # A disk image with the app and a link to Applications, which is what a
