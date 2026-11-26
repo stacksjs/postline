@@ -63,8 +63,11 @@ for (const file of glob.scanSync({ cwd: dist, absolute: true })) {
   if (/src="\/assets\/scripts\/[\w.-]+\.ts"/.test(readFileSync(file, 'utf8'))) left.push(file.slice(dist.length + 1))
 }
 
-for (const name of readdirSync(scriptsDir)) {
-  if (name.endsWith('.ts')) rmSync(join(scriptsDir, name))
+// Shared helpers under scripts/lib/ are inside the bundles; their copies go too.
+for (const name of new Bun.Glob('**/*.ts').scanSync({ cwd: scriptsDir }))
+  rmSync(join(scriptsDir, name))
+for (const name of readdirSync(scriptsDir, { withFileTypes: true })) {
+  if (name.isDirectory() && !readdirSync(join(scriptsDir, name.name)).length) rmSync(join(scriptsDir, name.name), { recursive: true })
 }
 
 if (left.length) {

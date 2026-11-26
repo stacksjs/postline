@@ -66,6 +66,7 @@ const config: BunPressOptions = {
           items: [
             { text: 'CI and releases', link: '/ci' },
             { text: 'Release checklist', link: '/releasing' },
+            { text: 'Smoke test', link: '/smoke-test' },
           ],
         },
       ],

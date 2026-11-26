@@ -61,6 +61,10 @@
                 sees them, and the static class is the pre-hydration state. --}}
             <span class="flex items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 border border-line rounded-xl" :class="{ 'hidden': !providersPending() }">Loading accounts…</span>
             <a class="flex hidden items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl transition-colors" :class="{ 'hidden': !providersEmpty() }" href="/accounts" data-stx-link>No accounts yet. Connect one →</a>
+            <button class="flex hidden gap-1.5 items-center px-2.5 min-h-8 text-danger text-xs bg-danger-soft hover:bg-raised border border-line rounded-xl transition-colors" :class="{ 'hidden': !providersFailed() }" type="button" @click="retryProviders()">
+              <span class="h-3.5 w-3.5 i-hugeicons-refresh" aria-hidden="true"></span>
+              Couldn't load your accounts. Try again
+            </button>
             <button
               class="inline-flex gap-1.5 items-center px-2.5 min-h-8 font-semibold text-xs border rounded-xl transition-colors"
               type="button"
@@ -68,14 +72,14 @@
               :data-provider-toggle="row.key"
               :data-selected="row.selected"
               :data-over="row.over"
-              :disabled="!row.connected"
+              :data-connect="!row.connected"
               :title="row.title"
               :aria-pressed="row.selected"
               @click="toggleProvider(row.key)"
             >
               <span class="h-2 w-2 rounded-full" data-provider-dot aria-hidden="true"></span>
               <span class="shrink-0 h-3.5 w-3.5" :class="row.icon || 'hidden'" aria-hidden="true"></span>
-              <span :text="row.label"></span>
+              <span :text="row.connected ? row.label : `Connect ${row.label}`"></span>
             </button>
           </div>
           {{-- Per-network overrides. Rows are built by the script, one per
@@ -196,8 +200,12 @@
     const providerRows = state([])
     const providersPending = state(true)
     const providersEmpty = state(false)
-    const composerHandlers = { toggleProvider: null }
+    // The accounts could not be read (offline, a server error): not the same
+    // as having none, so it says so and offers to try again.
+    const providersFailed = state(false)
+    const composerHandlers = { toggleProvider: null, retryProviders: null }
     const toggleProvider = key => composerHandlers.toggleProvider?.(key)
+    const retryProviders = () => composerHandlers.retryProviders?.()
 
     // Attached images: { id, file, name, alt, kept }. `kept` stands for the
     // images already saved on a post being edited, which have no file here.
@@ -349,6 +357,9 @@
             tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info',
             url: options.url,
             id: options.id,
+            action: options.action,
+            dedupeMs: options.dedupeMs,
+            durationMs: options.durationMs,
           })
           return
         }
@@ -479,7 +490,7 @@
             selected: isSelected,
             over,
             title: !connected
-              ? `Connect ${network} in Settings → Channels to crosspost here.`
+              ? `Opens Channels, where ${network} is connected.`
               : over
                 ? `Too long for ${network} — this target would be rejected.`
                 : target.multi ? full : '',
@@ -490,11 +501,17 @@
       effect(() => providerRows.set(providerRowsView()))
       effect(() => selectedNetworkIds.set(selectedNetworks().map(target => target.provider)))
       effect(() => providersPending.set(!providersLoaded()))
-      effect(() => providersEmpty.set(providersLoaded() && providers().length === 0))
+      effect(() => providersEmpty.set(providersLoaded() && providers().length === 0 && !providersFailed()))
 
       composerHandlers.toggleProvider = (key) => {
+        // A network with no account is a way to connect one, not a dead chip.
+        if (!publishTargets().find(target => target.key === key)?.canPublish) {
+          navigate('/accounts')
+          return
+        }
         if (selectedHas(key)) selectedDelete(key)
         else selectedAdd(key)
+        markEdited()
         updatePublishability()
       }
 
@@ -738,18 +755,24 @@
       }
 
       const refreshConnection = async () => {
+        providersFailed.set(false)
         try {
           const list = await window.postlineSocial?.fetchProviders()
           applyConnection(list || [])
         }
         catch (error) {
-          // Load-time provider status: degrade quietly to the inline
-          // "No accounts yet — connect one" state instead of firing an
-          // intrusive error toast. A 401 here (e.g. an expired session)
-          // would otherwise spam a toast on every page load.
+          // Inline, not a toast: a toast on every load would be noise, and an
+          // expired session is sent to sign-in by the session script anyway.
+          // It is not "no accounts", though, so it does not say that.
+          providersFailed.set(true)
           applyConnection([])
           console.warn('[postline] provider status failed:', error)
         }
+      }
+      composerHandlers.retryProviders = () => {
+        // A failed read is never cached, so asking again really asks.
+        providersLoaded.set(false)
+        void refreshConnection()
       }
 
       const textareaFor = post => post?.querySelector('[data-bluesky-text]')
@@ -1015,15 +1038,37 @@
 
       const removePost = (post) => {
         if (!post || allPosts().length === 1) return
-        const next = post.nextElementSibling?.matches('[data-composer-post]')
-          ? post.nextElementSibling
+        const label = post.querySelector('[data-post-label]')?.textContent || 'Post'
+        const hadText = Boolean(textareaFor(post)?.value.trim())
+        const parent = post.parentElement
+        const before = post.nextElementSibling
+        const next = before?.matches('[data-composer-post]')
+          ? before
           : post.previousElementSibling
         post.remove()
         renamePosts()
         selectPost(next || root.querySelector('[data-composer-post]'), { skipSave: true })
         renderVariantPanel()
-        // No toast: the row vanishes under the pointer that removed it.
         saveDraft()
+        // An empty post goes without a word. One with writing in it can come
+        // back: the node is kept, so Undo puts back exactly what was there.
+        if (!hadText || !parent) return
+        setStatus(`${label} removed.`, 'neutral', {
+          title: 'Removed',
+          id: 'composer-post-removed',
+          dedupeMs: 0,
+          durationMs: 10000,
+          action: {
+            label: 'Undo',
+            run: () => {
+              parent.insertBefore(post, before?.isConnected ? before : null)
+              renamePosts()
+              selectPost(post, { skipSave: true })
+              renderVariantPanel()
+              saveDraft()
+            },
+          },
+        })
       }
 
       const updatePublishLabel = () => {
@@ -1063,6 +1108,39 @@
         if (Number.isNaN(date.getTime())) return ''
         return wallTime(date)
       }
+
+      // Unsaved changes to a queued post. Edits never go to the local draft
+      // (saveDraft refuses in edit mode), so leaving would drop them silently.
+      let editDirty = false
+      const markEdited = () => { if (editingId) editDirty = true }
+      root.addEventListener('input', markEdited)
+      root.addEventListener('change', markEdited)
+      // A link or navigate() that would drop them is held, and the toast says
+      // why and offers the way out. Back and forward cannot be held (the URL
+      // has already moved); closing the window gets the browser's own prompt.
+      useEventListener('stx:before-navigate', (event) => {
+        if (!editingId || !editDirty || !event.cancelable) return
+        event.preventDefault()
+        const destination = event.detail?.url
+        setStatus(`Your changes to post #${editingId} are not saved yet.`, 'neutral', {
+          title: 'Unsaved changes',
+          id: 'composer-unsaved',
+          dedupeMs: 0,
+          durationMs: 10000,
+          action: {
+            label: 'Leave without saving',
+            run: () => {
+              editDirty = false
+              if (typeof destination === 'string') navigate(destination)
+            },
+          },
+        })
+      }, { target: window })
+      useEventListener('beforeunload', (event) => {
+        if (!editingId || !editDirty) return
+        event.preventDefault()
+        event.returnValue = ''
+      }, { target: window })
 
       const enterEditMode = (item) => {
         editingId = item.id
@@ -1174,9 +1252,11 @@
           const response = await fetch('/api/postline/queue/update', { method: 'POST', body: form })
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not update the post.')
+          editDirty = false
           setStatus('Post updated.', 'success', { title: 'Updated' })
-          // Back to the queue to see the change.
-          navigate('/queue', true)
+          // Back to the queue to see the change. A router visit, not a full
+          // load: a reload took the "Post updated" toast down with the page.
+          navigate('/queue')
         }
         catch (error) {
           setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Update failed' })

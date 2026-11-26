@@ -1,3 +1,5 @@
+import { openLabel } from './lib/open-label'
+
 export type PostlineToastTone = 'neutral' | 'success' | 'error' | 'info'
 
 export interface PostlineToastOptions {
@@ -10,6 +12,8 @@ export interface PostlineToastOptions {
   id?: string
   /** Suppress an identical recent toast. Set to 0 when repeats are intentional. */
   dedupeMs?: number
+  /** A button that does something and closes the toast: Undo, Retry. */
+  action?: { label: string, run: () => void }
 }
 
 const ICONS: Record<PostlineToastTone, string> = {
@@ -151,11 +155,20 @@ export function showPostlineToast(options: PostlineToastOptions): void {
     </div>
     ${options.url
       ? `<div class="postline-toast__actions">
-          <a class="postline-toast__btn postline-toast__btn--primary" href="${escapeHtml(options.url)}" target="_blank" rel="noopener noreferrer">Open on Bluesky</a>
+          <a class="postline-toast__btn postline-toast__btn--primary" href="${escapeHtml(options.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(openLabel(options.url))}</a>
           <button type="button" class="postline-toast__btn postline-toast__btn--secondary" data-toast-copy>Copy link</button>
         </div>`
-      : ''}
+      : options.action
+        ? `<div class="postline-toast__actions">
+          <button type="button" class="postline-toast__btn postline-toast__btn--primary" data-toast-action>${escapeHtml(options.action.label)}</button>
+        </div>`
+        : ''}
   `
+
+  toast.querySelector('[data-toast-action]')?.addEventListener('click', () => {
+    dismissToast(toast, options.id)
+    options.action?.run()
+  })
 
   toast.querySelector('[data-toast-dismiss]')?.addEventListener('click', () => dismissToast(toast, options.id))
   toast.querySelector('[data-toast-copy]')?.addEventListener('click', async () => {

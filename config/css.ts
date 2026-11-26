@@ -454,6 +454,7 @@ const COMPOSER_CHIPS: string = `
 [data-provider-toggle]:not([disabled]):hover { background: #ffffff; }
 [data-provider-toggle][data-selected]:not([data-selected="false"]) { border-color: #0a0a0a; background: var(--accent); color: var(--on-accent); }
 [data-provider-toggle][disabled] { color: #a1a1aa; cursor: not-allowed; }
+[data-provider-toggle][data-connect="true"] { border-style: dashed; color: var(--body); }
 
 [data-provider-toggle] [data-provider-dot] { background: #d4d4d8; }
 [data-provider-toggle][data-selected]:not([data-selected="false"]) [data-provider-dot] { background: #34d399; }

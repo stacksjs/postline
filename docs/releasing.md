@@ -38,7 +38,8 @@ Used for every release. Each step either passes or stops the release.
 
 5. Download the DMG from the release page, check it against `checksums.txt`,
    and install it on a Mac with an existing workspace. It opens, the data is
-   there, and a scheduled post goes out with the window closed.
+   there, and a scheduled post goes out with the window closed. Then run
+   [the smoke test](smoke-test.md).
 6. Open the download page and confirm its button names the new version.
 7. If anything is wrong, say so on the release before fixing forward with a
    new patch release; a published version is never replaced.
