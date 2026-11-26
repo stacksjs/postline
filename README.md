@@ -126,7 +126,6 @@ wins when both are set. The Mac app reads no `.env`, so it uses Settings.
 |---|---|
 | `./buddy dev` | Start the site, the API, the docs and the scheduler that publishes queued posts |
 | `./buddy dev:frontend` / `./buddy dev:api` | Start one of them |
-| `./buddy dev:dashboard` | The Stacks admin dashboard |
 | `./buddy migrate` | Apply pending migrations |
 | `./buddy seed` | Seed the workspace account and sample posts |
 | `./buddy test` | Run the suite |
@@ -173,18 +172,19 @@ open storage/framework/desktop/webview/darwin-arm64/Postline.app
 [docs/desktop.md](docs/desktop.md) covers how it is put together, upgrades,
 releases and what is not done.
 
-## Deploying
+## Running it on a server
 
-CI runs on [ReviewOS](https://reviewos.org) from `.reviewos/workflows`:
-lint, type check and test on every push, and the desktop release on a `v*`
-tag. [docs/ci.md](docs/ci.md) covers the setup and how to read a run.
+[docs/self-hosting.md](docs/self-hosting.md) covers the address, HTTPS (needed
+beyond your own machine, also on a local network) and what to set. Run the app
+with `./buddy serve` and the scheduler beside it with `./buddy schedule:run`.
 
-Nothing deploys Postline yet.
+## CI
 
-Before the first deploy, Postline needs a home of its own: a host in
-`config/domains.ts`, a server in `config/cloud.ts`, and the deploy secrets in
-the repository. Until then `config/cloud.ts` still describes the server this
-code shared with The Open Times, and deploying to it would collide.
+CI runs on [ReviewOS](https://reviewos.org) from `.reviewos/workflows`: lint,
+type check, the test suite, the compiled Mac app's agent and a static build of
+the site on every push, and the desktop release on a `v*` tag.
+[docs/ci.md](docs/ci.md) covers the setup and how to read a run. Nothing
+deploys the hosted site from CI yet: it waits for Postline's own host.
 
 ## Releasing
 

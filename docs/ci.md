@@ -69,9 +69,9 @@ Recorded so it can be repeated on another machine. All of it is done.
    running by the LaunchAgent `org.reviewos.postline-runner`. Running the
    command again rotates the token.
 
-Still to set, on the repository in ReviewOS, before the first release: the
-secret `GH_RELEASE_TOKEN` (a GitHub token with `contents: write` on
-`stacksjs/postline`).
+The release publishes with the repository secret `GH_RELEASE_TOKEN` in
+ReviewOS, a GitHub token with `contents: write` on `stacksjs/postline`. It is
+set; v0.1.0 and v0.1.1 were released with it.
 
 ## Checking on the runner
 

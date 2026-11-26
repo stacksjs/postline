@@ -135,7 +135,9 @@ first open.
 ## What is not done
 
 - **Notarization.** The release signs the app but does not notarize it. Until
-  it does, a downloaded copy needs a right-click, then Open, the first time.
+  it does, macOS refuses the first open of a downloaded copy: open it once,
+  then choose **Open Anyway** under System Settings > Privacy & Security.
+  (The right-click, then Open shortcut no longer works on current macOS.)
   `buddy release:desktop` notarizes, staples and publishes signed update
   manifests; moving the release onto it needs a Developer ID and an update
   signing key.
