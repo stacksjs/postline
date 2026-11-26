@@ -26,3 +26,15 @@ cannot see. Add a step when a fix can only be confirmed by using the app.
    accounts yet". Start the API and press it: the chips appear.
 7. **Connect from the composer.** A network with no account shows as a dashed
    "Connect …" chip. Clicking it opens Channels.
+
+## Campaigns
+
+1. **Unsaved edits.** Open "Create a campaign", type a name, press Cancel (or
+   Escape). The button turns into "Discard changes"; only the second press
+   closes the form. With nothing typed, one press closes it.
+2. **Removing a post.** Open a campaign post and press Delete. It reads
+   "Click again to remove"; only the second click removes it.
+3. **A failed load.** Stop the API and open Campaigns. It says the campaigns
+   could not be loaded and offers Try again, not "Create a campaign".
+4. **Local dates.** In the evening west of Greenwich, start a new campaign:
+   the start date is tomorrow by your own calendar.

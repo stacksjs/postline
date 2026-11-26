@@ -50,7 +50,13 @@
       <p>Opening your campaign workspace…</p>
     </div>
 
-    <section class="campaign-empty" x-show="!loading() && !campaign() && panelMode() !== 'campaign'">
+    <section class="campaign-empty" x-show="!loading() && loadFailed()" role="alert">
+      <span class="campaign-empty__mark i-hugeicons-alert-02" aria-hidden="true"></span>
+      <h2>Campaigns could not be loaded</h2>
+      <p class="campaign-empty__copy">Your campaigns are still saved. Check that Postline is running, then try again.</p>
+      <button class="campaign-primary-button" type="button" @click="retryLoad">Try again</button>
+    </section>
+    <section class="campaign-empty" x-show="!loading() && !loadFailed() && !campaign() && panelMode() !== 'campaign'">
       <span class="campaign-empty__mark i-hugeicons-flowchart-01" aria-hidden="true"></span>
       <p>Campaigns turn a launch brief into a sequence of useful posts.</p>
       <h2>Start with the story, not the schedule.</h2>
@@ -243,7 +249,7 @@
               <label class="campaign-field"><span>End</span><input ref="campaignEndDateInput" required type="date" x-model="campaignEndDate"></label>
             </div>
             <div class="campaign-form__footer">
-              <button class="campaign-secondary-button" type="button" @click="closePanel">Cancel</button>
+              <button class="campaign-secondary-button" type="button" @click="closePanel"><span :text="closeLabel('Cancel')">Cancel</span></button>
               <button class="campaign-primary-button" type="submit" :disabled="busy()"><span :text="busyAction() === 'campaign' ? 'Saving…' : 'Save campaign'"></span></button>
             </div>
           </form>
@@ -269,8 +275,8 @@
               <label class="campaign-ready-check"><input type="checkbox" :checked="postStatus() === 'ready'" @change="postStatus.set($event.target.checked ? 'ready' : 'idea')"><span><strong>Mark ready</strong><small>Ready posts still stay in the plan until you schedule the campaign.</small></span></label>
             </div>
             <div class="campaign-form__footer">
-              <button class="campaign-danger-button" type="button" x-show="postDraftId() && !queuedPostId()" @click="deletePost">Delete</button>
-              <button class="campaign-secondary-button" type="button" @click="closePanel">Close</button>
+              <button class="campaign-danger-button" type="button" x-show="postDraftId() && !queuedPostId()" :disabled="busy()" @click="deletePost"><span :text="busyAction() === 'delete' ? 'Removing…' : deleteArmed() ? 'Click again to remove' : 'Delete'">Delete</span></button>
+              <button class="campaign-secondary-button" type="button" @click="closePanel"><span :text="closeLabel('Close')">Close</span></button>
               <a class="campaign-primary-button" x-show="queuedPostId()" :href="`/composer?edit=${queuedPostId()}`" data-stx-link>Edit in Composer</a>
               <button class="campaign-primary-button" type="submit" x-show="!queuedPostId()" :disabled="busy()"><span :text="busyAction() === 'post' ? 'Saving…' : 'Save post'"></span></button>
             </div>
@@ -324,6 +330,21 @@
     const postPillar = state('story')
     const postStatus = state('idea')
     const postScheduledAt = state('')
+    // The campaigns could not be read: not the same as having none.
+    const loadFailed = state(false)
+    // Two-step actions instead of a browser dialog: the first click arms the
+    // button and says what the second will do.
+    const deleteArmed = state(false)
+    const discardArmed = state(false)
+    // What the open form held when it opened, to tell an edit from a glance.
+    let openedWith = ''
+    const formSnapshot = () => JSON.stringify(panelMode() === 'campaign'
+      ? [campaignName(), campaignObjective(), campaignAudience(), campaignTone(), campaignStartDate(), campaignEndDate()]
+      : panelMode() === 'post'
+        ? [postTitle(), postBody(), postProviders(), postPillar(), postStatus(), postScheduledAt()]
+        : [])
+    const formChanged = () => (panelMode() === 'campaign' || panelMode() === 'post') && formSnapshot() !== openedWith
+    const closeLabel = (idle) => discardArmed() ? 'Discard changes' : idle
     const campaignNameInput = useRef('campaignNameInput')
     const campaignObjectiveInput = useRef('campaignObjectiveInput')
     const campaignAudienceInput = useRef('campaignAudienceInput')
@@ -482,8 +503,12 @@
         campaign.set(data.selected?.campaign || null)
         posts.set(data.selected?.posts || [])
         if (campaign()) calendarStart.set(sundayFor(campaign().startDate))
+        loadFailed.set(false)
       }
       catch (error) {
+        // Only a first load that failed hides the board; with campaigns
+        // already on screen the notice is enough.
+        if (!campaignsList().length) loadFailed.set(true)
         showNotice('Could not open campaigns', error instanceof Error ? error.message : String(error), 'error')
       }
       finally {
@@ -542,6 +567,8 @@
       campaignStartDate.set(draft.startDate)
       campaignEndDate.set(draft.endDate)
       panelMode.set('campaign')
+      openedWith = formSnapshot()
+      discardArmed.set(false)
       void nextTick(() => {
         void nextTick(() => {
           if (campaignNameInput.current) campaignNameInput.current.value = draft.name
@@ -592,6 +619,9 @@
       postStatus.set(draft.status)
       postScheduledAt.set(draft.scheduledAt)
       panelMode.set('post')
+      openedWith = formSnapshot()
+      discardArmed.set(false)
+      deleteArmed.set(false)
       void nextTick(() => {
         void nextTick(() => {
           if (postTitleInput.current) postTitleInput.current.value = draft.title
@@ -603,8 +633,27 @@
     }
 
     function closePanel() {
+      // Unsaved edits are not thrown away on one click: the first says what
+      // the second will do.
+      if (formChanged() && !discardArmed()) {
+        discardArmed.set(true)
+        return
+      }
+      discardArmed.set(false)
+      deleteArmed.set(false)
       panelMode.set(campaign() ? 'planner' : '')
     }
+
+    function retryLoad() {
+      void loadCampaigns()
+    }
+
+    // Escape closes the open form, through the same unsaved-edits check.
+    useEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || (panelMode() !== 'campaign' && panelMode() !== 'post')) return
+      event.preventDefault()
+      closePanel()
+    })
 
     async function saveCampaign(event) {
       event.preventDefault()
@@ -674,6 +723,11 @@
 
     async function deletePost() {
       if (!postDraftId() || queuedPostId()) return
+      if (!deleteArmed()) {
+        deleteArmed.set(true)
+        return
+      }
+      deleteArmed.set(false)
       busyAction.set('delete')
       try {
         await api('/api/postline/campaigns/post/delete', { campaign_id: campaign().id, id: postDraftId() })
