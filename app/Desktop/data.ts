@@ -10,10 +10,11 @@
  * changes nothing.
  */
 import { Database } from 'bun:sqlite'
-import { randomBytes } from 'node:crypto'
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
+import type { WorkspaceKeychain } from './keychain'
+import { workspaceKey } from './keychain'
 
 export interface PreparedData {
   databasePath: string
@@ -21,25 +22,6 @@ export interface PreparedData {
   applied: string[]
   /** True when this launch created the database. */
   created: boolean
-}
-
-/**
- * The app key, made once and kept. It encrypts the access tokens in the
- * database, so losing it means reconnecting every account, and so it lives
- * beside the database it unlocks and nowhere else.
- */
-export function appKey(dataDir: string): string {
-  const file = join(dataDir, 'app.key')
-  if (existsSync(file)) {
-    const key = readFileSync(file, 'utf8').trim()
-    if (key) return key
-  }
-
-  const key = `base64:${randomBytes(32).toString('base64')}`
-  writeFileSync(file, `${key}\n`, { mode: 0o600 })
-  chmodSync(file, 0o600)
-
-  return key
 }
 
 /**
@@ -212,28 +194,19 @@ function pruneBackups(dataDir: string): void {
  * carries, after copying the database aside: an upgrade that goes wrong must
  * not be the only copy of somebody's queue.
  */
-export function prepareData(options: {
+export async function prepareData(options: {
   dataDir: string
   /** The built, migrated, empty database, as a path the process can read. */
   template: string
   migrations: Record<string, string>
   origin?: string
-}): PreparedData {
+  keychain?: WorkspaceKeychain
+}): Promise<PreparedData> {
   const { dataDir } = options
   mkdirSync(dataDir, { recursive: true })
 
   const databasePath = join(dataDir, 'postline.sqlite')
   const created = !existsSync(databasePath)
-
-  if (created) {
-    // Read and written, not copied: inside the compiled app the template is an
-    // embedded file, which can be read like any other but is not a path
-    // `copyFileSync` can open.
-    writeFileSync(databasePath, readFileSync(options.template), { mode: 0o600 })
-    chmodSync(databasePath, 0o600)
-  }
-
-  let applied: string[] = []
   if (!created) {
     // An older app must not open a database a newer one has already changed:
     // it would run against tables and columns it does not know.
@@ -245,7 +218,18 @@ export function prepareData(options: {
         + 'Install the newer version again. Nothing was changed.',
       )
     }
+  }
 
+  const appKey = await workspaceKey(dataDir, created, options.keychain)
+  if (created) {
+    // The compiled app's embedded template can be read but cannot be copied
+    // with copyFileSync.
+    writeFileSync(databasePath, readFileSync(options.template), { mode: 0o600 })
+    chmodSync(databasePath, 0o600)
+  }
+
+  let applied: string[] = []
+  if (!created) {
     const pending = pendingMigrations(databasePath, options.migrations)
     if (pending.length > 0) {
       const backup = join(dataDir, `postline.before-${pending[0]!.replace(/\.sql$/, '')}.sqlite`)
@@ -274,6 +258,8 @@ export function prepareData(options: {
   if (pendingMigrations(databasePath, options.migrations).length === 0)
     stampSchemaVersion(databasePath, schemaVersion(options.migrations))
 
+  appKey.complete()
+
   // The working directory is where the app's own code keeps uploaded media
   // (`storage/app/postline-media`) and blog posts (`content/blog`). Launched
   // from Finder it would otherwise be `/`.
@@ -282,7 +268,7 @@ export function prepareData(options: {
   Object.assign(process.env, {
     APP_NAME: 'Postline',
     APP_ENV: 'production',
-    APP_KEY: appKey(dataDir),
+    APP_KEY: appKey.value,
     DB_CONNECTION: 'sqlite',
     DB_DATABASE_PATH: databasePath,
     // What tells the auth middleware the caller is the app's own window. See

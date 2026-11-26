@@ -24,14 +24,14 @@ The app opens on the composer. Connect a network next:
 
 ## Where your data lives
 
-Everything is in `~/Library/Application Support/Postline`: the database, the
-key that encrypts your network tokens (`app.key`), images attached to queued
-posts, and blog posts. The log is `~/Library/Logs/Postline.log`; **Settings >
-General > Troubleshooting > Show in Finder** opens it.
+The database, queued images, and blog posts are in
+`~/Library/Application Support/Postline`. The login Keychain holds the key
+that encrypts your network tokens. Open **Settings > General > Troubleshooting >
+Show in Finder** to find `~/Library/Logs/Postline.log`.
 
-Back up that folder to keep your workspace. To move to another Mac, use
-**Settings > Data > Export this workspace** and import it there; network
-sign-ins do not travel and are connected again.
+Back up that folder and the matching Keychain entry to keep your workspace
+and its sign-ins. You can also export the workspace from **Settings > Data**
+and reconnect your accounts after import. [Back up or move a workspace](./workspace-data.md).
 
 ## Running in the background
 

@@ -10,10 +10,14 @@ Treat an export as private. It contains workspace content. For disaster recovery
 
 | Installation | Database and media | Encryption key |
 |---|---|---|
-| Mac | `~/Library/Application Support/Postline`, including `postline.sqlite`, `storage/app/postline-media/`, and `content/blog/` | `app.key` inside that folder |
+| Mac | `~/Library/Application Support/Postline`, including `postline.sqlite`, `storage/app/postline-media/`, and `content/blog/` | macOS login Keychain. `app.keychain-id` identifies the workspace's entry. |
 | Server | The paths configured by `DB_DATABASE_PATH` and `POSTLINE_MEDIA_DIR`. A local checkout defaults to `database/postline.sqlite` and `storage/app/postline-media/`. | The configured `APP_KEY` |
 
-Quit Postline before copying its Mac data directory. Back up the whole directory so the database, attachments, and key stay together. On a server, use the online snapshot procedure in the recovery guide. [Upgrade an existing workspace](./upgrading.md).
+Quit Postline before copying its Mac data directory. Back up the entire directory and the corresponding login Keychain. For a new Mac, Apple's Setup Assistant can transfer the Keychain with your workspace. If you move it manually, copy the matching `org.postline.workspace` entry identified by `app.keychain-id`. [Copy keychains to another Mac](https://support.apple.com/guide/keychain-access/kyca1121/mac).
+
+If you have a separately protected copy of the original key value, save it as `app.key` in the restored data directory with owner-only access. Postline checks it against `app.keychain-id`, imports it into the login Keychain, and removes the file after preparing the workspace. Keep your recovery copy separate from the data folder.
+
+On a server, use the online snapshot procedure. [Back up and restore a server](./recovery.md).
 
 ## Remove posts from networks
 
@@ -25,4 +29,4 @@ For age-based cleanup, use **Settings > Automatic Deletion**. Select the cutoff 
 
 **Settings > Data > Delete everything** clears the current workspace's stored posts, plans, messages, rules, accounts, and images. Posts on social networks remain there. Export anything you want to keep before confirming.
 
-On a Mac, quit Postline from the menu bar and move **Postline.app** out of Applications. Keep the data folder for a later installation, or remove it and `~/Library/Logs/Postline.log` when you no longer need them. On a server, stop the web, API, and scheduler services before removing the installation. Retain the database, media, and application key together if you plan to reinstall, and revoke network or AI credentials you no longer need through their providers.
+On a Mac, quit Postline from the menu bar and move **Postline.app** out of Applications. Keep the data folder and Keychain entry for a later installation. To clear all local data, use `app.keychain-id` to identify the `org.postline.workspace` entry in Keychain Access before removing it, the data folder, and `~/Library/Logs/Postline.log`. On a server, stop the web, API, and scheduler services before removing the installation. Retain the database, media, and application key if you plan to reinstall, and revoke network or AI credentials you no longer need through their providers.

@@ -28,6 +28,7 @@ describe('upgrading the Mac app from v0.1.1', () => {
       expect(result.created).toBe(false)
       expect(result.applied.length).toBeGreaterThan(0)
       expect(readdirSync(dataDir).some(name => /^postline\.before-.+\.sqlite$/.test(name))).toBe(true)
+      expect(readdirSync(dataDir)).not.toContain('app.key')
 
       const db = new Database(join(dataDir, 'postline.sqlite'), { readonly: true })
       expect(db.query('SELECT workspace_name, timezone FROM accounts WHERE id = 1').get()).toEqual({ workspace_name: 'Upgrade Workspace', timezone: 'Europe/Berlin' })

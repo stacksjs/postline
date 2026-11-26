@@ -3,8 +3,8 @@
  *
  * The framework's launcher starts this module, opens a loopback port only the
  * app's own window can call, and serves the built workspace pages. This file
- * adds what makes it Postline: the database and the app key in Application
- * Support, the routes and actions under `/api`, and the recurring jobs.
+ * adds what makes it Postline: the workspace database, the key from Keychain,
+ * the routes and actions under `/api`, and the recurring jobs.
  *
  * Nothing from the framework or the app is imported at the top. See
  * app/Desktop/data.ts for why the order matters: the data directory has to be
@@ -34,7 +34,7 @@ async function boot(dataDir: string, origin: string): Promise<void> {
 
   clientScripts = bundle.clientScripts
 
-  const prepared = prepareData({ dataDir, template: bundle.databaseTemplate, migrations: bundle.migrations, origin })
+  const prepared = await prepareData({ dataDir, template: bundle.databaseTemplate, migrations: bundle.migrations, origin })
   if (prepared.created) console.log(`[postline] created ${prepared.databasePath}`)
   for (const name of prepared.applied) console.log(`[postline] migrated: ${name}`)
 

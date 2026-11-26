@@ -11,7 +11,7 @@ What is theirs lives in `~/Library/Application Support/Postline`:
 | File | What it is |
 |---|---|
 | `postline.sqlite` | Posts, the queue, connected accounts, metrics |
-| `app.key` | The key that encrypts the access tokens in that database. Made on first launch, mode 0600. Lose it and every account has to be reconnected |
+| `app.keychain-id` | Identifies the workspace's encryption key in the login Keychain |
 | `storage/app/postline-media/` | Images attached to queued posts |
 | `content/blog/` | Long-form posts published to the blog channel |
 | `postline.before-<migration>.sqlite` | A copy made before an upgrade migrates the database |
@@ -25,6 +25,7 @@ The log is `~/Library/Logs/Postline.log`.
 | `config/desktop.ts` | The `webview` app: name, bundle id, window, where the agent and the views are |
 | `app/Desktop/Agent.ts` | The agent's own code: answers `/api/*` with the app's routes, starts the recurring jobs |
 | `app/Desktop/data.ts` | Prepares the data directory before any framework code loads: database, app key, working directory |
+| `app/Desktop/keychain.ts` | Loads or creates the workspace key in the login Keychain and migrates the legacy key file after a successful upgrade |
 | `app/Desktop/schedule.ts` | Runs the recurring jobs on timers while the app is open |
 | `scripts/desktop-bundle.ts` | Writes what the agent carries: routes, actions, middleware, jobs, migrations, and a migrated empty database |
 | `app/Desktop/build-views.ts` | Builds the pages the app carries: the workspace, without the marketing site |

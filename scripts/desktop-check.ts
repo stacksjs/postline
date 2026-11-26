@@ -20,11 +20,12 @@
  * images the app.
  */
 import { Database } from 'bun:sqlite'
-import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import agent from '../app/Desktop/Agent'
+import { WORKSPACE_KEY_ID_FILE, WORKSPACE_KEY_SERVICE } from '../app/Desktop/keychain'
 
 const dataDir = mkdtempSync(join(tmpdir(), 'postline-desktop-check-'))
 const origin = 'http://127.0.0.1:4999'
@@ -63,8 +64,11 @@ async function call(method: string, path: string, form?: Record<string, string>)
 
 await agent.start!({ ...context, launch: { args: [], cwd: dataDir } } as never)
 
-check('the working directory is the data directory', existsSync(join(process.cwd(), 'app.key')))
-check('the app key is private', (statSync(join(dataDir, 'app.key')).mode & 0o777) === 0o600)
+check('the working directory is the data directory', realpathSync(process.cwd()) === realpathSync(dataDir))
+const keychainItem = { service: WORKSPACE_KEY_SERVICE, name: readFileSync(join(dataDir, WORKSPACE_KEY_ID_FILE), 'utf8').trim() }
+const storedKey = await Bun.secrets.get(keychainItem)
+check('the workspace key is in Keychain', Boolean(storedKey) && storedKey === process.env.APP_KEY)
+check('there is no plaintext key file', !existsSync(join(dataDir, 'app.key')))
 
 // Postline's own config/, not the framework's defaults (#196). The framework
 // loads config/ by a dynamic import relative to the working directory, which
@@ -115,6 +119,7 @@ check('the database carries its migration ledger', ledger > 0, String(ledger))
 check('the blog file is in the data directory', existsSync(join(dataDir, 'content/blog')) && readdirSync(join(dataDir, 'content/blog')).includes('desktop-check.md'))
 
 await agent.stop?.()
+await Bun.secrets.delete(keychainItem)
 rmSync(dataDir, { recursive: true, force: true })
 
 if (failures.length > 0) {

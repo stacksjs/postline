@@ -13,7 +13,11 @@ Upgrading from v0.1.1 is covered by a test that opens a v0.1.1 database, with
 an account, a connected network and posts in it, in the current release
 (`tests/unit/desktop-upgrade.test.ts`).
 
-Keep `app.key` with the database: it decrypts the network tokens.
+Postline moves the old `app.key` into the login Keychain and deletes the file
+after the workspace has upgraded. Keep the matching Keychain entry to retain
+connected accounts after a restore. To reopen the data in a build from before
+this migration, use the original key as `app.key` with the pre-upgrade database
+copy. [Back up the workspace and its key](./workspace-data.md).
 
 ## A server install
 
