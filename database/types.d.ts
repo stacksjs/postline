@@ -15,6 +15,7 @@ declare module '@stacksjs/database' {
       workspace_name: string
       timezone: string
       share_media_by_tunnel: number
+      publishing_paused: number
       ai_provider: "" | "anthropic" | "openai" | "ollama"
       ai_api_key: string
       ai_model: string
