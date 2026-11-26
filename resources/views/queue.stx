@@ -395,10 +395,11 @@
 
     const loadZone = async () => {
       try {
-        const response = await fetch('/api/postline/settings/workspace')
-        const payload = await response.json()
-        const timezone = payload?.data?.timezone
-        if (response.ok && typeof timezone === 'string' && timezone) {
+        const workspace = postlineSocial
+          ? await postlineSocial.fetchWorkspace()
+          : await fetch('/api/postline/settings/workspace').then(response => response.json()).then(payload => payload?.data ?? null)
+        const timezone = workspace?.timezone
+        if (typeof timezone === 'string' && timezone) {
           zone.set(timezone)
           calMonth.set(monthOf(new Date()))
         }

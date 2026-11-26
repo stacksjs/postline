@@ -144,32 +144,98 @@ export interface NetworkStatus {
   [key: string]: unknown
 }
 
+/**
+ * Reads that every view makes, kept for a short while (#183). Moving between
+ * the composer, the queue, campaigns and Settings asked for the connected
+ * accounts again each time; now a read within FRESH_MS reuses the answer, and
+ * anything that changes accounts calls `invalidate()`. A failed read is not
+ * kept, so the next one tries again.
+ */
+const FRESH_MS = 30_000
+const cache = new Map<string, { at: number, value: Promise<unknown> }>()
+
+function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
+  const hit = cache.get(key)
+  if (hit && Date.now() - hit.at < FRESH_MS) return hit.value as Promise<T>
+  const value = load().catch((error) => {
+    cache.delete(key)
+    throw error
+  })
+  cache.set(key, { at: Date.now(), value })
+  return value
+}
+
+/** Forget every cached read, after something that changes accounts or networks. */
+export function invalidate(): void {
+  cache.clear()
+}
+
+// Any write to Postline's API may change what these reads answer (a connect,
+// a disconnect, a saved app), so a write clears them all. Done here, once,
+// rather than at every place in the views that writes.
+if (typeof window !== 'undefined' && !(window as unknown as { __postlineReadCacheBound?: boolean }).__postlineReadCacheBound) {
+  ;(window as unknown as { __postlineReadCacheBound?: boolean }).__postlineReadCacheBound = true
+  const send = window.fetch.bind(window)
+  window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const method = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
+    const url = String(input instanceof Request ? input.url : input)
+    if (method !== 'GET' && method !== 'HEAD' && url.includes('/api/')) invalidate()
+    return send(input, init)
+  }) as typeof fetch
+}
+
 /** One client for every network's status, in place of a module per network (#181). */
 export async function fetchStatus(network: StatusNetwork): Promise<NetworkStatus> {
-  const response = await fetch(`/api/postline/${network}/status`)
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok || !payload.ok)
-    throw new Error(payload.error || `Could not load ${providerLabel(network)} status.`)
-  return payload.data as NetworkStatus
+  return await cached(`status:${network}`, async () => {
+    const response = await fetch(`/api/postline/${network}/status`)
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok || !payload.ok)
+      throw new Error(payload.error || `Could not load ${providerLabel(network)} status.`)
+    return payload.data as NetworkStatus
+  })
+}
+
+/** The workspace profile (its name and time zone), which most views read. */
+export async function fetchWorkspace(): Promise<{ name: string, workspaceName: string, timezone: string } & Record<string, unknown>> {
+  return await cached('workspace', async () => {
+    const response = await fetch('/api/postline/settings/workspace')
+    const payload = await response.json()
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the workspace.')
+    return payload.data
+  })
+}
+
+/** A link's preview card, asked for once however often the composer redraws it. */
+export async function fetchLinkPreview(url: string): Promise<Record<string, unknown>> {
+  return await cached(`preview:${url}`, async () => {
+    const response = await fetch(`/api/postline/bluesky/link-preview?url=${encodeURIComponent(url)}`)
+    const payload = await response.json()
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not render link preview.')
+    return payload.data
+  })
 }
 
 export async function fetchProviders(): Promise<ProviderStatus[]> {
-  const response = await fetch('/api/postline/providers')
-  const payload = await response.json()
-  if (!response.ok || !payload.ok) {
-    throw new Error(payload.error || 'Could not load connected accounts.')
-  }
-  return (payload.data?.providers || []) as ProviderStatus[]
+  return await cached('providers', async () => {
+    const response = await fetch('/api/postline/providers')
+    const payload = await response.json()
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || 'Could not load connected accounts.')
+    }
+    return (payload.data?.providers || []) as ProviderStatus[]
+  })
 }
 
 /** Every connected account, across networks. */
 export async function fetchAccounts(): Promise<AccountStatus[]> {
-  const response = await fetch('/api/postline/accounts')
-  const payload = await response.json()
-  if (!response.ok || !payload.ok) {
-    throw new Error(payload.error || 'Could not load connected accounts.')
-  }
-  return (payload.data?.accounts || []) as AccountStatus[]
+  return await cached('accounts', async () => {
+    const response = await fetch('/api/postline/accounts')
+    const payload = await response.json()
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.error || 'Could not load connected accounts.')
+    }
+    return (payload.data?.accounts || []) as AccountStatus[]
+  })
 }
 
 /**
@@ -226,6 +292,9 @@ export async function publishCrosspost(input: CrosspostInput): Promise<{ postId:
 declare global {
   interface Window {
     postlineSocial?: {
+      invalidate: typeof invalidate
+      fetchWorkspace: typeof fetchWorkspace
+      fetchLinkPreview: typeof fetchLinkPreview
       fetchStatus: typeof fetchStatus
       fetchProviders: typeof fetchProviders
       fetchAccounts: typeof fetchAccounts
@@ -240,6 +309,9 @@ declare global {
 }
 
 window.postlineSocial = {
+  invalidate,
+  fetchWorkspace,
+  fetchLinkPreview,
   fetchStatus,
   fetchProviders,
   fetchAccounts,

@@ -304,7 +304,6 @@
       const refreshButton = root.querySelector('[data-composer-refresh]')
       const searchButton = root.querySelector('[data-composer-search]')
       const modeButtons = Array.from(root.querySelectorAll('[data-composer-mode]'))
-      const linkPreviewCache = new Map()
       const urlPattern = /https?:\/\/[^\s<>"']+/i
       const draftKey = 'postline:composer-draft:v1'
       let activePost = root.querySelector('[data-composer-post]')
@@ -942,13 +941,12 @@
         post.dataset.previewUrl = url
 
         try {
-          if (!linkPreviewCache.has(url)) {
-            const response = await fetch(`/api/postline/bluesky/link-preview?url=${encodeURIComponent(url)}`)
-            const payload = await response.json()
-            if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not render link preview.')
-            linkPreviewCache.set(url, payload.data)
-          }
-          renderLinkPreview(post, linkPreviewCache.get(url))
+          // Shared and cached, so a redraw or a second visit does not ask again.
+          const preview = window.postlineSocial
+            ? await window.postlineSocial.fetchLinkPreview(url)
+            : await fetch(`/api/postline/bluesky/link-preview?url=${encodeURIComponent(url)}`).then(response => response.json()).then(payload => payload?.ok ? payload.data : null)
+          if (!preview) throw new Error('Could not render link preview.')
+          renderLinkPreview(post, preview)
         }
         catch {
           renderLinkPreview(post, {
@@ -1041,10 +1039,11 @@
       let workspaceZone
       // Awaited before a saved post's time is shown, so it is never read in
       // one zone and saved in another.
-      const zoneReady = fetch('/api/postline/settings/workspace')
-        .then(response => response.ok ? response.json() : null)
-        .then((payload) => {
-          const timezone = payload?.data?.timezone
+      // The shared client when it has loaded; the endpoint itself otherwise.
+      const zoneReady = (window.postlineSocial?.fetchWorkspace()
+        ?? fetch('/api/postline/settings/workspace').then(response => response.ok ? response.json() : null).then(payload => payload?.data ?? null))
+        .then((workspace) => {
+          const timezone = workspace?.timezone
           if (typeof timezone !== 'string' || !timezone) return
           workspaceZone = timezone
           if (scheduleInput) scheduleInput.title = `Time in ${timezone}`
