@@ -777,6 +777,7 @@
           </button>
         </header>
           <textarea class="min-h-36 w-full leading-relaxed text-ink text-xl bg-transparent border-0 outline-none rounded-md resize-none" data-focus-outline spellcheck="true" aria-label="Post body ${number}" data-bluesky-text>${escapeHtml(text)}</textarea>
+        ${number === 1 ? '<div class="hidden" data-richtext-host></div>' : ''}
         <div class="hidden overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview></div>
       `
 

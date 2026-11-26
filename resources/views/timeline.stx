@@ -2,6 +2,10 @@
 
 @section('title', 'Postline - Timeline')
 
+@section('styles')
+  <link rel="stylesheet" href="/assets/styles/timeline.css">
+@endsection
+
 @section('content')
   @meta('description', 'Read connected social timelines from Postline.')
   <section class="grid gap-4" data-postline-page="timeline" data-testid="timeline-page">

@@ -16,6 +16,9 @@
  * Only long-form gets it. A 300-character Bluesky post does not want a
  * formatting toolbar, and the Markdown a rich editor emits would be published
  * literally by networks that do not render it.
+ *
+ * The editor is about 30 KB, so only the composer downloads it: view-code.ts,
+ * which every workspace page loads, imports this file when it finds one.
  */
 
 import { isEmptyHtml, toMarkdown } from 'ts-medium-editor'
@@ -124,12 +127,6 @@ function setupRichText(): void {
   sync()
 }
 
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupRichText)
-else setupRichText()
-
-// Re-run after client-side navigation, since the composer is swapped in by the
-// stx router rather than reloaded. The router fires `stx:load` on window once a navigated-to page is in place;
-// `stx:navigated` was never an event, so a client-side visit got no editor.
-window.addEventListener('stx:load', setupRichText)
-
+// view-code.ts imports this module the first time a composer is on the page
+// and calls setupRichText itself, on that load and after each navigation.
 export { markdownToHtml, setupRichText }

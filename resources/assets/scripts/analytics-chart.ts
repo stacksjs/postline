@@ -412,12 +412,8 @@ function mountAnalyticsIfShown(): void {
   scheduleAnalyticsRender()
 }
 
-if (document.readyState === 'loading')
-  document.addEventListener('DOMContentLoaded', mountAnalyticsIfShown, { once: true })
-else
-  mountAnalyticsIfShown()
-
-// The router fires `stx:load` on window once a navigated-to page is in place.
-window.addEventListener('stx:load', mountAnalyticsIfShown)
+// view-code.ts imports this module the first time the analytics view is on
+// the page and calls mountAnalyticsIfShown, then and after each navigation.
+export { mountAnalyticsIfShown }
 
 

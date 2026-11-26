@@ -2,6 +2,10 @@
 
 @section('title', 'Postline - Campaigns')
 
+@section('styles')
+  <link rel="stylesheet" href="/assets/styles/campaigns.css">
+@endsection
+
 @section('content')
   @meta('description', 'Plan multi-week social launches, draft campaign posts with AI, and send them into Postline queue.')
   <section class="grid gap-4 campaigns-page" data-postline-page="campaigns" data-testid="campaigns-page">
@@ -282,8 +286,6 @@
       <button type="button" aria-label="Dismiss" @click="notice.set({ title: '', message: '', tone: 'success' })"><span class="i-hugeicons-cancel-01" aria-hidden="true"></span></button>
     </div>
   </section>
-
-  <link rel="stylesheet" href="/assets/styles/campaigns.css">
 
   <script client>
     const campaignsList = state([])

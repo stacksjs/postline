@@ -22,14 +22,13 @@ export const BUDGETS = { script: 150 * KB, css: 30 * KB, fonts: 60 * KB }
 /**
  * Pages over a budget today, held at what they weigh now so they cannot grow.
  * Lower a number when a page gets lighter, and delete it once the page meets
- * the budget; never raise one. The composer and Channels shed weight with the
- * signals rewrites (#162, #172) and the smaller runtime (#186); Settings with
- * the one Settings window (#170).
+ * the budget; never raise one. Settings sheds its CSS with the one Settings
+ * window (#170).
+ *
+ * The composer's editor and the analytics chart are not counted: view-code.ts
+ * imports each after the page is up, and only on its own view.
  */
 export const CEILINGS: Record<string, Partial<typeof BUDGETS>> = {
-  composer: { script: 156 * KB },
-  campaigns: { script: 151 * KB },
-  accounts: { script: 153 * KB },
   settings: { css: 31.5 * KB },
 }
 

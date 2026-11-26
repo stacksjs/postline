@@ -5,7 +5,7 @@
  *
  * Runs after `buddy build:frontend` (see the `build` script). The stx build
  * copies `resources/assets/scripts/*.ts` into `dist/` as raw TypeScript and
- * leaves the pages pointing at them, and `richtext.ts` imports an npm package
+ * leaves the pages pointing at them, and `richtext-editor.ts` imports an npm package
  * by name: a static host can run none of it. Each script is bundled and
  * minified to `<name>.<hash>.js`, every page is pointed at that file, and the
  * `.ts` copies are removed. The hash changes with the code, so the files can
@@ -29,7 +29,13 @@ if (!existsSync(dist)) {
 
 const bundled = await bundleClientScripts(root)
 const renamed = new Map<string, string>()
-for (const [name, code] of Object.entries(bundled)) {
+// A script imported by URL is named by its hash before the scripts that
+// import it, so their code (and so their hash) carries the final name.
+const importsAnother = (code: string): boolean => /\/assets\/scripts\/[\w.-]+\.ts/.test(code)
+const ordered = Object.entries(bundled).sort(([, a], [, b]) => Number(importsAnother(a)) - Number(importsAnother(b)))
+for (const [name, raw] of ordered) {
+  const code = raw.replace(/\/assets\/scripts\/[\w.-]+\.ts/g, path => renamed.get(path) ?? path)
+  if (/\/assets\/scripts\/[\w.-]+\.ts/.test(code)) throw new Error(`${name} imports a script that was not bundled first.`)
   const hash = Bun.hash(code).toString(36).slice(0, 10)
   const file = `${name.replace(/\.ts$/, '')}.${hash}.js`
   writeFileSync(join(scriptsDir, file), code)
