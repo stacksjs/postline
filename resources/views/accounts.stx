@@ -242,6 +242,11 @@
                 <span>Client secret</span>
                 <input class="px-3 h-9 text-ink text-ui bg-panel border border-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="password" autocomplete="off" :placeholder="app.secretPlaceholder" :value="app.clientSecret" @input="setAppField(app.provider, 'clientSecret', $event)" data-app-client-secret>
               </label>
+              {{-- LinkedIn company Pages (#130): opt-in, since the scopes need a product the app may not have. --}}
+              <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'linkedin' ? 'flex' : 'hidden'">
+                <input class="mt-0.5" type="checkbox" :checked="app.organizationPages" @change="setAppPages(app.provider, $event)" data-app-organization-pages>
+                <span>Also connect the company Pages I administer. Needs the Community Management API product on this app; without it LinkedIn refuses the sign-in.</span>
+              </label>
               <div class="flex flex-wrap gap-2 items-center sm:col-span-2">
                 <p class="m-0 mr-auto text-muted text-xs" :text="app.note"></p>
                 <button class="px-3 h-8 font-medium text-danger text-xs bg-panel hover:bg-danger-soft border border-line rounded-lg disabled:opacity-50" type="button" x-show="app.removable" :disabled="appBusy() === app.provider" @click="clearApp(app.provider)">Remove</button>
@@ -361,6 +366,7 @@
           'Under Products, add "Sign In with LinkedIn using OpenID Connect" and "Share on LinkedIn".',
           'Under Auth, add the redirect address below as an Authorized redirect URL.',
           'Copy the Client ID and Primary Client Secret from the Auth tab into the fields below.',
+          'To post as a company Page too, add the "Community Management API" product, then tick the box below.',
         ],
       },
       instagram: {
@@ -394,6 +400,7 @@
         redirectUrl: app.redirectUrl,
         clientId: draft.clientId ?? app.clientId,
         clientSecret: draft.clientSecret ?? '',
+        organizationPages: draft.organizationPages ?? Boolean(app.organizationPages),
         secretPlaceholder: app.hasSecret ? 'Stored. Leave blank to keep it.' : 'Paste the client secret',
         removable: app.source === 'settings',
         note: app.source === 'environment' ? 'Read from .env. Saving here takes over from it.' : app.configured ? 'Saved. Connect the account in its card above.' : '',
@@ -402,6 +409,11 @@
     const setAppField = (provider, field, event) => {
       const drafts = { ...appDrafts() }
       drafts[provider] = { ...(drafts[provider] || {}), [field]: String(event?.target?.value || '') }
+      appDrafts.set(drafts)
+    }
+    const setAppPages = (provider, event) => {
+      const drafts = { ...appDrafts() }
+      drafts[provider] = { ...(drafts[provider] || {}), organizationPages: Boolean(event?.target?.checked) }
       appDrafts.set(drafts)
     }
     const appHandlers = { load: null, save: null, clear: null, copy: null }
@@ -1108,6 +1120,7 @@
           body.set('provider', provider)
           body.set('client_id', row.clientId || '')
           body.set('client_secret', row.clientSecret || '')
+          if (provider === 'linkedin') body.set('organization_pages', row.organizationPages ? '1' : '0')
           const response = await fetch('/api/postline/network-apps', { method: 'POST', body })
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save the app.')

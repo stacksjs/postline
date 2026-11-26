@@ -2663,6 +2663,15 @@
             "isUnique": false,
             "isNullable": true,
             "hasDefault": false
+          },
+          {
+            "name": "organization_pages",
+            "type": "boolean",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": true,
+            "defaultValue": false
           }
         ],
         "indexes": [
@@ -2677,7 +2686,7 @@
       }
     ]
   },
-  "hash": "6124c0a2f74369a30652c2164725606fd88f2b7b93ffb44625e5a95cca2e5b51",
+  "hash": "922b16e43bc254506fef45636726750672fec572a9a642227b74bd2e857e5abf",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-25T23:06:40.400Z"
+  "updatedAt": "2026-11-26T01:23:02.307Z"
 }

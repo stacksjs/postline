@@ -19,6 +19,9 @@ export default new Action({
         clientId: String(request.get('client_id') || ''),
         clientSecret: String(request.get('client_secret') || ''),
         redirectUrl: String(request.get('redirect_url') || ''),
+        ...(request.get('organization_pages') === undefined || request.get('organization_pages') === null
+          ? {}
+          : { organizationPages: ['1', 'true', 'on'].includes(String(request.get('organization_pages'))) }),
       })
       return response.json({ ok: true, data })
     }

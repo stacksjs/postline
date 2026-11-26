@@ -2,6 +2,7 @@ import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import { log } from '@stacksjs/logging'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
 import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { LinkedInDriver } from './Drivers/LinkedInDriver'
@@ -47,6 +48,14 @@ interface LinkedInConfig {
   accessToken: string
   authorUrn: string
   scopes: string[]
+  organizationPages: boolean
+}
+
+/** What signing in asks LinkedIn for: posting as the member, and as their Pages when that is on. */
+export function linkedInScopes(organizationPages: boolean): string[] {
+  const member = ['openid', 'profile', 'w_member_social']
+  // Posting as a Page, and listing the Pages the member administers.
+  return organizationPages ? [...member, 'w_organization_social', 'r_organization_admin'] : member
 }
 
 export class LinkedInService {
@@ -73,7 +82,8 @@ export class LinkedInService {
       apiVersion: resolveLinkedInVersion(env.LINKEDIN_API_VERSION),
       accessToken: String(env.LINKEDIN_ACCESS_TOKEN || '').trim(),
       authorUrn: String(env.LINKEDIN_AUTHOR_URN || '').trim(),
-      scopes: ['openid', 'profile', 'w_member_social'],
+      scopes: linkedInScopes(app.organizationPages),
+      organizationPages: app.organizationPages,
     }
   }
 
@@ -158,14 +168,33 @@ export class LinkedInService {
     const authorUrn = profile?.sub ? `urn:li:person:${profile.sub}` : cfg.authorUrn
     if (!authorUrn) throw new Error('Could not resolve your LinkedIn member URN.')
 
-    const identity = await this.saveSession({
-      accessToken: token.accessToken,
-      refreshToken: token.refreshToken,
-      expiresIn: token.expiresIn,
-      authorUrn,
-      name: profile?.name,
-    })
+    const session = { accessToken: token.accessToken, refreshToken: token.refreshToken, expiresIn: token.expiresIn }
+    const identity = await this.saveSession({ ...session, authorUrn, name: profile?.name })
+    if (cfg.organizationPages) await this.connectPages(session)
     return this.publicIdentity(identity)
+  }
+
+  /**
+   * One account per company Page the member may post for (#130), on the same
+   * token: a Page posts as `urn:li:organization:{id}`, and the token's
+   * `w_organization_social` is what allows it. A Page the member no longer
+   * administers is left as it was; disconnect it from the Accounts page.
+   *
+   * Listing Pages failing is not the sign-in failing: the member account is
+   * already saved, and the reason is logged for the owner.
+   */
+  async connectPages(session: { accessToken: string, refreshToken?: string, expiresIn?: number }): Promise<number> {
+    let pages
+    try {
+      pages = await this.driver.listOrganizations(session.accessToken)
+    }
+    catch (error) {
+      log.warn(`[postline] LinkedIn Pages were not connected: ${error instanceof Error ? error.message : String(error)}`)
+      return 0
+    }
+    for (const page of pages)
+      await this.saveSession({ ...session, authorUrn: page.urn, name: page.name || `Page ${page.id}` })
+    return pages.length
   }
 
   /**
@@ -360,13 +389,20 @@ export class LinkedInService {
         })
         const nextExpiry = expiresAt(refreshed.expiresIn)
         const nextRefresh = refreshed.refreshToken ?? current.refresh_token
-        await saveIdentityTokens(current.id, {
+        const tokens = {
           access_token: refreshed.accessToken,
           refresh_token: nextRefresh,
           token_expires_at: nextExpiry,
           auth_status: 'connected',
           updated_at: now(),
-        })
+        }
+        await saveIdentityTokens(current.id, tokens)
+        // The member and their Pages share one sign-in: renew them together,
+        // so a Page is not left holding a token its member has moved past.
+        for (const sibling of await listIdentityRows<SocialIdentityRow>('linkedin')) {
+          if (Number(sibling.id) !== Number(current.id) && isUsableIdentity(sibling) && sibling.refresh_token === current.refresh_token)
+            await saveIdentityTokens(sibling.id, tokens)
+        }
         return { ...current, access_token: refreshed.accessToken, refresh_token: nextRefresh, token_expires_at: nextExpiry }
       },
       refused: async current => await markIdentityExpired(current.id),
@@ -398,7 +434,7 @@ export class LinkedInService {
   ): Promise<SocialIdentityRow> {
     const accountId = await ensureAccount()
     const driver = await this.ensureDriver()
-    const handle = (input.name || input.authorUrn.replace('urn:li:person:', '')).trim()
+    const handle = (input.name || input.authorUrn.replace(/^urn:li:(?:person|organization):/, '')).trim()
 
     return await upsertIdentityRow<SocialIdentityRow>('linkedin', { externalId: input.authorUrn }, {
       handle,

@@ -48,5 +48,18 @@ export default defineModel({
       validation: { rule: schema.string().max(500).optional() },
       factory: () => null,
     },
+    /**
+     * LinkedIn only: also connect the company Pages the owner administers.
+     * Off unless asked for, because the scopes it requests need LinkedIn's
+     * Community Management API product, and asking for a scope the app does
+     * not have fails the whole sign-in.
+     */
+    organizationPages: {
+      required: false,
+      fillable: true,
+      default: false,
+      validation: { rule: schema.boolean() },
+      factory: () => false,
+    },
   },
 } as const)
