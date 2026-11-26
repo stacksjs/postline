@@ -1,5 +1,7 @@
-<FontFaces />
-<CsrfScripts />
+@head
+  <FontFaces />
+  <CsrfScripts />
+@endhead
 @yield('content')
 
 @yield('footer')

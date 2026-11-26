@@ -17,33 +17,31 @@
       </header>
 
       <form class="grid gap-3" @submit.prevent="onSubmit">
-        {{-- Inline display:none is the pre-hydration state. bindShow treats an
-            initial 'none' as "no original display", so showing the row clears
-            the inline style and the grid class takes over — no flash, and no
-            fighting between a hidden class and x-show. --}}
-        <label class="grid gap-1.5" style="display:none" x-show="registering()">
+        {{-- Object-form :class: the static hidden class is the pre-hydration
+            state, and classList.remove takes it off when the row shows. --}}
+        <label class="hidden gap-1.5" :class="{ 'hidden': !registering(), 'grid': registering() }">
           <span class="font-semibold text-muted text-xs">Name</span>
           <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="name" autocomplete="name" placeholder="Your name" x-model="accountName" :required="registering()">
         </label>
         <label class="grid gap-1.5" x-show="!challenge()">
           <span class="font-semibold text-muted text-xs">Email</span>
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="email" type="email" autocomplete="username" placeholder="you@example.com" x-model="email" :required="!challenge()">
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="email" type="email" autocomplete="username" placeholder="you@example.com" x-model="email" :required="!challenge()" autofocus>
         </label>
         <label class="grid gap-1.5" x-show="!challenge()">
           <span class="font-semibold text-muted text-xs">Password</span>
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password" type="password" autocomplete="current-password" placeholder="••••••••" :required="!challenge()" :minlength="registering() ? 8 : 1" x-model="password">
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password" type="password" :autocomplete="registering() ? 'new-password' : 'current-password'" autocomplete="current-password" placeholder="••••••••" :required="!challenge()" :minlength="registering() ? 8 : 1" x-model="password">
         </label>
-        <label class="grid gap-1.5" style="display:none" x-show="registering()">
+        <label class="hidden gap-1.5" :class="{ 'hidden': !registering(), 'grid': registering() }">
           <span class="font-semibold text-muted text-xs">Confirm password</span>
           <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password_confirmation" type="password" autocomplete="new-password" placeholder="••••••••" minlength="8" x-model="confirmPassword" :required="registering()">
         </label>
         {{-- The second step when two-factor sign-in is on (#95). --}}
         <label class="gap-1.5" :class="challenge() ? 'grid' : 'hidden'">
           <span class="font-semibold text-muted text-xs">Authenticator code</span>
-          <input class="px-3 h-10 text-ink text-sm tracking-widest bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="code" autocomplete="one-time-code" inputmode="text" placeholder="123456" maxlength="64" x-model="code" :required="!!challenge()" data-two-factor-code>
+          <input class="px-3 h-10 text-ink text-sm tracking-widest bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="code" autocomplete="one-time-code" inputmode="text" placeholder="123456" maxlength="64" x-model="code" :required="!!challenge()" ref="codeInput" data-two-factor-code>
           <span class="text-muted text-xs">The 6-digit code from your authenticator app, or one of your recovery codes.</span>
         </label>
-        <p class="m-0 text-danger text-xs" style="display:none" x-show="errorMessage()" :text="errorMessage()" role="alert"></p>
+        <p class="hidden m-0 text-danger text-xs" :class="{ 'hidden': !errorMessage() }" :text="errorMessage()" role="alert"></p>
         <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="busy()" :text="submitLabel()">Sign in</button>
       </form>
 
@@ -56,6 +54,7 @@
       <p class="text-center text-muted text-xs" :class="registering() ? 'hidden' : ''">
         Lost the password? Reset it on the machine Postline runs on:
         <code class="block mt-1 text-body whitespace-nowrap">./buddy user:add you@example.com --update</code>
+        <a class="inline-block mt-1.5 underline hover:text-body" href="https://github.com/stacksjs/postline/blob/main/docs/first-run.md#if-you-lose-the-password" target="_blank" rel="noopener noreferrer">Lost the authenticator too?</a>
       </p>
     </section>
   </main>
@@ -72,6 +71,12 @@
     /** The password step's challenge while an authenticator code is due. */
     const challenge = state('')
     const code = state('')
+    const codeInput = useRef('codeInput')
+    // The code field replaces the ones that had focus: put the cursor in it
+    // once stx has shown it, on whichever path asked for the code.
+    effect(() => {
+      if (challenge()) void nextTick(() => codeInput.current?.focus())
+    })
 
     // stx-strict-ignore-next-line PublicKeyCredential
     const webAuthn = typeof PublicKeyCredential !== 'undefined'
