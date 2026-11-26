@@ -42,7 +42,10 @@ the pending migrations.
 ## What changed between v0.1.1 and 1.0
 
 - **Database name.** A checkout from before the rename may still have
-  `database/opentimes.sqlite`; the README has the one-line move.
+  `database/opentimes.sqlite`. Stop Postline and move it to
+  `database/postline.sqlite`. Rename any corresponding `-wal` and `-shm`
+  files alongside it, then set `DB_DATABASE_PATH=database/postline.sqlite`
+  in `.env` before starting Postline again.
 - **Encrypted tokens.** Network tokens are stored encrypted with `APP_KEY`.
   Tokens saved by older versions are encrypted in place the first time
   Postline reads the connected accounts, so nothing has to be reconnected;

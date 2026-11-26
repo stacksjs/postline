@@ -32,34 +32,25 @@ it post as you never leave it.
 
 ## Getting started
 
-```bash
-./bootstrap
-```
+Install Bun and SQLite, then run these commands once in a fresh clone. Keep
+the `.env` and its application key for later launches.
 
+<!-- readme-setup -->
 ```bash
+bun install --frozen-lockfile
 cp .env.example .env
-```
-
-```bash
 ./buddy key:generate
-```
-
-```bash
 ./buddy migrate
 ```
+<!-- /readme-setup -->
 
-The database is `database/postline.sqlite`. A checkout from before the rename
-may still have `database/opentimes.sqlite`. With Postline stopped, move it
-together with its `-wal` and `-shm` files (the most recent writes live there)
-and point `.env` at the new name; nothing else changes.
+Start Postline locally in a browser.
 
+<!-- readme-start -->
 ```bash
-for f in database/opentimes.sqlite*; do mv "$f" "${f/opentimes/postline}"; done && sed -i '' 's#database/opentimes.sqlite#database/postline.sqlite#' .env
+APP_URL=localhost ./buddy dev --browser --with-localhost
 ```
-
-```bash
-./buddy dev
-```
+<!-- /readme-start -->
 
 Open the address it prints and create the workspace account (**First run?
 Create the workspace account**); see [docs/first-run.md](docs/first-run.md).
@@ -67,21 +58,9 @@ For sample data while developing, `./buddy seed` adds an account
 (`dev@postline.test`, password printed, or set `SEED_USER_PASSWORD`) and a few
 posts instead.
 
-### If you lose the password
-
-Postline has one account and no "forgot password" email. Reset it from the
-machine it runs on:
-
-```bash
-./buddy user:add you@example.com --update
-```
-
-That prints a new password once. Add `--password` to choose your own. The Mac
-app has no sign-in, so there is nothing to recover there.
-
-`./buddy dev` prints the URLs it is serving. If a port is taken it moves to the
-next free one and says so. Run `./buddy setup:ssl` once to get
-`https://postline.localhost` in place of a localhost port.
+The dev command prints the address it is serving. If a port is taken it moves
+to the next free one. The [first-run guide](docs/first-run.md) covers password
+and authenticator recovery on the server.
 
 `./buddy dev` also runs the scheduler, so a post scheduled for a minute from
 now goes out a minute from now. On a server without `buddy dev`, run it
@@ -150,28 +129,14 @@ wins when both are set. The Mac app reads no `.env`, so it uses Settings.
 | `config/domains.ts` | The canonical host and the hosts that redirect to it |
 | `routes/` | Route files, registered in `app/Routes.ts` |
 | `tests/` | Bun test suites |
-| `docs/` | Design notes and runbooks |
+| `docs/` | User guides, design notes, and runbooks |
 
 ## Desktop app
 
-Postline builds into a Mac app that runs itself: the workspace and the API are
-served from inside the app, and your data lives in
-`~/Library/Application Support/Postline`.
-
-```bash
-bun scripts/desktop-bundle.ts
-```
-
-```bash
-./buddy build:desktop
-```
-
-```bash
-open storage/framework/desktop/webview/darwin-arm64/Postline.app
-```
-
-[docs/desktop.md](docs/desktop.md) covers how it is put together, upgrades,
-releases and what is not done.
+The Mac app runs the workspace and API locally and stores data in
+`~/Library/Application Support/Postline`. See the [Mac installation
+guide](docs/install-mac.md) for downloads and the [desktop development
+guide](docs/desktop.md) for building from source.
 
 ## Running it on a server
 
@@ -189,13 +154,8 @@ workflow deploys a passing `main` commit to the public site.
 
 ## Releasing
 
-```bash
-bun run release:minor
-```
-
-That bumps the version, writes the changelog, tags and pushes. The tag builds
-the app on Postline's Mac runner and publishes a GitHub release with the DMG
-attached, through the [Pantry](https://github.com/pantry-pm/pantry) action.
+Follow the [release checklist](docs/releasing.md) when preparing a desktop
+release. ReviewOS builds the DMG and publishes it to GitHub for each version tag.
 
 ## Contributing
 
