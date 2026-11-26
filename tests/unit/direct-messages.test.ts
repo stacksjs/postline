@@ -16,6 +16,11 @@ describe('dm provider registry', () => {
     expect(isDmProvider(undefined)).toBe(false)
   })
 
+  test('names no network Postline no longer offers', () => {
+    // Facebook and TikTok were dropped; the inbox listed them anyway (#173).
+    expect(Object.keys(DM_UNAVAILABLE).sort()).toEqual(['instagram', 'linkedin', 'threads', 'twitter'])
+  })
+
   test('every unsupported network explains itself', () => {
     for (const [provider, reason] of Object.entries(DM_UNAVAILABLE)) {
       expect(DM_PROVIDERS).not.toContain(provider as never)

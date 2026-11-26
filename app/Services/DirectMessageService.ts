@@ -131,7 +131,12 @@ export class DirectMessageService {
       })),
       // Every connected account the inbox reads, for the account filter (#136).
       accounts: accounts.flat(),
-      unavailable: Object.entries(DM_UNAVAILABLE).map(([provider, reason]) => ({ provider, reason })),
+      // Only networks this workspace has connected: the panel explains why a
+      // network you use for publishing has no inbox here, and is no place to
+      // list networks you never connected (or Postline no longer offers).
+      unavailable: Object.entries(DM_UNAVAILABLE)
+        .filter(([provider]) => connected.has(provider))
+        .map(([provider, reason]) => ({ provider, reason })),
     }
   }
 

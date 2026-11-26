@@ -38,8 +38,6 @@ export const DM_UNAVAILABLE: Partial<Record<SocialProvider, string>> = {
   // Postline (#121).
   twitter: 'X messages are not supported yet; they will come with signing in to X inside Postline.',
   linkedin: 'LinkedIn messaging is limited to partner-approved apps.',
-  facebook: 'Facebook Page messaging needs the pages_messaging permission, which Postline does not request yet.',
-  tiktok: 'TikTok has no public messaging API.',
 }
 
 export function isDmProvider(value: unknown): value is DmProvider {

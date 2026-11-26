@@ -90,7 +90,7 @@
           <p class="m-0 mt-1 text-muted text-xs">These networks are connected for publishing, but their DMs are out of reach.</p>
           <ul class="grid gap-2 m-0 mt-3 p-0 list-none">
             <li class="grid gap-0.5" x-for="entry in unavailable()">
-              <strong class="capitalize text-ink text-xs" :text="entry.provider"></strong>
+              <strong class="text-ink text-xs" :text="providerLabel(entry.provider)"></strong>
               <span class="leading-4 text-muted text-xs" :text="entry.reason"></span>
             </li>
           </ul>
@@ -121,7 +121,7 @@
             </div>
           </header>
 
-          <div class="grid overflow-y-auto content-start flex-1 gap-3 px-4 py-4 max-h-[30rem]" data-inbox-thread>
+          <div class="grid overflow-y-auto content-start flex-1 gap-3 px-4 py-4 max-h-[30rem]" ref="threadList" data-inbox-thread>
             <p class="m-0 py-8 text-center text-muted text-sm" x-show="threadLoading()">Loading messages…</p>
             <p class="m-0 py-8 text-center text-muted text-sm" x-show="!threadLoading() && messages().length === 0">No messages mirrored yet. Run a sync to pull this thread's history.</p>
             <button class="justify-self-center px-3 py-1 text-muted text-xs hover:text-ink rounded-lg" type="button" x-show="olderOffset() !== null" :disabled="loadingOlder()" @click="loadOlderMessages" :text="loadingOlder() ? 'Loading…' : 'Show older messages'">Show older messages</button>
@@ -184,7 +184,7 @@
     // The networks the inbox reads. Why the others are missing comes from the
     // server and is shown above the list.
     const providerOptions = [{ id: 'bluesky', label: 'Bluesky' }, { id: 'mastodon', label: 'Mastodon' }]
-    const PROVIDER_NAMES: Record<string, string> = { twitter: 'X', instagram: 'Instagram' }
+    const PROVIDER_NAMES: Record<string, string> = { twitter: 'X', instagram: 'Instagram', threads: 'Threads', linkedin: 'LinkedIn' }
 
     const conversations = state([])
     const messages = state([])
@@ -205,6 +205,21 @@
       .filter(account => !providerFilter() || account.provider === providerFilter())
       .map(account => ({ id: String(account.id), label: `@${String(account.handle).replace(/^@/, '')}` })))
     const draftBody = state('')
+    // A reply half-written in one conversation waits there while you read
+    // another (#173). Kept for the visit; a sent reply clears its own.
+    const drafts = new Map<number, string>()
+    const keepDraft = () => {
+      if (!activeId()) return
+      if (draftBody().trim()) drafts.set(activeId(), draftBody())
+      else drafts.delete(activeId())
+    }
+    const threadList = useRef('threadList')
+    /** Within this many pixels of the bottom counts as reading the newest. */
+    const NEAR_BOTTOM = 80
+    const scrollToNewest = () => void nextTick(() => {
+      const list = threadList.current
+      if (list) list.scrollTop = list.scrollHeight
+    })
     const activeCharacterLimit = state(1000)
     let pollTimer = 0
 
@@ -289,6 +304,7 @@
     }
 
     const closeConversation = () => {
+      keepDraft()
       activeId.set(0)
       messages.set([])
       olderOffset.set(null)
@@ -304,6 +320,10 @@
         const payload = await requestJson(`/api/postline/inbox/thread?${query}`)
         // A quiet refresh keeps older messages already loaded above the newest page.
         const newest = payload.data?.messages || []
+        // A quiet refresh follows new messages only for someone already at the
+        // bottom; scrolled up into the history, they stay where they are.
+        const list = threadList.current
+        const following = !quiet || !list || list.scrollHeight - list.scrollTop - list.clientHeight < NEAR_BOTTOM
         if (quiet && messages().length > newest.length) {
           const fresh = new Set(newest.map(item => item.id))
           messages.set([...messages().filter(item => !fresh.has(item.id)), ...newest])
@@ -313,6 +333,7 @@
           olderOffset.set(payload.data?.olderOffset ?? null)
         }
         activeCharacterLimit.set(Number(payload.data?.characterLimit || 1000))
+        if (following) scrollToNewest()
         if (markRead) {
           await postJson('/api/postline/inbox/read', { conversation_id: conversationId })
           const opened = conversations().find(item => item.id === conversationId)
@@ -368,11 +389,25 @@
 
     const openConversation = async (id: number) => {
       if (activeId() === id) return
+      keepDraft()
       activeId.set(id)
       messages.set([])
-      draftBody.set('')
+      draftBody.set(drafts.get(id) || '')
       await loadThread()
     }
+
+    // j and k move through the list, as in most mail apps; never while typing.
+    useEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey || (event.key !== 'j' && event.key !== 'k')) return
+      const target = event.target as HTMLElement | null
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return
+      const list = conversations()
+      if (!list.length) return
+      const at = list.findIndex(item => item.id === activeId())
+      const next = event.key === 'j' ? Math.min(list.length - 1, at + 1) : Math.max(0, at === -1 ? 0 : at - 1)
+      event.preventDefault()
+      void openConversation(list[next].id)
+    })
 
     const setProviderFilter = async (value: string) => {
       providerFilter.set(value)
@@ -439,6 +474,8 @@
         const payload = await postJson('/api/postline/inbox/reply', { conversation_id: activeId(), body })
         if (payload.data?.message) messages.set([...messages(), payload.data.message])
         draftBody.set('')
+        drafts.delete(activeId())
+        scrollToNewest()
         await loadConversations({ quiet: true })
       }
       catch (error) {

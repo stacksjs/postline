@@ -17,7 +17,7 @@ afterEach(async () => {
   Object.assign(transport, original)
   await database.deleteFrom('dm_messages').execute()
   await database.deleteFrom('dm_conversations').where('provider', '=', 'bluesky').execute()
-  await database.deleteFrom('social_identities').where('provider', '=', 'bluesky').execute()
+  await database.deleteFrom('social_identities').where('provider', 'in', ['bluesky', 'threads']).execute()
 })
 
 async function connect(handle: string): Promise<number> {
@@ -55,5 +55,14 @@ describe('an inbox per account', () => {
 
     await directMessages.reply(forPersonal.conversations[0]!.id, 'from my own account')
     expect(sentAs).toEqual([personal])
+  })
+
+  test('explains only the connected networks it cannot read', async () => {
+    // A network you never connected is not "connected for publishing" (#173).
+    expect((await directMessages.providers()).unavailable.map(entry => entry.provider)).not.toContain('threads')
+    await upsertIdentityRow<any>('threads', { externalId: 'threads-1', handle: 'me' }, {
+      handle: 'me', external_id: 'threads-1', auth_status: 'connected', access_token: 'token',
+    })
+    expect((await directMessages.providers()).unavailable.map(entry => entry.provider)).toEqual(['threads'])
   })
 })
