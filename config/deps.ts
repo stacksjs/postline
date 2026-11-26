@@ -14,7 +14,7 @@ export const config: PantryConfig = {
    * These are binary tools and system packages required for development
    */
   dependencies: {
-    "bun.com": "^1.3.0",
+    "bun.com": "^1.3.14",
     // Pantry publishes no pinned versions for sqlite.org, so its type admits
     // only "*"/"latest" — a "^3.47.2" range was never resolvable and silently
     // meant nothing. "latest" is the strongest thing expressible here, and it
@@ -50,19 +50,14 @@ export const config: PantryConfig = {
      */
     database: {
       connection: "sqlite",
-      name: "stacks",
+      name: "postline",
       username: "root",
       password: "",
       authMethod: "trust",
     },
 
-    /**
-     * Commands to run after database setup
-     * Useful for migrations and seeding
-     */
-    postDatabaseSetup: Bun.env.NODE_ENV === "production"
-      ? []
-      : ["./buddy migrate", "./buddy seed"],
+    // Buddy setup applies migrations. Sample data is installed by buddy seed.
+    postDatabaseSetup: [],
 
     /**
      * Framework-specific service detection
@@ -85,16 +80,8 @@ export const config: PantryConfig = {
   },
 
   postSetup: {
-    enabled: Bun.env.NODE_ENV !== "production",
-    commands: [
-      {
-        name: "Generate model files",
-        command: "./buddy",
-        args: ["generate:model-files"],
-        description: "Generate TypeScript model files from database schema",
-        required: false,
-      },
-    ],
+    enabled: false,
+    commands: [],
   },
 
   preActivation: {

@@ -27,13 +27,22 @@ it post as you never leave it.
 
 ## Requirements
 
-- [Bun](https://bun.sh) 1.3.14 or newer (`./bootstrap` installs the pinned version through Pantry)
+- [Bun](https://bun.sh) 1.3.14 or newer
 - SQLite 3.47.2 or newer
 
 ## Getting started
 
-Install Bun and SQLite, then run these commands once in a fresh clone. Keep
-the `.env` and its application key for later launches.
+In a fresh clone, use the Pantry-managed setup to install the toolchain and
+initialize the workspace.
+
+<!-- readme-bootstrap -->
+```bash
+./bootstrap
+```
+<!-- /readme-bootstrap -->
+
+If you already have Bun and SQLite, you can set up the workspace manually
+with these commands. Keep the `.env` and its application key for later launches.
 
 <!-- readme-setup -->
 ```bash
@@ -76,8 +85,14 @@ it has stopped.
 `/` opens the workspace (or the sign-in page). The pages that describe
 Postline, its landing page, features, use cases and the hosted-plan waitlist,
 belong to the public site and redirect to the workspace on your install. To
-work on them, start the site with `POSTLINE_SITE=marketing ./buddy dev`; the
-production deployment for `postline.theopentimes.org` uses that setting too.
+work on them, start the site with this command. The production deployment for
+`postline.theopentimes.org` uses the same setting.
+
+<!-- readme-marketing-start -->
+```bash
+POSTLINE_SITE=marketing ./buddy dev
+```
+<!-- /readme-marketing-start -->
 
 ## Connecting networks
 
@@ -118,8 +133,15 @@ wins when both are set. The Mac app reads no `.env`, so it uses Settings.
 | `./buddy lint` | Lint; `./buddy lint:fix` fixes what it can |
 | `bun run typecheck:app` | Type check everything that ships: `app/`, `config/`, `routes/`, `scripts/`, `tests/`, `database/` and the client scripts |
 | `./buddy upgrade` | Move to the latest Stacks release |
-| `bun scripts/marketing-build.ts` | Regenerate the feature and use-case pages from `app/Support/Marketing/catalog.ts` |
-| `bun scripts/marketing-og.ts` | Regenerate the Open Graph cards |
+
+After editing `app/Support/Marketing/catalog.ts`, regenerate its pages and share cards.
+
+<!-- readme-marketing-build -->
+```bash
+bun scripts/marketing-build.ts
+bun scripts/marketing-og.ts
+```
+<!-- /readme-marketing-build -->
 
 ## Where things live
 
@@ -148,9 +170,17 @@ guide](docs/desktop.md) for building from source.
 
 [docs/self-hosting.md](docs/self-hosting.md) covers the address, HTTPS (needed
 beyond your own machine, also on a local network) and what to set. The Docker
-image starts all three services. For a source install, run the web server with
-`./buddy serve`, the API with `./buddy serve:api --port 3008`, and the scheduler with
-`./buddy schedule:run`.
+image starts all three services. For a source install, run each of these in its
+own service. The API listens on port 3008 by default. If you change that port,
+export the same `PORT_API` for the web and API services.
+
+<!-- readme-serve -->
+```bash
+./buddy serve
+./buddy serve:api --port "${PORT_API:-3008}"
+./buddy schedule:run
+```
+<!-- /readme-serve -->
 
 ## CI
 
