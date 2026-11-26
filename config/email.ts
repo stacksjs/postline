@@ -32,6 +32,19 @@ import { isMarketingSite } from '../app/Support/Marketing/site'
 const MAIL_DOMAIN: string = env.MAIL_DOMAIN || APEX || FALLBACK_MAIL_DOMAIN
 
 /**
+ * The host the sender address uses on an install: MAIL_DOMAIN when set, else
+ * this instance's own host from APP_URL. A self-hosted install never sends as
+ * a Stacks address (#213); with neither set, the sender is at `localhost`,
+ * which no real mailer will accept, so nothing goes out from someone else's
+ * domain by accident.
+ */
+function senderDomain(): string {
+  if (env.MAIL_DOMAIN) return String(env.MAIL_DOMAIN)
+  const host = String(env.APP_URL || '').trim().replace(/^https?:\/\//, '').replace(/[/:].*$/, '')
+  return host && !host.endsWith('.localhost') && host !== 'localhost' ? host : 'localhost'
+}
+
+/**
  * Give a host an explicit scheme, and leave one that already has it alone.
  * `.localhost` keeps http so a dev machine without a local certificate can
  * still follow the links in a captured email.
@@ -49,26 +62,17 @@ function normalizeOrigin(value: string | undefined): string {
 export default {
   from: {
     name: env.MAIL_FROM_NAME || 'Postline',
-    address: env.MAIL_FROM_ADDRESS || `hello@${MAIL_DOMAIN}`,
+    address: env.MAIL_FROM_ADDRESS || `no-reply@${senderDomain()}`,
   },
 
   domain: MAIL_DOMAIN,
 
   /**
-   * Mailbox users for IMAP/SMTP access.
-   * Passwords are automatically looked up from MAIL_PASSWORD_<USERNAME> env vars.
-   * After first deploy, passwords are synced to AWS Secrets Manager.
-   *
-   * Supported formats:
-   * - Simple usernames: ['chris', 'blake'] -> chris@{domain}, blake@{domain}
-   * - Full emails: ['chris@stacksjs.com']
-   * - Objects: [{ email: 'chris', password: '...' }]
+   * Mailbox users for IMAP/SMTP access. None: Postline sends mail through the
+   * mailer you configure (MAIL_MAILER) and hosts no inboxes. The three that
+   * were here were the framework authors' own, inherited by every install (#213).
    */
-  mailboxes: [
-    'chris',
-    'blake',
-    'glenn',
-  ],
+  mailboxes: [],
 
   /**
    * The origin templated into mail links (confirmation, unsubscribe).
@@ -84,7 +88,8 @@ export default {
   charset: 'UTF-8',
 
   server: {
-    enabled: true,
+    // The bundled mail server is off: an install sends through its own mailer.
+    enabled: false,
     scan: true, // scans for spam and viruses
     subdomain: 'mail', // mail.<MAIL_DOMAIN>
 

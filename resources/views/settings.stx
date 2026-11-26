@@ -42,6 +42,7 @@
           <SettingsRow label="Channels" setting="channels-summary" to="channels" :value="channelPill()" />
           <SettingsRow label="Automatic deletion" setting="deletion-summary" to="deletion" :value="statusPill()" />
           <SettingsRow label="Appearance" setting="appearance-summary" to="appearance" />
+          <SettingsRow label="Email" :description="mailDescription()" setting="mail-status" keywords="mail smtp mailer email" :value="mailPill()" />
         </SettingsGroup>
 
         {{--
@@ -446,6 +447,25 @@
       }
     }
 
+    // Whether email actually leaves this machine (#213). Without a mailer it
+    // is written to the log, which is fine until someone expects it to arrive.
+    const mail = state<{ configured: boolean, driver: string, from: string } | null>(null)
+    const mailPill = derived(() => !mail() ? '' : mail()!.configured ? 'Set up' : 'Not set up')
+    const mailDescription = derived(() => {
+      const current = mail()
+      if (!current) return ''
+      if (!current.configured) return 'Emails are written to the log, not sent. Set MAIL_MAILER and its settings in .env to send them.'
+      return current.from ? `Sent through ${current.driver} as ${current.from}.` : `Sent through ${current.driver}.`
+    })
+    const loadMail = async (): Promise<void> => {
+      try {
+        const response = await fetch('/api/postline/system')
+        const payload = await response.json()
+        if (response.ok && payload.ok) mail.set(payload.data?.mail || null)
+      }
+      catch {}
+    }
+
     // AI provider for campaign planning (#138). The key field starts empty and
     // stays empty after saving: the saved key never comes back to the page.
     const aiProviderOptions = [
@@ -676,6 +696,7 @@
       void loadWorkspace()
       void loadRetention()
       void loadAi()
+      void loadMail()
       onDestroy(() => workspace?.close())
 
       // A window with a hidden titlebar moves only when the page hands the

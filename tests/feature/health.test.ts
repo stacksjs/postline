@@ -22,3 +22,15 @@ describe('health', () => {
     expect(LOW_DISK_BYTES).toBe(512 * 1024 * 1024)
   })
 })
+
+describe('system status', () => {
+  test('says whether mail is set up', async () => {
+    const { featureTest } = await import('@stacksjs/testing')
+    const User = (await import('../../storage/framework/defaults/app/Models/User')).default
+    const user = await User.first() ?? await User.create({ name: 'Mail Test', email: `mail-${Date.now()}@postline.test`, password: 'unused-acting-as' })
+    const response = await featureTest().actingAs(user as unknown as { id: number }).get('/api/postline/system')
+    const body = await response.json() as { data: { mail: { configured: boolean, driver: string } } }
+    expect(typeof body.data.mail.configured).toBe('boolean')
+    expect(body.data.mail.configured).toBe(!['log', 'capture'].includes(body.data.mail.driver))
+  })
+})
