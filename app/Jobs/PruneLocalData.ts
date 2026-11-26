@@ -16,6 +16,13 @@ export default new Job({
     const removed = await housekeeping.prune()
     const total = Object.values(removed).reduce((sum, count) => sum + count, 0)
     if (total) log.info(`[postline] pruned ${total} old local rows: ${JSON.stringify(removed)}`)
+    // Monthly; a failure waits for tomorrow's run rather than failing this one.
+    try {
+      if (await housekeeping.vacuumIfDue() === 'vacuumed') log.info('[postline] compacted the database')
+    }
+    catch (error) {
+      log.warn(`[postline] could not compact the database: ${error instanceof Error ? error.message : String(error)}`)
+    }
     return removed
   }),
 })

@@ -3,7 +3,7 @@
  */
 import { describe, expect, test } from 'bun:test'
 import { db } from '@stacksjs/database'
-import { daysAgo, housekeeping, KEEP_DAYS } from '../../app/Services/HousekeepingService'
+import { daysAgo, housekeeping, KEEP_DAYS, VACUUM_EVERY_DAYS, VACUUM_JOB } from '../../app/Services/HousekeepingService'
 
 const database = db as any
 
@@ -29,5 +29,15 @@ describe('housekeeping', () => {
 
   test('the stamp it compares against is the format the tables store', () => {
     expect(daysAgo(1, Date.UTC(2026, 10, 25, 12, 0, 0))).toBe('2026-11-24 12:00:00')
+  })
+})
+
+describe('compacting the database (#215)', () => {
+  test('runs when it never has, then not again for a month', async () => {
+    await (db as any).deleteFrom('job_heartbeats').where('job', '=', VACUUM_JOB).execute()
+
+    expect(await housekeeping.vacuumIfDue()).toBe('vacuumed')
+    expect(await housekeeping.vacuumIfDue()).toBe('not-due')
+    expect(await housekeeping.vacuumIfDue(Date.now() + (VACUUM_EVERY_DAYS + 1) * 24 * 60 * 60 * 1000)).toBe('vacuumed')
   })
 })

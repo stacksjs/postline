@@ -8,7 +8,9 @@
  * PruneLocalData job removes what is older. Posts, their targets and their
  * numbers are never touched here; deleting posts is RetentionService's job.
  */
+import { config } from '@stacksjs/config'
 import { db } from '@stacksjs/database'
+import { readHeartbeats, withHeartbeat } from '../Support/heartbeat'
 
 const database = db as any
 
@@ -25,6 +27,10 @@ export const KEEP_DAYS = {
   /** Direct messages. Their conversations stay, and the networks keep the full history. */
   directMessages: 365,
 } as const
+
+/** How often the SQLite file is compacted (#215): deleted rows leave free pages behind, since auto_vacuum is off. */
+export const VACUUM_EVERY_DAYS = 30
+export const VACUUM_JOB = 'VacuumDatabase'
 
 export interface PruneResult {
   keywordMentions: number
@@ -55,6 +61,22 @@ export class HousekeepingService {
       readAlerts: await deleteOlder('alerts', 'read_at', KEEP_DAYS.readAlerts, query => query.where('read_at', 'is not', null)),
       directMessages: await deleteOlder('dm_messages', 'created_at', KEEP_DAYS.directMessages),
     }
+  }
+
+  /**
+   * Compact the SQLite file once a month (#215). Pruning frees pages inside
+   * the file but never returns them, so it only grows. VACUUM rewrites it; it
+   * needs the file to itself for a moment, and waits out other writers like
+   * any statement does. A failed attempt is recorded and tried again the next
+   * day, since only a successful run counts.
+   */
+  async vacuumIfDue(nowMs: number = Date.now()): Promise<'vacuumed' | 'not-due' | 'not-sqlite'> {
+    if (String(config.database?.default || 'sqlite') !== 'sqlite') return 'not-sqlite'
+    const last = (await readHeartbeats()).find(beat => beat.job === VACUUM_JOB)
+    const lastOk = last?.lastStatus === 'ok' && last.lastFinishedAt ? Date.parse(last.lastFinishedAt) : 0
+    if (lastOk && nowMs - lastOk < VACUUM_EVERY_DAYS * 24 * 60 * 60 * 1000) return 'not-due'
+    await withHeartbeat(VACUUM_JOB, async () => await database.unsafe('VACUUM').execute())
+    return 'vacuumed'
   }
 }
 
