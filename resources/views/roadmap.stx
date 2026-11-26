@@ -1,0 +1,24 @@
+@extends('layouts/marketing')
+
+@section('title', 'Roadmap - Postline')
+@section('description', 'What stands between Postline and 1.0, stage by stage, each tracked in the open on GitHub.')
+@section('canonical', 'https://postline.stacksjs.com/roadmap')
+
+<script server>
+import { REPOSITORY, ROADMAP } from '../../app/Support/Marketing/roadmap'
+
+const stages = ROADMAP.map(stage => ({ ...stage, url: `${REPOSITORY}/issues/${stage.issue}` }))
+</script>
+
+@section('content')
+  <LegalPage heading="Roadmap" intro="What stands between Postline and 1.0. Each stage is a tracking issue on GitHub, where its open work and progress are kept.">
+    <ol class="grid gap-5 m-0 p-0 list-none">
+      @foreach (stages as stage)
+        <li class="grid gap-1">
+          <a class="font-semibold text-[17px] text-ink underline-offset-4 hover:underline" href="{{ stage.url }}">{{ stage.title }}</a>
+          <p class="m-0 leading-relaxed text-[15px] text-body">{{ stage.summary }}</p>
+        </li>
+      @endforeach
+    </ol>
+  </LegalPage>
+@endsection

@@ -55,6 +55,7 @@ const useCases = USE_CASES
         </details>
 
         <a class="px-3 py-2 text-[14px] text-body hover:text-ink hover:bg-panel-2 rounded-lg transition-colors" href="/#pricing">Pricing</a>
+        <a class="px-3 py-2 text-[14px] text-body hover:text-ink hover:bg-panel-2 rounded-lg transition-colors" href="https://github.com/stacksjs/postline/tree/main/docs">Docs</a>
         <a class="flex gap-1.5 items-center px-3 py-2 text-[14px] text-body hover:text-ink hover:bg-panel-2 rounded-lg transition-colors" href="https://github.com/stacksjs/postline">
           <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
           GitHub
@@ -73,6 +74,7 @@ const useCases = USE_CASES
       <a class="shrink-0 px-3 py-1.5 text-[13px] text-body bg-panel border border-line rounded-full" href="/features" data-stx-link>Features</a>
       <a class="shrink-0 px-3 py-1.5 text-[13px] text-body bg-panel border border-line rounded-full" href="/use-cases" data-stx-link>Use cases</a>
       <a class="shrink-0 px-3 py-1.5 text-[13px] text-body bg-panel border border-line rounded-full" href="/#pricing">Pricing</a>
+      <a class="shrink-0 px-3 py-1.5 text-[13px] text-body bg-panel border border-line rounded-full" href="https://github.com/stacksjs/postline/tree/main/docs">Docs</a>
       <a class="shrink-0 px-3 py-1.5 text-[13px] text-body bg-panel border border-line rounded-full" href="https://github.com/stacksjs/postline">GitHub</a>
     </nav>
   </header>

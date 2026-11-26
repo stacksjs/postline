@@ -41,6 +41,9 @@ const year = new Date().getFullYear()
         <p class="m-0 pb-1 font-medium text-[13px] text-ink">Project</p>
         <a class="text-[14px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline">Source on GitHub</a>
         <a class="text-[14px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline/releases">Releases</a>
+        <a class="text-[14px] text-muted hover:text-ink transition-colors" href="/changelog" data-stx-link>Changelog</a>
+        <a class="text-[14px] text-muted hover:text-ink transition-colors" href="/roadmap" data-stx-link>Roadmap</a>
+        <a class="text-[14px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline/tree/main/docs">Docs</a>
         <a class="text-[14px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline/issues">Report an issue</a>
         <a class="text-[14px] text-muted hover:text-ink transition-colors" href="https://theopentimes.org">The Open Times</a>
         <a class="text-[14px] text-muted hover:text-ink transition-colors" href="/login" data-stx-link>Sign in</a>
