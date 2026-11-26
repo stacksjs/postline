@@ -30,6 +30,23 @@ html.marketing :where(h1, h2, h3, h4) {
 
 html.marketing :where(p) { text-wrap: pretty; }
 
+/* Reserve each section's approximate content height until its first layout.
+   The browser remembers the actual height for subsequent scrolls. */
+@media (width < 640px) {
+  html.marketing [data-home-section] {
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto var(--home-section-block-size);
+  }
+
+  html.marketing [data-home-section="features"] { --home-section-block-size: 142rem; }
+  html.marketing [data-home-section="how"] { --home-section-block-size: 71rem; }
+  html.marketing [data-home-section="ownership"] { --home-section-block-size: 46rem; }
+  html.marketing [data-home-section="use-cases"] { --home-section-block-size: 68rem; }
+  html.marketing [data-home-section="pricing"] { --home-section-block-size: 77rem; }
+  html.marketing [data-home-section="faq"] { --home-section-block-size: 40rem; }
+  html.marketing [data-home-section="cta"] { --home-section-block-size: 19rem; }
+}
+
 html.marketing .font-mono { font-family: var(--font-mono); }
 
 html.marketing ::selection { background: var(--ink); color: var(--bg); }

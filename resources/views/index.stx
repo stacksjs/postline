@@ -202,7 +202,7 @@ useHead({
   </section>
 
   {{-- Features --}}
-  <section class="mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px]" aria-labelledby="features-heading">
+  <section class="mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px]" aria-labelledby="features-heading" data-home-section="features">
     <div class="max-w-[44rem] reveal">
       <p class="m-0 eyebrow">Features</p>
       <h2 id="features-heading" class="m-0 mt-4 leading-[1.08] text-3xl text-ink sm:text-5xl">Everything that happens after the draft.</h2>
@@ -228,7 +228,7 @@ useHead({
   </section>
 
   {{-- How it works, beside the queue it produces --}}
-  <section class="bg-panel border-line border-y" aria-labelledby="how-heading">
+  <section class="bg-panel border-line border-y" aria-labelledby="how-heading" data-home-section="how">
     <div class="grid gap-12 items-center lg:gap-16 lg:grid-cols-2 mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px]">
       <div class="reveal">
         <p class="m-0 eyebrow">How it works</p>
@@ -270,7 +270,7 @@ useHead({
   </section>
 
   {{-- Self-hosting. The one dark band on the page. --}}
-  <section class="mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px]" aria-labelledby="own-heading">
+  <section class="mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px]" aria-labelledby="own-heading" data-home-section="ownership">
     <div class="grid overflow-hidden gap-10 items-center lg:gap-14 lg:grid-cols-2 p-8 sm:p-12 bg-ink rounded-3xl reveal">
       <div>
         <p class="m-0 font-mono text-[12px] text-white/50">Own your keys</p>
@@ -306,7 +306,7 @@ useHead({
   </section>
 
   {{-- Use cases --}}
-  <section class="bg-panel border-line border-y" aria-labelledby="who-heading">
+  <section class="bg-panel border-line border-y" aria-labelledby="who-heading" data-home-section="use-cases">
     <div class="mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px]">
       <div class="max-w-[44rem] reveal">
         <p class="m-0 eyebrow">Who uses it</p>
@@ -327,7 +327,7 @@ useHead({
   </section>
 
   {{-- Pricing --}}
-  <section id="pricing" class="mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px] scroll-mt-20" aria-labelledby="pricing-heading">
+  <section id="pricing" class="mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px] scroll-mt-20" aria-labelledby="pricing-heading" data-home-section="pricing">
     <div class="mx-auto max-w-[40rem] text-center reveal">
       <p class="m-0 eyebrow">Pricing</p>
       <h2 id="pricing-heading" class="m-0 mt-4 leading-[1.08] text-3xl text-ink sm:text-5xl">Free to run. Hosted when you want it.</h2>
@@ -368,7 +368,7 @@ useHead({
   </section>
 
   {{-- FAQ --}}
-  <section class="bg-panel border-line border-y" aria-labelledby="faq-heading">
+  <section class="bg-panel border-line border-y" aria-labelledby="faq-heading" data-home-section="faq">
     <div class="grid gap-10 lg:gap-16 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] mx-auto px-5 py-20 sm:px-8 sm:py-28 max-w-[1200px]">
       <div class="reveal">
         <p class="m-0 eyebrow">Questions</p>
@@ -389,7 +389,7 @@ useHead({
   </section>
 
   {{-- Closing call to action --}}
-  <section class="mx-auto px-5 py-24 sm:px-8 sm:py-32 max-w-[1200px] text-center" aria-labelledby="cta-heading">
+  <section class="mx-auto px-5 py-24 sm:px-8 sm:py-32 max-w-[1200px] text-center" aria-labelledby="cta-heading" data-home-section="cta">
     <h2 id="cta-heading" class="m-0 mx-auto max-w-[18ch] leading-[1.05] text-4xl text-ink sm:text-6xl reveal">Post once. Be everywhere.</h2>
     <p class="m-0 mt-6 mx-auto max-w-[48ch] leading-relaxed text-[17px] text-body reveal">Connect Bluesky or Mastodon and send your first post in a few minutes.</p>
     <div class="flex flex-wrap gap-3 items-center justify-center mt-9 reveal">
