@@ -32,12 +32,17 @@ Used for every release. Each step either passes or stops the release.
 
    (`release:minor` or `release:major` as appropriate.) The tag starts
    `.reviewos/workflows/release.yml`, which builds the DMG with a build number
-   and attaches it to the GitHub release with `checksums.txt`.
+and attaches it to the GitHub release with `checksums.txt` and its Ed25519
+signature, `checksums.txt.sig`. The release runner uses the `main` key from
+its `postline-desktop-updates` Keychain service or an injected
+`DESKTOP_UPDATE_PRIVATE_KEY` that matches the published key in `config/desktop.ts`.
 
 ## After
 
-5. Download the DMG from the release page, check it against `checksums.txt`,
-   and install it on a Mac with an existing workspace. It opens, the data is
+5. Download the DMG, `checksums.txt`, and `checksums.txt.sig` into one directory.
+   Verify them with `bun scripts/release-checksums.ts verify /path/to/Postline.dmg`
+   from a trusted Postline checkout. Install it on a Mac with an existing workspace.
+   It opens, the data is
    there, and a scheduled post goes out with the window closed. Then run
    [the smoke test](smoke-test.md).
 6. Open the download page and confirm its button names the new version.

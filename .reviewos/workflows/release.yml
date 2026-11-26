@@ -50,6 +50,8 @@ jobs:
       # leaves the DMG it built.
       artifact-paths:
         - storage/framework/desktop-dmg/*.dmg
+        - storage/framework/desktop-dmg/checksums.txt
+        - storage/framework/desktop-dmg/checksums.txt.sig
     runs-on: [self-hosted, macos-arm64, postline]
     timeout-minutes: 30
     env:
@@ -157,6 +159,11 @@ jobs:
           hdiutil verify "$dmg"
           echo "path=$dmg" >> "$GITHUB_OUTPUT"
 
+      - name: Sign and verify the checksums
+        env:
+          DMG: ${{ steps.dmg.outputs.path }}
+        run: bun scripts/release-checksums.ts sign "$DMG"
+
       # Published on GitHub through the Pantry action: notes from this
       # version's section of CHANGELOG.md, the DMG and a checksums file. The
       # three variables below name GitHub explicitly, because the ones a
@@ -168,8 +175,10 @@ jobs:
           install: 'false'
           release: 'true'
           release-tag: ${{ steps.version.outputs.tag }}
-          release-files: ${{ steps.dmg.outputs.path }}
-          release-checksums: sha256
+          release-files: |
+            ${{ steps.dmg.outputs.path }}
+            storage/framework/desktop-dmg/checksums.txt
+            storage/framework/desktop-dmg/checksums.txt.sig
           release-changelog: CHANGELOG.md
           release-notes: Postline ${{ steps.version.outputs.version }} for macOS (Apple Silicon).
           release-token: ${{ secrets.GH_RELEASE_TOKEN }}

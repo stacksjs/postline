@@ -1,5 +1,7 @@
 import type { DesktopConfig } from '@stacksjs/types'
 
+export const RELEASE_UPDATE_PUBLIC_KEY = 'ed25519-public:MCowBQYDK2VwAyEA1IU_iC3XzydzrT8_VxIeWe8BCAzErUk9Psc5nbxK4gw'
+
 /**
  * **Desktop**
  *
