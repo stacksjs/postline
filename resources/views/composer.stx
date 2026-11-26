@@ -1211,12 +1211,14 @@
           setStatus('Select a connected account before saving to the queue.', 'error', { title: 'Not connected' })
           return
         }
-        if (activeMode === 'thread' && allPosts().filter(post => textareaFor(post)?.value.trim()).length > 1) {
-          setStatus('Scheduling threads is not supported yet. Schedule posts one at a time.', 'error', { title: 'Queue' })
-          return
-        }
+        // A thread goes to the queue as its segments; the server stores them
+        // together and sends them in order when they come due (#255).
+        const threadTexts = activeMode === 'thread'
+          ? allPosts().map(post => textareaFor(post)?.value.trim()).filter(Boolean)
+          : []
 
         const form = new FormData()
+        if (threadTexts.length > 1) form.set('thread', JSON.stringify(threadTexts))
         form.set('text', text)
         form.set('providers', targetProviders.join(','))
         const queueTitle = composedTitle()
@@ -1240,6 +1242,14 @@
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save to the queue.')
 
+          // A scheduled thread took every segment with it.
+          if (threadTexts.length > 1) {
+            allPosts().forEach((post) => {
+              const segment = textareaFor(post)
+              if (segment) segment.value = ''
+              renderLinkPreview(post, null)
+            })
+          }
           const textarea = activeTextarea()
           if (textarea) textarea.value = ''
           if (scheduleInput) scheduleInput.value = ''

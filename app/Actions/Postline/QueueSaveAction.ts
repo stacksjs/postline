@@ -49,6 +49,31 @@ export default new Action({
     if (!readOptions.ok)
       return response.json({ ok: false, error: readOptions.error }, { status: 422 })
 
+    // A thread: `thread` is a JSON array of the segments' text (#255).
+    const threadField = request.get('thread')
+    if (threadField) {
+      let texts: unknown
+      try {
+        texts = typeof threadField === 'string' ? JSON.parse(threadField) : threadField
+      }
+      catch {
+        texts = null
+      }
+      if (!Array.isArray(texts))
+        return response.json({ ok: false, error: 'Could not read the thread.', code: 'request_failed' }, { status: 422 })
+      if (!scheduledAt)
+        return response.json({ ok: false, error: 'A thread can be scheduled or published now; it cannot be saved as a draft yet.', code: 'request_failed' }, { status: 422 })
+      if (images?.length)
+        return response.json({ ok: false, error: 'Images in a scheduled thread are not supported yet. Publish the thread now, or schedule it without images.', code: 'request_failed' }, { status: 422 })
+      try {
+        const data = await postQueue.saveThread({ texts: texts.map(String), providers, scheduledAt, options: readOptions.options })
+        return response.json({ ok: true, data })
+      }
+      catch (error) {
+        return actionFailure(error, 422)
+      }
+    }
+
     try {
       const data = await postQueue.save({ text, providers, title, scheduledAt, external, images, options: readOptions.options, variants: parsedVariants.variants })
       return response.json({ ok: true, data })

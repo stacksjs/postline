@@ -382,6 +382,54 @@ export class QueueService {
     return { postId: Number(post.id), status, scheduledAt }
   }
 
+  /**
+   * Schedule a thread (#255): one post per segment, sharing a thread key,
+   * each with the same targets and time. When it comes due the scheduler
+   * sends the segments once, in order, as replies (publishNow, below).
+   */
+  async saveThread(input: { texts: readonly string[], providers: readonly string[], scheduledAt: string, options?: SaveQueueInput['options'] }): Promise<{ postIds: number[], status: 'scheduled', scheduledAt: string }> {
+    const segments = input.texts.map(text => String(text).trim()).filter(Boolean)
+    if (segments.length < 2) throw new UserFacingError('A thread needs at least two posts.')
+    const targets = await this.validTargets(input.providers)
+
+    const scheduledAt = input.scheduledAt.trim()
+    if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(scheduledAt))
+      throw new Error('Scheduled time must be a UTC YYYY-MM-DD HH:MM:SS timestamp.')
+    if (!isRealTimestamp(scheduledAt))
+      throw new UserFacingError('That date or time does not exist. Check the day and the hour.')
+    if (scheduledAt <= now())
+      throw new UserFacingError('Pick a time in the future.')
+
+    const accountId = await ensureAccount()
+    const threadKey = uuid()
+    const options = sanitizePostOptions(input.options)
+    const column = await contentColumn()
+    const timezone = await workspace.timezone()
+    const postIds: number[] = []
+    for (const body of segments) {
+      const postUuid = uuid()
+      const createdAt = now()
+      await database.insertInto('posts').values({
+        uuid: postUuid,
+        title: body.slice(0, 80),
+        body,
+        status: 'scheduled',
+        [column]: options ? JSON.stringify({ options }) : null,
+        scheduled_at: scheduledAt,
+        timezone,
+        source: 'composer',
+        thread_key: threadKey,
+        account_id: accountId,
+        created_at: createdAt,
+        updated_at: createdAt,
+      }).execute()
+      const post = await database.selectFrom('posts').select(['id']).where('uuid', '=', postUuid).executeTakeFirstOrThrow()
+      postIds.push(Number(post.id))
+      await this.writePlaceholders(Number(post.id), targets, 'scheduled', scheduledAt, createdAt)
+    }
+    return { postIds, status: 'scheduled', scheduledAt }
+  }
+
   /** Recent posts with their per-provider targets, newest first. */
   async list(limit = QUEUE_PAGE_SIZE): Promise<QueueItemView[]> {
     return (await this.listPage({ limit })).items
@@ -669,11 +717,20 @@ export class QueueService {
    */
   async publishNow(id: number, options: { retriesOnly?: boolean } = {}): Promise<{ postId: number, results: CrosspostTargetResult[] }> {
     const post = await this.findPublishable(id)
-    // A segment of a thread that already went out in part is never sent on
-    // its own: it would land outside the thread. It resumes the thread from
-    // where each account stopped (#100).
-    if (post.thread_key && String(post.status) !== 'scheduled' && String(post.status) !== 'draft') {
-      const { results } = await this.publisher.resumeThread(String(post.thread_key))
+    // A segment of a thread is never sent on its own: it would land outside
+    // the thread. A scheduled thread is claimed whole and sent in order; one
+    // that went out in part resumes from where each account stopped (#100, #255).
+    if (post.thread_key) {
+      const threadKey = String(post.thread_key)
+      if (String(post.status) === 'scheduled' || String(post.status) === 'draft') {
+        const claimed = affected(await database.updateTable('posts').set({ status: 'publishing', updated_at: now() })
+          .where('thread_key', '=', threadKey).where('status', 'in', ['scheduled', 'draft']).execute())
+        if (claimed === 0) throw new AlreadyPublishingError()
+      }
+      const { results } = await this.publisher.resumeThread(threadKey)
+      // A segment still marked publishing did not go out anywhere.
+      await database.updateTable('posts').set({ status: 'failed', updated_at: now() })
+        .where('thread_key', '=', threadKey).where('status', '=', 'publishing').execute()
       return { postId: Number(post.id), results }
     }
     const wasPublished = String(post.status) === 'published'
@@ -945,10 +1002,13 @@ export class QueueService {
 
     const due = await database
       .selectFrom('posts')
-      .select(['id', 'scheduled_at'])
+      .select(['id', 'scheduled_at', 'thread_key'])
       .where('status', '=', 'scheduled')
       .where('scheduled_at', '<=', now())
+      .orderBy('id', 'asc')
       .execute()
+    // A thread is sent once, through its first due segment, which sends all of it.
+    const threadsSent = new Set<string>()
 
     const tooLate = new Date(Date.now() - graceMinutes * 60_000).toISOString().slice(0, 19).replace('T', ' ')
 
@@ -956,8 +1016,16 @@ export class QueueService {
     let failed = 0
     let missed = 0
     for (const post of due) {
+      if (post.thread_key) {
+        if (threadsSent.has(String(post.thread_key))) continue
+        threadsSent.add(String(post.thread_key))
+      }
       if (String(post.scheduled_at) < tooLate) {
-        missed += await this.setAside(Number(post.id), missedReason(String(post.scheduled_at)))
+        // Too late for a thread is too late for every segment of it.
+        const ids = post.thread_key
+          ? (await database.selectFrom('posts').select(['id']).where('thread_key', '=', post.thread_key).where('status', '=', 'scheduled').execute()).map((row: any) => Number(row.id))
+          : [Number(post.id)]
+        for (const id of ids) missed += await this.setAside(id, missedReason(String(post.scheduled_at)))
         continue
       }
 

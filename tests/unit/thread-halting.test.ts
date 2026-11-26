@@ -171,3 +171,43 @@ describe('resuming a thread (#100)', () => {
     expect(segment.thread).toEqual({ position: 3, length: 5, resumeFrom: 3 })
   })
 })
+
+describe('scheduling a thread (#255)', () => {
+  test('a five-post thread goes out when due, once, in order, as one thread', async () => {
+    const { QueueService } = await import('../../app/Services/Social/QueueService')
+    const sent: Array<{ body: string, replyTo?: string }> = []
+    const publisher: ProviderPublisher = {
+      async publishToPost(post, content): Promise<CrosspostTargetResult> {
+        sent.push({ body: post.body, replyTo: content?.reply?.parent?.uri })
+        const uri = `at://me/${post.body}`
+        await database.insertInto('post_targets').values({ uuid: crypto.randomUUID(), provider: 'blog', status: 'published', remote_uri: uri, remote_cid: `c-${post.body}`, post_id: post.id }).execute()
+        return { provider: 'blog', ok: true, uri, cid: `c-${post.body}`, target: 'blog' } as CrosspostTargetResult
+      },
+    }
+    const queue = new QueueService(new CrosspostService({ blog: publisher } as never))
+    const tag = crypto.randomUUID().slice(0, 6)
+    const texts = five.map(text => `${text}-${tag}`)
+    const soon = new Date(Date.now() + 60_000).toISOString().slice(0, 19).replace('T', ' ')
+
+    const saved = await queue.saveThread({ texts, providers: ['blog'], scheduledAt: soon })
+    expect(saved.postIds).toHaveLength(5)
+
+    // Make it due, then run the scheduler twice: the thread goes out once.
+    await database.updateTable('posts').set({ scheduled_at: new Date(Date.now() - 1000).toISOString().slice(0, 19).replace('T', ' ') }).where('id', 'in', saved.postIds).execute()
+    await queue.publishDue()
+    await queue.publishDue()
+
+    const mine = sent.filter(item => item.body.endsWith(tag))
+    expect(mine.map(item => item.body)).toEqual(texts)
+    expect(mine.map(item => item.replyTo)).toEqual([undefined, ...texts.slice(0, 4).map(text => `at://me/${text}`)])
+    const statuses = await database.selectFrom('posts').select(['status']).where('id', 'in', saved.postIds).execute()
+    expect(statuses.every((row: { status: string }) => row.status === 'published')).toBe(true)
+  })
+
+  test('a thread needs a future time and two posts', async () => {
+    const { QueueService } = await import('../../app/Services/Social/QueueService')
+    const queue = new QueueService()
+    await expect(queue.saveThread({ texts: ['only one'], providers: ['blog'], scheduledAt: '2099-01-01 10:00:00' })).rejects.toThrow('at least two posts')
+    await expect(queue.saveThread({ texts: ['a', 'b'], providers: ['blog'], scheduledAt: '2020-01-01 10:00:00' })).rejects.toThrow('future')
+  })
+})
