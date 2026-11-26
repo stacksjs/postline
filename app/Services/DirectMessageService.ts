@@ -208,8 +208,12 @@ export class DirectMessageService {
         result.synced += 1
 
         for (const candidate of candidates) {
-          const conversationId = await this.upsertConversation(transport.provider, candidate)
+          const { id: conversationId, changed } = await this.upsertConversation(transport.provider, candidate)
           result.conversations += 1
+          // Its newest message is the one already stored: nothing to fetch. A
+          // sync with nothing new is then one call per network, the list,
+          // instead of one more per conversation (#108).
+          if (!changed) continue
 
           try {
             const messages = await transport.listMessages(candidate.remoteId, MESSAGE_LIMIT)
@@ -349,7 +353,7 @@ export class DirectMessageService {
     lastMessageAt?: string | null
     lastMessageText?: string | null
     lastMessageOutgoing?: boolean
-  }): Promise<number> {
+  }): Promise<{ id: number, changed: boolean }> {
     const existing = await database
       .selectFrom('dm_conversations')
       .selectAll()
@@ -382,8 +386,12 @@ export class DirectMessageService {
     if (candidate.unreadCount > 0) values.unread_count = candidate.unreadCount
 
     if (existing) {
+      // Changed when the network reports a newer last message than the one
+      // stored, or does not say (then the messages are fetched to find out).
+      const changed = !candidate.lastMessageAt || String(values.last_message_at) !== String(existing.last_message_at)
+        || Number(candidate.unreadCount || 0) > Number(existing.unread_count || 0)
       await database.updateTable('dm_conversations').set(values).where('id', '=', existing.id).execute()
-      return Number(existing.id)
+      return { id: Number(existing.id), changed }
     }
 
     const conversationUuid = uuid()
@@ -401,7 +409,7 @@ export class DirectMessageService {
       .where('uuid', '=', conversationUuid)
       .executeTakeFirstOrThrow()
 
-    return Number(created.id)
+    return { id: Number(created.id), changed: true }
   }
 
   /**
@@ -414,15 +422,20 @@ export class DirectMessageService {
     let created = 0
     let freshIncoming = 0
 
-    for (const candidate of candidates) {
-      const existing = await database
-        .selectFrom('dm_messages')
-        .select(['id'])
-        .where('dm_conversation_id', '=', conversationId)
-        .where('remote_id', '=', candidate.remoteId)
-        .executeTakeFirst()
+    // One query for which of these are stored already, not one per message (#108).
+    const remoteIds = candidates.map(candidate => candidate.remoteId)
+    const stored = remoteIds.length
+      ? new Set((await database
+          .selectFrom('dm_messages')
+          .select(['remote_id'])
+          .where('dm_conversation_id', '=', conversationId)
+          .where('remote_id', 'in', remoteIds)
+          .execute()).map((row: { remote_id: string }) => String(row.remote_id)))
+      : new Set<string>()
 
-      if (existing) continue
+    for (const candidate of candidates) {
+      if (stored.has(candidate.remoteId)) continue
+      stored.add(candidate.remoteId)
 
       await database.insertInto('dm_messages').values({
         uuid: uuid(),
