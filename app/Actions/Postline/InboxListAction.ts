@@ -14,6 +14,7 @@ export default new Action({
       const data = await directMessages.list({
         status: String(request.get('status') || 'open'),
         provider: String(request.get('provider') || ''),
+        offset: Number(request.get('offset') || 0),
       })
 
       return response.json({ ok: true, data })

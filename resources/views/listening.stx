@@ -101,6 +101,7 @@
               <a class="grid place-items-center shrink-0 h-8 w-8 text-muted hover:text-ink hover:bg-raised border border-line rounded-lg" :href="mention.url" target="_blank" rel="noopener noreferrer" aria-label="Open mention" @click="markRead(mention.id)"><span class="h-4 w-4 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span></a>
             </div>
           </article>
+          <button class="p-3 w-full text-center text-muted text-ui hover:text-ink hover:bg-panel-2 transition-colors" type="button" x-show="nextOffset() !== null" :disabled="loadingMore()" @click="loadMoreMentions" :text="loadingMore() ? 'Loading…' : 'Load more mentions'">Load more mentions</button>
         </div>
         <p class="m-0 px-4 py-3 text-danger text-sm bg-danger-soft border-danger-line border-t" x-show="errorMessage()" :text="errorMessage()"></p>
       </section>
@@ -143,6 +144,9 @@
     const scanning = state(false)
     const errorMessage = state('')
     const filterMonitorId = state(0)
+    // Mentions come a page at a time (#105).
+    const nextOffset = state<number | null>(null)
+    const loadingMore = state(false)
     const draftId = state(0)
     const draftName = state('')
     const draftKeywords = state('')
@@ -203,7 +207,15 @@
         const monitorRows = Array.isArray(payload.data?.monitors) ? payload.data.monitors : []
         const mentionRows = Array.isArray(payload.data?.mentions) ? payload.data.mentions : []
         monitors.set(monitorRows)
-        mentions.set(mentionRows)
+        // A quiet refresh updates the first page and keeps pages loaded below it.
+        if (quiet && nextOffset() !== null && mentions().length > mentionRows.length) {
+          const fresh = new Set(mentionRows.map(item => item.id))
+          mentions.set([...mentionRows, ...mentions().filter(item => !fresh.has(item.id))])
+        }
+        else {
+          mentions.set(mentionRows)
+          nextOffset.set(payload.data?.nextOffset ?? null)
+        }
         if (quiet) notifyNewMentions(previousIds, mentionRows)
       }
       catch (error) {
@@ -212,6 +224,24 @@
       finally {
         loading.set(false)
         loaded.set(true)
+      }
+    }
+
+    const loadMoreMentions = async () => {
+      const offset = nextOffset()
+      if (offset === null || loadingMore()) return
+      loadingMore.set(true)
+      try {
+        const payload = await requestJson(`/api/postline/listening?offset=${offset}`)
+        const seen = new Set(mentions().map(item => item.id))
+        mentions.set([...mentions(), ...(Array.isArray(payload.data?.mentions) ? payload.data.mentions : []).filter(item => !seen.has(item.id))])
+        nextOffset.set(payload.data?.nextOffset ?? null)
+      }
+      catch (error) {
+        errorMessage.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        loadingMore.set(false)
       }
     }
 

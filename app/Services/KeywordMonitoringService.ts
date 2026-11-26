@@ -202,13 +202,21 @@ async function searchMastodon(keywords: string[], mode: MatchMode): Promise<Ment
   })
 }
 
-export class KeywordMonitoringService {
-  async list(monitorId = 0) {
-    const monitors = await database.selectFrom('keyword_monitors').selectAll().orderBy('updated_at', 'desc').execute()
-    const mentionsQuery = database.selectFrom('keyword_mentions').selectAll().orderBy('posted_at', 'desc').limit(200)
-    const mentions = await (monitorId ? mentionsQuery.where('keyword_monitor_id', '=', monitorId) : mentionsQuery).execute()
+/** Mentions per page in Listening (#105). */
+export const MENTION_PAGE = 50
 
-    const counts = await database.selectFrom('keyword_mentions').selectAll().execute()
+export class KeywordMonitoringService {
+  async list(monitorId = 0, offset = 0) {
+    const monitors = await database.selectFrom('keyword_monitors').selectAll().orderBy('updated_at', 'desc').execute()
+    // A page at a time, one more than shown to know whether another follows.
+    // It stopped at 200 mentions and said nothing of the rest (#105).
+    const start = Math.max(0, Math.floor(Number(offset) || 0))
+    let mentionsQuery = database.selectFrom('keyword_mentions').selectAll()
+    if (monitorId) mentionsQuery = mentionsQuery.where('keyword_monitor_id', '=', monitorId)
+    const fetched = await mentionsQuery.orderBy('posted_at', 'desc').orderBy('id', 'desc').limit(MENTION_PAGE + 1).offset(start).execute()
+
+    // Counts for every rule, read as two columns rather than every row in full.
+    const counts = await database.selectFrom('keyword_mentions').select(['keyword_monitor_id', 'status']).execute()
     const monitorViews = monitors.map((monitor: any) => {
       const owned = counts.filter((mention: any) => Number(mention.keyword_monitor_id) === Number(monitor.id))
       return monitorRow(monitor, owned.filter((mention: any) => mention.status === 'unread').length, owned.length)
@@ -216,7 +224,8 @@ export class KeywordMonitoringService {
 
     return {
       monitors: monitorViews,
-      mentions: mentions.map(mentionRow),
+      mentions: fetched.slice(0, MENTION_PAGE).map(mentionRow),
+      nextOffset: fetched.length > MENTION_PAGE ? start + MENTION_PAGE : null,
       unreadCount: counts.filter((mention: any) => mention.status === 'unread').length,
     }
   }

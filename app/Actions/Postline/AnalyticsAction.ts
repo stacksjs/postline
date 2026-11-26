@@ -35,10 +35,14 @@ export default new Action({
         .where('published_at', '>=', sinceKey)
         .execute()
 
+      // The same thirty days as the chart: channel mix, posting windows and
+      // engagement are for what went out in that window. It read every
+      // target ever published (#105).
       const targets = await database
         .selectFrom('post_targets')
         .select(['provider', 'status', 'created_at', 'metrics'])
         .where('status', '=', 'published')
+        .where('created_at', '>=', sinceKey)
         .execute()
 
       // Posts published per day over the last 30 days (gaps filled with 0).

@@ -76,6 +76,7 @@
                 <span class="grid place-items-center shrink-0 px-1.5 h-5 min-w-5 font-semibold text-on-solid text-xs bg-net-bluesky rounded-full" x-show="conversation.unreadCount > 0" :text="String(conversation.unreadCount)"></span>
               </div>
             </button>
+            <button class="p-3 w-full text-center text-muted text-ui hover:text-ink hover:bg-panel-2 transition-colors" type="button" x-show="nextOffset() !== null" :disabled="loadingMore()" @click="loadMoreConversations" :text="loadingMore() ? 'Loading…' : 'Load more conversations'">Load more conversations</button>
           </div>
         </section>
 
@@ -118,6 +119,7 @@
           <div class="grid overflow-y-auto content-start flex-1 gap-3 px-4 py-4 max-h-[30rem]" data-inbox-thread>
             <p class="m-0 py-8 text-center text-muted text-sm" x-show="threadLoading()">Loading messages…</p>
             <p class="m-0 py-8 text-center text-muted text-sm" x-show="!threadLoading() && messages().length === 0">No messages mirrored yet. Run a sync to pull this thread's history.</p>
+            <button class="justify-self-center px-3 py-1 text-muted text-xs hover:text-ink rounded-lg" type="button" x-show="olderOffset() !== null" :disabled="loadingOlder()" @click="loadOlderMessages" :text="loadingOlder() ? 'Loading…' : 'Show older messages'">Show older messages</button>
             <article class="flex" x-for="message in messages()" :class="message.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
               <div class="grid gap-1 max-w-[80%]">
                 <div class="px-3.5 py-2.5 rounded-2xl" :class="message.direction === 'outgoing' ? 'bg-accent text-on-accent' : 'bg-panel-2 text-body border border-line'">
@@ -196,7 +198,12 @@
     const activeCharacterLimit = state(1000)
     let pollTimer = 0
 
-    const unreadCount = derived(() => conversations().reduce((total, item) => total + item.unreadCount, 0))
+    // The whole inbox's unread count, from the server: the list is paged (#105).
+    const unreadCount = state(0)
+    const nextOffset = state<number | null>(null)
+    const olderOffset = state<number | null>(null)
+    const loadingMore = state(false)
+    const loadingOlder = state(false)
     const connected = derived(() => supported().filter(item => item.connected))
     const connectedCount = derived(() => connected().length)
     const connectedLabel = derived(() => connected().length ? connected().map(item => providerLabel(item.provider)).join(', ') : 'None yet')
@@ -245,7 +252,18 @@
       try {
         const query = new URLSearchParams({ status: statusFilter(), provider: providerFilter() })
         const payload = await requestJson(`/api/postline/inbox?${query}`)
-        conversations.set(payload.data?.conversations || [])
+        const first = payload.data?.conversations || []
+        // A quiet refresh updates the first page in place and keeps any pages
+        // already loaded below it; a full load starts over.
+        if (quiet && nextOffset() !== null && conversations().length > first.length) {
+          const fresh = new Set(first.map(item => item.id))
+          conversations.set([...first, ...conversations().filter(item => !fresh.has(item.id))])
+        }
+        else {
+          conversations.set(first)
+          nextOffset.set(payload.data?.nextOffset ?? null)
+        }
+        unreadCount.set(Number(payload.data?.unreadCount || 0))
         supported.set(payload.data?.providers?.supported || [])
         unavailable.set(payload.data?.providers?.unavailable || [])
         // A thread that has been archived or filtered away should not stay open.
@@ -262,6 +280,7 @@
     const closeConversation = () => {
       activeId.set(0)
       messages.set([])
+      olderOffset.set(null)
       draftBody.set('')
     }
 
@@ -272,10 +291,21 @@
         const conversationId = activeId()
         const query = new URLSearchParams({ conversation_id: String(conversationId) })
         const payload = await requestJson(`/api/postline/inbox/thread?${query}`)
-        messages.set(payload.data?.messages || [])
+        // A quiet refresh keeps older messages already loaded above the newest page.
+        const newest = payload.data?.messages || []
+        if (quiet && messages().length > newest.length) {
+          const fresh = new Set(newest.map(item => item.id))
+          messages.set([...messages().filter(item => !fresh.has(item.id)), ...newest])
+        }
+        else {
+          messages.set(newest)
+          olderOffset.set(payload.data?.olderOffset ?? null)
+        }
         activeCharacterLimit.set(Number(payload.data?.characterLimit || 1000))
         if (markRead) {
           await postJson('/api/postline/inbox/read', { conversation_id: conversationId })
+          const opened = conversations().find(item => item.id === conversationId)
+          unreadCount.set(Math.max(0, unreadCount() - Number(opened?.unreadCount || 0)))
           conversations.set(conversations().map(item => item.id === activeId() ? { ...item, unreadCount: 0 } : item))
         }
       }
@@ -284,6 +314,44 @@
       }
       finally {
         threadLoading.set(false)
+      }
+    }
+
+    const loadMoreConversations = async () => {
+      const offset = nextOffset()
+      if (offset === null || loadingMore()) return
+      loadingMore.set(true)
+      try {
+        const query = new URLSearchParams({ status: statusFilter(), provider: providerFilter(), offset: String(offset) })
+        const payload = await requestJson(`/api/postline/inbox?${query}`)
+        const seen = new Set(conversations().map(item => item.id))
+        conversations.set([...conversations(), ...(payload.data?.conversations || []).filter(item => !seen.has(item.id))])
+        nextOffset.set(payload.data?.nextOffset ?? null)
+      }
+      catch (error) {
+        errorMessage.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        loadingMore.set(false)
+      }
+    }
+
+    const loadOlderMessages = async () => {
+      const offset = olderOffset()
+      if (offset === null || loadingOlder() || !activeId()) return
+      loadingOlder.set(true)
+      try {
+        const query = new URLSearchParams({ conversation_id: String(activeId()), offset: String(offset) })
+        const payload = await requestJson(`/api/postline/inbox/thread?${query}`)
+        const seen = new Set(messages().map(item => item.id))
+        messages.set([...(payload.data?.messages || []).filter(item => !seen.has(item.id)), ...messages()])
+        olderOffset.set(payload.data?.olderOffset ?? null)
+      }
+      catch (error) {
+        errorMessage.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        loadingOlder.set(false)
       }
     }
 
@@ -374,6 +442,7 @@
       try {
         await postJson('/api/postline/inbox/read', { conversation_id: 0 })
         conversations.set(conversations().map(item => ({ ...item, unreadCount: 0 })))
+        unreadCount.set(0)
       }
       catch (error) {
         postlineToast?.show?.({ title: 'Could not update the inbox', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-read' })

@@ -16,7 +16,7 @@ export default new Action({
       // with a POST to /inbox/read.
       const data = await directMessages.thread(
         Number(request.get('conversation_id') || 0),
-        { markRead: false },
+        { markRead: false, offset: Number(request.get('offset') || 0) },
       )
 
       return response.json({ ok: true, data })

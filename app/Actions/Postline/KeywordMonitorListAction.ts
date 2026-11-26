@@ -11,7 +11,7 @@ export default new Action({
 
   async handle(request: RequestInstance) {
     try {
-      const data = await keywordMonitoring.list(Number(request.get('monitor_id') || 0))
+      const data = await keywordMonitoring.list(Number(request.get('monitor_id') || 0), Number(request.get('offset') || 0))
       return response.json({ ok: true, data })
     }
     catch (error) {

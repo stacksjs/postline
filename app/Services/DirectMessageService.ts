@@ -29,6 +29,14 @@ const CONVERSATION_LIMIT = 40
 
 /** Messages pulled per conversation per sync, and returned per thread read. */
 const MESSAGE_LIMIT = 100
+/** Conversations per page of the inbox list (#105). */
+export const CONVERSATION_PAGE = 50
+
+/** A page offset from a request: a whole number, never negative. */
+export function pageOffset(value: unknown): number {
+  const offset = Math.floor(Number(value) || 0)
+  return offset > 0 ? offset : 0
+}
 
 export interface DmSyncResult {
   synced: number
@@ -112,23 +120,34 @@ export class DirectMessageService {
   }
 
   /** The inbox list, newest activity first. Reads the local mirror only. */
-  async list(options: { status?: string, provider?: string } = {}) {
+  async list(options: { status?: string, provider?: string, offset?: number } = {}) {
     // Only networks the inbox can still read: conversations synced from X or
     // Instagram before those were dropped (#129) stay stored, not listed.
-    let query = database.selectFrom('dm_conversations').selectAll().where('provider', 'in', [...DM_PROVIDERS])
-    query = query.where('status', '=', options.status === 'archived' ? 'archived' : 'open')
-    if (isDmProvider(options.provider)) query = query.where('provider', '=', options.provider)
+    const scoped = (query: any) => {
+      query = query.where('provider', 'in', [...DM_PROVIDERS])
+      query = query.where('status', '=', options.status === 'archived' ? 'archived' : 'open')
+      if (isDmProvider(options.provider)) query = query.where('provider', '=', options.provider)
+      return query
+    }
 
-    const rows = await query
+    // A page at a time, one more than shown to know whether another follows.
+    // It stopped at 200 conversations and said nothing of the rest (#105).
+    const offset = pageOffset(options.offset)
+    const rows = await scoped(database.selectFrom('dm_conversations').selectAll())
       .orderBy('last_message_at', 'desc')
-      .limit(200)
+      .orderBy('id', 'desc')
+      .limit(CONVERSATION_PAGE + 1)
+      .offset(offset)
       .execute()
 
-    const conversations = rows.map(conversationRow)
+    const page = rows.slice(0, CONVERSATION_PAGE)
+    // The unread total is the whole inbox's, not this page's.
+    const unread = await scoped(database.selectFrom('dm_conversations').select(['unread_count'])).execute()
 
     return {
-      conversations,
-      unreadCount: conversations.reduce((total: number, conversation: any) => total + conversation.unreadCount, 0),
+      conversations: page.map(conversationRow),
+      nextOffset: rows.length > CONVERSATION_PAGE ? offset + CONVERSATION_PAGE : null,
+      unreadCount: unread.reduce((total: number, row: any) => total + (Number(row.unread_count) || 0), 0),
       providers: await this.providers(),
     }
   }
@@ -138,7 +157,7 @@ export class DirectMessageService {
    * only thing "read" can reasonably mean here, and making the caller issue a
    * second request would only invite the two to drift.
    */
-  async thread(conversationId: number, options: { markRead?: boolean } = {}) {
+  async thread(conversationId: number, options: { markRead?: boolean, offset?: number } = {}) {
     const conversation = await this.requireConversation(conversationId)
     // The newest messages, shown oldest first. Ordering ascending and then
     // limiting returned the first hundred ever exchanged, so a long
@@ -149,9 +168,12 @@ export class DirectMessageService {
       .where('dm_conversation_id', '=', conversation.id)
       .orderBy('sent_at', 'desc')
       .orderBy('id', 'desc')
-      .limit(MESSAGE_LIMIT)
+      .limit(MESSAGE_LIMIT + 1)
+      .offset(pageOffset(options.offset))
       .execute()
-    const messages = [...newest].reverse()
+    // `olderOffset` asks for the messages before these, a page at a time.
+    const olderOffset = newest.length > MESSAGE_LIMIT ? pageOffset(options.offset) + MESSAGE_LIMIT : null
+    const messages = newest.slice(0, MESSAGE_LIMIT).reverse()
 
     if (options.markRead !== false && Number(conversation.unread_count || 0) > 0)
       await this.markRead(conversationId)
@@ -159,6 +181,7 @@ export class DirectMessageService {
     return {
       conversation: conversationRow({ ...conversation, unread_count: options.markRead === false ? conversation.unread_count : 0 }),
       messages: messages.map(messageRow),
+      olderOffset,
       characterLimit: getDmTransport(String(conversation.provider) as DmProvider).characterLimit,
     }
   }
