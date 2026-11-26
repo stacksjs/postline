@@ -12,7 +12,13 @@
         <p class="mb-0 mt-1.5 text-muted text-ui">Watch brand, product, and competitor keywords across Bluesky, X, and Mastodon.</p>
       </div>
       <div class="flex flex-wrap gap-2 items-center">
-        <button class="inline-flex gap-2 items-center justify-center px-3 h-9 font-semibold text-ink text-xs bg-panel hover:bg-raised border border-line rounded-xl transition-colors" type="button" @click="enableDesktopAlerts" :text="desktopAlertLabel()">Enable desktop alerts</button>
+        {{-- New matches raise an alert on the server (#112): a Mac notification
+            from the app shell on any page, an email when mail is set up, and a
+            line in Activity. This page asks the browser for nothing. --}}
+        <a class="inline-flex gap-2 items-center justify-center px-3 h-9 font-semibold text-body text-xs bg-panel hover:bg-raised border border-line rounded-xl transition-colors" href="/activity" data-stx-link title="New matches appear in Activity, as a Mac notification in the app, and by email when mail is set up.">
+          <span class="h-4 w-4 i-hugeicons-notification-01" aria-hidden="true"></span>
+          Where alerts go
+        </a>
         <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="scanning() || activeCount() === 0" @click="runScan">
           <span class="h-4 w-4 i-hugeicons-radar-02" :class="scanning() ? 'animate-spin' : ''" aria-hidden="true"></span>
           <span :text="scanning() ? 'Scanning…' : 'Scan now'">Scan now</span>
@@ -50,7 +56,7 @@
             <label class="flex gap-3 items-center p-3 bg-panel-2 border border-line rounded-xl"><input type="checkbox" :checked="draftStatus() === 'active'" @change="draftStatus.set($event.target.checked ? 'active' : 'paused')"><span><strong class="block text-ink text-xs">Watch automatically</strong><small class="block mt-0.5 text-muted text-xs">The scheduler checks active rules every five minutes.</small></span></label>
             <div class="flex gap-2 items-center pt-1">
               <button class="inline-flex flex-1 items-center justify-center h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="submit" :disabled="saving()"><span :text="saving() ? 'Saving…' : draftId() ? 'Update rule' : 'Create rule'">Create rule</span></button>
-              <button class="inline-flex items-center justify-center px-3 h-9 font-semibold text-danger text-xs hover:bg-danger-soft border border-danger-line rounded-xl" type="button" x-show="draftId()" @click="deleteMonitor">Delete</button>
+              <button class="inline-flex items-center justify-center px-3 h-9 font-semibold text-danger text-xs hover:bg-danger-soft border border-danger-line rounded-xl disabled:opacity-50" type="button" x-show="draftId()" :disabled="deleting()" @click="deleteMonitor"><span :text="deleting() ? 'Deleting…' : 'Delete'">Delete</span></button>
             </div>
           </form>
         </section>
@@ -141,6 +147,7 @@
     const loading = state(true)
     const loaded = state(false)
     const saving = state(false)
+    const deleting = state(false)
     const scanning = state(false)
     const errorMessage = state('')
     const filterMonitorId = state(0)
@@ -153,7 +160,6 @@
     const draftProviders = state(['bluesky'])
     const draftMatchMode = state('any')
     const draftStatus = state('active')
-    const notificationPermission = state(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission)
     let pollTimer = 0
 
     const filteredMentions = derived(() => filterMonitorId() ? mentions().filter(item => item.monitorId === filterMonitorId()) : mentions())
@@ -165,7 +171,6 @@
       const values = monitors().map(item => item.lastCheckedAt).filter(Boolean).sort().reverse()
       return values.length ? relativeTime(values[0]) : 'Not yet'
     })
-    const desktopAlertLabel = derived(() => notificationPermission() === 'granted' ? 'Desktop alerts on' : notificationPermission() === 'denied' ? 'Alerts blocked' : notificationPermission() === 'unsupported' ? 'Alerts unavailable' : 'Enable desktop alerts')
 
     const providerLabel = (provider: string): string => providerOptions.find(item => item.id === provider)?.label || provider
     const providerInitial = (provider: string): string => provider === 'twitter' ? 'X' : provider.slice(0, 1).toUpperCase()
@@ -188,20 +193,9 @@
       return payload
     }
 
-    const notifyNewMentions = (previousIds: Set<number>, rows: ListeningMention[]) => {
-      if (notificationPermission() !== 'granted') return
-      const fresh = rows.filter(item => item.status === 'unread' && !previousIds.has(item.id))
-      if (!fresh.length) return
-      const first = fresh[0]
-      new Notification(fresh.length === 1 ? `New ${providerLabel(first.provider)} mention` : `${fresh.length} new social mentions`, {
-        body: fresh.length === 1 ? first.body.slice(0, 180) : 'Open Postline Listening to review the new matches.',
-      })
-    }
-
     const loadData = async ({ quiet = false } = {}) => {
       if (!quiet) loading.set(true)
       errorMessage.set('')
-      const previousIds = new Set(mentions().map(item => item.id))
       try {
         const payload = await requestJson('/api/postline/listening')
         const monitorRows = Array.isArray(payload.data?.monitors) ? payload.data.monitors : []
@@ -216,7 +210,6 @@
           mentions.set(mentionRows)
           nextOffset.set(payload.data?.nextOffset ?? null)
         }
-        if (quiet) notifyNewMentions(previousIds, mentionRows)
       }
       catch (error) {
         errorMessage.set(error instanceof Error ? error.message : String(error))
@@ -290,7 +283,8 @@
     }
 
     const deleteMonitor = async () => {
-      if (!draftId() || !window.confirm('Delete this listening rule and its saved mentions?')) return
+      if (deleting() || !draftId() || !window.confirm('Delete this listening rule and its saved mentions?')) return
+      deleting.set(true)
       try {
         await requestJson('/api/postline/listening/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: draftId() }) })
         resetForm()
@@ -300,6 +294,9 @@
       }
       catch (error) {
         postlineToast?.show?.({ title: 'Could not delete rule', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-delete' })
+      }
+      finally {
+        deleting.set(false)
       }
     }
 
@@ -338,13 +335,6 @@
       catch (error) {
         postlineToast?.show?.({ title: 'Could not update mentions', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-read' })
       }
-    }
-
-    const enableDesktopAlerts = async () => {
-      if (typeof Notification === 'undefined' || Notification.permission === 'denied') return
-      notificationPermission.set(await Notification.requestPermission())
-      if (notificationPermission() === 'granted')
-        postlineToast?.show?.({ title: 'Desktop alerts enabled', message: 'Postline can alert you when a polling refresh finds new mentions.', tone: 'success', id: 'listening-notifications' })
     }
 
     // A hidden tab asks for nothing (#184); the next tick after it is shown
