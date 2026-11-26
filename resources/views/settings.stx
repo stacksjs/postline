@@ -514,8 +514,7 @@
 
     /** Every session and token, everywhere; then this browser leaves like a normal sign-out. */
     const signOutEverywhere = async (): Promise<void> => {
-      // stx-strict-ignore-next-line window.confirm
-      if (!window.confirm('Sign out on every browser and device, this one included?')) return
+      if (!await stxConfirm('This signs you out from this browser and every other device.', { title: 'Sign out everywhere?', type: 'error', confirmText: 'Sign out everywhere' })) return
       await endSession('/api/logout-all')
     }
 
@@ -819,15 +818,17 @@
       return `Imported ${r.posts} posts, ${r.campaigns} campaigns, ${r.blogPosts} blog posts, ${r.monitors} Listening rules and ${r.media} images${r.skipped ? `; ${r.skipped} already here were left alone` : ''}.`
     })
 
-    const deleteEverything = (): Promise<void> => dataAction(async () => {
-      // stx-strict-ignore-next-line window.confirm
-      if (!window.confirm('Delete everything in this workspace? This cannot be undone.')) return ''
-      const body = new FormData()
-      body.set('confirmation', deletePhrase())
-      await requestJson('/api/postline/settings/delete-everything', { method: 'POST', body }, 'Nothing was deleted.')
-      deletePhrase.set('')
-      return 'Everything in this workspace was deleted.'
-    })
+    const deleteEverything = async (): Promise<void> => {
+      const confirmation = deletePhrase()
+      if (!await stxConfirm('This cannot be undone.', { title: 'Delete everything in this workspace?', type: 'error', confirmText: 'Delete everything' })) return
+      await dataAction(async () => {
+        const body = new FormData()
+        body.set('confirmation', confirmation)
+        await requestJson('/api/postline/settings/delete-everything', { method: 'POST', body }, 'Nothing was deleted.')
+        deletePhrase.set('')
+        return 'Everything in this workspace was deleted.'
+      })
+    }
 
     // Whether email actually leaves this machine (#213). Without a mailer it
     // is written to the log, which is fine until someone expects it to arrive.

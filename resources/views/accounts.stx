@@ -361,7 +361,7 @@
       }
       appHandlers.clear = async (provider) => {
         const row = appRows().find(entry => entry.provider === provider)
-        if (!row || !window.confirm(`Remove your ${row.label} app from Postline? Connected ${row.label} accounts stop renewing until an app is set up again.`)) return
+        if (!row || !await stxConfirm(`Connected ${row.label} accounts stop renewing until an app is set up again.`, { title: `Remove your ${row.label} app?`, type: 'error', confirmText: 'Remove app' })) return
         appBusy.set(provider)
         try {
           const body = new FormData()
@@ -485,7 +485,7 @@
         // Last stop before an irreversible action, with the number it is about.
         const count = Number((previewPhrase.match(/\d+/) || ['0'])[0])
         const where = scope === 'all' ? 'from the selected accounts' : 'that Postline published'
-        if (!window.confirm(`Permanently delete ${count} post${count === 1 ? '' : 's'} ${where}? This cannot be undone.`)) return
+        if (!await stxConfirm(`Delete ${count} post${count === 1 ? '' : 's'} ${where}. This cannot be undone.`, { title: 'Permanently delete posts?', type: 'error', confirmText: 'Delete posts' })) return
 
         purgeRun.disabled = true
         try {

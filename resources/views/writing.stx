@@ -300,7 +300,7 @@
 
     const removePost = async (id: number) => {
       const item = items().find(entry => entry.id === id)
-      if (!item || !window.confirm(`Delete "${item.title}" for good? Its page goes too. This cannot be undone.`)) return
+      if (!item || !await stxConfirm(`The page for "${item.title}" will also be deleted. This cannot be undone.`, { title: 'Delete this blog post?', type: 'error', confirmText: 'Delete post' })) return
       busyId.set(id)
       try {
         await send('delete', { id: String(id) })

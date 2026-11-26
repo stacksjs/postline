@@ -668,9 +668,9 @@
       'Resume failed',
     )
 
-    const deleteItem = (id: number): void => {
-      if (!confirm('Delete this post? This cannot be undone.')) return
-      void runAction(
+    const deleteItem = async (id: number): Promise<void> => {
+      if (!await stxConfirm('This cannot be undone.', { title: 'Delete this post?', type: 'error', confirmText: 'Delete post' })) return
+      await runAction(
         id,
         '/api/postline/queue/delete',
         { title: 'Removed', message: 'Post removed from the queue.' },

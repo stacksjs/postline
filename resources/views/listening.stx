@@ -263,10 +263,12 @@
     }
 
     const deleteMonitor = async () => {
-      if (deleting() || !draftId() || !window.confirm('Delete this listening rule and its saved mentions?')) return
+      const id = draftId()
+      if (deleting() || !id) return
+      if (!await stxConfirm('Its saved mentions will also be deleted.', { title: 'Delete this listening rule?', type: 'error', confirmText: 'Delete rule' })) return
       deleting.set(true)
       try {
-        await requestJson('/api/postline/listening/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: draftId() }) })
+        await requestJson('/api/postline/listening/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
         resetForm()
         filterMonitorId.set(0)
         await loadData()

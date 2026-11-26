@@ -278,7 +278,7 @@
               <label class="campaign-ready-check"><input type="checkbox" :checked="postStatus() === 'ready'" @change="postStatus.set($event.target.checked ? 'ready' : 'idea')"><span><strong>Mark ready</strong><small>Ready posts still stay in the plan until you schedule the campaign.</small></span></label>
             </div>
             <div class="campaign-form__footer">
-              <button class="campaign-danger-button" type="button" x-show="postDraftId() && !queuedPostId()" :disabled="busy()" @click="deletePost"><span :text="busyAction() === 'delete' ? 'Removing…' : deleteArmed() ? 'Click again to remove' : 'Delete'">Delete</span></button>
+              <button class="campaign-danger-button" type="button" x-show="postDraftId() && !queuedPostId()" :disabled="busy()" @click="deletePost"><span :text="busyAction() === 'delete' ? 'Removing…' : 'Delete'">Delete</span></button>
               <button class="campaign-secondary-button" type="button" @click="closePanel"><span :text="closeLabel('Close')">Close</span></button>
               <a class="campaign-primary-button" x-show="queuedPostId()" :href="`/composer?edit=${queuedPostId()}`" data-stx-link>Edit in Composer</a>
               <button class="campaign-primary-button" type="submit" x-show="!queuedPostId()" :disabled="busy()"><span :text="busyAction() === 'post' ? 'Saving…' : 'Save post'"></span></button>
@@ -337,9 +337,7 @@
     const postScheduledAt = state('')
     // The campaigns could not be read: not the same as having none.
     const loadFailed = state(false)
-    // Two-step actions instead of a browser dialog: the first click arms the
-    // button and says what the second will do.
-    const deleteArmed = state(false)
+    // Closing an edited form asks for a second click to discard its changes.
     const discardArmed = state(false)
     // What the open form held when it opened, to tell an edit from a glance.
     let openedWith = ''
@@ -617,7 +615,6 @@
       panelMode.set('post')
       openedWith = formSnapshot()
       discardArmed.set(false)
-      deleteArmed.set(false)
       void nextTick(() => {
         void nextTick(() => {
           if (postTitleInput.current) postTitleInput.current.value = draft.title
@@ -643,7 +640,6 @@
         return
       }
       discardArmed.set(false)
-      deleteArmed.set(false)
       panelMode.set(campaign() ? 'planner' : '')
     }
 
@@ -725,16 +721,14 @@
     }
 
     async function deletePost() {
-      if (!postDraftId() || queuedPostId()) return
-      if (!deleteArmed()) {
-        deleteArmed.set(true)
-        return
-      }
-      deleteArmed.set(false)
+      const id = postDraftId()
+      const campaignId = campaign()?.id
+      if (!id || !campaignId || queuedPostId()) return
+      if (!await stxConfirm('This removes the post from the campaign plan.', { title: 'Delete this planned post?', type: 'error', confirmText: 'Delete post' })) return
       busyAction.set('delete')
       try {
-        await api('/api/postline/campaigns/post/delete', { campaign_id: campaign().id, id: postDraftId() })
-        await loadCampaigns(campaign().id)
+        await api('/api/postline/campaigns/post/delete', { campaign_id: campaignId, id })
+        await loadCampaigns(campaignId)
         panelMode.set('planner')
         showNotice('Post removed', 'The rest of the campaign is unchanged.')
       }

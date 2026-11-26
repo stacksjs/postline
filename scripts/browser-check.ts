@@ -310,6 +310,30 @@ async function checkQueueKeyboard(cdp: Cdp): Promise<void> {
   await cdp.send('Input.insertText', { text: 'keyboard smoke test' })
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('The post search result', () => evaluate<boolean>(cdp, `document.querySelector('#queue-results[aria-label="Matching posts"] article')?.textContent.includes('A draft for the keyboard smoke test')`), 5_000)
+
+  await evaluate(cdp, `document.querySelector('#queue-results ${actions}').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await pressKey(cdp, 'Tab', 9)
+  await pressKey(cdp, 'Tab', 9)
+  if (await evaluate<string>(cdp, 'document.activeElement?.textContent?.trim()') !== 'Delete')
+    fail('queue', 'keyboard', 'Tab did not reach Delete in the search result')
+  await pressKey(cdp, 'Enter', 13)
+  const activeDialog = `document.activeElement?.closest('[role=alertdialog]')`
+  await waitUntil('The delete confirmation focuses Cancel', () => evaluate<boolean>(cdp, `
+    document.activeElement?.textContent === 'Cancel' && ${activeDialog}?.getAttribute('aria-modal') === 'true'
+      && document.getElementById(${activeDialog}.getAttribute('aria-labelledby'))?.textContent === 'Delete this post?'`), 5_000)
+  await pressKey(cdp, 'Escape', 27)
+  await waitUntil('Escaping the confirmation leaves the draft and restores focus', () => evaluate<boolean>(cdp, `
+    document.activeElement?.closest('#queue-results article')?.textContent.includes('A draft for the keyboard smoke test')
+      && document.activeElement?.textContent.trim() === 'Delete'`), 5_000)
+  await pressKey(cdp, 'Enter', 13)
+  await pressKey(cdp, 'Tab', 9)
+  if (!await evaluate<boolean>(cdp, `${activeDialog} && document.activeElement.textContent === 'Delete post'`))
+    fail('queue', 'keyboard', 'Tab did not reach the focused delete confirmation')
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The confirmed draft deletion', () => evaluate<boolean>(cdp, `
+    !document.querySelector('#queue-results[aria-label="Matching posts"] article')
+      && document.querySelector('#postline-toast-host')?.textContent.includes('Post removed from the queue.')`), 5_000)
 }
 
 async function checkDesktopUpdateControls(cdp: Cdp): Promise<void> {
