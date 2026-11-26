@@ -43,22 +43,41 @@ const NAMES: Record<string, string> = {
  * characters or fewer."). It is already written for the owner and passes
  * through as it is.
  */
-export function explainNetworkError(provider: string, error: unknown): NetworkErrorExplanation {
+/** What Postline was doing when the network said no, so the message names it. */
+export type NetworkAction = 'post' | 'delete' | 'read' | 'search'
+
+const DOING: Record<NetworkAction, { thing: string, verb: string }> = {
+  post: { thing: 'take this post', verb: 'post' },
+  delete: { thing: 'delete this post', verb: 'delete posts' },
+  read: { thing: 'load your messages', verb: 'read messages' },
+  search: { thing: 'run this search', verb: 'search' },
+}
+
+/**
+ * A message thrown by Postline's own code reads well as it is; a network's
+ * raw answer (a JSON or HTML body, a stack) does not, and is never shown (#134).
+ */
+function readable(message: string): boolean {
+  return Boolean(message) && message.length <= 300 && !/[{}<>]|\n\s+at /.test(message)
+}
+
+export function explainNetworkError(provider: string, error: unknown, action: NetworkAction = 'post'): NetworkErrorExplanation {
   const name = NAMES[provider] || provider
+  const doing = DOING[action]
   const { kind, status, reason } = classifySocialError(error)
   const own = String((error as { message?: unknown } | null)?.message ?? error ?? '')
 
   if (!status && kind === 'unknown')
-    return { kind, message: own || `${name} could not take this post.` }
+    return { kind, message: readable(own) ? own : `${name} could not ${doing.thing}.` }
 
-  const said = reason ? ` ${name} said: ${reason}.` : ''
+  const said = reason && readable(reason) ? ` ${name} said: ${reason}.` : ''
   switch (kind) {
     case 'expired':
       return { kind, message: `${name} no longer accepts this sign-in. Connect the account again under Settings, Channels.` }
     case 'permission':
-      return { kind, message: `${name} did not allow this.${said} Check that the app or token has permission to post, then try again.` }
+      return { kind, message: `${name} did not allow this.${said} Check that the app or token has permission to ${doing.verb}, then try again.` }
     case 'rate-limited':
-      return { kind, message: `${name} is limiting how often you can post right now. Postline will try again later.` }
+      return { kind, message: `${name} is limiting how often Postline can ${doing.verb} right now. It will try again later.` }
     case 'duplicate':
       return { kind, message: `${name} refused this as a duplicate of a post already there. Change the text, or leave it: the earlier post is up.` }
     case 'media':
@@ -68,10 +87,10 @@ export function explainNetworkError(provider: string, error: unknown): NetworkEr
     case 'temporary':
       return { kind, message: status ? `${name} is having trouble right now (${status}). Postline will try again shortly.` : `Postline could not reach ${name}. It will try again shortly.` }
     default:
-      return { kind, message: `${name} could not take this post${status ? ` (${status})` : ''}.${said}` }
+      return { kind, message: `${name} could not ${doing.thing}${status ? ` (${status})` : ''}.${said}` }
   }
 }
 
-export function describeNetworkError(provider: string, error: unknown): string {
-  return explainNetworkError(provider, error).message
+export function describeNetworkError(provider: string, error: unknown, action: NetworkAction = 'post'): string {
+  return explainNetworkError(provider, error, action).message
 }

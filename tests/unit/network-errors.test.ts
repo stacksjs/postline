@@ -70,3 +70,23 @@ describe('what the owner reads', () => {
     expect(describeNetworkError('mastodon', new Error('Posts on hachyderm.io must be 500 characters or fewer.'))).toBe('Posts on hachyderm.io must be 500 characters or fewer.')
   })
 })
+
+describe('the same failure, named for what Postline was doing (#134)', () => {
+  test('a rate limit while deleting says deleting, and while searching says searching', async () => {
+    const { describeNetworkError } = await import('../../app/Support/Social/network-errors')
+    const limited = Object.assign(new Error('Too Many Requests'), { status: 429 })
+    expect(describeNetworkError('twitter', limited, 'delete')).toContain('delete posts')
+    expect(describeNetworkError('mastodon', limited, 'search')).toContain('search')
+    expect(describeNetworkError('bluesky', limited, 'read')).toContain('read messages')
+  })
+
+  test('a raw API body is never passed on', async () => {
+    const { describeNetworkError } = await import('../../app/Support/Social/network-errors')
+    const raw = new Error('{"errors":[{"code":"InternalError","message":"stack trace follows"}]}')
+    const message = describeNetworkError('bluesky', raw, 'read')
+    expect(message).not.toContain('{')
+    expect(message).toBe('Bluesky could not load your messages.')
+    // Postline's own sentences pass through as they are.
+    expect(describeNetworkError('threads', new Error('Threads cannot list your whole post history to Postline.'), 'delete')).toBe('Threads cannot list your whole post history to Postline.')
+  })
+})

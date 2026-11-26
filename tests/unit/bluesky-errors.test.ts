@@ -1,38 +1,29 @@
 import { describe, expect, test } from 'bun:test'
 import { BlueskyApiError } from '../../app/Services/Social/Drivers/BlueskyDriver'
-import { describeBlueskyError } from '../../app/Support/Social/bluesky-errors'
+import { describeNetworkError } from '../../app/Support/Social/network-errors'
 
 const apiError = (status: number, body = '') =>
   new BlueskyApiError(`Bluesky API failed (${status})`, status, body)
 
-describe('describeBlueskyError', () => {
-  test('maps rate limit (429) to an actionable message', () => {
-    expect(describeBlueskyError(apiError(429))).toMatch(/rate limit/i)
+/** Bluesky failures go through the same explainer as every network (#134). */
+describe('Bluesky errors', () => {
+  test('each status reads as what happened and what to do', () => {
+    expect(describeNetworkError('bluesky', apiError(429))).toMatch(/limiting how often/)
+    expect(describeNetworkError('bluesky', apiError(401))).toMatch(/Connect the account again/)
+    // A 403 is a refusal of this action, not a dead session.
+    expect(describeNetworkError('bluesky', apiError(403))).toMatch(/did not allow this/)
+    expect(describeNetworkError('bluesky', apiError(413))).toMatch(/would not take the image/)
+    expect(describeNetworkError('bluesky', apiError(503))).toMatch(/having trouble/)
   })
 
-  test('maps auth errors (401/403) to a reconnect prompt', () => {
-    expect(describeBlueskyError(apiError(401))).toMatch(/reconnect/i)
-    expect(describeBlueskyError(apiError(403))).toMatch(/reconnect/i)
+  test('the network\'s own reason is quoted, never its raw body', () => {
+    const message = describeNetworkError('bluesky', apiError(400, '{"error":"InvalidRequest","message":"Record too long"}'))
+    expect(message).toContain('Record too long')
+    expect(message).not.toContain('{')
   })
 
-  test('maps oversized image (413)', () => {
-    expect(describeBlueskyError(apiError(413))).toMatch(/1MB/i)
-  })
-
-  test('maps 5xx to a transient-trouble message', () => {
-    expect(describeBlueskyError(apiError(503))).toMatch(/trouble/i)
-  })
-
-  test('surfaces the ATProto body message for other statuses', () => {
-    const err = apiError(400, JSON.stringify({ error: 'InvalidRequest', message: 'Record too long' }))
-    expect(describeBlueskyError(err)).toBe('Bluesky rejected the post: Record too long')
-  })
-
-  test('maps network failures to a connectivity message', () => {
-    expect(describeBlueskyError(new TypeError('fetch failed'))).toMatch(/couldn't reach bluesky/i)
-  })
-
-  test('passes through a plain error message unchanged', () => {
-    expect(describeBlueskyError(new Error('Write something before publishing.'))).toBe('Write something before publishing.')
+  test('an unreachable network and Postline\'s own sentences', () => {
+    expect(describeNetworkError('bluesky', new TypeError('fetch failed'))).toBe('Postline could not reach Bluesky. It will try again shortly.')
+    expect(describeNetworkError('bluesky', new Error('Write something before publishing.'))).toBe('Write something before publishing.')
   })
 })

@@ -3,7 +3,6 @@ import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import type { PublicAccount } from '../../Support/Social/accounts'
 import { pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
-import { describeBlueskyError } from '../../Support/Social/bluesky-errors'
 import { fetchRemoteImage } from '../../Support/Social/image-input'
 import type { BlueskyPublishInput } from './Drivers/BlueskyDriver'
 import { BLUESKY_MAX_BLOB_BYTES, BlueskyDriver, isBlueskySessionError } from './Drivers/BlueskyDriver'
@@ -14,6 +13,7 @@ import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityR
 import { workspace } from '../WorkspaceService'
 import { ensureAccount as ensureWorkspaceAccount } from './support'
 import { classifyFailure } from '../../Support/Social/retry'
+import { describeNetworkError } from '../../Support/Social/network-errors'
 
 const database = db as any
 
@@ -348,7 +348,7 @@ export class BlueskyService {
       }
     }
     catch (error) {
-      const message = describeBlueskyError(error)
+      const message = describeNetworkError('bluesky', error)
       const failedAt = now()
       await database.updateTable('post_targets').set({
         status: 'failed',

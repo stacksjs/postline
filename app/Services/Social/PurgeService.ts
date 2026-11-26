@@ -11,6 +11,7 @@ import { threads } from './ThreadsService'
 import { ensureAccount, now, uuid } from './support'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { twitter } from './TwitterService'
+import { describeNetworkError } from '../../Support/Social/network-errors'
 
 const database = db as any
 
@@ -231,10 +232,6 @@ interface PurgeCandidate {
   postedAt?: string
   targetId?: number
   postId?: number
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }
 
 /**
@@ -510,7 +507,7 @@ export class PurgeService {
       adapter = await this.adapterFor(provider, account?.id)
     }
     catch (error) {
-      result.skippedReason = messageOf(error)
+      result.skippedReason = describeNetworkError(provider, error, 'delete')
       // A network that was never connected is not news to a daily schedule;
       // writing it down every day would bury the runs that did something.
       if (context.trigger !== 'schedule') await this.recordRun(result, context, 'skipped')
@@ -531,7 +528,7 @@ export class PurgeService {
       // A provider that can delete but not enumerate lands here in `all` scope.
       // Surface it as a skip with the reason, so the UI explains the way
       // forward instead of reporting a bare zero.
-      const message = messageOf(error)
+      const message = describeNetworkError(provider, error, 'delete')
       result.skippedReason = message
       result.errors.push(message)
       await this.recordRun(result, context, 'skipped', message)
@@ -587,7 +584,7 @@ export class PurgeService {
         result.failed += 1
         if (context.progress) context.progress.failed += 1
         if (result.errors.length < MAX_RECORDED_ERRORS) {
-          result.errors.push(`${candidate.uri}: ${messageOf(error)}`)
+          result.errors.push(`${candidate.uri}: ${describeNetworkError(provider, error, 'delete')}`)
         }
       }
 

@@ -21,6 +21,7 @@ import { db } from '@stacksjs/database'
 import { DM_PROVIDERS, DM_UNAVAILABLE, isDmProvider } from '../Support/Social/direct-messages'
 import { getDmTransport, listDmTransports } from './Social/DirectMessages'
 import { now, uuid } from './Social/support'
+import { describeNetworkError } from '../Support/Social/network-errors'
 
 const database = db as any
 
@@ -224,13 +225,13 @@ export class DirectMessageService {
             // in the inbox with its preview — only its history is missing.
             result.errors.push({
               provider: transport.provider,
-              message: `${candidate.participants[0]?.handle || candidate.remoteId}: ${error instanceof Error ? error.message : String(error)}`,
+              message: `${candidate.participants[0]?.handle || candidate.remoteId}: ${describeNetworkError(transport.provider, error, 'read')}`,
             })
           }
         }
       }
       catch (error) {
-        result.errors.push({ provider: transport.provider, message: error instanceof Error ? error.message : String(error) })
+        result.errors.push({ provider: transport.provider, message: describeNetworkError(transport.provider, error, 'read') })
       }
     }
 
@@ -249,7 +250,7 @@ export class DirectMessageService {
       await this.refreshPreview(conversationId)
     }
     catch (error) {
-      result.errors.push({ provider, message: error instanceof Error ? error.message : String(error) })
+      result.errors.push({ provider, message: describeNetworkError(provider, error, 'read') })
     }
 
     return result

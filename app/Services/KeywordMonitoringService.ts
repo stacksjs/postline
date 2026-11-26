@@ -3,6 +3,7 @@ import { isUsableIdentity } from '../Support/Social/accounts'
 import { stripHtml } from '../Support/Social/text'
 import { findIdentityRow } from './Social/identities'
 import { ensureAccount, now, uuid } from './Social/support'
+import { describeNetworkError } from '../Support/Social/network-errors'
 
 const database = db as any
 
@@ -307,7 +308,7 @@ export class KeywordMonitoringService {
           candidates.push(...results)
         }
         catch (error) {
-          errors.push({ monitorId: Number(monitor.id), provider, message: error instanceof Error ? error.message : String(error) })
+          errors.push({ monitorId: Number(monitor.id), provider, message: describeNetworkError(provider, error, 'search') })
         }
       }
 
