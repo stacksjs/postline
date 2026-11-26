@@ -227,6 +227,12 @@ export interface QueueItemView {
    * failed networks can be sent again on their own with "publish now".
    */
   partial: boolean
+  /**
+   * For a segment of a thread: where it sits, and the segment a resume would
+   * start from (the first one that did not go out somewhere), or null when
+   * every segment went out everywhere (#100).
+   */
+  thread: { position: number, length: number, resumeFrom: number | null } | null
 }
 
 export interface SaveQueueInput {
@@ -308,7 +314,7 @@ export class QueueService {
    * The crosspost service is injectable so tests can publish through fake
    * networks, which is the only way to exercise two runs racing for one post.
    */
-  constructor(private publisher: Pick<CrosspostService, 'publishExisting'> = crosspost) {}
+  constructor(private publisher: Pick<CrosspostService, 'publishExisting' | 'resumeThread'> = crosspost) {}
 
   /**
    * Persist a post without publishing it. With `scheduledAt` the post is
@@ -420,6 +426,22 @@ export class QueueService {
       : []
     const handles = new Map<number, string>(identities.map((row: any) => [Number(row.id), String(row.handle)]))
 
+    // Threads on this page: each segment's position, and where a resume
+    // would start, from every segment of the thread (not only this page's).
+    const threadKeys = [...new Set(posts.map((post: any) => post.thread_key).filter(Boolean))]
+    const threadInfo = new Map<string, { ids: number[], resumeFrom: number | null }>()
+    if (threadKeys.length) {
+      const segments = await database.selectFrom('posts').select(['id', 'thread_key']).where('thread_key', 'in', threadKeys).orderBy('id', 'asc').execute()
+      const segmentTargets = segments.length
+        ? await database.selectFrom('post_targets').select(['post_id', 'status']).where('post_id', 'in', segments.map((row: any) => row.id)).execute()
+        : []
+      for (const key of threadKeys) {
+        const ids = segments.filter((row: any) => row.thread_key === key).map((row: any) => Number(row.id))
+        const first = ids.findIndex((id: number) => segmentTargets.some((target: any) => Number(target.post_id) === id && target.status === 'failed'))
+        threadInfo.set(String(key), { ids, resumeFrom: first === -1 ? null : first + 1 })
+      }
+    }
+
     const column = await contentColumn()
     const items = posts.map((post: any): QueueItemView => {
       const stored = parseStoredContent(post[column])
@@ -435,6 +457,13 @@ export class QueueService {
         hasLink: Boolean(stored?.external),
         partial: String(post.status) === 'published'
           && targets.some((target: any) => Number(target.post_id) === Number(post.id) && target.status === 'failed'),
+        thread: post.thread_key && threadInfo.has(String(post.thread_key))
+          ? {
+              position: threadInfo.get(String(post.thread_key))!.ids.indexOf(Number(post.id)) + 1,
+              length: threadInfo.get(String(post.thread_key))!.ids.length,
+              resumeFrom: threadInfo.get(String(post.thread_key))!.resumeFrom,
+            }
+          : null,
         providers: targets
           .filter((target: any) => Number(target.post_id) === Number(post.id))
           .map((target: any): QueueTargetView => {
@@ -640,6 +669,13 @@ export class QueueService {
    */
   async publishNow(id: number, options: { retriesOnly?: boolean } = {}): Promise<{ postId: number, results: CrosspostTargetResult[] }> {
     const post = await this.findPublishable(id)
+    // A segment of a thread that already went out in part is never sent on
+    // its own: it would land outside the thread. It resumes the thread from
+    // where each account stopped (#100).
+    if (post.thread_key && String(post.status) !== 'scheduled' && String(post.status) !== 'draft') {
+      const { results } = await this.publisher.resumeThread(String(post.thread_key))
+      return { postId: Number(post.id), results }
+    }
     const wasPublished = String(post.status) === 'published'
     // Read before the claim: a post whose image is gone is refused here, with
     // nothing changed, instead of being claimed and then failing halfway.

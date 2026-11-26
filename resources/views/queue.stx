@@ -51,7 +51,8 @@
             <footer class="flex flex-wrap gap-2 items-center justify-end">
               <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
               <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.actionable" :href="row.editUrl" data-stx-link>Edit</a>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="publishItem(row.id)">Publish now</button>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg transition-colors" type="button" x-show="row.actionable && !row.resumeLabel" :disabled="busyId() === row.id" @click="publishItem(row.id)">Publish now</button>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg transition-colors" type="button" x-show="row.actionable && row.resumeLabel" :disabled="busyId() === row.id" @click="resumeItem(row.id)" :text="row.resumeLabel">Resume thread</button>
               <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-danger text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="deleteItem(row.id)">Delete</button>
             </footer>
           </article>
@@ -77,7 +78,8 @@
             <p class="m-0 text-danger text-xs" x-show="row.failure" :text="row.failure"></p>
             <footer class="flex flex-wrap gap-2 items-center justify-end">
               <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View</a>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.partial" :disabled="busyId() === row.id" @click="retryItem(row.id)">Retry failed</button>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.partial && !row.resumeLabel" :disabled="busyId() === row.id" @click="retryItem(row.id)">Retry failed</button>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.resumeLabel" :disabled="busyId() === row.id" @click="resumeItem(row.id)" :text="row.resumeLabel">Resume thread</button>
             </footer>
           </article>
         </div>
@@ -154,6 +156,7 @@
       hasImage?: boolean
       hasLink?: boolean
       partial?: boolean
+      thread?: { position: number, length: number, resumeFrom: number | null } | null
       providers: QueueApiTarget[]
     }
 
@@ -170,6 +173,8 @@
       actionable: boolean
       /** Went out on some networks and failed on others. */
       partial: boolean
+      /** "Resume thread from 3", for a thread that stopped part way; '' otherwise. */
+      resumeLabel: string
       statusLabel: string
       pill: string
       scheduledAt?: string | null
@@ -286,8 +291,9 @@
           ? `Published · ${formatTime(item.publishedAt || item.createdAt)}`
           : `${item.status[0].toUpperCase()}${item.status.slice(1)} · ${formatTime(item.createdAt)}`
       const extras = [item.hasImage ? 'image' : '', item.hasLink ? 'link card' : ''].filter(Boolean).join(' · ')
+      const thread = item.thread ? `thread · post ${item.thread.position} of ${item.thread.length}` : ''
       const channels = (channelLabels(item.providers).join(', ') || 'No channel')
-        + (extras ? ` · ${extras}` : '')
+        + (extras ? ` · ${extras}` : '') + (thread ? ` · ${thread}` : '')
       return {
         id: item.id,
         status: item.status,
@@ -299,6 +305,7 @@
         editUrl: `/composer?edit=${item.id}`,
         actionable: ACTIONABLE.has(item.status),
         partial: Boolean(item.partial),
+        resumeLabel: item.thread?.resumeFrom ? `Resume thread from ${item.thread.resumeFrom}` : '',
         // A post that reached only some networks is not simply "published".
         // It borrows the amber of an unfinished publish.
         statusLabel: item.partial ? 'partly sent' : isMissed(item) ? 'missed' : item.status,
@@ -523,6 +530,16 @@
       '/api/postline/queue/publish-now',
       { title: 'Retried', message: 'The failed networks were sent again.' },
       'Retry failed',
+    )
+
+    // A thread that stopped part way carries on from that segment, as replies
+    // to the last one that went out (#100). The same endpoint as retry: the
+    // server sees the post is a thread segment and resumes the thread.
+    const resumeItem = (id: number): void => void runAction(
+      id,
+      '/api/postline/queue/publish-now',
+      { title: 'Thread resumed', message: 'The rest of the thread was sent from where it stopped.' },
+      'Resume failed',
     )
 
     const deleteItem = (id: number): void => {

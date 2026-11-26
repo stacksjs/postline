@@ -114,3 +114,60 @@ describe('a network that throws instead of answering', () => {
     expect(sent).toEqual(['blog'])
   })
 })
+
+describe('resuming a thread (#100)', () => {
+  /** A chaining network: each post gets a uri and cid, and records what it replied to. */
+  function chaining(failOn: number[] = []) {
+    const sent: Array<{ body: string, replyTo?: string }> = []
+    let call = 0
+    const publisher: ProviderPublisher = {
+      async publishToPost(post, content): Promise<CrosspostTargetResult> {
+        call++
+        const ok = !failOn.includes(call)
+        sent.push({ body: post.body, replyTo: content?.reply?.parent?.uri })
+        const uri = `at://me/${post.body}`
+        await database.insertInto('post_targets').values({
+          uuid: crypto.randomUUID(),
+          provider: 'blog',
+          status: ok ? 'published' : 'failed',
+          failure_reason: ok ? null : 'The network said no.',
+          remote_uri: ok ? uri : null,
+          remote_cid: ok ? `cid-${post.body}` : null,
+          post_id: post.id,
+        }).execute()
+        return { provider: 'blog', ok, uri: ok ? uri : undefined, cid: ok ? `cid-${post.body}` : undefined, error: ok ? undefined : 'The network said no.', target: 'blog' } as CrosspostTargetResult
+      },
+    }
+    return { publisher, sent }
+  }
+
+  test('a failure at post 3 of 5 sends nothing further, and resuming carries on from 3 as replies', async () => {
+    const first = chaining([3])
+    const service = new CrosspostService({ blog: first.publisher } as never)
+    const { postIds } = await service.publishThread(five, ['blog'])
+    expect(first.sent.map(item => item.body)).toEqual(['one', 'two', 'three'])
+
+    const threadKey = String((await database.selectFrom('posts').select(['thread_key']).where('id', '=', postIds[0]).executeTakeFirstOrThrow()).thread_key)
+    const second = chaining()
+    const resumed = await new CrosspostService({ blog: second.publisher } as never).resumeThread(threadKey)
+
+    expect(resumed.resumed).toBe(1)
+    expect(second.sent).toEqual([
+      { body: 'three', replyTo: 'at://me/two' },
+      { body: 'four', replyTo: 'at://me/three' },
+      { body: 'five', replyTo: 'at://me/four' },
+    ])
+    // Each segment now has exactly one row, published.
+    expect((await rows(postIds)).map(row => row.status)).toEqual(['published', 'published', 'published', 'published', 'published'])
+  })
+
+  test('the queue offers "resume from 3" for that thread', async () => {
+    const { QueueService } = await import('../../app/Services/Social/QueueService')
+    const first = chaining([3])
+    const service = new CrosspostService({ blog: first.publisher } as never)
+    const { postIds } = await service.publishThread(five, ['blog'])
+    const page = await new QueueService(service).listPage({ limit: 500 })
+    const segment = page.items.find(item => item.id === postIds[2])!
+    expect(segment.thread).toEqual({ position: 3, length: 5, resumeFrom: 3 })
+  })
+})
