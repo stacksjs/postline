@@ -112,6 +112,8 @@
               <div class="hidden overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview></div>
             </article>
           </div>
+          {{-- Bluesky shows images or a link card, never both (#132). --}}
+          <p class="m-0 mt-2 text-muted text-xs" :class="linkCardShown() && attachedImages().length ? '' : 'hidden'" data-card-replaced>The attached image is shown on Bluesky instead of the link card.</p>
         </div>
 
         {{--
@@ -201,6 +203,8 @@
     // images already saved on a post being edited, which have no file here.
     const MAX_IMAGES = 4
     const attachedImages = state([])
+    /** Whether the first post carries a link card, for the note that an image replaces it. */
+    const linkCardShown = state(false)
     const imageRows = derived(() => attachedImages().map((image, index) => ({
       id: image.id,
       name: image.name,
@@ -901,6 +905,7 @@
         const container = previewFor(post)
         if (!container) return
 
+        if (post === allPosts()[0]) linkCardShown.set(Boolean(preview))
         if (!preview) {
           container.classList.add('hidden')
           container.innerHTML = ''

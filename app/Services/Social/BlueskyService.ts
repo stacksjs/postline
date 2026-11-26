@@ -8,6 +8,7 @@ import type { BlueskyPublishInput } from './Drivers/BlueskyDriver'
 import { BLUESKY_MAX_BLOB_BYTES, BlueskyDriver, isBlueskySessionError } from './Drivers/BlueskyDriver'
 import { DEFAULT_BLUESKY_SERVER, resolveBlueskyServer } from '../../Support/Social/bluesky-server'
 import { fetchLinkPreview } from '../../Support/Social/link-preview'
+import { blueskyRecordKey } from '../../Support/Social/bluesky-rkey'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { workspace } from '../WorkspaceService'
@@ -319,13 +320,16 @@ export class BlueskyService {
 
     try {
       const accountDriver = await this.driverFor(identity)
+      // The same key on every attempt, so a retry after a publish that did
+      // land reads it back instead of posting twice (#132).
+      const rkey = blueskyRecordKey(Number(post.id), Number(identity.id))
       const published = await this.withFreshSession(identity, freshIdentity =>
         accountDriver.publish({
           handle: freshIdentity.handle,
           did: freshIdentity.external_id || undefined,
           accessToken: freshIdentity.access_token || undefined,
           refreshToken: freshIdentity.refresh_token || undefined,
-        }, publishInput),
+        }, publishInput, { rkey }),
       )
 
       const publishedAt = now()

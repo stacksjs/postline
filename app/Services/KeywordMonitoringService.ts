@@ -118,8 +118,31 @@ async function fetchJson(url: URL, init: RequestInit = {}): Promise<any> {
   return payload
 }
 
+/**
+ * The searches one rule takes on Bluesky. Its search has no `OR` (#132): `a OR
+ * b` is matched as three words. So "any" is one search per keyword, merged;
+ * "all" is the words together, which Bluesky reads as AND; a phrase is quoted.
+ */
+export function blueskyQueries(keywords: string[], mode: MatchMode): string[] {
+  if (mode === 'phrase') return [`"${keywords.join(' ')}"`]
+  if (mode === 'all') return [keywords.join(' ')]
+  return keywords.map(keyword => (/\s/.test(keyword) ? `"${keyword}"` : keyword))
+}
+
 async function searchBluesky(keywords: string[], mode: MatchMode): Promise<MentionCandidate[]> {
-  const query = mode === 'phrase' ? `"${keywords.join(' ')}"` : keywords.join(mode === 'all' ? ' ' : ' OR ')
+  const seen = new Set<string>()
+  const found: MentionCandidate[] = []
+  for (const query of blueskyQueries(keywords, mode)) {
+    for (const candidate of await searchBlueskyOnce(query, keywords, mode)) {
+      if (seen.has(candidate.remoteUri)) continue
+      seen.add(candidate.remoteUri)
+      found.push(candidate)
+    }
+  }
+  return found
+}
+
+async function searchBlueskyOnce(query: string, keywords: string[], mode: MatchMode): Promise<MentionCandidate[]> {
   const url = new URL('https://api.bsky.app/xrpc/app.bsky.feed.searchPosts')
   url.searchParams.set('q', query)
   url.searchParams.set('sort', 'latest')
