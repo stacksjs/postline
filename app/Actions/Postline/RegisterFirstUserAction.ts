@@ -1,12 +1,17 @@
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
-import { authCookieForBrowserSession, register } from '@stacksjs/auth'
+import { Auth, authCookieForBrowserSession, displayNameMessage, displayNameProblem, normalizeAuthEmail, normalizeDisplayName } from '@stacksjs/auth'
 import { db } from '@stacksjs/database'
 import { response } from '@stacksjs/router'
+import { makeHash } from '@stacksjs/security'
 import { actionFailure } from '../../Support/Http/action-error'
 import { isMarketingSite } from '../../Support/Marketing/site'
 
 const database = db as any
+
+function workspaceOwned() {
+  return response.json({ ok: false, error: 'This workspace already has an account. Sign in instead.' }, { status: 403 })
+}
 
 /**
  * First-run registration belongs to a self-hosted workspace. The public
@@ -31,29 +36,35 @@ export default new Action({
       .select(['id'])
       .executeTakeFirst()
 
-    if (existing) {
-      return response.json({
-        ok: false,
-        error: 'This workspace already has an account. Sign in instead.',
-      }, { status: 403 })
-    }
+    if (existing) return workspaceOwned()
 
-    const email = String(request.get('email') || '').trim()
+    const email = normalizeAuthEmail(String(request.get('email') || ''))
     const password = String(request.get('password') || '')
     const name = String(request.get('name') || '').trim()
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       return response.json({ ok: false, error: 'Email must be a valid email address.' }, { status: 422 })
-    // 8, not 6: `register()` throws its own 422 below 8 characters, so a
-    // 6- or 7-character password used to pass this check and then fail inside
-    // the framework with a different message and no account created.
     if (password.length < 8 || password.length > 255)
       return response.json({ ok: false, error: 'Password must be between 8 and 255 characters.' }, { status: 422 })
     if (name.length < 2 || name.length > 255)
       return response.json({ ok: false, error: 'Name must be between 2 and 255 characters.' }, { status: 422 })
+    const nameProblem = displayNameProblem(name)
+    if (nameProblem && nameProblem !== 'too_short')
+      return response.json({ ok: false, error: displayNameMessage(nameProblem) }, { status: 422 })
 
     try {
-      const result = await register({ email, password, name })
+      const hashedPassword = await makeHash(password, { algorithm: 'bcrypt' })
+      // The emptiness check and insert share a single SQLite write so even
+      // overlapping server processes can award the workspace only once.
+      const created = await database.unsafe(`
+        INSERT INTO users (email, password, name)
+        SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM users)
+        RETURNING id
+      `, [email, hashedPassword, normalizeDisplayName(name)]).execute() as Array<{ id: number }>
+      const owner = created[0]
+      if (!owner) return workspaceOwned()
+
+      const result = await Auth.loginUsingId(Number(owner.id), { name: 'user-auth-token' })
       if (!result)
         throw new Error('Registration failed.')
 
@@ -62,15 +73,15 @@ export default new Action({
       // left first-run registration unable to sign the new owner in: the page
       // cannot write that cookie itself, so the account was created and the
       // browser was bounced straight back to /login (#45).
-      const expiresIn = (result as { expiresIn?: number }).expiresIn
+      const { expiresIn, token } = result
       const headers = expiresIn
-        ? { 'Set-Cookie': authCookieForBrowserSession((result as any).token, expiresIn) }
+        ? { 'Set-Cookie': authCookieForBrowserSession(token, expiresIn) }
         : undefined
 
       return response.json({
         ok: true,
         data: {
-          access_token: (result as any).token,
+          access_token: token,
           token_type: 'Bearer',
           expires_in: expiresIn,
         },

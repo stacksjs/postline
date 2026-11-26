@@ -130,11 +130,17 @@ try {
     // the CSRF cookie and the session cookie land in this browser context.
     await auditPage(`${site}/login`, { cdp })
     const signedIn = await evaluate<string>(cdp, `(async () => {
-      const body = new FormData()
-      body.set('name', 'Browser Check')
-      body.set('email', 'check@postline.test')
-      body.set('password', 'browser-check-password')
-      await fetch('/api/register', { method: 'POST', body })
+      const credentials = ['check@postline.test', 'other@postline.test'].map(email => {
+        const fields = new FormData()
+        fields.set('name', 'Browser Check')
+        fields.set('email', email)
+        fields.set('password', 'browser-check-password')
+        return fields
+      })
+      const registrations = await Promise.all(credentials.map(body => fetch('/api/register', { method: 'POST', body })))
+      if (registrations.filter(result => result.ok).length !== 1 || !registrations.some(result => result.status === 403))
+        return 'expected exactly one workspace owner: ' + registrations.map(result => result.status).join(', ')
+      const body = credentials[registrations.findIndex(result => result.ok)]
       const login = await fetch('/api/login', { method: 'POST', body })
       const payload = await login.json()
       if (!payload.token && !payload.access_token) return 'login failed: ' + JSON.stringify(payload)
