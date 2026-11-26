@@ -808,7 +808,7 @@
     const mailDescription = derived(() => {
       const current = mail()
       if (!current) return ''
-      if (!current.configured) return 'Emails are written to the log, not sent. Set MAIL_MAILER and its settings in .env to send them.'
+      if (!current.configured) return 'Emails are written to the log, not sent: no mail service is set up on this machine. The self-hosting guide shows how to add one.'
       return current.from ? `Sent through ${current.driver} as ${current.from}.` : `Sent through ${current.driver}.`
     })
     const loadMail = async (): Promise<void> => {

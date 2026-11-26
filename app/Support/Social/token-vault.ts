@@ -23,7 +23,9 @@ export function isSealed(value: unknown): value is string {
 
 function requireKey(): void {
   if (!String(process.env.APP_KEY || '').trim()) {
-    throw new Error('APP_KEY is not set, so network tokens cannot be stored or read. Run `./buddy key:generate`.')
+    // Shown in Channels, so it names the fix rather than the variable; the
+    // key itself is described in docs/self-hosting.md.
+    throw new Error('This Postline has no encryption key yet, so it cannot save network sign-ins. On the machine it runs on, run `./buddy key:generate`, then connect again.')
   }
 }
 
@@ -53,6 +55,6 @@ export async function openToken(value: string | null | undefined): Promise<strin
     // Sealed with a key this install no longer has. The account has to be
     // reconnected; returning the ciphertext as if it were a token would send
     // it to a network.
-    throw new Error('A stored network token could not be read with the current APP_KEY. Reconnect the account.')
+    throw new Error('A saved sign-in for this account could not be read: the encryption key changed after it was saved. Reconnect the account in Channels.')
   }
 }

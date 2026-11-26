@@ -158,7 +158,7 @@ export class BlueskyService {
     const identifier = String(env.BLUESKY_IDENTIFIER || '').trim()
     const password = String(env.BLUESKY_APP_PASSWORD || '').trim()
     if (!identifier || !password) {
-      throw new Error('Set BLUESKY_IDENTIFIER and BLUESKY_APP_PASSWORD before using Bluesky.')
+      throw new Error('Connect Bluesky in Channels first.')
     }
 
     return await this.connect(identifier, password, options)

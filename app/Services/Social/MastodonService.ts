@@ -107,7 +107,7 @@ export class MastodonService {
   async connectFromEnv(options: { revive?: boolean } = {}) {
     const cfg = this.config()
     if (!cfg.instance || !cfg.accessToken)
-      throw new Error('Set MASTODON_INSTANCE_URL and MASTODON_ACCESS_TOKEN, or connect on the Accounts page.')
+      throw new Error('Connect Mastodon in Channels first.')
     return this.connect(cfg, options)
   }
 

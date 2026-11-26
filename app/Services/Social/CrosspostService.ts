@@ -423,7 +423,7 @@ export class CrosspostService {
     if (!(await this.mayShareMedia())) {
       return {
         ok: false,
-        error: `${name} fetches images from an address on the internet, and this Postline has none. Turn on "Share images through a temporary link" in Settings, General, or set STORAGE_PUBLIC_URL to a public address that serves Postline.`,
+        error: `${name} fetches images from an address on the internet, and this Postline has none. Turn on "Share images through a temporary link" in Settings, General, or give Postline a public web address (the self-hosting guide shows how).`,
       }
     }
 
@@ -433,7 +433,7 @@ export class CrosspostService {
       share = await this.shareMedia(needing.map(item => ({ bytes: item.bytes!, mimeType: item.mimeType || 'image/jpeg' })))
     }
     catch (error) {
-      return { ok: false, error: `${error instanceof Error ? error.message : String(error)} Try again, or set STORAGE_PUBLIC_URL to a public address that serves Postline.` }
+      return { ok: false, error: `${error instanceof Error ? error.message : String(error)} Try again, or give Postline a public web address (the self-hosting guide shows how).` }
     }
     let next = 0
     return {

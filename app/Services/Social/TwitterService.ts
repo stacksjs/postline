@@ -173,7 +173,7 @@ export class TwitterService {
   async connectFromEnv(options: { revive?: boolean } = {}) {
     const cfg = (await this.config())
     if (!cfg.accessToken) {
-      throw new Error('Set TWITTER_ACCESS_TOKEN (or connect via OAuth) before using X/Twitter.')
+      throw new Error('Connect X in Channels first.')
     }
 
     const profile = await this.driver.getProfile(cfg.accessToken)

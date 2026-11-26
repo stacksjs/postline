@@ -205,7 +205,7 @@ export class LinkedInService {
   async connectFromEnv(options: { revive?: boolean } = {}) {
     const cfg = (await this.config())
     if (!cfg.accessToken) {
-      throw new Error('Set LINKEDIN_ACCESS_TOKEN (or connect via OAuth) before using LinkedIn.')
+      throw new Error('Connect LinkedIn in Channels first.')
     }
 
     let authorUrn = cfg.authorUrn

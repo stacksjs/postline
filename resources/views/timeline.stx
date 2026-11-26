@@ -7,12 +7,12 @@
 @endsection
 
 @section('content')
-  @meta('description', 'Read connected social timelines from Postline.')
+  @meta('description', 'Read your Bluesky home timeline in Postline.')
   <section class="grid gap-4" data-postline-page="timeline" data-testid="timeline-page">
     <header class="flex flex-col gap-4 items-stretch justify-between sm:flex-row sm:items-center min-h-11">
       <div>
         <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Timeline</p>
-        <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Home feed</h1>
+        <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Bluesky timeline</h1>
         <p class="mb-0 mt-1.5 text-muted text-ui">Posts from your connected Bluesky account.</p>
       </div>
       <div class="grid sm:flex gap-2 grid-cols-2 items-center">
@@ -51,7 +51,10 @@
 
         <p class="postline-feed__empty" x-show="feedError()" :text="feedError()"></p>
         <p class="postline-feed__empty" x-show="showEmpty()">No posts in your feed yet. Publish from the composer or refresh again.</p>
-        <p class="postline-feed__empty" x-show="notConnected()">Connect a Bluesky account under Settings, Channels to read your timeline here.</p>
+        <p class="postline-feed__empty" x-show="notConnected()">
+          Your Bluesky home timeline shows here once an account is connected.
+          <a class="block mt-2 font-semibold text-ink underline" href="/accounts" data-stx-link>Connect Bluesky</a>
+        </p>
 
         <article class="postline-feed-post" x-for="item in items()">
           <div class="postline-feed-post__layout">

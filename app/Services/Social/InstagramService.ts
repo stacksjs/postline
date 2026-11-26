@@ -197,7 +197,7 @@ export class InstagramService {
   async connectFromEnv(options: { revive?: boolean } = {}) {
     const cfg = (await this.config())
     if (!cfg.accessToken) {
-      throw new Error('Set INSTAGRAM_ACCESS_TOKEN (or connect via OAuth) before using Instagram.')
+      throw new Error('Connect Instagram in Channels first.')
     }
 
     let igUserId = cfg.userId

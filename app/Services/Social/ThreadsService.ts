@@ -190,7 +190,7 @@ export class ThreadsService {
   async connectFromEnv(options: { revive?: boolean } = {}) {
     const cfg = (await this.config())
     if (!cfg.accessToken) {
-      throw new Error('Set THREADS_ACCESS_TOKEN (or connect via OAuth) before using Threads.')
+      throw new Error('Connect Threads in Channels first.')
     }
 
     let threadsUserId = cfg.userId

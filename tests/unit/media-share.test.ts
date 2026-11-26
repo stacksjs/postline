@@ -103,7 +103,8 @@ describe('at publish, for a network that fetches images from an address', () => 
 
     expect(result!.ok).toBe(false)
     expect(result!.error).toContain('Share images through a temporary link')
-    expect(result!.error).toContain('STORAGE_PUBLIC_URL')
+    expect(result!.error).toContain('public web address')
+    expect(result!.error).not.toMatch(/\b[A-Z]+_[A-Z_]{3,}\b/)
     expect(result!.retry).toEqual({ kind: 'permanent' })
     expect(seen).toEqual([])
     expect(log).toEqual([])
