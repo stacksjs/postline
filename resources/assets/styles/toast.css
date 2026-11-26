@@ -21,8 +21,8 @@
   opacity: 0;
   transform: translate3d(0, 14px, 0) scale(0.97);
   transition:
-    opacity 280ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity var(--duration-slow, 180ms) var(--ease-out, ease-out),
+    transform var(--duration-slow, 180ms) var(--ease-out, ease-out);
   will-change: opacity, transform;
 }
 
@@ -34,7 +34,7 @@
 .postline-toast.is-leaving {
   opacity: 0;
   transform: translate3d(0, 8px, 0) scale(0.98);
-  transition-duration: 200ms;
+  transition-duration: var(--duration, 150ms);
 }
 
 .postline-toast--success {

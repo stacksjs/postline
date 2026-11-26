@@ -259,6 +259,36 @@ const DARK_OVERRIDES: string = overriding(`
 `)
 
 /** App shell: sidebar collapse animation, native-window chrome, focus rings. */
+/**
+ * Motion (#152): three durations for everything that moves, and one guard.
+ *
+ * With reduced motion asked for, nothing moves but opacity: animations run a
+ * single imperceptible frame (a spinner stands still), transitions keep only
+ * their fade, the press-down nudge and view transitions are off, and smooth
+ * scrolling jumps. It is one rule here instead of a guard in each stylesheet,
+ * so a new animation is covered without anyone remembering to. !important
+ * because utilities are unlayered and these preflights are not.
+ */
+const MOTION: string = `
+:root {
+  --duration-fast: 120ms;
+  --duration: 150ms;
+  --duration-slow: 180ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--duration-slow); animation-timing-function: var(--ease-out); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-property: opacity !important;
+    scroll-behavior: auto !important;
+  }
+  [class*="active:translate"]:active, [class*="active:scale"]:active { transform: none !important; translate: none !important; scale: none !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+`
+
 const APP_SHELL: string = `
 @property --postline-sidebar-width {
   syntax: '<length>';
@@ -609,6 +639,7 @@ export default {
     ...(defaultConfig.preflights ?? []),
     { getCSS: (): string => TOKENS },
     { getCSS: (): string => DARK_OVERRIDES },
+    { getCSS: (): string => MOTION },
     { getCSS: (): string => APP_SHELL },
     { getCSS: (): string => APP_UI },
     { getCSS: (): string => QUEUE_STATUS },

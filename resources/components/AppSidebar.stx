@@ -61,12 +61,12 @@ const settingsActive = currentPath === '/accounts' || currentPath === '/settings
     </a>
   </nav>
 
-  <aside class="hidden lg:flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[68px] px-5 h-screen min-w-0 bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-200 ease-out transition-[width,padding]" aria-label="Postline" data-postline-sidebar data-window-drag-region>
+  <aside class="hidden lg:flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[68px] px-5 h-screen min-w-0 bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-150 ease-out transition-[width,padding]" aria-label="Postline" data-postline-sidebar data-window-drag-region>
     <div class="absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_45%,rgba(226,226,222,0.16)_100%)] pointer-events-none"></div>
     <div class="flex absolute right-5 top-3.5 z-20 items-center min-h-7" data-shell-controls-row>
       <div class="flex gap-1.5 items-center">
-        <button class="inline-flex items-center justify-center h-8 w-8 text-muted hover:text-ink bg-glass hover:bg-raised border border-line rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus shadow-sm duration-200 transition-all" type="button" aria-label="Collapse sidebar" aria-expanded="true" data-sidebar-collapse data-no-window-drag>
-          <span class="h-[18px] w-[18px] duration-200 transition-transform i-hugeicons-sidebar-left" data-sidebar-collapse-icon aria-hidden="true"></span>
+        <button class="inline-flex items-center justify-center h-8 w-8 text-muted hover:text-ink bg-glass hover:bg-raised border border-line rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus shadow-sm duration-150 transition-all" type="button" aria-label="Collapse sidebar" aria-expanded="true" data-sidebar-collapse data-no-window-drag>
+          <span class="h-[18px] w-[18px] duration-150 transition-transform i-hugeicons-sidebar-left" data-sidebar-collapse-icon aria-hidden="true"></span>
         </button>
         <button class="flex hidden items-center justify-center h-7 w-7 text-muted hover:text-ink hover:bg-glass-hover rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors" type="button" aria-label="Go back" data-shell-back data-native-shell-control>
           <span class="h-5 w-5 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
