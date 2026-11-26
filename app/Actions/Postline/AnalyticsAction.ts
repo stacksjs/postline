@@ -3,7 +3,7 @@ import { db } from '@stacksjs/database'
 import { response } from '@stacksjs/router'
 import { workspace } from '../../Services/WorkspaceService'
 import { actionFailure } from '../../Support/Http/action-error'
-import { hourInZone } from '../../Support/time'
+import { summarizeEngagement } from '../../Support/Social/engagement-analytics'
 
 const database = db as any
 
@@ -25,14 +25,17 @@ export default new Action({
 
   async handle() {
     try {
-      const since = new Date(Date.now() - 30 * DAY_MS)
+      const now = Date.now()
+      const since = new Date(now - 29 * DAY_MS)
       const sinceKey = `${dayKey(since)} 00:00:00`
+      const untilKey = new Date(now).toISOString().slice(0, 19).replace('T', ' ')
 
       const posts = await database
         .selectFrom('posts')
         .select(['id', 'published_at'])
         .where('status', '=', 'published')
         .where('published_at', '>=', sinceKey)
+        .where('published_at', '<=', untilKey)
         .execute()
 
       // The same thirty days as the chart: channel mix, posting windows and
@@ -43,6 +46,7 @@ export default new Action({
         .select(['provider', 'status', 'created_at', 'metrics'])
         .where('status', '=', 'published')
         .where('created_at', '>=', sinceKey)
+        .where('created_at', '<=', untilKey)
         .execute()
 
       // Posts published per day over the last 30 days (gaps filled with 0).
@@ -53,15 +57,15 @@ export default new Action({
       }
       const series: Array<{ label: string, value: number }> = []
       for (let offset = 29; offset >= 0; offset--) {
-        const date = new Date(Date.now() - offset * DAY_MS)
+        const date = new Date(now - offset * DAY_MS)
         series.push({
           label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }),
           value: byDay.get(dayKey(date)) || 0,
         })
       }
 
-      const weekAgo = Date.now() - 7 * DAY_MS
-      const twoWeeksAgo = Date.now() - 14 * DAY_MS
+      const weekAgo = now - 7 * DAY_MS
+      const twoWeeksAgo = now - 14 * DAY_MS
       let postsThisWeek = 0
       let postsLastWeek = 0
       for (const post of posts) {
@@ -84,35 +88,8 @@ export default new Action({
           share: totalTargets ? Math.round((count / totalTargets) * 100) : 0,
         }))
 
-      // Publish-hour histogram, in the workspace's time zone, so "best time"
-      // is an hour on the owner's clock and agrees with the calendar. Uses
-      // created_at: metric syncs bump updated_at, which would skew it.
       const timezone = await workspace.timezone()
-      const byHour = new Map<number, number>()
-      for (const target of targets) {
-        const date = parseUtc(target.created_at)
-        if (!date) continue
-        const hour = hourInZone(date, timezone)
-        byHour.set(hour, (byHour.get(hour) || 0) + 1)
-      }
-      const windows = [...byHour.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-        .map(([hour, count]) => ({ hour, count }))
-
-      // Engagement totals from synced post_targets.metrics.
-      const engagement = { likes: 0, reposts: 0, replies: 0, syncedTargets: 0 }
-      for (const target of targets) {
-        if (!target.metrics) continue
-        try {
-          const metrics = JSON.parse(String(target.metrics))
-          engagement.likes += Number(metrics.likes) || 0
-          engagement.reposts += Number(metrics.reposts) || 0
-          engagement.replies += Number(metrics.replies) || 0
-          engagement.syncedTargets += 1
-        }
-        catch {}
-      }
+      const { engagement, providers, minSample, bestChannel, bestHour, windows } = summarizeEngagement(targets, timezone)
 
       return response.json({
         ok: true,
@@ -120,9 +97,10 @@ export default new Action({
           stats: {
             postsThisWeek,
             postsLastWeek,
-            bestChannel: channelMix[0] || null,
-            bestHour: windows[0] || null,
-            engagement,
+            bestChannel,
+            bestHour,
+            engagement: { ...engagement, providers },
+            minSample,
           },
           series,
           channelMix,
