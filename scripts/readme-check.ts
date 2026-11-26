@@ -34,13 +34,19 @@ const origin = `http://127.0.0.1:${port}`
 const finished = new AbortController()
 async function checkStartup(): Promise<void> {
   const deadline = Date.now() + 120_000
+  let loginReady = false
   while (!finished.signal.aborted && Date.now() < deadline) {
+    if (!loginReady) {
+      const login = await fetch(`${origin}/login`, { signal: AbortSignal.timeout(20_000) }).catch(() => null)
+      if (login?.ok) {
+        if (!(await login.text()).includes('Create the workspace account'))
+          throw new Error('The fresh workspace did not show first-run registration.')
+        loginReady = true
+      }
+    }
     const health = await fetch(`${origin}/api/postline/health`, { signal: AbortSignal.timeout(3000) })
       .then(async response => response.ok ? response.json() : null).catch(() => null)
-    if (health?.database === 'ok' && health?.migrations === 'ok' && health?.scheduler === 'ok') {
-      const login = await fetch(`${origin}/login`, { signal: AbortSignal.timeout(5000) })
-      if (!login.ok || !(await login.text()).includes('Create the workspace account'))
-        throw new Error('The fresh workspace did not show first-run registration.')
+    if (loginReady && health?.database === 'ok' && health?.migrations === 'ok' && health?.scheduler === 'ok') {
       console.log('The README started a fresh workspace with a migrated database and a live scheduler.')
       return
     }
