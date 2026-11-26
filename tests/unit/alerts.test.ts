@@ -2,7 +2,7 @@ import type { ProviderPublisher } from '../../app/Services/Social/CrosspostServi
 import type { CrosspostTargetResult } from '../../app/Support/Social/types'
 import { describe, expect, test } from 'bun:test'
 import { db } from '@stacksjs/database'
-import { alerts, AlertService } from '../../app/Services/AlertService'
+import { alerts, AlertService, mailIsSetUp } from '../../app/Services/AlertService'
 import { CrosspostService } from '../../app/Services/Social/CrosspostService'
 import { QueueService } from '../../app/Services/Social/QueueService'
 
@@ -13,6 +13,30 @@ async function titlesFor(key: string): Promise<string[]> {
 }
 
 describe('raising an alert', () => {
+  test('an alert is emailed once, and an email that fails does not lose it', async () => {
+    const emailed: string[] = []
+    const service = new AlertService(async () => {}, () => '', async (alert) => { emailed.push(alert.title) })
+    const key = `test:${crypto.randomUUID()}`
+    await service.raise({ kind: 'account-expired', title: 'LinkedIn needs you to sign in again', key })
+    await service.raise({ kind: 'account-expired', title: 'LinkedIn needs you to sign in again', key })
+    expect(emailed).toEqual(['LinkedIn needs you to sign in again'])
+
+    const failing = new AlertService(async () => {}, () => '', async () => { throw new Error('smtp down') })
+    const other = `test:${crypto.randomUUID()}`
+    expect(await failing.raise({ kind: 'post-failed', title: 'Still recorded', key: other })).toBe(true)
+    expect(await titlesFor(other)).toEqual(['Still recorded'])
+  })
+
+  test('mail counts as set up only when it leaves', () => {
+    expect(mailIsSetUp('log')).toBe(false)
+    expect(mailIsSetUp('capture')).toBe(false)
+    expect(mailIsSetUp('')).toBe(false)
+    // The suite runs with the log mailer (tests/isolate-database.ts).
+    expect(mailIsSetUp()).toBe(false)
+    expect(mailIsSetUp('smtp')).toBe(true)
+    expect(mailIsSetUp('ses')).toBe(true)
+  })
+
   test('the same thing noticed twice is one alert, and one webhook call', async () => {
     const sent: Array<Record<string, unknown>> = []
     const service = new AlertService(async (_url, payload) => { sent.push(payload) }, () => 'https://hooks.example.com/x')

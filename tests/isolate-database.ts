@@ -72,6 +72,10 @@ process.env.POSTLINE_BLOG_DIR = blogDir
 // Images attached to queued posts, too: tests store and delete them, and the
 // project's own storage/app/postline-media is the developer's.
 process.env.POSTLINE_MEDIA_DIR = join(tmpdir(), `postline-test-media-${process.pid}-${Date.now()}`)
+// Mail goes nowhere. A developer's `.env` may name a real mailer, and the
+// suite raises alerts, which are emailed to the owner when mail is set up.
+process.env.MAIL_MAILER = 'log'
+process.env.MAIL_DRIVER = 'log'
 // Stacks' `bootTestEnvironment()` (called from tests/setup.ts) makes an empty
 // throwaway database of its own unless told one is already configured. This
 // one is, and is migrated, so it keeps it. The path also tells the framework's

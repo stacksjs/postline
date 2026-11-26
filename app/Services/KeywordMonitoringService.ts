@@ -1,4 +1,5 @@
 import { db } from '@stacksjs/database'
+import { alerts } from './AlertService'
 import { isUsableIdentity } from '../Support/Social/accounts'
 import { stripHtml } from '../Support/Social/text'
 import { findIdentityRow } from './Social/identities'
@@ -312,6 +313,7 @@ export class KeywordMonitoringService {
         }
       }
 
+      const fresh: MentionCandidate[] = []
       for (const candidate of candidates) {
         found++
         const existing = await database.selectFrom('keyword_mentions').select(['id']).where('keyword_monitor_id', '=', monitor.id).where('provider', '=', candidate.provider).where('remote_uri', '=', candidate.remoteUri).executeTakeFirst()
@@ -332,6 +334,21 @@ export class KeywordMonitoringService {
           updated_at: now(),
         }).execute()
         created++
+        fresh.push(candidate)
+      }
+
+      // One alert per scan that found something, not one per mention: a busy
+      // keyword should not bury the owner (#112).
+      if (fresh.length) {
+        const name = String(monitor.name || keywords.join(', ')).slice(0, 80)
+        const first = fresh[0]!
+        await alerts.raise({
+          kind: 'keyword-match',
+          title: fresh.length === 1 ? `New mention of ${name}` : `${fresh.length} new mentions of ${name}`,
+          body: `@${first.authorHandle}: ${first.body}`.slice(0, 280),
+          link: '/listening',
+          key: `keyword:${monitor.id}:${first.provider}:${first.remoteUri}`,
+        })
       }
 
       const monitorErrors = errors.filter(error => error.monitorId === Number(monitor.id))

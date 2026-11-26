@@ -62,6 +62,8 @@
     <script type="module" src="/assets/scripts/social.ts"></script>
     <script type="module" src="/assets/scripts/richtext.ts"></script>
     <script type="module" src="/assets/scripts/analytics.ts"></script>
+    {{-- Alerts as Mac notifications and a dock badge; does nothing in a browser. --}}
+    <script type="module" src="/assets/scripts/desktop-alerts.ts"></script>
     <script>
       ;(() => {
         const syncSidebarCollapse = (collapsed) => {

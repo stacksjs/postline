@@ -3,19 +3,22 @@
  *
  * A failed post or a refused sign-in used to be visible only to someone
  * looking at the right page. Each is now kept as an alert the app shows until
- * it is read, and sent to a webhook when one is configured
+ * it is read (and the Mac app raises as a notification), emailed to the owner
+ * when mail is set up, and sent to a webhook when one is configured
  * (`POSTLINE_ALERT_WEBHOOK_URL`), so it reaches the owner with the app closed.
  *
  * Raising an alert must never break what raised it: a webhook that is down
  * cannot be allowed to fail a publish.
  */
 import process from 'node:process'
+import { config } from '@stacksjs/config'
 import { db } from '@stacksjs/database'
+import { mail, template } from '@stacksjs/email'
 import { log } from '@stacksjs/logging'
 
 const database = db as any
 
-export type AlertKind = 'post-failed' | 'post-missed' | 'account-expired'
+export type AlertKind = 'post-failed' | 'post-missed' | 'account-expired' | 'keyword-match'
 
 export interface AlertInput {
   kind: AlertKind
@@ -38,6 +41,43 @@ export interface AlertView {
 }
 
 type Send = (url: string, payload: Record<string, unknown>) => Promise<void>
+type Mailer = (alert: AlertInput) => Promise<void>
+
+/** Whether mail actually leaves: the `log` and `capture` mailers only pretend to send. */
+export function mailIsSetUp(driver: unknown = config.email?.default): boolean {
+  const name = String(driver || 'log')
+  return name !== 'log' && name !== 'capture'
+}
+
+/** The app's address with a scheme, for the link in an alert email. */
+function appUrl(): string {
+  const raw = String(config.app?.url || '').trim().replace(/\/+$/, '')
+  return !raw ? '' : /^https?:\/\//.test(raw) ? raw : `https://${raw}`
+}
+
+/**
+ * Email the alert to the workspace owner. Silent when mail is not set up, so
+ * an install without a mailer behaves as before; `POSTLINE_ALERT_EMAIL=off`
+ * stops it where mail is set up for other reasons.
+ */
+const emailOwner: Mailer = async (alert) => {
+  if (!mailIsSetUp() || String(process.env.POSTLINE_ALERT_EMAIL || '').trim().toLowerCase() === 'off') return
+  const owner = await database.selectFrom('users').select(['email']).orderBy('id', 'asc').executeTakeFirst()
+  if (!owner?.email) return
+  const appName = String(config.app?.name || 'Postline')
+  const link = alert.link && appUrl() ? `${appUrl()}${alert.link}` : appUrl()
+  const { html, text } = await template('alert', {
+    variables: { title: alert.title, body: alert.body || '', link, appName, appUrl: appUrl(), year: new Date().getFullYear() },
+    subject: alert.title,
+  })
+  await mail.sendOrFail({
+    to: [String(owner.email)],
+    from: { name: config.email?.from?.name || appName, address: String(config.email?.from?.address || '') },
+    subject: `${appName}: ${alert.title}`,
+    html,
+    text,
+  })
+}
 
 function stamp(): string {
   return new Date().toISOString().slice(0, 19).replace('T', ' ')
@@ -56,7 +96,11 @@ const postJson: Send = async (url, payload) => {
 }
 
 export class AlertService {
-  constructor(private readonly send: Send = postJson, private readonly webhookUrl: () => string = () => String(process.env.POSTLINE_ALERT_WEBHOOK_URL || '').trim()) {}
+  constructor(
+    private readonly send: Send = postJson,
+    private readonly webhookUrl: () => string = () => String(process.env.POSTLINE_ALERT_WEBHOOK_URL || '').trim(),
+    private readonly email: Mailer = emailOwner,
+  ) {}
 
   /** Record an alert once and pass it on. Returns false when it was already raised. */
   async raise(input: AlertInput): Promise<boolean> {
@@ -81,6 +125,13 @@ export class AlertService {
       if (/unique/i.test(String(error))) return false
       log.warn(`[postline] could not record an alert (${input.title}): ${error instanceof Error ? error.message : String(error)}`)
       return false
+    }
+
+    try {
+      await this.email(input)
+    }
+    catch (error) {
+      log.warn(`[postline] the alert email for "${input.title}" was not sent: ${error instanceof Error ? error.message : String(error)}`)
     }
 
     const url = this.webhookUrl()

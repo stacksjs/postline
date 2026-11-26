@@ -28,7 +28,7 @@ export default defineModel({
     kind: {
       required: true,
       fillable: true,
-      validation: { rule: schema.enum(['post-failed', 'post-missed', 'account-expired']).required() },
+      validation: { rule: schema.enum(['post-failed', 'post-missed', 'account-expired', 'keyword-match']).required() },
       factory: () => 'post-failed',
     },
     title: {

@@ -1,0 +1,37 @@
+<script server>
+// An alert for the workspace owner (#112): a post that failed or was missed,
+// a network sign-in that was refused, a new mention on a Listening rule. Sent
+// only when mail is set up; the same alert is in the app until it is read.
+const title = props.title || 'Something in Postline needs you'
+const body = props.body || ''
+const link = props.link || ''
+const appName = props.appName || 'Postline'
+const appUrl = props.appUrl || ''
+const year = props.year || new Date().getFullYear()
+const postalAddress = String(process.env.MAIL_POSTAL_ADDRESS || '').trim()
+</script>
+
+<EmailLayout title="{{ title }}" preheader="{{ body }}" brand="{{ appName }}" brandUrl="{{ appUrl }}" accent="#0a0a0b">
+  <EmailText size="heading">{{ title }}</EmailText>
+  @if (body)
+    <EmailText>{{ body }}</EmailText>
+  @endif
+
+  @if (link)
+    <EmailButton href="{{ link }}" bg="#0a0a0b">Open {{ appName }}</EmailButton>
+  @endif
+
+  <EmailDivider />
+  <EmailText size="sm" spacing="0">{{ appName }} sends these to the account that owns this workspace. Set POSTLINE_ALERT_EMAIL=off to stop them.</EmailText>
+
+  <template #footer>
+    <tr>
+      <td class="email-muted" style="padding:16px 40px 20px;border-top:1px solid #e4e4e7;color:#a1a1aa;font-size:11px;text-align:center;">
+        &copy; {{ year }} {{ appName }}
+        @if (postalAddress)
+          <br>{{ postalAddress }}
+        @endif
+      </td>
+    </tr>
+  </template>
+</EmailLayout>
