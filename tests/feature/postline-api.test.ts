@@ -91,6 +91,24 @@ describe('postline api — reads', () => {
     expect(Array.isArray(body.data.items)).toBe(true)
   })
 
+  test('calendar dates find older scheduled and published posts past the first list page', async () => {
+    const providers = ['bluesky']
+    const scheduled = await postQueue.save({ text: 'Calendar fixture', providers, scheduledAt: '2099-04-02 15:00:00' })
+    const published = await postQueue.save({ text: 'Calendar history fixture', providers })
+    const database = db as any
+    await database.updateTable('posts').set({ status: 'published', published_at: '2099-04-03 00:00:00' }).where('id', '=', published.postId).execute()
+    for (let index = 0; index < 51; index++)
+      await postQueue.save({ text: `Later draft ${index}`, providers })
+
+    const client = featureTest().actingAs(await actingUser())
+    const response = await client.get('/api/postline/queue?calendar_from=2099-04-01&calendar_to=2099-04-08')
+    response.assertStatus(200)
+    const result = await response.json<{ data: { items: Array<{ id: number }> } }>()
+    expect(result.data.items.map(item => item.id)).toEqual([published.postId, scheduled.postId])
+    const malformed = await client.get('/api/postline/queue?calendar_from=2099-04-01&calendar_to=2099-05-08')
+    malformed.assertStatus(422)
+  })
+
   test('post search pages across statuses and matches titles, shared text and variants literally', async () => {
     const database = db as any
     const tag = `Launch!%_${crypto.randomUUID()}`

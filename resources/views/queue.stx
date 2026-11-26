@@ -125,19 +125,27 @@
     </section>
 
     <section class="bg-panel border border-line rounded-2xl shadow-sm" x-cloak x-show="!activeSearch() && view() === 'calendar'">
-      <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
+      <header class="flex flex-wrap gap-3 items-center justify-between p-3.5 border-b border-line">
         <div class="flex gap-2 items-center">
-          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Previous month" @click="prevMonth">
+          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" :aria-label="'Previous ' + calendarPeriod()" @click="shiftCalendar(-1)">
             <span class="h-4 w-4 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
           </button>
           <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" @click="goToday">Today</button>
-          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Next month" @click="nextMonth">
+          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" :aria-label="'Next ' + calendarPeriod()" @click="shiftCalendar(1)">
             <span class="h-4 w-4 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
           </button>
         </div>
-        <strong class="text-ui" :text="calTitle()">Calendar</strong>
+        <strong class="text-ui" aria-live="polite" :text="calTitle()">Calendar</strong>
+        <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Calendar period">
+          <button class="px-3 py-1.5 font-semibold text-xs rounded-lg" type="button" data-view-toggle :data-active="calendarPeriod() === 'month'" :aria-pressed="calendarPeriod() === 'month'" @click="calendarPeriod.set('month')">Month</button>
+          <button class="px-3 py-1.5 font-semibold text-xs rounded-lg" type="button" data-view-toggle :data-active="calendarPeriod() === 'week'" :aria-pressed="calendarPeriod() === 'week'" @click="calendarPeriod.set('week')">Week</button>
+        </div>
       </header>
-      <div class="sm:hidden divide-line divide-y" aria-label="Monthly agenda" role="list">
+      <div class="flex gap-2 items-center px-3.5 py-2" x-show="calendarBusy() || calendarError()">
+        <p class="m-0 text-muted text-ui" role="status" :text="calendarBusy() ? 'Loading calendar…' : calendarError()"></p>
+        <button class="px-2 py-1 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg" type="button" x-show="calendarError()" @click="loadCalendar">Retry</button>
+      </div>
+      <div class="sm:hidden divide-line divide-y" :aria-label="calendarPeriod() === 'week' ? 'Weekly agenda' : 'Monthly agenda'" role="list">
         <article class="grid gap-2 px-3 py-2" role="listitem" x-for="day in calDays()" :key="day.key">
           <header class="flex gap-3 items-center justify-between">
             <time class="font-semibold text-ui" :datetime="day.key" :aria-current="day.isToday ? 'date' : null" :text="day.label"></time>
@@ -162,13 +170,13 @@
             <div class="p-2 text-center">Sun</div><div class="p-2 text-center">Mon</div><div class="p-2 text-center">Tue</div><div class="p-2 text-center">Wed</div><div class="p-2 text-center">Thu</div><div class="p-2 text-center">Fri</div><div class="p-2 text-center">Sat</div>
           </div>
           <div class="grid grid-cols-7">
-            <div class="grid content-start gap-1 p-1.5 min-h-24 border-b border-line border-r" data-cal-cell :data-blank="cell.blank" :data-today="cell.isToday" x-for="cell in calCells()">
+            <div class="grid content-start gap-1 p-1.5 min-h-24 border-b border-line border-r data-[drop-target=true]:ring-2 data-[drop-target=true]:ring-focus data-[drop-target=true]:ring-inset" data-cal-cell :data-blank="cell.blank" :data-today="cell.isToday" :data-calendar-date="cell.blank ? null : cell.key" :data-drop-target="!cell.blank && dropDay() === cell.key" x-for="cell in calCells()" :key="cell.key" @dragover="allowCalendarDrop($event, cell)" @drop="dropOnCalendar($event, cell)">
               <a class="font-semibold text-xs hover:text-ink transition-colors" data-cal-day x-show="!cell.blank" :href="cell.scheduleUrl" data-stx-link title="Schedule a post on this day">{{ cell.day }}</a>
-              <a class="flex gap-1 items-center px-1 py-0.5 text-body text-xs bg-panel-2 hover:bg-panel-2 rounded transition-colors" x-for="chip in cell.chips.slice(0, 3)" :href="chip.href" data-stx-link>
-                <span class="shrink-0 h-1.5 w-1.5 rounded-full" data-cal-dot :data-status="chip.status"></span>
+              <a class="flex gap-1 items-center px-1 py-0.5 text-body text-xs bg-panel-2 hover:bg-panel-2 rounded transition-colors" x-for="chip in cell.chips" :key="chip.id" :href="chip.href" :draggable="chip.schedule ? 'true' : 'false'" @dragstart="startCalendarDrag($event, chip.schedule)" @dragend="endCalendarDrag" data-stx-link>
+                <span class="shrink-0 h-1.5 w-1.5 rounded-full" data-cal-dot :data-status="chip.status" aria-hidden="true"></span>
                 <span class="truncate">{{ chip.time }} {{ chip.label }}</span>
               </a>
-              <span class="px-1 text-muted text-xs" x-show="cell.chips.length > 3" :text="`+${cell.chips.length - 3} more`"></span>
+              <button class="px-1 text-left text-muted text-xs hover:text-ink" type="button" x-show="cell.more" :text="'+' + cell.more + ' more'" :aria-label="'Show all posts on ' + cell.label" @click="showCalendarWeek(cell.key)"></button>
             </div>
           </div>
         </div>
@@ -273,18 +281,21 @@
     // laptop travelling with its owner shows the same calendar (#106).
     // Undefined until loaded: Intl then uses the browser's zone.
     const zone = state<string | undefined>(undefined)
+    const zoneReady = state(false)
 
     /** A moment's calendar date in the workspace zone, as YYYY-MM-DD. */
     function dayKey(date: Date): string {
       return new Intl.DateTimeFormat('en-CA', { timeZone: zone(), year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
     }
 
-    function monthOf(date: Date): { year: number, month: number } {
-      const [year, month] = dayKey(date).split('-').map(Number)
-      return { year, month: month - 1 }
-    }
-
-    const calMonth = state(monthOf(new Date()))
+    const calAnchor = state(dayKey(new Date()))
+    const calendarPeriod = useLocalStorage('postline.queue.calendar-period', 'month')
+    const calendarItems = state<QueueApiItem[]>([])
+    const calendarBusy = state(false)
+    const calendarError = state('')
+    const draggedPost = state<ScheduledSelection | null>(null)
+    const dropDay = state('')
+    let calendarRequest: AbortController | undefined
 
     // A fresh key, not the legacy 'postline.queue.view': useLocalStorage
     // JSON.parses whatever is already stored, and the old value was a bare
@@ -460,56 +471,76 @@
       return `${n} ${activeSearch() ? 'matching ' : ''}post${n === 1 ? '' : 's'}${activeSearch() && nextCursor() ? ' shown' : ''}`
     })
 
-    const calTitle = derived(() =>
-      new Date(Date.UTC(calMonth().year, calMonth().month, 1)).toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' }))
+    const utcDate = (day: string): Date => new Date(`${day}T00:00:00Z`)
+    const utcKey = (date: Date): string => date.toISOString().slice(0, 10)
+    function calendarDay(date: Date, shift: number): Date {
+      const next = new Date(date.getTime())
+      next.setUTCDate(next.getUTCDate() + shift)
+      return next
+    }
 
-    /**
-     * The month grid as plain data. Derived rather than painted, so changing
-     * month or reloading the queue rebuilds it with no manual repaint call.
-     */
+    const calRange = derived(() => {
+      const anchor = utcDate(calAnchor())
+      if (calendarPeriod() === 'week') return { start: calendarDay(anchor, -anchor.getUTCDay()), days: 7 }
+      const year = anchor.getUTCFullYear()
+      const month = anchor.getUTCMonth()
+      return { start: new Date(Date.UTC(year, month, 1)), days: new Date(Date.UTC(year, month + 1, 0)).getUTCDate() }
+    })
     const agendaDateFormat = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+    const weekDateFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+    const calTitle = derived(() => {
+      const { start, days } = calRange()
+      if (calendarPeriod() === 'week') return weekDateFormat.formatRange(start, calendarDay(start, days - 1))
+      return start.toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' })
+    })
 
     const calDays = derived(() => {
-      const { year, month } = calMonth()
-      const byDay = new Map()
-      for (const row of rows()) {
+      const { start, days } = calRange()
+      const byDay = new Map<string, Array<{ row: QueueRow, date: Date }>>()
+      for (const item of calendarItems()) {
+        const row = toRow(item)
         const date = parseUtc(row.scheduledAt || row.publishedAt)
         if (!date) continue
         const key = dayKey(date)
-        if (!byDay.has(key)) byDay.set(key, [])
-        byDay.get(key).push({ row, date })
+        const posts = byDay.get(key) ?? []
+        posts.push({ row, date })
+        byDay.set(key, posts)
       }
 
-      const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
       const todayKey = dayKey(new Date())
-      return Array.from({ length: daysInMonth }, (_, index) => {
-        const day = index + 1
-        const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-        const dayItems = (byDay.get(key) || []).sort((a, b) => a.date - b.date)
+      return Array.from({ length: days }, (_, index) => {
+        const at = calendarDay(start, index)
+        const key = utcKey(at)
+        const dayItems = (byDay.get(key) ?? []).sort((a, b) => a.date.getTime() - b.date.getTime())
         return {
           blank: false,
-          day,
+          day: at.getUTCDate(),
           key,
-          label: agendaDateFormat.format(new Date(Date.UTC(year, month, day))),
+          label: agendaDateFormat.format(at),
           isToday: key === todayKey,
           scheduleUrl: `/composer?schedule=${key}`,
           chips: dayItems.map(({ row, date }) => ({
+            id: row.id,
             status: row.status,
             href: row.actionable ? row.editUrl : row.liveUrl || row.editUrl,
             time: date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: zone() }),
             label: (row.title || row.body || '').trim().slice(0, 160) || 'Post',
+            schedule: row.status === 'scheduled' && row.scheduledAt ? { id: row.id, scheduledAt: row.scheduledAt } : null,
           })),
         }
       })
     })
 
     const calCells = derived(() => {
-      // The grid itself is plain calendar arithmetic, the same in every zone.
-      const { year, month } = calMonth()
-      const startOffset = new Date(Date.UTC(year, month, 1)).getUTCDay()
-      const emptyCell = { blank: true, chips: [] }
-      const cells = [...Array.from({ length: startOffset }, () => emptyCell), ...calDays()]
-      while (cells.length % 7 !== 0) cells.push(emptyCell)
+      const days = calDays()
+      if (calendarPeriod() === 'week') return days
+      const startOffset = calRange().start.getUTCDay()
+      const emptyCell = (index: number) => ({ key: `blank-${index}`, blank: true, chips: [], more: 0 })
+      const cells = [
+        ...Array.from({ length: startOffset }, (_, index) => emptyCell(index)),
+        ...days.map(day => ({ ...day, chips: day.chips.slice(0, 3), more: Math.max(0, day.chips.length - 3) })),
+      ]
+      while (cells.length % 7 !== 0) cells.push(emptyCell(cells.length))
       return cells
     })
 
@@ -517,13 +548,56 @@
       if (next !== view()) closeSelection()
       view.set(next)
     }
-    const shiftMonth = (by: number) => {
-      const at = new Date(Date.UTC(calMonth().year, calMonth().month + by, 1))
-      calMonth.set({ year: at.getUTCFullYear(), month: at.getUTCMonth() })
+
+    function shiftCalendar(by: number) {
+      const { start } = calRange()
+      const next = calendarPeriod() === 'week'
+        ? calendarDay(start, by * 7)
+        : new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + by, 1))
+      calAnchor.set(utcKey(next))
     }
-    const prevMonth = () => shiftMonth(-1)
-    const nextMonth = () => shiftMonth(1)
-    const goToday = () => calMonth.set(monthOf(new Date()))
+
+    const goToday = () => calAnchor.set(dayKey(new Date()))
+
+    function showCalendarWeek(day: string) {
+      calAnchor.set(day)
+      calendarPeriod.set('week')
+    }
+
+    async function loadCalendar() {
+      calendarRequest?.abort()
+      const controller = new AbortController()
+      calendarRequest = controller
+      const { signal } = controller
+      const { start, days } = calRange()
+      const query = new URLSearchParams({ calendar_from: utcKey(start), calendar_to: utcKey(calendarDay(start, days)), limit: '200' })
+      const posts: QueueApiItem[] = []
+      calendarBusy.set(true)
+      calendarError.set('')
+      calendarItems.set([])
+      try {
+        let before: number | null
+        do {
+          const { data } = await requestJson(`/api/postline/queue?${query}`, { signal, cache: 'no-store' }, 'Could not load calendar.')
+          posts.push(...data.items)
+          before = data.nextCursor
+          if (before) query.set('before', String(before))
+        } while (before && !signal.aborted)
+        if (!signal.aborted) calendarItems.set(posts)
+      }
+      catch (error) {
+        if (!signal.aborted) calendarError.set(error instanceof Error ? error.message : String(error))
+      }
+      finally {
+        if (!signal.aborted) calendarBusy.set(false)
+      }
+    }
+
+    effect(() => {
+      if (zoneReady() && view() === 'calendar' && !activeSearch()) void loadCalendar()
+      else calendarRequest?.abort()
+    })
+    onDestroy(() => calendarRequest?.abort())
 
     const loadZone = async () => {
       try {
@@ -531,12 +605,52 @@
         const timezone = workspace?.timezone
         if (typeof timezone === 'string' && timezone) {
           zone.set(timezone)
-          calMonth.set(monthOf(new Date()))
+          goToday()
         }
       }
       catch {
-        // The browser's own zone stays in use; the queue still works.
+        // The browser's own zone stays in use if the workspace is unavailable.
       }
+      finally {
+        zoneReady.set(true)
+      }
+    }
+
+    function startCalendarDrag(event: DragEvent, post: ScheduledSelection | null) {
+      if (!post || !event.dataTransfer || rescheduling()) {
+        event.preventDefault()
+        return
+      }
+      draggedPost.set(post)
+      event.dataTransfer.effectAllowed = 'move'
+      event.dataTransfer.setData('application/x-postline-queue', String(post.id))
+    }
+
+    function endCalendarDrag() {
+      draggedPost.set(null)
+      dropDay.set('')
+    }
+
+    function allowCalendarDrop(event: DragEvent, cell: { key: string, blank: boolean }) {
+      if (!draggedPost()) return
+      if (cell.blank || cell.key < dayKey(new Date())) {
+        dropDay.set('')
+        return
+      }
+      event.preventDefault()
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+      dropDay.set(cell.key)
+    }
+
+    function dropOnCalendar(event: DragEvent, cell: { key: string, blank: boolean }) {
+      const post = draggedPost()
+      if (!post) return
+      endCalendarDrag()
+      event.preventDefault()
+      if (cell.blank || cell.key < dayKey(new Date()) || event.dataTransfer?.getData('application/x-postline-queue') !== String(post.id)) return
+      const original = parseUtc(post.scheduledAt)
+      if (original && dayKey(original) === cell.key) return
+      void reschedulePosts([post], { date: cell.key })
     }
 
     async function fetchQueuePage(parameters: Record<string, string>) {
@@ -688,8 +802,9 @@
       else if (selectedPosts().length < MAX_QUEUE_SELECTION) selectedPosts.set([...selectedPosts(), { id: row.id, scheduledAt: row.scheduledAt }])
     }
 
-    async function rescheduleSelection(destination: ScheduleDestination) {
-      const posts = selectedPosts()
+    const rescheduleSelection = (destination: ScheduleDestination) => reschedulePosts(selectedPosts(), destination)
+
+    async function reschedulePosts(posts: readonly ScheduledSelection[], destination: ScheduleDestination) {
       if (!posts.length || rescheduling()) return
       rescheduling.set(true)
       try {
@@ -707,6 +822,7 @@
       }
       finally {
         await refresh()
+        if (view() === 'calendar' && !activeSearch()) await loadCalendar()
         const current = new Map(items().filter(item => item.status === 'scheduled').map(item => [item.id, item.scheduledAt]))
         selectedPosts.set(selectedPosts().filter(post => current.get(post.id) === post.scheduledAt))
         rescheduling.set(false)

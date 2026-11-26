@@ -424,7 +424,7 @@ export class QueueService {
    * more. Paged by id, which never changes and is in creation order, so a
    * post added while the owner scrolls cannot shift or repeat a row.
    */
-  async listPage(options: { before?: number | null, limit?: number, search?: string } = {}): Promise<{ items: QueueItemView[], nextCursor: number | null }> {
+  async listPage(options: { before?: number | null, limit?: number, search?: string, calendar?: { from: string, to: string } } = {}): Promise<{ items: QueueItemView[], nextCursor: number | null }> {
     const limit = Math.min(MAX_QUEUE_PAGE_SIZE, Math.max(1, Math.floor(Number(options.limit) || QUEUE_PAGE_SIZE)))
     // Before any row is read: content an older version parked in `notes`
     // has to be in place first.
@@ -434,6 +434,13 @@ export class QueueService {
       .selectAll()
       .where('status', '!=', 'archived')
     if (options.before) query = query.where('id', '<', Number(options.before))
+    if (options.calendar) {
+      // The caller groups by its workspace time zone. Include the adjacent
+      // UTC dates so the range covers local days at either end of the offset.
+      const from = new Date(Date.parse(options.calendar.from) - 86_400_000).toISOString().slice(0, 10) + ' 00:00:00'
+      const to = new Date(Date.parse(options.calendar.to) + 86_400_000).toISOString().slice(0, 10) + ' 00:00:00'
+      query = query.whereRaw(raw`COALESCE(scheduled_at, published_at) >= ${from} AND COALESCE(scheduled_at, published_at) < ${to}`)
+    }
     const search = options.search?.trim().slice(0, 200)
     if (search) {
       const pattern = `%${search.replace(/[!%_]/g, character => `!${character}`)}%`

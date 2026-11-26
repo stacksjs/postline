@@ -76,8 +76,11 @@ function fail(view: string, mode: string, problem: string): void {
 }
 
 async function evaluate<T>(cdp: Cdp, expression: string): Promise<T> {
-  const result = await cdp.send<{ result: { value: T }, exceptionDetails?: { text: string } }>('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
-  if (result.exceptionDetails) throw new Error(result.exceptionDetails.text)
+  const result = await cdp.send<{
+    result: { value: T }
+    exceptionDetails?: { text: string, exception?: { description?: string } }
+  }>('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
+  if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text)
   return result.result.value
 }
 
@@ -692,6 +695,63 @@ async function checkQueueRescheduling(cdp: Cdp): Promise<void> {
   })) fail('queue', 'rescheduling', 'one bulk action did not move all five dates by one week')
 }
 
+async function checkQueueCalendar(cdp: Cdp): Promise<void> {
+  const fixture = await evaluate<{ id: number, from: string, to: string }>(cdp, `(async () => {
+    const saved = await fetch('/api/postline/settings/workspace', { method: 'POST', body: new URLSearchParams({ timezone: 'UTC' }) })
+    if (!saved.ok) throw new Error('Could not use UTC for the calendar check.')
+    const start = new Date()
+    start.setUTCHours(15, 0, 0, 0)
+    start.setUTCDate(start.getUTCDate() + 7 - start.getUTCDay())
+    const from = start.toISOString().slice(0, 10)
+    const to = new Date(start.getTime() + 2 * 86_400_000).toISOString().slice(0, 10)
+    const response = await fetch('/api/postline/queue', { method: 'POST', body: new URLSearchParams({
+      text: 'Move this calendar post', providers: 'bluesky', scheduled_at: from + ' 15:00:00',
+    }) })
+    if (!response.ok) throw new Error('Could not schedule the calendar fixture.')
+    return { id: (await response.json()).data.postId, from, to }
+  })()`)
+  await auditPage(`${site}/queue`, { cdp })
+  await evaluate(cdp, `[...document.querySelectorAll('[aria-label="Queue view"] button')].find(button => button.innerText.includes('Calendar')).click()`)
+  const week = `[...document.querySelectorAll('[aria-label="Calendar period"] button')].find(button => button.textContent === 'Week')`
+  await waitUntil('The Calendar period controls', () => evaluate<boolean>(cdp, `Boolean(${week}?.getClientRects().length)`), 5_000)
+  await evaluate(cdp, `${week}.click()`)
+  await waitUntil('Seven days in the week grid', () => evaluate<boolean>(cdp, `
+    ${week}.getAttribute('aria-pressed') === 'true'
+      && document.querySelectorAll('[data-calendar-date]').length === 7
+      && !!document.querySelector('[aria-label="Next week"]')`), 5_000)
+  await evaluate(cdp, `document.querySelector('[aria-label="Next week"]').click()`)
+
+  const source = `[...document.querySelectorAll('[data-calendar-date="${fixture.from}"] a[draggable=true]')].find(link => link.textContent.includes('Move this calendar post'))`
+  const target = `document.querySelector('[data-calendar-date="${fixture.to}"]')`
+  await waitUntil('The scheduled post in next week’s calendar', () => evaluate<boolean>(cdp, `Boolean(${source}) && Boolean(${target})`), 5_000)
+  const accepted = await evaluate<boolean>(cdp, `(() => {
+    const post = ${source}
+    const day = ${target}
+    const dataTransfer = new DataTransfer()
+    const options = { dataTransfer, bubbles: true, cancelable: true }
+    post.dispatchEvent(new DragEvent('dragstart', options))
+    const allowed = !day.dispatchEvent(new DragEvent('dragover', options))
+    day.dispatchEvent(new DragEvent('drop', options))
+    return allowed
+  })()`)
+  if (!accepted) fail('queue', 'calendar', 'the calendar did not accept a scheduled post dropped on a future date')
+  await waitUntil('The moved post reappears on its new calendar day', () => evaluate<boolean>(cdp, `
+    !${source} && ${target}?.textContent.includes('Move this calendar post')`), 10_000)
+  const newTime = await evaluate<string>(cdp, `(async () => {
+    const response = await fetch('/api/postline/queue?limit=500')
+    return (await response.json()).data.items.find(item => item.id === ${fixture.id})?.scheduledAt
+  })()`)
+  if (newTime !== `${fixture.to} 15:00:00`)
+    fail('queue', 'calendar', 'the dropped post lost its scheduled clock time')
+
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 1, mobile: true })
+  await waitUntil('The weekly agenda on a phone', () => evaluate<boolean>(cdp, `(() => {
+    const agenda = document.querySelector('[aria-label="Weekly agenda"]')
+    return agenda?.getClientRects().length && agenda.querySelectorAll('[role=listitem]').length === 7
+      && document.documentElement.scrollWidth - innerWidth <= 1
+  })()`), 5_000)
+}
+
 let exitCode = 0
 try {
   await waitUntil('The API', async () => (await fetch(`http://localhost:${API_PORT}/api/postline/health`)).status < 500)
@@ -758,6 +818,7 @@ try {
     await checkBrowserPasskey(cdp)
     await checkPhoneNavigation(cdp)
     await checkQueueRescheduling(cdp)
+    await checkQueueCalendar(cdp)
   }
   finally {
     await close()
