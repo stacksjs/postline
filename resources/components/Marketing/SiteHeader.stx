@@ -20,11 +20,11 @@ const useCases = USE_CASES
             keyboard with no script. site-menus.ts closes them on Escape, on a
             click elsewhere, and when the router swaps the page. --}}
         <details class="relative group" name="site-menu">
-          <summary class="flex gap-1.5 items-center px-3 h-9 list-none whitespace-nowrap text-[14px] text-body hover:text-ink hover:bg-panel-2 rounded-lg transition-colors cursor-pointer">
+          <summary class="flex gap-1.5 items-center px-3 h-9 list-none text-[14px] text-body whitespace-nowrap hover:text-ink hover:bg-panel-2 rounded-lg transition-colors cursor-pointer">
             Features
             <span class="h-3.5 w-3.5 text-muted transition-transform group-open:rotate-180 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
           </summary>
-          <div class="grid absolute left-0 top-11 gap-1 p-2 w-[22rem] lg:grid-cols-2 lg:w-[36rem] bg-panel border border-line rounded-2xl shadow-xl">
+          <div class="grid absolute left-0 top-11 gap-1 lg:grid-cols-2 p-2 w-[22rem] lg:w-[36rem] bg-panel border border-line rounded-2xl shadow-xl">
             @foreach (features as feature)
               <a class="flex gap-3 items-start p-3 hover:bg-panel-2 rounded-xl transition-colors" href="/features/{{ feature.slug }}" data-stx-link>
                 <span class="grid place-items-center shrink-0 mt-0.5 h-8 w-8 text-ink bg-panel-2 border border-line rounded-lg" aria-hidden="true"><span class="i-hugeicons-{{ feature.icon }}"></span></span>
@@ -38,7 +38,7 @@ const useCases = USE_CASES
         </details>
 
         <details class="relative group" name="site-menu">
-          <summary class="flex gap-1.5 items-center px-3 h-9 list-none whitespace-nowrap text-[14px] text-body hover:text-ink hover:bg-panel-2 rounded-lg transition-colors cursor-pointer">
+          <summary class="flex gap-1.5 items-center px-3 h-9 list-none text-[14px] text-body whitespace-nowrap hover:text-ink hover:bg-panel-2 rounded-lg transition-colors cursor-pointer">
             Use cases
             <span class="h-3.5 w-3.5 text-muted transition-transform group-open:rotate-180 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
           </summary>
@@ -55,8 +55,8 @@ const useCases = USE_CASES
           </div>
         </details>
 
-        <a class="px-3 py-2 whitespace-nowrap text-[14px] text-body hover:text-ink hover:bg-panel-2 rounded-lg transition-colors" href="/#pricing">Pricing</a>
-        <a class="px-3 py-2 whitespace-nowrap text-[14px] text-body hover:text-ink hover:bg-panel-2 rounded-lg transition-colors" href="https://github.com/stacksjs/postline/tree/main/docs">Docs</a>
+        <a class="px-3 py-2 text-[14px] text-body whitespace-nowrap hover:text-ink hover:bg-panel-2 rounded-lg transition-colors" href="/#pricing">Pricing</a>
+        <a class="px-3 py-2 text-[14px] text-body whitespace-nowrap hover:text-ink hover:bg-panel-2 rounded-lg transition-colors" href="https://github.com/stacksjs/postline/tree/main/docs">Docs</a>
         <a class="flex gap-1.5 items-center px-3 py-2 text-[14px] text-body hover:text-ink hover:bg-panel-2 rounded-lg transition-colors" href="https://github.com/stacksjs/postline">
           <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
           GitHub
@@ -64,7 +64,7 @@ const useCases = USE_CASES
       </nav>
 
       <div class="flex gap-2 items-center">
-        <a class="inline-flex items-center px-4 h-9 font-medium whitespace-nowrap text-[14px] text-on-accent bg-accent rounded-lg hover:opacity-90 transition-opacity" href="/download" data-stx-link>Get started</a>
+        <a class="inline-flex items-center px-4 h-9 font-medium text-[14px] text-on-accent whitespace-nowrap bg-accent rounded-lg hover:opacity-90 transition-opacity" href="/download" data-stx-link>Get started</a>
       </div>
     </div>
 

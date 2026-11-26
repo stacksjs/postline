@@ -41,7 +41,7 @@
     {{-- Shared chrome: defined once here, so a new page picks up the header
         and footer without remembering to include them. --}}
     {{-- First in the tab order: one key press past the header and its menus. --}}
-    <a class="fixed left-4 top-3 z-50 px-4 py-2 font-medium text-[14px] text-on-accent bg-accent rounded-lg -translate-y-20 focus:translate-y-0 transition-transform" href="#content">Skip to content</a>
+    <a class="fixed left-4 top-3 z-50 px-4 py-2 font-medium text-[14px] text-on-accent bg-accent rounded-lg transition-transform focus:translate-y-0 -translate-y-20" href="#content">Skip to content</a>
     <SiteHeader />
     {{-- The router's swap container. `__stxRouterConfig.container` is `main`, so
         without this element the router finds nothing to swap into and every

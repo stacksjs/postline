@@ -171,7 +171,7 @@ const structuredData = [
     {{-- Moving content needs a way to stop it (WCAG 2.2.2). A checkbox and
         :has() in config/css.ts pause the track with no script; hovering or
         focusing the row pauses it too, and reduced motion never starts it. --}}
-    <label class="absolute right-3 top-1/2 z-10 flex items-center justify-center -translate-y-1/2 h-8 w-8 text-muted bg-panel border border-line rounded-full cursor-pointer hover:text-ink marquee-toggle">
+    <label class="flex absolute right-3 top-1/2 z-10 items-center justify-center h-8 w-8 text-muted hover:text-ink bg-panel border border-line rounded-full cursor-pointer -translate-y-1/2 marquee-toggle">
       <input class="sr-only" type="checkbox">
       {{-- The swap is on plain wrappers: an icon class sets its own display,
           which would win over a layered rule. --}}
