@@ -93,9 +93,9 @@ const structuredData = [
       </p>
 
       <div class="flex flex-wrap gap-3 items-center justify-center mt-9">
-        <a class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/login" data-stx-link>
-          Get started
-          <span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+        <a class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/download" data-stx-link>
+          <span class="h-4 w-4 i-hugeicons-download-04" aria-hidden="true"></span>
+          Download for Mac
         </a>
         <a class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">
           <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
@@ -380,7 +380,7 @@ const structuredData = [
     <h2 id="cta-heading" class="m-0 mx-auto max-w-[18ch] leading-[1.05] text-4xl text-ink sm:text-6xl reveal">Post once. Be everywhere.</h2>
     <p class="m-0 mt-6 mx-auto max-w-[48ch] leading-relaxed text-[17px] text-body reveal">Connect Bluesky or Mastodon and send your first post in a few minutes.</p>
     <div class="flex flex-wrap gap-3 items-center justify-center mt-9 reveal">
-      <a class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/login" data-stx-link>
+      <a class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/download" data-stx-link>
         Get started
         <span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
       </a>

@@ -52,7 +52,7 @@ function page(entry: MarketingEntry, kind: 'feature' | 'use-case', siblings: Mar
       <h1 class="m-0 leading-[1.04] text-4xl text-ink sm:text-6xl">${h(entry.title)}</h1>
       <p class="m-0 max-w-[60ch] leading-relaxed text-[17px] text-body sm:text-lg">${h(entry.intro)}</p>
       <div class="flex flex-wrap gap-3 items-center">
-        <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/login" data-stx-link>Get started<span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span></a>
+        <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/download" data-stx-link>Get started<span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span></a>
         <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl transition-colors" href="${REPO}"><span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>Read the source</a>
       </div>
     </header>

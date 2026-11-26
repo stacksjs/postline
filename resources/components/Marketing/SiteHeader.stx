@@ -63,8 +63,7 @@ const useCases = USE_CASES
       </nav>
 
       <div class="flex gap-2 items-center">
-        <a class="hidden sm:inline-flex items-center px-3 h-9 text-[14px] text-body hover:text-ink hover:bg-panel-2 rounded-lg transition-colors" href="/login" data-stx-link>Sign in</a>
-        <a class="inline-flex items-center px-4 h-9 font-medium text-[14px] text-on-accent bg-accent rounded-lg hover:opacity-90 transition-opacity" href="/login" data-stx-link>Get started</a>
+        <a class="inline-flex items-center px-4 h-9 font-medium text-[14px] text-on-accent bg-accent rounded-lg hover:opacity-90 transition-opacity" href="/download" data-stx-link>Get started</a>
       </div>
     </div>
 

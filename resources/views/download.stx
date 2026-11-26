@@ -1,0 +1,56 @@
+@extends('layouts/marketing')
+
+@section('title', 'Download Postline for Mac, or run it from source')
+@section('description', 'Get Postline: the Mac app, free and open source, or the source to run on your own server.')
+@section('canonical', 'https://postline.stacksjs.com/download')
+
+<script server>
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+// The site is built from the same commit as the release it offers, so the
+// app's own version names the file to download.
+const version = String(JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')).version || '')
+const releases = 'https://github.com/stacksjs/postline/releases'
+const dmg = version ? `${releases}/latest/download/Postline-${version}-macos-arm64.dmg` : `${releases}/latest`
+</script>
+
+@section('content')
+  <LegalPage heading="Get Postline" intro="Free and open source. Run it on your Mac, or on a server of your own. Either way your posts and access tokens stay with you.">
+    <section class="grid gap-4" id="mac">
+      <h2 class="m-0 text-2xl text-ink">On your Mac</h2>
+      <p class="m-0 leading-relaxed text-[16px] text-body">The simplest way: an app that runs itself, with no server and no account to create. Scheduled posts go out while it runs, including from the menu bar with its window closed.</p>
+      <div class="flex flex-wrap gap-3 items-center">
+        <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="{{ dmg }}" data-download-dmg>
+          <span class="h-4 w-4 i-hugeicons-download-04" aria-hidden="true"></span>
+          Download for Mac
+        </a>
+        <a class="text-[14px] text-muted underline underline-offset-4 hover:text-ink" href="{{ releases }}">All releases and checksums</a>
+      </div>
+      <p class="m-0 text-[14px] text-muted">Version {{ version }}. Needs macOS 13 or later on Apple silicon (M1 and newer).</p>
+      <div class="grid gap-2">
+        <h3 class="m-0 font-semibold text-[15px] text-ink">Opening it the first time</h3>
+        <ol class="grid gap-1.5 m-0 pl-5 leading-relaxed text-[15px] text-body">
+          <li>Open the downloaded file and drag Postline into Applications.</li>
+          <li>Open Postline. macOS says it cannot check the app for malicious software, because this release is not notarized by Apple yet.</li>
+          <li>Open System Settings, Privacy and Security, and choose Open Anyway next to Postline. You only do this once.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="grid gap-4" id="source">
+      <h2 class="m-0 text-2xl text-ink">On a server, from source</h2>
+      <p class="m-0 leading-relaxed text-[16px] text-body">For a Postline that is up while your Mac sleeps, or that more than one machine can reach. It needs <a class="text-ink underline underline-offset-4" href="https://bun.sh">Bun</a> 1.3.14 or newer and SQLite 3.47.2 or newer, and HTTPS anywhere beyond the machine itself.</p>
+      <pre class="overflow-x-auto m-0 p-4 font-mono text-[13px] text-ink bg-panel-2 border border-line rounded-xl"><code>git clone https://github.com/stacksjs/postline
+cd postline && ./bootstrap
+cp .env.example .env && ./buddy key:generate
+./buddy migrate && ./buddy serve</code></pre>
+      <p class="m-0 text-[15px] text-body">The <a class="text-ink underline underline-offset-4" href="https://github.com/stacksjs/postline/blob/main/docs/self-hosting.md">server guide</a> covers the address, HTTPS, the scheduler and what to set.</p>
+    </section>
+
+    <section class="grid gap-3">
+      <h2 class="m-0 text-2xl text-ink">Then connect a network</h2>
+      <p class="m-0 leading-relaxed text-[16px] text-body">Bluesky and Mastodon connect in a minute with an app password or a token. X, LinkedIn, Instagram and Threads connect through an app you register on each network; Postline walks you through it under Settings, Channels.</p>
+    </section>
+  </LegalPage>
+@endsection
