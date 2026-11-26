@@ -1,11 +1,19 @@
 import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
 import process from 'node:process'
+import { Database } from 'bun:sqlite'
 
 const root = join(import.meta.dir, '..')
 const readme = await Bun.file(join(root, 'README.md')).text()
 const envPath = join(root, '.env')
-if (await Bun.file(envPath).exists()) throw new Error('Run the README check in a fresh checkout without a .env file.')
+const databasePath = join(root, 'database/postline.sqlite')
+if (await Bun.file(envPath).exists() || await Bun.file(databasePath).exists())
+  throw new Error('Run the README check in a fresh checkout without an environment file or workspace database.')
+
+function workspaceOwners(): Array<{ email: string, password: string }> {
+  using database = new Database(databasePath, { readonly: true })
+  return database.query<{ email: string, password: string }, []>('SELECT email, password FROM users').all()
+}
 
 function command(section: 'setup' | 'start' | 'seed'): string {
   const start = readme.indexOf(`<!-- readme-${section} -->`)
@@ -18,6 +26,7 @@ function command(section: 'setup' | 'start' | 'seed'): string {
 const setup = Bun.spawnSync(['bash', '-euc', command('setup')], { cwd: root, stdout: 'inherit', stderr: 'inherit' })
 if (setup.exitCode !== 0) throw new Error('The README setup commands failed.')
 if (!/^APP_KEY=.+$/m.test(await Bun.file(envPath).text())) throw new Error('The README setup did not create an application key.')
+if (workspaceOwners().length) throw new Error('A clean install must leave the workspace available for its first owner.')
 
 const ports = [0, 0, 0].map(() => Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response() }))
 const [port, apiPort, docsPort] = ports.map(server => String(server.port))
@@ -67,16 +76,15 @@ finally {
   await dev.stop()
 }
 
+const password = randomBytes(18).toString('base64url')
 const seed = Bun.spawnSync(['bash', '-euc', command('seed')], {
   cwd: root,
-  env: { ...process.env, APP_ENV: 'local', SEED_USER_PASSWORD: randomBytes(18).toString('base64url') },
+  env: { ...process.env, SEED_USER_PASSWORD: password },
   stdout: 'inherit',
   stderr: 'inherit',
 })
 if (seed.exitCode !== 0) throw new Error('The README development seed command failed.')
 
-const { Database } = await import('bun:sqlite')
-using database = new Database(join(root, 'database/postline.sqlite'), { readonly: true })
-const owner = database.query<{ email: string }, []>('SELECT email FROM users').all()
-if (owner.length !== 1 || owner[0]?.email !== 'dev@postline.test')
-  throw new Error('The development seed did not create the documented workspace account.')
+const [owner, extra] = workspaceOwners()
+if (!owner || extra || owner.email !== 'dev@postline.test' || !await Bun.password.verify(password, owner.password))
+  throw new Error('The development seed did not create the documented workspace account with the supplied password.')
