@@ -205,6 +205,34 @@ describe('undoable queue deletion', () => {
     expect(existsSync(mediaFile)).toBe(false)
     await expect(queue.get(postId)).rejects.toThrow('Post not found')
   })
+
+  test('a due thread waits for Undo and sends every restored segment once', async () => {
+    const blog = fakeNetwork('blog')
+    const queue = queueWith({ blog })
+    const { postIds } = await queue.saveThread({ texts: ['First', 'Middle', 'Last'], providers: ['blog'], scheduledAt: stamp(3_600_000) })
+    await database.updateTable('posts').set({ scheduled_at: stamp(-60_000) }).where('id', 'in', postIds).execute()
+    const { token } = await queue.removeWithUndo([postIds[1]!])
+    await expect(queue.publishNow(postIds[0]!)).rejects.toThrow('Undo the removal')
+    expect(await queue.publishDue()).toEqual({ published: 0, failed: 0, missed: 0 })
+    expect(blog.sends).toEqual([])
+
+    await queue.restoreRemoval(token)
+    await queue.publishDue()
+    await queue.publishDue()
+    expect(blog.sends).toEqual(postIds)
+  })
+
+  test('an expired removal cannot send an archived thread segment', async () => {
+    const blog = fakeNetwork('blog')
+    const queue = queueWith({ blog })
+    const { postIds } = await queue.saveThread({ texts: ['First', 'Removed', 'Last'], providers: ['blog'], scheduledAt: stamp(3_600_000) })
+    await database.updateTable('posts').set({ scheduled_at: stamp(-60_000) }).where('id', 'in', postIds).execute()
+    await queue.removeWithUndo([postIds[1]!])
+    await database.updateTable('posts').set({ queue_undo_until: stamp(-1000) }).where('id', '=', postIds[1]).execute()
+    await queue.publishDue()
+    expect(blog.sends).toEqual([postIds[0]!, postIds[2]!])
+    expect(await status(postIds[1]!)).toBe('archived')
+  })
 })
 
 describe('a publish that never finished', () => {

@@ -308,7 +308,8 @@ export class CrosspostService {
    * account there. Accounts that already have every segment are left alone.
    */
   async resumeThread(threadKey: string): Promise<{ resumed: number, results: CrosspostTargetResult[] }> {
-    const posts = await database.selectFrom('posts').selectAll().where('thread_key', '=', threadKey).orderBy('id', 'asc').execute()
+    const posts = await database.selectFrom('posts').selectAll().where('thread_key', '=', threadKey)
+      .where('status', '!=', 'archived').orderBy('id', 'asc').execute()
     if (!posts.length) throw new UserFacingError('That thread is not in the queue any more.')
 
     const rows = await database.selectFrom('post_targets').selectAll().where('post_id', 'in', posts.map((post: any) => post.id)).execute()
@@ -340,7 +341,7 @@ export class CrosspostService {
 
       let halted: number | undefined
       for (const [index, post] of posts.entries()) {
-        if (index < start) continue
+        if (index < start || forTarget(Number(post.id)).some((row: any) => row.status === 'published')) continue
         // The failed and held-back rows from before give way to this attempt.
         let stale = database.deleteFrom('post_targets').where('post_id', '=', post.id).where('status', '!=', 'published').where('provider', '=', target.provider)
         stale = target.identityId ? stale.where('social_identity_id', '=', target.identityId) : stale.where('social_identity_id', 'is', null)

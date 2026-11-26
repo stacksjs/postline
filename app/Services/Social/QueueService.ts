@@ -169,6 +169,12 @@ export class AlreadyPublishingError extends UserFacingError {
   }
 }
 
+class ThreadRemovalPendingError extends UserFacingError {
+  constructor() {
+    super('Undo the removal or wait for it to expire before publishing this thread.', 'queue_thread_removal_pending')
+  }
+}
+
 /** How many rows a write changed, whichever shape the query builder reports it in. */
 function affected(result: unknown): number {
   if (typeof result === 'number' || typeof result === 'bigint')
@@ -557,9 +563,13 @@ export class QueueService {
   /** Remove posts from the active queue while keeping the original records for Undo. */
   async removeWithUndo(ids: readonly number[]): Promise<QueueRemovalReceipt> {
     return database.transaction((tx: typeof database) => {
-      const posts = tx.selectFrom('posts').select(['id', 'status']).where('id', 'in', ids).execute() as Pick<ScheduledRow, 'id' | 'status'>[]
+      const posts = tx.selectFrom('posts').select(['id', 'status', 'thread_key']).where('id', 'in', ids).execute() as Pick<ScheduledRow, 'id' | 'status' | 'thread_key'>[]
       if (posts.length !== ids.length || posts.some(post => !ACTIONABLE.has(post.status)))
         throw new UserFacingError('Only draft, scheduled, or failed posts can be removed from the queue.', 'queue_removal_changed')
+      const threads = [...new Set(posts.map(post => post.thread_key).filter(Boolean))]
+      if (threads.length && tx.selectFrom('posts').select('id').where('thread_key', 'in', threads)
+        .where('status', '=', 'publishing').executeTakeFirst())
+        throw new UserFacingError('Wait until the thread finishes publishing before removing a post.', 'queue_removal_changed')
       const token = uuid()
       const until = expiresAt(QUEUE_UNDO_SECONDS)!
       const at = now()
@@ -866,6 +876,11 @@ export class QueueService {
       throw new AlreadyPublishingError()
   }
 
+  private pendingThreadRemoval(threadKey: string, tx = database) {
+    return tx.selectFrom('posts').select('id').where('thread_key', '=', threadKey).where('status', '=', 'archived')
+      .where('queue_undo_until', '>', now()).executeTakeFirst()
+  }
+
   /**
    * Publish a draft, scheduled or failed post immediately. Also sends the
    * failed networks of a post that went out elsewhere: only targets still
@@ -882,6 +897,7 @@ export class QueueService {
       const threadKey = String(post.thread_key)
       if (String(post.status) === 'scheduled' || String(post.status) === 'draft') {
         const claimed = await database.transaction((tx: typeof database) => {
+          if (this.pendingThreadRemoval(threadKey, tx)) throw new ThreadRemovalPendingError()
           if (expected && !tx.selectFrom('posts').select('id').where('id', '=', post.id)
             .where('status', '=', 'scheduled').where('scheduled_at', '=', expected).executeTakeFirst())
             return 0
@@ -889,6 +905,9 @@ export class QueueService {
             .where('thread_key', '=', threadKey).where('status', 'in', ['scheduled', 'draft']).execute())
         })
         if (claimed === 0) throw new AlreadyPublishingError()
+      }
+      else if (await this.pendingThreadRemoval(threadKey)) {
+        throw new ThreadRemovalPendingError()
       }
       const { results } = await this.publisher.resumeThread(threadKey)
       // A segment still marked publishing did not go out anywhere.
@@ -1187,8 +1206,9 @@ export class QueueService {
       const scheduledAt = post.scheduled_at
       if (!scheduledAt) continue
       if (post.thread_key) {
-        if (threadsSent.has(String(post.thread_key))) continue
-        threadsSent.add(String(post.thread_key))
+        if (threadsSent.has(post.thread_key)) continue
+        threadsSent.add(post.thread_key)
+        if (await this.pendingThreadRemoval(post.thread_key)) continue
       }
       if (scheduledAt < tooLate) {
         // Too late for a thread is too late for every segment of it.
@@ -1210,7 +1230,7 @@ export class QueueService {
       }
       catch (error) {
         // Another run has it: neither a publish nor a failure of this one.
-        if (error instanceof AlreadyPublishingError)
+        if (error instanceof AlreadyPublishingError || error instanceof ThreadRemovalPendingError)
           continue
         // Refused before anything was claimed or sent. Left as it was it
         // would be picked up and refused again every minute, so it is set
@@ -1241,7 +1261,7 @@ export class QueueService {
         if (results.some(result => result.ok)) published += 1
       }
       catch (error) {
-        if (error instanceof AlreadyPublishingError)
+        if (error instanceof AlreadyPublishingError || error instanceof ThreadRemovalPendingError)
           continue
         log.error(`[postline] retry of post ${postId} could not run: ${error instanceof Error ? error.message : String(error)}`)
       }
