@@ -289,6 +289,8 @@ const MOTION: string = `
 }
 `
 
+const collapsedWorkspaceShell = ':is([data-postline-shell][data-sidebar-collapsed="true"], html.postline-sidebar-collapsed [data-postline-shell]:not([data-sidebar-collapsed]))'
+
 const APP_SHELL: string = `
 @property --postline-sidebar-width {
   syntax: '<length>';
@@ -302,6 +304,8 @@ const APP_SHELL: string = `
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+${collapsedWorkspaceShell} { --postline-sidebar-width: 0px; }
+
 html.has-native-sidebar,
 html.has-native-sidebar body {
   background: transparent !important;
@@ -313,29 +317,32 @@ html.has-native-sidebar [data-postline-sidebar] {
   backdrop-filter: blur(24px) saturate(1.08);
 }
 
-html.postline-sidebar-collapsed [data-postline-content-shell],
+${collapsedWorkspaceShell} [data-postline-content-shell],
 html.has-native-sidebar [data-postline-content-shell],
 html.has-native-sidebar [data-postline-workspace] {
   background: #f3f3f1 !important;
 }
 
-html.postline-sidebar-collapsed [data-postline-workspace] {
+${collapsedWorkspaceShell} [data-postline-workspace] {
   border-top-left-radius: 0 !important;
   border-left-color: transparent !important;
   box-shadow: none !important;
 }
 
-html.postline-sidebar-collapsed [data-postline-sidebar] {
-  overflow: visible;
+${collapsedWorkspaceShell} [data-postline-sidebar] {
+  visibility: hidden;
   pointer-events: none;
 }
 
-html.postline-sidebar-collapsed [data-shell-controls-row] {
+${collapsedWorkspaceShell} [data-shell-controls-row],
+html.has-native-sidebar [data-shell-controls-row],
+[data-shell-native="true"] [data-shell-controls-row] {
   display: none !important;
 }
 
 [data-sidebar-expand-fab] {
   opacity: 0;
+  visibility: hidden;
   transform: translate3d(-6px, 0, 0) scale(0.94);
   pointer-events: none;
   transition:
@@ -343,8 +350,9 @@ html.postline-sidebar-collapsed [data-shell-controls-row] {
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-html.postline-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fab] {
+html:not(.has-native-sidebar) ${collapsedWorkspaceShell}:not([data-shell-native="true"]) [data-sidebar-expand-fab] {
   opacity: 1;
+  visibility: visible;
   transform: translate3d(0, 0, 0) scale(1);
   pointer-events: auto;
 }

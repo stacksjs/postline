@@ -16,7 +16,9 @@ describe('marketing accessibility', () => {
     const skip = layout.indexOf('href="#content"')
     expect(skip).toBeGreaterThan(-1)
     expect(skip).toBeLessThan(layout.indexOf('<SiteHeader />'))
-    expect(layout).toContain('<main id="content" tabindex="-1">')
+    const main = layout.match(/<main\b[^>]*>/)?.[0]
+    expect(main).toContain('id="content"')
+    expect(main).toContain('tabindex="-1"')
   })
 
   it('loads the script that closes the header menus', () => {

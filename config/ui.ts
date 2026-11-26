@@ -55,6 +55,11 @@ export default {
   // page, ahead of the real description.
   skipDefaultSeoTags: true,
 
+  router: {
+    container: '[data-postline-router]',
+    viewTransitions: true,
+  },
+
   app: {
     /**
      * The pre-paint theme stamp, owned by the framework rather than copied into
@@ -103,10 +108,8 @@ export default {
     },
   },
 
-  // Surface prohibited DOM access in client scripts, as warnings for now. The
-  // composer, Channels and the app shell still reach into the DOM directly;
-  // failOnViolation turns on once they are rebuilt on signals (#155, #162,
-  // #172), and until then it would fail those pages.
+  // Surface prohibited DOM access in client scripts as warnings while the
+  // composer, Settings and Channels purge controls still access the DOM.
   strict: {
     enabled: true,
     failOnViolation: false,

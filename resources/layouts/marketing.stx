@@ -39,12 +39,8 @@
     {{-- First in the tab order: one key press past the header and its menus. --}}
     <a class="fixed left-4 top-3 z-50 px-4 py-2 font-medium text-[14px] text-on-accent bg-accent rounded-lg transition-transform focus:translate-y-0 -translate-y-20" href="#content">Skip to content</a>
     <SiteHeader />
-    {{-- The router's swap container. `__stxRouterConfig.container` is `main`, so
-        without this element the router finds nothing to swap into and every
-        navigation across the marketing pages falls back to a full page load.
-        Deliberately class-free: a class here is inherited by every page the
-        router swaps in. --}}
-    <main id="content" tabindex="-1">
+    {{-- The router swaps this content while the header and footer stay mounted. --}}
+    <main id="content" tabindex="-1" data-postline-router>
       @yield('content')
     </main>
     <SiteFooter />

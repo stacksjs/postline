@@ -4,6 +4,6 @@
   <link rel="stylesheet" href="/assets/styles/marketing.css">
 @endhead
 
-<main class="mx-auto pb-20 pt-14 px-6 max-w-[48rem] w-full text-ink" id="content">
+<main class="mx-auto pb-20 pt-14 px-6 max-w-[48rem] w-full text-ink" id="content" data-postline-router>
   @yield('content')
 </main>

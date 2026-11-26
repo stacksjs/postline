@@ -10,9 +10,8 @@
 export default {
   stx: {
     baselines: {
-      // Direct DOM access in the composer, Channels and the app shell, until
-      // they are rebuilt on signals (#155, #162, #172).
-      'dom-guard': 32,
+      // Direct DOM access in the composer, Settings and Channels purge controls.
+      'dom-guard': 26,
       // Pre-hydration display:none on a few panels.
       'inline-style-attr': 3,
       'style-block': 1,

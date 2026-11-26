@@ -37,6 +37,8 @@ const moreLinks = [
 </script>
 
 <script client>
+const collapsed = useReactiveProp('collapsed', false)
+const emit = defineEmits()
 const moreDialog = useRef('moreDialog')
 const moreOpen = state(false)
 const desktopWidth = useMediaQuery('(min-width: 1024px)')
@@ -144,20 +146,13 @@ effect(() => {
     </div>
   </dialog>
 
-  <aside class="hidden lg:flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[68px] px-5 h-screen min-w-0 bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-150 ease-out transition-[width,padding]" aria-label="Postline" data-postline-sidebar data-window-drag-region>
+  <aside class="hidden lg:flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[68px] px-5 h-screen min-w-0 bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-150 ease-out transition-[width,padding]" aria-label="Postline" :aria-hidden="collapsed()" data-postline-sidebar data-window-drag-region>
     <div class="absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_45%,rgba(226,226,222,0.16)_100%)] pointer-events-none"></div>
     <div class="flex absolute right-5 top-3.5 z-20 items-center min-h-7" data-shell-controls-row>
-      <div class="flex gap-1.5 items-center">
-        <button class="inline-flex items-center justify-center h-8 w-8 text-muted hover:text-ink bg-glass hover:bg-raised border border-line rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus shadow-sm duration-150 transition-all" type="button" aria-label="Collapse sidebar" aria-expanded="true" data-sidebar-collapse data-no-window-drag>
-          <span class="h-[18px] w-[18px] duration-150 transition-transform i-hugeicons-sidebar-left" data-sidebar-collapse-icon aria-hidden="true"></span>
-        </button>
-        <button class="flex hidden items-center justify-center h-7 w-7 text-muted hover:text-ink hover:bg-glass-hover rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors" type="button" aria-label="Go back" data-shell-back data-native-shell-control>
-          <span class="h-5 w-5 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
-        </button>
-        <button class="flex hidden items-center justify-center h-7 w-7 text-muted hover:text-ink hover:bg-glass-hover rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors" type="button" aria-label="Go forward" data-shell-forward data-native-shell-control>
-          <span class="h-5 w-5 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
-        </button>
-      </div>
+      {{-- Craft's native titlebar uses this same button to toggle the sidebar. --}}
+      <button class="inline-flex items-center justify-center h-8 w-8 text-muted hover:text-ink bg-glass hover:bg-raised border border-line rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus shadow-sm duration-150 transition-all" type="button" :aria-label="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'" :aria-expanded="!collapsed()" data-sidebar-collapse data-no-window-drag @click="emit('toggle-sidebar')">
+        <span class="h-[18px] w-[18px] i-hugeicons-sidebar-left" aria-hidden="true"></span>
+      </button>
     </div>
 
     <a
@@ -165,17 +160,16 @@ effect(() => {
       href="/composer"
       data-stx-link
       data-stx-exact-active-class="text-ink"
-      data-sidebar-collapsible-content="true"
       data-no-window-drag
       aria-label="Postline composer"
     >
       {{-- The same mark as the favicon and the sign-in page (`.brand-mark`
           in config/css.ts), so the three agree. --}}
       <span class="h-7 w-7 brand-mark" aria-hidden="true"></span>
-      <span class="font-semibold text-sm" data-sidebar-expanded>Postline</span>
+      <span class="font-semibold text-sm">Postline</span>
     </a>
 
-    <nav class="grid relative z-10 gap-1" aria-label="Primary" data-stx-nav data-testid="postline-nav" data-sidebar-collapsible-content="true">
+    <nav class="grid relative z-10 gap-1" aria-label="Primary" data-stx-nav data-testid="postline-nav">
       @foreach (navLinks as link)
         <a
           href="{{ link.href }}"
@@ -191,12 +185,12 @@ effect(() => {
           aria-current="{{ link.active ? 'page' : 'false' }}"
         >
           <span class="h-[18px] w-[18px] {{ link.icon }} {{ link.active ? 'text-ink' : 'text-muted' }}" aria-hidden="true"></span>
-          <span class="flex-1 font-medium truncate" data-sidebar-expanded>{{ link.label }}</span>
+          <span class="flex-1 font-medium truncate">{{ link.label }}</span>
           @if(link.href === '/inbox' || link.href === '/listening')
-            <span class="px-1.5 min-w-5 font-semibold text-center text-on-accent text-xs bg-accent rounded-full" data-sidebar-expanded x-cloak x-show="unreadFor('{{ link.href }}') > 0" :text="unreadBadge('{{ link.href }}')" aria-hidden="true"></span>
+            <span class="px-1.5 min-w-5 font-semibold text-center text-on-accent text-xs bg-accent rounded-full" x-cloak x-show="unreadFor('{{ link.href }}') > 0" :text="unreadBadge('{{ link.href }}')" aria-hidden="true"></span>
             <span class="sr-only" x-show="unreadFor('{{ link.href }}') > 0" :text="unreadLabel('{{ link.href }}')"></span>
           @endif
-          <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-mono text-muted text-xs bg-panel border border-b-2 border-line rounded-md" data-sidebar-expanded aria-label="Shortcut {{ link.shortcut }}">{{ link.shortcut }}</kbd>
+          <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-mono text-muted text-xs bg-panel border border-b-2 border-line rounded-md" aria-label="Shortcut {{ link.shortcut }}">{{ link.shortcut }}</kbd>
         </a>
       @endforeach
     </nav>
@@ -206,7 +200,6 @@ effect(() => {
       data-stx-link
       data-stx-active-class="text-ink bg-nav-active"
       data-stx-exact-active-class="text-ink bg-nav-active"
-      data-sidebar-collapsible-content="true"
       data-no-window-drag
       title="Open Settings (,)"
       data-command-destination="Settings"
@@ -216,8 +209,8 @@ effect(() => {
       aria-current="{{ settingsActive ? 'page' : 'false' }}"
     >
       <span class="h-[18px] w-[18px] i-hugeicons-settings-02 {{ settingsActive ? 'text-ink' : 'text-muted' }}" aria-hidden="true"></span>
-      <span class="flex-1 font-medium" data-sidebar-expanded>Settings</span>
-      <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-mono text-muted text-xs bg-panel border border-b-2 border-line rounded-md" data-sidebar-expanded aria-label="Shortcut comma">,</kbd>
+      <span class="flex-1 font-medium">Settings</span>
+      <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-mono text-muted text-xs bg-panel border border-b-2 border-line rounded-md" aria-label="Shortcut comma">,</kbd>
     </a>
   </aside>
   </div>

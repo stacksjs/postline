@@ -145,6 +145,87 @@ async function checkWorkspaceCommands(cdp: Cdp): Promise<void> {
   await waitUntil('The existing Settings pane action', () => evaluate<boolean>(cdp, `!${dialog}.open && document.querySelector('[data-settings-item=appearance]')?.getAttribute('aria-selected') === 'true' && Boolean(document.querySelector('[data-settings-pane=appearance]')?.getClientRects().length)`), 5_000)
 }
 
+async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
+  const shell = "document.querySelector('[data-postline-shell]')"
+  const collapse = "document.querySelector('[data-sidebar-collapse]')"
+  const expand = "document.querySelector('[data-sidebar-expand-fab]')"
+  const width = `Math.round(Number.parseFloat(getComputedStyle(${shell}).getPropertyValue('--postline-sidebar-width')))`
+
+  await auditPage(`${site}/queue`, { cdp })
+  await waitUntil('Workspace sidebar hydration', () => evaluate<boolean>(cdp, `${shell}?.dataset.sidebarCollapsed === 'false'`), 5_000)
+  await evaluate(cdp, `${collapse}.click()`)
+  await waitUntil('The browser sidebar is collapsed', () => evaluate<boolean>(cdp, `
+    ${shell}.dataset.sidebarCollapsed === 'true' && ${width} === 0
+      && getComputedStyle(${expand}).visibility === 'visible'`), 5_000)
+  await auditPage(`${site}/queue`, { cdp })
+  if (!await evaluate<boolean>(cdp, `${shell}.dataset.sidebarCollapsed === 'true' && ${width} === 0`))
+    fail('queue', 'shell', 'a sidebar collapsed before reload was restored expanded')
+  await evaluate(cdp, `${expand}.click()`)
+  await waitUntil('The expanded sidebar is visible again', () => evaluate<boolean>(cdp, `
+    ${shell}.dataset.sidebarCollapsed === 'false' && ${width} === 286
+      && getComputedStyle(${expand}).visibility === 'hidden'`), 5_000)
+
+  await evaluate(cdp, `(() => {
+    const calls = window.postlineShellCalls = { collapsed: [], settings: [], drags: 0, focus: 0, appearance: '' }
+    window.craft = {
+      window: {
+        setWebSidebarCollapsed: async value => calls.collapsed.push(value),
+        startDrag: async () => { calls.drags++ },
+        open: async options => calls.settings.push(options),
+        focus: async () => { calls.focus++ },
+        setAppearance: async mode => { calls.appearance = mode },
+      },
+      settings: {
+        onOpen: callback => {
+          calls.openSettingsFromMenu = callback
+          return () => { delete calls.openSettingsFromMenu }
+        },
+      },
+    }
+    window.dispatchEvent(new Event('craft:ready'))
+  })()`)
+  await waitUntil('The late native bridge is connected', () => evaluate<boolean>(cdp, `
+    ${shell}.dataset.shellNative === 'true'
+      && getComputedStyle(${collapse}.parentElement).display === 'none'
+      && Boolean(window.postlineShellCalls.openSettingsFromMenu)`), 5_000)
+  await evaluate(cdp, `${collapse}.click()`)
+  await waitUntil('The Craft titlebar toggle collapses the sidebar', () => evaluate<boolean>(cdp, `
+    ${shell}.dataset.sidebarCollapsed === 'true'
+      && window.postlineShellCalls.collapsed.at(-1) === true
+      && getComputedStyle(${expand}).visibility === 'hidden'`), 5_000)
+  await evaluate(cdp, `${collapse}.click()`)
+  await waitUntil('The Craft titlebar toggle expands the sidebar', () => evaluate<boolean>(cdp, `
+    ${shell}.dataset.sidebarCollapsed === 'false' && window.postlineShellCalls.collapsed.at(-1) === false`), 5_000)
+  await evaluate(cdp, `(() => {
+    document.querySelector('[data-postline-workspace]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
+    ${collapse}.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
+    document.querySelector('a[data-command-destination="Settings"]').click()
+    window.postlineShellCalls.openSettingsFromMenu()
+  })()`)
+  if (!await evaluate<boolean>(cdp, `
+    window.postlineShellCalls.drags === 1 && location.pathname === '/queue'
+      && window.postlineShellCalls.settings.length === 2
+      && window.postlineShellCalls.settings.every(options => options.name === 'settings' && options.url === location.origin + '/settings')`))
+    fail('queue', 'shell', 'native dragging or opening Settings through the link and menu failed')
+
+  await evaluate(cdp, `(() => {
+    const settings = new BroadcastChannel('postline:settings')
+    settings.postMessage({ type: 'theme', pref: 'dark' })
+    settings.postMessage({ type: 'navigate', path: '/timeline' })
+    settings.close()
+  })()`)
+  await waitUntil('Settings can move the native workspace to another view', () => evaluate<boolean>(cdp, `
+    location.pathname === '/timeline' && !!document.querySelector('[data-postline-page=timeline]')
+      && window.postlineShellCalls?.focus === 1 && ${shell}.dataset.shellNative === 'true'
+      && window.postlineShellCalls.appearance === 'dark' && document.documentElement.dataset.theme === 'dark'`), 5_000)
+  await evaluate(cdp, `(() => {
+    const settings = new BroadcastChannel('postline:settings')
+    settings.postMessage({ type: 'theme', pref: 'system' })
+    settings.close()
+  })()`)
+  await waitUntil('The system theme is restored', () => evaluate<boolean>(cdp, 'window.postlineShellCalls.appearance === "system"'), 5_000)
+}
+
 async function checkQueueKeyboard(cdp: Cdp): Promise<void> {
   await pressKey(cdp, 'Tab', 9)
   const skip = await evaluate<string>(cdp, 'document.activeElement?.getAttribute("href")')
@@ -482,6 +563,7 @@ try {
       }
     }
     await checkDesktopUpdateControls(cdp)
+    await checkWorkspaceShell(cdp)
     await checkWorkspaceCommands(cdp)
     await checkWorkspaceBootstrap(cdp)
     await checkChannels(cdp)
