@@ -755,10 +755,7 @@
 
     const loadWorkspace = async (): Promise<void> => {
       try {
-        const response = await fetch('/api/postline/settings/workspace')
-        const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the workspace.')
-        applyWorkspace(payload.data)
+        applyWorkspace((await fetchWorkspaceBootstrap()).workspace)
         workspaceLoaded.set(true)
       }
       catch (error) {
@@ -777,9 +774,7 @@
         body.set('timezone', workspaceZone())
         body.set('shareMediaByTunnel', shareMediaByTunnel() ? '1' : '0')
         body.set('publishingPaused', publishingPaused() ? '1' : '0')
-        const response = await fetch('/api/postline/settings/workspace', { method: 'POST', body })
-        const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save.')
+        const payload = await requestJson('/api/postline/settings/workspace', { method: 'POST', body }, 'Could not save.')
         applyWorkspace(payload.data)
         workspaceMessage.set('Saved.')
         workspaceTone.set('success')
@@ -820,9 +815,7 @@
       if (!file) return ''
       const body = new FormData()
       body.set('archive', await file.text())
-      const response = await fetch('/api/postline/settings/import', { method: 'POST', body })
-      const payload = await response.json()
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'The import failed.')
+      const payload = await requestJson('/api/postline/settings/import', { method: 'POST', body }, 'The import failed.')
       const r = payload.data.report
       return `Imported ${r.posts} posts, ${r.campaigns} campaigns, ${r.blogPosts} blog posts, ${r.monitors} Listening rules and ${r.media} images${r.skipped ? `; ${r.skipped} already here were left alone` : ''}.`
     })
@@ -832,9 +825,7 @@
       if (!window.confirm('Delete everything in this workspace? This cannot be undone.')) return ''
       const body = new FormData()
       body.set('confirmation', deletePhrase())
-      const response = await fetch('/api/postline/settings/delete-everything', { method: 'POST', body })
-      const payload = await response.json()
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Nothing was deleted.')
+      await requestJson('/api/postline/settings/delete-everything', { method: 'POST', body }, 'Nothing was deleted.')
       deletePhrase.set('')
       return 'Everything in this workspace was deleted.'
     })

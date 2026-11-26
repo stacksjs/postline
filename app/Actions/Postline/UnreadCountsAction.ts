@@ -1,7 +1,6 @@
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
-import { directMessages } from '../../Services/DirectMessageService'
-import { keywordMonitoring } from '../../Services/KeywordMonitoringService'
+import { workspaceUnreadCounts } from '../../Services/WorkspaceBootstrapService'
 import { actionFailure } from '../../Support/Http/action-error'
 
 export default new Action({
@@ -11,8 +10,7 @@ export default new Action({
 
   async handle() {
     try {
-      const [inbox, listening] = await Promise.all([directMessages.unreadCount(), keywordMonitoring.unreadCount()])
-      return response.json({ ok: true, data: { inbox, listening } }, { headers: { 'Cache-Control': 'private, no-store' } })
+      return response.json({ ok: true, data: await workspaceUnreadCounts() }, { headers: { 'Cache-Control': 'private, no-store' } })
     }
     catch (error) {
       return actionFailure(error, 500)

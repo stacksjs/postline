@@ -136,7 +136,8 @@ async function checkWorkspaceCommands(cdp: Cdp): Promise<void> {
   await fill('settings')
   await waitUntil('The Settings destination', () => evaluate<boolean>(cdp, `${option}?.textContent.includes('Settings')`), 5_000)
   await pressKey(cdp, 'Enter', 13)
-  await waitUntil('The Settings command trigger to hydrate', () => evaluate<boolean>(cdp, `location.pathname === '/settings' && ${trigger}?.getAttribute('aria-expanded') === 'false'`), 5_000)
+  // Settings has its own layout. Wait for the new document to hydrate in dev.
+  await waitUntil('The Settings command trigger to hydrate', () => evaluate<boolean>(cdp, `location.pathname === '/settings' && ${trigger}?.getAttribute('aria-expanded') === 'false'`), 15_000)
   await evaluate(cdp, `${trigger}.click()`)
   await fill('appearance')
   await waitUntil('A command for the Appearance pane', () => evaluate<boolean>(cdp, `${option}?.textContent.trim().startsWith('Appearance')`), 5_000)
@@ -220,6 +221,7 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
     const postedAt = new Date().toISOString()
+    let inboxUnread = 3
     const conversations = [
       { id: 1, provider: 'bluesky', participantName: 'Alice Example', participantHandle: 'alice.example', lastMessageAt: postedAt, lastMessagePreview: 'Hello' },
       { id: 2, provider: 'mastodon', participantName: 'Morgan Example', participantHandle: 'morgan.example', lastMessageAt: postedAt, lastMessagePreview: 'Hello' },
@@ -227,8 +229,13 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
     window.fetch = (input, options) => {
       const request = new Request(input, options)
       const path = new URL(request.url).pathname
-      if (path === '/api/postline/unread') return Promise.resolve(Response.json({ ok: true, data: { inbox: 3, listening: 106 } }))
+      if (path === '/api/postline/bootstrap') return actualFetch(input, options).then(async response => {
+        if (!response.ok) return response
+        const payload = await response.json()
+        return Response.json({ ...payload, data: { ...payload.data, unread: { inbox: inboxUnread, listening: 106 } } })
+      })
       if (path === '/api/postline/inbox') return Promise.resolve(Response.json({ ok: true, data: { conversations } }))
+      if (path === '/api/postline/inbox/read') inboxUnread = 2
       if (path === '/api/postline/inbox/thread' || path === '/api/postline/inbox/read') return Promise.resolve(Response.json({ ok: true, data: {} }))
       if (path === '/api/postline/bluesky/timeline') return Promise.resolve(Response.json({ ok: true, data: {
         connected: true,
@@ -257,6 +264,8 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
     await evaluate(cdp, `document.querySelector('button span[role="img"][aria-label="Mastodon"]').closest('button').click()`)
     await waitUntil('The selected network badge in the conversation', () => evaluate<boolean>(cdp, `
       document.querySelector('section[aria-label="Conversation"] header [role="img"][aria-label="Mastodon"]')?.textContent === 'M'`), 5_000)
+    await waitUntil('The unread count after reading a conversation', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-testid="postline-nav"] a[href="/inbox"]')?.textContent.includes('2 unread messages')`), 5_000)
 
     await auditPage(`${site}/timeline`, { cdp })
     await waitUntil('Timeline initials and image from their own rows', () => evaluate<boolean>(cdp, `
@@ -266,6 +275,28 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
   }
+}
+
+async function checkWorkspaceBootstrap(cdp: Cdp): Promise<void> {
+  await auditPage(`${site}/composer`, { cdp })
+  const reads = `performance.getEntriesByType('resource')
+    .map(entry => new URL(entry.name).pathname)
+    .filter(path => /^\\/api\\/postline\\/(bootstrap|providers|accounts|unread|settings\\/workspace|(bluesky|twitter|mastodon|linkedin|instagram|threads)\\/status)$/.test(path))`
+  await waitUntil('The shared workspace bootstrap', () => evaluate<boolean>(cdp, `${reads}.includes('/api/postline/bootstrap')`), 5_000)
+  for (const view of ['queue', 'campaigns', 'accounts', 'listening', 'composer']) {
+    await evaluate(cdp, `window.stx.navigate('/${view}')`)
+    await waitUntil(`Client navigation to ${view}`, () => evaluate<boolean>(cdp, `location.pathname === '/${view}' && !!document.querySelector('[data-postline-page="${view}"]')`), 5_000)
+  }
+  const requests = await evaluate<string[]>(cdp, reads)
+  if (requests.length !== 1 || requests[0] !== '/api/postline/bootstrap')
+    fail('workspace', 'bootstrap', `expected one bootstrap request across five views, saw ${requests.join(', ') || 'none'}`)
+
+  await evaluate(cdp, `(() => {
+    const settingsWindow = new BroadcastChannel('postline:workspace')
+    settingsWindow.postMessage('changed')
+    settingsWindow.close()
+  })()`)
+  await waitUntil('The bootstrap after a change in another window', () => evaluate<boolean>(cdp, `${reads}.length === ${requests.length + 1}`), 5_000)
 }
 
 async function checkPhoneNavigation(cdp: Cdp): Promise<void> {
@@ -384,6 +415,7 @@ try {
     }
     await checkDesktopUpdateControls(cdp)
     await checkWorkspaceCommands(cdp)
+    await checkWorkspaceBootstrap(cdp)
     await checkNetworkComponents(cdp)
     await checkPhoneNavigation(cdp)
   }

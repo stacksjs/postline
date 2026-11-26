@@ -1,4 +1,37 @@
-import type { AccountStatus } from '../assets/scripts/social'
+import type { WorkspaceProfile } from '../../app/Services/WorkspaceService'
+import type { AccountStatus, ProviderStatus } from '../assets/scripts/social'
+
+interface WorkspaceBootstrap {
+  workspace: WorkspaceProfile
+  providers: ProviderStatus[]
+  accounts: AccountStatus[]
+  unread: { inbox: number, listening: number }
+}
+
+const bootstrapUrl = '/api/postline/bootstrap'
+const workspaceWrites = new Set([
+  '/api/postline/accounts/default',
+  '/api/postline/accounts/disconnect',
+  '/api/postline/bluesky/connect',
+  '/api/postline/twitter/connect',
+  '/api/postline/mastodon/connect',
+  '/api/postline/linkedin/connect',
+  '/api/postline/instagram/connect',
+  '/api/postline/threads/connect',
+  '/api/postline/network-apps',
+  '/api/postline/network-apps/clear',
+  '/api/postline/settings/workspace',
+  '/api/postline/settings/import',
+  '/api/postline/settings/delete-everything',
+  '/api/postline/inbox/read',
+  '/api/postline/inbox/archive',
+  '/api/postline/inbox/reply',
+  '/api/postline/inbox/sync',
+  '/api/postline/listening',
+  '/api/postline/listening/delete',
+  '/api/postline/listening/read',
+  '/api/postline/listening/scan',
+])
 
 export function escapeHtml(value: string | null | undefined): string {
   return String(value ?? '')
@@ -34,12 +67,40 @@ export async function requestJson(url: string, options: RequestInit = {}, errorM
   const payload = await response.json().catch(() => null)
   if (!response.ok || !payload || payload.ok === false)
     throw new Error(payload?.error || payload?.message || errorMessage || (response.status === 404 ? 'Not found.' : 'That did not work.'))
+  if (options.method && !/^(?:get|head)$/i.test(options.method) && workspaceWrites.has(url)) {
+    void refreshWorkspaceBootstrap()
+    window.dispatchEvent(new Event('postline:workspace-changed'))
+  }
   return payload
 }
 
+export function workspaceBootstrapQuery() {
+  return window.stx.cachedQuery<WorkspaceBootstrap | null>('postline:workspace-bootstrap', {
+    url: bootstrapUrl,
+    scope: false, // Keep the authenticated snapshot in this document's memory.
+    staleTime: 60_000,
+    load: async ({ signal }) => {
+      const payload = await requestJson(bootstrapUrl, { cache: 'no-store', signal }, 'Could not load the workspace.')
+      return payload.data
+    },
+  })
+}
+
+export async function fetchWorkspaceBootstrap(): Promise<WorkspaceBootstrap> {
+  const query = workspaceBootstrapQuery()
+  const data = await query.load()
+  if (!data) throw new Error(query.error() || 'Could not load the workspace.')
+  return data
+}
+
+export async function refreshWorkspaceBootstrap(): Promise<void> {
+  const query = workspaceBootstrapQuery()
+  query.invalidate()
+  await query.refresh()
+}
+
 export async function fetchAccounts(): Promise<AccountStatus[]> {
-  const payload = await requestJson('/api/postline/accounts', {}, 'Could not load connected accounts.')
-  return Array.isArray(payload.data?.accounts) ? payload.data.accounts : []
+  return (await fetchWorkspaceBootstrap()).accounts
 }
 
 export async function disconnectSocialAccount(id: number): Promise<void> {

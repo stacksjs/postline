@@ -1,4 +1,5 @@
 import { providerIcon, providerLabel } from '../../functions/networks'
+import { fetchWorkspaceBootstrap, refreshWorkspaceBootstrap } from '../../functions/postline-client'
 
 /** One connected account on a network. Several per network are allowed. */
 export interface AccountStatus {
@@ -116,11 +117,8 @@ export interface NetworkStatus {
 }
 
 /**
- * Reads that every view makes, kept for a short while (#183). Moving between
- * the composer, the queue, campaigns and Settings asked for the connected
- * accounts again each time; now a read within FRESH_MS reuses the answer, and
- * anything that changes accounts calls `invalidate()`. A failed read is not
- * kept, so the next one tries again.
+ * Link previews are keyed by URL. They can be reused independently of
+ * workspace state. A failed read is retried the next time it is needed.
  */
 const FRESH_MS = 30_000
 const cache = new Map<string, { at: number, value: Promise<unknown> }>()
@@ -136,44 +134,17 @@ function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
   return value
 }
 
-/** Forget every cached read, after something that changes accounts or networks. */
-export function invalidate(): void {
-  cache.clear()
-}
-
-// Any write to Postline's API may change what these reads answer (a connect,
-// a disconnect, a saved app), so a write clears them all. Done here, once,
-// rather than at every place in the views that writes.
-if (typeof window !== 'undefined' && !(window as unknown as { __postlineReadCacheBound?: boolean }).__postlineReadCacheBound) {
-  ;(window as unknown as { __postlineReadCacheBound?: boolean }).__postlineReadCacheBound = true
-  const send = window.fetch.bind(window)
-  window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-    const method = String(init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
-    const url = String(input instanceof Request ? input.url : input)
-    if (method !== 'GET' && method !== 'HEAD' && url.includes('/api/')) invalidate()
-    return send(input, init)
-  }) as typeof fetch
-}
-
-/** One client for every network's status, in place of a module per network (#181). */
+/** A channel card reads from the same workspace query as the composer. */
 export async function fetchStatus(network: StatusNetwork): Promise<NetworkStatus> {
-  return await cached(`status:${network}`, async () => {
-    const response = await fetch(`/api/postline/${network}/status`)
-    const payload = await response.json().catch(() => ({}))
-    if (!response.ok || !payload.ok)
-      throw new Error(payload.error || `Could not load ${providerLabel(network)} status.`)
-    return payload.data as NetworkStatus
-  })
+  const { providers } = await fetchWorkspaceBootstrap()
+  const provider = providers.find(entry => entry.provider === network)
+  if (!provider) throw new Error(`Could not load ${providerLabel(network)} status.`)
+  return provider as NetworkStatus
 }
 
 /** The workspace profile (its name and time zone), which most views read. */
-export async function fetchWorkspace(): Promise<{ name: string, workspaceName: string, timezone: string } & Record<string, unknown>> {
-  return await cached('workspace', async () => {
-    const response = await fetch('/api/postline/settings/workspace')
-    const payload = await response.json()
-    if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the workspace.')
-    return payload.data
-  })
+export async function fetchWorkspace() {
+  return (await fetchWorkspaceBootstrap()).workspace
 }
 
 /** A link's preview card, asked for once however often the composer redraws it. */
@@ -187,14 +158,7 @@ export async function fetchLinkPreview(url: string): Promise<Record<string, unkn
 }
 
 export async function fetchProviders(): Promise<ProviderStatus[]> {
-  return await cached('providers', async () => {
-    const response = await fetch('/api/postline/providers')
-    const payload = await response.json()
-    if (!response.ok || !payload.ok) {
-      throw new Error(payload.error || 'Could not load connected accounts.')
-    }
-    return (payload.data?.providers || []) as ProviderStatus[]
-  })
+  return (await fetchWorkspaceBootstrap()).providers
 }
 
 export async function publishCrosspost(input: CrosspostInput): Promise<{ postId: number, results: CrosspostResultItem[] }> {
@@ -233,10 +197,16 @@ export async function publishCrosspost(input: CrosspostInput): Promise<{ postId:
   return payload.data as { postId: number, results: CrosspostResultItem[] }
 }
 
+// The desktop Settings window and the workspace have separate JS contexts.
+const workspaceChanges = typeof BroadcastChannel === 'function' ? new BroadcastChannel('postline:workspace') : null
+workspaceChanges?.addEventListener('message', (event) => {
+  if (event.data === 'changed') void refreshWorkspaceBootstrap()
+})
+window.addEventListener('postline:workspace-changed', () => workspaceChanges?.postMessage('changed'))
+
 declare global {
   interface Window {
     postlineSocial?: {
-      invalidate: typeof invalidate
       fetchWorkspace: typeof fetchWorkspace
       fetchLinkPreview: typeof fetchLinkPreview
       fetchStatus: typeof fetchStatus
@@ -251,7 +221,6 @@ declare global {
 }
 
 window.postlineSocial = {
-  invalidate,
   fetchWorkspace,
   fetchLinkPreview,
   fetchStatus,

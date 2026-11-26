@@ -15,10 +15,13 @@ declare global {
   const providerColor: typeof autoImports.providerColor
   const providerIcon: typeof autoImports.providerIcon
   const requestJson: typeof autoImports.requestJson
+  const fetchWorkspaceBootstrap: typeof autoImports.fetchWorkspaceBootstrap
+  const refreshWorkspaceBootstrap: typeof autoImports.refreshWorkspaceBootstrap
   const fetchAccounts: typeof autoImports.fetchAccounts
   const disconnectSocialAccount: typeof autoImports.disconnectSocialAccount
   const escapeHtml: typeof autoImports.escapeHtml
   const relativeTime: typeof autoImports.relativeTime
+  const workspaceBootstrapQuery: typeof autoImports.workspaceBootstrapQuery
   const workspaceCommands: typeof autoImports.workspaceCommands
   const runWorkspaceCommand: typeof autoImports.runWorkspaceCommand
 }

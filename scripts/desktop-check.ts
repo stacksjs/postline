@@ -89,7 +89,7 @@ check('the landing page sends the window to the workspace', front.status === 302
 const script = await call('GET', '/assets/scripts/social.ts')
 check('a workspace script is served as JavaScript', script.status === 200 && script.type === 'text/javascript' && !/\binterface\s+\w+\s*\{/.test(script.text), `${script.status} ${script.type}`)
 
-for (const path of ['/api/csrf', '/api/postline/providers', '/api/postline/queue', '/api/postline/accounts', '/api/postline/analytics', '/api/postline/campaigns', '/api/postline/listening', '/api/postline/settings/retention']) {
+for (const path of ['/api/csrf', '/api/postline/bootstrap', '/api/postline/providers', '/api/postline/queue', '/api/postline/accounts', '/api/postline/analytics', '/api/postline/campaigns', '/api/postline/listening', '/api/postline/settings/retention']) {
   const read = await call('GET', path)
   check(`GET ${path}`, read.status === 200, `${read.status} ${read.text.slice(0, 160)}`)
 }

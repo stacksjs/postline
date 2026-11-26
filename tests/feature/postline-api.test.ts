@@ -34,6 +34,7 @@ async function actingUser() {
 
 describe('postline api — auth', () => {
   test.each([
+    ['/api/postline/bootstrap'],
     ['/api/postline/providers'],
     ['/api/postline/analytics'],
     ['/api/postline/queue'],
@@ -52,6 +53,21 @@ describe('postline api — auth', () => {
 })
 
 describe('postline api — reads', () => {
+  test('bootstrap returns the workspace profile, channels, and unread counts together', async () => {
+    const response = await featureTest().actingAs(await actingUser()).get('/api/postline/bootstrap')
+
+    response.assertStatus(200)
+    const body = await response.json<{
+      ok: boolean
+      data: { workspace: unknown, providers: { provider: string }[], accounts: unknown[], unread: unknown }
+    }>()
+    expect(body.ok).toBe(true)
+    expect(body.data.workspace).toMatchObject({ workspaceName: expect.any(String), timezone: expect.any(String) })
+    expect(body.data.providers.map(provider => provider.provider)).toEqual(['bluesky', 'twitter', 'linkedin', 'instagram', 'threads', 'mastodon', 'blog'])
+    expect(Array.isArray(body.data.accounts)).toBe(true)
+    expect(body.data.unread).toEqual({ inbox: expect.any(Number), listening: expect.any(Number) })
+  })
+
   test('providers answers with the connected-channel list', async () => {
     const response = await featureTest().actingAs(await actingUser()).get('/api/postline/providers')
 

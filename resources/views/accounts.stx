@@ -589,12 +589,10 @@
         notify('Connecting to Bluesky…', 'info', { title: 'Channels' })
 
         try {
-          const response = await fetch('/api/postline/bluesky/connect', {
+          const payload = await requestJson('/api/postline/bluesky/connect', {
             method: 'POST',
             body: new FormData(form),
-          })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky connect failed.')
+          }, 'Bluesky connect failed.')
           if (password) password.value = ''
           if (identifier) identifier.value = ''
           await Promise.all([refreshStatus(), refreshAccounts()])
@@ -668,9 +666,7 @@
         linkedinConnectEnv.setAttribute('disabled', 'disabled')
         notify('Connecting LinkedIn from .env…', 'info', { title: 'LinkedIn' })
         try {
-          const response = await fetch('/api/postline/linkedin/connect', { method: 'POST' })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'LinkedIn connect failed.')
+          await requestJson('/api/postline/linkedin/connect', { method: 'POST' }, 'LinkedIn connect failed.')
           await Promise.all([refreshLinkedIn(), refreshAccounts()])
           notify('LinkedIn connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
         }
@@ -776,9 +772,7 @@
         twitterConnectEnv.setAttribute('disabled', 'disabled')
         notify('Connecting X from .env…', 'info', { title: 'X/Twitter' })
         try {
-          const response = await fetch('/api/postline/twitter/connect', { method: 'POST' })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'X connect failed.')
+          await requestJson('/api/postline/twitter/connect', { method: 'POST' }, 'X connect failed.')
           await Promise.all([refreshTwitter(), refreshAccounts()])
           notify('X connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
         }
@@ -859,9 +853,7 @@
         instagramConnectEnv.setAttribute('disabled', 'disabled')
         notify('Connecting Instagram from .env…', 'info', { title: 'Instagram' })
         try {
-          const response = await fetch('/api/postline/instagram/connect', { method: 'POST' })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Instagram connect failed.')
+          await requestJson('/api/postline/instagram/connect', { method: 'POST' }, 'Instagram connect failed.')
           await Promise.all([refreshInstagram(), refreshAccounts()])
           notify('Instagram connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
         }
@@ -942,9 +934,7 @@
         threadsConnectEnv.setAttribute('disabled', 'disabled')
         notify('Connecting Threads from .env…', 'info', { title: 'Threads' })
         try {
-          const response = await fetch('/api/postline/threads/connect', { method: 'POST' })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Threads connect failed.')
+          await requestJson('/api/postline/threads/connect', { method: 'POST' }, 'Threads connect failed.')
           await Promise.all([refreshThreads(), refreshAccounts()])
           notify('Threads connected. You can crosspost from the composer.', 'success', { title: 'Connected' })
         }
@@ -1013,9 +1003,7 @@
         mastodonSubmit?.setAttribute('disabled', 'disabled')
         notify('Connecting to Mastodon…', 'info', { title: 'Mastodon' })
         try {
-          const response = await fetch('/api/postline/mastodon/connect', { method: 'POST', body: new FormData(mastodonForm) })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Mastodon connect failed.')
+          const payload = await requestJson('/api/postline/mastodon/connect', { method: 'POST', body: new FormData(mastodonForm) }, 'Mastodon connect failed.')
           if (mastodonToken) mastodonToken.value = ''
           await Promise.all([refreshMastodon(), refreshAccounts()])
           notify(`${payload.data.handle} is connected. You can crosspost from the composer.`, 'success', { title: 'Connected' })
@@ -1073,9 +1061,7 @@
         try {
           const body = new FormData()
           body.set('id', String(id))
-          const response = await fetch('/api/postline/accounts/default', { method: 'POST', body })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not change the default account.')
+          await requestJson('/api/postline/accounts/default', { method: 'POST', body }, 'Could not change the default account.')
           await Promise.all([refreshAccounts(), refreshNetwork[account.provider]?.()])
           notify(`Posts to this network now go to ${name} unless you pick another account.`, 'success', { title: 'Default changed' })
         }
@@ -1108,9 +1094,7 @@
           body.set('client_id', row.clientId || '')
           body.set('client_secret', row.clientSecret || '')
           if (provider === 'linkedin') body.set('organization_pages', row.organizationPages ? '1' : '0')
-          const response = await fetch('/api/postline/network-apps', { method: 'POST', body })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save the app.')
+          await requestJson('/api/postline/network-apps', { method: 'POST', body }, 'Could not save the app.')
           const drafts = { ...appDrafts() }
           delete drafts[provider]
           appDrafts.set(drafts)
@@ -1132,10 +1116,9 @@
         try {
           const body = new FormData()
           body.set('provider', provider)
-          const response = await fetch('/api/postline/network-apps/clear', { method: 'POST', body })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not remove the app.')
+          const payload = await requestJson('/api/postline/network-apps/clear', { method: 'POST', body }, 'Could not remove the app.')
           networkApps.set(payload.data.apps || [])
+          await refreshNetwork[provider]?.()
         }
         catch (error) {
           notify(error instanceof Error ? error.message : String(error), 'error', { title: row.label })

@@ -41,22 +41,11 @@ const moreDialog = useRef('moreDialog')
 const moreOpen = state(false)
 const desktopWidth = useMediaQuery('(min-width: 1024px)')
 
-const unread = state({ inbox: 0, listening: 0 })
-let loadingUnread = false
+const bootstrap = workspaceBootstrapQuery()
+const unread = derived(() => bootstrap.data()?.unread ?? { inbox: 0, listening: 0 })
 
-async function refreshUnread() {
-  if (loadingUnread) return
-  loadingUnread = true
-  try {
-    const payload = await requestJson('/api/postline/unread', { cache: 'no-store' })
-    unread.set({ inbox: Number(payload.data.inbox) || 0, listening: Number(payload.data.listening) || 0 })
-  }
-  catch {
-    // Keep the last counts while a request is unavailable.
-  }
-  finally {
-    loadingUnread = false
-  }
+function refreshUnread() {
+  void bootstrap.load()
 }
 
 function unreadFor(href: string): number {
