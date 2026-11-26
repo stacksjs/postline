@@ -372,21 +372,26 @@ export class BlueskyService {
    * any live session can read them.
    */
   async syncMetrics(limit = 100): Promise<{ synced: number }> {
-    let identities = (await listIdentityRows<SocialIdentityRow>('bluesky')).filter(hasSession)
-    if (identities.length === 0) identities = [await this.requireIdentity()]
-    const fallback = pickDefaultIdentity(identities, hasSession) || identities[0]!
-    await this.ensureDriver()
-
-    const targets = await database
+    const connected = (await listIdentityRows<SocialIdentityRow>('bluesky')).filter(hasSession)
+    const published = (take: number) => database
       .selectFrom('post_targets')
       .select(['id', 'remote_uri', 'social_identity_id', 'metrics'])
       .where('provider', '=', 'bluesky')
       .where('status', '=', 'published')
       .where('remote_uri', 'like', 'at://%')
       .orderBy('id', 'desc')
-      .limit(limit * identities.length)
+      .limit(take)
       .execute()
 
+    // Nothing published to Bluesky means nothing to sync, whether or not an
+    // account is connected: a fresh install is not a failure (#202).
+    if (connected.length === 0 && (await published(1)).length === 0) return { synced: 0 }
+
+    const identities = connected.length ? connected : [await this.requireIdentity()]
+    const fallback = pickDefaultIdentity(identities, hasSession) || identities[0]!
+    await this.ensureDriver()
+
+    const targets = await published(limit * identities.length)
     if (targets.length === 0) return { synced: 0 }
 
     const byIdentity = new Map<number, { identity: SocialIdentityRow, targets: any[] }>()

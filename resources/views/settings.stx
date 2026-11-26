@@ -76,6 +76,14 @@
           <p class="m-0 mr-auto text-xs" :data-tone="workspaceTone()" x-show="workspaceMessage()" :text="workspaceMessage()" role="status" aria-live="polite" data-workspace-message></p>
           <Button appearance="mac" variant="primary" :disabled="!canSaveWorkspace()" @click="saveWorkspace">Save</Button>
         </div>
+        {{-- The Mac app's log, for a bug report (#202). Only the app has one. --}}
+        <div class="mt-4" :class="ownWindow() ? '' : 'hidden'">
+          <SettingsGroup title="Troubleshooting" footer="The log is private to your Mac account, holds no passwords or sign-in links, and is kept to a few megabytes.">
+            <SettingsRow label="Log" setting="reveal-log" keywords="log logs debug bug report finder">
+              <Button appearance="mac" @click="revealLog">Show in Finder</Button>
+            </SettingsRow>
+          </SettingsGroup>
+        </div>
       </SettingsPane>
 
       <SettingsPane id="appearance" title="Appearance">
@@ -438,6 +446,14 @@
     }
 
     const signOut = (): Promise<void> => endSession('/api/logout')
+
+    /** Select the Mac app's log in Finder; the agent runs `open -R` on its fixed path. */
+    const revealLog = async (): Promise<void> => {
+      try {
+        await fetch('/api/postline/desktop/reveal-log', { method: 'POST' })
+      }
+      catch {}
+    }
 
     /** Every session and token, everywhere; then this browser leaves like a normal sign-out. */
     const signOutEverywhere = async (): Promise<void> => {

@@ -181,6 +181,8 @@ route.group({ prefix: '/postline' }, () => {
   // Automatic deletion of posts older than N days (Settings). The daily
   // AutoDeletePosts job does the deleting; these only read and save the rule.
   route.get('/system', 'Actions/Postline/SystemStatusAction').middleware('auth')
+  // The Mac app's log in Finder; answers only inside the Mac app (#202).
+  route.post('/desktop/reveal-log', 'Actions/Postline/DesktopRevealLogAction').middleware('auth').rateLimit(10, 'minute')
   route.get('/activity', 'Actions/Postline/ActivityAction').middleware('auth')
   route.get('/alerts', 'Actions/Postline/AlertListAction').middleware('auth')
   route.post('/alerts/read', 'Actions/Postline/AlertReadAction').middleware('auth').rateLimit(60, 'minute')
