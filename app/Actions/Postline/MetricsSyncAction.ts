@@ -1,7 +1,8 @@
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { actionFailure } from '../../Support/Http/action-error'
-import { bluesky } from '../../Services/Social/BlueskyService'
+import { UserFacingError } from '../../Support/Http/user-error'
+import { syncEngagement } from '../../Services/Social/EngagementService'
 
 export default new Action({
   name: 'Postline Metrics Sync',
@@ -10,7 +11,9 @@ export default new Action({
 
   async handle() {
     try {
-      const data = await bluesky.syncMetrics()
+      const data = await syncEngagement()
+      if (!data.synced && data.errors.length)
+        return actionFailure(new UserFacingError(data.errors.map(({ explanation }) => explanation).join(' '), 'engagement_sync_failed'), 422)
       return response.json({ ok: true, data })
     }
     catch (error) {

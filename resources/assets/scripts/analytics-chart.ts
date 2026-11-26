@@ -276,7 +276,7 @@ function fillStats(payload: AnalyticsPayload): void {
   set(
     '[data-analytics-engagement-trend]',
     engagement?.syncedTargets
-      ? `${measuredNetworks || 'Bluesky'} · ${engagement.likes} likes · ${engagement.reposts} reposts · ${engagement.replies} replies`
+      ? `${measuredNetworks || 'Measured posts'} · ${engagement.likes} likes · ${engagement.reposts} reposts · ${engagement.replies} replies`
       : 'Syncs after publishing to Bluesky',
   )
   const sampleLabel = ({ average, count }: { average: number, count: number }): string =>

@@ -12,4 +12,7 @@
   images. Visibility and content warnings are set per post in the composer.
 - **Inbox:** direct conversations (posts with Mentioned people only visibility)
   appear in Postline's inbox.
+- **Analytics:** Postline reads likes, boosts and replies through the account
+  that published each post. Private posts require the token's read scope.
+  [Mastodon status API](https://docs.joinmastodon.org/methods/statuses/#get).
 - Revoke access at any time by deleting the application on your instance.

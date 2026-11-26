@@ -1,3 +1,4 @@
+import type { PostMetrics } from '@stacksjs/socials'
 import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
@@ -7,7 +8,7 @@ import { MastodonDriver, mastodonIdempotencyKey, normalizeInstance } from './Dri
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { ensureAccount, now, uuid } from './support'
-import { explainNetworkError } from '../../Support/Social/network-errors'
+import { describeNetworkError, explainNetworkError } from '../../Support/Social/network-errors'
 import { classifyFailure } from '../../Support/Social/retry'
 
 const database = db as any
@@ -30,6 +31,12 @@ type SocialDriverRow = {
   display_name: string
   status: 'active' | 'planned' | 'disabled'
   character_limit: number
+}
+
+interface MetricTarget {
+  id: number
+  remote_uri: string | null
+  remote_cid: string | null
 }
 
 export class MastodonService {
@@ -211,6 +218,63 @@ export class MastodonService {
 
       return { provider: 'mastodon', ok: false, error: message, targetId: Number(target.id), retry: classifyFailure(error), ...account }
     }
+  }
+
+  /** Read each post through the account and instance that published it. */
+  async syncMetrics(limit = 100): Promise<{ synced: number, errors?: string[] }> {
+    const identities = (await listIdentityRows<SocialIdentityRow>('mastodon'))
+      .filter(identity => identity.external_id && isUsableIdentity(identity))
+    if (!identities.length) return { synced: 0 }
+
+    const published = () => database.selectFrom('post_targets')
+      .select(['id', 'remote_uri', 'remote_cid'])
+      .where('provider', '=', 'mastodon')
+      .where('status', '=', 'published')
+      .orderBy('id', 'desc')
+
+    // Older targets do not name an account. A Mastodon status id only makes
+    // sense on its own instance, so match the stored URL to that instance.
+    const older = await published().where('social_identity_id', 'is', null).limit(limit * identities.length).execute() as MetricTarget[]
+    let synced = 0
+    const errors: string[] = []
+
+    for (const identity of identities) {
+      const instance = String(identity.external_id)
+      const targets = await published().where('social_identity_id', '=', identity.id).limit(limit).execute() as MetricTarget[]
+      const sameInstance = identities.filter(account => account.external_id === instance)
+      if (targets.length < limit && pickDefaultIdentity(sameInstance)?.id === identity.id)
+        targets.push(...older.filter(target => target.remote_uri?.startsWith(`${instance}/`)).slice(0, limit - targets.length))
+
+      const referenced = targets.flatMap((target) => {
+        const remoteId = target.remote_cid || target.remote_uri
+        return remoteId ? [{ id: target.id, remoteId }] : []
+      })
+      if (!referenced.length) continue
+
+      let counts: PostMetrics[]
+      try {
+        counts = await this.driver.metrics(this.credentialsFor(identity), referenced.map(target => target.remoteId))
+      }
+      catch (error) {
+        errors.push(describeNetworkError('mastodon', error, 'metrics'))
+        continue
+      }
+
+      const byRemote = new Map(counts.map(count => [count.uri, count]))
+      const syncedAt = now()
+      for (const target of referenced) {
+        const count = byRemote.get(target.remoteId)
+        // A private post can be omitted when a token lacks read access.
+        // Keep its last measured counts until the server answers again.
+        if (!count) continue
+        const updated = await database.updateTable('post_targets').set({
+          metrics: JSON.stringify({ likes: count.likes, reposts: count.reposts, replies: count.replies, syncedAt }),
+        }).where('id', '=', target.id).where('status', '=', 'published').returning('id').executeTakeFirst()
+        if (updated) synced++
+      }
+    }
+
+    return { synced, ...(errors.length ? { errors } : {}) }
   }
 
   /**

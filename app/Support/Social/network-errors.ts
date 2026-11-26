@@ -44,13 +44,14 @@ const NAMES: Record<string, string> = {
  * through as it is.
  */
 /** What Postline was doing when the network said no, so the message names it. */
-export type NetworkAction = 'post' | 'delete' | 'read' | 'search'
+export type NetworkAction = 'post' | 'delete' | 'read' | 'search' | 'metrics'
 
 const DOING: Record<NetworkAction, { thing: string, verb: string }> = {
   post: { thing: 'take this post', verb: 'post' },
   delete: { thing: 'delete this post', verb: 'delete posts' },
   read: { thing: 'load your messages', verb: 'read messages' },
   search: { thing: 'run this search', verb: 'search' },
+  metrics: { thing: 'load engagement metrics', verb: 'read engagement metrics' },
 }
 
 /**

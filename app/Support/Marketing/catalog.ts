@@ -137,16 +137,16 @@ export const FEATURES: MarketingEntry[] = [
     slug: 'analytics',
     nav: 'Analytics',
     title: 'What actually landed',
-    summary: 'Publishing activity across every network, and engagement for Bluesky posts, stored against the posts that earned it.',
+    summary: 'Publishing activity across networks, plus engagement on Bluesky and Mastodon posts.',
     icon: 'chart-line-data-01',
-    intro: 'Compare publishing activity across the networks you use. Postline syncs likes, reposts, and replies for Bluesky and shows the interactions earned by measured posts.',
+    intro: 'Compare publishing activity across the networks you use. Postline syncs likes, reposts, and replies from Bluesky and Mastodon.',
     sections: [
-      { heading: 'Counts, attached to your posts', body: 'Postline stores interactions with each measured Bluesky post. Recommendations require enough measured posts and a clear leader.' },
+      { heading: 'Counts, attached to your posts', body: 'Postline stores interactions with each measured post. Recommendations require enough measured posts and a clear leader.' },
       { heading: 'When and where you publish', body: 'See how much went out over the last thirty days, which networks carried it, and which posting windows you use.' },
-      { heading: 'Batched and rate-aware', body: 'The Bluesky sync runs in batches and skips posts that have been deleted.' },
+      { heading: 'Batched and rate-aware', body: 'Postline groups requests by publishing account and uses each network’s batch API where available.' },
     ],
     points: [
-      'Bluesky likes, reposts and replies per post',
+      'Likes, reposts and replies from Bluesky and Mastodon',
       'Publishing by network and posting window',
       'History survives an account going away',
     ],
@@ -221,7 +221,7 @@ export const USE_CASES: MarketingEntry[] = [
     points: [
       'Cover fragmented developer communities',
       'Adjust tone per network',
-      'Per-post engagement on Bluesky',
+      'Per-post engagement on Bluesky and Mastodon',
     ],
   },
   {

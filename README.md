@@ -21,7 +21,7 @@ it post as you never leave it.
 | **Campaigns** | Lay a launch out across weeks, have an assistant draft the sequence, then move it into the queue in one step |
 | **Inbox** | Direct messages from Bluesky and Mastodon (an app password with message access) in one list. X messages are not supported yet |
 | **Listening** | Keyword rules across Bluesky, X and Mastodon, checked every five minutes |
-| **Analytics** | Publishing activity for every network; likes, reposts and replies synced for Bluesky posts, against the post that earned them |
+| **Analytics** | Publishing activity for every network, with likes, reposts and replies for Bluesky and Mastodon posts |
 | **Cleanup** | Delete posts older than a set number of days, or clear an account, with a preview first |
 | **Blog** | Write long-form posts under Writing and publish them to your own site |
 

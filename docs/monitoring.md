@@ -10,6 +10,6 @@ Open **Listening** and create a rule with the terms and networks you want to wat
 
 ## Analytics
 
-Publishing totals come from posts sent through Postline. Engagement comes from networks that supply metrics to the sync job. Postline currently syncs Bluesky engagement. A post with missing metrics still contributes to publishing totals once it is sent. Check the source network and date range before comparing engagement.
+Publishing totals come from posts sent through Postline. Engagement comes from networks that supply metrics to the sync job. Postline syncs engagement from Bluesky and Mastodon. Mastodon boosts count as reposts. A post with missing metrics still contributes to publishing totals once it is sent. Check the source network and date range before comparing engagement.
 
 **Best window** compares average interactions for measured posts by day of week and hour in the last 30 days. Each comparison requires enough samples in at least two groups and a unique highest average. The scheduler refreshes engagement periodically.
