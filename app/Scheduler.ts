@@ -58,6 +58,11 @@ export default function () {
     .daily()
     .withoutOverlapping(30)
 
+  schedule
+    .job('BackupWorkspace')
+    .dailyAt('02:00')
+    .withoutOverlapping(180)
+
   // Remove sign-in tokens that have expired or been revoked. Every sign-in
   // mints one and nothing else deletes them, so the table only ever grew.
   schedule

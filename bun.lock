@@ -10,6 +10,7 @@
         "@stacksjs/stx": "^0.2.953",
         "@stacksjs/ts-cloud": "^0.16.152",
         "stacks": "^0.75.695",
+        "ts-backups": "https://github.com/stacksjs/ts-backups/releases/download/v0.1.6/ts-backups-0.1.6.tgz",
         "ts-images": "^0.2.35",
         "ts-medium-editor": "^0.2.0",
       },
@@ -478,6 +479,8 @@
     "stripe": ["stripe@23.0.0", "", { "peerDependencies": { "@types/node": ">=20" }, "optionalPeers": ["@types/node"] }, "sha512-MDE2A5ZVVluYURORaZEVghSmnLJc3w6aHAlZSxDQMsOjOb3V0O6ro/CiaeFlJS4N7uIVmsg98ocRsPmUK6YfyA=="],
 
     "stx-router": ["stx-router@0.2.953", "", {}, "sha512-zRtSuyFn5yBw4KMYuRRzTbzgVKmuAo7OkWNLcUOuXGGp++6PqXgXcPJTGM6tuw3qNWltZVAy6xQB1r9ryUm3Cg=="],
+
+    "ts-backups": ["ts-backups@https://github.com/stacksjs/ts-backups/releases/download/v0.1.6/ts-backups-0.1.6.tgz", { "hasInstallScript": true, "bin": { "backup": "./dist/bin/cli.js", "ts-backups": "./dist/bin/cli.js" } }, "sha512-TUtDON8D0fGtI9QhQvpe0UQ9pKfed3tNkWAYjodiW7WK2RFKYARVDiekCC1NfRay+FIbSy6anFf0IkiPaflEbw=="],
 
     "ts-broadcasting": ["ts-broadcasting@0.0.13", "", { "bin": { "broadcast": "./dist/bin/cli.js" } }, "sha512-F9amVHcLX3DzslD9HuFEZh8l0HnQR8e1yc1H/lo0TIsbw0EcZLg8UTbOGAipCywkdJtJrMvlm9ab/dhM9ugBmA=="],
 

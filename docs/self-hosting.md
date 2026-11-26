@@ -61,6 +61,9 @@ postline.example.com {
 
 ## What else to set
 
+See [Back up and restore a Postline server](recovery.md) for encrypted off-site
+recovery of your database, media, and application key.
+
 | Variable | Why |
 |---|---|
 | `APP_KEY` | Encrypts the network tokens in the database. Back it up with the database: without it every account has to be reconnected |

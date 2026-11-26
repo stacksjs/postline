@@ -12,6 +12,7 @@
     "AutoDeletePosts": true,
     "Automation": true,
     "AutomationRun": true,
+    "BackupWorkspace": true,
     "Bid": true,
     "BlogPost": true,
     "Board": true,
