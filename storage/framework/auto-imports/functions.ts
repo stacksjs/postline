@@ -3,6 +3,8 @@
 export { providerLabel, providerInitial, providerColor, providerIcon } from '../../../resources/functions/networks'
 export { passkeys } from '../../../resources/functions/passkeys'
 export { requestJson, fetchWorkspaceBootstrap, refreshWorkspaceBootstrap, disconnectSocialAccount, escapeHtml, relativeTime, workspaceBootstrapQuery, announceWorkspaceChange, bindWorkspaceChanges } from '../../../resources/functions/postline-client'
+export { dismissPostlineToast, showPostlineToast } from '../../../resources/functions/postline-toast'
+export type { PostlineToastTone, PostlineToastOptions } from '../../../resources/functions/postline-toast'
 export { fetchWorkspace, fetchLinkPreview, fetchProviders, publishCrosspost, formatHandle, targetLabel } from '../../../resources/functions/social-client'
 export type { AccountStatus, ProviderStatus, CrosspostResultItem, CrosspostInput } from '../../../resources/functions/social-client'
 export { workspaceCommands, runWorkspaceCommand } from '../../../resources/functions/workspace-commands'

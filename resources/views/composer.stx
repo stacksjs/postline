@@ -189,6 +189,7 @@
   </section>
 
   <script client>
+    import { dismissPostlineToast, showPostlineToast } from '../functions/postline-toast'
     import { countText } from '../../app/Support/Social/count-text'
     import { mediaObjections } from '../../app/Support/Social/media-rules'
     import { fetchLinkPreview, fetchProviders, fetchWorkspace, formatHandle, publishCrosspost, targetLabel } from '../functions/social-client'
@@ -346,25 +347,16 @@
       let editRemoveImage = false
 
       const setStatus = (message, tone = 'neutral', options = {}) => {
-        // Resolve the toast helper at call time. It's a deferred module that
-        // loads AFTER this inline script parses, so capturing it eagerly (as
-        // this used to) left it undefined on every full page load — silently
-        // dropping all feedback to the console.
-        const show = window.postlineToast?.show
-        if (show) {
-          show({
-            title: options.title,
-            message,
-            tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info',
-            url: options.url,
-            id: options.id,
-            action: options.action,
-            dedupeMs: options.dedupeMs,
-            durationMs: options.durationMs,
-          })
-          return
-        }
-        console.log(`[postline] ${message}`)
+        showPostlineToast({
+          title: options.title,
+          message,
+          tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info',
+          url: options.url,
+          id: options.id,
+          action: options.action,
+          dedupeMs: options.dedupeMs,
+          durationMs: options.durationMs,
+        })
       }
 
       /**
@@ -1490,7 +1482,7 @@
           clearAttachment()
           resetPostOptions()
           if (composeTitle) composeTitle.value = ''
-          window.postlineToast?.dismiss?.('publish')
+          dismissPostlineToast('publish')
           if (failures.length && successCount === 0) {
             setStatus(`Publish failed. ${failures.join('; ')}`, 'error', { title: 'Publish failed' })
           }
@@ -1508,7 +1500,7 @@
           }
         }
         catch (error) {
-          window.postlineToast?.dismiss?.('publish')
+          dismissPostlineToast('publish')
           setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Publish failed' })
         }
         finally {

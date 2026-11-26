@@ -14,6 +14,7 @@ const root = resolve(import.meta.dir, '../..')
 const files = [
   ...readdirSync(join(root, 'resources/views')).filter(name => name.endsWith('.stx') && name !== 'index.stx').map(name => `resources/views/${name}`),
   ...readdirSync(join(root, 'resources/assets/scripts'), { recursive: true, encoding: 'utf8' }).filter(name => name.endsWith('.ts')).map(name => `resources/assets/scripts/${name}`),
+  ...readdirSync(join(root, 'resources/functions'), { recursive: true, encoding: 'utf8' }).filter(name => name.endsWith('.ts')).map(name => `resources/functions/${name}`),
   'resources/components/AppSidebar.stx',
   'resources/layouts/app.stx',
   'resources/layouts/settings.stx',

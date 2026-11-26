@@ -150,6 +150,7 @@
 
 
   <script client>
+    import { showPostlineToast } from '../functions/postline-toast'
     import { fetchWorkspace, targetLabel } from '../functions/social-client'
 
     /**
@@ -628,10 +629,10 @@
       busyId.set(id)
       try {
         await post(path, id)
-        postlineToast?.show?.({ title: success.title, message: success.message, tone: 'success' })
+        showPostlineToast({ title: success.title, message: success.message, tone: 'success' })
       }
       catch (error) {
-        postlineToast?.show?.({
+        showPostlineToast({
           title: failure,
           message: error instanceof Error ? error.message : String(error),
           tone: 'error',

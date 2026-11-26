@@ -196,6 +196,7 @@
   </section>
 
   <script client>
+    import { showPostlineToast } from '../functions/postline-toast'
     const bootstrap = workspaceBootstrapQuery()
     const channelsReady = derived(() => Boolean(bootstrap.data()))
     const channelProviders = derived(() => bootstrap.data()?.providers.map(status => status.provider) ?? [])
@@ -311,12 +312,7 @@
       if (!root) return
 
       const notify = (message, tone = 'neutral', options = {}) => {
-        // Resolve the toast helper at call time — it's a deferred module that
-        // loads after this inline script parses, so an eager capture is
-        // undefined on a full page load (e.g. the OAuth redirect back here).
-        const show = window.postlineToast?.show
-        if (show) show({ message, tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info', title: options.title })
-        else console.log(message)
+        showPostlineToast({ message, tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info', title: options.title })
       }
 
       const route = useRoute()

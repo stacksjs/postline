@@ -1,5 +1,6 @@
 <script client>
 import type { CraftBridgeAPI } from 'craft-native'
+import { dismissPostlineToast, showPostlineToast } from '../functions/postline-toast'
 
 type WorkspaceBridge = CraftBridgeAPI & {
   window: CraftBridgeAPI['window'] & {
@@ -17,6 +18,23 @@ const colorMode = useColorMode()
 let settingsChannel: BroadcastChannel | null = null
 let unbindSettingsMenu: (() => void) | undefined
 let unbindWorkspaceChanges: (() => void) | undefined
+const offlineToastId = 'postline-offline'
+
+function showOfflineNotice() {
+  showPostlineToast({
+    id: offlineToastId,
+    tone: 'info',
+    durationMs: 0,
+    title: 'You are offline',
+    message: 'Changes made now will not save until the connection is back. Scheduled posts still go out on time.',
+  })
+}
+
+useEventListener('offline', showOfflineNotice)
+useEventListener('online', () => {
+  dismissPostlineToast(offlineToastId)
+  showPostlineToast({ tone: 'success', durationMs: 3000, title: 'Back online', message: 'Postline is connected again.' })
+})
 
 function toggleSidebar() {
   collapsed.set(!collapsed())
@@ -96,6 +114,7 @@ desktop.onReady((host) => {
 })
 
 onMount(() => {
+  if (shell.current?.ownerDocument.defaultView?.navigator.onLine === false) showOfflineNotice()
   unbindWorkspaceChanges = bindWorkspaceChanges()
   if (typeof BroadcastChannel !== 'function') return
   settingsChannel = new BroadcastChannel('postline:settings')

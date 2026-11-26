@@ -101,6 +101,7 @@
   </section>
 
   <script client>
+    import { showPostlineToast } from '../functions/postline-toast'
     /**
      * Wire shapes for `/api/postline/timeline`, declared where they are used.
      *
@@ -225,7 +226,7 @@
         items.set(rows)
         metaText.set(notConnected() ? 'No account connected' : `${rows.length} post${rows.length === 1 ? '' : 's'}`)
         if (manual) {
-          postlineToast?.show?.({
+          showPostlineToast({
             title: 'Timeline',
             message: `Loaded ${rows.length} posts.`,
             tone: 'success',
@@ -239,7 +240,7 @@
         feedError.set(message)
         metaText.set('Could not load feed')
         if (manual)
-          postlineToast?.show?.({ title: 'Timeline', message, tone: 'error', id: 'timeline-load' })
+          showPostlineToast({ title: 'Timeline', message, tone: 'error', id: 'timeline-load' })
       }
       finally {
         busy.set(false)

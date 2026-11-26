@@ -115,6 +115,7 @@
   </section>
 
   <script client>
+    import { showPostlineToast } from '../functions/postline-toast'
     interface ListeningMonitor {
       id: number
       name: string
@@ -249,12 +250,12 @@
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ id: draftId(), name: draftName(), keywords: draftKeywords().split(',').map(item => item.trim()).filter(Boolean), providers: draftProviders(), match_mode: draftMatchMode(), status: draftStatus() }),
         })
-        postlineToast?.show?.({ title: 'Listening rule saved', message: 'Postline will watch these keywords automatically.', tone: 'success', id: 'listening-save' })
+        showPostlineToast({ title: 'Listening rule saved', message: 'Postline will watch these keywords automatically.', tone: 'success', id: 'listening-save' })
         resetForm()
         await loadData()
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not save rule', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-save' })
+        showPostlineToast({ title: 'Could not save rule', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-save' })
       }
       finally {
         saving.set(false)
@@ -269,10 +270,10 @@
         resetForm()
         filterMonitorId.set(0)
         await loadData()
-        postlineToast?.show?.({ title: 'Listening rule deleted', message: 'The watch and its saved mentions were removed.', tone: 'success', id: 'listening-delete' })
+        showPostlineToast({ title: 'Listening rule deleted', message: 'The watch and its saved mentions were removed.', tone: 'success', id: 'listening-delete' })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not delete rule', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-delete' })
+        showPostlineToast({ title: 'Could not delete rule', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-delete' })
       }
       finally {
         deleting.set(false)
@@ -286,10 +287,10 @@
         await loadData({ quiet: true })
         const skipped = payload.data?.errors?.length || 0
         const suffix = skipped ? ` ${skipped} network${skipped === 1 ? '' : 's'} need attention.` : ''
-        postlineToast?.show?.({ title: 'Listening scan complete', message: `${payload.data?.created || 0} new mention${payload.data?.created === 1 ? '' : 's'} saved.${suffix}`, tone: skipped ? 'neutral' : 'success', id: 'listening-scan' })
+        showPostlineToast({ title: 'Listening scan complete', message: `${payload.data?.created || 0} new mention${payload.data?.created === 1 ? '' : 's'} saved.${suffix}`, tone: skipped ? 'neutral' : 'success', id: 'listening-scan' })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Listening scan failed', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-scan' })
+        showPostlineToast({ title: 'Listening scan failed', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-scan' })
       }
       finally {
         scanning.set(false)
@@ -312,7 +313,7 @@
         mentions.set(mentions().map(item => !filterMonitorId() || item.monitorId === filterMonitorId() ? { ...item, status: 'read' } : item))
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not update mentions', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-read' })
+        showPostlineToast({ title: 'Could not update mentions', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-read' })
       }
     }
 

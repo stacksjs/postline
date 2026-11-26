@@ -165,6 +165,17 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
     ${shell}.dataset.sidebarCollapsed === 'false' && ${width} === 286
       && getComputedStyle(${expand}).visibility === 'hidden'`), 5_000)
 
+  const offlineNotice = "document.querySelector('[data-toast-id=postline-offline]')"
+  await evaluate(cdp, "window.dispatchEvent(new Event('offline')); window.dispatchEvent(new Event('offline'))")
+  await waitUntil('The offline notice is displayed once', () => evaluate<boolean>(cdp, `
+    ${offlineNotice}?.classList.contains('is-visible')
+      && document.querySelectorAll('[data-toast-id=postline-offline]').length === 1
+      && ${offlineNotice}.textContent.includes('Scheduled posts still go out on time.')`), 5_000)
+  await evaluate(cdp, "window.dispatchEvent(new Event('online'))")
+  await waitUntil('The online notice replaces the offline notice', () => evaluate<boolean>(cdp, `
+    !${offlineNotice}
+      && document.querySelector('#postline-toast-host .is-visible')?.textContent.includes('Back online')`), 5_000)
+
   await evaluate(cdp, `(() => {
     const calls = window.postlineShellCalls = { collapsed: [], settings: [], drags: 0, focus: 0, appearance: '' }
     window.craft = {
@@ -302,6 +313,7 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
     const postedAt = new Date().toISOString()
+    const publishGate = new Promise(resolve => { window.finishPublish = resolve })
     let inboxUnread = 3
     const conversations = [
       { id: 1, provider: 'bluesky', participantName: 'Alice Example', participantHandle: 'alice.example', lastMessageAt: postedAt, lastMessagePreview: 'Hello' },
@@ -319,8 +331,9 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
           : provider)
         return Response.json({ ...payload, data: { ...payload.data, providers, unread: { inbox: inboxUnread, listening: 106 } } })
       })
-      if (path === '/api/postline/publish') return request.formData().then(body => {
+      if (path === '/api/postline/publish') return request.formData().then(async body => {
         window.composerPublish = { text: body.get('text'), providers: body.get('providers') }
+        await publishGate
         return Response.json({ ok: true, data: { postId: 1, results: [{ provider: 'bluesky', ok: true }] } })
       })
       if (path === '/api/postline/inbox') return Promise.resolve(Response.json({ ok: true, data: { conversations } }))
@@ -376,6 +389,12 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
     await evaluate(cdp, "document.querySelector('[data-bluesky-publish]').click()")
     await waitUntil('The imported publish function', () => evaluate<boolean>(cdp, `
       window.composerPublish?.text === ${JSON.stringify(text)} && window.composerPublish.providers === 'bluesky:101'`), 5_000)
+    await waitUntil('The publish progress notice', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-toast-id=publish].is-visible .postline-toast__spinner') !== null`), 5_000)
+    await evaluate(cdp, 'window.finishPublish()')
+    await waitUntil('The publish success notice replaces progress', () => evaluate<boolean>(cdp, `
+      !document.querySelector('[data-toast-id=publish]')
+        && document.querySelector('#postline-toast-host .postline-toast--success.is-visible')?.textContent.includes('Your post is live on Bluesky.')`), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })

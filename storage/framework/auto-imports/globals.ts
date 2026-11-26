@@ -24,6 +24,8 @@ declare global {
   const workspaceBootstrapQuery: typeof autoImports.workspaceBootstrapQuery
   const announceWorkspaceChange: typeof autoImports.announceWorkspaceChange
   const bindWorkspaceChanges: typeof autoImports.bindWorkspaceChanges
+  const dismissPostlineToast: typeof autoImports.dismissPostlineToast
+  const showPostlineToast: typeof autoImports.showPostlineToast
   const fetchWorkspace: typeof autoImports.fetchWorkspace
   const fetchLinkPreview: typeof autoImports.fetchLinkPreview
   const fetchProviders: typeof autoImports.fetchProviders

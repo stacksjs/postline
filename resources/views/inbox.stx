@@ -157,6 +157,7 @@
   </section>
 
   <script client>
+    import { showPostlineToast } from '../functions/postline-toast'
     interface InboxConversation {
       id: number
       provider: string
@@ -412,7 +413,7 @@
         if (activeId()) await loadThread({ markRead: false, quiet: true })
         const failures = payload.data?.errors?.length || 0
         const suffix = failures ? ` ${failures} network${failures === 1 ? '' : 's'} need attention.` : ''
-        postlineToast?.show?.({
+        showPostlineToast({
           title: 'Inbox synced',
           message: `${payload.data?.messages || 0} new message${payload.data?.messages === 1 ? '' : 's'}.${suffix}`,
           tone: failures ? 'neutral' : 'success',
@@ -420,7 +421,7 @@
         })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Inbox sync failed', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-sync' })
+        showPostlineToast({ title: 'Inbox sync failed', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-sync' })
       }
       finally {
         syncing.set(false)
@@ -436,7 +437,7 @@
         await loadConversations({ quiet: true })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not refresh thread', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-refresh' })
+        showPostlineToast({ title: 'Could not refresh thread', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-refresh' })
       }
       finally {
         refreshing.set(false)
@@ -457,7 +458,7 @@
         await loadConversations({ quiet: true })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Message not sent', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-reply' })
+        showPostlineToast({ title: 'Message not sent', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-reply' })
       }
       finally {
         sending.set(false)
@@ -477,7 +478,7 @@
         unreadCount.set(0)
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not update the inbox', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-read' })
+        showPostlineToast({ title: 'Could not update the inbox', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-read' })
       }
     }
 
@@ -488,7 +489,7 @@
         await postJson('/api/postline/inbox/archive', { conversation_id: activeId(), status: nextStatus })
         closeConversation()
         await loadConversations()
-        postlineToast?.show?.({
+        showPostlineToast({
           title: nextStatus === 'archived' ? 'Conversation archived' : 'Conversation restored',
           message: nextStatus === 'archived' ? 'It stays searchable under Archived.' : 'It is back in your inbox.',
           tone: 'success',
@@ -496,7 +497,7 @@
         })
       }
       catch (error) {
-        postlineToast?.show?.({ title: 'Could not update the conversation', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-archive' })
+        showPostlineToast({ title: 'Could not update the conversation', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-archive' })
       }
     }
 
