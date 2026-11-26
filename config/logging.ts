@@ -1,5 +1,7 @@
 import type { LoggingConfig } from '@stacksjs/types'
+import process from 'node:process'
 import { storagePath } from '@stacksjs/path'
+import { errorReporter } from '../app/Support/error-reporter'
 
 /**
  * **Logging Configuration**
@@ -28,4 +30,23 @@ export default {
    * @default 'storage/logs/deployments.log'
    */
   deploymentsPath: storagePath('logs/deployments.log'),
+
+  /**
+   * **Retention**
+   *
+   * Daily log files older than this many days are deleted (#211).
+   * `LOG_RETENTION_DAYS` sets it; 0 keeps every file.
+   *
+   * @default 14
+   */
+  retentionDays: /^\d+$/.test(String(process.env.LOG_RETENTION_DAYS ?? '').trim()) ? Number(process.env.LOG_RETENTION_DAYS) : 14,
+
+  /**
+   * **Error reporting**
+   *
+   * Every error the app logs is also POSTed as JSON to
+   * `POSTLINE_ERROR_WEBHOOK_URL` when it is set: a service of the owner's own.
+   * Nothing is sent anywhere without it.
+   */
+  transports: errorReporter(),
 } satisfies LoggingConfig
