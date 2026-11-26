@@ -19,19 +19,6 @@ const dist = resolve(import.meta.dir, '..', process.argv[2] || 'dist')
 const KB = 1024
 export const BUDGETS = { script: 150 * KB, css: 30 * KB, fonts: 60 * KB }
 
-/**
- * Pages over a budget today, held at what they weigh now so they cannot grow.
- * Lower a number when a page gets lighter, and delete it once the page meets
- * the budget; never raise one. Settings sheds its CSS with the one Settings
- * window (#170).
- *
- * The composer's editor and the analytics chart are not counted: view-code.ts
- * imports each after the page is up, and only on its own view.
- */
-export const CEILINGS: Record<string, Partial<typeof BUDGETS>> = {
-  settings: { css: 31.5 * KB },
-}
-
 /** The workspace pages, which carry the app's scripts. */
 const APP_PAGES = ['composer', 'queue', 'timeline', 'analytics', 'campaigns', 'listening', 'inbox', 'accounts', 'activity', 'writing', 'settings', 'login']
 
@@ -53,6 +40,7 @@ for (const page of APP_PAGES) {
   const html = readFileSync(file, 'utf8')
 
   let script = 0
+  const inlineScripts: string[] = []
   for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
     const attrs = match[1]!
     if (/type\s*=\s*["'](?!module|text\/javascript)[^"']*["']/i.test(attrs)) continue
@@ -61,13 +49,14 @@ for (const page of APP_PAGES) {
       const path = local(src)
       if (path) script += gz(readFileSync(path))
     }
-    else {
-      script += gz(match[2]!)
-    }
+    else inlineScripts.push(match[2]!)
   }
+  // Inline blocks share the HTML response's compression dictionary. Linked
+  // assets are separate responses, each with a dictionary of its own.
+  if (inlineScripts.length) script += gz(inlineScripts.join('\n'))
 
-  let css = 0
-  for (const match of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)) css += gz(match[1]!)
+  const inlineStyles = Array.from(html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi), match => match[1])
+  let css = inlineStyles.length ? gz(inlineStyles.join('\n')) : 0
   for (const match of html.matchAll(/<link\b[^>]*rel\s*=\s*["']stylesheet["'][^>]*>/gi)) {
     const href = match[0].match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1]
     const path = href ? local(href) : null
@@ -90,7 +79,7 @@ for (const page of APP_PAGES) {
   }
 
   rows.push(`${page.padEnd(10)} script ${(script / KB).toFixed(1).padStart(6)} KB   css ${(css / KB).toFixed(1).padStart(5)} KB   fonts ${(fonts / KB).toFixed(1).padStart(5)} KB`)
-  const limit = { ...BUDGETS, ...CEILINGS[page] }
+  const limit = BUDGETS
   if (script > limit.script) failures.push(`${page}: scripts ${(script / KB).toFixed(1)} KB gzipped, budget ${limit.script / KB} KB`)
   if (css > limit.css) failures.push(`${page}: CSS ${(css / KB).toFixed(1)} KB gzipped, budget ${limit.css / KB} KB`)
   if (fonts > limit.fonts) failures.push(`${page}: fonts ${(fonts / KB).toFixed(1)} KB, budget ${limit.fonts / KB} KB`)
