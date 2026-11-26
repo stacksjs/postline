@@ -152,3 +152,27 @@ jobs:
         run: |
           LEFT="$(find dist -name '*.ts')"
           if [ -n "$LEFT" ]; then echo "TypeScript left in dist/:"; echo "$LEFT"; exit 1; fi
+
+  # Every workspace view in a real browser, signed in, light, dark and on a
+  # phone (#80): fails on console errors, failed requests and pages wider than
+  # the screen. The screenshots stay with the run.
+  browser:
+    reviewos:
+      secrets: []
+      artifact-paths:
+        - storage/framework/browser-check/*.png
+    runs-on: [self-hosted, macos-arm64, postline]
+    timeout-minutes: 25
+    steps:
+      - name: Set up Pantry and Bun
+        uses: pantry-pm/pantry/packages/action@be9f7a5b0af91351f5c0b7ea3b2fa98e267753a8 # v0.11.207
+        with:
+          version: 0.11.207
+          install: 'false'
+          packages: bun.sh@${{ env.BUN_VERSION }} git-scm.org@2.53.0
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Write the migrated database the check starts from
+        run: bun scripts/desktop-bundle.ts
+      - name: Open every view
+        run: bun scripts/browser-check.ts

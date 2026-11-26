@@ -47,6 +47,7 @@
 
         <p class="postline-feed__empty" x-show="feedError()" :text="feedError()"></p>
         <p class="postline-feed__empty" x-show="showEmpty()">No posts in your feed yet. Publish from the composer or refresh again.</p>
+        <p class="postline-feed__empty" x-show="notConnected()">Connect a Bluesky account under Settings, Channels to read your timeline here.</p>
 
         <article class="postline-feed-post" x-for="item in items()">
           <div class="postline-feed-post__layout">
@@ -141,7 +142,9 @@
     const loaded = state(false)
 
     const skeletonRows = () => [1, 2, 3, 4]
-    const showEmpty = derived(() => loaded() && !feedError() && items().length === 0)
+    /** No Bluesky account to read from: the page says how to connect one. */
+    const notConnected = state(false)
+    const showEmpty = derived(() => loaded() && !feedError() && !notConnected() && items().length === 0)
 
     const escapeHtml = value => String(value || '')
       .replaceAll('&', '&amp;')
@@ -241,9 +244,10 @@
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky timeline sync failed.')
 
+        notConnected.set(payload.data.connected === false)
         const rows = Array.isArray(payload.data.items) ? payload.data.items.map(toRow) : []
         items.set(rows)
-        metaText.set(`${rows.length} post${rows.length === 1 ? '' : 's'}`)
+        metaText.set(notConnected() ? 'No account connected' : `${rows.length} post${rows.length === 1 ? '' : 's'}`)
         if (manual) {
           postlineToast?.show?.({
             title: 'Timeline',

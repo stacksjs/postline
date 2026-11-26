@@ -15,6 +15,13 @@ export default new Action({
     const identityId = Number(request.get('identity_id') || 0) || null
 
     try {
+      // Nothing to read is not an error: with no Bluesky account the page
+      // shows how to connect one, instead of a failed request on every visit.
+      if (!identityId) {
+        const status = await bluesky.status()
+        if (!status.canPublish && !status.configuredFromEnv)
+          return response.json({ ok: true, data: { connected: false, items: [] } })
+      }
       const data = await bluesky.syncTimeline(limit, identityId)
       return response.json({ ok: true, data })
     }

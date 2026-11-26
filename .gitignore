@@ -101,3 +101,4 @@ storage/framework/desktop/
 # Posts published to the Blog channel. They are the workspace's data, written
 # by the running app, not part of the source.
 content/blog/
+storage/framework/browser-check/
