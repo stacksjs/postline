@@ -37,6 +37,26 @@ route.post('/logout', 'Actions/Auth/LogoutAction')
 // session: there is nobody to sign out of everywhere without one.
 route.post('/logout-all', 'Actions/Auth/LogoutAllAction').middleware('auth').rateLimit(10, 'minute')
 
+// Passkeys and two-factor sign-in (#95), the framework's ceremonies. Signing in
+// with a passkey is public, as signing in is; adding or removing one, and
+// everything about the authenticator app, needs the session. The password
+// stays a way in, so a lost passkey or phone never locks the owner out, and
+// turning the authenticator off asks for it again.
+route.post('/auth/passkeys/authentication/options', 'Actions/Auth/PasskeyAuthenticationOptionsAction').rateLimit(10, 'minute')
+route.post('/auth/passkeys/authentication', 'Actions/Auth/PasskeyAuthenticationAction').rateLimit(10, 'minute')
+route.post('/auth/passkeys/registration/options', 'Actions/Auth/PasskeyRegistrationOptionsAction').middleware('auth').rateLimit(5, 'minute')
+route.post('/auth/passkeys/registration', 'Actions/Auth/PasskeyRegistrationAction').middleware('auth').rateLimit(5, 'minute')
+route.get('/auth/passkeys', 'Actions/Auth/PasskeyIndexAction').middleware('auth')
+route.delete('/auth/passkeys/{id}', 'Actions/Auth/PasskeyDestroyAction').middleware('auth').rateLimit(10, 'minute')
+route.get('/auth/two-factor', 'Actions/Postline/SignInSecurityAction').middleware('auth')
+route.post('/auth/two-factor/setup', 'Actions/Auth/GenerateTwoFactorSecretAction').middleware('auth').rateLimit(10, 'minute')
+route.post('/auth/two-factor/enable', 'Actions/Auth/EnableTwoFactorAction').middleware('auth').rateLimit(10, 'minute')
+route.post('/auth/two-factor/disable', 'Actions/Auth/DisableTwoFactorAction').middleware('auth').rateLimit(10, 'minute')
+route.post('/auth/two-factor/recovery-codes', 'Actions/Postline/RecoveryCodesAction').middleware('auth').rateLimit(5, 'minute')
+// The second step of /login: the password answered with a short-lived
+// challenge, and this trades it plus a code for the session.
+route.post('/auth/two-factor/verify', 'Actions/Auth/VerifyTwoFactorLoginAction').rateLimit(10, 'minute')
+
 // Hands a browser its CSRF cookie. Every write made with the session cookie
 // has to echo that cookie's value in a header (see CsrfScripts.stx). Pages and
 // API responses set it as they go on the web server; the desktop agent does

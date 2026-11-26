@@ -4,4 +4,7 @@
 
 @yield('footer')
 
+{{-- Signing in with a passkey (#95); the sign-in page is this layout's only page. --}}
+<script type="module" src="/assets/scripts/passkeys.ts"></script>
+
 @stack('scripts')

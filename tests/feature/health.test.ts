@@ -9,7 +9,8 @@ describe('health', () => {
   test('reports the scheduler, the disk and the migrations', async () => {
     const response = await featureTest().get('/api/postline/health')
     const body = await response.json() as { disk: string, migrations: string } & Record<string, unknown>
-    expect(Object.keys(body).sort()).toEqual(['database', 'disk', 'migrations', 'ok', 'scheduler'])
+    // `request_id` is the framework's correlation id, on every JSON response.
+    expect(Object.keys(body).filter(key => key !== 'request_id').sort()).toEqual(['database', 'disk', 'migrations', 'ok', 'scheduler'])
     expect(['ok', 'low', 'unknown']).toContain(body.disk)
     expect(['ok', 'pending']).toContain(body.migrations)
     // The suite's database is migrated: only the scheduler can make it unhealthy here.

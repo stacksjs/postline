@@ -21,6 +21,12 @@ const APP_PUBLIC = [
   'POST /api/login',
   'POST /api/register',
   'POST /api/logout',
+  // Signing in with a passkey, and the code step after the password (#95).
+  // Each needs what only the owner has: the passkey, or a challenge the
+  // password just issued plus the authenticator's code.
+  'POST /api/auth/passkeys/authentication/options',
+  'POST /api/auth/passkeys/authentication',
+  'POST /api/auth/two-factor/verify',
   // Hands a browser its CSRF cookie. Reads and changes nothing.
   'GET /api/csrf',
   // Instagram and Threads fetch a queued image from here, server to server.

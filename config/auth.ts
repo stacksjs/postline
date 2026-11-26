@@ -1,5 +1,26 @@
 import type { AuthConfig } from '@stacksjs/types'
 import { env } from '@stacksjs/env'
+import { url as canonicalUrl } from './domains'
+
+/**
+ * The origin passkeys are bound to.
+ *
+ * A passkey only works on the exact origin it was made on, and the browser
+ * offers it only over https or on localhost. `PASSKEY_ORIGIN` names that origin
+ * when the browser reaches Postline somewhere APP_URL does not say; otherwise
+ * APP_URL, which may be written without a scheme (`postline.localhost`).
+ */
+export function passkeyOrigin(source: { PASSKEY_ORIGIN?: unknown, APP_URL?: unknown } = env): string {
+  const raw = String(source.PASSKEY_ORIGIN || source.APP_URL || '').trim()
+  if (!raw) return canonicalUrl
+  const local = /^(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(raw)
+  try {
+    return new URL(/^https?:\/\//.test(raw) ? raw : `${local ? 'http' : 'https'}://${raw}`).origin
+  }
+  catch {
+    return canonicalUrl
+  }
+}
 
 /**
  * **Authentication Configuration**
@@ -78,5 +99,16 @@ export default {
      * @default 60
      */
     throttle: env.AUTH_PASSWORD_RESET_THROTTLE ||60,
+  },
+
+  /**
+   * Passkeys (#95): sign in with Touch ID, a phone or a security key instead
+   * of the password. The password keeps working, so a lost passkey never
+   * locks the owner out.
+   */
+  passkeys: {
+    enabled: true,
+    origin: passkeyOrigin(),
+    name: 'Postline',
   },
 } satisfies AuthConfig

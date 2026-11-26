@@ -32,7 +32,7 @@
         </SettingsSidebarGroup>
         <div x-show="!ownWindow()">
           <SettingsSidebarGroup>
-            <SettingsSidebarItem id="account" label="Account" icon="i-lucide-user" tone="indigo" keywords="sign out log out" />
+            <SettingsSidebarItem id="account" label="Account" icon="i-lucide-user" tone="indigo" keywords="sign out log out passkey two-factor 2fa authenticator recovery codes security" />
           </SettingsSidebarGroup>
         </div>
       </template>
@@ -206,6 +206,75 @@
       </SettingsPane>
 
       <SettingsPane id="account" title="Account">
+        {{--
+          Ways in besides the password (#95). The password always keeps
+          working, so neither a lost passkey nor a lost phone locks the owner
+          out; the recovery codes cover the phone, ./buddy user:add the rest.
+        --}}
+        <SettingsGroup title="Passkeys" footer="Sign in with Touch ID, your phone or a security key instead of typing the password. The password keeps working.">
+          <SettingsRow label="Your passkeys" layout="stacked" setting="passkeys" keywords="passkey webauthn touch id face id security key">
+            <ul class="grid gap-1.5 m-0 p-0 list-none" data-passkey-list>
+              <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-lg" x-for="key in passkeyRows()" data-passkey-row>
+                <span class="grid min-w-0">
+                  <span class="text-ink text-ui truncate" :text="key.name"></span>
+                  <span class="text-muted text-xs" :text="key.detail"></span>
+                </span>
+                <button class="px-2 h-6 text-danger text-xs bg-panel border border-line rounded-md disabled:opacity-50" type="button" :disabled="securityBusy()" @click="askRemovePasskey(key.id)">Remove</button>
+              </li>
+              <li class="text-muted text-xs" x-show="!passkeyRows().length" :text="passkeyEmpty()">No passkeys yet.</li>
+            </ul>
+          </SettingsRow>
+          <SettingsRow label="Add a passkey" :description="passkeyHint()" setting="passkey-add">
+            <Button appearance="mac" :disabled="securityBusy() || !passkeysSupported()" @click="addPasskey">Add Passkey…</Button>
+          </SettingsRow>
+        </SettingsGroup>
+
+        <SettingsGroup title="Two-factor sign-in" footer="After the password, Postline asks for a code from an authenticator app such as 1Password, Google Authenticator or Authy. Recovery codes stand in for the phone if you lose it; each works once.">
+          <SettingsRow label="Authenticator app" setting="two-factor" keywords="2fa totp otp code">
+            <span :class="!twoFactorOn() && !setupQr() ? '' : 'hidden'"><Button appearance="mac" :disabled="securityBusy() || !securityLoaded()" @click="startTwoFactor">Turn On…</Button></span>
+            <span :class="twoFactorOn() ? '' : 'hidden'"><Button appearance="mac" variant="danger" :disabled="securityBusy()" @click="askDisableTwoFactor">Turn Off…</Button></span>
+          </SettingsRow>
+          <div class="gap-3 px-4 py-3" :class="setupQr() ? 'grid' : 'hidden'" data-two-factor-setup>
+            <p class="m-0 text-body text-ui">Scan this with your authenticator app, then enter the 6-digit code it shows.</p>
+            <img class="h-44 w-44 rounded-lg" :src="setupQr()" alt="QR code for your authenticator app">
+            <p class="m-0 text-muted text-xs">Can't scan it? Enter this key instead: <code class="break-all text-body" :text="setupSecret()"></code></p>
+            <div class="flex flex-wrap gap-2 items-center">
+              <TextInput variant="mac" v-model:value="setupCode" placeholder="123456" autocomplete="one-time-code" maxlength="6" data-two-factor-setup-code />
+              <Button appearance="mac" variant="primary" :disabled="securityBusy() || setupCode().trim().length !== 6" @click="confirmTwoFactor">Turn On</Button>
+              <Button appearance="mac" :disabled="securityBusy()" @click="cancelTwoFactorSetup">Cancel</Button>
+            </div>
+          </div>
+          <div :class="twoFactorOn() ? '' : 'hidden'">
+            <SettingsRow label="Recovery codes" :description="recoveryDescription()" setting="recovery-codes" keywords="backup codes">
+              <Button appearance="mac" :disabled="securityBusy()" @click="askNewRecoveryCodes">New Codes…</Button>
+            </SettingsRow>
+          </div>
+          <div class="gap-2 px-4 py-3" :class="recoveryCodes().length ? 'grid' : 'hidden'" data-recovery-codes>
+            <p class="m-0 text-body text-ui">Save these recovery codes somewhere safe, such as your password manager. They are shown only now; each one signs you in once.</p>
+            <ul class="grid gap-1 m-0 p-0 font-mono list-none text-ink text-ui">
+              <li x-for="item in recoveryCodes()" :text="item"></li>
+            </ul>
+            <div class="flex gap-2">
+              <Button appearance="mac" @click="copyRecoveryCodes">Copy</Button>
+              <Button appearance="mac" @click="recoveryCodes.set([])">I Saved Them</Button>
+            </div>
+          </div>
+        </SettingsGroup>
+
+        {{-- One confirmation for the changes that need proof: the password to
+            remove a passkey or turn two-factor off, a current code for new
+            recovery codes. --}}
+        <div class="gap-2 mt-3 p-3 bg-panel-2 border border-line rounded-lg" :class="confirming() ? 'grid' : 'hidden'" data-security-confirm>
+          <p class="m-0 text-body text-ui" :text="confirmPrompt()"></p>
+          <div class="flex flex-wrap gap-2 items-center">
+            <span :class="confirming() === 'codes' ? 'hidden' : ''"><TextInput variant="mac" type="password" v-model:value="confirmValue" autocomplete="current-password" placeholder="Password" data-security-confirm-password /></span>
+            <span :class="confirming() === 'codes' ? '' : 'hidden'"><TextInput variant="mac" v-model:value="confirmValue" autocomplete="one-time-code" placeholder="123456" data-security-confirm-code /></span>
+            <Button appearance="mac" variant="primary" :disabled="securityBusy() || !confirmValue().trim()" @click="runConfirmed">Confirm</Button>
+            <Button appearance="mac" :disabled="securityBusy()" @click="cancelConfirm">Cancel</Button>
+          </div>
+        </div>
+        <p class="m-0 mt-2 text-xs" :data-tone="securityTone()" x-show="securityMessage()" :text="securityMessage()" role="status" aria-live="polite" data-security-message></p>
+
         <SettingsGroup footer="Signing out ends this session on the server and clears it from this browser.">
           <SettingsRow label="Sign out of Postline" setting="sign-out">
             <Button appearance="mac" variant="danger" @click="signOut">Sign Out</Button>
@@ -376,6 +445,192 @@
       if (!window.confirm('Sign out on every browser and device, this one included?')) return
       await endSession('/api/logout-all')
     }
+
+    // --- Passkeys and two-factor sign-in (#95) -------------------------
+    // The ceremonies are in resources/assets/scripts/passkeys.ts; this pane
+    // lists, adds and removes, and walks the authenticator setup.
+
+    interface PasskeyView { id: string, device: string, created_at: unknown, last_used_at: unknown }
+
+    const passkeyList = state<PasskeyView[]>([])
+    const passkeysLoaded = state(false)
+    const securityLoaded = state(false)
+    const twoFactorOn = state(false)
+    const recoveryLeft = state(0)
+    const setupQr = state('')
+    const setupSecret = state('')
+    const setupCode = state('')
+    const recoveryCodes = state<string[]>([])
+    const confirming = state<'' | 'remove' | 'disable' | 'codes'>('')
+    const confirmTarget = state('')
+    const confirmValue = state('')
+    const securityBusy = state(false)
+    const securityMessage = state('')
+    const securityTone = state('muted')
+    // stx-strict-ignore-next-line PublicKeyCredential
+    const passkeysSupported = state(typeof PublicKeyCredential !== 'undefined')
+
+    const shortDate = (value: unknown): string => {
+      const date = value ? new Date(String(value).replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(String(value)) ? '' : 'Z')) : null
+      return date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : ''
+    }
+    const passkeyRows = derived(() => passkeyList().map((key) => {
+      const added = shortDate(key.created_at)
+      const used = shortDate(key.last_used_at)
+      return {
+        id: key.id,
+        name: key.device === 'multiDevice' ? 'Synced passkey' : key.device === 'singleDevice' ? 'Device-bound passkey' : (key.device || 'Passkey'),
+        detail: [added && `Added ${added}`, used ? `last used ${used}` : 'never used'].filter(Boolean).join(' · '),
+      }
+    }))
+    const passkeyEmpty = derived(() => passkeysLoaded() ? 'No passkeys yet.' : 'Loading…')
+    const passkeyHint = derived(() => passkeysSupported()
+      ? 'Your browser or password manager asks where to keep it.'
+      : 'This browser cannot make passkeys.')
+    const recoveryDescription = derived(() => `${recoveryLeft()} unused ${recoveryLeft() === 1 ? 'code' : 'codes'} left.`)
+    const confirmPrompt = derived(() => confirming() === 'codes'
+      ? 'Enter a code from your authenticator app to replace every recovery code.'
+      : confirming() === 'disable'
+        ? 'Enter your password to turn two-factor sign-in off. Your recovery codes stop working too.'
+        : 'Enter your password to remove this passkey.')
+
+    const saySecurity = (message: string, tone = 'muted'): void => {
+      securityMessage.set(message)
+      securityTone.set(tone)
+    }
+
+    const requestJson = async (path: string, init?: RequestInit): Promise<any> => {
+      const response = await fetch(path, {
+        ...init,
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', ...(init?.headers ?? {}) },
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || payload.ok === false)
+        throw new Error(payload.error || payload.message || (response.status === 404 ? 'Not found.' : 'That did not work.'))
+      return payload
+    }
+
+    const loadSecurity = async (): Promise<void> => {
+      try {
+        const [keys, factor] = await Promise.all([
+          requestJson('/api/auth/passkeys'),
+          requestJson('/api/auth/two-factor'),
+        ])
+        passkeyList.set(Array.isArray(keys.passkeys) ? keys.passkeys : [])
+        twoFactorOn.set(!!factor.data?.twoFactor)
+        recoveryLeft.set(Number(factor.data?.recoveryCodesLeft) || 0)
+        securityLoaded.set(true)
+      }
+      catch (error) {
+        saySecurity(error instanceof Error ? error.message : String(error), 'error')
+      }
+      finally {
+        passkeysLoaded.set(true)
+      }
+    }
+
+    const busyWhile = async (work: () => Promise<void>): Promise<void> => {
+      securityBusy.set(true)
+      saySecurity('')
+      try {
+        await work()
+      }
+      catch (error) {
+        saySecurity(error instanceof Error ? error.message : String(error), 'error')
+      }
+      finally {
+        securityBusy.set(false)
+      }
+    }
+
+    const addPasskey = (): Promise<void> => busyWhile(async () => {
+      // stx-strict-ignore-next-line window.postlinePasskeys
+      const passkeys = window.postlinePasskeys
+      if (!passkeys) throw new Error('Passkeys are still loading. Try again in a moment.')
+      if (await passkeys.register()) {
+        await loadSecurity()
+        saySecurity('Passkey added. Use it next time you sign in.', 'success')
+      }
+    })
+
+    const startTwoFactor = (): Promise<void> => busyWhile(async () => {
+      const setup = await requestJson('/api/auth/two-factor/setup', { method: 'POST' })
+      setupSecret.set(String(setup.secret ?? ''))
+      setupQr.set(setup.qr ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(String(setup.qr))}` : '')
+      setupCode.set('')
+    })
+
+    const cancelTwoFactorSetup = (): void => {
+      setupQr.set('')
+      setupSecret.set('')
+      setupCode.set('')
+    }
+
+    const confirmTwoFactor = (): Promise<void> => busyWhile(async () => {
+      const result = await requestJson('/api/auth/two-factor/enable', { method: 'POST', body: JSON.stringify({ code: setupCode().trim() }) })
+      cancelTwoFactorSetup()
+      recoveryCodes.set(Array.isArray(result.recoveryCodes) ? result.recoveryCodes : [])
+      await loadSecurity()
+      saySecurity('Two-factor sign-in is on.', 'success')
+    })
+
+    const askRemovePasskey = (id: string): void => {
+      confirmTarget.set(id)
+      confirmValue.set('')
+      confirming.set('remove')
+    }
+    const askDisableTwoFactor = (): void => {
+      confirmValue.set('')
+      confirming.set('disable')
+    }
+    const askNewRecoveryCodes = (): void => {
+      confirmValue.set('')
+      confirming.set('codes')
+    }
+    const cancelConfirm = (): void => {
+      confirming.set('')
+      confirmValue.set('')
+      confirmTarget.set('')
+    }
+
+    const runConfirmed = (): Promise<void> => busyWhile(async () => {
+      const value = confirmValue().trim()
+      const action = confirming()
+      if (action === 'remove') {
+        // A wrong password answers 422 with its own message; 404 is a passkey
+        // already removed, from another tab or device.
+        await requestJson(`/api/auth/passkeys/${encodeURIComponent(confirmTarget())}`, { method: 'DELETE', body: JSON.stringify({ password: confirmValue() }) })
+          .catch((error) => {
+            if (!(error instanceof Error) || error.message !== 'Not found.') throw error
+          })
+        saySecurity('Passkey removed.', 'success')
+      }
+      else if (action === 'disable') {
+        await requestJson('/api/auth/two-factor/disable', { method: 'POST', body: JSON.stringify({ password: confirmValue() }) })
+        recoveryCodes.set([])
+        saySecurity('Two-factor sign-in is off.', 'success')
+      }
+      else if (action === 'codes') {
+        const result = await requestJson('/api/auth/two-factor/recovery-codes', { method: 'POST', body: JSON.stringify({ code: value }) })
+        recoveryCodes.set(Array.isArray(result.data?.recoveryCodes) ? result.data.recoveryCodes : [])
+        saySecurity('New recovery codes made. The old ones no longer work.', 'success')
+      }
+      cancelConfirm()
+      await loadSecurity()
+    })
+
+    const copyRecoveryCodes = async (): Promise<void> => {
+      try {
+        // stx-strict-ignore-next-line navigator.clipboard
+        await navigator.clipboard.writeText(recoveryCodes().join('\n'))
+        saySecurity('Copied.', 'success')
+      }
+      catch {
+        saySecurity('Copy did not work here; select the codes instead.', 'error')
+      }
+    }
+
+    if (!ownWindow()) void loadSecurity()
 
     // --- Automatic deletion ---------------------------------------------
     interface RetentionSettings {
