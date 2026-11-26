@@ -92,6 +92,30 @@
 
       <p class="m-0 px-4 py-3 text-danger text-sm bg-danger-soft border-danger-line border-t" x-show="errorMessage()" :text="errorMessage()"></p>
     </section>
+
+    {{--
+      Bring posts over from another platform (#117): a CSV export or a JSON
+      array of { title, body, slug, publishedAt }. A preview runs first and
+      says exactly what an import would create, update and skip.
+    --}}
+    <section class="grid gap-3 p-4 bg-panel border border-line rounded-2xl shadow-sm" aria-labelledby="import-heading">
+      <div>
+        <h2 id="import-heading" class="m-0 font-semibold text-ink text-sm">Import posts</h2>
+        <p class="m-0 mt-1 text-muted text-xs">A CSV export (title, body, and optionally slug and date columns) or a JSON array. Up to 5,000 posts at a time; running it again updates posts instead of duplicating them.</p>
+      </div>
+      <div class="flex flex-wrap gap-2 items-center">
+        <label class="inline-flex gap-2 items-center px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg cursor-pointer">
+          <span class="h-3.5 w-3.5 i-hugeicons-file-import" aria-hidden="true"></span>
+          <span :text="importName() || 'Choose a file'">Choose a file</span>
+          <input class="sr-only" type="file" accept=".csv,.json,text/csv,application/json" @change="chooseImport($event)">
+        </label>
+        <button class="inline-flex items-center px-3 h-8 font-semibold text-on-accent text-xs bg-accent rounded-lg disabled:opacity-50" type="button" x-show="importPreview() && !importPreview().done" :disabled="importing()" @click="runImport" :text="importing() ? 'Importing…' : 'Import'">Import</button>
+      </div>
+      <p class="m-0 text-xs" x-show="importMessage()" :class="importTone() === 'error' ? 'text-danger' : 'text-body'" :text="importMessage()" role="status" aria-live="polite"></p>
+      <ul class="grid gap-1 m-0 pl-5 list-disc text-muted text-xs" x-show="importSkipped().length">
+        <li x-for="item in importSkipped()" :text="`Row ${item.row}: ${item.reason}`"></li>
+      </ul>
+    </section>
   </section>
 
   <script client>
@@ -118,6 +142,72 @@
       return Number.isNaN(date.getTime())
         ? 'Published'
         : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    }
+
+    // Import (#117): the chosen file's text, a preview report, then the real run.
+    const importName = state('')
+    const importText = state('')
+    const importPreview = state(null)
+    const importing = state(false)
+    const importMessage = state('')
+    const importTone = state('neutral')
+    // At most 20 skipped rows on screen; the count above covers the rest.
+    const importSkipped = derived(() => (importPreview()?.skippedRows || []).slice(0, 20))
+
+    const sendImport = async (dryRun: boolean) => {
+      const body = new FormData()
+      const text = importText()
+      if (importName().toLowerCase().endsWith('.json') || text.trim().startsWith('['))
+        body.set('posts', text)
+      else
+        body.set('csv', text)
+      if (dryRun) body.set('dry_run', '1')
+      const response = await fetch('/api/postline/import/posts', { method: 'POST', body })
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'The file could not be read.')
+      return payload.data.report
+    }
+
+    const describeImport = (report, dryRun: boolean): string => {
+      const verb = dryRun ? ['would be created', 'would be updated', 'would be skipped'] : ['created', 'updated', 'skipped']
+      return `${report.imported} ${verb[0]}, ${report.updated} ${verb[1]}, ${report.skipped} ${verb[2]}.`
+    }
+
+    const chooseImport = async (event) => {
+      const file = event?.target?.files?.[0]
+      if (!file) return
+      importName.set(file.name)
+      importPreview.set(null)
+      importMessage.set('Reading the file…')
+      importTone.set('neutral')
+      try {
+        importText.set(await file.text())
+        const report = await sendImport(true)
+        importPreview.set(report)
+        importMessage.set(`Preview: ${describeImport(report, true)}`)
+      }
+      catch (error) {
+        importMessage.set(error instanceof Error ? error.message : String(error))
+        importTone.set('error')
+      }
+    }
+
+    const runImport = async () => {
+      if (!importPreview() || importing()) return
+      importing.set(true)
+      try {
+        const report = await sendImport(false)
+        importPreview.set({ ...report, done: true })
+        importMessage.set(`Imported: ${describeImport(report, false)}`)
+        await loadPosts()
+      }
+      catch (error) {
+        importMessage.set(error instanceof Error ? error.message : String(error))
+        importTone.set('error')
+      }
+      finally {
+        importing.set(false)
+      }
     }
 
     const loadPosts = async () => {

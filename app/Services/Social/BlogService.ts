@@ -53,12 +53,19 @@ export interface BlogPostView {
   url: string | null
 }
 
-function slugify(value: string): string {
+/**
+ * A URL slug from a title, in any script. Latin accents drop to their base
+ * letter (café, cafe); other scripts keep their letters, so a Japanese or
+ * Greek title is not emptied to "post" (#117). Marks inside a script (kana
+ * voicing, Devanagari vowel signs) are kept and recomposed.
+ */
+export function slugify(value: string): string {
   return value
     .toLowerCase()
     .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/[\u0300-\u036F]/g, '')
+    .replace(/[^\p{L}\p{M}\p{N}\s-]/gu, '')
+    .normalize('NFC')
     .trim()
     .replace(/[\s-]+/g, '-')
     .slice(0, 80)
@@ -173,6 +180,59 @@ export class BlogService {
 
       return { provider: 'blog', ok: false, error: message, targetId: Number(target.id), retry: classifyFailure(error) }
     }
+  }
+
+  /**
+   * Bring one post over from another platform (ImportService). Keyed on the
+   * slug: a post already there under it is updated, so running an import
+   * twice does not duplicate it. A new one is published with its file, so it
+   * appears on the blog like any other.
+   */
+  async importPost(input: { title: string, body: string, slug?: string, publishedAt: string }, options: { dryRun?: boolean, createdThisRun?: Set<string> } = {}): Promise<'created' | 'updated'> {
+    const title = input.title.trim().slice(0, 200)
+    const body = input.body.trim()
+    const wanted = input.slug?.trim() ? slugify(input.slug) : slugify(title)
+    const existing = await database.selectFrom('blog_posts').selectAll().where('slug', '=', wanted).executeTakeFirst()
+    // A post with this slug that came from the same title (or the row named
+    // the slug) is this post again. Anything else keeps its slug and the new
+    // one gets the next free one.
+    // One made earlier in this same import is a different post with the same
+    // title (two "Weekly update" rows), not this one again.
+    const madeThisRun = options.createdThisRun?.has(wanted) ?? false
+    const same = existing && !madeThisRun && (input.slug?.trim() || String(existing.title) === title)
+
+    if (same) {
+      if (!options.dryRun) {
+        if (existing.status === 'published') await writePostFile(String(existing.slug), title, input.publishedAt, body)
+        await database.updateTable('blog_posts')
+          .set({ title, body, excerpt: body.slice(0, 280), published_at: input.publishedAt, updated_at: now() })
+          .where('id', '=', existing.id)
+          .execute()
+      }
+      return 'updated'
+    }
+
+    if (options.dryRun) {
+      options.createdThisRun?.add(wanted)
+      return 'created'
+    }
+    const slug = await uniqueSlug(wanted)
+    options.createdThisRun?.add(wanted)
+    options.createdThisRun?.add(slug)
+    await writePostFile(slug, title, input.publishedAt, body)
+    await database.insertInto('blog_posts').values({
+      uuid: uuid(),
+      title,
+      slug,
+      body,
+      excerpt: body.slice(0, 280),
+      status: 'published',
+      published_at: input.publishedAt,
+      account_id: await ensureAccount(),
+      created_at: now(),
+      updated_at: now(),
+    }).execute()
+    return 'created'
   }
 
   /** Blog posts, newest first: published ones, and ones taken down. */

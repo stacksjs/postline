@@ -12,20 +12,23 @@
  * of 1,500" with no explanation is worse than an error.
  */
 
-import { db } from '@stacksjs/database'
-import { now, uuid } from './Social/support'
-
-const database = db as any
+import { publicMessage } from '../Support/Http/action-error'
+import { blog } from './Social/BlogService'
+import { now } from './Social/support'
 
 /** Cap per run, so a pasted file cannot become an unbounded write loop. */
-const MAX_ROWS = 5000
+export const MAX_ROWS = 5000
 
 export interface ImportReport {
   imported: number
   updated: number
   skipped: number
-  /** The first few reasons, so a bad file is diagnosable without a log. */
+  /** Every row that was not imported, by its number in the file (1 is the first post), and why. */
+  skippedRows: Array<{ row: number, reason: string }>
+  /** The distinct reasons, so a bad file is diagnosable at a glance. */
   reasons: string[]
+  /** True for a preview: nothing was written. */
+  dryRun: boolean
 }
 
 export interface PostImportRow {
@@ -110,79 +113,61 @@ export function parseCsv(input: string): Array<Record<string, string>> {
 
 export class ImportService {
   /**
-   * Import posts into the archive.
+   * Import posts into the blog, or with `dryRun` say what an import would do.
    *
-   * Keyed on slug, so a re-run updates rather than duplicating.
+   * Each post goes through BlogService, so it gets its file and appears on
+   * the blog. A re-run updates rather than duplicating. Nothing is silent:
+   * every row not imported is listed with its number and the reason,
+   * including the rows past the per-run cap (#117).
    */
-  async importPosts(rows: PostImportRow[]): Promise<ImportReport> {
-    const report: ImportReport = { imported: 0, updated: 0, skipped: 0, reasons: [] }
-
-    const addReason = (reason: string) => {
-      if (report.reasons.length < 10 && !report.reasons.includes(reason)) report.reasons.push(reason)
+  async importPosts(rows: PostImportRow[], options: { dryRun?: boolean } = {}): Promise<ImportReport> {
+    const report: ImportReport = { imported: 0, updated: 0, skipped: 0, skippedRows: [], reasons: [], dryRun: Boolean(options.dryRun) }
+    const skip = (row: number, reason: string) => {
+      report.skipped++
+      report.skippedRows.push({ row, reason })
+      if (!report.reasons.includes(reason)) report.reasons.push(reason)
     }
 
-    for (const row of rows.slice(0, MAX_ROWS)) {
-      const title = String(row.title || '').trim()
-      const body = String(row.body || '').trim()
-
-      if (!title || !body) {
-        report.skipped++
-        addReason('A post needs both a title and a body')
+    const createdThisRun = new Set<string>()
+    for (const [index, row] of rows.entries()) {
+      const number = index + 1
+      if (index >= MAX_ROWS) {
+        skip(number, `Past the ${MAX_ROWS.toLocaleString('en-US')}-post limit for one import; import the rest as a second file`)
         continue
       }
 
-      const slug = String(row.slug || '').trim() || title
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .trim()
-        .replace(/[\s-]+/g, '-')
-        .slice(0, 80)
+      const title = String(row.title ?? '').trim()
+      const body = String(row.body ?? '').trim()
+      if (!title || !body) {
+        skip(number, 'A post needs both a title and a body')
+        continue
+      }
 
       const publishedAt = this.timestamp(row.publishedAt)
-      const existing = await database
-        .selectFrom('blog_posts')
-        .selectAll()
-        .where('slug', '=', slug)
-        .executeTakeFirst()
-
-      if (existing) {
-        await database.updateTable('blog_posts').set({
-          title: title.slice(0, 200),
-          body,
-          excerpt: body.slice(0, 280),
-          published_at: publishedAt,
-          updated_at: now(),
-        }).where('id', '=', existing.id).execute()
-        report.updated++
+      if (publishedAt === null) {
+        skip(number, `"${String(row.publishedAt).slice(0, 40)}" is not a date Postline can read`)
+        continue
       }
-      else {
-        await database.insertInto('blog_posts').values({
-          uuid: uuid(),
-          title: title.slice(0, 200),
-          slug,
-          body,
-          excerpt: body.slice(0, 280),
-          status: 'published',
-          published_at: publishedAt,
-          account_id: await this.accountId(),
-          created_at: now(),
-          updated_at: now(),
-        }).execute()
-        report.imported++
+
+      try {
+        const outcome = await blog.importPost({ title, body, slug: row.slug ? String(row.slug) : undefined, publishedAt }, { dryRun: options.dryRun, createdThisRun })
+        if (outcome === 'created') report.imported++
+        else report.updated++
+      }
+      catch (error) {
+        skip(number, publicMessage(error, 'Could not be saved'))
       }
     }
 
     return report
   }
 
-  private async accountId(): Promise<number | null> {
-    const account = await database.selectFrom('accounts').select(['id']).orderBy('id', 'asc').executeTakeFirst()
-    return account ? Number(account.id) : null
-  }
-
-  private timestamp(value: unknown): string {
-    const date = new Date(String(value || ''))
-    return Number.isNaN(date.getTime()) ? now() : date.toISOString().slice(0, 19).replace('T', ' ')
+  /** The stored timestamp for a date given in the file: now when none is given, null when it cannot be read. */
+  private timestamp(value: unknown): string | null {
+    const given = String(value ?? '').trim()
+    if (!given) return now()
+    const date = new Date(given)
+    return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 19).replace('T', ' ')
   }
 }
 
