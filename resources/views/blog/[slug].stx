@@ -1,0 +1,26 @@
+@extends('layouts/blog')
+
+<script server>
+import { publicBlogPost } from '../../../app/Support/Social/public-blog'
+import blogConfig from '../../../config/blog'
+
+const post = await publicBlogPost(String(params?.slug || ''))
+setResponseHeader('Cache-Control', 'no-store')
+if (!post) notFound()
+useHead({ title: post ? `${post.title} · ${blogConfig.title}` : `Post not found · ${blogConfig.title}` })
+</script>
+
+@section('content')
+  <a class="inline-block mb-8 text-sm underline underline-offset-4" href="/blog" data-stx-link>{{ blogConfig.title }}</a>
+  @if (post)
+    <article>
+      <header class="grid gap-3 mb-8">
+        <time class="text-muted text-sm" datetime="{{ post.date }}">{{ post.dateLabel }}</time>
+        <h1 class="m-0 leading-tight text-4xl">{{ post.title }}</h1>
+      </header>
+      <div class="max-w-none break-words prose">{!! post.html !!}</div>
+    </article>
+  @else
+    <h1 class="m-0 text-4xl">Post not found</h1>
+  @endif
+@endsection

@@ -38,6 +38,11 @@ export default defineModel({
       validation: { rule: schema.string().required().min(1) },
       factory: faker => faker.lorem.paragraphs({ min: 2, max: 5 }),
     },
+    publishedBody: {
+      required: false,
+      fillable: true,
+      validation: { rule: schema.string().optional() },
+    },
     excerpt: {
       required: false,
       fillable: true,

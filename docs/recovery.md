@@ -47,12 +47,15 @@ in the scheduler log if a run fails.
    The output path must be new. The tool checks the encrypted files against
    the manifest, authenticates them during decryption, checks SQLite, and
    extracts the media. The output contains `postline.sqlite`, `media/`, and
-   `app-key` in a private directory.
+   `app-key` in a private directory. If the workspace has published Blog posts,
+   the restore also rebuilds their Markdown files in `blog/`.
 
 3. Before starting the replacement server, place the database and media in
    its `DB_DATABASE_PATH` and `POSTLINE_MEDIA_DIR`. Install the recovered
    `app-key` as `APP_KEY` in its secret store. Keep that value across upgrades
    so Postline can open the encrypted network sign-ins in the database.
+   Put the recovered Blog files in `content/blog/` or, for the shared Postline
+   production host, `/var/lib/postline/blog/`.
 4. Start the replacement web and API services with the scheduler disabled.
    Sign in and enable **Settings > General > Pause scheduled publishing**.
    Check that the workspace opens and a queued image loads. In

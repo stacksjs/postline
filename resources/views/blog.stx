@@ -1,0 +1,35 @@
+@extends('layouts/blog')
+
+<script server>
+import { useRequestEvent } from '@stacksjs/config'
+import { publicBlogPosts } from '../../app/Support/Social/public-blog'
+import blogConfig from '../../config/blog'
+
+const posts = useRequestEvent().url ? await publicBlogPosts() : []
+setResponseHeader('Cache-Control', 'no-store')
+useHead({ title: blogConfig.title, meta: [{ name: 'description', content: blogConfig.description }] })
+</script>
+
+@section('content')
+  <header class="mb-10">
+    <h1 class="m-0 text-4xl">{{ blogConfig.title }}</h1>
+    @if (blogConfig.description)
+      <p class="mt-4 text-body">{{ blogConfig.description }}</p>
+    @endif
+  </header>
+  @if (posts.length)
+    <ul class="m-0 p-0 list-none border-line border-t">
+      @foreach (posts as post)
+        <li class="grid gap-2 py-6 border-b border-line">
+          <time class="text-muted text-sm" datetime="{{ post.date }}">{{ post.dateLabel }}</time>
+          <h2 class="m-0 text-xl"><a class="underline underline-offset-4" href="{{ post.url }}" data-stx-link>{{ post.title }}</a></h2>
+          @if (post.excerpt)
+            <p class="m-0 text-body">{{ post.excerpt }}</p>
+          @endif
+        </li>
+      @endforeach
+    </ul>
+  @else
+    <p class="text-muted">No posts have been published yet.</p>
+  @endif
+@endsection

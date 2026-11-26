@@ -1,9 +1,12 @@
 import { describe, expect, test } from 'bun:test'
+import { Database } from 'bun:sqlite'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { db } from '@stacksjs/database'
 import { blog } from '../../app/Services/Social/BlogService'
+import { restorePublishedBlog } from '../../app/Support/Social/blog-files'
+import { publicBlogPost, publicBlogPosts } from '../../app/Support/Social/public-blog'
 
 const database = db as any
 const dir = (): string => process.env.POSTLINE_BLOG_DIR!
@@ -64,5 +67,45 @@ describe('the blog', () => {
     const { id } = await publish('Text', 'Needs both')
     await expect(blog.update(id, { title: ' ', body: 'x' })).rejects.toThrow('needs a title')
     await expect(blog.update(id, { title: 'x', body: '' })).rejects.toThrow('needs some text')
+  })
+
+  test('published Markdown is recoverable with the original heading and URL', async () => {
+    const { slug, file } = await publish('東京のお知らせ\n\n**Today’s update**')
+    const post = await publicBlogPost(slug)
+    expect(post?.url).toBe(`/blog/${encodeURIComponent(slug)}`)
+    expect(post?.title).toBe('東京のお知らせ')
+    expect(post?.html.trim()).toBe('<p><strong>Today’s update</strong></p>')
+
+    const recovered = join(dir(), 'recovered')
+    using snapshot = new Database(process.env.DB_DATABASE_PATH!, { readonly: true })
+    await restorePublishedBlog(snapshot, recovered)
+    expect(readFileSync(join(recovered, `${slug}.md`), 'utf8')).toBe(readFileSync(file, 'utf8'))
+  })
+
+  test('paid and unpublished workspace rows are excluded from the public Blog', async () => {
+    const paid = await publish('Reserved text', 'Paid article')
+    await database.updateTable('blog_posts').set({ access: 'paid' }).where('id', '=', paid.id).execute()
+    const draft = await publish('Draft text', 'Draft article')
+    await blog.unpublish(draft.id)
+
+    expect(await publicBlogPost(paid.slug)).toBeNull()
+    expect(await publicBlogPost(draft.slug)).toBeNull()
+    const urls = (await publicBlogPosts()).map(post => post.url)
+    expect(urls).not.toContain(`/blog/${paid.slug}`)
+    expect(urls).not.toContain(`/blog/${draft.slug}`)
+    const recovered = join(dir(), 'excluded')
+    using snapshot = new Database(process.env.DB_DATABASE_PATH!, { readonly: true })
+    await restorePublishedBlog(snapshot, recovered)
+    expect(existsSync(join(recovered, `${paid.slug}.md`))).toBe(false)
+    expect(existsSync(join(recovered, `${draft.slug}.md`))).toBe(false)
+  })
+
+  test('backups predating the dedicated published body still recover published files', async () => {
+    const recovered = join(dir(), 'legacy')
+    using snapshot = new Database(':memory:')
+    snapshot.run('CREATE TABLE blog_posts (slug TEXT, title TEXT, body TEXT, status TEXT, published_at TEXT, created_at TEXT)')
+    snapshot.run('INSERT INTO blog_posts VALUES (?, ?, ?, ?, ?, ?)', ['old-url', 'Old title', 'Old text', 'published', null, '2025-04-02 10:00:00'])
+    await restorePublishedBlog(snapshot, recovered)
+    expect(readFileSync(join(recovered, 'old-url.md'), 'utf8')).toContain('date: 2025-04-02\nauthor: Postline\n---\n\nOld text')
   })
 })

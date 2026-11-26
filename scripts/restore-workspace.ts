@@ -6,6 +6,7 @@ import process from 'node:process'
 import { decryptBackupFile, restoreFromConfig } from 'ts-backups'
 import { RECOVERY_FILES } from '../app/Services/RecoveryBackupService'
 import { verifyRecoveryMedia } from '../app/Support/Recovery/media'
+import { restorePublishedBlog } from '../app/Support/Social/blog-files'
 
 const [set, destination] = process.argv.slice(2)
 if (!set || !destination)
@@ -41,6 +42,7 @@ try {
   try {
     const result = database.query<{ quick_check: string }, []>('PRAGMA quick_check').get()
     if (result?.quick_check !== 'ok') throw new Error('The recovered SQLite database failed its integrity check.')
+    await restorePublishedBlog(database, join(output, 'blog'))
   }
   finally {
     database.close()

@@ -39,6 +39,7 @@ const DB_DATABASE_PATH = `${DATA_DIR}/postline.sqlite`
 // release directory: a deploy replaces the release, and the API (which stores
 // an upload) and the scheduler (which publishes it) run from different ones.
 const POSTLINE_MEDIA_DIR = `${DATA_DIR}/media`
+const BLOG_SHARED_PATH = { path: 'content/blog', target: `${DATA_DIR}/blog` }
 const PORT_WEB = 3320
 const PORT_API = 3321
 const API_HEALTH = '/api/postline/health'
@@ -651,6 +652,7 @@ export const tsCloud: TsCloudConfig = {
       deploy: 'server',
       pathRewriteStyle: 'directory',
       build: './buddy build:docs',
+      keepReleases: KEEP_RELEASES,
     },
 
     // The publication keeps its own virtual hosts and processes.
@@ -667,7 +669,7 @@ export const tsCloud: TsCloudConfig = {
       liveness: { path: '/' },
       keepReleases: KEEP_RELEASES,
       zeroDowntime: true,
-      sharedPaths: [{ path: 'storage/postline-data', target: DATA_DIR }],
+      sharedPaths: [{ path: 'storage/postline-data', target: DATA_DIR }, BLOG_SHARED_PATH],
       scheduler: true,
       /*
        * Sized to the workload, now that it is allowed to be.
@@ -723,7 +725,7 @@ export const tsCloud: TsCloudConfig = {
       liveness: { path: API_HEALTH },
       keepReleases: KEEP_RELEASES,
       zeroDowntime: true,
-      sharedPaths: [{ path: 'storage/postline-data', target: DATA_DIR, seed: false }],
+      sharedPaths: [{ path: 'storage/postline-data', target: DATA_DIR, seed: false }, { ...BLOG_SHARED_PATH, seed: false }],
       /*
        * The API serves JSON off the same database and holds flat — it renders
        * no views, so it never touches the component path that makes `main`
