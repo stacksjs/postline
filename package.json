@@ -51,6 +51,7 @@
     "key:generate": "./buddy key:generate",
     "commit": "./buddy commit",
     "browser:check": "bun scripts/browser-check.ts",
+    "budget:check": "bun scripts/budget-check.ts",
     "publication:check": "bun scripts/publication-check.ts",
     "release": "./buddy release",
     "release:patch": "./buddy release --bump patch",

@@ -4,7 +4,12 @@
       fetched from a font service. One variable file per family covers every
       weight. The sans is preloaded because every page sets text in it before
       anything else paints; the mono is only used for small labels and loads
-      when first needed. --}}
+      when first needed.
+
+      Both files are subset to Latin, Latin-1 and common punctuation (#188),
+      which halved them; other scripts fall back to the system font, as the
+      unicode-range below tells the browser. Rebuild them from the upstream
+      Geist release with fontTools' pyftsubset and the same ranges. --}}
   <link rel="preload" href="/assets/fonts/geist/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
   <style>
     @font-face {
@@ -13,6 +18,7 @@
       font-weight: 100 900;
       font-style: normal;
       font-display: swap;
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2190-2199, U+2212, U+2215, U+FEFF, U+FFFD;
     }
     @font-face {
       font-family: 'Geist Mono';
@@ -20,5 +26,6 @@
       font-weight: 100 900;
       font-style: normal;
       font-display: swap;
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2190-2199, U+2212, U+2215, U+FEFF, U+FFFD;
     }
   </style>

@@ -152,6 +152,10 @@ jobs:
         run: |
           LEFT="$(find dist -name '*.ts')"
           if [ -n "$LEFT" ]; then echo "TypeScript left in dist/:"; echo "$LEFT"; exit 1; fi
+      # Script, CSS and font weight per app page, and nothing fetched from
+      # another origin (#188).
+      - name: Weight budgets
+        run: bun scripts/budget-check.ts
 
   # Every workspace view in a real browser, signed in, light, dark and on a
   # phone (#80): fails on console errors, failed requests and pages wider than
