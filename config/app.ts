@@ -29,7 +29,9 @@ export default {
   // docMode: true, // instead of example.com/docs, deploys example.com as main entry point for docs
   docMode: false,
 
-  timezone: 'America/Los_Angeles',
+  // The server's own zone, or TZ. Schedules use the workspace zone set in
+  // Settings; this is only the framework's default for its own clocks (#68).
+  timezone: env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   locale: 'en',
   fallbackLocale: 'en',
   cipher: 'aes-256-cbc',
