@@ -54,7 +54,7 @@ export default new Action({
       const free = freeBytes()
       const disk = free === null ? 'unknown' : free < LOW_DISK_BYTES ? 'low' : 'ok'
       // A deploy that did not migrate serves code the schema does not match.
-      const migrations = await migrationsPending().catch(() => false) ? 'pending' : 'ok'
+      const migrations = await migrationsPending().then(pending => pending ? 'pending' : 'ok').catch(() => 'unknown')
       const healthy = (state === 'ok' || starting) && disk !== 'low' && migrations === 'ok'
       return response.json({ ok: healthy, database: 'ok', scheduler: starting ? 'starting' : state, disk, migrations }, { status: healthy ? 200 : 503 })
     }
