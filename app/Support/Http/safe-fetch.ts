@@ -8,13 +8,8 @@
  * other end likes, and read a body of any size into memory.
  *
  * `safeFetch` refuses anything that is not plain http(s) to a public address,
- * re-checks every redirect hop, and enforces one deadline and one size cap
- * over the whole exchange.
- *
- * One gap is left open knowingly: the address is checked when the name is
- * resolved, and `fetch` resolves it again to connect, so a DNS answer that
- * changes between the two is not caught. Closing it needs the connection made
- * to the address that was checked, which `fetch` does not offer.
+ * connects to the address it verified, re-checks every redirect hop, and
+ * enforces one deadline and one size cap over the whole exchange.
  */
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
@@ -51,14 +46,12 @@ function isPrivateIpv4(address: string): boolean {
 }
 
 function isPrivateIpv6(address: string): boolean {
-  const lower = address.toLowerCase().split('%')[0] || ''
+  if (address.includes('%')) return true
+  const lower = new URL(`http://[${address}]/`).hostname.slice(1, -1)
   if (lower === '::' || lower === '::1')
     return true
 
-  // IPv4-mapped (`::ffff:10.0.0.1`) and NAT64 addresses carry an IPv4 address.
-  const embedded = lower.match(/(\d+\.\d+\.\d+\.\d+)$/)
-  if (embedded)
-    return isPrivateIpv4(embedded[1] as string)
+  // IPv4-mapped and NAT64 addresses can carry a private IPv4 address.
   if (lower.startsWith('::ffff:') || lower.startsWith('64:ff9b:'))
     return true
 
@@ -83,11 +76,9 @@ const systemResolver: Resolver = async (hostname) => {
   return answers.map(answer => answer.address)
 }
 
-/**
- * Parse and vet a URL. Throws `UnsafeUrlError` with a message that is safe to
- * show the person who supplied it.
- */
-export async function assertPublicHttpUrl(value: string, resolve: Resolver = systemResolver): Promise<URL> {
+interface PublicTarget { url: URL, addresses: string[] }
+
+async function resolvePublicTarget(value: string, resolve: Resolver = systemResolver): Promise<PublicTarget> {
   let url: URL
   try {
     url = new URL(value)
@@ -122,7 +113,12 @@ export async function assertPublicHttpUrl(value: string, resolve: Resolver = sys
   if (addresses.length === 0 || addresses.some(isPrivateAddress))
     throw new UnsafeUrlError('That address is not on the public internet.')
 
-  return url
+  return { url, addresses }
+}
+
+/** Parse and vet a URL before handing it to a publishing destination. */
+export async function assertPublicHttpUrl(value: string, resolve?: Resolver): Promise<URL> {
+  return (await resolvePublicTarget(value, resolve)).url
 }
 
 export interface SafeFetchOptions {
@@ -177,47 +173,75 @@ async function readCapped(response: Response, maxBytes: number): Promise<{ bytes
   return { bytes, truncated }
 }
 
-/** Fetch a caller-supplied URL. Throws `UnsafeUrlError` when it, or a redirect from it, is refused. */
-export async function safeFetch(value: string, options: SafeFetchOptions): Promise<SafeFetchResult> {
+async function fetchTarget(target: PublicTarget, options: SafeFetchOptions, signal: AbortSignal): Promise<Response> {
+  const { url, addresses } = target
   const fetcher = options.fetcher ?? fetch
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs)
+  const hostname = url.hostname.replace(/^\[|\]$/g, '')
+  const headers = new Headers(options.headers)
+  headers.set('Host', url.host)
+  let lastError: unknown
 
-  try {
-    let url = await assertPublicHttpUrl(value, options.resolve)
-
-    for (let hop = 0; ; hop++) {
-      const response = await fetcher(url, {
-        headers: options.headers,
+  for (const address of addresses) {
+    signal.throwIfAborted()
+    const dial = new URL(url)
+    dial.hostname = isIP(address) === 6 ? `[${address}]` : address
+    try {
+      return await fetcher(dial, {
+        headers,
+        // Bun dials the IP while TLS keeps verifying the named origin.
+        tls: url.protocol === 'https:' && !isIP(hostname) ? { serverName: hostname } : undefined,
+        proxy: false,
         redirect: 'manual',
-        signal: controller.signal,
+        signal,
       })
-
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get('location')
-        await response.body?.cancel().catch(() => {})
-        if (!location)
-          throw new UnsafeUrlError('That address redirected nowhere.')
-        if (hop >= MAX_REDIRECTS)
-          throw new UnsafeUrlError('That address redirected too many times.')
-        url = await assertPublicHttpUrl(new URL(location, url).toString(), options.resolve)
-        continue
-      }
-
-      const { bytes, truncated } = await readCapped(response, options.maxBytes)
-      return {
-        url,
-        status: response.status,
-        contentType: (response.headers.get('content-type') || '').split(';')[0]?.trim().toLowerCase() || '',
-        bytes,
-        truncated,
-      }
+    }
+    catch (error) {
+      lastError = error
     }
   }
-  catch (error) {
-    if (controller.signal.aborted)
-      throw new UnsafeUrlError('That address took too long to answer.')
-    throw error
+  throw lastError
+}
+
+async function follow(value: string, options: SafeFetchOptions, signal: AbortSignal): Promise<SafeFetchResult> {
+  let target = await resolvePublicTarget(value, options.resolve)
+  for (let hop = 0; ; hop++) {
+    const response = await fetchTarget(target, options, signal)
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location')
+      await response.body?.cancel().catch(() => {})
+      if (!location)
+        throw new UnsafeUrlError('That address redirected nowhere.')
+      if (hop >= MAX_REDIRECTS)
+        throw new UnsafeUrlError('That address redirected too many times.')
+      target = await resolvePublicTarget(new URL(location, target.url).toString(), options.resolve)
+      continue
+    }
+
+    const { bytes, truncated } = await readCapped(response, options.maxBytes)
+    return {
+      url: target.url,
+      status: response.status,
+      contentType: (response.headers.get('content-type') || '').split(';')[0]?.trim().toLowerCase() || '',
+      bytes,
+      truncated,
+    }
+  }
+}
+
+/** Fetch a caller-supplied URL with the deadline covering DNS, transport, and the body. */
+export async function safeFetch(value: string, options: SafeFetchOptions): Promise<SafeFetchResult> {
+  const controller = new AbortController()
+  const deadline = new UnsafeUrlError('That address took too long to answer.')
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(deadline)
+      controller.abort(deadline)
+    }, options.timeoutMs)
+  })
+  try {
+    return await Promise.race([follow(value, options, controller.signal), timeout])
   }
   finally {
     clearTimeout(timer)

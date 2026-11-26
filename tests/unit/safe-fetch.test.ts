@@ -15,6 +15,7 @@ describe('isPrivateAddress', () => {
     '0.0.0.0',
     '224.0.0.1',
     '::1',
+    '0:0:0:0:0:0:0:1',
     '::',
     'fc00::1',
     'fd12:3456::1',
@@ -74,6 +75,26 @@ describe('safeFetch', () => {
     expect(new TextDecoder().decode(result.bytes)).toBe('hello')
     expect(result.contentType).toBe('text/html')
     expect(result.truncated).toBe(false)
+  })
+
+  test('dials the validated address with the original HTTPS authority', async () => {
+    let calls = 0
+    const fetcher = (async (input: URL, init?: RequestInit & { tls?: { serverName?: string }, proxy?: false }) => {
+      calls++
+      expect(input.href).toBe('https://93.184.216.34:8443/page')
+      expect(new Headers(init?.headers).get('Host')).toBe('example.com:8443')
+      expect(init?.tls?.serverName).toBe('example.com')
+      expect(init?.proxy).toBe(false)
+      return new Response('ok')
+    }) as unknown as typeof fetch
+    const result = await safeFetch('https://example.com:8443/page', { ...options, fetcher })
+    expect(result.url.href).toBe('https://example.com:8443/page')
+    expect(calls).toBe(1)
+  })
+
+  test('includes name resolution in the deadline', async () => {
+    const resolve = () => new Promise<string[]>(() => {})
+    await expect(safeFetch('https://example.com/', { ...options, timeoutMs: 20, resolve })).rejects.toThrow('took too long')
   })
 
   test('stops reading at the size cap', async () => {
