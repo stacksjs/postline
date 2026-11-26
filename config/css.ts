@@ -373,14 +373,6 @@ const APP_UI: string = `
 [data-postline-page] .folio,
 [data-postline-page] .byline { font-family: var(--font-label); }
 
-[data-postline-page] .rounded-2xl { border-radius: 14px; }
-[data-postline-page] .rounded-xl { border-radius: 10px; }
-[data-postline-page] .rounded-lg { border-radius: 8px; }
-
-[data-postline-page] .shadow-sm {
-  box-shadow: 0 1px 2px rgb(24 24 27 / 0.035), 0 8px 24px rgb(24 24 27 / 0.025);
-}
-
 [data-postline-page] :is(a, button, summary) {
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
@@ -633,6 +625,17 @@ export default {
       // set in 700.
       fontSize: {
         ui: ['13px', { lineHeight: '1.4' }],
+      },
+      // One radius and shadow scale for every surface (#143). These used to be
+      // redefined under [data-postline-page] only, so `rounded-xl` was 10px
+      // in a view and 12px in the sidebar, the sign-in page and a toast.
+      borderRadius: {
+        'lg': '8px',
+        'xl': '10px',
+        '2xl': '14px',
+      },
+      boxShadow: {
+        sm: '0 1px 2px rgb(24 24 27 / 0.035), 0 8px 24px rgb(24 24 27 / 0.025)',
       },
       colors: {
         // Surfaces
