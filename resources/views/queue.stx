@@ -19,7 +19,7 @@
             <span class="h-3.5 w-3.5 i-hugeicons-menu-01" aria-hidden="true"></span><span>List</span>
           </button>
           <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'calendar'" :aria-pressed="view() === 'calendar'" @click="setView('calendar')">
-            <span class="h-3.5 w-3.5 i-hugeicons-calendar-03" aria-hidden="true"></span><span>Calendar</span>
+            <span class="h-3.5 w-3.5 i-hugeicons-calendar-03" aria-hidden="true"></span><span class="sm:hidden">Agenda</span><span class="hidden sm:inline">Calendar</span>
           </button>
         </div>
         <a href="/composer" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors">
@@ -109,7 +109,26 @@
         </div>
         <strong class="text-ui" :text="calTitle()">Calendar</strong>
       </header>
-      <div class="overflow-x-auto">
+      <div class="sm:hidden divide-line divide-y" aria-label="Monthly agenda" role="list">
+        <article class="grid gap-2 px-3 py-2" role="listitem" x-for="day in calDays()" :key="day.key">
+          <header class="flex gap-3 items-center justify-between">
+            <time class="font-semibold text-ui" :datetime="day.key" :aria-current="day.isToday ? 'date' : null" :text="day.label"></time>
+            <a class="grid place-items-center shrink-0 h-11 w-11 text-ink bg-panel-2 hover:bg-raised rounded-xl" :href="day.scheduleUrl" :aria-label="'Schedule a post on ' + day.label" data-stx-link>
+              <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
+            </a>
+          </header>
+          <div class="grid gap-1" x-show="day.chips.length">
+            <a class="grid gap-1 p-2.5 min-w-0 text-body text-ui bg-panel-2 hover:bg-raised rounded-xl" x-for="chip in day.chips" :href="chip.href" data-stx-link>
+              <span class="flex gap-2 items-center font-semibold text-xs">
+                <span class="h-1.5 w-1.5 rounded-full" data-cal-dot :data-status="chip.status" aria-hidden="true"></span>
+                <span :text="chip.time"></span>
+              </span>
+              <span class="min-w-0 break-words" :text="chip.label"></span>
+            </a>
+          </div>
+        </article>
+      </div>
+      <div class="hidden sm:block overflow-x-auto">
         <div class="min-w-[560px]">
           <div class="grid grid-cols-7 font-semibold text-muted text-xs border-b border-line">
             <div class="p-2 text-center">Sun</div><div class="p-2 text-center">Mon</div><div class="p-2 text-center">Tue</div><div class="p-2 text-center">Wed</div><div class="p-2 text-center">Thu</div><div class="p-2 text-center">Fri</div><div class="p-2 text-center">Sat</div>
@@ -117,11 +136,11 @@
           <div class="grid grid-cols-7">
             <div class="grid content-start gap-1 p-1.5 min-h-24 border-b border-line border-r" data-cal-cell :data-blank="cell.blank" :data-today="cell.isToday" x-for="cell in calCells()">
               <a class="font-semibold text-xs hover:text-ink transition-colors" data-cal-day x-show="!cell.blank" :href="cell.scheduleUrl" data-stx-link title="Schedule a post on this day">{{ cell.day }}</a>
-              <a class="flex gap-1 items-center px-1 py-0.5 text-body text-xs bg-panel-2 hover:bg-panel-2 rounded transition-colors" x-for="chip in cell.chips" :href="chip.href" data-stx-link>
+              <a class="flex gap-1 items-center px-1 py-0.5 text-body text-xs bg-panel-2 hover:bg-panel-2 rounded transition-colors" x-for="chip in cell.chips.slice(0, 3)" :href="chip.href" data-stx-link>
                 <span class="shrink-0 h-1.5 w-1.5 rounded-full" data-cal-dot :data-status="chip.status"></span>
-                <span class="truncate">{{ chip.label }}</span>
+                <span class="truncate">{{ chip.time }} {{ chip.label }}</span>
               </a>
-              <span class="px-1 text-muted text-xs" x-show="cell.more" :text="cell.more"></span>
+              <span class="px-1 text-muted text-xs" x-show="cell.chips.length > 3" :text="`+${cell.chips.length - 3} more`"></span>
             </div>
           </div>
         </div>
@@ -407,9 +426,10 @@
      * The month grid as plain data. Derived rather than painted, so changing
      * month or reloading the queue rebuilds it with no manual repaint call.
      */
-    const calCells = derived(() => {
-      const { year, month } = calMonth()
+    const agendaDateFormat = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
 
+    const calDays = derived(() => {
+      const { year, month } = calMonth()
       const byDay = new Map()
       for (const row of rows()) {
         const date = parseUtc(row.scheduledAt || row.publishedAt)
@@ -419,32 +439,36 @@
         byDay.get(key).push({ row, date })
       }
 
-      const cells = []
-      // The grid itself is plain calendar arithmetic, the same in every zone.
-      const startOffset = new Date(Date.UTC(year, month, 1)).getUTCDay()
       const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
       const todayKey = dayKey(new Date())
-
-      for (let i = 0; i < startOffset; i++) cells.push({ blank: true, chips: [] })
-
-      for (let day = 1; day <= daysInMonth; day++) {
+      return Array.from({ length: daysInMonth }, (_, index) => {
+        const day = index + 1
         const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
         const dayItems = (byDay.get(key) || []).sort((a, b) => a.date - b.date)
-        cells.push({
+        return {
           blank: false,
           day,
+          key,
+          label: agendaDateFormat.format(new Date(Date.UTC(year, month, day))),
           isToday: key === todayKey,
           scheduleUrl: `/composer?schedule=${key}`,
-          chips: dayItems.slice(0, 3).map(({ row, date }) => ({
+          chips: dayItems.map(({ row, date }) => ({
             status: row.status,
             href: row.actionable ? row.editUrl : row.liveUrl || row.editUrl,
-            label: `${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: zone() })} ${(row.title || row.body || '').slice(0, 22) || 'post'}`,
+            time: date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: zone() }),
+            label: (row.title || row.body || '').trim().slice(0, 160) || 'Post',
           })),
-          more: dayItems.length > 3 ? `+${dayItems.length - 3} more` : '',
-        })
-      }
+        }
+      })
+    })
 
-      while (cells.length % 7 !== 0) cells.push({ blank: true, chips: [] })
+    const calCells = derived(() => {
+      // The grid itself is plain calendar arithmetic, the same in every zone.
+      const { year, month } = calMonth()
+      const startOffset = new Date(Date.UTC(year, month, 1)).getUTCDay()
+      const emptyCell = { blank: true, chips: [] }
+      const cells = [...Array.from({ length: startOffset }, () => emptyCell), ...calDays()]
+      while (cells.length % 7 !== 0) cells.push(emptyCell)
       return cells
     })
 

@@ -51,9 +51,7 @@ interface AnalyticsPayload {
 let points: Point[] = []
 let analyticsPromise: Promise<AnalyticsPayload | null> | null = null
 
-const width = 640
-const height = 280
-const inset = { top: 46, right: 34, bottom: 58, left: 56 }
+const drawn = new WeakMap<SVGSVGElement, { width: number, points: Point[], events: AbortController }>()
 const blue = '#2563eb'
 const text = '#18181b'
 const muted = '#71717a'
@@ -65,9 +63,26 @@ function formatTick(value: number): string {
 
 function renderAnalyticsChart(): void {
   const chart = document.querySelector<SVGSVGElement>('[data-analytics-chart]')
-  const existingPath = chart?.querySelector<SVGPathElement>('[data-chart-line]')?.getAttribute('d')
-  if (!chart || (chart.dataset.rendered === 'true' && existingPath)) return
-  if (points.length < 2) return
+  if (!chart || points.length < 2 || !chart.clientWidth) return
+
+  const width = Math.max(240, Math.min(640, chart.clientWidth))
+  const previous = drawn.get(chart)
+  if (previous?.width === width && previous.points === points) return
+  previous?.events.abort()
+  const events = new AbortController()
+  drawn.set(chart, { width, points, events })
+
+  const compact = width < 460
+  const height = compact ? 235 : 280
+  const inset = compact ? { top: 38, right: 28, bottom: 50, left: 40 } : { top: 46, right: 36, bottom: 58, left: 56 }
+  chart.setAttribute('viewBox', `0 0 ${width} ${height}`)
+  const size = (selector: string) => {
+    const rect = chart.querySelector(selector)
+    rect?.setAttribute('width', String(width))
+    rect?.setAttribute('height', String(height))
+  }
+  size('[data-chart-background]')
+  size('[data-chart-hit-area]')
 
   const maxValue = Math.max(...points.map(point => point.value))
   const yMax = Math.max(4, Math.ceil((maxValue + 1) / 2) * 2)
@@ -80,8 +95,9 @@ function renderAnalyticsChart(): void {
   const lastX = x(points.length - 1)
   const areaPath = `${path}L${lastX},${baseline}L${firstX},${baseline}Z`
   const yTicks = niceTicks(0, yMax, 4)
+  const tickStride = compact ? 10 : 5
   const xTickIndexes = points.map((_point, index) => index)
-    .filter(index => index === 0 || index === points.length - 1 || (index % 5 === 0 && index < points.length - 3))
+    .filter(index => index === 0 || index === points.length - 1 || (index % tickStride === 0 && index < points.length - 3))
 
   chart.querySelector<SVGPathElement>('[data-chart-line]')?.setAttribute('d', path)
   chart.querySelector<SVGPathElement>('[data-chart-area]')?.setAttribute('d', areaPath)
@@ -101,7 +117,7 @@ function renderAnalyticsChart(): void {
     yAxis.innerHTML = yTicks
       .map((tick) => {
         const yy = y(tick)
-        return `<g transform="translate(0 ${yy})"><line x1="${inset.left - 5}" x2="${inset.left}" stroke="${rule}" stroke-width="1"></line><text x="${inset.left - 10}" y="4" text-anchor="end" fill="${muted}" font-size="10">${formatTick(tick)}</text></g>`
+        return `<g transform="translate(0 ${yy})"><line x1="${inset.left - 5}" x2="${inset.left}" stroke="${rule}" stroke-width="1"></line><text x="${inset.left - 10}" y="4" text-anchor="end" fill="${muted}" font-size="12">${formatTick(tick)}</text></g>`
       })
       .join('')
   }
@@ -112,7 +128,7 @@ function renderAnalyticsChart(): void {
       `<line x1="${inset.left}" x2="${width - inset.right}" y1="${baseline}" y2="${baseline}" stroke="${rule}" stroke-width="1"></line>`,
       ...xTickIndexes.map((index) => {
         const xx = x(index)
-        return `<g transform="translate(${xx} 0)"><line y1="${baseline}" y2="${baseline + 5}" stroke="${rule}" stroke-width="1"></line><text y="${baseline + 22}" text-anchor="middle" fill="${muted}" font-size="10">${escapeHtml(points[index]!.label)}</text></g>`
+        return `<g transform="translate(${xx} 0)"><line y1="${baseline}" y2="${baseline + 5}" stroke="${rule}" stroke-width="1"></line><text y="${baseline + 22}" text-anchor="middle" fill="${muted}" font-size="12">${escapeHtml(points[index]!.label)}</text></g>`
       }),
     ].join('')
   }
@@ -127,7 +143,7 @@ function renderAnalyticsChart(): void {
 
   const legend = chart.querySelector<SVGGElement>('[data-chart-legend]')
   if (legend) {
-    legend.innerHTML = [
+    legend.innerHTML = compact ? '' : [
       `<circle cx="${width - 212}" cy="22" r="4" fill="${blue}"></circle>`,
       `<text x="${width - 202}" y="26" fill="${text}" font-size="11" font-weight="700">Publishing activity</text>`,
       `<rect x="${width - 82}" y="16" width="22" height="8" rx="4" fill="rgba(37, 99, 235, 0.12)"></rect>`,
@@ -200,25 +216,19 @@ function renderAnalyticsChart(): void {
     return Math.round((svgX - inset.left) / step)
   }
 
-  if (chart.dataset.hoverBound !== 'true') {
-    chart.addEventListener('pointermove', (event) => {
-      showHover(pointIndexFromPointer(event))
-    })
-    chart.addEventListener('pointerleave', hideHover)
+  const options = { signal: events.signal }
+  chart.addEventListener('pointermove', event => showHover(pointIndexFromPointer(event)), options)
+  chart.addEventListener('pointerleave', hideHover, options)
+  hitArea?.addEventListener('focus', () => showHover(activeIndex), options)
+  hitArea?.addEventListener('blur', hideHover, options)
+  hitArea?.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+    event.preventDefault()
+    showHover(activeIndex + (event.key === 'ArrowRight' ? 1 : -1))
+  }, options)
+  hideHover()
+  if (document.activeElement === hitArea) showHover(activeIndex)
 
-    hitArea?.addEventListener('focus', () => showHover(activeIndex))
-    hitArea?.addEventListener('blur', hideHover)
-    hitArea?.addEventListener('keydown', (event) => {
-      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-
-      event.preventDefault()
-      showHover(activeIndex + (event.key === 'ArrowRight' ? 1 : -1))
-    })
-
-    chart.dataset.hoverBound = 'true'
-  }
-
-  chart.dataset.rendered = 'true'
 }
 
 /**
@@ -390,14 +400,23 @@ function scheduleAnalyticsRender(): void {
   })
 }
 
-/**
- * Load and draw when the analytics view is on the page: at first load and
- * after each client-side navigation. It used to watch the whole document with
- * a MutationObserver for the life of the session, on every page (#182); the
- * router says when the page changed, so nothing needs watching.
- */
+let observedChart: SVGSVGElement | null = null
+const chartResize = new ResizeObserver(scheduleAnalyticsRender)
+
+window.addEventListener('stx:load', () => {
+  if (!observedChart || observedChart.isConnected) return
+  chartResize.disconnect()
+  observedChart = null
+})
+
 function mountAnalyticsIfShown(): void {
-  if (!document.querySelector('[data-analytics-chart]')) return
+  const chart = document.querySelector<SVGSVGElement>('[data-analytics-chart]')
+  if (!chart) return
+  if (observedChart !== chart) {
+    chartResize.disconnect()
+    chartResize.observe(chart)
+    observedChart = chart
+  }
   void loadAnalytics()
   scheduleAnalyticsRender()
 }

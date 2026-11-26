@@ -50,7 +50,7 @@
         <div class="p-3.5">
           <svg class="block h-auto w-full" viewBox="0 0 640 280" role="img" aria-label="Posts published over the last 30 days" data-analytics-chart>
             <desc>Posts published over the last 30 days with dates on the x axis and post counts on the y axis.</desc>
-            <rect x="0" y="0" width="640" height="280" rx="16" fill="#fafafa"></rect>
+            <rect data-chart-background x="0" y="0" width="640" height="280" rx="16" fill="#fafafa"></rect>
             <g data-chart-legend></g>
             <g data-chart-grid></g>
             <g data-chart-y-axis></g>

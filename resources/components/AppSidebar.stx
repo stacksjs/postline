@@ -27,39 +27,85 @@ const navLinks = [
 }))
 
 const settingsActive = currentPath === '/accounts' || currentPath === '/settings' || currentPath.startsWith('/settings/')
+const mobilePrimary = new Set(['/composer', '/queue', '/inbox'])
+const mobileLinks = navLinks.filter(link => mobilePrimary.has(link.href))
+const moreLinks = [
+  ...navLinks.filter(link => !mobilePrimary.has(link.href)),
+  { href: '/accounts', label: 'Channels', icon: 'i-hugeicons-share-08', active: currentPath === '/accounts' },
+  { href: '/settings', label: 'Settings', icon: 'i-hugeicons-settings-02', active: settingsActive && currentPath !== '/accounts' },
+]
+</script>
+
+<script client>
+const moreDialog = useRef('moreDialog')
+const moreOpen = state(false)
+const desktopWidth = useMediaQuery('(min-width: 1024px)')
+
+function showMore() {
+  moreDialog.current?.showModal()
+  moreOpen.set(Boolean(moreDialog.current?.open))
+}
+
+function closeMore() {
+  moreDialog.current?.close()
+}
+
+function dismissOutside(event: MouseEvent) {
+  if (event.target === moreDialog.current) closeMore()
+}
+
+effect(() => {
+  if (desktopWidth() && moreOpen()) closeMore()
+})
 </script>
 
 <template>
   <div class="contents">
-  <nav class="flex lg:hidden overflow-x-auto sticky top-0 z-50 gap-1.5 items-center px-3 py-2 bg-bg border-b border-line" aria-label="Primary" data-postline-mobile-nav>
-    <span class="mr-1 h-7 w-7 brand-mark" aria-hidden="true"></span>
-    @foreach (navLinks as link)
+  <nav class="grid lg:hidden bottom-0 fixed inset-x-0 z-50 grid-cols-4 items-center px-2 bg-panel border-line border-t" aria-label="Primary" data-postline-mobile-nav>
+    @foreach (mobileLinks as link)
       <a
         href="{{ link.href }}"
         data-stx-link
-        data-stx-active-class="text-ink bg-raised shadow-sm"
-        data-stx-exact-active-class="text-ink bg-raised shadow-sm"
-        data-no-window-drag
-        class="inline-flex shrink-0 gap-1.5 items-center px-3 py-1.5 text-xs font-medium whitespace-nowrap rounded-full transition-colors hover:bg-glass-hover {{ link.active ? 'bg-raised text-ink shadow-sm' : 'text-muted' }}"
+        data-stx-active-class="text-ink bg-nav-active"
+        data-stx-exact-active-class="text-ink bg-nav-active"
+        class="grid justify-items-center content-center gap-0.5 mx-0.5 px-1 h-12 font-semibold text-xs rounded-xl {{ link.active ? 'bg-nav-active text-ink' : 'text-muted' }}"
         aria-current="{{ link.active ? 'page' : 'false' }}"
       >
-        <span class="h-4 w-4 {{ link.icon }}" aria-hidden="true"></span>
-        <span>{{ link.label }}</span>
+        <span class="h-5 w-5 {{ link.icon }}" aria-hidden="true"></span>
+        <span>{{ link.href === '/composer' ? 'Compose' : link.label }}</span>
       </a>
     @endforeach
-    <a
-      href="/settings"
-      data-stx-link
-      data-stx-active-class="text-ink bg-raised shadow-sm"
-      data-stx-exact-active-class="text-ink bg-raised shadow-sm"
-      data-no-window-drag
-      class="inline-flex shrink-0 gap-1.5 items-center px-3 py-1.5 text-xs font-medium whitespace-nowrap rounded-full transition-colors hover:bg-glass-hover {{ settingsActive ? 'bg-raised text-ink shadow-sm' : 'text-muted' }}"
-      aria-current="{{ settingsActive ? 'page' : 'false' }}"
-    >
-      <span class="h-4 w-4 i-hugeicons-settings-02" aria-hidden="true"></span>
-      <span>Settings</span>
-    </a>
+    <button class="grid content-center gap-0.5 justify-items-center mx-0.5 px-1 h-12 font-semibold text-muted text-xs rounded-xl" type="button" aria-controls="workspace-more" aria-haspopup="dialog" :aria-expanded="moreOpen()" @click="showMore">
+      <span class="h-5 w-5 i-hugeicons-more-horizontal" aria-hidden="true"></span>
+      <span>More</span>
+    </button>
   </nav>
+
+  <dialog id="workspace-more" ref="moreDialog" class="p-0 text-ink bg-panel border border-line rounded-t-2xl shadow-xl" aria-labelledby="workspace-more-title" data-postline-mobile-menu @close="moreOpen.set(false)" @click="dismissOutside($event)">
+    <div class="p-4">
+      <header class="flex gap-3 items-center justify-between mb-2">
+        <h2 id="workspace-more-title" class="m-0 font-semibold text-base">More views</h2>
+        <button class="grid place-items-center h-11 w-11 text-muted bg-panel-2 hover:bg-raised rounded-xl" type="button" aria-label="Close menu" autofocus @click="closeMore">
+          <span class="h-5 w-5 i-hugeicons-cancel-01" aria-hidden="true"></span>
+        </button>
+      </header>
+      <nav class="grid gap-1.5 grid-cols-2" aria-label="More views">
+        @foreach (moreLinks as link)
+          <a
+            href="{{ link.href }}"
+            class="flex min-w-0 gap-2 items-center px-3 min-h-11 font-medium text-ui rounded-xl hover:bg-panel-2 {{ link.active ? 'bg-nav-active text-ink' : 'text-body' }}"
+            data-stx-link
+            data-stx-exact-active-class="text-ink bg-nav-active"
+            aria-current="{{ link.active ? 'page' : 'false' }}"
+            @click="closeMore"
+          >
+            <span class="shrink-0 h-5 w-5 {{ link.icon }}" aria-hidden="true"></span>
+            <span class="truncate">{{ link.label }}</span>
+          </a>
+        @endforeach
+      </nav>
+    </div>
+  </dialog>
 
   <aside class="hidden lg:flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[68px] px-5 h-screen min-w-0 bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-150 ease-out transition-[width,padding]" aria-label="Postline" data-postline-sidebar data-window-drag-region>
     <div class="absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_45%,rgba(226,226,222,0.16)_100%)] pointer-events-none"></div>

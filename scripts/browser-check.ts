@@ -203,6 +203,63 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkPhoneNavigation(cdp: Cdp): Promise<void> {
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 1, mobile: true })
+  await auditPage(`${site}/queue`, { cdp })
+  await waitUntil('The bottom navigation on a phone', () => evaluate<boolean>(cdp, `
+    (() => {
+      const nav = document.querySelector('[data-postline-mobile-nav]')
+      return nav.getBoundingClientRect().bottom === innerHeight && nav.clientWidth === nav.scrollWidth
+        && nav.querySelector('a[href="/queue"]').getAttribute('aria-current') === 'page'
+    })()`), 5_000)
+
+  const more = '[aria-controls="workspace-more"]'
+  await evaluate(cdp, `document.querySelector('${more}').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The More dialog and its focused Close button', () => evaluate<boolean>(cdp, `
+    document.querySelector('#workspace-more').open
+      && document.querySelector('${more}').getAttribute('aria-expanded') === 'true'
+      && document.activeElement.getAttribute('aria-label') === 'Close menu'`), 5_000)
+  await pressKey(cdp, 'Escape', 27)
+  await waitUntil('Closing More returns focus', () => evaluate<boolean>(cdp, `
+    !document.querySelector('#workspace-more').open
+      && document.activeElement.matches('${more}')
+      && document.activeElement.getAttribute('aria-expanded') === 'false'`), 5_000)
+
+  await evaluate(cdp, `Array.from(document.querySelectorAll('[data-view-toggle]')).find(button => button.innerText.includes('Agenda')).click()`)
+  await waitUntil('The agenda replaces the month grid', () => evaluate<boolean>(cdp, `
+    document.querySelector('[aria-label="Monthly agenda"]').getClientRects().length > 0
+      && !document.querySelector('[data-cal-cell]')?.getClientRects().length`), 5_000)
+  await evaluate(cdp, `document.querySelector('button[aria-label="Next month"]').click()`)
+  await waitUntil('All posts scheduled on the same day are available in the agenda', () => evaluate<boolean>(cdp, `
+    [...document.querySelectorAll('[aria-label="Monthly agenda"] a')].filter(link => link.textContent.includes('Phone agenda fixture')).length === 4`), 5_000)
+  await evaluate(cdp, `Array.from(document.querySelectorAll('[aria-label="Monthly agenda"] a')).find(link => link.textContent.includes('Phone agenda fixture')).scrollIntoView({ block: 'center' })`)
+  const agendaScreenshot = await cdp.send<{ data: string }>('Page.captureScreenshot', { format: 'png' })
+  writeFileSync(join(out, 'queue-agenda-phone.png'), Buffer.from(agendaScreenshot.data, 'base64'))
+
+  await evaluate(cdp, `document.querySelector('${more}').click()`)
+  await waitUntil('More reopens before choosing Analytics', () => evaluate<boolean>(cdp, `document.querySelector('#workspace-more').open`), 5_000)
+  await evaluate(cdp, `document.querySelector('#workspace-more a[href="/analytics"]').click()`)
+  await waitUntil('The Analytics view opens and closes the menu', () => evaluate<boolean>(cdp, `
+    location.pathname === '/analytics' && !document.querySelector('#workspace-more').open`), 10_000)
+  await waitUntil('The chart has readable phone labels', () => evaluate<boolean>(cdp, `
+    (() => {
+      const chart = document.querySelector('[data-analytics-chart]')
+      const tick = chart?.querySelector('[data-chart-x-axis] text')
+      return tick && chart.viewBox.baseVal.width <= 375
+        && chart.getScreenCTM().a * Number.parseFloat(getComputedStyle(tick).fontSize) >= 11
+    })()`), 5_000)
+
+  await auditPage(`${site}/composer`, { cdp })
+  await evaluate(cdp, `document.querySelector('[data-schedule-toggle]').click()`)
+  await waitUntil('The composer schedule fits at 375 pixels', () => evaluate<boolean>(cdp, `
+    (() => {
+      const input = document.querySelector('[data-compose-schedule]')
+      const bounds = input.getBoundingClientRect()
+      return bounds.width > 0 && bounds.left >= 0 && bounds.right <= innerWidth
+    })()`), 5_000)
+}
+
 let exitCode = 0
 try {
   await waitUntil('The API', async () => (await fetch(`http://localhost:${API_PORT}/api/postline/health`)).status < 500)
@@ -233,6 +290,12 @@ try {
       await fetch('/api/csrf')
       const draft = await fetch('/api/postline/queue', { method: 'POST', body: new URLSearchParams({ text: 'A draft for the keyboard smoke test', providers: 'bluesky' }) })
       if (!draft.ok) return 'could not create the queue fixture: ' + await draft.text()
+      const current = new Date()
+      const upcoming = new Date(current.getFullYear(), current.getMonth() + 1, 15, 12).toISOString().slice(0, 19).replace('T', ' ')
+      for (let index = 1; index <= 4; index++) {
+        const scheduled = await fetch('/api/postline/queue', { method: 'POST', body: new URLSearchParams({ text: 'Phone agenda fixture ' + index, providers: 'bluesky', scheduled_at: upcoming }) })
+        if (!scheduled.ok) return 'could not create the agenda fixture: ' + await scheduled.text()
+      }
       return 'ok'
     })()`)
     if (signedIn !== 'ok') throw new Error(signedIn)
@@ -256,6 +319,7 @@ try {
     }
     await checkDesktopUpdateControls(cdp)
     await checkNetworkComponents(cdp)
+    await checkPhoneNavigation(cdp)
   }
   finally {
     await close()

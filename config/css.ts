@@ -352,15 +352,34 @@ html.postline-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fa
 @media (max-width: 1023px) {
   [data-sidebar-expand-fab] { display: none; }
 
-  [data-postline-mobile-nav] {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    -webkit-mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 28px), transparent);
-    mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 28px), transparent);
+  [data-postline-shell] {
+    --postline-bottom-nav-height: calc(3.75rem + env(safe-area-inset-bottom, 0px));
   }
 
-  [data-postline-mobile-nav]::-webkit-scrollbar { display: none; }
+  [data-postline-content-shell] { padding-bottom: var(--postline-bottom-nav-height); }
+
+  [data-postline-mobile-nav] {
+    height: var(--postline-bottom-nav-height);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  [data-postline-shell] + #postline-toast-host {
+    bottom: calc(1rem + 3.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
 }
+
+[data-postline-mobile-menu] {
+  position: fixed;
+  inset: auto 0 0;
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: calc(100dvh - 1rem);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+[data-postline-mobile-menu]::backdrop { background: rgb(15 23 42 / 48%); }
 
 /* A focus ring every control shows, at 3:1 against the panels (#142). The
    writing surfaces with no border of their own opt in with data-focus-outline. */

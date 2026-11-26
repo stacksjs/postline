@@ -35,7 +35,7 @@
       </article>
     </div>
 
-    <div class="grid gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
+    <div class="grid gap-4 lg:grid-cols-[minmax(13rem,18rem)_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]">
       <aside class="grid content-start gap-4" aria-label="Conversations">
         <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm">
           <header class="grid gap-2.5 px-4 py-3 border-b border-line">
@@ -67,7 +67,7 @@
             </div>
           </div>
 
-          <div class="overflow-y-auto max-h-[32rem] divide-line divide-y" x-show="!loading() && conversations().length">
+          <div class="overflow-y-auto max-h-80 lg:max-h-[32rem] divide-line divide-y" x-show="!loading() && conversations().length">
             <button class="grid gap-1.5 p-3 w-full text-left hover:bg-panel-2 transition-colors" type="button" x-for="conversation in conversations()" :aria-current="conversation.id === activeId() ? 'true' : 'false'" @click="openConversation(conversation.id)" :class="conversation.id === activeId() ? 'bg-panel-2' : conversation.unreadCount ? 'bg-info-soft' : ''">
               <div class="flex gap-2 items-center">
                 <NetworkChip :provider="conversation.provider" size="small" />

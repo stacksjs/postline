@@ -162,12 +162,12 @@
           <div class="flex gap-2 items-center min-w-0">
             <span class="min-w-0 text-muted text-xs truncate" data-bluesky-count>0 / 300 characters</span>
           </div>
-          <div class="flex flex-nowrap gap-2 items-center justify-end w-full sm:w-auto">
+          <div class="flex flex-wrap gap-2 items-center justify-end w-full sm:w-auto">
             <input class="hidden" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple aria-label="Attach images" data-attach-input>
             <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach images" title="Attach images (up to 4)" data-attach-button>
               <span class="h-4 w-4 i-hugeicons-image-01" aria-hidden="true"></span>
             </button>
-            <input class="hidden px-2 h-9 text-ink text-xs bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="datetime-local" aria-label="Schedule time" data-compose-schedule>
+            <input class="hidden px-2 h-9 max-w-full min-w-0 text-ink text-xs bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="datetime-local" aria-label="Schedule time" data-compose-schedule>
             <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Schedule post" title="Schedule post" data-schedule-toggle>
               <span class="h-4 w-4 i-hugeicons-calendar-03" aria-hidden="true"></span>
             </button>

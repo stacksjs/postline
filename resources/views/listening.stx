@@ -41,7 +41,7 @@
       </article>
     </div>
 
-    <div class="grid gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
+    <div class="grid gap-4 lg:grid-cols-[minmax(13rem,18rem)_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]">
       <aside class="grid content-start gap-4" aria-label="Listening rules">
         <section class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
           <header class="flex gap-3 items-start justify-between mb-4">
