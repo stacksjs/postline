@@ -88,6 +88,27 @@ tail -f ~/.local/share/reviewos/postline/runner.log
 of. The runner needs 8 GB of free disk before it takes a job, and this Mac has
 run close to that.
 
+## Bringing up a replacement Mac runner
+
+Use another Apple Silicon Mac with enough disk space for Pantry, Chrome, the
+compiled agent and the DMG. From the ReviewOS checkout, register it with a
+unique name and the same Postline job labels.
+
+```bash
+./buddy runner:local --register --repository stacks/postline --name postline-macos-arm64-spare --labels self-hosted,macos-arm64,postline
+```
+
+Install the launch agent under the runner's Mac account. Confirm it can run
+the compiled agent check with its login Keychain available. To build release
+artifacts, provision the approved Developer ID identity and the matching
+Postline update signing key through the release secret store.
+
+While the primary runner is offline, dispatch `ci.yml` on `main` and confirm
+the job ran on the replacement. Check the exact commit's `ReviewOS / CI`
+verdict on GitHub. Then use the normal release workflow for an approved tag.
+It will use the same Bun version, build, checksum signing, and CI checks.
+[Release checklist](releasing.md).
+
 ## Deploying the public site
 
 The production environment uses the Postline runner's SSH identity for the
