@@ -85,6 +85,11 @@ app has no sign-in, so there is nothing to recover there.
 next free one and says so. Run `./buddy setup:ssl` once to get
 `https://postline.localhost` in place of a localhost port.
 
+`./buddy dev` also runs the scheduler, so a post scheduled for a minute from
+now goes out a minute from now. On a server without `buddy dev`, run it
+alongside the app with `./buddy schedule:run`; the Queue and Activity pages say when
+it has stopped.
+
 `/` opens the workspace (or the sign-in page). The pages that describe
 Postline, its landing page, features, use cases and the hosted-plan waitlist,
 belong to the public site and redirect to the workspace on your install. To
@@ -119,7 +124,7 @@ wins when both are set. The Mac app reads no `.env`, so it uses Settings.
 
 | Command | What it does |
 |---|---|
-| `./buddy dev` | Start the site, the API and the docs |
+| `./buddy dev` | Start the site, the API, the docs and the scheduler that publishes queued posts |
 | `./buddy dev:frontend` / `./buddy dev:api` | Start one of them |
 | `./buddy dev:dashboard` | The Stacks admin dashboard |
 | `./buddy migrate` | Apply pending migrations |
