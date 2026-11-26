@@ -20,9 +20,9 @@ export const config: PantryConfig = {
     // meant nothing. "latest" is the strongest thing expressible here, and it
     // satisfies the >= 3.47.2 floor this project requires.
     "sqlite.org": "latest",
-    // ^0.0.1 does not exist in the catalog; the published versions are 0.0.19,
-    // 0.0.20, 0.0.23 and 0.0.37.
-    craft: "^0.0.37",
+    // `craft` is Pantry's alias for craft-native.org, the runtime the Mac app is
+    // built with. A 0.0.x caret is an exact version, so this names the one in use.
+    craft: "^0.0.499",
     // Uncomment as needed:
     // 'redis.io': '^7.4.1',
     // 'mailpit.axllent.org': '^1.21.8',
