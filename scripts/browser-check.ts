@@ -111,6 +111,11 @@ async function checkQueueKeyboard(cdp: Cdp): Promise<void> {
   await pressKey(cdp, 'Escape', 27)
   if (!await evaluate<boolean>(cdp, `document.activeElement?.matches('${actions}') && !document.activeElement.parentElement.open`))
     fail('queue', 'keyboard', 'Escape did not close the disclosure and return focus')
+
+  await evaluate(cdp, 'document.getElementById("queue-search")?.focus()')
+  await cdp.send('Input.insertText', { text: 'keyboard smoke test' })
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The post search result', () => evaluate<boolean>(cdp, `document.querySelector('#queue-results[aria-label="Matching posts"] article')?.textContent.includes('A draft for the keyboard smoke test')`), 5_000)
 }
 
 let exitCode = 0

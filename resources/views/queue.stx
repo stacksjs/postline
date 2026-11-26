@@ -14,7 +14,7 @@
         <p class="mb-0 mt-1.5 text-muted text-ui">What's drafted, scheduled, and recently published.</p>
       </div>
       <div class="flex flex-wrap gap-2 items-center">
-        <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Queue view">
+        <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Queue view" x-show="!activeSearch()">
           <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'list'" :aria-pressed="view() === 'list'" @click="setView('list')">
             <span class="h-3.5 w-3.5 i-hugeicons-menu-01" aria-hidden="true"></span><span>List</span>
           </button>
@@ -29,19 +29,27 @@
       </div>
     </header>
 
+    <form class="flex flex-wrap gap-2 items-center" role="search" aria-label="Posts" @submit.prevent="searchPosts">
+      <label class="sr-only" for="queue-search">Search posts</label>
+      <input class="px-3 h-9 w-full sm:max-w-xs text-ink text-ui bg-panel border border-field-line rounded-lg" id="queue-search" type="search" placeholder="Search all posts" maxlength="200" x-model="searchText">
+      <button class="px-3 h-9 font-semibold text-on-accent text-ui bg-accent hover:bg-accent-hover rounded-lg" type="submit">Search</button>
+      <button class="px-3 h-9 font-medium text-muted text-ui hover:text-ink rounded-lg" type="button" x-show="activeSearch()" @click="clearSearch">Clear search</button>
+    </form>
+
     {{-- x-cloak on both views: neither paints before the stored choice is
         read, so a queue left on Calendar no longer flashes the list first. --}}
-    <section class="bg-panel border border-line rounded-2xl shadow-sm" x-cloak x-show="view() === 'list'">
+    <section class="bg-panel border border-line rounded-2xl shadow-sm" x-cloak x-show="activeSearch() || view() === 'list'">
       <header class="flex flex-wrap gap-3 items-center justify-between p-2.5 border-b border-line">
-        <div class="flex flex-wrap gap-1" role="tablist" aria-label="Queue">
+        <div class="flex flex-wrap gap-1" role="tablist" aria-label="Queue" x-show="!activeSearch()">
           <button class="inline-flex gap-1.5 items-center px-3 h-8 font-semibold text-xs rounded-lg transition-colors" type="button" role="tab" x-for="entry in tabs()" :id="'queue-tab-' + entry.id" aria-controls="queue-results" :aria-selected="tab() === entry.id" :tabindex="tab() === entry.id ? 0 : -1" :data-active="tab() === entry.id" :data-tone="entry.tone" data-queue-tab @click="setTab(entry.id)" @keydown="moveTab($event, entry.id)">
             <span :text="entry.label"></span>
             <span class="px-1.5 min-w-5 text-center text-xs rounded-full" data-queue-tab-count :text="entry.count"></span>
           </button>
         </div>
-        <span class="pr-1 text-muted text-xs" :text="metaText()">Loading…</span>
+        <h2 class="m-0 px-1 font-semibold text-ui" x-show="activeSearch()">Search results</h2>
+        <span class="pr-1 text-muted text-xs" aria-live="polite" :text="metaText()">Loading…</span>
       </header>
-      <div class="grid gap-2.5 p-3" id="queue-results" role="tabpanel" :aria-labelledby="'queue-tab-' + tab()">
+      <div class="grid gap-2.5 p-3" id="queue-results" :role="activeSearch() ? 'region' : 'tabpanel'" :aria-label="activeSearch() ? 'Matching posts' : null" :aria-labelledby="activeSearch() ? null : 'queue-tab-' + tab()">
         <p class="m-0 p-3 text-muted text-ui" x-show="loadError()" :text="loadError()"></p>
         <p class="m-0 p-3 text-muted text-ui" x-show="showEmpty()" :text="emptyText()"></p>
         <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl group" x-for="row in visible()">
@@ -83,12 +91,12 @@
         </article>
       </div>
       {{-- The list is paged; this fetches the page of older posts. --}}
-      <div class="flex justify-center p-3" x-show="tab() === 'published' && nextCursor()">
-        <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" :disabled="loadingMore()" @click="loadMore" :text="loadingMore() ? 'Loading…' : 'Load older posts'">Load older posts</button>
+      <div class="flex justify-center p-3" x-show="(activeSearch() || tab() === 'published') && nextCursor()">
+        <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" :disabled="loadingMore()" @click="loadMore" :text="loadingMore() ? 'Loading…' : (activeSearch() ? 'Load more results' : 'Load older posts')">Load older posts</button>
       </div>
     </section>
 
-    <section class="bg-panel border border-line rounded-2xl shadow-sm" x-cloak x-show="view() === 'calendar'">
+    <section class="bg-panel border border-line rounded-2xl shadow-sm" x-cloak x-show="!activeSearch() && view() === 'calendar'">
       <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
         <div class="flex gap-2 items-center">
           <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Previous month" @click="prevMonth">
@@ -196,6 +204,9 @@
     const items = state([])
     const loadError = state('')
     const loaded = state(false)
+    const searchText = state('')
+    const activeSearch = state('')
+    const queueRequest = state(0)
     /** The cursor for the next page of older posts; 0 when there are none. */
     const nextCursor = state(0)
     const loadingMore = state(false)
@@ -374,9 +385,9 @@
         { id: 'attention', label: 'Needs attention', count: count('attention'), tone: count('attention') ? 'danger' : '' },
       ]
     })
-    const visible = derived(() => rows().filter(row => inTab(row, tab())))
+    const visible = derived(() => activeSearch() ? rows() : rows().filter(row => inTab(row, tab())))
     const showEmpty = derived(() => loaded() && !loadError() && visible().length === 0)
-    const emptyText = derived(() => ({
+    const emptyText = derived(() => activeSearch() ? 'No posts match your search.' : ({
       scheduled: 'Nothing scheduled. Pick a time in the composer and the post waits here.',
       drafts: 'No drafts. Save one from the composer to finish it later.',
       published: 'Nothing published yet.',
@@ -387,7 +398,7 @@
       if (!loaded()) return 'Loading…'
       if (loadError()) return 'Could not load'
       const n = visible().length
-      return `${n} post${n === 1 ? '' : 's'}`
+      return `${n} ${activeSearch() ? 'matching ' : ''}post${n === 1 ? '' : 's'}${activeSearch() && nextCursor() ? ' shown' : ''}`
     })
 
     const calTitle = derived(() =>
@@ -463,27 +474,57 @@
       }
     }
 
+    async function fetchQueuePage(parameters: Record<string, string>) {
+      const query = new URLSearchParams(parameters)
+      if (activeSearch()) query.set('q', activeSearch())
+      const response = await fetch(`/api/postline/queue?${query}`)
+      const payload = await response.json()
+      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load posts.')
+      return payload.data
+    }
+
     const refresh = async () => {
+      const request = queueRequest() + 1
+      queueRequest.set(request)
+      loadingMore.set(false)
       try {
         // Reload as many rows as are on screen, so a refresh after an action
         // does not throw away the older pages the owner had loaded.
-        const response = await fetch(`/api/postline/queue?limit=${Math.max(50, items().length)}`)
-        const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the queue.')
-        items.set(payload.data.items || [])
-        nextCursor.set(payload.data.nextCursor || 0)
+        const page = await fetchQueuePage({ limit: String(Math.max(50, items().length)) })
+        if (request !== queueRequest()) return
+        items.set(page.items || [])
+        nextCursor.set(page.nextCursor || 0)
         loadError.set('')
       }
       catch (error) {
         // Degrade to the inline error state; no toast on load/refresh so a
         // failing fetch (e.g. an expired session) can't spam or stack.
+        if (request !== queueRequest()) return
         items.set([])
+        nextCursor.set(0)
         loadError.set(error instanceof Error ? error.message : String(error))
         console.warn('[postline] queue load failed:', error)
       }
       finally {
-        loaded.set(true)
+        if (request === queueRequest()) loaded.set(true)
       }
+    }
+
+    function searchPosts() {
+      const term = searchText().trim()
+      if (activeSearch() !== term) {
+        activeSearch.set(term)
+        loaded.set(false)
+        loadError.set('')
+        items.set([])
+        nextCursor.set(0)
+      }
+      void refresh()
+    }
+
+    function clearSearch() {
+      searchText.set('')
+      searchPosts()
     }
 
     // --- Scheduler: say so when it is not running ---
@@ -534,19 +575,20 @@
 
     const loadMore = async () => {
       if (!nextCursor() || loadingMore()) return
+      const request = queueRequest()
       loadingMore.set(true)
       try {
-        const response = await fetch(`/api/postline/queue?before=${nextCursor()}`)
-        const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load older posts.')
-        items.set([...items(), ...(payload.data.items || [])])
-        nextCursor.set(payload.data.nextCursor || 0)
+        const page = await fetchQueuePage({ before: String(nextCursor()) })
+        if (request !== queueRequest()) return
+        items.set([...items(), ...(page.items || [])])
+        nextCursor.set(page.nextCursor || 0)
+        loadError.set('')
       }
       catch (error) {
-        loadError.set(error instanceof Error ? error.message : String(error))
+        if (request === queueRequest()) loadError.set(error instanceof Error ? error.message : String(error))
       }
       finally {
-        loadingMore.set(false)
+        if (request === queueRequest()) loadingMore.set(false)
       }
     }
 

@@ -16,6 +16,7 @@ export default new Action({
       const page = await postQueue.listPage({
         before: Number(request.get('before')) || null,
         limit: Number(request.get('limit')) || undefined,
+        search: String(request.get('q') ?? ''),
       })
       return response.json({ ok: true, data: page })
     }

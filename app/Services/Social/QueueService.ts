@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import { raw } from '@stacksjs/query-builder'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { dedupeTargets, isAccountProvider, parseTargets, targetKey, targetProviders } from '../../Support/Social/targets'
 import { MEDIA_DIR, publicMediaUrl } from '../../Support/Social/uploads'
@@ -441,7 +442,7 @@ export class QueueService {
    * more. Paged by id, which never changes and is in creation order, so a
    * post added while the owner scrolls cannot shift or repeat a row.
    */
-  async listPage(options: { before?: number | null, limit?: number } = {}): Promise<{ items: QueueItemView[], nextCursor: number | null }> {
+  async listPage(options: { before?: number | null, limit?: number, search?: string } = {}): Promise<{ items: QueueItemView[], nextCursor: number | null }> {
     const limit = Math.min(MAX_QUEUE_PAGE_SIZE, Math.max(1, Math.floor(Number(options.limit) || QUEUE_PAGE_SIZE)))
     // Before any row is read: content an older version parked in `notes`
     // has to be in place first.
@@ -451,6 +452,18 @@ export class QueueService {
       .selectAll()
       .where('status', '!=', 'archived')
     if (options.before) query = query.where('id', '<', Number(options.before))
+    const search = options.search?.trim().slice(0, 200)
+    if (search) {
+      const pattern = `%${search.replace(/[!%_]/g, character => `!${character}`)}%`
+      query = query.whereRaw(raw`(
+        lower(body) LIKE lower(${pattern}) ESCAPE '!'
+        OR lower(title) LIKE lower(${pattern}) ESCAPE '!'
+        OR EXISTS (
+          SELECT 1 FROM json_each(CASE WHEN json_valid(content) THEN json_extract(content, '$.variants') END)
+          WHERE type = 'text' AND lower(value) LIKE lower(${pattern}) ESCAPE '!'
+        )
+      )`)
+    }
 
     // One more than asked for: its presence is how we know there is a next page.
     const fetched = await query.orderBy('id', 'desc').limit(limit + 1).execute()

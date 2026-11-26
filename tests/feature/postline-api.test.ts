@@ -15,7 +15,9 @@
  * they exercise the API rather than the cookie the client cannot read.
  */
 import { describe, expect, test } from 'bun:test'
+import { db } from '@stacksjs/database'
 import { featureTest } from '@stacksjs/testing'
+import { postQueue } from '../../app/Services/Social/QueueService'
 import User from '../../storage/framework/defaults/app/Models/User'
 
 /** Every Postline endpoint below is behind `middleware('auth')`. */
@@ -69,6 +71,35 @@ describe('postline api — reads', () => {
     const body = await response.json<{ ok: boolean, data: { items: unknown[] } }>()
     expect(body.ok).toBe(true)
     expect(Array.isArray(body.data.items)).toBe(true)
+  })
+
+  test('post search pages across statuses and matches titles, shared text and variants literally', async () => {
+    const database = db as any
+    const tag = `Launch!%_${crypto.randomUUID()}`
+    const providers = ['bluesky']
+    const draft = await postQueue.save({ text: `Draft about ${tag}`, providers })
+    const scheduled = await postQueue.save({ title: `Scheduled ${tag}`, text: 'Different shared text', scheduledAt: '2099-01-01 12:00:00', providers })
+    const published = await postQueue.save({ text: 'Different shared text', variants: { bluesky: `Variant about ${tag}` }, providers })
+    const archived = await postQueue.save({ text: `Archived ${tag}`, providers })
+    await postQueue.save({ text: tag.replace('%_', 'many'), providers })
+    await database.updateTable('posts').set({ status: 'published' }).where('id', '=', published.postId).execute()
+    await database.updateTable('posts').set({ status: 'archived' }).where('id', '=', archived.postId).execute()
+
+    const user = await actingUser()
+    const search = async (before?: number) => {
+      const query = new URLSearchParams({ q: tag.toLowerCase(), limit: '2' })
+      if (before) query.set('before', String(before))
+      const response = await featureTest().actingAs(user).get(`/api/postline/queue?${query}`)
+      response.assertStatus(200)
+      return (await response.json<{ data: { items: Array<{ id: number, status: string }>, nextCursor: number | null } }>()).data
+    }
+
+    const first = await search()
+    expect(first.items.map(item => [item.id, item.status])).toEqual([[published.postId, 'published'], [scheduled.postId, 'scheduled']])
+    expect(first.nextCursor).toBe(scheduled.postId)
+    const older = await search(first.nextCursor!)
+    expect(older.items.map(item => [item.id, item.status])).toEqual([[draft.postId, 'draft']])
+    expect(older.nextCursor).toBeNull()
   })
 
   test('the menu-bar status says paused or not, the next post and unread alerts', async () => {
