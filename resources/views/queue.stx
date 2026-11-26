@@ -52,7 +52,7 @@
       <div class="grid gap-2.5 p-3" id="queue-results" :role="activeSearch() ? 'region' : 'tabpanel'" :aria-label="activeSearch() ? 'Matching posts' : null" :aria-labelledby="activeSearch() ? null : 'queue-tab-' + tab()">
         <p class="m-0 p-3 text-muted text-ui" x-show="loadError()" :text="loadError()"></p>
         <p class="m-0 p-3 text-muted text-ui" x-show="showEmpty()" :text="emptyText()"></p>
-        <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl group" x-for="row in visible()">
+        <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl group" x-for="row in visible()" :data-command-context="row.body">
           <header class="flex gap-3 items-start justify-between">
             <div class="grid gap-1.5">
               <span class="font-semibold text-xs">{{ row.when }}</span>

@@ -139,6 +139,9 @@ effect(() => {
             data-stx-exact-active-class="text-ink bg-nav-active"
             aria-current="{{ link.active ? 'page' : 'false' }}"
             @click="closeMore"
+            @if(link.href === '/accounts')
+              data-command-destination="Channels"
+            @endif
           >
             <span class="shrink-0 h-5 w-5 {{ link.icon }}" aria-hidden="true"></span>
             <span class="flex-1 truncate">{{ link.label }}</span>
@@ -192,6 +195,9 @@ effect(() => {
           data-stx-exact-active-class="text-ink bg-nav-active"
           data-no-window-drag
           title="Open {{ link.label }} ({{ link.shortcut }})"
+          data-command-destination="{{ link.label }}"
+          data-command-shortcut="{{ link.shortcut }}"
+          aria-keyshortcuts="{{ link.shortcut }}"
           class="flex w-full items-center gap-3 rounded-[14px] px-3 py-1.5 text-left text-ui transition-colors hover:bg-glass-hover focus-visible:bg-glass-hover focus-visible:outline-none {{ link.active ? 'bg-nav-active text-ink' : 'text-body' }}"
           aria-current="{{ link.active ? 'page' : 'false' }}"
         >
@@ -214,6 +220,9 @@ effect(() => {
       data-sidebar-collapsible-content="true"
       data-no-window-drag
       title="Open Settings (,)"
+      data-command-destination="Settings"
+      data-command-shortcut=","
+      aria-keyshortcuts=","
       class="relative z-10 mt-auto flex w-full items-center gap-3 rounded-[14px] px-3 py-1.5 text-left text-ui transition-colors hover:bg-glass-hover focus-visible:bg-glass-hover focus-visible:outline-none {{ settingsActive ? 'bg-nav-active text-ink' : 'text-body' }}"
       aria-current="{{ settingsActive ? 'page' : 'false' }}"
     >

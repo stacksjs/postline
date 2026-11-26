@@ -91,7 +91,7 @@
         </div>
 
         <div class="divide-line divide-y" x-show="!loading() && filteredMentions().length">
-          <article class="grid gap-3 p-4 hover:bg-panel-2/45 transition-colors" x-for="mention in filteredMentions()" :class="mention.status === 'unread' ? 'bg-info-soft' : ''">
+          <article class="grid gap-3 p-4 hover:bg-panel-2/45 transition-colors" x-for="mention in filteredMentions()" :data-command-context="mention.authorName || mention.authorHandle" :class="mention.status === 'unread' ? 'bg-info-soft' : ''">
             <div class="flex gap-3 items-start">
               <NetworkChip :provider="mention.provider" />
               <div class="flex-1 min-w-0">

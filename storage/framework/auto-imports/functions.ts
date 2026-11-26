@@ -2,6 +2,8 @@
 
 export { providerLabel, providerInitial, providerColor, providerIcon } from '../../../resources/functions/networks'
 export { requestJson, fetchAccounts, disconnectSocialAccount, escapeHtml, relativeTime } from '../../../resources/functions/postline-client'
+export { workspaceCommands, runWorkspaceCommand } from '../../../resources/functions/workspace-commands'
+export type { WorkspaceCommand } from '../../../resources/functions/workspace-commands'
 export { fetchWebAnalytics, fetchSalesAnalytics, fetchCampaignAnalytics, fetchEventAnalytics, recordAnalyticsEvent, useAnalytics } from '@stacksjs/defaults/functions/analytics.ts'
 export type { AnalyticsOverview, TrafficDataPoint, PageData, ReferrerData, DeviceData, BrowserData, CountryData, AnalyticsRange, AnalyticsScope, WebAnalyticsResponse, SalesAnalyticsResponse, CampaignAnalyticsResponse, EventAnalyticsResponse, RecordAnalyticsEventInput } from '@stacksjs/defaults/functions/analytics.ts'
 export { resolveApiBaseUrl } from '@stacksjs/defaults/functions/api-url.ts'

@@ -52,6 +52,9 @@
           <span class="h-[18px] w-[18px] i-hugeicons-sidebar-right" aria-hidden="true"></span>
         </button>
         <section class="overflow-hidden lg:overflow-y-auto min-h-screen min-w-0 lg:h-screen bg-bg border-line border-t lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_rgba(24,31,42,0.08)]" aria-label="Postline workspace" data-postline-workspace data-window-drag-region>
+          <div class="flex justify-end pt-3.5 px-3.5 sm:pt-4 sm:px-4">
+            <WorkspaceCommands />
+          </div>
           <main id="workspace-content" class="p-3.5 sm:p-4 min-w-0" tabindex="-1" data-postline-router>
             @yield('content')
           </main>
@@ -250,12 +253,6 @@
           })
         }
 
-        // Number keys jump between pages and the comma opens Settings (the sidebar
-        // shows the badges).
-        // Bound through stx's useEventListener rather than a raw document
-        // listener: it unsubscribes on destroy, so repeated SPA navigations
-        // can't stack duplicate handlers. Routing goes through stx `navigate`
-        // instead of synthesising a click on a link element.
         // Settings is a window of its own in the desktop app, the way it is in
         // every Mac app: one window, brought forward when asked for again
         // (Craft keys it by name). In a browser it is a page.
@@ -326,22 +323,6 @@
           }
         }
 
-        const bindKeyboardShortcuts = () => {
-          if (window.__postlineShortcutsBound) return
-          window.__postlineShortcutsBound = true
-          const routes = { 1: '/composer', 2: '/queue', 3: '/timeline', 4: '/analytics', 5: '/campaigns', 6: '/listening', 7: '/inbox', 8: '/writing', 9: '/activity', ',': '/settings' }
-          window.stx?.useEventListener('keydown', (event) => {
-            if (event.metaKey || event.ctrlKey || event.altKey) return
-            const target = event.target
-            if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable]')) return
-            const href = routes[event.key]
-            if (!href || window.location.pathname === href) return
-            event.preventDefault()
-            if (href === '/settings') openSettings()
-            else window.stx.navigate(href)
-          }, { target: document })
-        }
-
         // Clicking the already-active destination is a no-op. Apart from
         // avoiding needless work, this prevents page-init success feedback
         // from being replayed when someone repeatedly clicks the same tab.
@@ -363,7 +344,6 @@
         bindSidebarCollapse()
         bindShellHistory()
         bindWindowDragRegions()
-        bindKeyboardShortcuts()
         bindIdempotentNavigation()
         bindSettingsWindow()
         syncNativeShell()

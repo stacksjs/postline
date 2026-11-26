@@ -1,0 +1,183 @@
+<script client>
+const commandDialog = useRef<HTMLDialogElement>('commandDialog')
+const commandSearch = useRef<HTMLInputElement>('commandSearch')
+const commandResults = useRef('commandResults')
+const open = state(false)
+const sheet = state(false)
+const query = state('')
+const selected = state(0)
+const commands = state<ReturnType<typeof workspaceCommands>>([])
+const shortcuts = state<ReturnType<typeof workspaceCommands>>([])
+
+const results = derived(() => {
+  const words = query().toLowerCase().trim().split(/\s+/).filter(Boolean)
+  return commands().filter(({ label, context }) => {
+    const candidate = `${label} ${context ?? ''}`.toLowerCase()
+    return words.every(word => candidate.includes(word))
+  }).map((command, index) => ({ ...command, index, id: `workspace-command-${index}` }))
+})
+
+function showCommands(showSheet = false) {
+  const dialog = commandDialog.current
+  if (!dialog || dialog.open) return
+  const available = workspaceCommands(dialog)
+  commands.set(available)
+  shortcuts.set(available.filter(command => command.shortcut))
+  query.set('')
+  selected.set(0)
+  sheet.set(showSheet)
+  dialog.showModal()
+  open.set(true)
+  if (!showSheet) commandSearch.current?.focus()
+}
+
+function closeCommands() {
+  commandDialog.current?.close()
+}
+
+function dismissCommands(event: MouseEvent) {
+  if (event.target === commandDialog.current) closeCommands()
+}
+
+function chooseCommand(index: number) {
+  const command = results()[index]
+  if (!command) return
+  closeCommands()
+  runWorkspaceCommand(command)
+}
+
+function searchCommands(event: Event) {
+  query.set((event.target as HTMLInputElement).value)
+  selected.set(0)
+  if (commandResults.current) commandResults.current.scrollTop = 0
+}
+
+function moveSelection(event: KeyboardEvent) {
+  if (event.isComposing) return
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    closeCommands()
+    return
+  }
+  const count = results().length
+  if (!count) return
+  if (event.key === 'Enter') {
+    event.preventDefault()
+    chooseCommand(selected())
+  }
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+  event.preventDefault()
+  const next = (selected() + (event.key === 'ArrowDown' ? 1 : -1) + count) % count
+  selected.set(next)
+  commandResults.current?.children[next]?.scrollIntoView({ block: 'nearest' })
+}
+
+function handleShortcut(event: KeyboardEvent) {
+  if (event.defaultPrevented || event.isComposing || event.repeat || event.altKey) return
+  const dialog = commandDialog.current
+  if (!dialog) return
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault()
+    if (dialog.open) closeCommands()
+    else showCommands()
+    return
+  }
+  if (dialog.open || event.metaKey || event.ctrlKey) return
+  const target = event.target
+  if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable], [role="textbox"]')) return
+  if (event.key === '?') {
+    event.preventDefault()
+    showCommands(true)
+    return
+  }
+  if (!/^[1-9,]$/.test(event.key)) return
+  const command = workspaceCommands(dialog, true).find(item => item.shortcut === event.key)
+  if (!command) return
+  event.preventDefault()
+  runWorkspaceCommand(command)
+}
+
+useEventListener('keydown', handleShortcut)
+</script>
+
+<template>
+  <div class="contents">
+    <button
+      class="inline-flex gap-2 items-center justify-center px-3 h-11 min-w-11 sm:h-9 font-medium text-muted text-ui hover:text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl"
+      type="button"
+      aria-label="Open command palette"
+      aria-controls="workspace-commands"
+      aria-haspopup="dialog"
+      aria-keyshortcuts="Meta+K Control+K"
+      data-command-ignore
+      title="Commands (Command+K or Ctrl+K)"
+      :aria-expanded="open()"
+      @click="showCommands()"
+    >
+      <span class="h-4 w-4 i-hugeicons-search-01" aria-hidden="true"></span>
+      <span class="hidden sm:inline">Commands</span>
+    </button>
+    <dialog
+      id="workspace-commands"
+      ref="commandDialog"
+      class="overflow-hidden p-0 text-ink bg-panel border border-line rounded-2xl shadow-xl"
+      aria-labelledby="workspace-commands-title"
+      data-command-dialog
+      @close="open.set(false)"
+      @click="dismissCommands($event)"
+    >
+      <div class="grid gap-3 p-4">
+        <header class="flex gap-3 items-center justify-between">
+          <h2 class="m-0 font-semibold text-base" id="workspace-commands-title" :text="sheet() ? 'Keyboard shortcuts' : 'Command palette'">Command palette</h2>
+          <div class="flex gap-2 items-center">
+            <button class="px-2 h-9 text-muted text-xs hover:bg-panel-2 rounded-lg" type="button" :text="sheet() ? 'Commands' : 'Shortcuts'" @click="sheet.set(!sheet())">Shortcuts</button>
+            <button class="grid place-items-center h-9 w-9 text-muted bg-panel-2 hover:bg-raised rounded-xl" type="button" aria-label="Close commands" autofocus @click="closeCommands">
+              <span class="h-5 w-5 i-hugeicons-cancel-01" aria-hidden="true"></span>
+            </button>
+          </div>
+        </header>
+        <div class="grid gap-2" x-cloak x-show="!sheet()">
+          <input
+            class="px-3 h-11 w-full text-sm bg-bg border border-field-line rounded-xl"
+            type="search"
+            ref="commandSearch"
+            role="combobox"
+            aria-label="Search commands"
+            aria-controls="workspace-command-results"
+            aria-autocomplete="list"
+            :aria-expanded="open() && results().length > 0"
+            :aria-activedescendant="results()[selected()]?.id ?? null"
+            placeholder="Search views and actions"
+            autocomplete="off"
+            :value="query()"
+            @input="searchCommands($event)"
+            @keydown="moveSelection($event)"
+          >
+          <div class="overflow-y-auto max-h-[min(55dvh,24rem)]" id="workspace-command-results" ref="commandResults" role="listbox" aria-label="Commands" x-show="results().length > 0">
+            <button
+              class="flex gap-2 items-center justify-between px-3 py-2 min-h-10 w-full text-left text-ui hover:bg-panel-2 rounded-lg"
+              type="button"
+              role="option"
+              tabindex="-1"
+              x-for="command in results()"
+              :id="command.id"
+              :aria-selected="command.index === selected()"
+              :class="command.index === selected() ? 'bg-nav-active text-ink' : 'text-body'"
+              @click="chooseCommand(command.index)"
+            >
+              <span class="min-w-0 truncate" :text="command.label"></span>
+              <span class="shrink-0 max-w-[40%] text-muted text-xs truncate" :text="command.context"></span>
+            </button>
+          </div>
+          <p class="m-0 px-3 py-2 text-muted text-sm" role="status" x-show="results().length === 0">No matching commands</p>
+        </div>
+        <dl class="grid overflow-y-auto gap-2 m-0 max-h-[min(55dvh,24rem)] text-ui" x-cloak x-show="sheet()">
+          <div class="flex gap-3 items-center justify-between"><dt>Open command palette</dt><dd class="m-0"><kbd>⌘ K</kbd> / <kbd>Ctrl K</kbd></dd></div>
+          <div class="flex gap-3 items-center justify-between"><dt>Show keyboard shortcuts</dt><dd class="m-0"><kbd>?</kbd></dd></div>
+          <div class="flex gap-3 items-center justify-between" x-for="command in shortcuts()"><dt :text="command.label"></dt><dd class="m-0"><kbd :text="command.shortcut"></kbd></dd></div>
+          <div class="flex gap-3 items-center justify-between"><dt>Close dialog</dt><dd class="m-0"><kbd>Esc</kbd></dd></div>
+        </dl>
+      </div>
+    </dialog>
+  </div>
+</template>

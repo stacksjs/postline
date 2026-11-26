@@ -81,10 +81,67 @@ async function evaluate<T>(cdp: Cdp, expression: string): Promise<T> {
   return result.result.value
 }
 
-async function pressKey(cdp: Cdp, key: string, keyCode: number): Promise<void> {
-  const event = { key, code: key, windowsVirtualKeyCode: keyCode }
+async function pressKey(cdp: Cdp, key: string, keyCode: number, modifiers = 0): Promise<void> {
+  const event = { key, code: key, windowsVirtualKeyCode: keyCode, modifiers }
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', ...event, text: key === 'Enter' ? '\r' : undefined })
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...event })
+}
+
+async function checkWorkspaceCommands(cdp: Cdp): Promise<void> {
+  await auditPage(`${site}/queue`, { cdp })
+  const dialog = "document.getElementById('workspace-commands')"
+  const search = `${dialog}.querySelector('input')`
+  const option = `${dialog}.querySelector('[role=option][aria-selected=true]')`
+  const trigger = "document.querySelector('button[aria-controls=workspace-commands]')"
+  const fill = (value: string): Promise<void> => evaluate(cdp, `${search}.value = ${JSON.stringify(value)}; ${search}.dispatchEvent(new Event('input', { bubbles: true }))`)
+
+  await evaluate(cdp, "document.getElementById('queue-search').focus()")
+  await pressKey(cdp, '?', 191, 8)
+  if (await evaluate<boolean>(cdp, `${dialog}.open`)) fail('queue', 'commands', 'typing a question mark opened the shortcuts over a text field')
+
+  await evaluate(cdp, `${trigger}.focus()`)
+  await pressKey(cdp, '?', 191, 8)
+  await waitUntil('The shortcut sheet', () => evaluate<boolean>(cdp, `${dialog}.open && ${dialog}.querySelector('h2').textContent === 'Keyboard shortcuts' && ${dialog}.querySelector('dl').innerText.includes('Settings')`), 5_000)
+  await pressKey(cdp, 'Escape', 27)
+  if (!await evaluate<boolean>(cdp, `!${dialog}.open && document.activeElement === ${trigger}`))
+    fail('queue', 'commands', 'Escape did not restore focus after the shortcut sheet')
+
+  await pressKey(cdp, 'k', 75, 2)
+  await waitUntil('Search focus in the command palette', () => evaluate<boolean>(cdp, `${dialog}.open && document.activeElement === ${search}`), 5_000)
+  await fill('queue view')
+  await waitUntil('Both Queue views as command results', () => evaluate<boolean>(cdp, `${option}?.textContent.includes('Go to view') && [...${dialog}.querySelectorAll('[role=option]')].some(item => item.textContent.includes('Calendar'))`), 5_000)
+  await pressKey(cdp, 'ArrowDown', 40)
+  await pressKey(cdp, 'ArrowDown', 40)
+  if (!await evaluate<boolean>(cdp, `${option}?.textContent.includes('Calendar') && ${search}.getAttribute('aria-activedescendant') === ${option}.id`))
+    fail('queue', 'commands', 'Arrow Down did not move the accessible selection to Calendar')
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The existing Calendar action', () => evaluate<boolean>(cdp, `!${dialog}.open && Boolean(document.querySelector('[aria-label="Previous month"]')?.getClientRects().length)`), 5_000)
+
+  await pressKey(cdp, 'k', 75, 4)
+  await fill('analytics')
+  await waitUntil('The Analytics destination', () => evaluate<boolean>(cdp, `${option}?.textContent.includes('Analytics')`), 5_000)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Navigation from the command palette', () => evaluate<boolean>(cdp, `location.pathname === '/analytics' && !!document.querySelector('[data-postline-page=analytics]')`), 5_000)
+
+  await pressKey(cdp, 'k', 75, 2)
+  await fill('no-matching-command-42')
+  await waitUntil('The palette after client navigation', () => evaluate<boolean>(cdp, `${dialog}.open && ${dialog}.querySelector('[role=status]').innerText === 'No matching commands' && !${option}`), 5_000)
+  await pressKey(cdp, 'Escape', 27)
+  if (await evaluate<boolean>(cdp, `${dialog}.open`)) fail('analytics', 'commands', 'Escape only cleared the query and left the palette open')
+  await evaluate(cdp, `${trigger}.focus()`)
+  await pressKey(cdp, '2', 50)
+  await waitUntil('The existing Queue number shortcut', () => evaluate<boolean>(cdp, `location.pathname === '/queue' && !!document.querySelector('[data-postline-page=queue]')`), 5_000)
+
+  await pressKey(cdp, 'k', 75, 2)
+  await fill('settings')
+  await waitUntil('The Settings destination', () => evaluate<boolean>(cdp, `${option}?.textContent.includes('Settings')`), 5_000)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The Settings command trigger to hydrate', () => evaluate<boolean>(cdp, `location.pathname === '/settings' && ${trigger}?.getAttribute('aria-expanded') === 'false'`), 5_000)
+  await evaluate(cdp, `${trigger}.click()`)
+  await fill('appearance')
+  await waitUntil('A command for the Appearance pane', () => evaluate<boolean>(cdp, `${option}?.textContent.trim().startsWith('Appearance')`), 5_000)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The existing Settings pane action', () => evaluate<boolean>(cdp, `!${dialog}.open && document.querySelector('[data-settings-item=appearance]')?.getAttribute('aria-selected') === 'true' && Boolean(document.querySelector('[data-settings-pane=appearance]')?.getClientRects().length)`), 5_000)
 }
 
 async function checkQueueKeyboard(cdp: Cdp): Promise<void> {
@@ -326,6 +383,7 @@ try {
       }
     }
     await checkDesktopUpdateControls(cdp)
+    await checkWorkspaceCommands(cdp)
     await checkNetworkComponents(cdp)
     await checkPhoneNavigation(cdp)
   }

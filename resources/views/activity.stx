@@ -28,7 +28,7 @@
         <button class="text-warning text-xs underline disabled:opacity-50" type="button" :disabled="marking()" @click="markAllRead()">Mark all as read</button>
       </div>
       <div>
-        <article class="grid gap-0.5 px-4 py-3 border-b border-line last:border-b-0" x-for="alert in attention()" data-activity-alert>
+        <article class="grid gap-0.5 px-4 py-3 border-b border-line last:border-b-0" x-for="alert in attention()" :data-command-context="alert.title" data-activity-alert>
           <div class="flex gap-2 items-center justify-between">
             <span class="font-medium text-ink text-ui" :text="alert.title"></span>
             <span class="shrink-0 text-muted text-xs" :text="alert.when"></span>

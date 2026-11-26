@@ -379,7 +379,9 @@ html.postline-sidebar-collapsed:not(.has-native-sidebar) [data-sidebar-expand-fa
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-[data-postline-mobile-menu]::backdrop { background: rgb(15 23 42 / 48%); }
+[data-command-dialog] { width: min(36rem, calc(100% - 2rem)); }
+[data-postline-mobile-menu]::backdrop,
+[data-command-dialog]::backdrop { background: rgb(15 23 42 / 48%); }
 
 /* A focus ring every control shows, at 3:1 against the panels (#142). The
    writing surfaces with no border of their own opt in with data-focus-outline. */

@@ -19,6 +19,8 @@ declare global {
   const disconnectSocialAccount: typeof autoImports.disconnectSocialAccount
   const escapeHtml: typeof autoImports.escapeHtml
   const relativeTime: typeof autoImports.relativeTime
+  const workspaceCommands: typeof autoImports.workspaceCommands
+  const runWorkspaceCommand: typeof autoImports.runWorkspaceCommand
 }
 
 export {}
