@@ -47,7 +47,7 @@ const dmg = version ? `${releases}/latest/download/Postline-${version}-macos-arm
 cd postline && ./bootstrap
 cp .env.example .env && ./buddy key:generate
 ./buddy migrate && ./buddy serve</code></pre>
-      <p class="m-0 text-[15px] text-body">The <a class="text-ink underline underline-offset-4" href="https://github.com/stacksjs/postline/blob/main/docs/self-hosting.md">server guide</a> covers the address, HTTPS, the scheduler and what to set.</p>
+      <p class="m-0 text-[15px] text-body">The <a class="text-ink underline underline-offset-4" href="/docs/self-hosting" data-no-router>server guide</a> covers the address, HTTPS, the scheduler and what to set.</p>
     </section>
 
     <section class="grid gap-3">

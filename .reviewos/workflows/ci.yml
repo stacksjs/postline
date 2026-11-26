@@ -150,6 +150,10 @@ jobs:
         run: bun run build:frontend
       - name: Marketing metadata and sitemap
         run: bun scripts/marketing-check.ts
+      - name: Build and check documentation
+        run: |
+          ./buddy build:docs
+          bun scripts/docs-check.ts
       - name: No TypeScript in the build
         run: |
           LEFT="$(find dist -name '*.ts')"

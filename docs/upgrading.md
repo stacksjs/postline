@@ -17,6 +17,9 @@ Keep `app.key` with the database: it decrypts the network tokens.
 
 ## A server install
 
+Take a [server recovery snapshot](./recovery.md) before migrating. Keep the
+database, media and `APP_KEY` together if you need to restore.
+
 ```bash
 git pull
 ```
@@ -29,9 +32,8 @@ bun install --frozen-lockfile
 ./buddy migrate
 ```
 
-Then restart the app and the scheduler. `./buddy migrate` applies only what is
-new; take a copy of `database/postline.sqlite` (with its `-wal` and `-shm`
-files) first if you want a way back.
+Then restart the web, API, and scheduler services. `./buddy migrate` applies
+the pending migrations.
 
 ## What changed between v0.1.1 and 1.0
 

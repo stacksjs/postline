@@ -76,6 +76,10 @@ jobs:
               '
           primary=$(curl --fail --silent --show-error --max-time 20 https://postline.theopentimes.org/)
           printf '%s\n' "$primary" | grep -F 'https://postline.theopentimes.org/' > /dev/null
+          docs=$(curl --fail --silent --show-error --max-time 20 https://postline.theopentimes.org/docs/)
+          printf '%s\n' "$docs" | grep -F '/docs/compose' > /dev/null
+          compose=$(curl --fail --silent --show-error --max-time 20 https://postline.theopentimes.org/docs/compose)
+          printf '%s\n' "$compose" | grep -F 'Compose a post' > /dev/null
           redirect=$(curl --fail --silent --show-error --max-time 20 -o /dev/null -w '%{redirect_url}' 'https://postline.theot.org/download?source=deploy')
           test "$redirect" = 'https://postline.theopentimes.org/download?source=deploy'
 

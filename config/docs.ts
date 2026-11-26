@@ -14,8 +14,10 @@ const config: BunPressOptions = {
   verbose: false,
   docsDir: './docs',
   outDir: './dist/docs',
+  basePath: '/docs',
 
   nav: [
+    { text: 'Postline', link: siteUrl },
     { text: 'Releases', link: 'https://github.com/stacksjs/postline/releases' },
     { text: 'Source', link: 'https://github.com/stacksjs/postline' },
   ],
@@ -37,10 +39,29 @@ const config: BunPressOptions = {
         {
           text: 'Getting started',
           items: [
+            { text: 'Overview', link: '/' },
             { text: 'Install the Mac app', link: '/install-mac' },
             { text: 'Run it on a server', link: '/self-hosting' },
             { text: 'First run', link: '/first-run' },
             { text: 'Upgrading', link: '/upgrading' },
+          ],
+        },
+        {
+          text: 'Using Postline',
+          items: [
+            { text: 'Compose posts', link: '/compose' },
+            { text: 'Scheduling and campaigns', link: '/planning' },
+            { text: 'Inbox, Listening, and Analytics', link: '/monitoring' },
+            { text: 'Workspace data and cleanup', link: '/workspace-data' },
+          ],
+        },
+        {
+          text: 'Operating Postline',
+          items: [
+            { text: 'Environment reference', link: '/environment' },
+            { text: 'Back up and restore', link: '/recovery' },
+            { text: 'Security and privacy', link: '/security' },
+            { text: 'Troubleshooting', link: '/troubleshooting' },
           ],
         },
         {

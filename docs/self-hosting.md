@@ -70,4 +70,5 @@ recovery of your database, media, and application key.
 | `MAIL_MAILER` and its settings | So alerts reach you by email. Without a mailer they stay in the app |
 | `POSTLINE_ALERT_WEBHOOK_URL` | Alerts to Slack, Discord or your own service |
 
-Every variable Postline reads is listed, with what it does, in `.env.example`.
+See the [environment reference](environment.md) for storage, scheduling, and
+backup settings and a link to the full `.env.example` template.

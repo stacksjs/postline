@@ -644,6 +644,15 @@ export const tsCloud: TsCloudConfig = {
    * For multi-site deployments
    */
   sites: {
+    docs: {
+      root: 'dist/docs/.bunpress',
+      path: '/docs',
+      domain: domains.canonical,
+      deploy: 'server',
+      pathRewriteStyle: 'directory',
+      build: './buddy build:docs',
+    },
+
     // The publication keeps its own virtual hosts and processes.
     main: {
       root: '.',
