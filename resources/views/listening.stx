@@ -347,9 +347,15 @@
         postlineToast?.show?.({ title: 'Desktop alerts enabled', message: 'Postline can alert you when a polling refresh finds new mentions.', tone: 'success', id: 'listening-notifications' })
     }
 
+    // A hidden tab asks for nothing (#184); the next tick after it is shown
+    // again catches up, and a quiet refresh merges by id rather than redrawing.
+    const visibility = useDocumentVisibility()
     onMount(() => {
       void loadData()
-      pollTimer = window.setInterval(() => void loadData({ quiet: true }), 60_000)
+      pollTimer = window.setInterval(() => {
+        if (visibility.value === 'hidden') return
+        void loadData({ quiet: true })
+      }, 60_000)
     })
     onUnmounted(() => window.clearInterval(pollTimer))
   </script>

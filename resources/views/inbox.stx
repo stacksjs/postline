@@ -3,13 +3,13 @@
 @section('title', 'Postline - Inbox')
 
 @section('content')
-  @meta('description', 'Read and answer direct messages from Bluesky, X, Mastodon, and Instagram in one place.')
+  @meta('description', 'Read and answer direct messages from Bluesky and Mastodon in one place.')
   <section class="grid gap-4" data-postline-page="inbox" data-testid="inbox-page">
     <header class="flex flex-col gap-4 items-stretch justify-between md:flex-row md:items-center min-h-11">
       <div>
         <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Direct Messages</p>
         <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Answer everyone from one inbox</h1>
-        <p class="mb-0 mt-1.5 text-muted text-ui">Read and reply to DMs from Bluesky, X, Mastodon, and Instagram without switching apps.</p>
+        <p class="mb-0 mt-1.5 text-muted text-ui">Read and reply to direct messages from Bluesky and Mastodon without switching apps.</p>
       </div>
       <div class="flex flex-wrap gap-2 items-center">
         <button class="inline-flex gap-2 items-center justify-center px-3 h-9 font-semibold text-ink text-xs bg-panel hover:bg-raised border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="unreadCount() === 0" @click="markAllRead">Mark all read</button>
@@ -468,11 +468,14 @@
       }
     }
 
+    // A hidden tab asks for nothing (#184); quiet refreshes merge by id.
+    const visibility = useDocumentVisibility()
     onMount(() => {
       void loadConversations()
       // Reads hit the local mirror, so polling is cheap; the scheduler is what
       // actually talks to the networks, every five minutes.
       pollTimer = window.setInterval(() => {
+        if (visibility.value === 'hidden') return
         void loadConversations({ quiet: true })
         if (activeId()) void loadThread({ markRead: false, quiet: true })
       }, 45_000)
