@@ -15,10 +15,10 @@
       </div>
       <div class="flex flex-wrap gap-2 items-center">
         <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Queue view">
-          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'list'" @click="setView('list')">
+          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'list'" :aria-pressed="view() === 'list'" @click="setView('list')">
             <span class="h-3.5 w-3.5 i-hugeicons-menu-01" aria-hidden="true"></span><span>List</span>
           </button>
-          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'calendar'" @click="setView('calendar')">
+          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'calendar'" :aria-pressed="view() === 'calendar'" @click="setView('calendar')">
             <span class="h-3.5 w-3.5 i-hugeicons-calendar-03" aria-hidden="true"></span><span>Calendar</span>
           </button>
         </div>
@@ -34,17 +34,17 @@
     <section class="bg-panel border border-line rounded-2xl shadow-sm" x-cloak x-show="view() === 'list'">
       <header class="flex flex-wrap gap-3 items-center justify-between p-2.5 border-b border-line">
         <div class="flex flex-wrap gap-1" role="tablist" aria-label="Queue">
-          <button class="inline-flex gap-1.5 items-center px-3 h-8 font-semibold text-xs rounded-lg transition-colors" type="button" role="tab" x-for="entry in tabs()" :aria-selected="tab() === entry.id" :data-active="tab() === entry.id" :data-tone="entry.tone" data-queue-tab @click="setTab(entry.id)">
+          <button class="inline-flex gap-1.5 items-center px-3 h-8 font-semibold text-xs rounded-lg transition-colors" type="button" role="tab" x-for="entry in tabs()" :id="'queue-tab-' + entry.id" aria-controls="queue-results" :aria-selected="tab() === entry.id" :tabindex="tab() === entry.id ? 0 : -1" :data-active="tab() === entry.id" :data-tone="entry.tone" data-queue-tab @click="setTab(entry.id)" @keydown="moveTab($event, entry.id)">
             <span :text="entry.label"></span>
             <span class="px-1.5 min-w-5 text-center text-xs rounded-full" data-queue-tab-count :text="entry.count"></span>
           </button>
         </div>
         <span class="pr-1 text-muted text-xs" :text="metaText()">Loading…</span>
       </header>
-      <div class="grid gap-2.5 p-3">
+      <div class="grid gap-2.5 p-3" id="queue-results" role="tabpanel" :aria-labelledby="'queue-tab-' + tab()">
         <p class="m-0 p-3 text-muted text-ui" x-show="loadError()" :text="loadError()"></p>
         <p class="m-0 p-3 text-muted text-ui" x-show="showEmpty()" :text="emptyText()"></p>
-        <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl" x-for="row in visible()">
+        <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl group" x-for="row in visible()">
           <header class="flex gap-3 items-start justify-between">
             <div class="grid gap-1.5">
               <span class="font-semibold text-xs">{{ row.when }}</span>
@@ -62,13 +62,23 @@
           </header>
           <p class="m-0 leading-normal text-body text-ui">{{ row.body }}</p>
           <p class="m-0 text-danger text-xs" x-show="row.failure" :text="row.failure"></p>
-          <footer class="flex flex-wrap gap-1.5 items-center justify-end">
-            <a class="inline-flex items-center justify-center px-2 h-7 font-medium text-muted text-xs hover:text-ink rounded-lg disabled:opacity-50 transition-colors" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View post</a>
-            <a class="inline-flex items-center justify-center px-2 h-7 font-medium text-muted text-xs hover:text-ink rounded-lg disabled:opacity-50 transition-colors" x-show="row.actionable" :href="row.editUrl" data-stx-link>Edit</a>
-            <button class="inline-flex items-center justify-center px-2 h-7 font-medium text-muted text-xs hover:text-danger hover:text-ink rounded-lg disabled:opacity-50 transition-colors" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="deleteItem(row.id)">Delete</button>
-            <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.resumeLabel" :disabled="busyId() === row.id" @click="resumeItem(row.id)" :text="row.resumeLabel"></button>
-            <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.partial && !row.resumeLabel" :disabled="busyId() === row.id" @click="retryItem(row.id)">Retry failed networks</button>
-            <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50 transition-colors" type="button" x-show="row.actionable && !row.partial && !row.resumeLabel" :disabled="busyId() === row.id" @click="publishItem(row.id)" :text="row.status === 'failed' ? 'Try again now' : 'Publish now'">Publish now</button>
+          <footer class="flex flex-wrap gap-1.5 items-center justify-end" x-show="row.liveUrl || row.actionable || row.partial || row.resumeLabel">
+            <div class="group-focus-within:opacity-100 group-hover:opacity-100 transition-opacity" :class="row.attention ? '' : 'pointer-fine:opacity-0'">
+              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl && !row.actionable && !row.partial && !row.resumeLabel" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View post</a>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.resumeLabel" :disabled="busyId() === row.id" @click="resumeItem(row.id)" :text="row.resumeLabel"></button>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.partial && !row.resumeLabel" :disabled="busyId() === row.id" @click="retryItem(row.id)">Retry failed networks</button>
+              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50 transition-colors" type="button" x-show="row.actionable && !row.partial && !row.resumeLabel" :disabled="busyId() === row.id" @click="publishItem(row.id)" :text="row.status === 'failed' ? 'Try again now' : 'Publish now'">Publish now</button>
+            </div>
+            <details class="relative" x-show="row.actionable || (row.liveUrl && (row.partial || row.resumeLabel))" @keydown="closeActionsOnEscape($event)">
+              <summary class="grid place-items-center h-7 w-8 list-none text-muted bg-panel hover:bg-hover border border-line rounded-lg cursor-pointer" aria-label="More post actions" title="More post actions">
+                <span class="h-4 w-4 i-hugeicons-more-horizontal" aria-hidden="true"></span>
+              </summary>
+              <div class="grid absolute right-0 top-full z-10 gap-0.5 mt-1 p-1 min-w-28 text-ui bg-panel border border-line rounded-lg shadow-sm">
+                <a class="block px-2 py-1 text-ink hover:bg-hover rounded-md" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View post</a>
+                <a class="block px-2 py-1 text-ink hover:bg-hover rounded-md" x-show="row.actionable" :href="row.editUrl" data-stx-link>Edit</a>
+                <button class="px-2 py-1 text-danger text-left hover:bg-danger-soft rounded-md disabled:opacity-50" type="button" x-show="row.actionable" :disabled="busyId() === row.id" @click="deleteItem(row.id)">Delete</button>
+              </div>
+            </details>
           </footer>
         </article>
       </div>
@@ -323,11 +333,31 @@
 
     const rows = derived(() => items().map(toRow))
 
+    function closeActionsOnEscape(event) {
+      const details = event.currentTarget
+      if (event.key !== 'Escape' || !details.open) return
+      event.stopPropagation()
+      details.open = false
+      details.firstElementChild?.focus()
+    }
+
     // One list, four tabs (#168). A post that failed anywhere is under "Needs
     // attention" and nowhere else, so it cannot hide among the published.
     type QueueTab = 'scheduled' | 'drafts' | 'published' | 'attention'
     const tab = useLocalStorage('postline.queue.tab', 'scheduled')
     const setTab = (next: QueueTab) => tab.set(next)
+
+    function moveTab(event, id: QueueTab) {
+      const entries = tabs()
+      const index = entries.findIndex(entry => entry.id === id)
+      const positions = { ArrowLeft: index - 1, ArrowRight: index + 1, Home: 0, End: entries.length - 1 }
+      if (!Object.hasOwn(positions, event.key)) return
+      event.preventDefault()
+      const next = (positions[event.key] + entries.length) % entries.length
+      const button = event.currentTarget.parentElement.children[next]
+      setTab(entries[next].id)
+      button.focus()
+    }
     const inTab = (row: QueueRow, which: string): boolean => {
       if (which === 'attention') return row.attention
       if (row.attention) return false

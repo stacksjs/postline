@@ -108,6 +108,7 @@
                   @dragstart="beginDrag($event, item)"
                   @dragend="endDrag"
                   @click="openPostForm(item)"
+                  @keydown="openOnKey($event, item)"
                   tabindex="0"
                   role="button"
                 >
@@ -129,7 +130,7 @@
 
         <div class="campaign-list" x-show="view() === 'list'">
           <div class="campaign-list__empty" x-show="posts().length === 0">No posts planned yet. Add one or ask the planner to draft a sequence.</div>
-          <article class="campaign-list-row" x-for="item in posts()" @click="openPostForm(item)" tabindex="0" role="button">
+          <article class="campaign-list-row" x-for="item in posts()" @click="openPostForm(item)" @keydown="openOnKey($event, item)" tabindex="0" role="button">
             <div class="campaign-list-row__date">
               <strong>{{ shortDate(item.scheduledAt) }}</strong>
               <span>{{ timeLabel(item.scheduledAt) }}</span>
@@ -180,22 +181,24 @@
           </div>
 
           <div class="campaign-assistant-prompts" aria-label="Assistant shortcuts">
-            <button type="button" x-for="suggestion in assistantSuggestions" :data-active="assistantStrategy() === suggestion.id" @click="chooseAssistantPrompt(suggestion)">
+            <button type="button" x-for="suggestion in assistantSuggestions" :data-active="assistantStrategy() === suggestion.id" :aria-pressed="assistantStrategy() === suggestion.id" @click="chooseAssistantPrompt(suggestion)">
               <span :class="suggestion.icon" aria-hidden="true"></span>
               <span>{{ suggestion.label }}</span>
             </button>
           </div>
 
-          <label class="campaign-field">
-            <span>Channels</span>
+          {{-- A group, not a <label>: a label names one control, and wrapping
+              a row of buttons in one gave none of them a name (#160). --}}
+          <div class="campaign-field" role="group" aria-label="Channels">
+            <span aria-hidden="true">Channels</span>
             <div class="campaign-channel-picker" x-show="connectedProviders().length">
-              <button type="button" x-for="provider in connectedProviders()" :data-selected="plannerProviders().includes(provider.provider)" @click="togglePlannerProvider(provider.provider)">
+              <button type="button" x-for="provider in connectedProviders()" :data-selected="plannerProviders().includes(provider.provider)" :aria-pressed="plannerProviders().includes(provider.provider)" @click="togglePlannerProvider(provider.provider)">
                 <i>{{ providerInitial(provider.provider) }}</i><span>{{ providerLabel(provider.provider) }}</span>
               </button>
             </div>
             <a class="campaign-connect-link" href="/accounts" data-stx-link x-show="providersLoaded() && connectedProviders().length === 0">Connect a social account before planning posts.</a>
             <small x-show="!providersLoaded()">Checking connected accounts…</small>
-          </label>
+          </div>
 
           <label class="campaign-assistant-composer campaign-field">
             <span>Ask the assistant <small>optional</small></span>
@@ -271,7 +274,7 @@
                 <label class="campaign-field"><span>Date and time</span><input ref="postScheduledAtInput" required type="datetime-local" x-model="postScheduledAt"></label>
                 <label class="campaign-field"><span>Pillar</span><select ref="postPillarInput" x-model="postPillar"><option value="teaser">Teaser</option><option value="story">Story</option><option value="education">Education</option><option value="proof">Proof</option><option value="launch">Launch</option><option value="follow-up">Follow-up</option></select></label>
               </div>
-              <label class="campaign-field"><span>Channels</span><div class="campaign-channel-picker"><button type="button" x-for="provider in connectedProviders()" :data-selected="postProviders().includes(provider.provider)" @click="togglePostProvider(provider.provider)"><i>{{ providerInitial(provider.provider) }}</i><span>{{ providerLabel(provider.provider) }}</span></button></div></label>
+              <div class="campaign-field" role="group" aria-label="Channels"><span aria-hidden="true">Channels</span><div class="campaign-channel-picker"><button type="button" x-for="provider in connectedProviders()" :data-selected="postProviders().includes(provider.provider)" :aria-pressed="postProviders().includes(provider.provider)" @click="togglePostProvider(provider.provider)"><i>{{ providerInitial(provider.provider) }}</i><span>{{ providerLabel(provider.provider) }}</span></button></div></div>
               <label class="campaign-ready-check"><input type="checkbox" :checked="postStatus() === 'ready'" @change="postStatus.set($event.target.checked ? 'ready' : 'idea')"><span><strong>Mark ready</strong><small>Ready posts still stay in the plan until you schedule the campaign.</small></span></label>
             </div>
             <div class="campaign-form__footer">
@@ -630,6 +633,13 @@
           if (postPillarInput.current) postPillarInput.current.value = draft.pillar
         })
       })
+    }
+
+    // Cards that open a post answer the keyboard as a button does (#160).
+    function openOnKey(event, item) {
+      if (event.key !== 'Enter' && event.key !== ' ') return
+      event.preventDefault()
+      openPostForm(item)
     }
 
     function closePanel() {

@@ -39,9 +39,9 @@
             </a>
           </div>
           <div class="grid grid-cols-3 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Post mode">
-            <button class="px-2.5 py-1.5 min-w-19 text-ink text-xs bg-panel rounded-lg shadow-sm transition-colors" type="button" data-composer-mode="single">Single</button>
-            <button class="px-2.5 py-1.5 min-w-19 text-muted text-xs rounded-lg transition-colors" type="button" data-composer-mode="thread">Thread</button>
-            <button class="px-2.5 py-1.5 min-w-19 text-muted text-xs rounded-lg transition-colors" type="button" data-composer-mode="draft">Draft</button>
+            <button class="px-2.5 py-1.5 min-w-19 text-ink text-xs bg-panel rounded-lg shadow-sm transition-colors" type="button" aria-pressed="true" data-composer-mode="single">Single</button>
+            <button class="px-2.5 py-1.5 min-w-19 text-muted text-xs rounded-lg transition-colors" type="button" aria-pressed="false" data-composer-mode="thread">Thread</button>
+            <button class="px-2.5 py-1.5 min-w-19 text-muted text-xs rounded-lg transition-colors" type="button" aria-pressed="false" data-composer-mode="draft">Draft</button>
           </div>
         </header>
 
@@ -1372,6 +1372,7 @@
         activeMode = nextMode
         modeButtons.forEach((button) => {
           const active = button.dataset.composerMode === nextMode
+          button.setAttribute('aria-pressed', String(active))
           button.classList.toggle('bg-panel', active)
           button.classList.toggle('text-ink', active)
           button.classList.toggle('shadow-sm', active)

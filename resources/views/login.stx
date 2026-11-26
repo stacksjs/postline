@@ -41,7 +41,7 @@
           <input class="px-3 h-10 text-ink text-sm tracking-widest bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="code" autocomplete="one-time-code" inputmode="text" placeholder="123456" maxlength="64" x-model="code" :required="!!challenge()" ref="codeInput" data-two-factor-code>
           <span class="text-muted text-xs">The 6-digit code from your authenticator app, or one of your recovery codes.</span>
         </label>
-        <p class="hidden m-0 text-danger text-xs" :class="{ 'hidden': !errorMessage() }" :text="errorMessage()" role="alert"></p>
+        <p class="m-0 text-danger text-xs" :class="{ 'sr-only': !errorMessage() }" :text="errorMessage()" role="alert"></p>
         <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="busy()" :text="submitLabel()">Sign in</button>
       </form>
 

@@ -79,6 +79,40 @@ async function evaluate<T>(cdp: Cdp, expression: string): Promise<T> {
   return result.result.value
 }
 
+async function pressKey(cdp: Cdp, key: string, keyCode: number): Promise<void> {
+  const event = { key, code: key, windowsVirtualKeyCode: keyCode }
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', ...event, text: key === 'Enter' ? '\r' : undefined })
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...event })
+}
+
+async function checkQueueKeyboard(cdp: Cdp): Promise<void> {
+  await pressKey(cdp, 'Tab', 9)
+  const skip = await evaluate<string>(cdp, 'document.activeElement?.getAttribute("href")')
+  if (skip !== '#workspace-content') fail('queue', 'keyboard', 'the skip link is not the first tab stop')
+  await pressKey(cdp, 'Enter', 13)
+  if (await evaluate<string>(cdp, 'document.activeElement?.id') !== 'workspace-content')
+    fail('queue', 'keyboard', 'the skip link did not focus the main content')
+
+  await evaluate(cdp, 'document.getElementById("queue-tab-scheduled")?.focus()')
+  await pressKey(cdp, 'ArrowRight', 39)
+  const selected = await evaluate<boolean>(cdp, `document.activeElement?.id === 'queue-tab-drafts'
+    && document.activeElement.getAttribute('aria-selected') === 'true'`)
+  if (!selected) fail('queue', 'keyboard', 'Right Arrow did not select and focus the Drafts tab')
+
+  const actions = 'summary[aria-label="More post actions"]'
+  await waitUntil('The queue draft', () => evaluate<boolean>(cdp, `Boolean(document.querySelector('${actions}')?.getClientRects().length)`), 5_000)
+  await evaluate(cdp, `document.querySelector('${actions}').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  if (!await evaluate<boolean>(cdp, `document.querySelector('${actions}').parentElement.open`))
+    fail('queue', 'keyboard', 'Enter did not open the actions disclosure')
+  await pressKey(cdp, 'Tab', 9)
+  if (await evaluate<string>(cdp, 'document.activeElement?.textContent?.trim()') !== 'Edit')
+    fail('queue', 'keyboard', 'Tab did not reach Edit in the open actions disclosure')
+  await pressKey(cdp, 'Escape', 27)
+  if (!await evaluate<boolean>(cdp, `document.activeElement?.matches('${actions}') && !document.activeElement.parentElement.open`))
+    fail('queue', 'keyboard', 'Escape did not close the disclosure and return focus')
+}
+
 let exitCode = 0
 try {
   await waitUntil('The API', async () => (await fetch(`http://localhost:${API_PORT}/api/postline/health`)).status < 500)
@@ -100,6 +134,9 @@ try {
       const payload = await login.json()
       if (!payload.token && !payload.access_token) return 'login failed: ' + JSON.stringify(payload)
       document.cookie = 'postline-signed-in=1; path=/'
+      await fetch('/api/csrf')
+      const draft = await fetch('/api/postline/queue', { method: 'POST', body: new URLSearchParams({ text: 'A draft for the keyboard smoke test', providers: 'bluesky' }) })
+      if (!draft.ok) return 'could not create the queue fixture: ' + await draft.text()
       return 'ok'
     })()`)
     if (signedIn !== 'ok') throw new Error(signedIn)
@@ -118,6 +155,7 @@ try {
 
         const shot = await cdp.send<{ data: string }>('Page.captureScreenshot', { format: 'png' })
         writeFileSync(join(out, `${view}-${mode.name}.png`), Buffer.from(shot.data, 'base64'))
+        if (view === 'queue' && mode.name === 'light') await checkQueueKeyboard(cdp)
       }
     }
   }
