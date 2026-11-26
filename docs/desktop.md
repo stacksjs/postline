@@ -127,8 +127,9 @@ pushes. After CI passes, dispatch the approved tag. ReviewOS builds
 through Pantry. [Release checklist](releasing.md).
 
 The release requires the `DESKTOP_SIGNING_IDENTITY` repository variable to
-name the approved Developer ID Application identity. The Mac runner verifies
-the signed app before packaging the DMG.
+identify the approved Developer ID Application certificate. Use its
+fingerprint when the Keychain has more than one certificate under that name.
+The Mac runner verifies the signed app before packaging the DMG.
 
 ## What is not done
 

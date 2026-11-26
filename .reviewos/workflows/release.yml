@@ -117,10 +117,10 @@ jobs:
       - name: Build the app
         run: |
           set -euo pipefail
-          case "${DESKTOP_SIGNING_IDENTITY:-}" in
-            'Developer ID Application: '*) ;;
-            *) echo '::error::Set DESKTOP_SIGNING_IDENTITY to the approved Developer ID Application identity.' >&2; exit 1 ;;
-          esac
+          if [[ ! "${DESKTOP_SIGNING_IDENTITY:-}" =~ ^[[:xdigit:]]{40}$ && "${DESKTOP_SIGNING_IDENTITY:-}" != 'Developer ID Application: '* ]]; then
+            echo '::error::Set DESKTOP_SIGNING_IDENTITY to the approved Developer ID certificate name or fingerprint.' >&2
+            exit 1
+          fi
           # CFBundleVersion, so two builds of one version can be told apart
           # (#203): the number of commits behind this one, which only grows.
           DESKTOP_BUILD_NUMBER="$(git rev-list --count HEAD)"
