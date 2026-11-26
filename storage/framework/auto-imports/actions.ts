@@ -74,6 +74,7 @@ export const actions = {
   'Actions/Postline/QueuePublishNowAction': '../../../app/Actions/Postline/QueuePublishNowAction.ts',
   'Actions/Postline/QueueRescheduleAction': '../../../app/Actions/Postline/QueueRescheduleAction.ts',
   'Actions/Postline/QueueSaveAction': '../../../app/Actions/Postline/QueueSaveAction.ts',
+  'Actions/Postline/QueueUndoDeleteAction': '../../../app/Actions/Postline/QueueUndoDeleteAction.ts',
   'Actions/Postline/QueueUpdateAction': '../../../app/Actions/Postline/QueueUpdateAction.ts',
   'Actions/Postline/RecoveryCodesAction': '../../../app/Actions/Postline/RecoveryCodesAction.ts',
   'Actions/Postline/RegisterFirstUserAction': '../../../app/Actions/Postline/RegisterFirstUserAction.ts',

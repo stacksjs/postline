@@ -9,6 +9,8 @@ export default defineModel({
 
   indexes: [
     { name: 'posts_status_scheduled_at_index', columns: ['status', 'scheduled_at'] },
+    { name: 'posts_queue_undo_token_index', columns: ['queue_undo_token'] },
+    { name: 'posts_queue_undo_until_index', columns: ['queue_undo_until'] },
   ],
 
   traits: {
@@ -57,6 +59,21 @@ export default defineModel({
       fillable: true,
       validation: { rule: schema.timestamp().optional() },
       factory: faker => faker.helpers.maybe(() => faker.date.recent({ days: 10 }).toISOString().slice(0, 19).replace('T', ' '), { probability: 0.35 }) ?? null,
+    },
+    queueUndoToken: {
+      required: false,
+      nullable: true,
+      validation: { rule: schema.string().max(36).optional() },
+    },
+    queueUndoUntil: {
+      required: false,
+      nullable: true,
+      validation: { rule: schema.timestamp().optional() },
+    },
+    queueUndoStatus: {
+      required: false,
+      nullable: true,
+      validation: { rule: schema.enum(['draft', 'scheduled', 'failed']).optional() },
     },
     timezone: {
       required: true,

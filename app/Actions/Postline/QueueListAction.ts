@@ -28,7 +28,8 @@ export default new Action({
         search: String(request.get('q') ?? ''),
         calendar: from && to ? { from, to } : undefined,
       })
-      return response.json({ ok: true, data: page })
+      const removals = request.get('include_undo') === '1' ? await postQueue.pendingRemovals() : undefined
+      return response.json({ ok: true, data: { ...page, ...(removals ? { removals } : {}) } }, { headers: { 'Cache-Control': 'private, no-store' } })
     }
     catch (error) {
       return actionFailure(error, 500)

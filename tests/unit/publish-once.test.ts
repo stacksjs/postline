@@ -179,6 +179,34 @@ describe('moving a scheduled time', () => {
   })
 })
 
+describe('undoable queue deletion', () => {
+  test('a due post that was removed never publishes, and expired removal cleans up its media', async () => {
+    const blog = fakeNetwork('blog')
+    const queue = queueWith({ blog })
+    const { postId } = await queue.save({
+      text: 'Remove with an attachment',
+      providers: ['blog'],
+      scheduledAt: stamp(3_600_000),
+      image: { mimeType: 'image/png', bytes: new Uint8Array([1, 2, 3]) },
+    })
+    const saved = await database.selectFrom('posts').select('content').where('id', '=', postId).executeTakeFirst()
+    const mediaFile = join(MEDIA_DIR, JSON.parse(saved.content).media[0].path)
+    await database.updateTable('posts').set({ scheduled_at: stamp(-60_000) }).where('id', '=', postId).execute()
+    const { token } = await queue.removeWithUndo([postId])
+    expect(existsSync(mediaFile)).toBe(true)
+    expect(await queue.pruneExpiredRemovals()).toBe(0)
+    await queue.publishDue()
+    expect(blog.sends).toEqual([])
+
+    await database.updateTable('posts').set({ queue_undo_until: stamp(-1000) }).where('id', '=', postId).execute()
+    await expect(queue.restoreRemoval(token)).rejects.toThrow('can no longer be undone')
+    expect(await queue.pruneExpiredRemovals()).toBe(1)
+    expect(await targets(postId)).toEqual([])
+    expect(existsSync(mediaFile)).toBe(false)
+    await expect(queue.get(postId)).rejects.toThrow('Post not found')
+  })
+})
+
 describe('a publish that never finished', () => {
   test('is left alone while it could still be running', async () => {
     const queue = queueWith({ blog: fakeNetwork('blog') })

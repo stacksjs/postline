@@ -40,6 +40,7 @@ export default defineModel({
     },
     publishedBody: {
       required: false,
+      nullable: true,
       fillable: true,
       validation: { rule: schema.string().optional() },
     },

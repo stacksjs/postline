@@ -201,6 +201,40 @@ describe('rescheduling the queue', () => {
   })
 })
 
+describe('removing posts from the queue', () => {
+  test('bulk removal is atomic and its undo receipt survives a new request', async () => {
+    const client = featureTest().actingAs(await actingUser())
+    const schedule = '2099-07-01 15:00:00'
+    const scheduled = await postQueue.save({ text: 'Scheduled removal', providers: ['bluesky'], scheduledAt: schedule })
+    const draft = await postQueue.save({ text: 'Draft removal', providers: ['bluesky'] })
+    const ids = [scheduled.postId, draft.postId]
+    const path = '/api/postline/queue/delete'
+
+    const stale = await client.post(path, { ids: [...ids, 999999] })
+    stale.assertStatus(409)
+    expect((await postQueue.get(scheduled.postId)).status).toBe('scheduled')
+
+    const removed = await client.post(path, { ids })
+    removed.assertStatus(200)
+    const { data: receipt } = await removed.json<{ data: { count: number, token: string } }>()
+    expect(receipt.count).toBe(2)
+    const queued = await client.get('/api/postline/queue?include_undo=1&limit=500')
+    queued.assertStatus(200)
+    const { data: queue } = await queued.json<{ data: { items: Array<{ id: number }>, removals: Array<{ token: string, count: number }> } }>()
+    expect(queue.items.every(post => !ids.includes(post.id))).toBe(true)
+    expect(queue.removals).toContainEqual(expect.objectContaining({ count: 2, token: receipt.token }))
+
+    const token = receipt.token
+    const guestUndo = await featureTest().post('/api/postline/queue/undo-delete', { token })
+    guestUndo.assertStatus(401)
+    const restored = await client.post('/api/postline/queue/undo-delete', { token })
+    restored.assertStatus(200)
+    expect(await restored.json()).toEqual({ ok: true, data: { count: 2 } })
+    expect(await postQueue.get(scheduled.postId)).toMatchObject({ status: 'scheduled', scheduledAt: schedule, targets: ['bluesky'] })
+    expect(await postQueue.get(draft.postId)).toMatchObject({ status: 'draft', scheduledAt: null, targets: ['bluesky'] })
+  })
+})
+
 describe('postline api — the endpoints that had no table', () => {
   /**
    * The regression guard for the migration gap. Before the pending migrations

@@ -1479,6 +1479,9 @@ declare module '@stacksjs/database' {
       status: "draft" | "scheduled" | "publishing" | "published" | "failed" | "archived"
       scheduled_at: string
       published_at: string
+      queue_undo_token: string | null
+      queue_undo_until: string | null
+      queue_undo_status: "draft" | "scheduled" | "failed" | null
       timezone: string
       thread_key: string
       source: "composer" | "import" | "api"

@@ -337,6 +337,10 @@ async function checkQueueKeyboard(cdp: Cdp): Promise<void> {
   await waitUntil('The confirmed draft deletion', () => evaluate<boolean>(cdp, `
     !document.querySelector('#queue-results[aria-label="Matching posts"] article')
       && document.querySelector('#postline-toast-host')?.textContent.includes('Post removed from the queue.')`), 5_000)
+  await evaluate(cdp, `document.querySelector('#postline-toast-host button[data-toast-action]').click()`)
+  await waitUntil('Undo restores the draft to the search results', () => evaluate<boolean>(cdp, `
+    document.querySelector('#queue-results[aria-label="Matching posts"] article')?.textContent.includes('A draft for the keyboard smoke test')
+      && document.querySelector('#postline-toast-host')?.textContent.includes('Post restored to the queue.')`), 5_000)
 }
 
 async function checkDesktopUpdateControls(cdp: Cdp): Promise<void> {
@@ -693,6 +697,24 @@ async function checkQueueRescheduling(cdp: Cdp): Promise<void> {
       .toISOString().slice(0, 19).replace('T', ' ')
     return moved.some(item => item.id === post.id && item.scheduledAt === expected)
   })) fail('queue', 'rescheduling', 'one bulk action did not move all five dates by one week')
+
+  await waitUntil('The moved posts can be selected for removal', () => evaluate<boolean>(cdp, `
+    ${checkboxes}.length === 5 && ${checkboxes}.every(checkbox => !checkbox.checked && !checkbox.disabled)`), 5_000)
+  await evaluate(cdp, `${checkboxes}.forEach(checkbox => checkbox.click())`)
+  await evaluate(cdp, `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Delete selected').click()`)
+  const confirm = `[...document.querySelectorAll('[role=alertdialog] button')].find(button => button.textContent === 'Delete posts')`
+  await waitUntil('The bulk removal confirms the selected posts', () => evaluate<boolean>(cdp, `
+    ${confirm}?.closest('[role=alertdialog]')?.textContent.includes('Delete 5 posts?')`), 5_000)
+  await evaluate(cdp, `${confirm}.click()`)
+  await waitUntil('The five posts are removed together', () => evaluate<boolean>(cdp, `
+    ${checkboxes}.length === 0 && document.querySelector('#postline-toast-host')?.textContent.includes('5 posts removed from the queue.')`), 5_000)
+  await auditPage(`${site}/queue`, { cdp })
+  const undo = `document.querySelector('#postline-toast-host button[data-toast-action]')`
+  await waitUntil('Undo is available again after reload', () => evaluate<boolean>(cdp, `
+    ${undo}?.textContent === 'Undo' && ${checkboxes}.length === 0`), 10_000)
+  await evaluate(cdp, `${undo}.click()`)
+  await waitUntil('Undo restores the whole batch', () => evaluate<boolean>(cdp, `
+    ${checkboxes}.length === 5 && document.querySelector('#postline-toast-host')?.textContent.includes('5 posts restored to the queue.')`), 5_000)
 }
 
 async function checkQueueCalendar(cdp: Cdp): Promise<void> {

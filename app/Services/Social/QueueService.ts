@@ -26,7 +26,7 @@ import { findIdentityRow, unavailableAccountError } from './identities'
 import { isRealTimestamp } from '../../Support/time'
 import { alerts } from '../AlertService'
 import { workspace } from '../WorkspaceService'
-import { ensureAccount, now, uuid } from './support'
+import { ensureAccount, expiresAt, now, uuid } from './support'
 
 const database = db as any
 
@@ -90,6 +90,13 @@ export const MAX_QUEUE_PAGE_SIZE = 500
 const NETWORK_NAMES: Record<string, string> = { bluesky: 'Bluesky', twitter: 'X', mastodon: 'Mastodon', linkedin: 'LinkedIn', instagram: 'Instagram', threads: 'Threads', blog: 'the blog' }
 
 const ACTIONABLE = new Set(['draft', 'scheduled', 'failed'])
+const QUEUE_UNDO_SECONDS = 60
+
+export interface QueueRemovalReceipt {
+  token: string
+  count: number
+  expiresAt: string
+}
 
 /**
  * How long a post may sit in `publishing` before it is taken to be stranded:
@@ -360,7 +367,7 @@ export class QueueService {
       .where('uuid', '=', postUuid)
       .executeTakeFirstOrThrow()
 
-    await this.writePlaceholders(Number(post.id), targets, status, scheduledAt, createdAt)
+    this.writePlaceholders(Number(post.id), targets, status, scheduledAt, createdAt)
 
     return { postId: Number(post.id), status, scheduledAt }
   }
@@ -408,7 +415,7 @@ export class QueueService {
       }).execute()
       const post = await database.selectFrom('posts').select(['id']).where('uuid', '=', postUuid).executeTakeFirstOrThrow()
       postIds.push(Number(post.id))
-      await this.writePlaceholders(Number(post.id), targets, 'scheduled', scheduledAt, createdAt)
+      this.writePlaceholders(Number(post.id), targets, 'scheduled', scheduledAt, createdAt)
     }
     return { postIds, status: 'scheduled', scheduledAt }
   }
@@ -539,9 +546,101 @@ export class QueueService {
   /** Delete a draft, scheduled, or failed post along with its targets. */
   async remove(id: number): Promise<void> {
     const post = await this.findActionable(id)
-    await database.deleteFrom('post_targets').where('post_id', '=', post.id).execute()
-    await database.deleteFrom('posts').where('id', '=', post.id).execute()
+    await database.transaction((tx: typeof database) => {
+      const unchanged = tx.selectFrom('posts').select('id').where('id', '=', post.id).where('status', '=', post.status).executeTakeFirst()
+      if (!unchanged) throw new UserFacingError('This post changed before it could be removed.', 'queue_removal_changed')
+      this.deletePostRows(tx, Number(post.id))
+    })
     await this.removeStoredMedia(post)
+  }
+
+  /** Remove posts from the active queue while keeping the original records for Undo. */
+  async removeWithUndo(ids: readonly number[]): Promise<QueueRemovalReceipt> {
+    return database.transaction((tx: typeof database) => {
+      const posts = tx.selectFrom('posts').select(['id', 'status']).where('id', 'in', ids).execute() as Pick<ScheduledRow, 'id' | 'status'>[]
+      if (posts.length !== ids.length || posts.some(post => !ACTIONABLE.has(post.status)))
+        throw new UserFacingError('Only draft, scheduled, or failed posts can be removed from the queue.', 'queue_removal_changed')
+      const token = uuid()
+      const until = expiresAt(QUEUE_UNDO_SECONDS)!
+      const at = now()
+      for (const post of posts) {
+        tx.updateTable('posts').set({
+          status: 'archived',
+          queue_undo_token: token,
+          queue_undo_until: until,
+          queue_undo_status: post.status,
+          updated_at: at,
+        }).where('id', '=', post.id).execute()
+      }
+      return { token, count: posts.length, expiresAt: `${until.replace(' ', 'T')}Z` }
+    })
+  }
+
+  async pendingRemovals(): Promise<QueueRemovalReceipt[]> {
+    const rows: { queue_undo_token: string, queue_undo_until: string }[] = await database.selectFrom('posts')
+      .select(['queue_undo_token', 'queue_undo_until']).where('status', '=', 'archived')
+      .where('queue_undo_until', '>', now()).execute()
+    const receipts = new Map<string, QueueRemovalReceipt>()
+    for (const row of rows) {
+      const token = row.queue_undo_token
+      if (!token) continue
+      const receipt = receipts.get(token)
+      if (receipt) receipt.count += 1
+      else receipts.set(token, { token, count: 1, expiresAt: `${row.queue_undo_until.replace(' ', 'T')}Z` })
+    }
+    return [...receipts.values()]
+  }
+
+  async restoreRemoval(token: string): Promise<{ count: number }> {
+    return database.transaction((tx: typeof database) => {
+      const at = now()
+      const posts: { id: number, queue_undo_status: string | null }[] = tx.selectFrom('posts').select(['id', 'queue_undo_status'])
+        .where('status', '=', 'archived').where('queue_undo_token', '=', token).where('queue_undo_until', '>', at).execute()
+      if (!posts.length)
+        throw new UserFacingError('This removal can no longer be undone.', 'queue_undo_unavailable')
+      for (const post of posts) {
+        if (!post.queue_undo_status || !ACTIONABLE.has(post.queue_undo_status))
+          throw new UserFacingError('Could not restore these posts.', 'queue_undo_unavailable')
+        tx.updateTable('posts').set({
+          status: post.queue_undo_status,
+          queue_undo_token: null,
+          queue_undo_until: null,
+          queue_undo_status: null,
+          updated_at: at,
+        }).where('id', '=', post.id).execute()
+      }
+      return { count: posts.length }
+    })
+  }
+
+  /** Permanently delete expired removals. An ordinary archived post has no undo deadline. */
+  async pruneExpiredRemovals(): Promise<number> {
+    await contentColumn()
+    const at = now()
+    const posts = await database.selectFrom('posts').selectAll().where('status', '=', 'archived')
+      .where('queue_undo_until', '<=', at).orderBy('queue_undo_until', 'asc').limit(200).execute()
+    let removed = 0
+    for (const post of posts) {
+      try {
+        await this.removeStoredMedia(post, true)
+        removed += await database.transaction((tx: typeof database) => {
+          const expired = tx.selectFrom('posts').select('id').where('id', '=', post.id).where('status', '=', 'archived')
+            .where('queue_undo_until', '<=', at).executeTakeFirst()
+          if (!expired) return 0
+          this.deletePostRows(tx, Number(post.id))
+          return 1
+        })
+      }
+      catch (error) {
+        log.warn(`[postline] could not finish deleting queue post ${post.id}: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+    return removed
+  }
+
+  private deletePostRows(tx: typeof database, id: number): void {
+    tx.deleteFrom('post_targets').where('post_id', '=', id).execute()
+    tx.deleteFrom('posts').where('id', '=', id).execute()
   }
 
   /**
@@ -624,19 +723,29 @@ export class QueueService {
       stored.media = existing.media
     }
 
-    const updatedAt = now()
-    await database.updateTable('posts').set({
-      title: input.title?.trim() || body.slice(0, 80),
-      body,
-      status,
-      [column]: Object.keys(stored).length ? JSON.stringify(stored) : null,
-      scheduled_at: scheduledAt,
-      updated_at: updatedAt,
-    }).where('id', '=', post.id).execute()
-
-    // Rebuild placeholder targets to match the new target set.
-    await database.deleteFrom('post_targets').where('post_id', '=', post.id).execute()
-    await this.writePlaceholders(Number(post.id), targets, status, scheduledAt, updatedAt)
+    try {
+      await database.transaction((tx: typeof database) => {
+        const latest = tx.selectFrom('posts').select(['status', 'updated_at', 'scheduled_at']).where('id', '=', post.id).executeTakeFirst()
+        if (!latest || latest.status !== post.status || latest.updated_at !== post.updated_at || latest.scheduled_at !== post.scheduled_at)
+          throw new UserFacingError('This post changed while you were editing. Reopen it from the queue.', 'queue_post_changed')
+        const updatedAt = now()
+        tx.updateTable('posts').set({
+          title: input.title?.trim() || body.slice(0, 80),
+          body,
+          status,
+          [column]: Object.keys(stored).length ? JSON.stringify(stored) : null,
+          scheduled_at: scheduledAt,
+          updated_at: updatedAt,
+        }).where('id', '=', post.id).execute()
+        tx.deleteFrom('post_targets').where('post_id', '=', post.id).execute()
+        this.writePlaceholders(Number(post.id), targets, status, scheduledAt, updatedAt, tx)
+      })
+    }
+    catch (error) {
+      if (images !== undefined && stored.media?.length)
+        await this.removeStoredMedia({ [column]: JSON.stringify({ media: stored.media }) })
+      throw error
+    }
     if (images !== undefined) await this.removeStoredMedia(post)
 
     return { postId: Number(post.id), status }
@@ -710,15 +819,16 @@ export class QueueService {
   }
 
   /** One placeholder `post_targets` row per target, carrying its account. */
-  private async writePlaceholders(
+  private writePlaceholders(
     postId: number,
     targets: readonly PublishTarget[],
     status: 'draft' | 'scheduled',
     scheduledAt: string | null,
     at: string,
-  ): Promise<void> {
+    tx = database,
+  ): void {
     for (const target of targets) {
-      await database.insertInto('post_targets').values({
+      tx.insertInto('post_targets').values({
         uuid: uuid(),
         provider: target.provider,
         social_identity_id: target.identityId,
@@ -976,11 +1086,13 @@ export class QueueService {
     return Object.keys(content).length ? content : undefined
   }
 
-  private async removeStoredMedia(post: any): Promise<void> {
+  private async removeStoredMedia(post: any, failOnError = false): Promise<void> {
     const stored = parseStoredContent(await storedContentOf(post))
     for (const item of stored?.media || []) {
       if (!item.path || !isSafeMediaFilename(item.path)) continue
-      await unlink(join(MEDIA_DIR, item.path)).catch(() => {})
+      await unlink(join(MEDIA_DIR, item.path)).catch((error: NodeJS.ErrnoException) => {
+        if (failOnError && error.code !== 'ENOENT') throw error
+      })
     }
   }
 
@@ -1116,9 +1228,11 @@ export class QueueService {
     // touched.
     const retryable = await database
       .selectFrom('post_targets')
-      .select(['post_id', 'next_attempt_at'])
-      .where('status', '=', 'failed')
-      .where('next_attempt_at', '<=', now())
+      .innerJoin('posts', 'posts.id', '=', 'post_targets.post_id')
+      .select('post_targets.post_id')
+      .where('posts.status', 'in', ['failed', 'published'])
+      .where('post_targets.status', '=', 'failed')
+      .where('post_targets.next_attempt_at', '<=', now())
       .execute()
     const retryPosts = [...new Set<number>(retryable.map((row: any) => Number(row.post_id)))]
     for (const postId of retryPosts) {

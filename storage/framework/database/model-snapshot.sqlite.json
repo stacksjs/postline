@@ -296,6 +296,14 @@
             "isUnique": true,
             "isNullable": true,
             "hasDefault": false
+          },
+          {
+            "name": "published_body",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
           }
         ],
         "indexes": [
@@ -1184,6 +1192,36 @@
             "isUnique": false,
             "isNullable": true,
             "hasDefault": false
+          },
+          {
+            "name": "queue_undo_token",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 36
+          },
+          {
+            "name": "queue_undo_until",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "queue_undo_status",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "enumValues": [
+              "draft",
+              "scheduled",
+              "failed"
+            ]
           }
         ],
         "indexes": [
@@ -1201,6 +1239,20 @@
               "uuid"
             ],
             "type": "unique"
+          },
+          {
+            "name": "posts_queue_undo_token_index",
+            "columns": [
+              "queue_undo_token"
+            ],
+            "type": "index"
+          },
+          {
+            "name": "posts_queue_undo_until_index",
+            "columns": [
+              "queue_undo_until"
+            ],
+            "type": "index"
           }
         ]
       },
@@ -2697,7 +2749,7 @@
       }
     ]
   },
-  "hash": "54741d770d26d05be4534f5d270683b3799e25af7aa08967fe9c76e09b3c7d12",
+  "hash": "93ca22bdbe45e6564f9772b4b83e4a1b44fcb7a6021c3abca58f0692f260b9fb",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-26T03:17:09.175Z"
+  "updatedAt": "2026-11-26T23:12:13.430Z"
 }

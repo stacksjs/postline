@@ -107,6 +107,19 @@ check('publishing to the blog', published.status === 200 && JSON.parse(published
 const draft = await call('POST', '/api/postline/queue', { text: 'A draft kept by the desktop check.', providers: 'blog' })
 check('saving a draft', draft.status === 200 && JSON.parse(draft.text)?.data?.status === 'draft', `${draft.status} ${draft.text.slice(0, 200)}`)
 
+const draftId = JSON.parse(draft.text).data?.postId
+const removed = await call('POST', '/api/postline/queue/delete', { id: String(draftId) })
+const token = JSON.parse(removed.text).data?.token
+check('removing a draft with Undo', removed.status === 200 && typeof token === 'string')
+
+const pending = await call('GET', '/api/postline/queue?include_undo=1')
+const pendingQueue = JSON.parse(pending.text).data
+check('the removed draft is hidden and can still be restored', pending.status === 200
+  && !pendingQueue?.items?.some((post: { id: number }) => post.id === draftId)
+  && pendingQueue?.removals?.some((receipt: { token: string }) => receipt.token === token))
+const restored = await call('POST', '/api/postline/queue/undo-delete', { token: token || '' })
+check('restoring the draft', restored.status === 200 && JSON.parse(restored.text).data?.count === 1)
+
 const database = new Database(join(dataDir, 'postline.sqlite'), { readonly: true })
 const posts = database.query('SELECT status FROM posts ORDER BY id').all() as Array<{ status: string }>
 const blog = database.query('SELECT slug FROM blog_posts').all() as Array<{ slug: string }>
