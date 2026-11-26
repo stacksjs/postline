@@ -167,10 +167,7 @@
             <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach images" title="Attach images (up to 4)" data-attach-button>
               <span class="h-4 w-4 i-hugeicons-image-01" aria-hidden="true"></span>
             </button>
-            <input class="hidden px-2 h-9 max-w-full min-w-0 text-ink text-xs bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="datetime-local" aria-label="Schedule time" data-compose-schedule>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Schedule post" title="Schedule post" data-schedule-toggle>
-              <span class="h-4 w-4 i-hugeicons-calendar-03" aria-hidden="true"></span>
-            </button>
+            <PostlineSchedulePicker :value="scheduledIso" :timeZone="scheduleZone" @change="selectSchedule" />
             <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Add post" title="Add post" data-add-post>
               <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
             </button>
@@ -192,6 +189,7 @@
     import { dismissPostlineToast, showPostlineToast } from '../functions/postline-toast'
     import { countText } from '../../app/Support/Social/count-text'
     import { mediaObjections } from '../../app/Support/Social/media-rules'
+    import { instantFromWallTime, systemTimeZone } from '../../app/Support/time'
     import { fetchLinkPreview, fetchProviders, fetchWorkspace, formatHandle, publishCrosspost, targetLabel } from '../functions/social-client'
 
     // What the template reads lives at the top level: stx binds `x-for`,
@@ -205,7 +203,13 @@
     // The accounts could not be read (offline, a server error): not the same
     // as having none, so it says so and offers to try again.
     const providersFailed = state(false)
-    const composerHandlers = { toggleProvider: null, retryProviders: null }
+    const composerHandlers = { toggleProvider: null, retryProviders: null, scheduleChanged: null }
+    const scheduledIso = state<string | null>(null)
+    const scheduleZone = state(systemTimeZone())
+    const selectSchedule = ({ value }: { value: string | null }) => {
+      scheduledIso.set(value)
+      composerHandlers.scheduleChanged?.()
+    }
     const toggleProvider = key => composerHandlers.toggleProvider?.(key)
     const retryProviders = () => composerHandlers.retryProviders?.()
 
@@ -270,8 +274,6 @@
       const variantPanel = root.querySelector('[data-variant-panel]')
       const composeImageRow = root.querySelector('[data-compose-image-row]')
       const composeImage = root.querySelector('[data-compose-image]')
-      const scheduleToggle = root.querySelector('[data-schedule-toggle]')
-      const scheduleInput = root.querySelector('[data-compose-schedule]')
       const attachButton = root.querySelector('[data-attach-button]')
       const attachInput = root.querySelector('[data-attach-input]')
 
@@ -1050,44 +1052,25 @@
 
       const updatePublishLabel = () => {
         if (!publishLabel) return
-        if (editingId) publishLabel.textContent = scheduleInput?.value ? 'Update schedule' : 'Update post'
+        if (editingId) publishLabel.textContent = scheduledIso() ? 'Update schedule' : 'Update post'
+        else if (scheduledIso()) publishLabel.textContent = 'Schedule'
         else if (activeMode === 'draft') publishLabel.textContent = 'Save draft'
-        else if (scheduleInput?.value) publishLabel.textContent = 'Schedule'
         else publishLabel.textContent = 'Publish'
       }
 
-      // Schedule times are wall-clock times in the workspace's zone, the one
-      // the queue calendar and analytics use (#106), not this browser's.
-      // Undefined until loaded, and then Intl falls back to the browser zone.
-      let workspaceZone
-      // Awaited before a saved post's time is shown, so it is never read in
-      // one zone and saved in another.
       const zoneReady = fetchWorkspace()
         .then((workspace) => {
-          const timezone = workspace?.timezone
-          if (typeof timezone !== 'string' || !timezone) return
-          workspaceZone = timezone
-          if (scheduleInput) scheduleInput.title = `Time in ${timezone}`
+          if (workspace?.timezone) scheduleZone.set(workspace.timezone)
         })
         .catch(() => {})
 
-      // A moment as the datetime-local value it reads as in the workspace zone.
-      const wallTime = (date) => {
-        const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: workspaceZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date).map(part => [part.type, part.value]))
-        return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
-      }
-
-      // Convert a UTC "YYYY-MM-DD HH:MM:SS" to the datetime-local input value.
-      const utcToLocalInput = (utc) => {
-        const date = new Date(`${utc.replace(' ', 'T')}Z`)
-        if (Number.isNaN(date.getTime())) return ''
-        return wallTime(date)
-      }
+      const scheduleTimestamp = (iso: string): string => new Date(iso).toISOString().slice(0, 19).replace('T', ' ')
 
       // Unsaved changes to a queued post. Edits never go to the local draft
       // (saveDraft refuses in edit mode), so leaving would drop them silently.
       let editDirty = false
       const markEdited = () => { if (editingId) editDirty = true }
+      composerHandlers.scheduleChanged = markEdited
       root.addEventListener('input', markEdited)
       root.addEventListener('change', markEdited)
       // A link or navigate() that would drop them is held, and the toast says
@@ -1147,10 +1130,8 @@
         updatePublishability()
 
         // Schedule.
-        if (item.scheduledAt && scheduleInput) {
-          scheduleInput.value = utcToLocalInput(item.scheduledAt)
-          scheduleInput.classList.remove('hidden')
-        }
+        const savedSchedule = item.scheduledAt ? new Date(`${item.scheduledAt.replace(' ', 'T')}Z`) : null
+        scheduledIso.set(savedSchedule && Number.isFinite(savedSchedule.getTime()) ? savedSchedule.toISOString() : null)
 
         // Link card.
         if (item.external?.uri) {
@@ -1206,7 +1187,8 @@
         form.set('providers', targetProviders.join(','))
         const editTitle = composedTitle()
         if (editTitle) form.set('title', editTitle)
-        if (scheduleInput?.value) form.set('scheduled_at', toUtcTimestamp(scheduleInput.value))
+        const scheduled = scheduledIso()
+        if (scheduled) form.set('scheduled_at', scheduleTimestamp(scheduled))
         if (activePost?.dataset.externalUri && activePost.dataset.externalTitle) {
           form.set('external_uri', activePost.dataset.externalUri)
           form.set('external_title', activePost.dataset.externalTitle)
@@ -1239,24 +1221,6 @@
         }
       }
 
-      // A datetime-local value, read as wall time in the workspace zone, as UTC.
-      // Guess it as UTC, see how far the zone's clock is from that, and step
-      // back by the difference; a second pass settles a daylight-saving edge.
-      const toUtcTimestamp = (localValue) => {
-        const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(localValue || ''))
-        if (!match) throw new Error('Pick a valid schedule time.')
-        const wanted = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5]))
-        let at = wanted
-        for (let pass = 0; pass < 2; pass++) {
-          const shown = wallTime(new Date(at))
-          const shownMs = Date.UTC(Number(shown.slice(0, 4)), Number(shown.slice(5, 7)) - 1, Number(shown.slice(8, 10)), Number(shown.slice(11, 13)), Number(shown.slice(14, 16)))
-          at += wanted - shownMs
-        }
-        const date = new Date(at)
-        if (Number.isNaN(date.getTime())) throw new Error('Pick a valid schedule time.')
-        return date.toISOString().slice(0, 19).replace('T', ' ')
-      }
-
       // Draft mode and schedule-time both save to the server-side queue
       // instead of publishing immediately.
       const saveToQueue = async (scheduleValue) => {
@@ -1283,7 +1247,7 @@
         form.set('providers', targetProviders.join(','))
         const queueTitle = composedTitle()
         if (queueTitle) form.set('title', queueTitle)
-        if (scheduleValue) form.set('scheduled_at', toUtcTimestamp(scheduleValue))
+        if (scheduleValue) form.set('scheduled_at', scheduleTimestamp(scheduleValue))
         if (activePost?.dataset.externalUri && activePost.dataset.externalTitle) {
           form.set('external_uri', activePost.dataset.externalUri)
           form.set('external_title', activePost.dataset.externalTitle)
@@ -1312,9 +1276,8 @@
           }
           const textarea = activeTextarea()
           if (textarea) textarea.value = ''
-          if (scheduleInput) scheduleInput.value = ''
+          scheduledIso.set(null)
           if (composeTitle) composeTitle.value = ''
-          scheduleInput?.classList.add('hidden')
           clearAttachment()
           resetPostOptions()
           renderLinkPreview(activePost, null)
@@ -1387,8 +1350,8 @@
           await updateQueued()
           return
         }
-        if (activeMode === 'draft' || scheduleInput?.value) {
-          await saveToQueue(scheduleInput?.value || null)
+        if (activeMode === 'draft' || scheduledIso()) {
+          await saveToQueue(scheduledIso())
           return
         }
 
@@ -1533,20 +1496,7 @@
         selectPost(post)
         updateCount()
       })
-      scheduleToggle?.addEventListener('click', () => {
-        if (!scheduleInput) return
-        const showing = scheduleInput.classList.toggle('hidden') === false
-        if (showing) {
-          // A floor in the workspace zone so the picker can't select the past.
-          scheduleInput.min = wallTime(new Date(Date.now() + 5 * 60 * 1000))
-          scheduleInput.focus()
-        }
-        else {
-          scheduleInput.value = ''
-        }
-        updatePublishLabel()
-      })
-      scheduleInput?.addEventListener('input', updatePublishLabel)
+      effect(updatePublishLabel)
       attachButton?.addEventListener('click', () => attachInput?.click())
       attachInput?.addEventListener('change', () => {
         const picked = [...(attachInput.files || [])]
@@ -1668,21 +1618,22 @@
       updateCount()
       void updateLinkPreview(activePost)
       // Load the edit post only after connection so provider toggles resolve.
-      // /composer?schedule=YYYY-MM-DD (from the queue calendar) opens the schedule
-      // input pre-set to 09:00 local on that day.
+      // The queue calendar prefills 09:00 on the chosen workspace date.
       const scheduleParam = useRoute().query.schedule || null
       const applyScheduleParam = () => {
-        if (!scheduleParam || !scheduleInput || !/^\d{4}-\d{2}-\d{2}$/.test(scheduleParam)) return
-        scheduleInput.value = `${scheduleParam}T09:00`
-        scheduleInput.classList.remove('hidden')
-        updatePublishLabel()
+        if (!scheduleParam || !/^\d{4}-\d{2}-\d{2}$/.test(scheduleParam)) return
+        const instant = instantFromWallTime(`${scheduleParam} 09:00:00`, scheduleZone())
+        if (instant) scheduledIso.set(instant.toISOString())
         activeTextarea()?.focus()
       }
 
       const start = async () => {
         await refreshConnection()
         if (editParam) await loadEditPost(editParam)
-        else applyScheduleParam()
+        else {
+          await zoneReady
+          applyScheduleParam()
+        }
       }
       onMount(() => { void start() })
     })()

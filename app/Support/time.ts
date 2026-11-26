@@ -49,3 +49,32 @@ export function hourInZone(instant: Date, zone: string): number {
   const hour = new Intl.DateTimeFormat('en-US', { timeZone: zone, hourCycle: 'h23', hour: '2-digit' }).format(instant)
   return Number(hour) % 24
 }
+
+/** Format a UTC instant as a local calendar timestamp with seconds. */
+export function wallTimeInZone(instant: Date, zone: string): string {
+  const clock = new Intl.DateTimeFormat('en-CA', {
+    timeZone: zone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  })
+  const parts = Object.fromEntries(clock.formatToParts(instant).map(part => [part.type, part.value]))
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`
+}
+
+/** Convert a local timestamp to an instant, returning null in a clock gap. */
+export function instantFromWallTime(wallTime: string, zone: string): Date | null {
+  if (wallTime.length !== 19 || !isRealTimestamp(wallTime) || !isValidTimeZone(zone)) return null
+  const wallClockMs = Date.parse(`${wallTime.replace(' ', 'T')}Z`)
+  const date = new Date(wallClockMs)
+  for (let pass = 0; pass < 3; pass++) {
+    const shown = wallTimeInZone(date, zone)
+    if (shown === wallTime) return date
+    date.setTime(date.getTime() + wallClockMs - Date.parse(`${shown.replace(' ', 'T')}Z`))
+  }
+  return null
+}

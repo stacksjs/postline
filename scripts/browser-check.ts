@@ -645,13 +645,25 @@ async function checkPhoneNavigation(cdp: Cdp): Promise<void> {
     })()`), 5_000)
 
   await auditPage(`${site}/composer`, { cdp })
-  await evaluate(cdp, `document.querySelector('[data-schedule-toggle]').click()`)
-  await waitUntil('The composer schedule fits at 375 pixels', () => evaluate<boolean>(cdp, `
+  const picker = '[data-postline-schedule-picker] [data-date-time-trigger]'
+  await waitUntil('The composer scheduling picker', () => evaluate<boolean>(cdp, `
+    document.querySelector('${picker}')?.getAttribute('aria-expanded') === 'false'`), 5_000)
+  const timezone = await evaluate<string>(cdp, `(async () => {
+    const response = await fetch('/api/postline/bootstrap')
+    return (await response.json()).data.workspace.timezone
+  })()`)
+  await evaluate(cdp, `document.querySelector('${picker}').click()`)
+  await waitUntil('The workspace calendar fits at 375 pixels', () => evaluate<boolean>(cdp, `
     (() => {
-      const input = document.querySelector('[data-compose-schedule]')
-      const bounds = input.getBoundingClientRect()
-      return bounds.width > 0 && bounds.left >= 0 && bounds.right <= innerWidth
+      const panel = document.querySelector('[data-date-time-panel]')
+      const bounds = panel?.getBoundingClientRect()
+      return bounds?.width > 0 && bounds.left >= 0 && bounds.right <= innerWidth
+        && panel.textContent.includes(${JSON.stringify(timezone)})
     })()`), 5_000)
+  await evaluate(cdp, `document.querySelector('[data-date-time-preset=hour]').click()`)
+  await waitUntil('In an hour schedules the composer post', () => evaluate<boolean>(cdp, `
+    !document.querySelector('[data-date-time-panel]')
+      && document.querySelector('[data-bluesky-publish-label]')?.textContent === 'Schedule'`), 5_000)
 }
 
 async function checkQueueRescheduling(cdp: Cdp): Promise<void> {

@@ -1,0 +1,57 @@
+<script server>
+export const value = $props.value || null
+export const timeZone = $props.timeZone || 'UTC'
+export const label = $props.label || 'Schedule post'
+export const placeholder = $props.placeholder || 'Schedule'
+</script>
+
+<script client>
+import { instantFromWallTime, wallTimeInZone } from '../../app/Support/time'
+import { requestJson } from '../functions/postline-client'
+
+const emit = defineEmits()
+const value = useReactiveProp('value', {{ value }}, { parse: value => value })
+const timeZone = useReactiveProp('timeZone', {{ timeZone }})
+const label = useReactiveProp('label', {{ label }})
+const placeholder = useReactiveProp('placeholder', {{ placeholder }})
+const minimum = state(new Date().toISOString())
+const analytics = cachedQuery<number | null>('postline:schedule-best-hour', {
+  scope: false,
+  staleTime: 5 * 60_000,
+  load: async ({ signal }) => {
+    const payload = await requestJson('/api/postline/analytics', { signal, cache: 'no-store' })
+    return payload.data?.stats?.bestHour?.hour ?? null
+  },
+})
+
+const suggestedTime = derived(() => {
+  const hour = analytics.data()
+  if (typeof hour !== 'number' || !Number.isInteger(hour) || hour < 0 || hour > 23) return null
+  const zone = timeZone()
+  const earliest = new Date(minimum())
+  const today = wallTimeInZone(earliest, zone).slice(0, 10)
+  const day = new Date(`${today}T00:00:00Z`)
+  const clock = `${String(hour).padStart(2, '0')}:00:00`
+  for (let offset = 0; offset < 3; offset++) {
+    const candidate = instantFromWallTime(`${day.toISOString().slice(0, 10)} ${clock}`, zone)
+    if (candidate && candidate > earliest) return candidate.toISOString()
+    day.setUTCDate(day.getUTCDate() + 1)
+  }
+  return null
+})
+
+function prepare() {
+  minimum.set(new Date().toISOString())
+  void analytics.load()
+}
+
+function change(detail: { value: string | null }) {
+  emit('change', { value: detail.value })
+}
+</script>
+
+<template>
+  <div class="min-w-0" data-postline-schedule-picker>
+    <DateTimePicker :value="value" :timeZone="timeZone" :minDate="minimum" :label="label" :placeholder="placeholder" :suggestedTime="suggestedTime" @open="prepare" @change="change" />
+  </div>
+</template>
