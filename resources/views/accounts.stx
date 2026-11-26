@@ -575,7 +575,7 @@
 
       const refreshStatus = async () => {
         try {
-          const data = await window.postlineBluesky?.fetchStatus()
+          const data = await window.postlineSocial?.fetchStatus('bluesky')
           renderStatus(data)
         }
         catch (error) {
@@ -653,7 +653,7 @@
 
       const refreshLinkedIn = async () => {
         try {
-          const data = await window.postlineLinkedin?.fetchStatus()
+          const data = await window.postlineSocial?.fetchStatus('linkedin')
           renderLinkedIn(data)
         }
         catch (error) {
@@ -762,10 +762,7 @@
 
       const refreshTwitter = async () => {
         try {
-          const response = await fetch('/api/postline/twitter/status')
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load X/Twitter status.')
-          renderTwitter(payload.data)
+          renderTwitter(await window.postlineSocial?.fetchStatus('twitter'))
         }
         catch (error) {
           renderTwitter(null)
@@ -847,7 +844,7 @@
 
       const refreshInstagram = async () => {
         try {
-          const data = await window.postlineInstagram?.fetchStatus()
+          const data = await window.postlineSocial?.fetchStatus('instagram')
           renderInstagram(data)
         }
         catch (error) {
@@ -930,7 +927,7 @@
 
       const refreshThreads = async () => {
         try {
-          const data = await window.postlineThreads?.fetchStatus()
+          const data = await window.postlineSocial?.fetchStatus('threads')
           renderThreads(data)
         }
         catch (error) {
@@ -1006,10 +1003,7 @@
 
       const refreshMastodon = async () => {
         try {
-          const response = await fetch('/api/postline/mastodon/status')
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load Mastodon status.')
-          renderMastodon(payload.data)
+          renderMastodon(await window.postlineSocial?.fetchStatus('mastodon'))
         }
         catch (error) {
           renderMastodon(null)

@@ -121,6 +121,38 @@ export function providerIcon(provider: string): string {
   return PROVIDER_ICONS[provider] || 'i-hugeicons-share-08'
 }
 
+/** A network whose connection the Accounts page shows. */
+export type StatusNetwork = 'bluesky' | 'linkedin' | 'instagram' | 'threads' | 'twitter' | 'mastodon'
+
+/**
+ * One network's connection, as `/api/postline/<network>/status` answers it.
+ * The fields every network sends, and the ones only some do.
+ */
+export interface NetworkStatus {
+  connected: boolean
+  provider: string
+  id: number | null
+  handle: string | null
+  displayName: string | null
+  canPublish: boolean
+  characterLimit: number
+  configuredFromEnv: boolean
+  authStatus: string
+  oauthConfigured?: boolean
+  requiresMedia?: boolean
+  accounts?: AccountStatus[]
+  [key: string]: unknown
+}
+
+/** One client for every network's status, in place of a module per network (#181). */
+export async function fetchStatus(network: StatusNetwork): Promise<NetworkStatus> {
+  const response = await fetch(`/api/postline/${network}/status`)
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok || !payload.ok)
+    throw new Error(payload.error || `Could not load ${providerLabel(network)} status.`)
+  return payload.data as NetworkStatus
+}
+
 export async function fetchProviders(): Promise<ProviderStatus[]> {
   const response = await fetch('/api/postline/providers')
   const payload = await response.json()
@@ -194,6 +226,7 @@ export async function publishCrosspost(input: CrosspostInput): Promise<{ postId:
 declare global {
   interface Window {
     postlineSocial?: {
+      fetchStatus: typeof fetchStatus
       fetchProviders: typeof fetchProviders
       fetchAccounts: typeof fetchAccounts
       disconnectAccount: typeof disconnectAccount
@@ -207,6 +240,7 @@ declare global {
 }
 
 window.postlineSocial = {
+  fetchStatus,
   fetchProviders,
   fetchAccounts,
   disconnectAccount,

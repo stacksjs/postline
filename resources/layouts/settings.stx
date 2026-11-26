@@ -15,10 +15,6 @@
 @yield('content')
 
 {{-- Channel status for the Channels and Composer panes. --}}
-<script type="module" src="/assets/scripts/bluesky.ts"></script>
-<script type="module" src="/assets/scripts/linkedin.ts"></script>
-<script type="module" src="/assets/scripts/instagram.ts"></script>
-<script type="module" src="/assets/scripts/threads.ts"></script>
 <script type="module" src="/assets/scripts/social.ts"></script>
 {{-- Adding passkeys in the Account pane (#95). --}}
 <script type="module" src="/assets/scripts/passkeys.ts"></script>
