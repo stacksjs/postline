@@ -1,10 +1,11 @@
 @extends('layouts/blog')
 
 <script server>
+import { useRequestEvent } from '@stacksjs/config'
 import { publicBlogPost } from '../../../app/Support/Social/public-blog'
 import blogConfig from '../../../config/blog'
 
-const post = await publicBlogPost(String(params?.slug || ''))
+const post = useRequestEvent().url ? await publicBlogPost(String(params?.slug || '')) : null
 setResponseHeader('Cache-Control', 'no-store')
 if (!post) notFound()
 useHead({ title: post ? `${post.title} · ${blogConfig.title}` : `Post not found · ${blogConfig.title}` })
