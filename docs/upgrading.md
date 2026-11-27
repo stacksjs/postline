@@ -55,6 +55,9 @@ the pending migrations.
 - **Network apps in Settings.** X, LinkedIn, Instagram and Threads apps can be
   entered under Settings, Channels instead of `.env`; values in `.env` still
   apply until something is saved in Settings.
+- **X API.** Reconnect X accounts to grant image upload permission. Postline
+  estimates and caps API reads at $2 per UTC day by default. See the
+  [X setup guide](networks/x.md) for the budget setting and how to check usage.
 - **Sign-in.** Passkeys and two-factor sign-in are available under Settings,
   Account; the password keeps working.
 - **Configuration.** `.env.example` lists every variable Postline reads; ones
