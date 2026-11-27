@@ -43,7 +43,10 @@ describe('upgrading the Mac app from v0.1.1', () => {
       expect(db.query('SELECT workspace_name, timezone FROM accounts WHERE id = 1').get()).toEqual({ workspace_name: 'Upgrade Workspace', timezone: 'Europe/Berlin' })
       expect(db.query('SELECT handle, access_token, refresh_token FROM social_identities WHERE id = 1').get()).toEqual({ handle: 'owner.bsky.social', access_token: 'plain-access-token-v011', refresh_token: 'plain-refresh-token-v011' })
       expect(db.query('SELECT status FROM posts ORDER BY id').all()).toEqual([{ status: 'published' }, { status: 'scheduled' }])
-      expect(db.query('SELECT remote_uri FROM post_targets WHERE id = 1').get()).toEqual({ remote_uri: 'at://did:plc:owner/app.bsky.feed.post/3kv011' })
+      expect(db.query('SELECT remote_uri, social_identity_id, archived_account FROM post_targets WHERE id = 1').get()).toEqual({
+        remote_uri: 'at://did:plc:owner/app.bsky.feed.post/3kv011', social_identity_id: 1, archived_account: null,
+      })
+      expect(db.query('SELECT thread_key FROM thread_publish_claims').all()).toEqual([])
       // Columns added since v0.1.1 are there, with their defaults.
       expect(db.query('SELECT publishing_paused, twitter_browser_handle, twitter_browser_needs_check FROM accounts WHERE id = 1').get()).toEqual({ publishing_paused: 0, twitter_browser_handle: null, twitter_browser_needs_check: 0 })
       expect(db.query('SELECT twitter_read_source FROM keyword_monitors WHERE id = 1985').get()).toEqual({ twitter_read_source: 'api' })
