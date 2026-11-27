@@ -126,7 +126,18 @@ async function checkWorkspaceCommands(cdp: Cdp): Promise<void> {
   const search = `${dialog}.querySelector('input')`
   const option = `${dialog}.querySelector('[role=option][aria-selected=true]')`
   const trigger = "document.querySelector('button[aria-controls=workspace-commands]')"
-  const fill = (value: string): Promise<void> => evaluate(cdp, `${search}.value = ${JSON.stringify(value)}; ${search}.dispatchEvent(new Event('input', { bubbles: true }))`)
+  const openPalette = async (modifier: number): Promise<void> => {
+    await waitUntil('The command trigger is ready', () => evaluate<boolean>(cdp, `
+      Boolean(${trigger}?.getClientRects().length && ${trigger}.getAttribute('aria-expanded') === 'false')
+    `), 5_000)
+    await pressKey(cdp, 'k', 75, modifier)
+  }
+  const typeQuery = async (value: string): Promise<void> => {
+    await waitUntil('The command palette is ready for typing', () => evaluate<boolean>(cdp, `
+      ${dialog}.open && document.activeElement === ${search} && ${search}.value === ''
+    `), 5_000)
+    await cdp.send('Input.insertText', { text: value })
+  }
 
   await evaluate(cdp, "document.getElementById('queue-search').focus()")
   await pressKey(cdp, '?', 191, 8)
@@ -139,9 +150,8 @@ async function checkWorkspaceCommands(cdp: Cdp): Promise<void> {
   if (!await evaluate<boolean>(cdp, `!${dialog}.open && document.activeElement === ${trigger}`))
     fail('queue', 'commands', 'Escape did not restore focus after the shortcut sheet')
 
-  await pressKey(cdp, 'k', 75, 2)
-  await waitUntil('Search focus in the command palette', () => evaluate<boolean>(cdp, `${dialog}.open && document.activeElement === ${search}`), 5_000)
-  await fill('queue view')
+  await openPalette(2)
+  await typeQuery('queue view')
   await waitUntil('Both Queue views as command results', () => evaluate<boolean>(cdp, `${option}?.textContent.includes('Go to view') && [...${dialog}.querySelectorAll('[role=option]')].some(item => item.textContent.includes('Calendar'))`), 5_000)
   await pressKey(cdp, 'ArrowDown', 40)
   await pressKey(cdp, 'ArrowDown', 40)
@@ -150,29 +160,33 @@ async function checkWorkspaceCommands(cdp: Cdp): Promise<void> {
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('The existing Calendar action', () => evaluate<boolean>(cdp, `!${dialog}.open && Boolean(document.querySelector('[aria-label="Queue calendar"] [aria-label="Previous month"]')?.getClientRects().length)`), 5_000)
 
-  await pressKey(cdp, 'k', 75, 4)
-  await fill('analytics')
+  await openPalette(4)
+  await typeQuery('analytics')
   await waitUntil('The Analytics destination', () => evaluate<boolean>(cdp, `${option}?.textContent.includes('Analytics')`), 5_000)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Navigation from the command palette', () => evaluate<boolean>(cdp, `location.pathname === '/analytics' && !!document.querySelector('[data-postline-page=analytics]')`), 5_000)
 
-  await pressKey(cdp, 'k', 75, 2)
-  await fill('no-matching-command-42')
+  await openPalette(2)
+  await typeQuery('no-matching-command-42')
   await waitUntil('The palette after client navigation', () => evaluate<boolean>(cdp, `${dialog}.open && ${dialog}.querySelector('[role=status]').innerText === 'No matching commands' && !${option}`), 5_000)
   await pressKey(cdp, 'Escape', 27)
   if (await evaluate<boolean>(cdp, `${dialog}.open`)) fail('analytics', 'commands', 'Escape only cleared the query and left the palette open')
   await evaluate(cdp, `${trigger}.focus()`)
   await pressKey(cdp, '2', 50)
-  await waitUntil('The existing Queue number shortcut', () => evaluate<boolean>(cdp, `location.pathname === '/queue' && !!document.querySelector('[data-postline-page=queue]')`), 5_000)
+  await waitUntil('The existing Queue number shortcut', () => evaluate<boolean>(cdp, `
+    location.pathname === '/queue' && !!document.querySelector('[data-postline-page=queue]')
+      && ${trigger}?.getAttribute('aria-expanded') === 'false'
+  `), 5_000)
 
-  await pressKey(cdp, 'k', 75, 2)
-  await fill('settings')
+  await openPalette(2)
+  await typeQuery('settings')
   await waitUntil('The Settings destination', () => evaluate<boolean>(cdp, `${option}?.textContent.includes('Settings')`), 5_000)
   await pressKey(cdp, 'Enter', 13)
   // Settings has its own layout. Wait for the new document to hydrate in dev.
   await waitUntil('The Settings command trigger to hydrate', () => evaluate<boolean>(cdp, `location.pathname === '/settings' && ${trigger}?.getAttribute('aria-expanded') === 'false'`), 15_000)
-  await evaluate(cdp, `${trigger}.click()`)
-  await fill('appearance')
+  await evaluate(cdp, `${trigger}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await typeQuery('appearance')
   await waitUntil('A command for the Appearance pane', () => evaluate<boolean>(cdp, `${option}?.textContent.trim().startsWith('Appearance')`), 5_000)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('The existing Settings pane action', () => evaluate<boolean>(cdp, `!${dialog}.open && document.querySelector('[data-settings-item=appearance]')?.getAttribute('aria-selected') === 'true' && Boolean(document.querySelector('[data-settings-pane=appearance]')?.getClientRects().length)`), 5_000)
