@@ -17,8 +17,12 @@ interface TrayItem {
 
 export interface DesktopAlertsBridge {
   app?: {
-    notify?: (options: { title: string, body?: string }) => Promise<void>
     setBadge?: (count: number) => Promise<void>
+  }
+  notifications?: {
+    show?: (options: { id: string, title: string, body?: string }) => Promise<unknown>
+    getPermissionStatus?: () => Promise<string>
+    requestPermission?: () => Promise<boolean>
   }
   timers?: {
     sleep?: (delayMs: number, options: { signal: AbortSignal }) => Promise<void>
@@ -69,7 +73,7 @@ function remember(id: number): void {
 }
 
 /** Bind notification delivery, the dock badge and menu-bar controls to a Craft workspace. */
-export function bindDesktopAlerts({ app, timers, tray, autoLaunch }: DesktopAlertsBridge): () => void {
+export function bindDesktopAlerts({ app, notifications, timers, tray, autoLaunch }: DesktopAlertsBridge): () => void {
   if (!app) return () => {}
 
   const controller = new AbortController()
@@ -79,6 +83,33 @@ export function bindDesktopAlerts({ app, timers, tray, autoLaunch }: DesktopAler
   let openAtLogin = false
   let changingMenu = false
   let timer: ReturnType<typeof setTimeout> | undefined
+
+  function markSeen(id: number): void {
+    seen = id
+    remember(id)
+  }
+
+  async function notifyNewAlerts(alerts: AlertView[]): Promise<boolean> {
+    if (!alerts.length || !notifications?.show || !notifications.getPermissionStatus) return true
+    try {
+      const permission = await notifications.getPermissionStatus()
+      if (permission === 'unknown') return false
+      if (permission !== 'authorized' && permission !== 'provisional') return true
+      for (const alert of alerts) {
+        if (signal.aborted) return false
+        await notifications.show({
+          id: `postline-alert-${alert.id}`,
+          title: alert.title,
+          ...(alert.body ? { body: alert.body } : {}),
+        })
+        markSeen(alert.id)
+      }
+      return true
+    }
+    catch {
+      return false
+    }
+  }
 
   async function refreshTray(): Promise<void> {
     if (!tray || signal.aborted) return
@@ -131,17 +162,11 @@ export function bindDesktopAlerts({ app, timers, tray, autoLaunch }: DesktopAler
       const alerts: AlertView[] = payload.data?.alerts ?? []
       const newest = alerts.reduce((max, alert) => Math.max(max, alert.id), 0)
       const previous = seen
-      if (newest > (previous ?? -1)) {
-        seen = newest
-        remember(newest)
-      }
-
       // Record a baseline on the first poll. Announce subsequent unread alerts oldest first.
-      if (previous !== null) {
-        for (const alert of alerts.filter(alert => alert.id > previous && !alert.read).reverse()) {
-          if (signal.aborted) return
-          await app?.notify?.({ title: alert.title, ...(alert.body ? { body: alert.body } : {}) }).catch(() => {})
-        }
+      if (previous === null) markSeen(newest)
+      else if (newest > previous) {
+        const pending = alerts.filter(alert => alert.id > previous && !alert.read).reverse()
+        if (await notifyNewAlerts(pending) && !signal.aborted) markSeen(newest)
       }
       if (signal.aborted) return
       await app?.setBadge?.(Math.max(0, Number(payload.data?.unread) || 0)).catch(() => {})

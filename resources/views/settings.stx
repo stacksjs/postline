@@ -113,7 +113,9 @@ export const buildVersion = manifest.version
           <SettingsRow label="Workspace alerts" setting="activity-alerts">
             <Button appearance="mac" @click="openWorkspacePage('/activity')">Open Activity</Button>
           </SettingsRow>
-          <SettingsRow label="macOS notifications" description="Manage Postline’s notification permission in macOS System Settings." setting="macos-notifications" x-show="ownWindow()" />
+          <SettingsRow label="macOS notifications" :description="nativeNotificationDescription()" setting="macos-notifications" x-show="notificationControls()">
+            <Button appearance="mac" :disabled="requestingNotifications()" :show="nativeNotificationPermission() === 'notDetermined'" @click="allowNativeNotifications">Allow notifications…</Button>
+          </SettingsRow>
         </SettingsGroup>
         <SettingsGroup title="Delivery">
           <SettingsRow label="Email delivery" :description="mailDescription()" setting="mail-status" keywords="mail smtp mailer email" />
@@ -345,6 +347,7 @@ export const buildVersion = manifest.version
 
   <script client>
     import type { ComposerFormat } from '../functions/composer-draft'
+    import type { DesktopAlertsBridge } from '../functions/desktop-alerts'
     import { COMPOSER_AUTOSAVE_KEY, COMPOSER_DEFAULT_FORMAT_KEY } from '../functions/composer-draft'
     import { passkeys } from '../functions/passkeys'
     import { fetchProviders } from '../functions/social-client'
@@ -878,6 +881,45 @@ export const buildVersion = manifest.version
       return current.from ? `Sent through ${current.driver} as ${current.from}.` : `Sent through ${current.driver}.`
     })
     const delivery = state<{ email: boolean, webhook: boolean } | null>(null)
+    const desktop = useNativeDesktop()
+    const notifications = () => (desktop() as DesktopAlertsBridge | null)?.notifications
+    const notificationControls = derived(() => Boolean(notifications()?.getPermissionStatus && notifications()?.requestPermission))
+    const nativeNotificationPermission = state('')
+    const requestingNotifications = state(false)
+    const nativeNotificationDescription = derived(() => {
+      switch (nativeNotificationPermission()) {
+        case 'authorized': return 'On'
+        case 'provisional': return 'Delivered quietly. Choose banners and sounds in macOS System Settings.'
+        case 'denied': return 'Off. Allow Postline in macOS System Settings → Notifications.'
+        case 'notDetermined': return 'Allow Postline to notify you when a post or a channel needs attention.'
+        case 'unknown': return 'Check Postline’s permission in macOS System Settings → Notifications.'
+        default: return ''
+      }
+    })
+    const loadNativeNotificationPermission = async () => {
+      const permission = await notifications()?.getPermissionStatus?.().catch(() => 'unknown')
+      nativeNotificationPermission.set(permission || 'unknown')
+    }
+    const allowNativeNotifications = async () => {
+      if (requestingNotifications()) return
+      requestingNotifications.set(true)
+      try {
+        await notifications()?.requestPermission?.()
+        await loadNativeNotificationPermission()
+      }
+      catch {
+        nativeNotificationPermission.set('unknown')
+      }
+      finally {
+        requestingNotifications.set(false)
+      }
+    }
+    effect(() => {
+      if (pane() === 'notifications' && notificationControls()) void loadNativeNotificationPermission()
+    })
+    useEventListener('focus', () => {
+      if (pane() === 'notifications' && notificationControls()) void loadNativeNotificationPermission()
+    })
     const loadDelivery = async (): Promise<void> => {
       try {
         const response = await fetch('/api/postline/system')

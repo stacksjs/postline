@@ -261,8 +261,11 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
         },
       },
       app: {
-        notify: async notification => calls.notifications.push(notification),
         setBadge: async count => { calls.badge = count },
+      },
+      notifications: {
+        getPermissionStatus: async () => 'authorized',
+        show: async notification => calls.notifications.push(notification),
       },
       timers: {
         sleep(delay, { signal }) {
@@ -289,7 +292,7 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
     (() => {
       const { badge, menu, notifications } = window.postlineShellCalls
       return badge === 2 && notifications.length === 1 && notifications[0].title === 'Scheduled post failed'
-        && notifications[0].body === 'Review the queue.'
+        && notifications[0].id === 'postline-alert-102' && notifications[0].body === 'Review the queue.'
         && menu.some(item => item.label === 'Pause Publishing' && item.action === 'toggle-publishing')
         && localStorage.getItem('postline:alerts:last-seen') === '103'
     })()`), 5_000)
@@ -304,6 +307,7 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
     (() => {
       const { badge, deadlines, notifications } = window.postlineShellCalls
       return badge === 3 && notifications.length === 2 && notifications[1].title === 'New scheduled failure'
+        && notifications[1].id === 'postline-alert-104'
         && deadlines.length === 2 && localStorage.getItem('postline:alerts:last-seen') === '104'
     })()`), 5_000)
   const trayAction = (action: string): string => `window.dispatchEvent(new CustomEvent('craft:tray:menuAction', { detail: { action: ${JSON.stringify(action)} } }))`
@@ -454,7 +458,20 @@ async function checkNotificationSettings(cdp: Cdp): Promise<void> {
 
 async function checkDesktopUpdateControls(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
-    window.craft = { window: {}, capabilities: { nativePlatformControls: false } }
+    let permission = 'notDetermined'
+    window.nativeNotificationRequests = 0
+    window.craft = {
+      window: {},
+      capabilities: { nativePlatformControls: false },
+      notifications: {
+        getPermissionStatus: async () => permission,
+        requestPermission: async () => {
+          window.nativeNotificationRequests++
+          permission = 'authorized'
+          return true
+        },
+      },
+    }
     window.postlineUpdateTestActions = []
     const actualFetch = window.fetch.bind(window)
     window.fetch = async (input, options) => {
@@ -471,7 +488,9 @@ async function checkDesktopUpdateControls(cdp: Cdp): Promise<void> {
   ` })
   try {
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
-    await auditPage(`${site}/settings`, { cdp })
+    const report = await auditPage(`${site}/settings`, { cdp })
+    for (const error of report.errors) fail('settings', 'desktop controls', error)
+    for (const request of report.failed) fail('settings', 'desktop controls', request)
     const about = "document.querySelector('[data-settings-item=about]')"
     await waitUntil('The About pane', () => evaluate<boolean>(cdp, `Boolean(${about}?.getClientRects().length)`), 5_000)
     await evaluate(cdp, `${about}.focus()`)
@@ -486,6 +505,23 @@ async function checkDesktopUpdateControls(cdp: Cdp): Promise<void> {
     await waitUntil('Settings displays the available desktop update', () => evaluate<boolean>(cdp, `document.querySelector('[data-setting="desktop-install"]')?.innerText.includes('0.4.0')`), 5_000)
     await evaluate(cdp, `document.querySelector('[data-setting="desktop-install"] button')?.click()`)
     await waitUntil('Settings announces the installed update', () => evaluate<boolean>(cdp, `Array.from(document.querySelectorAll('[role="status"]')).some(node => node.textContent.includes('Update installed.'))`), 5_000)
+
+    const item = "document.querySelector('[data-settings-item=notifications]')"
+    await waitUntil('Native Notifications pane', () => evaluate<boolean>(cdp, `Boolean(${item}?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, `${item}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const allow = "document.querySelector('[data-setting=macos-notifications] button')"
+    const description = "document.getElementById('settings-row-macos-notifications-description')"
+    await waitUntil('macOS notification permission is offered without prompting', () => evaluate<boolean>(cdp, `
+      Boolean(${allow}?.getClientRects().length)
+        && ${allow}.textContent.trim() === 'Allow notifications…'
+        && window.nativeNotificationRequests === 0
+    `), 5_000)
+    await evaluate(cdp, `${allow}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Allow notifications requests permission once and shows the result', () => evaluate<boolean>(cdp, `
+      !${allow}?.getClientRects().length && ${description}?.innerText === 'On' && window.nativeNotificationRequests === 1
+    `), 5_000)
   }
   catch (error) {
     const details = await evaluate<unknown>(cdp, `({
