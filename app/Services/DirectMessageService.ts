@@ -16,7 +16,7 @@
  * claiming to have been delivered when it was not.
  */
 
-import type { DmMessageCandidate, DmProvider } from '../Support/Social/direct-messages'
+import type { DmConversationCandidate, DmMessageCandidate, DmProvider } from '../Support/Social/direct-messages'
 import { db } from '@stacksjs/database'
 import { DM_PROVIDERS, DM_UNAVAILABLE, isDmProvider } from '../Support/Social/direct-messages'
 import { isUsableIdentity } from '../Support/Social/accounts'
@@ -252,10 +252,10 @@ export class DirectMessageService {
         for (const candidate of candidates) {
           const { id: conversationId, changed } = await this.upsertConversation(transport.provider, candidate, identityId)
           result.conversations += 1
-          // Its newest message is the one already stored: nothing to fetch. A
-          // sync with nothing new is then one call per network, the list,
-          // instead of one more per conversation (#108).
-          if (!changed) continue
+          // The preview is saved before fetching the history. A previous
+          // failure may therefore leave an unchanged preview with missing
+          // messages. Check the local mirror before skipping the remote read.
+          if (!changed && await this.hasMirroredPreview(conversationId, candidate)) continue
 
           try {
             const messages = await transport.listMessages(candidate.remoteId, MESSAGE_LIMIT, identityId)
@@ -389,14 +389,7 @@ export class DirectMessageService {
    * lowered: X reports none at all, and letting a zero from one network stomp
    * a count Postline is tracking locally would silently mark threads read.
    */
-  private async upsertConversation(provider: DmProvider, candidate: {
-    remoteId: string
-    participants: Array<{ remoteId: string, handle: string, name?: string | null, avatar?: string | null }>
-    unreadCount: number
-    lastMessageAt?: string | null
-    lastMessageText?: string | null
-    lastMessageOutgoing?: boolean
-  }, identityId: number | null = null): Promise<{ id: number, changed: boolean }> {
+  private async upsertConversation(provider: DmProvider, candidate: DmConversationCandidate, identityId: number | null = null): Promise<{ id: number, changed: boolean }> {
     // Keyed on (provider, account, remote id): two of the owner's accounts in
     // one conversation are two inbox rows, each answering as its own account.
     // A row stored before conversations had an account is adopted by the
@@ -453,6 +446,15 @@ export class DirectMessageService {
       .executeTakeFirstOrThrow()
 
     return { id: Number(created.id), changed: true }
+  }
+
+  private async hasMirroredPreview(conversationId: number, candidate: DmConversationCandidate): Promise<boolean> {
+    const query = database.selectFrom('dm_messages').select(['id']).where('dm_conversation_id', '=', conversationId)
+    if (candidate.lastMessageRemoteId)
+      return Boolean(await query.where('remote_id', '=', candidate.lastMessageRemoteId).limit(1).executeTakeFirst())
+
+    if (!candidate.lastMessageAt) return false
+    return Boolean(await query.where('sent_at', '>=', sqliteTimestamp(candidate.lastMessageAt)).limit(1).executeTakeFirst())
   }
 
   /**

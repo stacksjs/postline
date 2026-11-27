@@ -140,6 +140,7 @@ export class MastodonDmTransport implements DmTransport {
           .filter(account => canonicalAcct(account.acct || account.username || '', identity.instance) !== self)
           .map(account => participantFrom(account, identity.instance)),
         unreadCount: conversation.unread ? 1 : 0,
+        lastMessageRemoteId: last?.id || null,
         lastMessageAt: last?.created_at || null,
         lastMessageText: last?.content ? stripHtml(last.content) : null,
         lastMessageOutgoing: Boolean(lastAcct && lastAcct === self),

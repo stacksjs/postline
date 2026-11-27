@@ -59,6 +59,8 @@ export interface DmConversationCandidate {
   participants: DmParticipant[]
   /** Provider-reported unread count; Postline keeps its own when absent. */
   unreadCount: number
+  /** Provider ID of the message represented by the conversation preview. */
+  lastMessageRemoteId?: string | null
   lastMessageAt?: string | null
   lastMessageText?: string | null
   /** Whether the most recent message was sent by us. */

@@ -40,4 +40,36 @@ describe('direct message sync', () => {
     expect(messageCalls).toBe(2)
     expect(third.messages).toBe(0)
   })
+
+  test('retries missing history for an unchanged preview and sees a second message in the same second', async () => {
+    const remote = `sync-${crypto.randomUUID()}`
+    const sentAt = '2026-11-03T10:00:00Z'
+    let latest = `${remote}-1`
+    let messageCalls = 0
+    transport.listConversations = async () => [{
+      remoteId: remote,
+      participants: [{ remoteId: 'p', handle: 'friend@example.social' }],
+      unreadCount: 0,
+      lastMessageAt: sentAt,
+      lastMessageRemoteId: latest,
+      lastMessageText: 'Hello',
+    }]
+    transport.listMessages = async () => {
+      if (++messageCalls === 1) throw new Error('Network temporarily unavailable')
+      return [{ remoteId: latest, conversationRemoteId: remote, direction: 'incoming', authorRemoteId: 'p', authorHandle: 'friend@example.social', body: 'Hello', sentAt }]
+    }
+
+    const first = await directMessages.sync({ provider: 'mastodon' })
+    expect(first.errors).toHaveLength(1)
+    expect(first.messages).toBe(0)
+    expect((await directMessages.sync({ provider: 'mastodon' })).messages).toBe(1)
+    expect((await directMessages.sync({ provider: 'mastodon' })).messages).toBe(0)
+    expect(messageCalls).toBe(2)
+
+    latest = `${remote}-2`
+    expect((await directMessages.sync({ provider: 'mastodon' })).messages).toBe(1)
+    const { conversations } = await directMessages.list({ provider: 'mastodon' })
+    const conversation = conversations.find((item: { remoteId: string }) => item.remoteId === remote)!
+    expect((await directMessages.thread(conversation.id, { markRead: false })).messages).toHaveLength(2)
+  })
 })

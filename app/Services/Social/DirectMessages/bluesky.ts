@@ -144,6 +144,7 @@ export class BlueskyDmTransport implements DmTransport {
               avatar: member.avatar || null,
             })),
           unreadCount: Number(convo.unreadCount || 0),
+          lastMessageRemoteId: convo.lastMessage?.id || null,
           lastMessageAt: convo.lastMessage?.sentAt || null,
           lastMessageText: convo.lastMessage?.text || null,
           lastMessageOutgoing: Boolean(convo.lastMessage?.sender?.did && convo.lastMessage.sender.did === selfDid),
