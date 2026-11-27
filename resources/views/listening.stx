@@ -1,83 +1,91 @@
 @extends('layouts/app')
 
-@section('title', 'Postline - Listening')
+<script server cache>
+import { workspaceListeningText, workspaceLocale } from '../../app/Support/Localization/workspace'
+
+export const listeningLocale = workspaceLocale
+export const listeningText = workspaceListeningText
+export const listeningClient = { locale: workspaceLocale, messages: workspaceListeningText }
+</script>
+
+@section('title')Postline - {{ listeningText.title }}@endsection
 
 @section('content')
-  @meta('description', 'Watch brand and product keywords across social networks and collect new mentions.')
-  <section class="grid gap-4" data-postline-page="listening" data-testid="listening-page">
+  @meta('description', listeningText.description)
+  <section class="grid gap-4" data-postline-page="listening" data-testid="listening-page" lang="{{ listeningLocale }}">
     <WorkspacePageHeader titleKey="workspace.pages.listening.title">
       <template #description><span :show="!loading()" :text="watchOverview()"></span></template>
       <div class="flex flex-wrap gap-2 items-center">
         {{-- New matches raise an alert on the server (#112): a Mac notification
             from the app shell on any page, an email when mail is set up, and a
             line in Activity. This page asks the browser for nothing. --}}
-        <a class="inline-flex gap-2 items-center justify-center px-3 h-9 font-semibold text-body text-xs bg-panel hover:bg-raised border border-line rounded-xl transition-colors" href="/activity" data-stx-link title="New matches appear in Activity, as a Mac notification in the app, and by email when mail is set up.">
+        <a class="inline-flex gap-2 items-center justify-center px-3 h-9 font-semibold text-body text-xs bg-panel hover:bg-raised border border-line rounded-xl transition-colors" href="/activity" data-stx-link title="{{ listeningText.alertDetails }}">
           <span class="h-4 w-4 i-hugeicons-notification-01" aria-hidden="true"></span>
-          Where alerts go
+          {{ listeningText.alertLocation }}
         </a>
         <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="scanning() || !canScan()" @click="runScan">
           <span class="h-4 w-4 i-hugeicons-radar-02" :class="scanning() ? 'animate-spin' : ''" aria-hidden="true"></span>
-          <span :text="scanning() ? 'Scanning…' : 'Scan now'">Scan now</span>
+          <span :text="scanning() ? copy.scanning : copy.scan">{{ listeningText.scan }}</span>
         </button>
       </div>
     </WorkspacePageHeader>
 
     <div class="grid gap-4 lg:grid-cols-[minmax(13rem,18rem)_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]">
-      <aside class="grid content-start gap-4" aria-label="Listening rules">
+      <aside class="grid content-start gap-4" aria-label="{{ listeningText.rules }}">
         <section class="p-4 bg-panel border border-line rounded-2xl shadow-sm">
           <header class="flex gap-3 items-start justify-between mb-4">
-            <div><h2 class="m-0 font-semibold text-ink text-sm" :text="draftId() ? 'Edit listening rule' : 'New listening rule'">New listening rule</h2><p class="m-0 mt-1 text-muted text-xs">Use commas to watch several keywords.</p></div>
-            <button class="grid place-items-center h-8 w-8 text-muted hover:text-ink hover:bg-panel-2 rounded-lg" type="button" aria-label="Clear form" x-show="draftId()" @click="resetForm"><span class="h-4 w-4 i-hugeicons-cancel-01" aria-hidden="true"></span></button>
+            <div><h2 class="m-0 font-semibold text-ink text-sm" :text="draftId() ? copy.editRule : copy.newRule">{{ listeningText.newRule }}</h2><p class="m-0 mt-1 text-muted text-xs">{{ listeningText.splitKeywords }}</p></div>
+            <button class="grid place-items-center h-8 w-8 text-muted hover:text-ink hover:bg-panel-2 rounded-lg" type="button" aria-label="{{ listeningText.clearForm }}" x-show="draftId()" @click="resetForm"><span class="h-4 w-4 i-hugeicons-cancel-01" aria-hidden="true"></span></button>
           </header>
           <form class="grid gap-3" @submit="saveMonitor($event)">
-            <label class="grid gap-1.5"><span class="font-semibold text-body text-xs">Name</span><input class="px-3 h-9 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus" required maxlength="120" placeholder="Brand mentions" x-model="draftName"></label>
-            <label class="grid gap-1.5"><span class="font-semibold text-body text-xs">Keywords</span><textarea class="px-3 py-2 min-h-24 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus resize-y" required placeholder="Postline, stacks.js, launch tool" x-model="draftKeywords"></textarea><small class="text-muted text-xs">Up to 20 keywords. Matching is case-insensitive.</small></label>
-            <label class="grid gap-1.5"><span class="font-semibold text-body text-xs">Trigger when</span><select class="px-3 h-9 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="draftMatchMode"><option value="any">Any keyword appears</option><option value="all">All keywords appear</option><option value="phrase">The exact phrase appears</option></select></label>
-            <fieldset class="grid gap-2 m-0 p-0 border-0"><legend class="mb-1 font-semibold text-body text-xs">Networks</legend><div class="grid gap-2 grid-cols-3"><button class="px-2 h-9 font-semibold text-xs border rounded-xl transition-colors" type="button" x-for="provider in providerOptions" :class="draftProviders().includes(provider) ? 'text-ink bg-panel-2 border-line-strong' : 'text-muted bg-bg border-line'" @click="toggleProvider(provider)" :aria-pressed="draftProviders().includes(provider)" :text="providerLabel(provider)"></button></div></fieldset>
+            <label class="grid gap-1.5"><span class="font-semibold text-body text-xs">{{ listeningText.name }}</span><input class="px-3 h-9 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus" required maxlength="120" placeholder="{{ listeningText.nameExample }}" x-model="draftName"></label>
+            <label class="grid gap-1.5"><span class="font-semibold text-body text-xs">{{ listeningText.keywords }}</span><textarea class="px-3 py-2 min-h-24 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus resize-y" required placeholder="{{ listeningText.keywordsExample }}" x-model="draftKeywords"></textarea><small class="text-muted text-xs">{{ listeningText.keywordLimit }}</small></label>
+            <label class="grid gap-1.5"><span class="font-semibold text-body text-xs">{{ listeningText.triggerWhen }}</span><select class="px-3 h-9 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="draftMatchMode"><option value="any">{{ listeningText.anyKeyword }}</option><option value="all">{{ listeningText.allKeywords }}</option><option value="phrase">{{ listeningText.exactPhrase }}</option></select></label>
+            <fieldset class="grid gap-2 m-0 p-0 border-0"><legend class="mb-1 font-semibold text-body text-xs">{{ listeningText.networks }}</legend><div class="grid gap-2 grid-cols-3"><button class="px-2 h-9 font-semibold text-xs border rounded-xl transition-colors" type="button" x-for="provider in providerOptions" :class="draftProviders().includes(provider) ? 'text-ink bg-panel-2 border-line-strong' : 'text-muted bg-bg border-line'" @click="toggleProvider(provider)" :aria-pressed="draftProviders().includes(provider)" :text="providerLabel(provider)"></button></div></fieldset>
             <label class="grid gap-1.5" :show="canReadXInBrowser() && draftProviders().includes('twitter')">
-              <span class="font-semibold text-body text-xs">X source</span>
+              <span class="font-semibold text-body text-xs">{{ listeningText.xSource }}</span>
               <select class="px-3 h-9 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus" x-model="draftTwitterReadSource">
                 <option value="api">X API</option>
-                <option value="browser">X browser session</option>
+                <option value="browser">{{ listeningText.browserSession }}</option>
               </select>
               <small class="text-muted text-xs" :show="draftTwitterReadSource() === 'browser'">
-                Import posts from Search or Mentions using the X browser controls in <a href="/accounts" data-stx-link class="text-info underline">Channels</a>.
+                {{ listeningText.importX }} <a href="/accounts" data-stx-link class="text-info underline">{{ listeningText.channels }}</a>.
               </small>
             </label>
-            <label class="flex gap-3 items-center p-3 bg-panel-2 border border-line rounded-xl"><input type="checkbox" :checked="draftStatus() === 'active'" @change="draftStatus.set($event.target.checked ? 'active' : 'paused')"><span><strong class="block text-ink text-xs">Watch active</strong><small class="block mt-0.5 text-muted text-xs">The scheduler checks API sources every five minutes.</small></span></label>
+            <label class="flex gap-3 items-center p-3 bg-panel-2 border border-line rounded-xl"><input type="checkbox" :checked="draftStatus() === 'active'" @change="draftStatus.set($event.target.checked ? 'active' : 'paused')"><span><strong class="block text-ink text-xs">{{ listeningText.watchActive }}</strong><small class="block mt-0.5 text-muted text-xs">{{ listeningText.schedulerChecks }}</small></span></label>
             <div class="flex gap-2 items-center pt-1">
-              <button class="inline-flex flex-1 items-center justify-center h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="submit" :disabled="saving()"><span :text="saving() ? 'Saving…' : draftId() ? 'Update rule' : 'Create rule'">Create rule</span></button>
-              <button class="inline-flex items-center justify-center px-3 h-9 font-semibold text-danger text-xs hover:bg-danger-soft border border-danger-line rounded-xl disabled:opacity-50" type="button" x-show="draftId()" :disabled="deleting()" @click="deleteMonitor"><span :text="deleting() ? 'Deleting…' : 'Delete'">Delete</span></button>
+              <button class="inline-flex flex-1 items-center justify-center h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="submit" :disabled="saving()"><span :text="saving() ? copy.saving : draftId() ? copy.updateRule : copy.createRule">{{ listeningText.createRule }}</span></button>
+              <button class="inline-flex items-center justify-center px-3 h-9 font-semibold text-danger text-xs hover:bg-danger-soft border border-danger-line rounded-xl disabled:opacity-50" type="button" x-show="draftId()" :disabled="deleting()" @click="deleteMonitor"><span :text="deleting() ? copy.deleting : copy.delete">{{ listeningText.delete }}</span></button>
             </div>
           </form>
         </section>
 
         <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" x-show="monitors().length">
-          <header class="px-4 py-3 border-b border-line"><h2 class="m-0 font-semibold text-ink text-sm">Saved watches</h2></header>
+          <header class="px-4 py-3 border-b border-line"><h2 class="m-0 font-semibold text-ink text-sm">{{ listeningText.savedWatches }}</h2></header>
           <div class="divide-line divide-y">
             <button class="grid gap-2 p-3 w-full text-left hover:bg-panel-2 transition-colors" type="button" x-for="monitor in monitors()" @click="selectMonitor(monitor)">
-              <div class="flex gap-2 items-center justify-between"><strong class="text-ink text-ui" :text="monitor.name"></strong><span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="monitor.status === 'active' ? 'text-success bg-success-soft' : 'text-muted bg-panel-2'" :text="monitor.status"></span></div>
+              <div class="flex gap-2 items-center justify-between"><strong class="text-ink text-ui" :text="monitor.name"></strong><span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="monitor.status === 'active' ? 'text-success bg-success-soft' : 'text-muted bg-panel-2'" :text="copy.statuses[monitor.status] || monitor.status"></span></div>
               <p class="m-0 line-clamp-2 text-muted text-xs" :text="monitor.keywords.join(', ')"></p>
-              <div class="flex gap-2 items-center text-muted text-xs"><span :text="`${monitor.unreadCount} unread`"></span><span>·</span><span :text="monitor.providers.map(providerLabel).join(', ')"></span></div>
+              <div class="flex gap-2 items-center text-muted text-xs"><span :text="words.t('unreadCount', { count: monitor.unreadCount })"></span><span>·</span><span :text="monitor.providers.map(providerLabel).join(', ')"></span></div>
             </button>
           </div>
         </section>
       </aside>
 
-      <section aria-label="Keyword mentions">
+      <section aria-label="{{ listeningText.mentions }}">
         <Card padding="none" className="min-h-[34rem] shadow-sm">
           <header class="flex flex-wrap gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
-            <div><h2 class="m-0 font-semibold text-ink text-sm">Mention inbox</h2><p class="m-0 mt-1 text-muted text-xs" :text="inboxSummary()">New matching posts appear here.</p></div>
+            <div><h2 class="m-0 font-semibold text-ink text-sm">{{ listeningText.mentionInbox }}</h2><p class="m-0 mt-1 text-muted text-xs" :text="inboxSummary()">{{ listeningText.newMatches }}</p></div>
             <div class="flex gap-2 items-center">
-              <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-field-line rounded-lg" aria-label="Watch" @change="filterMonitorId.set(Number($event.target.value))"><option value="0">All watches</option><option x-for="monitor in monitors()" :value="monitor.id" :text="monitor.name"></option></select>
-              <button class="px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :disabled="unreadCount() === 0" @click="markAllRead">Mark all read</button>
+              <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-field-line rounded-lg" aria-label="{{ listeningText.watch }}" @change="filterMonitorId.set(Number($event.target.value))"><option value="0">{{ listeningText.allWatches }}</option><option x-for="monitor in monitors()" :value="monitor.id" :text="monitor.name"></option></select>
+              <button class="px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :disabled="unreadCount() === 0" @click="markAllRead">{{ listeningText.markAllRead }}</button>
             </div>
           </header>
 
-          <WorkspaceListSkeleton :show="loading()" label="Loading mentions" />
-          <ErrorState :show="mentionLoadError() && !loading()" title="Could not load mentions" :message="mentionLoadError()" @retry="loadData()" />
-          <EmptyState :show="showEmpty()" variant="bare" :title="monitors().length ? 'No mentions found yet' : 'Create your first listening rule'" :description="monitors().length ? 'New matching posts will appear here.' : 'Choose the terms and networks you want to watch.'">
-            <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="activeCount()" :disabled="scanning()" @click="runScan">Run a scan</button>
+          <WorkspaceListSkeleton :show="loading()" label="{{ listeningText.loadingMentions }}" />
+          <ErrorState :show="mentionLoadError() && !loading()" title="{{ listeningText.readMentionsFailed }}" :message="mentionLoadError()" @retry="loadData()" />
+          <EmptyState :show="showEmpty()" variant="bare" :title="monitors().length ? copy.noMentions : copy.firstRule" :description="monitors().length ? copy.matchesWillAppear : copy.chooseTerms">
+            <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="activeCount()" :disabled="scanning()" @click="runScan">{{ listeningText.runScan }}</button>
           </EmptyState>
 
           <div class="divide-line divide-y" x-show="!loading() && filteredMentions().length">
@@ -88,16 +96,16 @@
                   <div class="flex flex-wrap gap-x-2 gap-y-1 items-center">
                     <strong class="text-ink text-ui" :text="mention.authorName || `@${mention.authorHandle}`"></strong>
                     <span class="text-muted text-xs" :text="`@${mention.authorHandle}`" x-show="mention.authorName"></span>
-                    <span class="text-muted text-xs">·</span><time class="text-muted text-xs" :datetime="mention.postedAt" :text="relativeTime(mention.postedAt, { fallback: 'Not yet' })"></time>
-                    <span class="h-2 w-2 bg-info-solid rounded-full" x-show="mention.status === 'unread'" aria-label="Unread"></span>
+                    <span class="text-muted text-xs">·</span><time class="text-muted text-xs" :datetime="mention.postedAt" :text="relativeTime(mention.postedAt, { fallback: copy.notYet, formatter: elapsed })"></time>
+                    <span class="h-2 w-2 bg-info-solid rounded-full" x-show="mention.status === 'unread'" aria-label="{{ listeningText.unread }}"></span>
                   </div>
                   <p class="m-0 mt-2 leading-5 text-body text-ui whitespace-pre-line" :text="mention.body"></p>
                   <div class="flex flex-wrap gap-1.5 mt-3"><span class="px-2 py-0.5 font-semibold text-note text-xs bg-note-soft border border-note-line rounded-full" x-for="keyword in mention.matchedKeywords" :text="keyword"></span></div>
                 </div>
-                <a class="grid place-items-center shrink-0 h-8 w-8 text-muted hover:text-ink hover:bg-raised border border-line rounded-lg" :href="mention.url" target="_blank" rel="noopener noreferrer" aria-label="Open mention" @click="markRead(mention.id)"><span class="h-4 w-4 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span></a>
+                <a class="grid place-items-center shrink-0 h-8 w-8 text-muted hover:text-ink hover:bg-raised border border-line rounded-lg" :href="mention.url" target="_blank" rel="noopener noreferrer" aria-label="{{ listeningText.openMention }}" @click="markRead(mention.id)"><span class="h-4 w-4 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span></a>
               </div>
             </article>
-            <button class="p-3 w-full text-center text-muted text-ui hover:text-ink hover:bg-panel-2 transition-colors" type="button" x-show="nextOffset() !== null" :disabled="loadingMore()" @click="loadMoreMentions" :text="loadingMore() ? 'Loading…' : 'Load more mentions'">Load more mentions</button>
+            <button class="p-3 w-full text-center text-muted text-ui hover:text-ink hover:bg-panel-2 transition-colors" type="button" x-show="nextOffset() !== null" :disabled="loadingMore()" @click="loadMoreMentions" :text="loadingMore() ? copy.loading : copy.moreMentions">{{ listeningText.moreMentions }}</button>
           </div>
           <p class="m-0 px-4 py-3 text-danger text-sm bg-danger-soft border-danger-line border-t" x-show="errorMessage()" :text="errorMessage()"></p>
         </Card>
@@ -106,8 +114,13 @@
   </section>
 
   <script client>
+    import { createI18n } from '@stacksjs/i18n/client'
     import { showNotification } from '../functions/notification'
     import { xBrowserWindow } from '../functions/x-browser-session'
+    const { locale: language, messages: copy } = {{ listeningClient }}
+    const words = createI18n({ locale: language, messages: { [language]: copy } })
+    const elapsed = language === 'en' ? undefined : new Intl.RelativeTimeFormat(language, { numeric: 'auto' })
+
     interface ListeningMonitor {
       id: number
       name: string
@@ -167,22 +180,25 @@
       && (!filterMonitorId() || monitor.id === filterMonitorId())
       && monitor.providers.some(provider => provider !== 'twitter' || monitor.twitterReadSource !== 'browser')))
     const showEmpty = derived(() => loaded() && !loading() && !mentionLoadError() && filteredMentions().length === 0)
-    const inboxSummary = derived(() => `${filteredMentions().length} mention${filteredMentions().length === 1 ? '' : 's'}, ${filteredMentions().filter(item => item.status === 'unread').length} unread`)
+    const inboxSummary = derived(() => {
+      const rows = filteredMentions()
+      return words.tc('mentionSummary', rows.length, { unread: rows.filter(item => item.status === 'unread').length })
+    })
     const lastCheckedLabel = derived(() => {
       const values = monitors().map(item => item.lastCheckedAt).filter(Boolean).sort().reverse()
-      return values.length ? relativeTime(values[0], { fallback: 'Not yet' }) : 'Not yet'
+      return values.length ? relativeTime(values[0], { formatter: elapsed }) : ''
     })
     const watchOverview = derived(() => {
-      const count = activeCount()
-      const checked = lastCheckedLabel()
-      return `${count} active watch${count === 1 ? '' : 'es'} · ${unreadCount()} unread${checked === 'Not yet' ? '' : ` · Last checked ${checked}`}`
+      const summary = words.tc('watchSummary', activeCount(), { unread: unreadCount() })
+      const time = lastCheckedLabel()
+      return time ? `${summary} · ${words.t('lastChecked', { time })}` : summary
     })
 
     const loadData = async ({ quiet = false } = {}) => {
       if (!quiet) loading.set(true)
       mentionLoadError.set('')
       try {
-        const payload = await requestJson('/api/postline/listening')
+        const payload = await requestJson('/api/postline/listening', {}, copy.readMentionsFailed)
         const monitorRows = Array.isArray(payload.data?.monitors) ? payload.data.monitors : []
         const mentionRows = Array.isArray(payload.data?.mentions) ? payload.data.mentions : []
         monitors.set(monitorRows)
@@ -210,7 +226,7 @@
       if (offset === null || loadingMore()) return
       loadingMore.set(true)
       try {
-        const payload = await requestJson(`/api/postline/listening?offset=${offset}`)
+        const payload = await requestJson(`/api/postline/listening?offset=${offset}`, {}, copy.readMentionsFailed)
         const seen = new Set(mentions().map(item => item.id))
         mentions.set([...mentions(), ...(Array.isArray(payload.data?.mentions) ? payload.data.mentions : []).filter(item => !seen.has(item.id))])
         nextOffset.set(payload.data?.nextOffset ?? null)
@@ -257,12 +273,12 @@
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ id: draftId(), name: draftName(), keywords: draftKeywords().split(',').map(item => item.trim()).filter(Boolean), providers: draftProviders(), match_mode: draftMatchMode(), status: draftStatus(), twitter_read_source: canReadXInBrowser() ? draftTwitterReadSource() : undefined }),
         })
-        showNotification({ title: 'Listening rule saved', message: 'New matches will appear in Listening.', tone: 'success', id: 'listening-save' })
+        showNotification({ title: copy.saved, message: copy.savedDescription, tone: 'success', id: 'listening-save' })
         resetForm()
         await loadData()
       }
       catch (error) {
-        showNotification({ title: 'Could not save rule', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-save' })
+        showNotification({ title: copy.saveFailed, message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-save' })
       }
       finally {
         saving.set(false)
@@ -272,17 +288,17 @@
     const deleteMonitor = async () => {
       const id = draftId()
       if (deleting() || !id) return
-      if (!await stxConfirm('Its saved mentions will also be deleted.', { title: 'Delete this listening rule?', type: 'error', confirmText: 'Delete rule' })) return
+      if (!await stxConfirm(copy.deleteWarning, { title: copy.confirmDelete, type: 'error', confirmText: copy.deleteRule, cancelText: copy.cancel })) return
       deleting.set(true)
       try {
         await requestJson('/api/postline/listening/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
         resetForm()
         filterMonitorId.set(0)
         await loadData()
-        showNotification({ title: 'Listening rule deleted', message: 'The watch and its saved mentions were removed.', tone: 'success', id: 'listening-delete' })
+        showNotification({ title: copy.deleted, message: copy.deletedDescription, tone: 'success', id: 'listening-delete' })
       }
       catch (error) {
-        showNotification({ title: 'Could not delete rule', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-delete' })
+        showNotification({ title: copy.deleteFailed, message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-delete' })
       }
       finally {
         deleting.set(false)
@@ -295,11 +311,12 @@
         const payload = await requestJson('/api/postline/listening/scan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ monitor_id: filterMonitorId() || 0 }) })
         await loadData({ quiet: true })
         const skipped = payload.data?.errors?.length || 0
-        const suffix = skipped ? ` ${skipped} network${skipped === 1 ? '' : 's'} need attention.` : ''
-        showNotification({ title: 'Listening scan complete', message: `${payload.data?.created || 0} new mention${payload.data?.created === 1 ? '' : 's'} saved.${suffix}`, tone: skipped ? 'neutral' : 'success', id: 'listening-scan' })
+        const message = words.tc('newMentions', payload.data?.created || 0)
+        const attention = skipped ? words.tc('scanAttention', skipped) : ''
+        showNotification({ title: copy.scanComplete, message: [message, attention].filter(Boolean).join(' '), tone: skipped ? 'neutral' : 'success', id: 'listening-scan' })
       }
       catch (error) {
-        showNotification({ title: 'Listening scan failed', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-scan' })
+        showNotification({ title: copy.scanFailed, message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-scan' })
       }
       finally {
         scanning.set(false)
@@ -322,7 +339,7 @@
         mentions.set(mentions().map(item => !filterMonitorId() || item.monitorId === filterMonitorId() ? { ...item, status: 'read' } : item))
       }
       catch (error) {
-        showNotification({ title: 'Could not update mentions', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-read' })
+        showNotification({ title: copy.updateMentionsFailed, message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'listening-read' })
       }
     }
 

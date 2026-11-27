@@ -2792,6 +2792,50 @@ async function checkSpanishInbox(cdp: Cdp): Promise<void> {
   await waitUntil('Escape closes the public reply dialog', () => evaluate<boolean>(cdp, `!${publicInbox}?.querySelector('dialog[open]')`), 5_000)
 }
 
+async function checkSpanishListening(cdp: Cdp): Promise<void> {
+  const fixture = new Database(database)
+  try {
+    const monitor = fixture.query(`INSERT INTO keyword_monitors (uuid, name, keywords, providers, last_checked_at)
+      VALUES (?, 'Marca de prueba', '["Postline"]', '["bluesky"]', datetime('now', '-3 minutes')) RETURNING id`)
+      .get(crypto.randomUUID()) as { id: number }
+    fixture.query(`INSERT INTO keyword_mentions (uuid, keyword_monitor_id, provider, remote_uri, url, author_handle, body, matched_keywords, posted_at)
+      VALUES (?, ?, 'bluesky', 'at://did:plc:fixture/app.bsky.feed.post/es-mention', ?, 'autora.example', 'Una mención de Postline', '["Postline"]', datetime('now', '-3 minutes'))`)
+      .run(crypto.randomUUID(), monitor.id, 'https://bsky.app/profile/autora.example/post/es-mention')
+  }
+  finally {
+    fixture.close()
+  }
+
+  const report = await auditPage(`${site}/listening`, { cdp })
+  for (const error of report.errors) fail('listening', 'Spanish', error)
+  for (const request of report.failed) fail('listening', 'Spanish', request)
+  const listening = "document.querySelector('[data-testid=listening-page][lang=es]')"
+  const mentions = `${listening}?.querySelector('[aria-label="Menciones de palabras clave"]')`
+  await waitUntil('Spanish Listening shows the mention, watch count, and last check', () => evaluate<boolean>(cdp, `
+    document.title === 'Postline - Escucha'
+      && ${listening}?.querySelector('h1')?.textContent === 'Escucha social'
+      && ${listening}?.innerText.includes('1 regla activa · 1 sin leer · Última búsqueda: hace ')
+      && ${mentions}?.innerText.includes('1 mención, 1 sin leer')
+      && ${mentions}?.querySelector('select[aria-label="Regla"] option')?.textContent === 'Todas las reglas'
+      && ${mentions}?.querySelector('article a[aria-label="Abrir mención"]')?.getClientRects().length > 0
+  `), 5_000)
+  const watch = `[...${listening}.querySelectorAll('aside button')].find(button => button.innerText.includes('Marca de prueba'))`
+  await evaluate(cdp, `${watch}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The Spanish watch opens in the editor from the keyboard', () => evaluate<boolean>(cdp, `
+    ${listening}?.querySelector('aside h2')?.textContent === 'Editar regla de escucha'
+      && ${listening}?.querySelector('input[placeholder="Menciones de la marca"]')?.value === 'Marca de prueba'
+  `), 5_000)
+  const markRead = `[...${mentions}.querySelectorAll('button')].find(button => button.textContent.trim() === 'Marcar todo como leído')`
+  await evaluate(cdp, `${markRead}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Spanish Listening records the mention as read', () => evaluate<boolean>(cdp, `(async () => {
+    const payload = await fetch('/api/postline/listening').then(response => response.json())
+    return ${mentions}?.innerText.includes('1 mención, 0 sin leer')
+      && payload.data?.mentions?.some(mention => mention.body === 'Una mención de Postline' && mention.status === 'read')
+  })()`), 5_000)
+}
+
 async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
@@ -2960,6 +3004,7 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
       document.querySelector('[aria-labelledby="import-heading"] [role="status"]')?.innerText === 'Vista previa: crear 1, actualizar 0, omitir 0.'
     `), 5_000)
     await checkSpanishInbox(cdp)
+    await checkSpanishListening(cdp)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
@@ -3113,7 +3158,7 @@ else {
   // eslint-disable-next-line no-console
   console.log(marketingScreenshots
     ? `Product screenshots written to ${productImages}.`
-    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, Blog, and Inbox passed.'
+    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, Blog, Inbox, and Listening passed.'
     : `Every view opened clean in ${MODES.map(mode => mode.name).join(', ')}. Screenshots in ${out}.`)
 }
 process.exit(exitCode)
