@@ -217,13 +217,13 @@
               <span><strong>Use the Stacks launch brief</strong><small>Pre-alpha story, technical builders, eight weeks of useful proof.</small></span>
               <span class="i-hugeicons-arrow-right-02" aria-hidden="true"></span>
             </button>
-            <label class="campaign-field"><span>Name</span><input ref="campaignNameInput" required maxlength="120" placeholder="Autumn product launch" x-model="campaignName"></label>
-            <label class="campaign-field"><span>Goal</span><textarea ref="campaignObjectiveInput" required rows="4" placeholder="What should this campaign make happen?" x-model="campaignObjective"></textarea></label>
-            <label class="campaign-field"><span>Audience</span><input ref="campaignAudienceInput" placeholder="Founders planning a launch" x-model="campaignAudience"></label>
-            <label class="campaign-field"><span>Tone</span><select ref="campaignToneInput" x-model="campaignTone"><option value="clear">Clear</option><option value="bold">Bold</option><option value="warm">Warm</option><option value="technical">Technical</option><option value="playful">Playful</option></select></label>
+            <label class="campaign-field"><span>Name</span><input required maxlength="120" placeholder="Autumn product launch" x-model="campaignName"></label>
+            <label class="campaign-field"><span>Goal</span><textarea required rows="4" placeholder="What should this campaign make happen?" x-model="campaignObjective"></textarea></label>
+            <label class="campaign-field"><span>Audience</span><input placeholder="Founders planning a launch" x-model="campaignAudience"></label>
+            <label class="campaign-field"><span>Tone</span><select x-model="campaignTone"><option value="clear">Clear</option><option value="bold">Bold</option><option value="warm">Warm</option><option value="technical">Technical</option><option value="playful">Playful</option></select></label>
             <div class="campaign-form__dates">
-              <label class="campaign-field"><span>Start</span><input ref="campaignStartDateInput" required type="date" x-model="campaignStartDate"></label>
-              <label class="campaign-field"><span>End</span><input ref="campaignEndDateInput" required type="date" x-model="campaignEndDate"></label>
+              <label class="campaign-field"><span>Start</span><input required type="date" x-model="campaignStartDate"></label>
+              <label class="campaign-field"><span>End</span><input required type="date" x-model="campaignEndDate"></label>
             </div>
             <div class="campaign-form__footer">
               <button class="campaign-secondary-button" type="button" @click="closePanel"><span :text="closeLabel('Cancel')">Cancel</span></button>
@@ -242,14 +242,14 @@
           <form class="campaign-form" @submit="savePost($event)">
             <div class="campaign-queued-notice" x-show="queuedPostId()"><span class="i-hugeicons-checkmark-circle-02" aria-hidden="true"></span><p><strong>{{ postTitle() }}</strong><span>{{ postBody() }}</span><small>Publishing owns this post now. Open it in Queue to edit or reschedule.</small></p></div>
             <div class="grid gap-4" x-show="!queuedPostId()">
-              <label class="campaign-field"><span>Working title</span><input ref="postTitleInput" required maxlength="160" placeholder="The first signal" x-model="postTitle"></label>
-              <label class="campaign-field"><span>Post copy</span><textarea ref="postBodyInput" required rows="8" maxlength="4000" placeholder="Write the post…" x-model="postBody"></textarea><small>{{ postBody().length }} characters</small></label>
+              <label class="campaign-field"><span>Working title</span><input required maxlength="160" placeholder="The first signal" x-model="postTitle"></label>
+              <label class="campaign-field"><span>Post copy</span><textarea required rows="8" maxlength="4000" placeholder="Write the post…" x-model="postBody"></textarea><small>{{ postBody().length }} characters</small></label>
               <div class="campaign-form__dates">
                 <div class="campaign-field">
                   <span>Date and time</span>
                   <PostlineSchedulePicker :value="postScheduledAt" :timeZone="postScheduleZone" label="Date and time" placeholder="Choose date and time" :allowPast="true" :clearable="false" @change="selectPostSchedule" />
                 </div>
-                <label class="campaign-field"><span>Pillar</span><select ref="postPillarInput" x-model="postPillar"><option value="teaser">Teaser</option><option value="story">Story</option><option value="education">Education</option><option value="proof">Proof</option><option value="launch">Launch</option><option value="follow-up">Follow-up</option></select></label>
+                <label class="campaign-field"><span>Pillar</span><select x-model="postPillar"><option value="teaser">Teaser</option><option value="story">Story</option><option value="education">Education</option><option value="proof">Proof</option><option value="launch">Launch</option><option value="follow-up">Follow-up</option></select></label>
               </div>
               <div class="campaign-field" role="group" aria-label="Channels"><span aria-hidden="true">Channels</span><div class="campaign-channel-picker"><button type="button" x-for="provider in connectedProviders()" :data-selected="postProviders().includes(provider.provider)" :aria-pressed="postProviders().includes(provider.provider)" @click="togglePostProvider(provider.provider)"><i>{{ providerInitial(provider.provider) }}</i><span>{{ providerLabel(provider.provider) }}</span></button></div></div>
               <label class="campaign-ready-check"><input type="checkbox" :checked="postStatus() === 'ready'" @change="postStatus.set($event.target.checked ? 'ready' : 'idea')"><span><strong>Mark ready</strong><small>Ready posts still stay in the plan until you schedule the campaign.</small></span></label>
@@ -296,9 +296,9 @@
     const campaignObjective = state('')
     const campaignAudience = state('')
     const campaignTone = state('clear')
-    const initialCampaignDraft = emptyCampaignDraft()
-    const campaignStartDate = state(initialCampaignDraft.startDate)
-    const campaignEndDate = state(initialCampaignDraft.endDate)
+    const workspaceTimezone = state(systemTimeZone())
+    const campaignStartDate = state('')
+    const campaignEndDate = state('')
     const postDraftId = state(0)
     const queuedPostId = state(0)
     const postTitle = state('')
@@ -307,7 +307,7 @@
     const postPillar = state('story')
     const postStatus = state('idea')
     const postScheduledAt = state<string | null>(null)
-    const postScheduleZone = derived(() => campaign()?.timezone || systemTimeZone())
+    const postScheduleZone = derived(() => campaign()?.timezone || workspaceTimezone())
     const selectPostSchedule = ({ value }: { value: string | null }) => postScheduledAt.set(value)
     // The campaigns could not be read: not the same as having none.
     const loadError = state('')
@@ -322,15 +322,6 @@
         : [])
     const formChanged = () => (panelMode() === 'campaign' || panelMode() === 'post') && formSnapshot() !== openedWith
     const closeLabel = (idle) => discardArmed() ? 'Discard changes' : idle
-    const campaignNameInput = useRef('campaignNameInput')
-    const campaignObjectiveInput = useRef('campaignObjectiveInput')
-    const campaignAudienceInput = useRef('campaignAudienceInput')
-    const campaignToneInput = useRef('campaignToneInput')
-    const campaignStartDateInput = useRef('campaignStartDateInput')
-    const campaignEndDateInput = useRef('campaignEndDateInput')
-    const postTitleInput = useRef('postTitleInput')
-    const postBodyInput = useRef('postBodyInput')
-    const postPillarInput = useRef('postPillarInput')
 
     const busy = derived(() => Boolean(busyAction()))
     const readyCount = derived(() => posts().filter(item => item.status === 'ready').length)
@@ -379,16 +370,17 @@
       return dateKey(date)
     }
 
+    function todayIn(timeZone) {
+      return wallTimeInZone(new Date(), timeZone).slice(0, 10)
+    }
+
     function emptyCampaignDraft() {
-      const start = new Date()
-      start.setDate(start.getDate() + 1)
-      const end = new Date(start)
-      end.setDate(end.getDate() + 41)
-      return { id: 0, name: '', objective: '', audience: '', tone: 'clear', startDate: dateKey(start), endDate: dateKey(end) }
+      const startDate = todayIn(workspaceTimezone())
+      return { id: 0, name: '', objective: '', audience: '', tone: 'clear', startDate, endDate: addDays(startDate, 41) }
     }
 
     function emptyPostDraft(day) {
-      const key = day || campaign()?.startDate || dateKey(new Date())
+      const key = day || campaign()?.startDate || todayIn(postScheduleZone())
       return { id: 0, postId: null, title: '', body: '', providers: [...plannerProviders()], pillar: 'story', status: 'idea', scheduledAt: `${key}T09:00` }
     }
 
@@ -429,7 +421,7 @@
     const calendarCells = derived(() => {
       if (!calendarStart()) return []
       const current = campaign()
-      const today = dateKey(new Date())
+      const today = todayIn(postScheduleZone())
       return Array.from({ length: 42 }, (_, index) => {
         const key = addDays(calendarStart(), index)
         const date = parseDay(key)
@@ -466,6 +458,7 @@
       try {
         const query = selectedId ? `?id=${encodeURIComponent(selectedId)}` : ''
         const data = await api(`/api/postline/campaigns${query}`, {}, 'GET')
+        workspaceTimezone.set(data.workspaceTimezone || systemTimeZone())
         campaignsList.set(data.campaigns || [])
         campaign.set(data.selected?.campaign || null)
         posts.set(data.selected?.posts || [])
@@ -537,20 +530,10 @@
       panelMode.set('campaign')
       openedWith = formSnapshot()
       discardArmed.set(false)
-      void nextTick(() => {
-        void nextTick(() => {
-          if (campaignNameInput.current) campaignNameInput.current.value = draft.name
-          if (campaignObjectiveInput.current) campaignObjectiveInput.current.value = draft.objective
-          if (campaignAudienceInput.current) campaignAudienceInput.current.value = draft.audience
-          if (campaignToneInput.current) campaignToneInput.current.value = draft.tone
-          if (campaignStartDateInput.current) campaignStartDateInput.current.value = draft.startDate
-          if (campaignEndDateInput.current) campaignEndDateInput.current.value = draft.endDate
-        })
-      })
     }
 
     function applyStacksLaunchPreset() {
-      const start = addDays(dateKey(new Date()), 1)
+      const start = addDays(todayIn(workspaceTimezone()), 1)
       const end = addDays(start, 55)
       const objective = 'Move Stacks from pre-alpha awareness toward an engaged alpha and beta community. Show how one cohesive TypeScript framework covers web and Craft desktop apps, APIs, models and migrations, queues, AI, cloud infrastructure, testing, releases, and deployment through Buddy. Lead with working product proof, transparent build notes, and useful lessons rather than dependency-count claims or hype.'
       const audience = 'TypeScript and Bun developers, open-source maintainers, technical founders, and small teams tired of stitching together a full-stack toolchain'
@@ -564,13 +547,6 @@
       campaignEndDate.set(end)
       assistantStrategy.set('stacks-launch')
       direction.set(creativeDirection)
-
-      if (campaignNameInput.current) campaignNameInput.current.value = 'Stacks: Pre-alpha to Beta'
-      if (campaignObjectiveInput.current) campaignObjectiveInput.current.value = objective
-      if (campaignAudienceInput.current) campaignAudienceInput.current.value = audience
-      if (campaignToneInput.current) campaignToneInput.current.value = 'technical'
-      if (campaignStartDateInput.current) campaignStartDateInput.current.value = start
-      if (campaignEndDateInput.current) campaignEndDateInput.current.value = end
     }
 
     function openPostForm(item, day) {
@@ -591,13 +567,6 @@
       panelMode.set('post')
       openedWith = formSnapshot()
       discardArmed.set(false)
-      void nextTick(() => {
-        void nextTick(() => {
-          if (postTitleInput.current) postTitleInput.current.value = draft.title
-          if (postBodyInput.current) postBodyInput.current.value = draft.body
-          if (postPillarInput.current) postPillarInput.current.value = draft.pillar
-        })
-      })
     }
 
     // Cards that open a post answer the keyboard as a button does (#160).

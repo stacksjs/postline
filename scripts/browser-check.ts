@@ -1217,7 +1217,10 @@ async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
     await evaluate(cdp, `${post}.focus()`)
   await pressKey(cdp, 'Enter', 13)
     const picker = `document.querySelector('[data-postline-schedule-picker] [data-date-time-trigger]')`
-    await waitUntil('The campaign scheduling picker is present', () => evaluate<boolean>(cdp, `Boolean(${picker}?.getClientRects().length)`), 5_000)
+    await waitUntil('The campaign editor opens with the saved post fields', () => evaluate<boolean>(cdp, `
+      Boolean(${picker}?.getClientRects().length)
+        && document.querySelector('input[placeholder=\"The first signal\"]')?.value === 'Plan the scheduling fixture'
+        && document.querySelector('textarea[placeholder=\"Write the post…\"]')?.value === 'Keep the campaign clock time.'`), 5_000)
     await evaluate(cdp, `${picker}.click()`)
     const suggested = `document.querySelector('[data-date-time-preset=suggested]')`
     await waitUntil('The next best time in the campaign zone', () => evaluate<boolean>(cdp, `
@@ -1241,6 +1244,50 @@ async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: recommendation.identifier })
+  }
+}
+
+async function checkCampaignLocalDates(cdp: Cdp): Promise<void> {
+  const setZone = (timezone: string) => evaluate<boolean>(cdp, `(async () => {
+    const result = await fetch('/api/postline/settings/workspace', { method: 'POST', body: new URLSearchParams({ timezone: ${JSON.stringify(timezone)} }) })
+    return result.ok
+  })()`)
+  const original = await evaluate<string>(cdp, `(async () => (await (await fetch('/api/postline/settings/workspace')).json()).data.timezone)()`)
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const fixed = new Date('2026-11-27T07:00:00Z').getTime()
+    window.Date = class extends Date {
+      constructor(...args) { super(...(args.length ? args : [fixed])) }
+      static now() { return fixed }
+    }
+  ` })
+  try {
+    if (!await setZone('America/Los_Angeles')) throw new Error('Could not set the campaign workspace time zone.')
+    await cdp.send('Emulation.setTimezoneOverride', { timezoneId: 'UTC' })
+    await auditPage(`${site}/campaigns`, { cdp })
+    const create = `[...document.querySelectorAll('[data-postline-page=campaigns] button')].find(button => button.getClientRects().length && ['New campaign', 'Create a campaign'].includes(button.textContent.trim()))`
+    await waitUntil('A new campaign can be opened', () => evaluate<boolean>(cdp, `Boolean(${create})`), 5_000)
+    await evaluate(cdp, `${create}.click()`)
+    const name = `document.querySelector('input[placeholder="Autumn product launch"]')`
+    const start = `${name}.closest('form').querySelector('input[type=date]')`
+    await waitUntil('At 11 pm Pacific the campaign starts on the workspace calendar day', () => evaluate<boolean>(cdp, `
+      ${name}?.getClientRects().length > 0 && ${start}.value === '2026-11-26'`), 5_000)
+    await evaluate(cdp, `${name}.focus()`)
+    await cdp.send('Input.insertText', { text: 'Pacific kickoff' })
+    await evaluate(cdp, `${name}.closest('form').querySelector('textarea').focus()`)
+    await cdp.send('Input.insertText', { text: 'Verify the local campaign date.' })
+    await evaluate(cdp, `${name}.closest('form').querySelector('button[type=submit]').click()`)
+    await waitUntil('The saved campaign keeps its Pacific start date', () => evaluate<boolean>(cdp, `(async () => {
+      const response = await fetch('/api/postline/campaigns')
+      const { data } = await response.json()
+      return data.selected?.campaign.name === 'Pacific kickoff'
+        && data.selected.campaign.startDate === '2026-11-26'
+        && data.selected.campaign.timezone === 'America/Los_Angeles'
+    })()`), 5_000)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+    await cdp.send('Emulation.setTimezoneOverride', { timezoneId: '' })
+    if (!await setZone(original)) throw new Error('Could not restore the workspace time zone after the campaign test.')
   }
 }
 
@@ -1583,6 +1630,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkQueueRescheduling(cdp)
   await checkQueueCalendar(cdp)
   await checkCampaignScheduling(cdp)
+  await checkCampaignLocalDates(cdp)
   await checkAnalytics(cdp)
   await checkListStates(cdp)
 }
