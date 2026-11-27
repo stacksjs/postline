@@ -20,6 +20,9 @@ export interface DesktopAlertsBridge {
     notify?: (options: { title: string, body?: string }) => Promise<void>
     setBadge?: (count: number) => Promise<void>
   }
+  timers?: {
+    sleep?: (delayMs: number, options: { signal: AbortSignal }) => Promise<void>
+  }
   tray?: {
     setIcon?: (icon: string) => Promise<void>
     setTitle?: (title: string) => Promise<void>
@@ -66,7 +69,7 @@ function remember(id: number): void {
 }
 
 /** Bind notification delivery, the dock badge and menu-bar controls to a Craft workspace. */
-export function bindDesktopAlerts({ app, tray, autoLaunch }: DesktopAlertsBridge): () => void {
+export function bindDesktopAlerts({ app, timers, tray, autoLaunch }: DesktopAlertsBridge): () => void {
   if (!app) return () => {}
 
   const controller = new AbortController()
@@ -144,7 +147,15 @@ export function bindDesktopAlerts({ app, tray, autoLaunch }: DesktopAlertsBridge
       await app?.setBadge?.(Math.max(0, Number(payload.data?.unread) || 0)).catch(() => {})
     }
     if (!changingMenu) await refreshTray()
-    if (!signal.aborted) timer = setTimeout(() => void poll(), POLL_MS)
+    if (signal.aborted) return
+    // WebKit throttles browser timers when the window is closed to the tray.
+    // Craft's native deadline also runs while the workspace is hidden.
+    if (timers?.sleep) {
+      void timers.sleep(POLL_MS, { signal }).then(poll, () => {
+        if (!signal.aborted) timer = setTimeout(() => void poll(), POLL_MS)
+      })
+    }
+    else timer = setTimeout(() => void poll(), POLL_MS)
   }
 
   window.addEventListener('craft:tray:menuAction', (event) => void onTrayAction(event), { signal })

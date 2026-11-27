@@ -211,12 +211,14 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
     const calls = window.postlineShellCalls = {
       collapsed: [], settings: [], drags: 0, focus: 0, appearance: '',
       notifications: [], badge: 0, menu: [], login: false, loginChanges: 0,
+      deadlines: [], alertQueued: false,
     }
     localStorage.setItem('postline:alerts:last-seen', '101')
     const send = window.fetch.bind(window)
     window.fetch = (input, options) => {
       if (new URL(input instanceof Request ? input.url : input, location.href).pathname === '/api/postline/alerts')
-        return Promise.resolve(Response.json({ ok: true, data: { unread: 2, alerts: [
+        return Promise.resolve(Response.json({ ok: true, data: { unread: calls.alertQueued ? 3 : 2, alerts: [
+          ...(calls.alertQueued ? [{ id: 104, title: 'New scheduled failure', body: null, read: false }] : []),
           { id: 103, title: 'Already read', body: null, read: true },
           { id: 102, title: 'Scheduled post failed', body: 'Review the queue.', read: false },
           { id: 101, title: 'Already seen', body: null, read: false },
@@ -241,6 +243,15 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
         notify: async notification => calls.notifications.push(notification),
         setBadge: async count => { calls.badge = count },
       },
+      timers: {
+        sleep(delay, { signal }) {
+          calls.deadlines.push(delay)
+          return new Promise((resolve, reject) => {
+            calls.deliverDeadline = resolve
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+          })
+        },
+      },
       tray: { setMenu: async items => { calls.menu = items } },
       autoLaunch: {
         isEnabled: async () => calls.login,
@@ -260,6 +271,19 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
         && notifications[0].body === 'Review the queue.'
         && menu.some(item => item.label === 'Pause Publishing' && item.action === 'toggle-publishing')
         && localStorage.getItem('postline:alerts:last-seen') === '103'
+    })()`), 5_000)
+  await waitUntil('The next alert poll is scheduled through Craft', () => evaluate<boolean>(cdp, `
+    window.postlineShellCalls.deadlines.length === 1 && window.postlineShellCalls.deadlines[0] === 60000`), 5_000)
+  await evaluate(cdp, `(() => {
+    const calls = window.postlineShellCalls
+    calls.alertQueued = true
+    calls.deliverDeadline()
+  })()`)
+  await waitUntil('A native deadline delivers fresh alerts and updates the dock badge', () => evaluate<boolean>(cdp, `
+    (() => {
+      const { badge, deadlines, notifications } = window.postlineShellCalls
+      return badge === 3 && notifications.length === 2 && notifications[1].title === 'New scheduled failure'
+        && deadlines.length === 2 && localStorage.getItem('postline:alerts:last-seen') === '104'
     })()`), 5_000)
   const trayAction = (action: string): string => `window.dispatchEvent(new CustomEvent('craft:tray:menuAction', { detail: { action: ${JSON.stringify(action)} } }))`
   await evaluate(cdp, trayAction('toggle-publishing'))
