@@ -42,10 +42,13 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
   if (/^\/account\/access(?:\/|$)/.test(url.pathname) || page.querySelector('[data-testid="ocfEnterTextTextInput"]'))
     return { state: 'needs-attention' }
   // X can keep the account sidebar mounted while opening its sign-in flow.
-  if (/^\/(?:login|i\/flow\/login)(?:\/|$)/.test(url.pathname))
+  if (/^\/(?:login|i\/flow\/login)(?:\/|$)/.test(url.pathname)
+    || (/^\/i\/jf\/onboarding\/web\/?$/.test(url.pathname) && url.searchParams.get('mode') === 'login')) {
     return { state: 'signed-out' }
+  }
 
-  const profileLink = page.querySelector('a[data-testid="AppTabBar_Profile_Link"]')?.getAttribute('href')
+  const profileLink = (page.querySelector('a[data-testid="AppTabBar_Profile_Link"]')
+    ?? page.querySelector('nav a[aria-label="Profile"]'))?.getAttribute('href')
   if (profileLink) {
     const profile = new URL(profileLink, url)
     const handle = /^\/([A-Za-z0-9_]{1,15})\/?$/.exec(profile.pathname)?.[1]
@@ -56,11 +59,14 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
       if (read === 'metrics' || listening) {
         const articleSelector = listening
           ? '[data-testid="primaryColumn"] article[data-testid="tweet"]'
-          : 'article[data-testid="tweet"]'
+          : 'article[data-testid="tweet"], [data-navigation-stop] > article'
         for (const article of Array.from(page.querySelectorAll(articleSelector)).slice(0, 100)) {
           if (!article.getClientRects().length) continue
           const time = article.querySelector('time')
-          const path = time?.closest('a')?.getAttribute('href')
+          // X's newer timeline puts the canonical status link beside the
+          // article, under the row navigation control.
+          const path = article.parentElement?.querySelector(':scope[data-navigation-stop] > a[aria-hidden="true"][href]')?.getAttribute('href')
+            ?? time?.closest('a')?.getAttribute('href')
           const post = path ? new URL(path, url) : null
           const match = post && /^\/([A-Za-z0-9_]{1,15})\/status\/([0-9]{1,19})\/?$/.exec(post.pathname)
           if (!post || post.origin !== url.origin || !match?.[1] || !match[2]) continue
@@ -75,14 +81,14 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
 
           const counts: EngagementCounts = {}
           const selectors = {
-            likes: '[data-testid="like"], [data-testid="unlike"]',
-            replies: '[data-testid="reply"]',
-            reposts: '[data-testid="retweet"], [data-testid="unretweet"]',
-            views: 'a[href$="/analytics"]',
+            likes: '[data-testid="like"], [data-testid="unlike"], [data-engagement-action="like"] button',
+            replies: '[data-testid="reply"], [data-engagement-action="reply"] a, [data-engagement-action="reply"] button',
+            reposts: '[data-testid="retweet"], [data-testid="unretweet"], [data-engagement-action="retweet"] button',
+            views: 'a[href$="/analytics"], button[aria-label="View count"]',
           } as const
           for (const [field, selector] of Object.entries(selectors)) {
             const control = article.querySelector(selector)
-            if (!control?.getClientRects().length) continue
+            if (!control?.getClientRects().length || control.closest('article') !== article) continue
             const visible = (control.textContent ?? '').trim()
             const labelled = /^(\d+(?:,\d{3})*)\s+(?:likes?|replies|reply|reposts?|views?)\b/i.exec(control.getAttribute('aria-label') ?? '')?.[1]
             const count = labelled ?? (/^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(visible) ? visible : undefined)
@@ -96,7 +102,7 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
     }
   }
 
-  if (page.querySelector('[data-testid="loginButton"]'))
+  if (page.querySelector('[data-testid="loginButton"], [data-interaction="mobile-top-bar-log-in"]'))
     return { state: 'signed-out' }
   return { state: 'unavailable' }
 }

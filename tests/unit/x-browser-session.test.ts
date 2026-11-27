@@ -8,21 +8,25 @@ import { inspectXPage } from '../../resources/functions/x-browser-session'
 
 describe('X session browser reads', () => {
   test('captures measured zero and exact text counts from the owner’s rendered posts', () => {
-    const control = (textContent: string, label = '') => ({
-      textContent,
-      getAttribute: () => label,
-      getClientRects: () => [1],
-    })
-    const article = (handle: string) => ({
-      getClientRects: () => [1],
-      querySelector(selector: string) {
-        if (selector === 'time') return { closest: () => ({ getAttribute: () => `/${handle}/status/42` }) }
-        if (selector.includes('"like"')) return control('', '0 Likes. Like')
-        if (selector.includes('"reply"')) return control('1.2K')
-        if (selector.includes('analytics')) return control('1,440')
-        return null
-      },
-    })
+    const article = (handle: string) => {
+      const row = {
+        getClientRects: () => [1],
+        querySelector(selector: string) {
+          if (selector === 'time') return { closest: () => ({ getAttribute: () => `/${handle}/status/42` }) }
+          if (selector.includes('"like"')) return control('', '0 Likes. Like')
+          if (selector.includes('"reply"')) return control('1.2K')
+          if (selector.includes('analytics')) return control('1,440')
+          return null
+        },
+      }
+      const control = (textContent: string, label = '') => ({
+        textContent,
+        getAttribute: () => label,
+        getClientRects: () => [1],
+        closest: () => row,
+      })
+      return row
+    }
     const document = {
       querySelector: (selector: string) => selector.includes('Profile_Link') ? { getAttribute: () => '/postline_test' } : null,
       querySelectorAll: () => [article('postline_test'), article('another_user')],
@@ -36,12 +40,41 @@ describe('X session browser reads', () => {
     expect(inspectXPage(document, 'https://example.test/postline_test', 'metrics')).toEqual({ state: 'unavailable' })
   })
 
+  test('reads exact engagement from the current timeline row and ignores a nested post count', () => {
+    const article = {
+      parentElement: { querySelector: () => ({ getAttribute: () => '/postline_test/status/2126032940035445011' }) },
+      getClientRects: () => [1],
+      querySelector(selector: string) {
+        if (selector.includes('action="reply"')) return control('1.9K', '1926 Replies. Reply')
+        if (selector.includes('action="retweet"')) return control('2K', '2051 reposts. Repost')
+        if (selector.includes('action="like"')) return control('13K', '13107 Likes. Like', { quoted: true })
+        if (selector.includes('View count')) return control('1.7M', 'View count')
+        return null
+      },
+    }
+    function control(textContent: string, label: string, owner: object = article) {
+      return { textContent, getAttribute: () => label, getClientRects: () => [1], closest: () => owner }
+    }
+    const document = {
+      querySelector: (selector: string) => selector === 'nav a[aria-label="Profile"]' ? { getAttribute: () => '/postline_test' } : null,
+      querySelectorAll: (selector: string) => selector.includes('[data-navigation-stop]') ? [article] : [],
+    } as unknown as Document
+    expect(inspectXPage(document, 'https://x.com/postline_test', 'metrics')).toEqual({
+      state: 'connected',
+      handle: 'postline_test',
+      measurements: [{ id: '2126032940035445011', counts: { replies: 1926, reposts: 2051 } }],
+    })
+  })
+
   test('stops at login and account checks even when the account sidebar is still mounted', () => {
     const document = {
       querySelector: (selector: string) => selector.includes('Profile_Link') ? { getAttribute: () => '/postline_test' } : null,
       querySelectorAll: () => { throw new Error('Reading posts at a sign-in gate') },
     } as unknown as Document
     expect(inspectXPage(document, 'https://x.com/i/flow/login', 'metrics')).toEqual({ state: 'signed-out' })
+    const redirected = 'https://x.com/i/jf/onboarding/web?redirect_after_login=%2Fi%2Fchat&mode=login'
+    expect(inspectXPage(document, redirected, 'metrics')).toEqual({ state: 'signed-out' })
+    expect(inspectXPage(document, 'https://example.test/i/jf/onboarding/web?mode=login')).toEqual({ state: 'unavailable' })
     expect(inspectXPage(document, 'https://x.com/login', 'listening')).toEqual({ state: 'signed-out' })
     expect(inspectXPage(document, 'https://x.com/account/access/', 'metrics')).toEqual({ state: 'needs-attention' })
     expect(inspectXPage(document, 'https://x.com/account/accessibility')).toMatchObject({ state: 'connected' })
