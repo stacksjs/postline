@@ -117,6 +117,7 @@ recovery of your database, media, and application key.
 | `APP_KEY` | Encrypts the network tokens in the database. Back it up with the database: without it every account has to be reconnected |
 | `MAIL_MAILER` and its settings | So alerts reach you by email. Without a mailer they stay in the app |
 | `POSTLINE_ALERT_WEBHOOK_URL` | Alerts to Slack, Discord or your own service |
+| `POSTLINE_POST_WEBHOOK_URL`, `POSTLINE_POST_WEBHOOK_SECRET` | Signed post events delivered by the scheduler. See [automation](automation.md#outgoing-webhooks). |
 
 See the [environment reference](environment.md) for storage, scheduling, and
 backup settings and a link to the full `.env.example` template.

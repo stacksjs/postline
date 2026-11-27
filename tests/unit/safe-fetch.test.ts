@@ -137,6 +137,22 @@ describe('safeFetch', () => {
     expect(calls).toBe(1)
   })
 
+  test('sends a POST once with its body and refuses to forward it on redirect', async () => {
+    let calls = 0
+    const fetcher = (async (url: URL, init?: RequestInit) => {
+      calls++
+      expect(url.href).toBe('https://93.184.216.34/hook')
+      expect(init?.method).toBe('POST')
+      expect(init?.body).toBe('{"event":"post.created"}')
+      return new Response(null, { status: 307, headers: { location: 'https://another.example/hook' } })
+    }) as unknown as typeof fetch
+
+    await expect(safeFetch('https://example.com/hook', {
+      ...options, fetcher, method: 'POST', redirect: 'error', body: '{"event":"post.created"}',
+    })).rejects.toBeInstanceOf(UnsafeUrlError)
+    expect(calls).toBe(1)
+  })
+
   test('follows a redirect to another public address', async () => {
     let calls = 0
     const fetcher = (async () => {

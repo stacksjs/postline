@@ -121,18 +121,21 @@ export async function assertPublicHttpUrl(value: string, resolve?: Resolver): Pr
   return (await resolvePublicTarget(value, resolve)).url
 }
 
-export interface SafeFetchOptions {
+interface SafeFetchBase {
   /** Deadline for the whole exchange, body included. */
   timeoutMs: number
   /** Hard cap on the body, enforced while reading. */
   maxBytes: number
   headers?: Record<string, string>
-  /** Reject redirects when a request carries credentials for one origin. */
-  redirect?: 'error'
   /** Injected in tests. */
   fetcher?: typeof fetch
   resolve?: Resolver
 }
+
+export type SafeFetchOptions = SafeFetchBase & (
+  | { method?: 'GET', body?: never, redirect?: 'error' }
+  | { method: 'POST', body: string, redirect: 'error' }
+)
 
 export interface SafeFetchResult {
   url: URL
@@ -190,6 +193,8 @@ async function fetchTarget(target: PublicTarget, options: SafeFetchOptions, sign
     try {
       return await fetcher(dial, {
         headers,
+        method: options.method,
+        body: options.body,
         // Bun dials the IP while TLS keeps verifying the named origin.
         tls: url.protocol === 'https:' && !isIP(hostname) ? { serverName: hostname } : undefined,
         proxy: false,
@@ -198,6 +203,7 @@ async function fetchTarget(target: PublicTarget, options: SafeFetchOptions, sign
       })
     }
     catch (error) {
+      if (options.method === 'POST') throw error
       lastError = error
     }
   }

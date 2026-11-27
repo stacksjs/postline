@@ -27,6 +27,7 @@ export interface Schedule {
 
 export function startSchedule(jobs: {
   publishScheduledPosts: Runnable
+  deliverPostWebhooks: Runnable
   syncEngagementMetrics: Runnable
   scanKeywordMonitors: Runnable
   importDraftFeeds: Runnable
@@ -46,6 +47,7 @@ export function startSchedule(jobs: {
 } = {}): Schedule {
   const entries: Entry[] = [
     { job: jobs.publishScheduledPosts, everyMs: MINUTE },
+    { job: jobs.deliverPostWebhooks, everyMs: MINUTE },
     { job: jobs.scanKeywordMonitors, everyMs: 5 * MINUTE },
     { job: jobs.syncDirectMessages, everyMs: 5 * MINUTE },
     { job: jobs.syncEngagementMetrics, everyMs: 30 * MINUTE },

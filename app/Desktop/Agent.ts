@@ -20,7 +20,7 @@ export default {
 
     const [
       { startSchedule }, { readHeartbeats },
-      { default: publishScheduledPosts }, { default: syncEngagementMetrics },
+      { default: publishScheduledPosts }, { default: deliverPostWebhooks }, { default: syncEngagementMetrics },
       { default: scanKeywordMonitors }, { default: importDraftFeeds },
       { default: syncDirectMessages }, { default: autoDeletePosts },
       { default: keepTokensAlive }, { default: pruneLocalData },
@@ -28,6 +28,7 @@ export default {
       import('./schedule'),
       import('../Support/heartbeat'),
       import('../Jobs/PublishScheduledPosts.ts'),
+      import('../Jobs/DeliverPostWebhooks.ts'),
       import('../Jobs/SyncEngagementMetrics.ts'),
       import('../Jobs/ScanKeywordMonitors.ts'),
       import('../Jobs/ImportDraftFeeds.ts'),
@@ -38,7 +39,7 @@ export default {
     ])
 
     schedule = startSchedule({
-      publishScheduledPosts, syncEngagementMetrics, scanKeywordMonitors, importDraftFeeds,
+      publishScheduledPosts, deliverPostWebhooks, syncEngagementMetrics, scanKeywordMonitors, importDraftFeeds,
       syncDirectMessages, autoDeletePosts, keepTokensAlive, pruneLocalData,
     }, {
       say: line => console.error(line),

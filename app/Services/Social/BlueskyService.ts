@@ -12,6 +12,7 @@ import { blueskyRecordKey } from '../../Support/Social/bluesky-rkey'
 import { exceedsLimit } from '../../Support/Social/count-text'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, saveIdentityTokens, unavailableAccountError, upsertIdentityRow } from './identities'
 import { workspace } from '../WorkspaceService'
+import { postWebhooks } from '../PostWebhookService'
 import { ensureAccount as ensureWorkspaceAccount } from './support'
 import { classifyFailure } from '../../Support/Social/retry'
 import { describeNetworkError } from '../../Support/Social/network-errors'
@@ -208,20 +209,16 @@ export class BlueskyService {
     const result = await this.publishToPost({ id: Number(post.id), body }, external ? { external } : undefined)
     const finishedAt = now()
 
-    if (!result.ok) {
-      await database.updateTable('posts').set({
-        status: 'failed',
+    await database.transaction((tx: typeof database) => {
+      tx.updateTable('posts').set({
+        status: result.ok ? 'published' : 'failed',
+        ...(result.ok ? { published_at: finishedAt } : {}),
         updated_at: finishedAt,
       }).where('id', '=', post.id).execute()
+      postWebhooks.enqueueAttempt(tx, Number(post.id), [result])
+    })
 
-      throw new Error(result.error || 'Bluesky publish failed.')
-    }
-
-    await database.updateTable('posts').set({
-      status: 'published',
-      published_at: finishedAt,
-      updated_at: finishedAt,
-    }).where('id', '=', post.id).execute()
+    if (!result.ok) throw new Error(result.error || 'Bluesky publish failed.')
 
     return {
       post: { provider: 'bluesky', uri: result.uri || '', url: result.url },

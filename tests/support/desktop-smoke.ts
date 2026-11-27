@@ -215,11 +215,14 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   const posts = database.query('SELECT status FROM posts ORDER BY id').all() as Array<{ status: string }>
   const blog = database.query('SELECT slug FROM blog_posts').all() as Array<{ slug: string }>
   const ledger = (database.query('SELECT count(*) AS count FROM migrations').get() as { count: number }).count
+  const webhookScheduler = database.query("SELECT last_status FROM job_heartbeats WHERE job = 'DeliverPostWebhooks'").get() as { last_status: string } | null
+  const webhookOutbox = database.query('SELECT count(*) AS count FROM post_webhook_deliveries').get() as { count: number }
   database.close()
 
   check('both posts are in the database', posts.map(post => post.status).join(',') === 'published,draft', JSON.stringify(posts))
   check('the blog post is recorded', blog.length === 1 && blog[0]!.slug === 'desktop-check', JSON.stringify(blog))
   check('the database carries its migration ledger', ledger > 0, String(ledger))
+  check('the Mac agent runs the webhook job without queuing events when disabled', webhookScheduler?.last_status === 'ok' && webhookOutbox.count === 0)
   check('the blog file is in the data directory', existsSync(join(dataDir, 'content/blog')) && readdirSync(join(dataDir, 'content/blog')).includes('desktop-check.md'))
 
   if (failures.length > 0) {

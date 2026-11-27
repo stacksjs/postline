@@ -18,6 +18,11 @@ export default function () {
     .everyMinute()
     .withoutOverlapping(10)
 
+  schedule
+    .job('DeliverPostWebhooks')
+    .everyMinute()
+    .withoutOverlapping(2)
+
   // Refresh Bluesky engagement counts for the analytics page
   schedule
     .job('SyncEngagementMetrics')

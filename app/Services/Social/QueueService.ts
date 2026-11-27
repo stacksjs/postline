@@ -28,6 +28,7 @@ import { nextPostingSlot } from '../../Support/Social/posting-slots'
 import { isRealTimestamp, isValidTimeZone } from '../../Support/time'
 import { listPostingSlots } from '../PostingSlotService'
 import { alerts } from '../AlertService'
+import { postWebhooks } from '../PostWebhookService'
 import { defaultTimeZone, workspace } from '../WorkspaceService'
 import { ensureAccount, expiresAt, now, uuid } from './support'
 
@@ -464,6 +465,7 @@ export class QueueService {
             created_at: createdAt,
             updated_at: createdAt,
           }).execute()
+          postWebhooks.enqueue(tx, 'post.created', receipt)
         }
         return receipt
       })
@@ -1336,6 +1338,7 @@ export class QueueService {
       }).execute()
     }
 
+    const retries = new Map<CrosspostTargetResult, string>()
     // Count the send on every network that failed, and say when it goes again.
     // A manual "publish now" counts too, so a network that keeps failing
     // stops being retried whoever was pressing the button.
@@ -1353,6 +1356,7 @@ export class QueueService {
         : failedRows.where('social_identity_id', 'is', null)
       await failedRows.execute()
       if (next) {
+        retries.set(result, next)
         log.info(`[postline] post ${post.id} will be sent to ${result.target || result.provider} again at ${next} UTC (attempt ${attempts + 1} of ${MAX_ATTEMPTS})`)
       }
       else {
@@ -1377,11 +1381,14 @@ export class QueueService {
     // A retry of a post that already went out somewhere leaves it published
     // whatever the retry did, and keeps the time it first went out.
     const published = anyOk || wasPublished
-    await database.updateTable('posts').set({
-      status: published ? 'published' : 'failed',
-      ...(published && !post.published_at ? { published_at: finishedAt } : {}),
-      updated_at: finishedAt,
-    }).where('id', '=', post.id).execute()
+    await database.transaction((tx: typeof database) => {
+      tx.updateTable('posts').set({
+        status: published ? 'published' : 'failed',
+        ...(published && !post.published_at ? { published_at: finishedAt } : {}),
+        updated_at: finishedAt,
+      }).where('id', '=', post.id).execute()
+      postWebhooks.enqueueAttempt(tx, Number(post.id), results, retries)
+    })
 
     // The image is kept while any network still needs it. It used to be
     // removed as soon as one network succeeded, which left a failed network
@@ -1449,11 +1456,17 @@ export class QueueService {
       // Only if it is still stranded: a run that was merely slow may have
       // finished between the read above and this write.
       const full = await database.selectFrom('posts').select(['published_at']).where('id', '=', post.id).executeTakeFirst()
-      const settled = affected(await database.updateTable('posts').set({
-        status: sent.size > 0 ? 'published' : 'failed',
-        ...(sent.size > 0 && !full?.published_at ? { published_at: at } : {}),
-        updated_at: at,
-      }).where('id', '=', post.id).where('status', '=', 'publishing').execute())
+      const settled = await database.transaction((tx: typeof database) => {
+        const status = sent.size ? 'published' : 'failed'
+        const changed = affected(tx.updateTable('posts').set({
+          status,
+          ...(sent.size && !full?.published_at ? { published_at: at } : {}),
+          updated_at: at,
+        }).where('id', '=', post.id).where('status', '=', 'publishing').execute())
+        if (changed)
+          postWebhooks.enqueue(tx, status === 'published' ? 'post.published' : 'post.failed', { postId: Number(post.id), status, reason: 'interrupted' })
+        return changed
+      })
 
       recovered += settled
       if (settled)
@@ -1566,22 +1579,27 @@ export class QueueService {
   private async setAside(postId: number, reason: string, scheduledAt: string): Promise<number> {
     const at = now()
     // A publish or reschedule may have moved the post since the due list was read.
-    const held = affected(await database.updateTable('posts').set({
-      status: 'failed',
-      updated_at: at,
-    }).where('id', '=', postId).where('status', '=', 'scheduled').where('scheduled_at', '=', scheduledAt).execute())
-    if (held !== 1)
-      return 0
+    const missed = reason.startsWith(MISSED_PREFIX)
+    const held = await database.transaction((tx: typeof database) => {
+      const changed = affected(tx.updateTable('posts').set({
+        status: 'failed',
+        updated_at: at,
+      }).where('id', '=', postId).where('status', '=', 'scheduled').where('scheduled_at', '=', scheduledAt).execute())
+      if (changed !== 1) return false
 
-    await database.updateTable('post_targets').set({
-      status: 'failed',
-      failure_reason: reason,
-      updated_at: at,
-    }).where('post_id', '=', postId).where('status', '=', 'scheduled').execute()
+      tx.updateTable('post_targets').set({
+        status: 'failed',
+        failure_reason: reason,
+        updated_at: at,
+      }).where('post_id', '=', postId).where('status', '=', 'scheduled').execute()
+      postWebhooks.enqueue(tx, 'post.failed', { postId, status: 'failed', scheduledAt, reason: missed ? 'missed' : 'unavailable' })
+      return true
+    })
+    if (!held) return 0
 
     await alerts.raise({
-      kind: reason.startsWith(MISSED_PREFIX) ? 'post-missed' : 'post-failed',
-      title: reason.startsWith(MISSED_PREFIX) ? 'A scheduled post was not sent' : 'A scheduled post could not be sent',
+      kind: missed ? 'post-missed' : 'post-failed',
+      title: missed ? 'A scheduled post was not sent' : 'A scheduled post could not be sent',
       body: reason,
       link: '/queue',
       key: `post-set-aside:${postId}`,

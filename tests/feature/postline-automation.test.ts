@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'bun:test'
+import process from 'node:process'
 import { createToken, revokeTokenById } from '@stacksjs/auth'
 import { authCookieName } from '@stacksjs/auth/cookie'
 import { db } from '@stacksjs/database'
 import { featureTest } from '@stacksjs/testing'
+import { blog } from '../../app/Services/Social/BlogService'
+import { postQueue } from '../../app/Services/Social/QueueService'
 import { createPostToken, postTokens, revokePostToken } from '../../app/Support/Automation/tokens'
 import User from '../../storage/framework/defaults/app/Models/User'
 
@@ -55,6 +58,10 @@ describe('Postline automation API', () => {
     const key = crypto.randomUUID()
     const scheduledAt = new Date(Date.now() + 3_600_000).toISOString().replace(/\.\d{3}Z$/, 'Z')
     const post = { text: 'A scheduled post from automation', title: 'Automation test', providers: ['blog'], scheduledAt }
+    const oldWebhook = process.env.POSTLINE_POST_WEBHOOK_URL
+    const oldSecret = process.env.POSTLINE_POST_WEBHOOK_SECRET
+    process.env.POSTLINE_POST_WEBHOOK_URL = 'https://automation-hooks.example.com/events'
+    process.env.POSTLINE_POST_WEBHOOK_SECRET = 'test-only-signing-key-for-automation'
     let created: number | undefined
     try {
       ;(await submit(token.plainTextToken).post(endpoint, { ...post, providers: ['blog', 'typo'] })).assertStatus(422)
@@ -77,6 +84,17 @@ describe('Postline automation API', () => {
       const targets = await db.selectFrom('post_targets').select('provider').where('post_id', '=', created).execute()
       expect(targets.map(target => target.provider)).toEqual(['blog'])
 
+      const published = await postQueue.publishNow(created)
+      expect(published.results).toHaveLength(1)
+      expect(published.results[0]?.ok).toBe(true)
+      const deliveries = await db.selectFrom('post_webhook_deliveries').select('payload')
+        .where('payload', 'like', `%"postId":${created},%`).orderBy('id', 'asc').execute()
+      const events = deliveries.map(row => JSON.parse(String(row.payload)))
+      expect(events.map(event => event.type)).toEqual(['post.created', 'post.published'])
+      expect(events[1]?.data).toEqual({ postId: created, status: 'published', targets: [{ target: 'blog', status: 'published' }] })
+      const article = await db.selectFrom('blog_posts').select('id').where('post_id', '=', created).executeTakeFirstOrThrow()
+      await blog.remove(Number(article.id))
+
       await db.deleteFrom('post_targets').where('post_id', '=', created).execute()
       await db.deleteFrom('posts').where('id', '=', created).execute()
       const afterRemoval = await submit(token.plainTextToken, key).post(endpoint, post)
@@ -84,7 +102,12 @@ describe('Postline automation API', () => {
       expect(await db.selectFrom('posts').select('id').where('body', '=', post.text).execute()).toEqual([])
     }
     finally {
+      if (oldWebhook === undefined) delete process.env.POSTLINE_POST_WEBHOOK_URL
+      else process.env.POSTLINE_POST_WEBHOOK_URL = oldWebhook
+      if (oldSecret === undefined) delete process.env.POSTLINE_POST_WEBHOOK_SECRET
+      else process.env.POSTLINE_POST_WEBHOOK_SECRET = oldSecret
       if (created) {
+        await db.deleteFrom('post_webhook_deliveries').where('payload', 'like', `%"postId":${created},%`).execute()
         await db.deleteFrom('post_targets').where('post_id', '=', created).execute()
         await db.deleteFrom('posts').where('id', '=', created).execute()
       }

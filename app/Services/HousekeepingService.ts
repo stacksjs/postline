@@ -11,6 +11,7 @@
 import { config } from '@stacksjs/config'
 import { db } from '@stacksjs/database'
 import { readHeartbeats, withHeartbeat } from '../Support/heartbeat'
+import { WEBHOOK_KEEP_DAYS } from './PostWebhookService'
 
 const database = db as any
 
@@ -40,6 +41,7 @@ export interface PruneResult {
   purgeRuns: number
   readAlerts: number
   directMessages: number
+  webhookDeliveries: number
 }
 
 /** A UTC `YYYY-MM-DD HH:MM:SS` stamp `days` ago, the format the tables store. */
@@ -63,6 +65,7 @@ export class HousekeepingService {
       purgeRuns: await deleteOlder('purge_runs', 'created_at', KEEP_DAYS.purgeRuns),
       readAlerts: await deleteOlder('alerts', 'read_at', KEEP_DAYS.readAlerts, query => query.where('read_at', 'is not', null)),
       directMessages: await deleteOlder('dm_messages', 'created_at', KEEP_DAYS.directMessages),
+      webhookDeliveries: await deleteOlder('post_webhook_deliveries', 'created_at', WEBHOOK_KEEP_DAYS),
     }
   }
 

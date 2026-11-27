@@ -1530,6 +1530,20 @@ declare module '@stacksjs/database' {
       social_driver_id: number
       social_identity_id: number
     }
+    post_webhook_deliveries: {
+      // columns
+      id: number
+      uuid: string
+      created_at: string
+      updated_at: string | null
+      destination_key: string
+      payload: string
+      status: "pending" | "delivered" | "failed"
+      attempts: number
+      available_at: string
+      lease: string | null
+      failure: string | null
+    }
     posting_slots: {
       // columns
       id: number

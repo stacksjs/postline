@@ -59,3 +59,52 @@ For a scheduled post, the receipt contains `"status": "scheduled"` and
 the scheduled UTC time in `YYYY-MM-DD HH:MM:SS` format. Replaying the
 original submission returns the original receipt. Reusing its key with
 different content returns HTTP 409.
+
+## Outgoing webhooks
+
+Set these variables in the API and scheduler environments, then restart both
+processes. Use a public HTTPS receiver that accepts a JSON POST.
+
+```dotenv
+POSTLINE_POST_WEBHOOK_URL=https://hooks.example.org/postline
+POSTLINE_POST_WEBHOOK_SECRET=
+```
+
+Generate and store a signing secret with `openssl rand -hex 32`. Configure the
+same secret at the receiver. Postline records the event with the post and sends
+it through the usual scheduler. Deliveries stop at a redirect and never include
+the post text, credentials, or the network's raw error.
+
+| Event | When it is recorded |
+| --- | --- |
+| `post.created` | The automation API creates a draft or scheduled post. Replaying its key returns the receipt without creating another event. |
+| `post.published` | A publish attempt succeeds on at least one target. Inspect `data.targets` for the result on each target in that attempt. |
+| `post.failed` | A publish attempt succeeds on no targets, or the scheduler sets aside an unsent post. A target's `retryAt` gives the next scheduled publishing attempt when one is planned. |
+
+```json
+{
+  "id": "8fc870ce-7b6f-4848-b3a0-f26fad15e898",
+  "type": "post.published",
+  "createdAt": "2027-01-20T18:30:00.000Z",
+  "data": {
+    "postId": 42,
+    "status": "published",
+    "targets": [{ "target": "blog", "status": "published" }]
+  }
+}
+```
+
+Verify the signature before using the event. Read the raw request body.
+Compute the hexadecimal HMAC-SHA256 of
+`Postline-Delivery + "." + Postline-Timestamp + "." + rawBody` with the
+configured secret. Use a constant-time comparison against the value after
+`sha256=` in `Postline-Signature`. The timestamp is Unix time in seconds.
+Reject timestamps outside your replay window and deduplicate on
+`Postline-Delivery`, which is the same as the JSON `id`.
+
+Return any HTTP 2xx to acknowledge the event. Other responses or an unavailable
+receiver are retried with exponential backoff starting at one minute, up to
+eight attempts total. Each delivery keeps its event ID and body and is signed
+with the current timestamp. Retries and outages can change arrival order.
+Changing the receiver URL keeps old events bound to their original URL.
+Postline keeps delivery records for 30 days.

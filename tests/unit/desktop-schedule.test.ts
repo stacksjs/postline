@@ -13,6 +13,7 @@ function job(name: string, handle: () => unknown = () => {}) {
 }
 
 const idle = {
+  deliverPostWebhooks: job('DeliverPostWebhooks'),
   syncEngagementMetrics: job('SyncEngagementMetrics'),
   scanKeywordMonitors: job('ScanKeywordMonitors'),
   importDraftFeeds: job('ImportDraftFeeds'),
@@ -102,6 +103,7 @@ describe('overdue jobs at launch (#197)', () => {
     const now = Date.now()
     const schedule = startSchedule({
       publishScheduledPosts: track('PublishScheduledPosts'),
+      deliverPostWebhooks: track('DeliverPostWebhooks'),
       syncEngagementMetrics: track('SyncEngagementMetrics'),
       scanKeywordMonitors: track('ScanKeywordMonitors'),
       importDraftFeeds: track('ImportDraftFeeds'),
@@ -121,7 +123,7 @@ describe('overdue jobs at launch (#197)', () => {
     })
     stop = schedule.stop
     await Bun.sleep(20)
-    expect(ran.sort()).toEqual(['AutoDeletePosts', 'ImportDraftFeeds', 'KeepTokensAlive', 'PruneLocalData', 'PublishScheduledPosts'])
+    expect(ran.sort()).toEqual(['AutoDeletePosts', 'DeliverPostWebhooks', 'ImportDraftFeeds', 'KeepTokensAlive', 'PruneLocalData', 'PublishScheduledPosts'])
   })
 
   test('the Mac app runs all workspace jobs and leaves off-site backups to configured servers', () => {

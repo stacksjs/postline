@@ -15,6 +15,7 @@ import { mastodon } from './MastodonService'
 import { threads } from './ThreadsService'
 import { twitter } from './TwitterService'
 import { workspace } from '../WorkspaceService'
+import { postWebhooks } from '../PostWebhookService'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { fitImage, suits } from '../../Support/Social/image-fit'
 import { persistTempMedia, removeTempMedia } from '../../Support/Social/uploads'
@@ -190,13 +191,7 @@ export class CrosspostService {
 
     const results = await this.publishExisting({ id: Number(post.id), body }, selected, content)
 
-    const anyOk = results.some(result => result.ok)
-    const finishedAt = now()
-    await database.updateTable('posts').set({
-      status: anyOk ? 'published' : 'failed',
-      ...(anyOk ? { published_at: finishedAt } : {}),
-      updated_at: finishedAt,
-    }).where('id', '=', post.id).execute()
+    await this.finishAttempt(Number(post.id), results)
 
     return { postId: Number(post.id), results }
   }
@@ -289,13 +284,7 @@ export class CrosspostService {
       }
 
       results.push(...segmentResults)
-      const anyOk = segmentResults.some(result => result.ok)
-      const finishedAt = now()
-      await database.updateTable('posts').set({
-        status: anyOk ? 'published' : 'failed',
-        ...(anyOk ? { published_at: finishedAt } : {}),
-        updated_at: finishedAt,
-      }).where('id', '=', post.id).execute()
+      await this.finishAttempt(Number(post.id), segmentResults)
     }
 
     return { postIds, results }
@@ -365,13 +354,26 @@ export class CrosspostService {
         if (!result.ok) halted = index
         const advanced = advanceChain(chain, result)
         if (advanced) chain = advanced
-        if (result.ok) {
-          await database.updateTable('posts').set({ status: 'published', published_at: now(), updated_at: now() }).where('id', '=', post.id).execute()
-        }
+        await this.finishAttempt(Number(post.id), [result], true)
       }
     }
 
     return { resumed, results }
+  }
+
+  private async finishAttempt(postId: number, results: CrosspostTargetResult[], resume = false): Promise<void> {
+    const published = results.some(result => result.ok)
+    const at = now()
+    await database.transaction((tx: typeof database) => {
+      if (published || !resume) {
+        tx.updateTable('posts').set({
+          status: published ? 'published' : 'failed',
+          ...(published ? { published_at: at } : {}),
+          updated_at: at,
+        }).where('id', '=', postId).execute()
+      }
+      postWebhooks.enqueueAttempt(tx, postId, results)
+    })
   }
 
   /**
