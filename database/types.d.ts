@@ -1614,6 +1614,15 @@ declare module '@stacksjs/database' {
       category_id: number
       manufacturer_id: number
     }
+    purge_previews: {
+      // columns
+      id: number
+      uuid: string
+      created_at: string
+      updated_at: string | null
+      snapshot: unknown
+      expires_at: string
+    }
     purge_runs: {
       // columns
       id: number

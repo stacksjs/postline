@@ -37,7 +37,7 @@ export default new Action({
         ok: true,
         data: {
           // `confirmation` is the phrase a run of this preview must send, and
-          // `previewToken` ties the run to exactly this selection and count.
+          // `previewToken` authorizes the posts and accounts in this preview once.
           ...result,
           purgeableProviders: PURGEABLE_PROVIDERS,
         },

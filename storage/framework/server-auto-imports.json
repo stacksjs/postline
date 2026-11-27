@@ -122,6 +122,7 @@
     "PruneRetainedDataJob": true,
     "PublishScheduledPagesJob": true,
     "PublishScheduledPosts": true,
+    "PurgePreview": true,
     "PurgeRun": true,
     "QueryController": true,
     "QueryLog": true,

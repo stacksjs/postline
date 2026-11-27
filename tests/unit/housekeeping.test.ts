@@ -27,6 +27,21 @@ describe('housekeeping', () => {
     expect(alerts.map((row: { title: string }) => row.title)).toEqual([`unread ${marker}`])
   })
 
+  test('prunes expired cleanup previews and keeps approvals that can still be used', async () => {
+    const expired = crypto.randomUUID()
+    const fresh = crypto.randomUUID()
+    await database.insertInto('purge_previews').values([
+      { uuid: expired, snapshot: '[]', expires_at: daysAgo(1) },
+      { uuid: fresh, snapshot: '[]', expires_at: daysAgo(-1) },
+    ]).execute()
+
+    const removed = await housekeeping.prune()
+    expect(removed.purgePreviews).toBeGreaterThanOrEqual(1)
+    const left = await database.selectFrom('purge_previews').select('uuid').where('uuid', 'in', [expired, fresh]).execute()
+    expect(left).toEqual([{ uuid: fresh }])
+    await database.deleteFrom('purge_previews').where('uuid', '=', fresh).execute()
+  })
+
   test('the stamp it compares against is the format the tables store', () => {
     expect(daysAgo(1, Date.UTC(2026, 10, 25, 12, 0, 0))).toBe('2026-11-24 12:00:00')
   })

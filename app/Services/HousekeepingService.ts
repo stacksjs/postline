@@ -39,6 +39,7 @@ export interface PruneResult {
   publicInbox: number
   timelineItems: number
   purgeRuns: number
+  purgePreviews: number
   readAlerts: number
   directMessages: number
   webhookDeliveries: number
@@ -63,6 +64,7 @@ export class HousekeepingService {
       keywordMentions: await deleteOlder('keyword_mentions', 'created_at', KEEP_DAYS.keywordMentions),
       timelineItems: await deleteOlder('timeline_items', 'created_at', KEEP_DAYS.timelineItems),
       purgeRuns: await deleteOlder('purge_runs', 'created_at', KEEP_DAYS.purgeRuns),
+      purgePreviews: await deleteOlder('purge_previews', 'expires_at', 0),
       readAlerts: await deleteOlder('alerts', 'read_at', KEEP_DAYS.readAlerts, query => query.where('read_at', 'is not', null)),
       directMessages: await deleteOlder('dm_messages', 'created_at', KEEP_DAYS.directMessages),
       webhookDeliveries: await deleteOlder('post_webhook_deliveries', 'created_at', WEBHOOK_KEEP_DAYS),

@@ -79,6 +79,7 @@ declare global {
   const PostTarget: typeof import('../../../app/Models/PostTarget')['default']
   const PostWebhookDelivery: typeof import('../../../app/Models/PostWebhookDelivery')['default']
   const PostingSlot: typeof import('../../../app/Models/PostingSlot')['default']
+  const PurgePreview: typeof import('../../../app/Models/PurgePreview')['default']
   const PurgeRun: typeof import('../../../app/Models/PurgeRun')['default']
   const RecurringPost: typeof import('../../../app/Models/RecurringPost')['default']
   const SocialDriver: typeof import('../../../app/Models/SocialDriver')['default']

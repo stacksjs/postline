@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { db } from '@stacksjs/database'
+import { ensureAccount } from '../../app/Services/Social/support'
 import { PurgeService, postPurge, PURGEABLE_PROVIDERS, purgeConfirmationFor, readPreviewToken } from '../../app/Services/Social/PurgeService'
 
 /**
@@ -89,14 +90,89 @@ describe('a run acts on the preview the owner saw', () => {
   test('posts added after the preview are not deleted', async () => {
     const network = fakeNetwork(2)
     const preview = await network.service.preview({ providers: ['bluesky'], scope: 'all' })
-    network.posts.push({ uri: 'at://me/post/new', cid: 'cnew', postedAt: '2020-01-01T00:00:00Z' })
+    network.posts.unshift({ uri: 'at://me/post/new', cid: 'cnew', postedAt: '2020-01-01T00:00:00Z' })
 
-    const result = await network.service.purge({ providers: ['bluesky'], scope: 'all', confirmation: purgeConfirmationFor(2), previewToken: preview.previewToken })
+    const input = { providers: ['bluesky' as const], scope: 'all' as const, confirmation: preview.confirmation, previewToken: preview.previewToken }
+    const result = await network.service.purge(input)
 
     expect(result.deleted).toBe(2)
+    expect(network.deleted).toEqual(['at://me/post/0', 'at://me/post/1'])
+    await expect(network.service.purge(input)).rejects.toThrow('was used or has expired')
     expect(network.deleted).toHaveLength(2)
-    expect(network.deleted).not.toContain('at://me/post/new')
-    expect(result.providers[0]!.truncated).toBe(true)
+  })
+
+  test('a confirmed cleanup keeps the previewed account even if the default changes', async () => {
+    const { service, deleted } = fakeNetwork(1)
+    const internal = service as any
+    const originalAdapter = internal.adapterFor
+    const selected: number[] = []
+    internal.adapterFor = async (provider: string, identityId: number) => {
+      selected.push(identityId)
+      return { ...await originalAdapter(provider), identityId }
+    }
+    const preview = await service.preview({ providers: ['bluesky'], scope: 'all' })
+    internal.accountsFor = async () => [{ id: 2, isDefault: true }, { id: 1, isDefault: false }]
+    await service.purge({ providers: ['bluesky'], scope: 'all', confirmation: preview.confirmation, previewToken: preview.previewToken })
+    expect(selected).toEqual([1, 1])
+    expect(deleted).toHaveLength(1)
+  })
+
+  test('a full cleanup reconciles only targets that the network confirmed deleted', async () => {
+    const database = db as any
+    const tag = crypto.randomUUID()
+    const identity = await database.insertInto('social_identities').values({
+      uuid: crypto.randomUUID(), provider: 'bluesky', handle: `${tag}.bsky.social`, auth_status: 'connected',
+    }).returning('id').executeTakeFirstOrThrow()
+    const accountId = await ensureAccount()
+    const refs = ['deleted', 'refused', 'unlisted'].map(name => `at://${tag}/${name}`)
+    const postIds = []
+    for (const uri of refs) {
+      const post = await database.insertInto('posts').values({
+        uuid: crypto.randomUUID(), body: uri, timezone: 'UTC', source: 'composer', status: 'published', account_id: accountId,
+      }).returning('id').executeTakeFirstOrThrow()
+      postIds.push(post.id)
+      await database.insertInto('post_targets').values({
+        uuid: crypto.randomUUID(), provider: 'bluesky', remote_uri: uri, status: 'published', post_id: post.id, social_identity_id: identity.id,
+      }).execute()
+    }
+    const { service } = fakeNetwork(0)
+    const internal = service as any
+    internal.accountsFor = async () => [{ id: identity.id, isDefault: true }]
+    internal.adapterFor = async () => ({
+      provider: 'bluesky', identityId: identity.id, handle: `${tag}.bsky.social`,
+      listPage: async () => ({ posts: refs.slice(0, 2).map(uri => ({ uri })) }),
+      deletePost: async ({ uri }: { uri: string }) => {
+        if (uri === refs[1]) throw new Error('The network refused this post.')
+      },
+    })
+
+    try {
+      const preview = await service.preview({ providers: ['bluesky'], scope: 'all' })
+      const result = await service.purge({ providers: ['bluesky'], scope: 'all', confirmation: preview.confirmation, previewToken: preview.previewToken })
+      expect(result.deleted).toBe(1)
+      expect(result.failed).toBe(1)
+      const targets = await database.selectFrom('post_targets').select('remote_uri').where('post_id', 'in', postIds).orderBy('id', 'asc').execute()
+      expect(targets).toEqual([{ remote_uri: refs[1] }, { remote_uri: refs[2] }])
+      expect(await database.selectFrom('posts').select('id').where('id', 'in', postIds).orderBy('id', 'asc').execute())
+        .toEqual([{ id: postIds[1] }, { id: postIds[2] }])
+    }
+    finally {
+      await database.deleteFrom('post_targets').where('post_id', 'in', postIds).execute()
+      await database.deleteFrom('posts').where('id', 'in', postIds).execute()
+      await database.deleteFrom('social_identities').where('id', '=', identity.id).execute()
+    }
+  })
+
+  test('the preview cap applies across all connected accounts', async () => {
+    const { service } = fakeNetwork(1100)
+    const internal = service as any
+    const originalAdapter = internal.adapterFor
+    internal.accountsFor = async () => [{ id: 1, isDefault: true }, { id: 2, isDefault: false }]
+    internal.adapterFor = async (provider: string, identityId: number) => ({ ...await originalAdapter(provider), identityId })
+    const preview = await service.preview({ providers: ['bluesky'], scope: 'all' })
+    expect(preview.matched).toBe(2000)
+    expect(preview.providers.map(result => result.matched)).toEqual([1100, 900])
+    expect(preview.providers[1]?.truncated).toBe(true)
   })
 
   test('a preview of another selection, an old one, or a forged one is refused', () => {

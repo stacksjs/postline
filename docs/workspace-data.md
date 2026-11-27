@@ -23,7 +23,7 @@ On a server, use the online snapshot procedure. [Back up and restore a server](.
 
 ## Remove posts from networks
 
-Open **Settings > Channels > Manage Channels**, then **Cleanup**. Choose the networks and whether to include all posts on those accounts or only posts made through Postline. Preview the results, review the counts, and enter the confirmation phrase if you want to proceed. Supported deletion networks are Bluesky, X, Mastodon, and LinkedIn. Remote deletion is permanent.
+Open **Settings > Channels > Manage Channels**, then **Cleanup**. Choose the networks and whether to include all posts on those accounts or only posts made through Postline. Review the preview and enter its confirmation phrase to delete those posts. Run a fresh preview for each cleanup. Supported deletion networks are Bluesky, X, Mastodon, LinkedIn, and Threads. Remote deletion is permanent.
 
 For age-based cleanup, use **Settings > Automatic Cleanup**. Select the cutoff in days, the scope, and the networks. Preview the rule before saving it. The scheduler checks it daily and preserves posts whose dates it cannot read.
 

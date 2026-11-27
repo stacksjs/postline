@@ -19,10 +19,9 @@ function parseOlderThanDays(value: unknown): number | undefined {
 
 /**
  * Permanently delete posts from the connected social accounts. Irreversible —
- * the caller must send the token its preview returned and the phrase that
- * names the previewed count, and no more than that count is deleted; and `dry_run=1` still
- * routes through the preview path so a mis-wired client can't delete by
- * accident.
+ * the caller must send the unused preview token and its confirmation phrase.
+ * The token authorizes only the accounts and posts in that preview. The
+ * `dry_run=1` flag routes through the preview path.
  */
 export default new Action({
   name: 'Postline Purge Run',

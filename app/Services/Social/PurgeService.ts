@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer'
 import { timingSafeEqual } from 'node:crypto'
 import process from 'node:process'
 import type { AuthoredPost, ProviderPurgeAdapter, SocialProvider } from '../../Support/Social/types'
-import { db } from '@stacksjs/database'
+import { db, sqliteWriteOptions } from '@stacksjs/database'
 import type { SocialOperationLease } from './operation-lease'
 import { acquireSocialOperationLease } from './operation-lease'
 import { bluesky } from './BlueskyService'
@@ -59,6 +59,7 @@ interface PreviewClaims {
   olderThanDays: number | null
   matched: number
   issuedAt: number
+  previewId?: string
 }
 
 function previewKey(): string {
@@ -241,6 +242,7 @@ interface RunContext {
   /** Deletions left in this run: a manual run stops at the count its preview showed. */
   budget: { left: number }
   lease?: SocialOperationLease
+  preview?: CleanupPreviewAccount[]
   /** A background run's progress, updated after each deletion. */
   progress?: PurgeProgress
   /** True once the owner asked a background run to stop. */
@@ -254,7 +256,52 @@ interface PurgeCandidate {
   text?: string
   postedAt?: string
   targetId?: number
-  postId?: number
+}
+
+interface CleanupPreviewAccount {
+  provider: SocialProvider
+  identityId: number
+  truncated: boolean
+  candidates: PurgeCandidate[]
+}
+
+function storedTime(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 19).replace('T', ' ')
+}
+
+function savePreview(claims: PreviewClaims, accounts: CleanupPreviewAccount[]): string {
+  const previewId = uuid()
+  if (claims.matched) {
+    database.transaction((tx: typeof database) => {
+      const at = storedTime(claims.issuedAt)
+      tx.deleteFrom('purge_previews').where('expires_at', '<=', at).execute()
+      tx.insertInto('purge_previews').values({
+        uuid: previewId,
+        snapshot: JSON.stringify(accounts),
+        expires_at: storedTime(claims.issuedAt + PREVIEW_TTL_MS),
+        created_at: at,
+        updated_at: at,
+      }).execute()
+    }, sqliteWriteOptions())
+  }
+  return signClaims({ ...claims, previewId })
+}
+
+function consumePreview(claims: PreviewClaims): CleanupPreviewAccount[] {
+  if (claims.previewId) {
+    const preview = database.deleteFrom('purge_previews').where('uuid', '=', claims.previewId)
+      .where('expires_at', '>', now()).returning('snapshot').executeTakeFirst()
+    if (preview) return typeof preview.snapshot === 'string' ? JSON.parse(preview.snapshot) : preview.snapshot
+  }
+  throw new UserFacingError('That preview was used or has expired. Run a new preview before deleting.')
+}
+
+interface CleanupRunInput extends PurgeInput {
+  dryRun: boolean
+  trigger?: PurgeTrigger
+  limit?: number
+  approved?: CleanupPreviewAccount[]
+  lease?: SocialOperationLease
 }
 
 /**
@@ -313,8 +360,8 @@ export class PurgeService {
    * throws before a single delete is issued.
    */
   async purge(input: PurgeInput): Promise<PurgeResult> {
-    const limit = this.confirmedLimit(input)
-    return await this.run({ ...input, dryRun: false, limit })
+    const operation = this.beginConfirmedCleanup(input)
+    return await this.run({ ...input, ...operation, dryRun: false })
   }
 
   /**
@@ -324,15 +371,13 @@ export class PurgeService {
    * `cancel(runId)` stops it after the deletion in hand.
    */
   start(input: PurgeInput): PurgeProgress {
-    const limit = this.confirmedLimit(input)
-    // Taken here, before answering, so a second run is refused straight away
-    // rather than discovered by polling.
-    const lease = claimCleanup()
+    // Claim the run and consume its approval before answering.
+    const operation = this.beginConfirmedCleanup(input)
 
     const progress: PurgeProgress = {
       runId: crypto.randomUUID(),
       status: 'running',
-      limit,
+      limit: operation.limit,
       deleted: 0,
       failed: 0,
       startedAt: new Date().toISOString(),
@@ -346,7 +391,7 @@ export class PurgeService {
       if (run.status !== 'running') this.runs.delete(id)
     }
 
-    void this.runUnlocked({ ...input, dryRun: false, limit, lease }, progress, () => this.cancelRequested.has(progress.runId))
+    void this.runUnlocked({ ...input, ...operation, dryRun: false }, progress, () => this.cancelRequested.has(progress.runId))
       .then((result) => {
         progress.result = result
         progress.status = this.cancelRequested.has(progress.runId) ? 'cancelled' : 'completed'
@@ -358,7 +403,7 @@ export class PurgeService {
       .finally(() => {
         progress.finishedAt = new Date().toISOString()
         this.cancelRequested.delete(progress.runId)
-        lease.release()
+        operation.lease.release()
       })
 
     return progress
@@ -381,11 +426,10 @@ export class PurgeService {
   private readonly cancelRequested = new Set<string>()
 
   /**
-   * A run acts on a preview the owner has seen: the same selection, at most
-   * as many posts as it showed, confirmed by typing that number. Returns that
-   * number; throws, deleting nothing, when anything does not match.
+   * Claim the exact selection the owner approved. A busy run cannot consume
+   * another preview, and each accepted preview can be used once.
    */
-  private confirmedLimit(input: PurgeInput): number {
+  private beginConfirmedCleanup(input: PurgeInput) {
     const claims = readPreviewToken(input.previewToken, {
       scope: input.scope === 'all' ? 'all' : 'tracked',
       providers: this.resolveProviders(input.providers),
@@ -396,7 +440,14 @@ export class PurgeService {
       throw new UserFacingError(`Type "${phrase}" to confirm. Nothing was deleted.`)
     if (claims.matched === 0)
       throw new UserFacingError('The preview matched no posts. Nothing was deleted.')
-    return claims.matched
+    const lease = claimCleanup()
+    try {
+      return { lease, approved: consumePreview(claims), limit: claims.matched }
+    }
+    catch (error) {
+      lease.release()
+      throw error
+    }
   }
 
   /**
@@ -410,7 +461,7 @@ export class PurgeService {
     return await this.run({ ...input, dryRun: false, trigger: 'schedule' })
   }
 
-  private async run(input: PurgeInput & { dryRun: boolean, trigger?: PurgeTrigger, limit?: number }): Promise<PurgeResult> {
+  private async run(input: CleanupRunInput): Promise<PurgeResult> {
     // A preview deletes nothing and may overlap anything. A real run may not
     // overlap another: the manual purge runs in the API process and the daily
     // one in the scheduler, and two at once would each page through the same
@@ -418,7 +469,7 @@ export class PurgeService {
     if (input.dryRun)
       return await this.runUnlocked(input)
 
-    const lease = claimCleanup()
+    const lease = input.lease ?? claimCleanup()
     try {
       return await this.runUnlocked({ ...input, lease })
     }
@@ -427,7 +478,7 @@ export class PurgeService {
     }
   }
 
-  private async runUnlocked(input: PurgeInput & { dryRun: boolean, trigger?: PurgeTrigger, limit?: number, lease?: SocialOperationLease }, progress?: PurgeProgress, cancelled?: () => boolean): Promise<PurgeResult> {
+  private async runUnlocked(input: CleanupRunInput, progress?: PurgeProgress, cancelled?: () => boolean): Promise<PurgeResult> {
     const scope: PurgeScope = input.scope === 'all' ? 'all' : 'tracked'
     const providers = this.resolveProviders(input.providers)
     const cutoff = cutoffFor(input.olderThanDays)
@@ -437,8 +488,9 @@ export class PurgeService {
       cutoff,
       olderThanDays: cutoff ? Math.floor(Number(input.olderThanDays)) : null,
       trigger: input.trigger || 'manual',
-      budget: { left: input.limit ?? Number.POSITIVE_INFINITY },
+      budget: { left: input.limit ?? MAX_DELETIONS_PER_RUN },
       lease: input.lease,
+      preview: input.dryRun ? [] : undefined,
       progress,
       cancelled,
     }
@@ -449,6 +501,13 @@ export class PurgeService {
     // why it was skipped.
     for (const provider of providers) {
       if (context.cancelled?.()) break
+      if (input.approved) {
+        for (const snapshot of input.approved.filter(account => account.provider === provider)) {
+          if (context.cancelled?.()) break
+          results.push(await this.runProvider(provider, context, undefined, snapshot))
+        }
+        continue
+      }
       const accounts = await this.accountsFor(provider)
       if (!accounts.length) {
         results.push(await this.runProvider(provider, context))
@@ -466,7 +525,9 @@ export class PurgeService {
       olderThanDays: context.olderThanDays,
       cutoff: cutoff ? cutoff.toISOString() : null,
       confirmation: purgeConfirmationFor(matched),
-      ...(input.dryRun ? { previewToken: signClaims({ scope, providers, olderThanDays: context.olderThanDays, matched, issuedAt: Date.now() }) } : {}),
+      ...(context.preview ? {
+        previewToken: savePreview({ scope, providers, olderThanDays: context.olderThanDays, matched, issuedAt: Date.now() }, context.preview),
+      } : {}),
       matched,
       deleted: results.reduce((total, result) => total + result.deleted, 0),
       failed: results.reduce((total, result) => total + result.failed, 0),
@@ -500,7 +561,7 @@ export class PurgeService {
     }
   }
 
-  private async runProvider(provider: SocialProvider, context: RunContext, account?: PurgeAccount): Promise<PurgeProviderResult> {
+  private async runProvider(provider: SocialProvider, context: RunContext, account?: PurgeAccount, snapshot?: CleanupPreviewAccount): Promise<PurgeProviderResult> {
     const { scope, dryRun, cutoff } = context
     const result: PurgeProviderResult = {
       provider,
@@ -524,7 +585,9 @@ export class PurgeService {
 
     let adapter: ProviderPurgeAdapter
     try {
-      adapter = await this.adapterFor(provider, account?.id)
+      adapter = await this.adapterFor(provider, snapshot?.identityId ?? account?.id)
+      if (snapshot && adapter.identityId !== snapshot.identityId)
+        throw new UserFacingError('Reconnect the account from the preview to delete its posts.')
     }
     catch (error) {
       result.skippedReason = describeNetworkError(provider, error, 'delete')
@@ -539,10 +602,17 @@ export class PurgeService {
 
     let candidates: PurgeCandidate[]
     try {
-      candidates = scope === 'all'
-        ? await this.collectRemote(adapter, result, cutoff)
-        : await this.collectTracked(provider, adapter.identityId, account?.isDefault ?? true)
-      if (cutoff) candidates = candidates.filter(candidate => isOlderThan(candidate.postedAt, cutoff))
+      if (snapshot) {
+        candidates = snapshot.candidates
+        result.truncated = snapshot.truncated
+      }
+      else {
+        const includeUnassigned = account?.isDefault ?? true
+        candidates = scope === 'all'
+          ? await this.collectRemote(adapter, result, includeUnassigned, cutoff)
+          : await this.collectTracked(provider, adapter.identityId, includeUnassigned)
+        if (cutoff) candidates = candidates.filter(candidate => isOlderThan(candidate.postedAt, cutoff))
+      }
     }
     catch (error) {
       // A provider that can delete but not enumerate lands here in `all` scope.
@@ -570,6 +640,10 @@ export class PurgeService {
       }
     }
 
+    if (candidates.length > context.budget.left) {
+      result.truncated = true
+      candidates = candidates.slice(0, context.budget.left)
+    }
     result.matched = candidates.length
     result.sample = candidates.slice(0, 5).map(candidate => ({
       uri: candidate.uri,
@@ -578,17 +652,23 @@ export class PurgeService {
     }))
 
     if (dryRun) {
+      context.budget.left -= candidates.length
+      if (candidates.length) {
+        context.preview?.push({
+          provider,
+          identityId: adapter.identityId,
+          truncated: result.truncated,
+          candidates: candidates.map(({ uri, cid, targetId }) => ({ uri, cid, targetId })),
+        })
+      }
       await this.recordRun(result, context, 'previewed')
       return result
     }
 
-    const deletedTargetIds: number[] = []
-    const deletedUris: string[] = []
-    const affectedPostIds = new Set<number>()
+    const deleted: PurgeCandidate[] = []
 
     for (const [index, candidate] of candidates.entries()) {
-      // Never more than the preview showed: history can grow between the
-      // preview and the run, and those posts were not in what was confirmed.
+      // The same cap applies across all the approved accounts.
       if (context.budget.left <= 0 || context.cancelled?.()) {
         result.truncated = true
         break
@@ -602,10 +682,8 @@ export class PurgeService {
       try {
         await adapter.deletePost({ uri: candidate.uri, cid: candidate.cid })
         result.deleted += 1
-        deletedUris.push(candidate.uri)
+        deleted.push(candidate)
         if (context.progress) context.progress.deleted += 1
-        if (candidate.targetId) deletedTargetIds.push(candidate.targetId)
-        if (candidate.postId) affectedPostIds.add(candidate.postId)
       }
       catch (error) {
         result.failed += 1
@@ -618,21 +696,7 @@ export class PurgeService {
       if (index < candidates.length - 1) await sleep(this.deleteDelayMs === 0 ? 0 : deletePause(provider, this.deleteDelayMs))
     }
 
-    // In `all` scope the local targets are gone remotely by definition, so
-    // sweep every one of this provider's targets — not just the ones this run
-    // happened to match — but only when nothing failed. An age-limited run
-    // deliberately left the newer posts up, so it keeps their rows too.
-    // Not after a list that was cut short either: the posts past the cut
-    // are still up, and their rows must stay to say so.
-    if (scope === 'all' && !cutoff && result.failed === 0 && !result.truncated) {
-      const remaining = await this.collectTracked(provider, adapter.identityId, account?.isDefault ?? true)
-      for (const target of remaining) {
-        if (target.targetId) deletedTargetIds.push(target.targetId)
-        if (target.postId) affectedPostIds.add(target.postId)
-      }
-    }
-
-    result.localRemoved = await this.removeLocal(deletedTargetIds, affectedPostIds, adapter.identityId, deletedUris)
+    result.localRemoved = this.removeLocal(adapter.identityId, deleted)
 
     const status = !result.failed && !result.skippedReason ? 'completed' : result.deleted > 0 ? 'partial' : 'failed'
     await this.recordRun(result, context, status)
@@ -682,7 +746,6 @@ export class PurgeService {
       cid: target.remote_cid ? String(target.remote_cid) : undefined,
       postedAt: publishedAt.get(Number(target.post_id)) || (target.updated_at ? String(target.updated_at) : undefined),
       targetId: Number(target.id),
-      postId: target.post_id ? Number(target.post_id) : undefined,
     }))
   }
 
@@ -691,8 +754,8 @@ export class PurgeService {
    * remote post back to a Postline target row where one exists, so local
    * cleanup stays accurate.
    */
-  private async collectRemote(adapter: ProviderPurgeAdapter, result: PurgeProviderResult, cutoff: Date | null = null): Promise<PurgeCandidate[]> {
-    const tracked = await this.collectTracked(adapter.provider, adapter.identityId, true)
+  private async collectRemote(adapter: ProviderPurgeAdapter, result: PurgeProviderResult, includeUnassigned: boolean, cutoff: Date | null): Promise<PurgeCandidate[]> {
+    const tracked = await this.collectTracked(adapter.provider, adapter.identityId, includeUnassigned)
     const byUri = new Map<string, PurgeCandidate>()
     for (const candidate of tracked) {
       byUri.set(candidate.uri, candidate)
@@ -724,7 +787,6 @@ export class PurgeService {
           text: post.text,
           postedAt,
           targetId: local?.targetId,
-          postId: local?.postId,
         })
       }
 
@@ -741,49 +803,41 @@ export class PurgeService {
    * post left with no targets at all (plus its media rows), and cached
    * timeline entries pointing at posts that no longer exist.
    */
-  private async removeLocal(
-    targetIds: number[],
-    affectedPostIds: Set<number>,
-    identityId: number,
-    deletedUris: string[],
-  ): Promise<number> {
-    let removed = 0
+  private removeLocal(identityId: number, deleted: PurgeCandidate[]): number {
+    if (!deleted.length) return 0
+    return database.transaction((tx: typeof database) => {
+      let removed = 0
+      const byTarget = new Map(deleted.flatMap(candidate => candidate.targetId ? [[candidate.targetId, candidate] as const] : []))
+      const affected = new Set<number>()
+      for (const ids of chunk([...byTarget.keys()], 200)) {
+        const targets: Array<{ id: number, post_id: number, remote_uri: string | null, remote_cid: string | null }> = tx
+          .selectFrom('post_targets').select(['id', 'post_id', 'remote_uri', 'remote_cid']).where('id', 'in', ids).execute()
+        const confirmed = targets.filter((row) => {
+          const candidate = byTarget.get(Number(row.id))
+          return candidate && (candidate.uri === row.remote_uri || candidate.uri === row.remote_cid || (candidate.cid && candidate.cid === row.remote_cid))
+        })
+        if (!confirmed.length) continue
+        tx.deleteFrom('post_targets').where('id', 'in', confirmed.map(row => row.id)).execute()
+        for (const row of confirmed) affected.add(Number(row.post_id))
+        removed += confirmed.length
+      }
 
-    for (const ids of chunk([...new Set(targetIds)], 200)) {
-      if (!ids.length) continue
-      await database.deleteFrom('post_targets').where('id', 'in', ids).execute()
-      removed += ids.length
-    }
+      // Prune the post only after the last target goes, in the same transaction.
+      for (const postIds of chunk([...affected], 200)) {
+        const survivors: Array<{ post_id: number }> = tx.selectFrom('post_targets').select('post_id').where('post_id', 'in', postIds).execute()
+        const stillTargeted = new Set(survivors.map(row => Number(row.post_id)))
+        const orphaned = postIds.filter(id => !stillTargeted.has(id))
+        if (!orphaned.length) continue
+        tx.deleteFrom('media_assets').where('post_id', 'in', orphaned).execute()
+        tx.deleteFrom('posts').where('id', 'in', orphaned).execute()
+        removed += orphaned.length
+      }
 
-    // Only posts that *had* targets are eligible — a draft has none and must
-    // survive a purge untouched.
-    for (const postIds of chunk([...affectedPostIds], 200)) {
-      if (!postIds.length) continue
-      const survivors = await database
-        .selectFrom('post_targets')
-        .select(['post_id'])
-        .where('post_id', 'in', postIds)
-        .execute()
-
-      const stillTargeted = new Set((survivors as any[]).map(row => Number(row.post_id)))
-      const orphaned = postIds.filter(id => !stillTargeted.has(id))
-      if (!orphaned.length) continue
-
-      await database.deleteFrom('media_assets').where('post_id', 'in', orphaned).execute()
-      await database.deleteFrom('posts').where('id', 'in', orphaned).execute()
-      removed += orphaned.length
-    }
-
-    for (const batch of chunk(deletedUris, 200)) {
-      if (!batch.length) continue
-      await database
-        .deleteFrom('timeline_items')
-        .where('social_identity_id', '=', identityId)
-        .where('remote_uri', 'in', batch)
-        .execute()
-    }
-
-    return removed
+      for (const uris of chunk(deleted.map(candidate => candidate.uri), 200)) {
+        tx.deleteFrom('timeline_items').where('social_identity_id', '=', identityId).where('remote_uri', 'in', uris).execute()
+      }
+      return removed
+    }, sqliteWriteOptions())
   }
 
   /** Write the audit row. Never throws — a logging failure must not mask a purge. */

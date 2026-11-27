@@ -442,7 +442,7 @@ export class WorkspaceArchiveService {
       }
     })
 
-    for (const table of ['campaign_posts', 'launch_campaigns', 'post_targets', 'thread_publish_claims', 'social_operation_leases', 'posts', 'post_submissions', 'post_webhook_deliveries', 'keyword_mentions', 'keyword_monitors', 'composer_presets', 'tracked_links', 'inbox_mentions', 'dm_messages', 'dm_conversations', 'timeline_items', 'purge_runs', 'alerts', 'social_identities', 'network_apps', 'twitter_read_usage'])
+    for (const table of ['campaign_posts', 'launch_campaigns', 'post_targets', 'thread_publish_claims', 'social_operation_leases', 'posts', 'post_submissions', 'post_webhook_deliveries', 'keyword_mentions', 'keyword_monitors', 'composer_presets', 'tracked_links', 'inbox_mentions', 'dm_messages', 'dm_conversations', 'timeline_items', 'purge_previews', 'purge_runs', 'alerts', 'social_identities', 'network_apps', 'twitter_read_usage'])
       await wipe(table)
 
     const accountId = await ensureAccount()
