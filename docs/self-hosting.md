@@ -113,8 +113,9 @@ Set `POSTLINE_WORKSPACE_LOCALE=es` for Spanish navigation, page headings, the
 command palette, the Queue, Activity, the Bluesky Timeline, and Blog
 management. The Queue includes search, the calendar, posting slots, draft
 feeds, and recurring posts. Activity includes send filters and background job
-status. English is the default. Set the same value when building and serving
-the frontend.
+status. Composer uses Spanish for its publishing controls, submission
+confirmations, and validation for threads and network options. English is the
+default. Set the same value when building and serving the frontend.
 
 ## What else to set
 

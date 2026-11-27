@@ -1577,7 +1577,10 @@
         "saving": "Guardando…",
         "scheduleFor": "Programar para {when}",
         "updatePost": "Actualizar publicación",
-        "saveDraft": "Guardar borrador"
+        "saveDraft": "Guardar borrador",
+        "updateFailed": "No se pudo actualizar",
+        "queue": "Cola",
+        "publishFailed": "No se pudo publicar"
       }
     }
   }

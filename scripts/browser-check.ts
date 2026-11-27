@@ -3567,6 +3567,49 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
     if (optionError.status !== 422
       || optionError.message !== '"english" no es un código de idioma que Postline reconozca, como en o pt-BR.')
       throw new Error('The Queue API did not return the Spanish validation message for the language option.')
+
+    const blog = `${editor}.querySelector('[data-provider-toggle=blog]')`
+    await waitUntil('Spanish Composer loads the Blog channel', () => evaluate<boolean>(cdp, `Boolean(${blog}?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, `if (${blog}.getAttribute('aria-pressed') !== 'true') ${blog}.click()`)
+    const rich = `${editor}.querySelector('[data-richtext-host] [contenteditable=true]')`
+    await waitUntil('The Spanish Blog editor opens', () => evaluate<boolean>(cdp, `Boolean(${rich}?.getClientRects().length)`), 10_000)
+    const writePost = async (text: string) => {
+      await evaluate(cdp, `${rich}.focus()`)
+      await cdp.send('Input.insertText', { text })
+      await waitUntil('The Spanish post text reaches the editor', () => evaluate<boolean>(cdp, `
+        ${rich}.textContent.includes(${JSON.stringify(text)})
+          && !${editor}.querySelector('[data-bluesky-publish]').disabled
+      `), 5_000)
+    }
+    await writePost('Borrador de verificación.')
+    await pressKey(cdp, 's', 83, 4)
+    await waitUntil('Saving a draft shows the Spanish confirmation', () => evaluate<boolean>(cdp, `
+      document.querySelector('#stx-toast-container')?.textContent.includes('Se guardó el borrador en la cola.')
+    `), 5_000)
+
+    await writePost('Publicación programada de verificación.')
+    await evaluate(cdp, `${menu}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The scheduling trigger is exposed by the publishing menu', () => evaluate<boolean>(cdp, `Boolean(${schedule}?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, `${schedule}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The Spanish scheduling choices reopen', () => evaluate<boolean>(cdp, `Boolean(${hour}?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, `${hour}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The scheduled action is ready', () => evaluate<boolean>(cdp, `
+      ${editor}.querySelector('[data-bluesky-publish-label]')?.textContent.startsWith('Programar para ')
+    `), 5_000)
+    await evaluate(cdp, `${rich}.focus()`)
+    await pressKey(cdp, 'Enter', 13, 4)
+    await waitUntil('Scheduling a post shows the Spanish confirmation', () => evaluate<boolean>(cdp, `
+      document.querySelector('#stx-toast-container')?.textContent.includes('Se programó la publicación. Puedes gestionarla en la Cola.')
+    `), 5_000)
+
+    await writePost('Publicación inmediata de verificación.')
+    await pressKey(cdp, 'Enter', 13, 4)
+    await waitUntil('Publishing to Blog shows the Spanish confirmation', () => evaluate<boolean>(cdp, `
+      document.querySelector('#stx-toast-container')?.textContent.includes('Tu publicación está disponible en Blog.')
+    `), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })

@@ -318,6 +318,7 @@ export const composerMessages = workspaceComposerText.client
     import { fetchProviders, fetchWorkspace, targetLabel } from '../functions/social-client'
 
     const copy = {{ composerMessages }}
+    const locale = {{ composerLocale }}
     const providersFailed = state(false)
     const query = useRoute().query
     const editParam = query.edit || null
@@ -350,7 +351,7 @@ export const composerMessages = workspaceComposerText.client
       if (submitting()) return selectedAction === 'publish' && !editingQueued() ? copy.publishing : copy.saving
       const iso = scheduledIso()
       if (selectedAction === 'schedule' && iso) {
-        const when = new Date(iso).toLocaleString({{ composerLocale }}, { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: scheduleZone() })
+        const when = new Date(iso).toLocaleString(locale, { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: scheduleZone() })
         return copy.scheduleFor.replace('{when}', () => when)
       }
       if (selectedAction === 'draft') return copy.saveDraft
@@ -1122,23 +1123,26 @@ export const composerMessages = workspaceComposerText.client
     }
 
     async function saveQueued(posts: ComposerSegment[], providers: string[], schedule: string | null, id: number | null, nextSlot: boolean) {
-      const { saveQueuedPost } = await loadSubmission()
-      return saveQueuedPost(await submissionInput(posts, providers), {
+      const { composerSubmitCopy, saveQueuedPost } = await loadSubmission()
+      const messages = composerSubmitCopy(locale)
+      const data = await saveQueuedPost(await submissionInput(posts, providers), {
         id, scheduledAt: schedule ? composerQueueTimestamp(schedule) : undefined, nextSlot, removeMedia: editRemoveImage,
-      })
+      }, messages)
+      return { data, messages }
     }
 
     async function updateQueued(posts: ComposerSegment[], targetProviders: string[], nextSlot: boolean) {
       try {
-        await saveQueued(posts, targetProviders, scheduledIso(), editingId(), nextSlot)
+        const { messages } = await saveQueued(posts, targetProviders, scheduledIso(), editingId(), nextSlot)
         editDirty = false
-        setStatus(nextSlot ? 'Added to queue.' : composerFormat() === 'thread' ? 'Thread updated.' : 'Post updated.', 'success', { title: nextSlot ? 'Scheduled' : 'Updated' })
+        const updated = composerFormat() === 'thread' ? messages.threadUpdated : messages.postUpdated
+        setStatus(nextSlot ? messages.addedToQueue : updated, 'success', { title: nextSlot ? messages.scheduled : messages.updated })
         // Back to the queue to see the change. A router visit, not a full
         // load: a reload took the "Post updated" toast down with the page.
         navigate('/queue')
       }
       catch (error) {
-        setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Update failed' })
+        setStatus(error instanceof Error ? error.message : String(error), 'error', { title: copy.updateFailed })
       }
     }
 
@@ -1147,22 +1151,21 @@ export const composerMessages = workspaceComposerText.client
     async function saveToQueue(posts: ComposerSegment[], targetProviders: string[], nextSlot: boolean) {
       const scheduleValue = postAction() === 'schedule' ? scheduledIso() : null
       try {
-        const data = await saveQueued(posts, targetProviders, scheduleValue, null, nextSlot)
+        const { data, messages } = await saveQueued(posts, targetProviders, scheduleValue, null, nextSlot)
+        const scheduled = data.status === 'scheduled'
 
         scheduledIso.set(null)
         if (scheduleValue || nextSlot) postAction.set('publish')
         clearSubmittedPost(posts)
         setStatus(
-          data.status === 'scheduled'
-            ? `Scheduled. Check the Queue page to manage it.`
-            : 'Draft saved to the queue.',
+          scheduled ? messages.scheduledNotice : messages.draftNotice,
           'success',
-          { title: data.status === 'scheduled' ? 'Scheduled' : 'Draft saved' },
+          { title: scheduled ? messages.scheduled : messages.draftSaved },
         )
-        if (data.status === 'scheduled') finishSetup(data.postId ?? data.postIds?.[0])
+        if (scheduled) finishSetup(data.postId ?? data.postIds?.[0])
       }
       catch (error) {
-        setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Queue' })
+        setStatus(error instanceof Error ? error.message : String(error), 'error', { title: copy.queue })
       }
     }
 
@@ -1179,27 +1182,23 @@ export const composerMessages = workspaceComposerText.client
       const providerNames = selectedConnected()
         .map(target => target.multi ? targetLabel(target.provider, target.account?.handle) : providerLabel(target.provider))
         .join(', ')
-      setStatus(
-        targets.length > 1 ? `Publishing ${targets.length} posts to ${providerNames}…` : `Publishing to ${providerNames}…`,
-        'info',
-        { title: 'Publishing', id: 'publish', loading: true },
-      )
-
       try {
-        const { publishCrosspost, summarizePublish } = await loadSubmission()
-        const data = await publishCrosspost(await submissionInput(targets, targetProviders))
-        const outcome = summarizePublish(data.results || [], targets.length, providerNames, targetLabel)
+        const { composerSubmitCopy, publishCrosspost, publishingNotice, summarizePublish } = await loadSubmission()
+        const messages = composerSubmitCopy(locale)
+        setStatus(publishingNotice(targets.length, providerNames, messages), 'info', { title: messages.publishing, id: 'publish', loading: true })
+        const data = await publishCrosspost(await submissionInput(targets, targetProviders), messages)
+        const outcome = summarizePublish(data.results || [], targets.length, providerNames, targetLabel, messages)
 
         clearSubmittedPost(targets)
         toast.dismiss('publish')
         setStatus(outcome.notice.text, outcome.notice.tone, { title: outcome.notice.title, url: outcome.lastUrl })
         if (outcome.firstCommentNeedsAttention)
-          setStatus('Check Needs attention in Queue.', 'info', { title: 'A first comment needs attention' })
+          setStatus(messages.commentAttentionNotice, 'info', { title: messages.commentAttention })
         if (outcome.anySucceeded) finishSetup(data.postId ?? data.postIds?.[0] ?? 0)
       }
       catch (error) {
         toast.dismiss('publish')
-        setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Publish failed' })
+        setStatus(error instanceof Error ? error.message : String(error), 'error', { title: copy.publishFailed })
       }
     }
 

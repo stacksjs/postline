@@ -1577,7 +1577,10 @@
         "saving": "Saving…",
         "scheduleFor": "Schedule for {when}",
         "updatePost": "Update post",
-        "saveDraft": "Save draft"
+        "saveDraft": "Save draft",
+        "updateFailed": "Update failed",
+        "queue": "Queue",
+        "publishFailed": "Publish failed"
       }
     }
   }

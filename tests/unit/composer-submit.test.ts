@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { postForm } from '../../resources/assets/scripts/composer-submit'
+import { composerSubmitCopy, postForm, publishingNotice, summarizePublish } from '../../resources/assets/scripts/composer-submit'
 
 test('queue edits explicitly remove old media and clear saved overrides', () => {
   const form = postForm({
@@ -37,4 +37,15 @@ test('queueing at the next slot sends new attachments and their alt text', () =>
   expect(form.get('image_alts')).toBe('["The author"]')
   expect(form.get('linkedin_first_comment')).toBe('Read more')
   expect(form.get('bluesky_labels')).toBe('["graphic-media"]')
+})
+
+test('submission feedback uses the workspace locale and keeps provider details', () => {
+  const copy = composerSubmitCopy('es')
+  expect(publishingNotice(2, 'Bluesky', copy)).toBe('Publicando 2 publicaciones en Bluesky…')
+  const result = summarizePublish([
+    { provider: 'Bluesky', ok: true, url: 'https://bsky.app/profile/example.test/post/one' },
+    { provider: 'Mastodon', ok: false },
+  ], 1, 'Bluesky, Mastodon', provider => provider, copy)
+  expect(result.notice).toEqual({ title: 'Publicación parcial', tone: 'info', text: 'Se publicó en algunos canales. Mastodon: error' })
+  expect(result.lastUrl).toBe('https://bsky.app/profile/example.test/post/one')
 })

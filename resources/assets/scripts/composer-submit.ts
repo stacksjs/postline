@@ -4,6 +4,22 @@ import type { ComposerPreviewImage } from '../../functions/composer-preview'
 import type { ComposerVariants } from '../../functions/composer-variants'
 import { previewImageUrl } from '../../functions/composer-preview'
 import type { POST_OPTION_FIELDS } from '../../../app/Support/Social/post-options'
+import en from '../../../locales/composer-submit/en.json'
+import es from '../../../locales/composer-submit/es.json'
+
+type ComposerSubmitCopy = typeof en
+
+export function composerSubmitCopy(locale: string): ComposerSubmitCopy {
+  return locale === 'es' ? es : en
+}
+
+function channelsNotice(template: string, count: number, channels: string): string {
+  return template.replace('{count}', () => String(count)).replace('{channels}', () => channels)
+}
+
+export function publishingNotice(count: number, channels: string, copy: ComposerSubmitCopy): string {
+  return channelsNotice(count > 1 ? copy.publishingMany : copy.publishingOne, count, channels)
+}
 
 export interface CrosspostResultItem {
   provider: string
@@ -98,22 +114,22 @@ export function postForm(input: CrosspostInput, queue?: QueueDestination): FormD
   return body
 }
 
-export async function publishCrosspost(input: CrosspostInput): Promise<{ postId?: number, postIds?: number[], results: CrosspostResultItem[] }> {
+export async function publishCrosspost(input: CrosspostInput, copy = en): Promise<{ postId?: number, postIds?: number[], results: CrosspostResultItem[] }> {
   const response = await fetch('/api/postline/publish', { method: 'POST', body: postForm(input) })
   const payload = await response.json()
   if (!payload?.data) {
-    throw new Error(payload?.error || 'Publish failed.')
+    throw new Error(payload?.error || copy.publishError)
   }
   return payload.data as { postId: number, results: CrosspostResultItem[] }
 }
 
 
-export async function saveQueuedPost(input: CrosspostInput, destination: QueueDestination): Promise<{ postId?: number, postIds?: number[], status: 'draft' | 'scheduled' }> {
+export async function saveQueuedPost(input: CrosspostInput, destination: QueueDestination, copy = en): Promise<{ postId?: number, postIds?: number[], status: 'draft' | 'scheduled' }> {
   const endpoint = destination.id ? '/api/postline/queue/update' : '/api/postline/queue'
   const response = await fetch(endpoint, { method: 'POST', body: postForm(input, destination) })
   const payload = await response.json()
   if (!response.ok || !payload.ok)
-    throw new Error(payload.error || (destination.id ? 'Could not update the post.' : 'Could not save to the queue.'))
+    throw new Error(payload.error || (destination.id ? copy.updateError : copy.queueError))
   return payload.data
 }
 
@@ -122,20 +138,21 @@ export function summarizePublish(
   count: number,
   providerNames: string,
   label: (provider: string, handle?: string) => string,
+  copy = en,
 ) {
   const succeeded = results.filter(result => result.ok)
   const lastUrl = succeeded.findLast(result => result.url)?.url
   const failures = results.filter(result => !result.ok)
-    .map(result => `${label(result.provider, result.handle)}: ${result.error || 'failed'}`)
+    .map(result => `${label(result.provider, result.handle)}: ${result.error || copy.failed}`)
   const failureText = failures.join('; ')
   const notice = failures.length
     ? succeeded.length
-      ? { text: `Published to some channels. ${failureText}`, tone: 'info' as const, title: 'Partially published' }
-      : { text: `Publish failed. ${failureText}`, tone: 'error' as const, title: 'Publish failed' }
+      ? { text: copy.partialNotice.replace('{errors}', () => failureText), tone: 'info' as const, title: copy.partiallyPublished }
+      : { text: copy.publishFailureNotice.replace('{errors}', () => failureText), tone: 'error' as const, title: copy.publishFailed }
     : {
-        text: count > 1 ? `Published ${count} posts to ${providerNames}.` : `Your post is live on ${providerNames}.`,
+        text: channelsNotice(count > 1 ? copy.publishedMany : copy.publishedOne, count, providerNames),
         tone: 'success' as const,
-        title: 'Published',
+        title: copy.published,
       }
   return {
     notice,
