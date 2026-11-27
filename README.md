@@ -49,7 +49,7 @@ with these commands. Keep the `.env` and its application key for later launches.
 bun install --frozen-lockfile
 cp .env.example .env
 ./buddy key:generate
-./buddy migrate
+bun scripts/migrate-workspace.ts
 ```
 <!-- /readme-setup -->
 
@@ -128,7 +128,7 @@ wins when both are set. The Mac app reads no `.env`, so it uses Settings.
 |---|---|
 | `./buddy dev` | Start the site, the API, the docs and the scheduler that publishes queued posts |
 | `./buddy dev:frontend` / `./buddy dev:api` | Start one of them |
-| `./buddy migrate` | Apply pending migrations |
+| `bun scripts/migrate-workspace.ts` | Apply pending workspace migrations |
 | `./buddy seed` | Seed the workspace account and sample posts |
 | `./buddy test` | Run the suite |
 | `./buddy lint` | Lint; `./buddy lint:fix` fixes what it can |

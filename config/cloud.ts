@@ -698,12 +698,7 @@ export const tsCloud: TsCloudConfig = {
         // it survives deploys; create it before migrating into it.
         `mkdir -p ${DATA_DIR}`,
         'bun install --production --frozen-lockfile',
-        // Deliberately not `--force`. The pending drop of `categorizable_models`
-        // and `taggable_models` needed it once, on 2026-08-14, and it was
-        // reverted the moment that deploy landed: a deploy that applies
-        // whatever destructive change happens to be pending, with nobody
-        // watching, is worse than a deploy that stops and says so.
-        './buddy migrate',
+        'bun scripts/migrate-workspace.ts',
       ],
       // The page server reverse-proxies `/api/**` to the API process. Name that
       // port explicitly: the framework default (3008) is already owned by a

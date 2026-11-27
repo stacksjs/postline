@@ -17,13 +17,17 @@ import process from 'node:process'
 const root = join(import.meta.dir, '../..')
 
 describe('upgrading the Mac app from v0.1.1', () => {
-  test('keeps every row and applies the new migrations after a backup', async () => {
+  test('keeps workspace rows, archives publication records, and applies the new migrations', async () => {
     const dataDir = mkdtempSync(join(tmpdir(), 'postline-upgrade-'))
     try {
       copyFileSync(join(root, 'tests/fixtures/desktop-v0.1.1.sqlite'), join(dataDir, 'postline.sqlite'))
       const oldDb = new Database(join(dataDir, 'postline.sqlite'))
       oldDb.query('INSERT INTO keyword_monitors (id, name, keywords, providers, account_id) VALUES (?, ?, ?, ?, ?)').run(
         1985, 'Existing X watch', '["Postline"]', '["twitter"]', 1,
+      )
+      oldDb.query('INSERT INTO publications (id, name, slug, account_id) VALUES (?, ?, ?, ?)').run(4, 'Old Newsletter', 'old-newsletter', 1)
+      oldDb.query('INSERT INTO publication_subscribers (email, unsubscribe_token, publication_id) VALUES (?, ?, ?)').run(
+        'reader@example.invalid', 'test-unsubscribe-token', 4,
       )
       oldDb.close()
       const run = Bun.spawnSync([process.execPath, join(root, 'tests/support/desktop-upgrade-run.ts'), dataDir, String(process.env.DB_DATABASE_PATH)], { cwd: root, env: { ...process.env, POSTLINE_DESKTOP_AGENT: '' }, stdout: 'pipe', stderr: 'pipe' })
@@ -43,7 +47,14 @@ describe('upgrading the Mac app from v0.1.1', () => {
       // Columns added since v0.1.1 are there, with their defaults.
       expect(db.query('SELECT publishing_paused, twitter_browser_handle FROM accounts WHERE id = 1').get()).toEqual({ publishing_paused: 0, twitter_browser_handle: null })
       expect(db.query('SELECT twitter_read_source FROM keyword_monitors WHERE id = 1985').get()).toEqual({ twitter_read_source: 'api' })
+      expect(db.query("SELECT name FROM sqlite_schema WHERE type = 'table' AND (name LIKE 'publication%' OR name IN ('discover_entries', 'post_comments'))").all()).toEqual([])
+      expect(db.query('PRAGMA foreign_key_check').all()).toEqual([])
       db.close()
+
+      const archive = new Database(join(dataDir, 'postline.retired-publication.sqlite'), { readonly: true })
+      expect(archive.query('SELECT name, slug FROM publications WHERE id = 4').get()).toEqual({ name: 'Old Newsletter', slug: 'old-newsletter' })
+      expect(archive.query('SELECT email FROM publication_subscribers WHERE publication_id = 4').get()).toEqual({ email: 'reader@example.invalid' })
+      archive.close()
     }
     finally {
       rmSync(dataDir, { recursive: true, force: true })

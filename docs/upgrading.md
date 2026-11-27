@@ -38,11 +38,13 @@ bun install --frozen-lockfile
 ```
 
 ```bash
-./buddy migrate
+bun scripts/migrate-workspace.ts
 ```
 
-Then restart the web, API, and scheduler services. `./buddy migrate` applies
-the pending migrations.
+Then restart the web, API, and scheduler services. The migration command
+applies the committed migrations and archives any retired publication data
+before removing those tables. The container and the Postline server deployment
+use the same command.
 
 ## What changed between v0.1.1 and 1.0
 
@@ -55,8 +57,11 @@ the pending migrations.
   Tokens saved by older versions are encrypted in place the first time
   Postline reads the connected accounts, so nothing has to be reconnected;
   losing `APP_KEY` means reconnecting every account.
-- **Publication tables.** The publication product moved to The Open Times;
-  its tables stay in an existing database until #72 removes them.
+- **Publication data.** The publication product moved to The Open Times. If
+  your database still contains publication records, the upgrade saves a
+  private copy as `postline.retired-publication.sqlite` next to your
+  workspace database before removing the retired tables. Keep that SQLite
+  copy with your backups if you need to recover the old publication data.
 - **Network apps in Settings.** X, LinkedIn, Instagram and Threads apps can be
   entered under Settings, Channels instead of `.env`; values in `.env` still
   apply until something is saved in Settings.

@@ -39,7 +39,7 @@ async function workspaceKey(): Promise<string> {
 await mkdir(join(data, 'media'), { recursive: true, mode: 0o700 })
 await mkdir(join(data, 'blog'), { recursive: true, mode: 0o700 })
 const env = { ...process.env, APP_KEY: await workspaceKey() }
-const migrate = Bun.spawn([process.execPath, buddy, 'migrate', '--no-generate'], { env, stdout: 'inherit', stderr: 'inherit' })
+const migrate = Bun.spawn([process.execPath, 'scripts/migrate-workspace.ts'], { env, stdout: 'inherit', stderr: 'inherit' })
 if (await migrate.exited !== 0) throw new Error('The workspace database did not migrate.')
 
 const services = [
