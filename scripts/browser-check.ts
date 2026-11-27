@@ -1545,6 +1545,10 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
       const shot = await cdp.send<{ data: string }>('Page.captureScreenshot', { format: 'png' })
       writeFileSync(join(out, `${view}-${mode.name}.png`), Buffer.from(shot.data, 'base64'))
       if (mode.name === 'light') {
+        if (view !== 'settings' && !await evaluate<boolean>(cdp, `(() => {
+          const headers = document.querySelectorAll('#workspace-content [data-workspace-page-header]')
+          return headers.length === 1 && Boolean(headers[0].querySelector('h1')?.textContent.trim())
+        })()`)) fail(view, mode.name, 'the workspace page has no named shared header')
         await checkAccessibleControls(cdp, view)
         await checkWorkspaceSkipLink(cdp, view)
         if (view === 'queue') await checkQueueKeyboard(cdp)

@@ -5,13 +5,9 @@
 @section('content')
   @meta('description', 'Write, schedule, publish, and review social posts from a clean personal workspace.')
   <section class="grid gap-5" data-postline-page="composer" data-testid="composer-page">
-    <header class="flex gap-4 items-center justify-between min-h-11">
-      <div>
-        <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Composer</p>
-        <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Write a post</h1>
-        <p class="mb-0 mt-1.5 text-muted text-ui">Draft once, then publish to every connected account.</p>
-      </div>
-    </header>
+    <WorkspacePageHeader title="Write a post">
+      <template #description>Draft once, then publish to every connected account.</template>
+    </WorkspacePageHeader>
     <div class="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <section class="grid content-start grid-rows-[auto_auto_auto] self-start min-w-0 bg-panel border border-line rounded-2xl shadow-sm" aria-label="Post composer" :class="dragDepth() > 0 ? 'ring-2 ring-accent' : ''" @input="markEdited" @change="markEdited" @dragenter="enterImageDrop" @dragleave="leaveImageDrop" @dragover="overImageDrop" @drop="dropImages" @paste="pasteImages" data-composer-image-drop>
         <div :if="setupActive" class="flex flex-wrap gap-2 items-center justify-between px-3 py-2 text-info text-xs bg-info-soft border-b border-line" data-setup-composer>
@@ -206,13 +202,13 @@
       <aside class="grid content-start gap-3 min-w-0" aria-labelledby="composer-preview-title">
         <h2 id="composer-preview-title" class="m-0 font-semibold text-ink text-sm">Live preview</h2>
         <p :if="providersLoaded() && !previewCards().length" class="m-0 p-4 text-muted text-ui bg-panel border border-line rounded-2xl">Select a publishing channel to preview your post.</p>
-        <section x-for="card in previewCards()" :key="card.provider" :data-network-preview="card.provider" class="grid min-w-0 overflow-hidden bg-panel border border-line rounded-2xl">
+        <section x-for="card in previewCards()" :key="card.provider" :data-network-preview="card.provider" class="grid overflow-hidden min-w-0 bg-panel border border-line rounded-2xl">
           <header class="flex gap-2.5 items-center p-3 bg-panel-2 border-b border-line">
             <span class="shrink-0 h-4 w-4 text-ink" :class="card.icon" aria-hidden="true"></span>
             <h3 class="m-0 font-semibold text-ink text-sm" :text="card.name"></h3>
-            <span :if="card.handle" class="min-w-0 truncate text-muted text-xs" :text="card.handle"></span>
+            <span :if="card.handle" class="min-w-0 text-muted text-xs truncate" :text="card.handle"></span>
           </header>
-          <article x-for="(post, index) in card.posts" :key="post.id" class="grid gap-2 min-w-0 p-3 border-b border-line last:border-b-0" data-preview-segment>
+          <article x-for="(post, index) in card.posts" :key="post.id" class="grid gap-2 p-3 min-w-0 border-b border-line last:border-b-0" data-preview-segment>
             <div class="flex gap-2 items-center justify-between text-xs" :class="post.overflow ? 'text-danger' : 'text-muted'">
               <span :if="card.posts.length > 1" :text="card.chained && index > 0 ? 'Reply ' + index : 'Post ' + (index + 1)"></span>
               <span class="inline-flex gap-1.5 items-center ml-auto tabular-nums">
@@ -221,20 +217,20 @@
                 <span :text="post.count" data-preview-count></span>
               </span>
             </div>
-            <p :if="post.spoiler" class="m-0 px-2 py-1 rounded-md bg-panel-2 text-ui text-muted" :text="post.spoiler"></p>
-            <h4 :if="post.title" class="m-0 break-words font-semibold text-lg text-ink" :text="post.title"></h4>
-            <div :if="post.html" class="max-w-none break-words prose text-ui" x-html="post.html" data-preview-copy></div>
-            <p :if="!post.html" class="m-0 whitespace-pre-wrap [overflow-wrap:anywhere] text-ui leading-normal" :class="post.text ? 'text-ink' : 'text-muted'" :text="post.text ? post.text + (post.overflow ? '…' : '') : 'Your post will appear here.'" data-preview-copy></p>
+            <p :if="post.spoiler" class="m-0 px-2 py-1 text-muted text-ui bg-panel-2 rounded-md" :text="post.spoiler"></p>
+            <h4 :if="post.title" class="m-0 break-words font-semibold text-ink text-lg" :text="post.title"></h4>
+            <div :if="post.html" class="max-w-none break-words text-ui prose" x-html="post.html" data-preview-copy></div>
+            <p :if="!post.html" class="m-0 leading-normal text-ui whitespace-pre-wrap [overflow-wrap:anywhere]" :class="post.text ? 'text-ink' : 'text-muted'" :text="post.text ? post.text + (post.overflow ? '…' : '') : 'Your post will appear here.'" data-preview-copy></p>
             <p :if="post.overflow" class="m-0 text-danger text-xs" :text="'Over the limit by ' + post.overflow + (post.overflow === 1 ? ' character' : ' characters')" data-preview-overflow></p>
-            <div :if="post.images.length" class="grid gap-1 overflow-hidden rounded-lg" :class="post.images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'" data-preview-images>
-              <img x-for="image in post.images" :key="image.id" class="block aspect-[4/3] w-full object-cover bg-panel-2" :src="image.src" :alt="image.alt" referrerpolicy="no-referrer">
+            <div :if="post.images.length" class="grid overflow-hidden gap-1 rounded-lg" :class="post.images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'" data-preview-images>
+              <img x-for="image in post.images" :key="image.id" class="block aspect-[4/3] object-cover w-full bg-panel-2" :src="image.src" :alt="image.alt" referrerpolicy="no-referrer">
             </div>
             <div :if="post.card" class="overflow-hidden bg-panel-2 border border-line rounded-lg" data-link-preview>
-              <img :if="post.card.image" class="block object-cover aspect-[2/1] w-full bg-panel-3 border-b border-line" :src="post.card.image" alt="" referrerpolicy="no-referrer">
+              <img :if="post.card.image" class="block aspect-[2/1] object-cover w-full bg-panel-3 border-b border-line" :src="post.card.image" alt="" referrerpolicy="no-referrer">
               <div class="grid gap-1 p-2.5">
-                <span class="font-semibold text-muted text-xs uppercase truncate" :text="post.card.domain"></span>
-                <span class="font-semibold text-ink text-sm break-words" :text="post.card.title"></span>
-                <span :if="post.card.description" class="line-clamp-2 text-muted text-ui break-words" :text="post.card.description"></span>
+                <span class="font-semibold text-muted text-xs truncate uppercase" :text="post.card.domain"></span>
+                <span class="break-words font-semibold text-ink text-sm" :text="post.card.title"></span>
+                <span :if="post.card.description" class="break-words line-clamp-2 text-muted text-ui" :text="post.card.description"></span>
               </div>
             </div>
           </article>

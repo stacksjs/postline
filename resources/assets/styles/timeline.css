@@ -2,8 +2,6 @@
   display: grid;
   gap: 0;
   width: 100%;
-  max-width: 54rem;
-  margin: 0 auto;
 }
 
 .postline-feed__header {

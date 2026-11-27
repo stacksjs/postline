@@ -5,18 +5,14 @@
 @section('content')
   @meta('description', 'What Postline sent, what failed, and when each job last ran.')
   <section class="grid gap-5" data-postline-page="activity" data-testid="activity-page">
-    <header class="flex flex-wrap gap-4 items-center justify-between min-h-11">
-      <div>
-        <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Activity</p>
-        <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">What Postline did</h1>
-        <p class="mb-0 mt-1.5 text-muted text-ui">Every send to a network, and when each background job last ran.</p>
-      </div>
+    <WorkspacePageHeader title="Activity">
+      <template #description>Every send to a network and when each background job last ran.</template>
       <div class="grid grid-cols-3 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Show">
         <button class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="filter() === ''" @click="setFilter('')">All</button>
         <button class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="filter() === 'published'" @click="setFilter('published')">Sent</button>
         <button class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="filter() === 'failed'" @click="setFilter('failed')">Failed</button>
       </div>
-    </header>
+    </WorkspacePageHeader>
 
     <p class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !schedulerWarning() }" :text="schedulerWarning()" role="status" data-scheduler-warning></p>
 
@@ -40,52 +36,56 @@
     </section>
 
     <div class="grid gap-5 items-start lg:grid-cols-[minmax(0,1fr)_320px]">
-      <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" aria-label="Sends">
-        <div class="flex items-center justify-between px-4 py-3 border-b border-line">
-          <strong class="font-semibold text-ink text-sm">Sends</strong>
-          <span class="text-muted text-xs" :text="countText()"></span>
-        </div>
-        <WorkspaceListSkeleton :show="!loaded()" label="Loading activity" />
-        <ErrorState :show="loadError() && loaded()" title="Could not load activity" :message="loadError()" @retry="refresh()" />
-        <EmptyState :show="showEmpty()" variant="bare" :title="filter() === 'failed' ? 'Nothing has failed' : 'Nothing has been sent yet'" description="Your publishing activity will appear here.">
-          <StxLink class="text-info text-ui underline" to="/composer" :show="filter() !== 'failed'">Write a post</StxLink>
-        </EmptyState>
-        <div>
-          <article class="grid gap-1 px-4 py-3 border-b border-line last:border-b-0" x-for="row in rows()" data-activity-row>
-            <div class="flex flex-wrap gap-2 items-center">
-              <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="row.failed ? 'text-danger bg-danger-soft' : 'text-success bg-success-soft'" :text="row.outcome"></span>
-              <span class="font-medium text-ink text-ui" :text="row.where"></span>
-              <span class="ml-auto text-muted text-xs" :text="row.when" :title="row.whenFull"></span>
-            </div>
-            <p class="m-0 text-body text-ui truncate" :text="row.excerpt"></p>
-            <p class="m-0 text-danger text-xs" x-show="row.reason" :text="row.reason"></p>
-            <div class="flex gap-3 items-center" x-show="row.url || row.failed">
-              <a class="text-muted text-xs underline hover:text-ink" x-show="row.url" :href="row.url" target="_blank" rel="noopener noreferrer">View on the network</a>
-              <a class="text-muted text-xs underline hover:text-ink" x-show="row.failed" href="/queue" data-stx-link>Open the queue to retry</a>
-            </div>
-          </article>
-        </div>
-        <div class="flex justify-center p-3" x-show="nextCursor()">
-          <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" :disabled="loadingMore()" @click="loadMore()" :text="loadingMore() ? 'Loading…' : 'Load older activity'">Load older activity</button>
-        </div>
+      <section aria-label="Sends">
+        <Card padding="none" className="shadow-sm">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-line">
+            <strong class="font-semibold text-ink text-sm">Sends</strong>
+            <span class="text-muted text-xs" :text="countText()"></span>
+          </div>
+          <WorkspaceListSkeleton :show="!loaded()" label="Loading activity" />
+          <ErrorState :show="loadError() && loaded()" title="Could not load activity" :message="loadError()" @retry="refresh()" />
+          <EmptyState :show="showEmpty()" variant="bare" :title="filter() === 'failed' ? 'Nothing has failed' : 'Nothing has been sent yet'" description="Your publishing activity will appear here.">
+            <StxLink class="text-info text-ui underline" to="/composer" :show="filter() !== 'failed'">Write a post</StxLink>
+          </EmptyState>
+          <div>
+            <article class="grid gap-1 px-4 py-3 border-b border-line last:border-b-0" x-for="row in rows()" data-activity-row>
+              <div class="flex flex-wrap gap-2 items-center">
+                <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="row.failed ? 'text-danger bg-danger-soft' : 'text-success bg-success-soft'" :text="row.outcome"></span>
+                <span class="font-medium text-ink text-ui" :text="row.where"></span>
+                <span class="ml-auto text-muted text-xs" :text="row.when" :title="row.whenFull"></span>
+              </div>
+              <p class="m-0 text-body text-ui truncate" :text="row.excerpt"></p>
+              <p class="m-0 text-danger text-xs" x-show="row.reason" :text="row.reason"></p>
+              <div class="flex gap-3 items-center" x-show="row.url || row.failed">
+                <a class="text-muted text-xs underline hover:text-ink" x-show="row.url" :href="row.url" target="_blank" rel="noopener noreferrer">View on the network</a>
+                <a class="text-muted text-xs underline hover:text-ink" x-show="row.failed" href="/queue" data-stx-link>Open the queue to retry</a>
+              </div>
+            </article>
+          </div>
+          <div class="flex justify-center p-3" x-show="nextCursor()">
+            <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" :disabled="loadingMore()" @click="loadMore()" :text="loadingMore() ? 'Loading…' : 'Load older activity'">Load older activity</button>
+          </div>
+        </Card>
       </section>
 
-      <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" aria-label="Background jobs">
-        <div class="px-4 py-3 border-b border-line">
-          <strong class="font-semibold text-ink text-sm">Background jobs</strong>
-          <p class="m-0 mt-0.5 text-muted text-xs" :text="schedulerText()"></p>
-        </div>
-        <p class="m-0 p-4 text-muted text-ui" x-show="showNoJobs()">No job has run yet.</p>
-        <div>
-          <div class="grid gap-0.5 px-4 py-2.5 border-b border-line last:border-b-0" x-for="job in jobRows()" data-activity-job>
-            <div class="flex gap-2 items-center justify-between">
-              <span class="font-medium text-ink text-ui" :text="job.label"></span>
-              <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="job.failed ? 'text-danger bg-danger-soft' : 'text-success bg-success-soft'" :text="job.status"></span>
-            </div>
-            <p class="m-0 text-muted text-xs" :text="job.detail"></p>
-            <p class="m-0 text-danger text-xs" x-show="job.error" :text="job.error"></p>
+      <section aria-label="Background jobs">
+        <Card padding="none" className="shadow-sm">
+          <div class="px-4 py-3 border-b border-line">
+            <strong class="font-semibold text-ink text-sm">Background jobs</strong>
+            <p class="m-0 mt-0.5 text-muted text-xs" :text="schedulerText()"></p>
           </div>
-        </div>
+          <p class="m-0 p-4 text-muted text-ui" x-show="showNoJobs()">No job has run yet.</p>
+          <div>
+            <div class="grid gap-0.5 px-4 py-2.5 border-b border-line last:border-b-0" x-for="job in jobRows()" data-activity-job>
+              <div class="flex gap-2 items-center justify-between">
+                <span class="font-medium text-ink text-ui" :text="job.label"></span>
+                <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="job.failed ? 'text-danger bg-danger-soft' : 'text-success bg-success-soft'" :text="job.status"></span>
+              </div>
+              <p class="m-0 text-muted text-xs" :text="job.detail"></p>
+              <p class="m-0 text-danger text-xs" x-show="job.error" :text="job.error"></p>
+            </div>
+          </div>
+        </Card>
       </section>
     </div>
   </section>

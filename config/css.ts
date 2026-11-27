@@ -361,12 +361,12 @@ const APP_UI: string = `
   margin-inline: auto;
 }
 
-[data-postline-page] > header:first-child {
+[data-workspace-page-header] {
   min-height: 72px;
   padding: 5px 2px 7px;
 }
 
-[data-postline-page] > header:first-child h1 {
+[data-workspace-page-header] h1 {
   font-family: var(--font-display);
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -392,8 +392,8 @@ const APP_UI: string = `
 @media (max-width: 640px) {
   [data-postline-router] { padding: 12px; }
   [data-postline-page] { gap: 12px; }
-  [data-postline-page] > header:first-child { min-height: auto; padding: 2px 1px 5px; }
-  [data-postline-page] > header:first-child h1 { font-size: 21px; }
+  [data-workspace-page-header] { min-height: auto; padding: 2px 1px 5px; }
+  [data-workspace-page-header] h1 { font-size: 21px; }
 }
 `
 

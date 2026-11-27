@@ -5,12 +5,8 @@
 @section('content')
   @meta('description', 'Watch brand and product keywords across social networks and collect new mentions.')
   <section class="grid gap-4" data-postline-page="listening" data-testid="listening-page">
-    <header class="flex flex-col gap-4 items-stretch justify-between md:flex-row md:items-center min-h-11">
-      <div>
-        <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Social Listening</p>
-        <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Know when people talk about you</h1>
-        <p class="mb-0 mt-1.5 text-muted text-ui">Watch brand, product, and competitor keywords across Bluesky, X, and Mastodon.</p>
-      </div>
+    <WorkspacePageHeader title="Social listening">
+      <template #description><span :show="!loading()" :text="watchOverview()"></span></template>
       <div class="flex flex-wrap gap-2 items-center">
         {{-- New matches raise an alert on the server (#112): a Mac notification
             from the app shell on any page, an email when mail is set up, and a
@@ -24,22 +20,7 @@
           <span :text="scanning() ? 'Scanning…' : 'Scan now'">Scan now</span>
         </button>
       </div>
-    </header>
-
-    <div class="grid gap-3 sm:grid-cols-3">
-      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-note bg-note-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-radar-02"></span></span>
-        <div><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Active watches</span><strong class="block mt-1 text-ink text-xl" :text="String(activeCount())">0</strong></div>
-      </article>
-      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-info text-lg bg-info-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-notification-02"></span></span>
-        <div><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Unread mentions</span><strong class="block mt-1 text-ink text-xl" :text="String(unreadCount())">0</strong></div>
-      </article>
-      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-success bg-success-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-clock-01"></span></span>
-        <div class="min-w-0"><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Last checked</span><strong class="block mt-1 text-ink text-sm truncate" :text="lastCheckedLabel()">Not yet</strong></div>
-      </article>
-    </div>
+    </WorkspacePageHeader>
 
     <div class="grid gap-4 lg:grid-cols-[minmax(13rem,18rem)_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]">
       <aside class="grid content-start gap-4" aria-label="Listening rules">
@@ -73,41 +54,43 @@
         </section>
       </aside>
 
-      <section class="overflow-hidden min-h-[34rem] bg-panel border border-line rounded-2xl shadow-sm" aria-label="Keyword mentions">
-        <header class="flex flex-wrap gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
-          <div><h2 class="m-0 font-semibold text-ink text-sm">Mention inbox</h2><p class="m-0 mt-1 text-muted text-xs" :text="inboxSummary()">New matching posts appear here.</p></div>
-          <div class="flex gap-2 items-center">
-            <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-field-line rounded-lg" aria-label="Watch" @change="filterMonitorId.set(Number($event.target.value))"><option value="0">All watches</option><option x-for="monitor in monitors()" :value="monitor.id" :text="monitor.name"></option></select>
-            <button class="px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :disabled="unreadCount() === 0" @click="markAllRead">Mark all read</button>
-          </div>
-        </header>
-
-        <WorkspaceListSkeleton :show="loading()" label="Loading mentions" />
-        <ErrorState :show="mentionLoadError() && !loading()" title="Could not load mentions" :message="mentionLoadError()" @retry="loadData()" />
-        <EmptyState :show="showEmpty()" variant="bare" :title="monitors().length ? 'No mentions found yet' : 'Create your first listening rule'" :description="monitors().length ? 'New matching posts will appear here.' : 'Choose the terms and networks you want to watch.'">
-          <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="activeCount()" :disabled="scanning()" @click="runScan">Run a scan</button>
-        </EmptyState>
-
-        <div class="divide-line divide-y" x-show="!loading() && filteredMentions().length">
-          <article class="grid gap-3 p-4 hover:bg-panel-2/45 transition-colors" x-for="mention in filteredMentions()" :data-command-context="mention.authorName || mention.authorHandle" :class="mention.status === 'unread' ? 'bg-info-soft' : ''">
-            <div class="flex gap-3 items-start">
-              <NetworkChip :provider="mention.provider" />
-              <div class="flex-1 min-w-0">
-                <div class="flex flex-wrap gap-x-2 gap-y-1 items-center">
-                  <strong class="text-ink text-ui" :text="mention.authorName || `@${mention.authorHandle}`"></strong>
-                  <span class="text-muted text-xs" :text="`@${mention.authorHandle}`" x-show="mention.authorName"></span>
-                  <span class="text-muted text-xs">·</span><time class="text-muted text-xs" :datetime="mention.postedAt" :text="relativeTime(mention.postedAt, { fallback: 'Not yet' })"></time>
-                  <span class="h-2 w-2 bg-info-solid rounded-full" x-show="mention.status === 'unread'" aria-label="Unread"></span>
-                </div>
-                <p class="m-0 mt-2 leading-5 text-body text-ui whitespace-pre-line" :text="mention.body"></p>
-                <div class="flex flex-wrap gap-1.5 mt-3"><span class="px-2 py-0.5 font-semibold text-note text-xs bg-note-soft border border-note-line rounded-full" x-for="keyword in mention.matchedKeywords" :text="keyword"></span></div>
-              </div>
-              <a class="grid place-items-center shrink-0 h-8 w-8 text-muted hover:text-ink hover:bg-raised border border-line rounded-lg" :href="mention.url" target="_blank" rel="noopener noreferrer" aria-label="Open mention" @click="markRead(mention.id)"><span class="h-4 w-4 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span></a>
+      <section aria-label="Keyword mentions">
+        <Card padding="none" className="min-h-[34rem] shadow-sm">
+          <header class="flex flex-wrap gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
+            <div><h2 class="m-0 font-semibold text-ink text-sm">Mention inbox</h2><p class="m-0 mt-1 text-muted text-xs" :text="inboxSummary()">New matching posts appear here.</p></div>
+            <div class="flex gap-2 items-center">
+              <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-field-line rounded-lg" aria-label="Watch" @change="filterMonitorId.set(Number($event.target.value))"><option value="0">All watches</option><option x-for="monitor in monitors()" :value="monitor.id" :text="monitor.name"></option></select>
+              <button class="px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :disabled="unreadCount() === 0" @click="markAllRead">Mark all read</button>
             </div>
-          </article>
-          <button class="p-3 w-full text-center text-muted text-ui hover:text-ink hover:bg-panel-2 transition-colors" type="button" x-show="nextOffset() !== null" :disabled="loadingMore()" @click="loadMoreMentions" :text="loadingMore() ? 'Loading…' : 'Load more mentions'">Load more mentions</button>
-        </div>
-        <p class="m-0 px-4 py-3 text-danger text-sm bg-danger-soft border-danger-line border-t" x-show="errorMessage()" :text="errorMessage()"></p>
+          </header>
+
+          <WorkspaceListSkeleton :show="loading()" label="Loading mentions" />
+          <ErrorState :show="mentionLoadError() && !loading()" title="Could not load mentions" :message="mentionLoadError()" @retry="loadData()" />
+          <EmptyState :show="showEmpty()" variant="bare" :title="monitors().length ? 'No mentions found yet' : 'Create your first listening rule'" :description="monitors().length ? 'New matching posts will appear here.' : 'Choose the terms and networks you want to watch.'">
+            <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="activeCount()" :disabled="scanning()" @click="runScan">Run a scan</button>
+          </EmptyState>
+
+          <div class="divide-line divide-y" x-show="!loading() && filteredMentions().length">
+            <article class="grid gap-3 p-4 hover:bg-panel-2/45 transition-colors" x-for="mention in filteredMentions()" :data-command-context="mention.authorName || mention.authorHandle" :class="mention.status === 'unread' ? 'bg-info-soft' : ''">
+              <div class="flex gap-3 items-start">
+                <NetworkChip :provider="mention.provider" />
+                <div class="flex-1 min-w-0">
+                  <div class="flex flex-wrap gap-x-2 gap-y-1 items-center">
+                    <strong class="text-ink text-ui" :text="mention.authorName || `@${mention.authorHandle}`"></strong>
+                    <span class="text-muted text-xs" :text="`@${mention.authorHandle}`" x-show="mention.authorName"></span>
+                    <span class="text-muted text-xs">·</span><time class="text-muted text-xs" :datetime="mention.postedAt" :text="relativeTime(mention.postedAt, { fallback: 'Not yet' })"></time>
+                    <span class="h-2 w-2 bg-info-solid rounded-full" x-show="mention.status === 'unread'" aria-label="Unread"></span>
+                  </div>
+                  <p class="m-0 mt-2 leading-5 text-body text-ui whitespace-pre-line" :text="mention.body"></p>
+                  <div class="flex flex-wrap gap-1.5 mt-3"><span class="px-2 py-0.5 font-semibold text-note text-xs bg-note-soft border border-note-line rounded-full" x-for="keyword in mention.matchedKeywords" :text="keyword"></span></div>
+                </div>
+                <a class="grid place-items-center shrink-0 h-8 w-8 text-muted hover:text-ink hover:bg-raised border border-line rounded-lg" :href="mention.url" target="_blank" rel="noopener noreferrer" aria-label="Open mention" @click="markRead(mention.id)"><span class="h-4 w-4 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span></a>
+              </div>
+            </article>
+            <button class="p-3 w-full text-center text-muted text-ui hover:text-ink hover:bg-panel-2 transition-colors" type="button" x-show="nextOffset() !== null" :disabled="loadingMore()" @click="loadMoreMentions" :text="loadingMore() ? 'Loading…' : 'Load more mentions'">Load more mentions</button>
+          </div>
+          <p class="m-0 px-4 py-3 text-danger text-sm bg-danger-soft border-danger-line border-t" x-show="errorMessage()" :text="errorMessage()"></p>
+        </Card>
       </section>
     </div>
   </section>
@@ -170,6 +153,11 @@
     const lastCheckedLabel = derived(() => {
       const values = monitors().map(item => item.lastCheckedAt).filter(Boolean).sort().reverse()
       return values.length ? relativeTime(values[0], { fallback: 'Not yet' }) : 'Not yet'
+    })
+    const watchOverview = derived(() => {
+      const count = activeCount()
+      const checked = lastCheckedLabel()
+      return `${count} active watch${count === 1 ? '' : 'es'} · ${unreadCount()} unread${checked === 'Not yet' ? '' : ` · Last checked ${checked}`}`
     })
 
     const loadData = async ({ quiet = false } = {}) => {

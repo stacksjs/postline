@@ -5,62 +5,49 @@
 @section('content')
   @meta('description', 'Connect and manage publishing channels in Postline settings.')
   <section class="grid gap-4" data-postline-page="accounts" data-testid="accounts-page">
-    <header class="flex flex-col gap-4 items-stretch justify-between sm:flex-row sm:items-end min-h-11">
-      <div>
-        <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Settings</p>
-        <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Connect your channels</h1>
-        <p class="mb-0 mt-1.5 text-muted text-ui">Bring every place you publish into one calm, reliable workspace.</p>
-      </div>
+    <WorkspacePageHeader title="Connect your channels">
+      <template #description><span :show="channelsReady()" :text="channelProviders().length + (channelProviders().length === 1 ? ' publishing channel' : ' publishing channels')"></span></template>
       <a class="inline-flex gap-2 items-center justify-center px-4 h-9 w-fit font-semibold text-ink text-sm bg-panel hover:bg-raised border border-line rounded-xl shadow-sm transition-colors" :href="returnToSetup() ? '/setup?step=channels' : '/composer'" data-stx-link>
         <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>
         <span :text="returnToSetup() ? 'Continue setup' : 'Open Composer'">Open Composer</span>
       </a>
-    </header>
+      <StxLink class="text-info text-ui underline" to="/listening">Watch brand mentions</StxLink>
+    </WorkspacePageHeader>
 
     <nav class="flex gap-1 p-1 w-fit bg-panel-3 border border-line rounded-xl" aria-label="Settings sections">
       <a class="inline-flex items-center justify-center px-3 h-8 font-semibold text-muted text-xs hover:text-ink rounded-lg transition-colors" href="/settings" data-stx-link>General</a>
       <a class="inline-flex items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel border border-line rounded-lg shadow-sm" href="/accounts" data-stx-link aria-current="page">Channels</a>
     </nav>
 
-    <div class="grid gap-3 sm:grid-cols-2">
-      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-success bg-success-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-shield-key"></span></span>
-        <div><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Credentials</span><strong class="block mt-1 text-ink text-sm">Stored in your workspace</strong></div>
-      </article>
-      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-note bg-note-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-radar-02"></span></span>
-        <div><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Listening</span><a class="block mt-1 font-semibold text-ink text-sm hover:underline" href="/listening" data-stx-link>Watch brand mentions</a></div>
-      </article>
-    </div>
-
-    <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" aria-labelledby="publishing-channels-title" :aria-busy="!channelsReady() && !bootstrap.error()">
-      <header class="flex gap-3 items-start justify-between px-4 py-3.5 border-b border-line">
-        <div>
-          <h2 class="m-0 font-semibold text-ink text-sm" id="publishing-channels-title">Publishing channels</h2>
-          <p class="m-0 mt-1 text-muted text-xs">Connect accounts for the networks you use.</p>
-        </div>
-        <span class="px-2.5 py-1 font-semibold text-muted text-xs bg-panel-2 border border-line rounded-full" x-cloak x-show="channelsReady()" :text="channelProviders().length + ' channels'"></span>
-      </header>
-      <p class="m-0 pt-3 px-4 text-sm" role="status" x-cloak x-show="oauthFeedback()" :class="oauthFailed() ? 'text-danger' : 'text-success'" :text="oauthFeedback()"></p>
-      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" x-show="!channelsReady() && !bootstrap.error()" data-channels-loading>
-        <span class="sr-only" role="status">Loading publishing channels</span>
-        @for(i = 0; i < 3; i++)
-          <div class="grid gap-4 p-4 min-h-52 border border-line rounded-2xl" aria-hidden="true">
-            <Skeleton variant="avatar" className="bg-panel-2" />
-            <Skeleton variant="text" className="w-3/4 bg-panel-2" />
-            <Skeleton variant="text" className="w-1/2 bg-panel-2" />
+    <section aria-labelledby="publishing-channels-title" :aria-busy="!channelsReady() && !bootstrap.error()">
+      <Card padding="none" className="shadow-sm">
+        <header class="flex gap-3 items-start justify-between px-4 py-3.5 border-b border-line">
+          <div>
+            <h2 class="m-0 font-semibold text-ink text-sm" id="publishing-channels-title">Publishing channels</h2>
+            <p class="m-0 mt-1 text-muted text-xs">Postline stores channel credentials in your workspace.</p>
           </div>
-        @endfor
-      </div>
-      <ErrorState :show="bootstrap.error() && !channelsReady()" title="Could not load publishing channels" :message="bootstrap.error()" @retry="bootstrap.refresh()" testID="channels-error" />
-      <EmptyState :show="channelsReady() && !channelProviders().length" variant="bare" title="No publishing channels available" description="Refresh to check which channels this workspace can use.">
-        <button class="text-info text-ui underline" type="button" @click="bootstrap.refresh()">Refresh channels</button>
-      </EmptyState>
-      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" x-cloak x-show="channelsReady()" data-publishing-channels>
-        <div class="min-w-0" x-for="provider in channelProviders()" :key="provider">
-          <NetworkChannelCard :provider="provider" />
+        </header>
+        <p class="m-0 pt-3 px-4 text-sm" role="status" x-cloak x-show="oauthFeedback()" :class="oauthFailed() ? 'text-danger' : 'text-success'" :text="oauthFeedback()"></p>
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" x-show="!channelsReady() && !bootstrap.error()" data-channels-loading>
+          <span class="sr-only" role="status">Loading publishing channels</span>
+          @for(i = 0; i < 3; i++)
+            <div class="grid gap-4 p-4 min-h-52 border border-line rounded-2xl" aria-hidden="true">
+              <Skeleton variant="avatar" className="bg-panel-2" />
+              <Skeleton variant="text" className="w-3/4 bg-panel-2" />
+              <Skeleton variant="text" className="w-1/2 bg-panel-2" />
+            </div>
+          @endfor
         </div>
-      </div>
+        <ErrorState :show="bootstrap.error() && !channelsReady()" title="Could not load publishing channels" :message="bootstrap.error()" @retry="bootstrap.refresh()" testID="channels-error" />
+        <EmptyState :show="channelsReady() && !channelProviders().length" variant="bare" title="No publishing channels available" description="Refresh to check which channels this workspace can use.">
+          <button class="text-info text-ui underline" type="button" @click="bootstrap.refresh()">Refresh channels</button>
+        </EmptyState>
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" x-cloak x-show="channelsReady()" data-publishing-channels>
+          <div class="min-w-0" x-for="provider in channelProviders()" :key="provider">
+            <NetworkChannelCard :provider="provider" />
+          </div>
+        </div>
+      </Card>
     </section>
 
     {{--
@@ -69,58 +56,60 @@
       secret are entered here (the secret is stored sealed), so no file has to
       be edited, which the Mac app cannot do at all.
     --}}
-    <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm" aria-label="Your network apps" x-cloak x-show="channelsReady()" data-network-apps>
-      <header class="px-4 py-3.5 border-b border-line">
-        <h2 class="m-0 font-semibold text-ink text-sm">Your network apps</h2>
-        <p class="m-0 mt-1 text-muted text-xs">X, LinkedIn, Instagram and Threads connect through an app you register on each network. Postline has no keys of its own: yours stay in this workspace.</p>
-      </header>
-      <div class="divide-line divide-y">
-        <details class="group" x-for="app in appRows()" data-network-app>
-          <summary class="flex gap-3 items-center justify-between px-4 py-3 list-none hover:bg-panel-2 cursor-pointer">
-            <span class="font-medium text-ink text-ui" :text="app.label"></span>
-            <span class="flex gap-2 items-center">
-              <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="app.configured ? 'text-success bg-success-soft' : 'text-muted bg-panel-2'" :text="app.status"></span>
-              <span class="h-4 w-4 text-muted transition-transform group-open:rotate-180 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
-            </span>
-          </summary>
-          <div class="grid gap-3 pb-4 px-4">
-            <ol class="grid gap-1 m-0 pl-5 text-body text-xs">
-              <li x-for="step in app.steps" :text="step"></li>
-            </ol>
-            <div class="grid gap-1">
-              <span class="font-medium text-muted text-xs">Redirect address to give the network</span>
-              <div class="flex gap-2 items-center">
-                <code class="flex-1 px-2.5 py-1.5 min-w-0 text-ink text-xs truncate bg-panel-2 border border-line rounded-lg" :text="app.redirectUrl" :title="app.redirectUrl"></code>
-                <button class="shrink-0 px-2.5 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" type="button" @click="copyRedirect(app.provider)">Copy</button>
+    <section aria-label="Your network apps" x-cloak x-show="channelsReady()" data-network-apps>
+      <Card padding="none" className="shadow-sm">
+        <header class="px-4 py-3.5 border-b border-line">
+          <h2 class="m-0 font-semibold text-ink text-sm">Your network apps</h2>
+          <p class="m-0 mt-1 text-muted text-xs">X, LinkedIn, Instagram and Threads connect through an app you register on each network. Postline has no keys of its own: yours stay in this workspace.</p>
+        </header>
+        <div class="divide-line divide-y">
+          <details class="group" x-for="app in appRows()" data-network-app>
+            <summary class="flex gap-3 items-center justify-between px-4 py-3 list-none hover:bg-panel-2 cursor-pointer">
+              <span class="font-medium text-ink text-ui" :text="app.label"></span>
+              <span class="flex gap-2 items-center">
+                <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="app.configured ? 'text-success bg-success-soft' : 'text-muted bg-panel-2'" :text="app.status"></span>
+                <span class="h-4 w-4 text-muted transition-transform group-open:rotate-180 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
+              </span>
+            </summary>
+            <div class="grid gap-3 pb-4 px-4">
+              <ol class="grid gap-1 m-0 pl-5 text-body text-xs">
+                <li x-for="step in app.steps" :text="step"></li>
+              </ol>
+              <div class="grid gap-1">
+                <span class="font-medium text-muted text-xs">Redirect address to give the network</span>
+                <div class="flex gap-2 items-center">
+                  <code class="flex-1 px-2.5 py-1.5 min-w-0 text-ink text-xs truncate bg-panel-2 border border-line rounded-lg" :text="app.redirectUrl" :title="app.redirectUrl"></code>
+                  <button class="shrink-0 px-2.5 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" type="button" @click="copyRedirect(app.provider)">Copy</button>
+                </div>
               </div>
+              <form class="grid gap-2 sm:grid-cols-2" @submit.prevent="saveApp(app.provider)">
+                <label class="grid gap-1 text-muted text-xs">
+                  <span>Client id</span>
+                  <input class="px-3 h-9 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" autocomplete="off" spellcheck="false" :value="app.clientId" @input="setAppField(app.provider, 'clientId', $event)" data-app-client-id>
+                </label>
+                <label class="grid gap-1 text-muted text-xs">
+                  <span>Client secret</span>
+                  <input class="px-3 h-9 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="password" autocomplete="off" :placeholder="app.secretPlaceholder" :value="app.clientSecret" @input="setAppField(app.provider, 'clientSecret', $event)" data-app-client-secret>
+                </label>
+                {{-- LinkedIn company Pages (#130): opt-in, since the scopes need a product the app may not have. --}}
+                <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'linkedin' ? 'flex' : 'hidden'">
+                  <input class="mt-0.5" type="checkbox" :checked="app.organizationPages" @change="setAppFlag(app.provider, 'organizationPages', $event)" data-app-organization-pages>
+                  <span>Also connect the company Pages I administer. Needs the Community Management API product on this app; without it LinkedIn refuses the sign-in.</span>
+                </label>
+                <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'twitter' ? 'hidden' : 'flex'">
+                  <input class="mt-0.5" type="checkbox" :checked="app.engagementMetrics" @change="setAppFlag(app.provider, 'engagementMetrics', $event)">
+                  <span>Read engagement metrics. Enable the permission in your developer app, then reconnect the account.</span>
+                </label>
+                <div class="flex flex-wrap gap-2 items-center sm:col-span-2">
+                  <p class="m-0 mr-auto text-muted text-xs" :text="app.note"></p>
+                  <button class="px-3 h-8 font-medium text-danger text-xs bg-panel hover:bg-danger-soft border border-line rounded-lg disabled:opacity-50" type="button" x-show="app.removable" :disabled="appBusy() === app.provider" @click="clearApp(app.provider)">Remove</button>
+                  <button class="px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="submit" :disabled="appBusy() === app.provider">Save</button>
+                </div>
+              </form>
             </div>
-            <form class="grid gap-2 sm:grid-cols-2" @submit.prevent="saveApp(app.provider)">
-              <label class="grid gap-1 text-muted text-xs">
-                <span>Client id</span>
-                <input class="px-3 h-9 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" autocomplete="off" spellcheck="false" :value="app.clientId" @input="setAppField(app.provider, 'clientId', $event)" data-app-client-id>
-              </label>
-              <label class="grid gap-1 text-muted text-xs">
-                <span>Client secret</span>
-                <input class="px-3 h-9 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="password" autocomplete="off" :placeholder="app.secretPlaceholder" :value="app.clientSecret" @input="setAppField(app.provider, 'clientSecret', $event)" data-app-client-secret>
-              </label>
-              {{-- LinkedIn company Pages (#130): opt-in, since the scopes need a product the app may not have. --}}
-              <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'linkedin' ? 'flex' : 'hidden'">
-                <input class="mt-0.5" type="checkbox" :checked="app.organizationPages" @change="setAppFlag(app.provider, 'organizationPages', $event)" data-app-organization-pages>
-                <span>Also connect the company Pages I administer. Needs the Community Management API product on this app; without it LinkedIn refuses the sign-in.</span>
-              </label>
-              <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'twitter' ? 'hidden' : 'flex'">
-                <input class="mt-0.5" type="checkbox" :checked="app.engagementMetrics" @change="setAppFlag(app.provider, 'engagementMetrics', $event)">
-                <span>Read engagement metrics. Enable the permission in your developer app, then reconnect the account.</span>
-              </label>
-              <div class="flex flex-wrap gap-2 items-center sm:col-span-2">
-                <p class="m-0 mr-auto text-muted text-xs" :text="app.note"></p>
-                <button class="px-3 h-8 font-medium text-danger text-xs bg-panel hover:bg-danger-soft border border-line rounded-lg disabled:opacity-50" type="button" x-show="app.removable" :disabled="appBusy() === app.provider" @click="clearApp(app.provider)">Remove</button>
-                <button class="px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="submit" :disabled="appBusy() === app.provider">Save</button>
-              </div>
-            </form>
-          </div>
-        </details>
-      </div>
+          </details>
+        </div>
+      </Card>
     </section>
 
     <details class="overflow-hidden bg-panel border border-line rounded-2xl open:border-danger-line shadow-sm group" data-purge-card>

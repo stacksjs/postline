@@ -1,0 +1,14 @@
+<script server cache>
+export const workspacePageTitle = $props.title || ''
+</script>
+
+<header class="flex flex-wrap gap-x-5 gap-y-2 items-end justify-between" data-workspace-page-header>
+  <div class="min-w-0">
+    <div class="flex flex-wrap gap-2 items-center">
+      <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">{{ workspacePageTitle }}</h1>
+      <slot name="status" />
+    </div>
+    <p class="empty:hidden mb-0 mt-1.5 text-muted text-ui"><slot name="description" /></p>
+  </div>
+  <div class="flex empty:hidden flex-wrap gap-2 items-center"><slot /></div>
+</header>

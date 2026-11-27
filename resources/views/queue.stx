@@ -7,12 +7,8 @@
   <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
     <p class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !schedulerWarning() }" :text="schedulerWarning()" role="status" data-scheduler-warning></p>
     <a class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !attentionText() }" href="/activity" data-stx-link :text="attentionText()" data-attention-link></a>
-    <header class="flex flex-wrap gap-4 items-center justify-between min-h-11">
-      <div>
-        <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Queue</p>
-        <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Scheduled posts</h1>
-        <p class="mb-0 mt-1.5 text-muted text-ui">What's drafted, scheduled, and recently published.</p>
-      </div>
+    <WorkspacePageHeader title="Scheduled posts">
+      <template #description>What's drafted, scheduled, and recently published.</template>
       <div class="flex flex-wrap gap-2 items-center">
         <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Queue view" x-show="!activeSearch()">
           <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'list'" :aria-pressed="view() === 'list'" @click="setView('list')">
@@ -27,7 +23,7 @@
           <span>New post</span>
         </a>
       </div>
-    </header>
+    </WorkspacePageHeader>
 
     <form class="flex flex-wrap gap-2 items-center" role="search" aria-label="Posts" @submit.prevent="searchPosts">
       <label class="sr-only" for="queue-search">Search posts</label>
@@ -126,61 +122,63 @@
       </div>
     </section>
 
-    <section class="bg-panel border border-line rounded-2xl shadow-sm" aria-label="Queue calendar" x-cloak x-show="!activeSearch() && view() === 'calendar'">
-      <header class="flex flex-wrap gap-3 items-center justify-between p-3.5 border-b border-line">
-        <div class="flex gap-2 items-center">
-          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" :aria-label="'Previous ' + calendarPeriod()" @click="shiftCalendar(-1)">
-            <span class="h-4 w-4 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
-          </button>
-          <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" @click="goToday">Today</button>
-          <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" :aria-label="'Next ' + calendarPeriod()" @click="shiftCalendar(1)">
-            <span class="h-4 w-4 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
-          </button>
-        </div>
-        <strong class="text-ui" aria-live="polite" :text="calTitle()">Calendar</strong>
-        <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Calendar period">
-          <button class="px-3 py-1.5 font-semibold text-xs rounded-lg" type="button" data-view-toggle :data-active="calendarPeriod() === 'month'" :aria-pressed="calendarPeriod() === 'month'" @click="calendarPeriod.set('month')">Month</button>
-          <button class="px-3 py-1.5 font-semibold text-xs rounded-lg" type="button" data-view-toggle :data-active="calendarPeriod() === 'week'" :aria-pressed="calendarPeriod() === 'week'" @click="calendarPeriod.set('week')">Week</button>
-        </div>
-      </header>
-      <WorkspaceListSkeleton :show="calendarBusy()" label="Loading calendar" />
-      <ErrorState :show="calendarError() && !calendarBusy()" title="Could not load the calendar" :message="calendarError()" @retry="loadCalendar()" />
-      <div class="sm:hidden divide-line divide-y" :aria-label="calendarPeriod() === 'week' ? 'Weekly agenda' : 'Monthly agenda'" role="list">
-        <article class="grid gap-2 px-3 py-2" role="listitem" x-for="day in calDays()" :key="day.key">
-          <header class="flex gap-3 items-center justify-between">
-            <time class="font-semibold text-ui" :datetime="day.key" :aria-current="day.isToday ? 'date' : null" :text="day.label"></time>
-            <a class="grid place-items-center shrink-0 h-11 w-11 text-ink bg-panel-2 hover:bg-raised rounded-xl" :href="day.scheduleUrl" :aria-label="'Schedule a post on ' + day.label" data-stx-link>
-              <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
-            </a>
-          </header>
-          <div class="grid gap-1" x-show="day.chips.length">
-            <a class="grid gap-1 p-2.5 min-w-0 text-body text-ui bg-panel-2 hover:bg-raised rounded-xl" x-for="chip in day.chips" :href="chip.href" data-stx-link>
-              <span class="flex gap-2 items-center font-semibold text-xs">
-                <span class="h-1.5 w-1.5 rounded-full" data-cal-dot :data-status="chip.status" aria-hidden="true"></span>
-                <span :text="chip.time"></span>
-              </span>
-              <span class="min-w-0 break-words" :text="chip.label"></span>
-            </a>
+    <section aria-label="Queue calendar" x-cloak x-show="!activeSearch() && view() === 'calendar'">
+      <Card padding="none" className="shadow-sm">
+        <header class="flex flex-wrap gap-3 items-center justify-between p-3.5 border-b border-line">
+          <div class="flex gap-2 items-center">
+            <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" :aria-label="'Previous ' + calendarPeriod()" @click="shiftCalendar(-1)">
+              <span class="h-4 w-4 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
+            </button>
+            <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" @click="goToday">Today</button>
+            <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" :aria-label="'Next ' + calendarPeriod()" @click="shiftCalendar(1)">
+              <span class="h-4 w-4 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
+            </button>
           </div>
-        </article>
-      </div>
-      <div class="hidden sm:block overflow-x-auto">
-        <div class="min-w-[560px]">
-          <div class="grid grid-cols-7 font-semibold text-muted text-xs border-b border-line">
-            <div class="p-2 text-center">Sun</div><div class="p-2 text-center">Mon</div><div class="p-2 text-center">Tue</div><div class="p-2 text-center">Wed</div><div class="p-2 text-center">Thu</div><div class="p-2 text-center">Fri</div><div class="p-2 text-center">Sat</div>
+          <strong class="text-ui" aria-live="polite" :text="calTitle()">Calendar</strong>
+          <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Calendar period">
+            <button class="px-3 py-1.5 font-semibold text-xs rounded-lg" type="button" data-view-toggle :data-active="calendarPeriod() === 'month'" :aria-pressed="calendarPeriod() === 'month'" @click="calendarPeriod.set('month')">Month</button>
+            <button class="px-3 py-1.5 font-semibold text-xs rounded-lg" type="button" data-view-toggle :data-active="calendarPeriod() === 'week'" :aria-pressed="calendarPeriod() === 'week'" @click="calendarPeriod.set('week')">Week</button>
           </div>
-          <div class="grid grid-cols-7">
-            <div class="grid content-start gap-1 p-1.5 min-h-24 border-b border-line border-r data-[drop-target=true]:ring-2 data-[drop-target=true]:ring-focus data-[drop-target=true]:ring-inset" data-cal-cell :data-blank="cell.blank" :data-today="cell.isToday" :data-calendar-date="cell.blank ? null : cell.key" :data-drop-target="!cell.blank && dropDay() === cell.key" x-for="cell in calCells()" :key="cell.key" @dragover="allowCalendarDrop($event, cell)" @drop="dropOnCalendar($event, cell)">
-              <a class="font-semibold text-xs hover:text-ink transition-colors" data-cal-day x-show="!cell.blank" :href="cell.scheduleUrl" data-stx-link title="Schedule a post on this day">{{ cell.day }}</a>
-              <a class="flex gap-1 items-center px-1 py-0.5 text-body text-xs bg-panel-2 hover:bg-panel-2 rounded transition-colors" x-for="chip in cell.chips" :key="chip.id" :href="chip.href" :draggable="chip.schedule ? 'true' : 'false'" @dragstart="startCalendarDrag($event, chip.schedule)" @dragend="endCalendarDrag" data-stx-link>
-                <span class="shrink-0 h-1.5 w-1.5 rounded-full" data-cal-dot :data-status="chip.status" aria-hidden="true"></span>
-                <span class="truncate">{{ chip.time }} {{ chip.label }}</span>
+        </header>
+        <WorkspaceListSkeleton :show="calendarBusy()" label="Loading calendar" />
+        <ErrorState :show="calendarError() && !calendarBusy()" title="Could not load the calendar" :message="calendarError()" @retry="loadCalendar()" />
+        <div class="sm:hidden divide-line divide-y" :aria-label="calendarPeriod() === 'week' ? 'Weekly agenda' : 'Monthly agenda'" role="list">
+          <article class="grid gap-2 px-3 py-2" role="listitem" x-for="day in calDays()" :key="day.key">
+            <header class="flex gap-3 items-center justify-between">
+              <time class="font-semibold text-ui" :datetime="day.key" :aria-current="day.isToday ? 'date' : null" :text="day.label"></time>
+              <a class="grid place-items-center shrink-0 h-11 w-11 text-ink bg-panel-2 hover:bg-raised rounded-xl" :href="day.scheduleUrl" :aria-label="'Schedule a post on ' + day.label" data-stx-link>
+                <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
               </a>
-              <button class="px-1 text-left text-muted text-xs hover:text-ink" type="button" x-show="cell.more" :text="'+' + cell.more + ' more'" :aria-label="'Show all posts on ' + cell.label" @click="showCalendarWeek(cell.key)"></button>
+            </header>
+            <div class="grid gap-1" x-show="day.chips.length">
+              <a class="grid gap-1 p-2.5 min-w-0 text-body text-ui bg-panel-2 hover:bg-raised rounded-xl" x-for="chip in day.chips" :href="chip.href" data-stx-link>
+                <span class="flex gap-2 items-center font-semibold text-xs">
+                  <span class="h-1.5 w-1.5 rounded-full" data-cal-dot :data-status="chip.status" aria-hidden="true"></span>
+                  <span :text="chip.time"></span>
+                </span>
+                <span class="min-w-0 break-words" :text="chip.label"></span>
+              </a>
+            </div>
+          </article>
+        </div>
+        <div class="hidden sm:block overflow-x-auto">
+          <div class="min-w-[560px]">
+            <div class="grid grid-cols-7 font-semibold text-muted text-xs border-b border-line">
+              <div class="p-2 text-center">Sun</div><div class="p-2 text-center">Mon</div><div class="p-2 text-center">Tue</div><div class="p-2 text-center">Wed</div><div class="p-2 text-center">Thu</div><div class="p-2 text-center">Fri</div><div class="p-2 text-center">Sat</div>
+            </div>
+            <div class="grid grid-cols-7">
+              <div class="grid content-start gap-1 p-1.5 min-h-24 border-b border-line border-r data-[drop-target=true]:ring-2 data-[drop-target=true]:ring-focus data-[drop-target=true]:ring-inset" data-cal-cell :data-blank="cell.blank" :data-today="cell.isToday" :data-calendar-date="cell.blank ? null : cell.key" :data-drop-target="!cell.blank && dropDay() === cell.key" x-for="cell in calCells()" :key="cell.key" @dragover="allowCalendarDrop($event, cell)" @drop="dropOnCalendar($event, cell)">
+                <a class="font-semibold text-xs hover:text-ink transition-colors" data-cal-day x-show="!cell.blank" :href="cell.scheduleUrl" data-stx-link title="Schedule a post on this day">{{ cell.day }}</a>
+                <a class="flex gap-1 items-center px-1 py-0.5 text-body text-xs bg-panel-2 hover:bg-panel-2 rounded transition-colors" x-for="chip in cell.chips" :key="chip.id" :href="chip.href" :draggable="chip.schedule ? 'true' : 'false'" @dragstart="startCalendarDrag($event, chip.schedule)" @dragend="endCalendarDrag" data-stx-link>
+                  <span class="shrink-0 h-1.5 w-1.5 rounded-full" data-cal-dot :data-status="chip.status" aria-hidden="true"></span>
+                  <span class="truncate">{{ chip.time }} {{ chip.label }}</span>
+                </a>
+                <button class="px-1 text-left text-muted text-xs hover:text-ink" type="button" x-show="cell.more" :text="'+' + cell.more + ' more'" :aria-label="'Show all posts on ' + cell.label" @click="showCalendarWeek(cell.key)"></button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </Card>
     </section>
   </section>
 

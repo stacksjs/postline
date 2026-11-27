@@ -5,12 +5,8 @@
 @section('content')
   @meta('description', 'Read and answer direct messages from Bluesky and Mastodon in one place.')
   <section class="grid gap-4" data-postline-page="inbox" data-testid="inbox-page">
-    <header class="flex flex-col gap-4 items-stretch justify-between md:flex-row md:items-center min-h-11">
-      <div>
-        <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Direct Messages</p>
-        <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Answer everyone from one inbox</h1>
-        <p class="mb-0 mt-1.5 text-muted text-ui">Read and reply to direct messages from Bluesky and Mastodon without switching apps.</p>
-      </div>
+    <WorkspacePageHeader title="Inbox">
+      <template #description><span :show="!loading()" :text="inboxOverview()"></span></template>
       <div class="flex flex-wrap gap-2 items-center">
         <button class="inline-flex gap-2 items-center justify-center px-3 h-9 font-semibold text-ink text-xs bg-panel hover:bg-raised border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="unreadCount() === 0" @click="markAllRead">Mark all read</button>
         <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="syncing() || connectedCount() === 0" @click="runSync">
@@ -18,26 +14,11 @@
           <span :text="syncing() ? 'Syncing…' : 'Sync now'">Sync now</span>
         </button>
       </div>
-    </header>
-
-    <div class="grid gap-3 sm:grid-cols-3">
-      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-info text-lg bg-info-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-message-01"></span></span>
-        <div><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Conversations</span><strong class="block mt-1 text-ink text-xl" :text="String(conversations().length)">0</strong></div>
-      </article>
-      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-note bg-note-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-notification-02"></span></span>
-        <div><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Unread</span><strong class="block mt-1 text-ink text-xl" :text="String(unreadCount())">0</strong></div>
-      </article>
-      <article class="flex gap-3 items-center p-4 bg-panel border border-line rounded-2xl shadow-sm">
-        <span class="grid place-items-center shrink-0 h-10 w-10 text-lg text-success bg-success-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-link-02"></span></span>
-        <div class="min-w-0"><span class="block font-semibold text-muted text-xs tracking-wider uppercase">Connected</span><strong class="block mt-1 text-ink text-sm truncate" :text="connectedLabel()">None yet</strong></div>
-      </article>
-    </div>
+    </WorkspacePageHeader>
 
     <div class="grid gap-4 lg:grid-cols-[minmax(13rem,18rem)_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]">
       <aside class="grid content-start gap-4" aria-label="Conversations">
-        <section class="overflow-hidden bg-panel border border-line rounded-2xl shadow-sm">
+        <Card padding="none" className="shadow-sm">
           <header class="grid gap-2.5 px-4 py-3 border-b border-line">
             <div class="flex gap-2 items-center justify-between">
               <h2 class="m-0 font-semibold text-ink text-sm" :text="statusFilter() === 'archived' ? 'Archived' : 'Inbox'">Inbox</h2>
@@ -77,7 +58,7 @@
             </button>
             <button class="p-3 w-full text-center text-muted text-ui hover:text-ink hover:bg-panel-2 transition-colors" type="button" x-show="nextOffset() !== null" :disabled="loadingMore()" @click="loadMoreConversations" :text="loadingMore() ? 'Loading…' : 'Load more conversations'">Load more conversations</button>
           </div>
-        </section>
+        </Card>
 
         <section class="p-4 bg-panel border border-line rounded-2xl shadow-sm" x-show="unavailable().length">
           <h2 class="m-0 font-semibold text-ink text-sm">Not available yet</h2>
@@ -224,13 +205,17 @@
 
     // The whole inbox's unread count, from the server: the list is paged (#105).
     const unreadCount = state(0)
+    const inboxOverview = derived(() => {
+      const count = conversations().length
+      const more = nextOffset() !== null ? '+' : ''
+      return `${count}${more} conversation${count === 1 && !more ? '' : 's'} · ${unreadCount()} unread`
+    })
     const nextOffset = state<number | null>(null)
     const olderOffset = state<number | null>(null)
     const loadingMore = state(false)
     const loadingOlder = state(false)
     const connected = derived(() => supported().filter(item => item.connected))
     const connectedCount = derived(() => connected().length)
-    const connectedLabel = derived(() => connected().length ? connected().map(item => providerLabel(item.provider)).join(', ') : 'None yet')
     const showEmptyList = derived(() => !loading() && !conversationError() && conversations().length === 0)
     const activeConversation = derived(() => conversations().find(item => item.id === activeId()) || null)
     const activeProvider = derived(() => activeConversation()?.provider || 'bluesky')
