@@ -11,6 +11,7 @@ import { MEDIA_DIR } from '../../app/Support/Social/uploads'
 
 const database = db as any
 const at = '2026-11-20 10:00:00'
+const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD1sAAAAASUVORK5CYII='
 
 describe('workspace archive', () => {
   test('the media folder in tests is not the project\'s', () => {
@@ -21,9 +22,9 @@ describe('workspace archive', () => {
     const tag = crypto.randomUUID().slice(0, 8)
     await database.insertInto('social_identities').values({ uuid: crypto.randomUUID(), provider: 'bluesky', handle: `${tag}.bsky.social`, auth_status: 'connected', created_at: at }).execute()
     const identity = await database.selectFrom('social_identities').select(['id']).where('handle', '=', `${tag}.bsky.social`).executeTakeFirstOrThrow()
-    await Bun.write(join(MEDIA_DIR, `${tag}.jpg`), new Uint8Array([1, 2, 3]))
+    await Bun.write(join(MEDIA_DIR, `${tag}.png`), Buffer.from(png, 'base64'))
     const postUuid = crypto.randomUUID()
-    await database.insertInto('posts').values({ uuid: postUuid, title: tag, body: `post ${tag}`, status: 'published', content: JSON.stringify({ media: [{ path: `${tag}.jpg`, mimeType: 'image/jpeg' }] }), published_at: at, created_at: at }).execute()
+    await database.insertInto('posts').values({ uuid: postUuid, title: tag, body: `post ${tag}`, status: 'published', content: JSON.stringify({ media: [{ path: `${tag}.png`, mimeType: 'image/png' }] }), published_at: at, created_at: at }).execute()
     const post = await database.selectFrom('posts').select(['id']).where('uuid', '=', postUuid).executeTakeFirstOrThrow()
     await database.insertInto('post_targets').values({ uuid: crypto.randomUUID(), provider: 'bluesky', status: 'published', remote_uri: `at://${tag}`, post_id: post.id, social_identity_id: identity.id, created_at: at }).execute()
     const campaignUuid = crypto.randomUUID()
@@ -39,13 +40,13 @@ describe('workspace archive', () => {
     const archivedWatch = archive.monitors.find(row => row.name === watch.name)
     expect(archivedWatch?.twitter_read_source).toBe('browser')
     expect(archive.posts.some(row => row.uuid === postUuid)).toBe(true)
-    expect(archive.media[`${tag}.jpg`]).toBe(Buffer.from([1, 2, 3]).toString('base64'))
+    expect(archive.media[`${tag}.png`]).toBe(png)
     expect(JSON.stringify(archive)).not.toContain('access_token')
 
     await expect(workspaceArchive.deleteEverything('delete everything')).rejects.toThrow(DELETE_EVERYTHING_PHRASE)
     await workspaceArchive.deleteEverything(DELETE_EVERYTHING_PHRASE)
     expect(await database.selectFrom('posts').select(['id']).where('uuid', '=', postUuid).executeTakeFirst()).toBeUndefined()
-    expect(existsSync(join(MEDIA_DIR, `${tag}.jpg`))).toBe(false)
+    expect(existsSync(join(MEDIA_DIR, `${tag}.png`))).toBe(false)
 
     // The account is connected again on the new install, then the archive comes in.
     await database.insertInto('social_identities').values({ uuid: crypto.randomUUID(), provider: 'bluesky', handle: `${tag}.bsky.social`, auth_status: 'connected', created_at: at }).execute()
@@ -60,7 +61,7 @@ describe('workspace archive', () => {
     const campaignBack = await database.selectFrom('launch_campaigns').select(['id']).where('uuid', '=', campaignUuid).executeTakeFirstOrThrow()
     const cp = await database.selectFrom('campaign_posts').selectAll().where('launch_campaign_id', '=', campaignBack.id).executeTakeFirstOrThrow()
     expect(Number(cp.post_id)).toBe(Number(back.id))
-    expect(existsSync(join(MEDIA_DIR, `${tag}.jpg`))).toBe(true)
+    expect(existsSync(join(MEDIA_DIR, `${tag}.png`))).toBe(true)
     const restoredWatch = await database.selectFrom('keyword_monitors').select(['id', 'twitter_read_source'])
       .where('uuid', '=', archivedWatch?.uuid).executeTakeFirstOrThrow()
     expect(restoredWatch.twitter_read_source).toBe('browser')
@@ -99,6 +100,23 @@ describe('workspace archive', () => {
 
   test('something that is not an export is refused', async () => {
     await expect(workspaceArchive.import({ hello: 'world' })).rejects.toThrow('not a Postline workspace export')
+  })
+
+  test('an invalid queued image leaves settings, posts and media untouched', async () => {
+    const uuid = crypto.randomUUID()
+    const file = `${uuid}.png`
+    const before = await workspaceArchive.export()
+    await expect(workspaceArchive.import({
+      format: 'postline-workspace',
+      version: 2,
+      settings: { workspace_name: 'Unapplied archive name' },
+      posts: [{ uuid, content: JSON.stringify({ media: [{ path: file }] }) }],
+      media: { [file]: Buffer.from([1, 2, 3]).toString('base64') },
+    })).rejects.toThrow('invalid queued image')
+    const after = await workspaceArchive.export()
+    expect(after.settings).toEqual(before.settings)
+    expect(after.posts.some(post => post.uuid === uuid)).toBe(false)
+    expect(existsSync(join(MEDIA_DIR, file))).toBe(false)
   })
 
   test('invalid attachment references are rejected before any post is imported', async () => {

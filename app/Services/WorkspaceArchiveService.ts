@@ -85,6 +85,14 @@ function pick(row: Record<string, unknown>, columns: readonly string[]): Record<
   return Object.fromEntries(columns.map(column => [column, row[column] ?? null]))
 }
 
+function readArchivedImage(data: unknown, message: string) {
+  if (typeof data !== 'string' || data.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4)
+    throw new UserFacingError(message)
+  const checked = checkImageBytes(Buffer.from(data, 'base64'))
+  if (!checked.ok) throw new UserFacingError(message)
+  return checked
+}
+
 export class WorkspaceArchiveService {
   async export(): Promise<WorkspaceArchive> {
     const accountId = await ensureAccount()
@@ -162,14 +170,18 @@ export class WorkspaceArchiveService {
         throw new UserFacingError('A Listening watch in this export has an invalid X read source.')
       return { ...pick(monitor, MONITOR_COLUMNS), uuid: monitor.uuid ?? null, twitter_read_source: source }
     })
-    const media = Object.entries(archive.media || {})
+    const mediaEntries = Object.entries(archive.media || {})
     try {
       for (const post of archive.posts || []) referencedMediaFiles(post.content)
-      if (media.some(([name]) => !isSafeMediaFilename(name))) throw new Error('Invalid image filename')
+      if (mediaEntries.some(([name]) => !isSafeMediaFilename(name))) throw new Error('Invalid image filename')
     }
     catch {
       throw new UserFacingError('That export contains an invalid stored image reference.')
     }
+
+    const media = mediaEntries.map(([name, data]) => [
+      name, readArchivedImage(data, 'That export contains an invalid queued image.').bytes,
+    ] as const)
 
     const blogPosts = (archive.blogPosts || []).filter(post => post.status === 'published' || post.status === 'draft')
       .map((post) => {
@@ -177,10 +189,9 @@ export class WorkspaceArchiveService {
         if (attachments !== undefined && (!Array.isArray(attachments) || attachments.length > MAX_POST_IMAGES))
           throw new UserFacingError('That export contains invalid Blog attachments.')
         const images = attachments?.map((image) => {
-          if (typeof image?.data !== 'string' || image.data.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4 || typeof image.alt !== 'string')
-            throw new UserFacingError('That export contains an invalid Blog image.')
-          const checked = checkImageBytes(Buffer.from(image.data, 'base64'))
-          if (!checked.ok) throw new UserFacingError('That export contains an invalid Blog image.')
+          const message = 'That export contains an invalid Blog image.'
+          if (typeof image?.alt !== 'string') throw new UserFacingError(message)
+          const checked = readArchivedImage(image.data, message)
           return { bytes: checked.bytes, mimeType: checked.mimeType, altText: image.alt }
         })
         return { ...post, images }
@@ -255,10 +266,10 @@ export class WorkspaceArchiveService {
     }
 
     await mkdir(MEDIA_DIR, { recursive: true })
-    for (const [name, data] of media) {
+    for (const [name, bytes] of media) {
       const path = join(MEDIA_DIR, name)
       if (existsSync(path)) continue
-      await Bun.write(path, Buffer.from(String(data), 'base64'))
+      await Bun.write(path, bytes)
       report.media++
     }
 
