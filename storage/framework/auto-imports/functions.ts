@@ -6,7 +6,7 @@ export { isComposerVideo, composerVideoError, composerFileError, composerMediaWa
 export type { ComposerImage } from '../../../resources/functions/composer-media'
 export { composerPreviewCards, previewImageUrl } from '../../../resources/functions/composer-preview'
 export type { ComposerPreviewImage } from '../../../resources/functions/composer-preview'
-export { composerScheduleIso, composerQueueTimestamp, composerActionText } from '../../../resources/functions/composer-schedule'
+export { composerScheduleIso, composerQueueTimestamp } from '../../../resources/functions/composer-schedule'
 export { shareablePage, shareWorkspace, sharedPage, shareComposerPath, takeSharedPage } from '../../../resources/functions/composer-share'
 export { composerTargets, uniqueComposerNetworks, composerSelection, composerKeyForSpec, composerTargetRows } from '../../../resources/functions/composer-targets'
 export type { ComposerTarget } from '../../../resources/functions/composer-targets'

@@ -25,7 +25,6 @@ declare global {
   const previewImageUrl: typeof autoImports.previewImageUrl
   const composerScheduleIso: typeof autoImports.composerScheduleIso
   const composerQueueTimestamp: typeof autoImports.composerQueueTimestamp
-  const composerActionText: typeof autoImports.composerActionText
   const shareablePage: typeof autoImports.shareablePage
   const shareWorkspace: typeof autoImports.shareWorkspace
   const sharedPage: typeof autoImports.sharedPage

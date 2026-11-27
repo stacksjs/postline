@@ -3394,6 +3394,35 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
     await checkSpanishChannels(cdp)
     await checkSpanishCampaigns(cdp)
     await checkSpanishSettings(cdp)
+    const composer = await auditPage(`${site}/composer`, { cdp })
+    for (const error of composer.errors) fail('composer', 'Spanish', error)
+    for (const request of composer.failed) fail('composer', 'Spanish', request)
+    const editor = `document.querySelector('[data-testid="composer-page"][lang="es"]')`
+    const menu = `${editor}.querySelector('[data-composer-actions] summary')`
+    await waitUntil('Spanish Composer shows its heading, format, and primary action', () => evaluate<boolean>(cdp, `
+      document.title === 'Postline - Redactar'
+        && ${editor}.querySelector('[data-composer-heading]')?.textContent === 'Nueva publicación'
+        && ${editor}.querySelector('[data-stx-segmented-control][aria-label="Formato de publicación"] [aria-label="Hilo"]')
+        && ${editor}.querySelector('[data-bluesky-publish-label]')?.textContent === 'Publicar'
+        && ${editor}.querySelector('#composer-preview-title')?.textContent === 'Vista previa'
+    `), 5_000)
+    await evaluate(cdp, `${menu}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The Spanish publishing menu opens from the keyboard', () => evaluate<boolean>(cdp, `
+      ${menu}.parentElement.open && ${menu}.getAttribute('aria-label') === 'Opciones de publicación'
+        && Boolean([...${menu}.parentElement.querySelectorAll('button')].find(button => button.textContent.trim() === 'Guardar borrador'))
+    `), 5_000)
+    const schedule = `${editor}.querySelector('[data-postline-schedule-picker] [data-date-time-trigger]')`
+    await evaluate(cdp, `${schedule}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const hour = `${editor}.querySelector('[data-date-time-preset=hour]')`
+    await waitUntil('Spanish Composer shows the one-hour scheduling choice', () => evaluate<boolean>(cdp, `Boolean(${hour}?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, `${hour}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Picking a time shows the Spanish scheduled action', () => evaluate<boolean>(cdp, `
+      !${menu}.parentElement.open
+        && ${editor}.querySelector('[data-bluesky-publish-label]')?.textContent.startsWith('Programar para ')
+    `), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })

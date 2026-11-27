@@ -1,31 +1,40 @@
 @extends('layouts/app')
 
-@section('title', 'Postline - Composer')
+<script server cache>
+import { workspaceComposerText, workspaceLocale } from '../../app/Support/Localization/workspace'
+
+export const composerLocale = workspaceLocale
+export const composerText = workspaceComposerText.labels
+export const composerMessages = workspaceComposerText.client
+</script>
+
+@section('title'){{ composerText.documentTitle }}@endsection
 
 @section('content')
-  @meta('description', 'Write, schedule, publish, and review social posts from a clean personal workspace.')
-  <section class="grid gap-5" data-postline-page="composer" data-testid="composer-page">
+  @meta('description', composerText.description)
+  <section class="grid gap-5" data-postline-page="composer" data-testid="composer-page" lang="{{ composerLocale }}">
     <WorkspacePageHeader titleKey="workspace.pages.composer.title" descriptionKey="workspace.pages.composer.description">
     </WorkspacePageHeader>
     <div class="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-      <section class="grid content-start grid-rows-[auto_auto_auto] self-start min-w-0 bg-panel border border-line rounded-2xl shadow-sm" aria-label="Post composer" :class="dragDepth() > 0 ? 'ring-2 ring-accent' : ''" @input="markEdited" @change="markEdited" @dragenter="enterImageDrop" @dragleave="leaveImageDrop" @dragover="overImageDrop" @drop="dropImages" @paste="pasteImages" data-composer-image-drop>
+      <section class="grid content-start grid-rows-[auto_auto_auto] self-start min-w-0 bg-panel border border-line rounded-2xl shadow-sm" aria-label="{{ composerText.composer }}" :class="dragDepth() > 0 ? 'ring-2 ring-accent' : ''" @input="markEdited" @change="markEdited" @dragenter="enterImageDrop" @dragleave="leaveImageDrop" @dragover="overImageDrop" @drop="dropImages" @paste="pasteImages" data-composer-image-drop>
         <div :if="setupActive" class="flex flex-wrap gap-2 items-center justify-between px-3 py-2 text-info text-xs bg-info-soft border-b border-line" data-setup-composer>
-          <span class="font-semibold" :text="setupTargetUnavailable() ? 'The channel chosen in setup is unavailable.' : 'Write and publish or schedule your first post.'">Write and publish or schedule your first post.</span>
-          <a class="underline" href="/setup?step=channels" data-stx-link>Choose a different channel</a>
+          <span class="font-semibold" x-show="setupTargetUnavailable()" x-cloak>{{ composerText.channelUnavailable }}</span>
+          <span class="font-semibold" x-show="!setupTargetUnavailable()">{{ composerText.firstPost }}</span>
+          <a class="underline" href="/setup?step=channels" data-stx-link>{{ composerText.changeChannel }}</a>
         </div>
         <div class="hidden flex-wrap gap-3 items-center justify-between px-3 py-2 text-xs bg-info-soft border-b border-info-line" :class="{ 'hidden': !editHeading(), 'flex': !!editHeading() }" data-edit-banner>
-          <span class="font-semibold text-info">Editing a queued post</span>
-          <a class="inline-flex items-center px-2.5 min-h-6 font-semibold text-info bg-panel hover:bg-info-line border border-info-line rounded-lg transition-colors" href="/composer" data-stx-link>Cancel</a>
+          <span class="font-semibold text-info">{{ composerText.editQueued }}</span>
+          <a class="inline-flex items-center px-2.5 min-h-6 font-semibold text-info bg-panel hover:bg-info-line border border-info-line rounded-lg transition-colors" href="/composer" data-stx-link>{{ composerText.cancel }}</a>
         </div>
         <header class="flex flex-wrap gap-3 items-center justify-between p-3 border-b border-line">
           <div class="flex gap-2 items-center">
-            <strong class="text-ui" :text="editHeading() || 'New post'" data-composer-heading>New post</strong>
+            <strong class="text-ui" :text="editHeading() || copy.newPost" data-composer-heading>{{ composerText.newPost }}</strong>
             <a class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-xs hover:bg-raised border rounded-xl transition-colors" :class="accountsConnected() ? 'text-success bg-success-soft border-success-line' : 'text-muted bg-panel-2 border-line'" href="/accounts" data-stx-link data-bluesky-connection data-craft-no-drag>
               <span class="h-2 w-2 rounded-full" :class="accountsConnected() ? 'bg-success-solid' : 'bg-line-strong'" aria-hidden="true"></span>
-              <span :text="connectionLabel()">Checking accounts…</span>
+              <span :text="connectionLabel()">{{ composerText.checkingAccounts }}</span>
             </a>
           </div>
-          <SegmentedControl label="Post format" size="sm" :value="composerFormat()" :disabled="editingQueued()" :options="[{ value: 'single', label: 'Single' }, { value: 'thread', label: 'Thread' }]" @change="chooseFormat" />
+          <SegmentedControl label="{{ composerText.postFormat }}" size="sm" :value="composerFormat()" :disabled="editingQueued()" :options="[{ value: 'single', label: copy.single }, { value: 'thread', label: copy.thread }]" @change="chooseFormat" />
         </header>
 
         <div class="grid gap-1 p-4">
@@ -35,18 +44,18 @@
               data-attributes and are styled in config/css.ts, because a
               class string composed in the browser is invisible to the
               Crosswind extractor. --}}
-          <div class="flex flex-wrap gap-2 mb-3" role="group" aria-label="Publishing channels">
+          <div class="flex flex-wrap gap-2 mb-3" role="group" aria-label="{{ composerText.channels }}">
             {{-- Object-form :class, rather than an inline display rule plus
                 x-show. The string form of :class MERGES with the static class
                 list, so a static hidden class would never come back off; the
                 object form goes through classList.add/remove instead. Its keys
                 are single-quoted literals, so the Crosswind extractor still
                 sees them, and the static class is the pre-hydration state. --}}
-            <span class="flex items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 border border-line rounded-xl" :class="{ 'hidden': !providersPending() }">Loading accounts…</span>
-            <a class="flex hidden items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl transition-colors" :class="{ 'hidden': !providersEmpty() }" href="/accounts" data-stx-link>No accounts yet. Connect one →</a>
+            <span class="flex items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 border border-line rounded-xl" :class="{ 'hidden': !providersPending() }">{{ composerText.loadingAccounts }}</span>
+            <a class="flex hidden items-center px-2.5 min-h-8 text-muted text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl transition-colors" :class="{ 'hidden': !providersEmpty() }" href="/accounts" data-stx-link>{{ composerText.connectAccount }}</a>
             <button class="flex hidden gap-1.5 items-center px-2.5 min-h-8 text-danger text-xs bg-danger-soft hover:bg-raised border border-line rounded-xl transition-colors" :class="{ 'hidden': !providersFailed() }" type="button" @click="retryProviders()">
               <span class="h-3.5 w-3.5 i-hugeicons-refresh" aria-hidden="true"></span>
-              Couldn't load your accounts. Try again
+              {{ composerText.retryAccounts }}
             </button>
             <button
               class="inline-flex gap-1.5 items-center px-2.5 min-h-8 font-semibold text-xs border rounded-xl transition-colors"
@@ -80,15 +89,15 @@
                   <ComposerVariantField :provider="row.provider" :label="row.name + ' post body'" :value="row.text" :autoFocus="newVariant() === row.provider" @edit="editVariant(row.provider, $event)" />
                 </template>
                 <p class="m-0 text-xs" :class="row.over ? 'text-danger' : 'text-muted'" :text="row.description"></p>
-                <p :if="row.stale" class="m-0 text-warning text-xs" :data-variant-stale="row.provider">The shared text changed after you customised this.</p>
+                <p :if="row.stale" class="m-0 text-warning text-xs" :data-variant-stale="row.provider">{{ composerText.variantStale }}</p>
               </div>
             </div>
           </div>
           <label class="hidden gap-2 items-center mb-2.5" :class="{ 'hidden': !showImageUrl(), 'flex': showImageUrl() }" data-compose-image-row>
             <span class="h-4 w-4 text-muted i-hugeicons-image-01" aria-hidden="true"></span>
-            <input class="px-3 h-9 w-full text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="url" inputmode="url" placeholder="Image URL for Instagram" aria-label="Image URL for Instagram" x-model="postImageUrl" data-compose-image>
+            <input class="px-3 h-9 w-full text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="url" inputmode="url" placeholder="{{ composerText.imageUrl }}" aria-label="{{ composerText.imageUrl }}" x-model="postImageUrl" data-compose-image>
           </label>
-          <input class="hidden mb-2 w-full font-semibold leading-snug text-2xl text-ink placeholder:text-muted bg-transparent border-0 outline-none rounded-md" :class="{ 'hidden': !showTitle(), 'block': showTitle() }" data-focus-outline type="text" maxlength="200" placeholder="Post title" aria-label="Blog post title" x-model="postTitle" data-compose-title>
+          <input class="hidden mb-2 w-full font-semibold leading-snug text-2xl text-ink placeholder:text-muted bg-transparent border-0 outline-none rounded-md" :class="{ 'hidden': !showTitle(), 'block': showTitle() }" data-focus-outline type="text" maxlength="200" placeholder="{{ composerText.postTitle }}" aria-label="{{ composerText.blogTitle }}" x-model="postTitle" data-compose-title>
           <div class="grid overflow-y-auto content-start gap-4 pr-1 max-h-72" data-composer-posts>
             <article class="gap-2 pb-3 last:pb-0 border-b border-line last:border-b-0" x-for="row in postRows()" :key="row.id" :class="composerFormat() === 'thread' || row.number === 1 ? 'grid' : 'hidden'" data-composer-post :data-active="row.id === activeSegmentId()">
               <header class="flex gap-3 items-center justify-between" x-show="composerFormat() === 'thread'">
@@ -100,12 +109,12 @@
                   <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
                 </button>
               </header>
-              <ComposerSegmentField :text="row.text" :label="`Post body ${row.number}`" :placeholder="row.number === 1 ? 'What do you want to share?' : ''" :focusRequest="segmentFocus().id === row.id ? segmentFocus().revision : 0" :readonly="submitting()" @activate="activateSegment(row.id)" @edit="editSegment(row.id, $event)" />
+              <ComposerSegmentField :text="row.text" :label="`Post body ${row.number}`" :placeholder="row.number === 1 ? copy.writePrompt : ''" :focusRequest="segmentFocus().id === row.id ? segmentFocus().revision : 0" :readonly="submitting()" @activate="activateSegment(row.id)" @edit="editSegment(row.id, $event)" />
               <div :if="row.number === 1" class="hidden" data-richtext-host></div>
             </article>
           </div>
           {{-- Bluesky shows images or a link card, never both (#132). --}}
-          <p class="m-0 mt-2 text-muted text-xs" :class="linkCardShown() && (previewImages().length || attachedVideo()) ? '' : 'hidden'" data-card-replaced>Bluesky shows the attachment instead of the link card.</p>
+          <p class="m-0 mt-2 text-muted text-xs" :class="linkCardShown() && (previewImages().length || attachedVideo()) ? '' : 'hidden'" data-card-replaced>{{ composerText.linkCardAttachment }}</p>
         </div>
 
         {{--
@@ -132,8 +141,8 @@
               </button>
             </div>
             <video :if="image.video" class="block col-span-2 max-h-72 w-full bg-panel rounded-lg" :src="image.preview" :aria-label="image.alt || 'Video preview'" controls preload="metadata" playsinline data-attached-video></video>
-            <input class="col-span-2 px-2.5 h-8 min-w-0 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="1000" placeholder="Describe it for people who cannot see it" x-show="image.editable" :disabled="submitting()" :value="image.alt" :aria-label="image.altLabel" @input="setImageAlt(image.id, $event)" data-image-alt>
-            <span class="col-span-2 text-muted text-xs" x-show="!image.editable">Saved with the post. Attach new files to replace it.</span>
+            <input class="col-span-2 px-2.5 h-8 min-w-0 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="1000" placeholder="{{ composerText.attachmentDescription }}" x-show="image.editable" :disabled="submitting()" :value="image.alt" :aria-label="image.altLabel" @input="setImageAlt(image.id, $event)" data-image-alt>
+            <span class="col-span-2 text-muted text-xs" x-show="!image.editable">{{ composerText.replaceMedia }}</span>
           </div>
           <ul class="grid gap-1 m-0 p-0 list-none text-danger text-xs" role="status" data-image-warnings>
             <li x-for="warning in imageWarnings()" :text="warning"></li>
@@ -147,100 +156,100 @@
         --}}
         <div class="flex hidden flex-wrap gap-2 items-center pb-3 px-3" :class="{ 'hidden': !showLanguage() }" data-post-options>
           <label class="inline-flex gap-1.5 items-center text-muted text-xs" x-show="showLanguage()">
-            <span>Language</span>
+            <span>{{ composerText.postLanguage }}</span>
             <select class="px-2 h-8 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="postLanguage" data-post-language>
               <option x-for="option in languageOptions()" :value="option.value" :selected="option.value === postLanguage()" :text="option.label"></option>
             </select>
           </label>
           <label class="inline-flex gap-1.5 items-center text-muted text-xs" x-show="showMastodonOptions()">
             <span>Mastodon</span>
-            <select class="px-2 h-8 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="mastodonVisibility" aria-label="Who can see it on Mastodon" data-mastodon-visibility>
-              <option value="public">Public</option>
-              <option value="unlisted">Quiet public</option>
-              <option value="private">Followers only</option>
-              <option value="direct">Mentioned people only</option>
+            <select class="px-2 h-8 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="mastodonVisibility" aria-label="{{ composerText.mastodonVisibility }}" data-mastodon-visibility>
+              <option value="public">{{ composerText.public }}</option>
+              <option value="unlisted">{{ composerText.quietPublic }}</option>
+              <option value="private">{{ composerText.followers }}</option>
+              <option value="direct">{{ composerText.mentioned }}</option>
             </select>
           </label>
-          <input class="flex-1 px-2.5 h-8 min-w-48 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="500" placeholder="Content warning on Mastodon (optional)" aria-label="Content warning on Mastodon" x-show="showMastodonOptions()" x-model="mastodonSpoiler" data-mastodon-spoiler>
+          <input class="flex-1 px-2.5 h-8 min-w-48 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="500" placeholder="{{ composerText.mastodonWarning }}" aria-label="{{ composerText.mastodonWarningLabel }}" x-show="showMastodonOptions()" x-model="mastodonSpoiler" data-mastodon-spoiler>
           <form class="contents" ref="networkOptionsForm" @submit.prevent="markEdited">
             <details class="w-full text-body text-xs" x-show="showMastodonOptions()">
-              <summary class="font-medium cursor-pointer">Mastodon poll or quote</summary>
+              <summary class="font-medium cursor-pointer">{{ composerText.mastodonPollQuote }}</summary>
               <div class="grid gap-2 pt-2">
                 <label class="grid gap-1">
-                  <span>Poll choices, one per line</span>
+                  <span>{{ composerText.pollChoices }}</span>
                   <textarea class="p-2 text-ink text-ui bg-panel border border-field-line rounded-lg" maxlength="5000" rows="3" name="pollChoices" data-mastodon-poll></textarea>
                 </label>
                 <div class="flex flex-wrap gap-2 items-end">
-                  <label class="grid gap-1"><span>Duration in minutes</span><input class="px-2 h-8 max-w-32 bg-panel border border-field-line rounded-lg" type="number" min="1" max="525600" name="pollMinutes" value="1440"></label>
-                  <label class="inline-flex gap-1.5 items-center"><input type="checkbox" name="pollMultiple"> Allow multiple choices</label>
-                  <label class="inline-flex gap-1.5 items-center"><input type="checkbox" name="pollHideTotals"> Hide totals until voting ends</label>
+                  <label class="grid gap-1"><span>{{ composerText.pollDuration }}</span><input class="px-2 h-8 max-w-32 bg-panel border border-field-line rounded-lg" type="number" min="1" max="525600" name="pollMinutes" value="1440"></label>
+                  <label class="inline-flex gap-1.5 items-center"><input type="checkbox" name="pollMultiple"> {{ composerText.multipleChoices }}</label>
+                  <label class="inline-flex gap-1.5 items-center"><input type="checkbox" name="pollHideTotals"> {{ composerText.hideTotals }}</label>
                 </div>
                 <label class="grid gap-1">
-                  <span>Quote a Mastodon post</span>
+                  <span>{{ composerText.mastodonQuote }}</span>
                   <input class="px-2 h-8 text-ink text-ui bg-panel border border-field-line rounded-lg" type="url" maxlength="2048" name="mastodonQuote" data-mastodon-quote>
                 </label>
-                <p class="m-0 text-muted">Choose a poll, a quote, or media. In a thread, the poll or quote goes on the first post.</p>
+                <p class="m-0 text-muted">{{ composerText.mastodonPollHelp }}</p>
               </div>
             </details>
             <details class="w-full text-body text-xs" x-show="showBlueskyOptions()">
-              <summary class="font-medium cursor-pointer">Bluesky quote and labels</summary>
+              <summary class="font-medium cursor-pointer">{{ composerText.blueskyQuoteLabels }}</summary>
               <div class="grid gap-2 pt-2">
                 <label class="grid gap-1">
-                  <span>Quote a Bluesky post</span>
+                  <span>{{ composerText.blueskyQuote }}</span>
                   <input class="px-2 h-8 text-ink text-ui bg-panel border border-field-line rounded-lg" type="text" maxlength="2048" name="blueskyQuote" data-bluesky-quote>
                 </label>
                 <label class="grid gap-1">
-                  <span>Content labels, separated by commas</span>
+                  <span>{{ composerText.contentLabels }}</span>
                   <input class="px-2 h-8 text-ink text-ui bg-panel border border-field-line rounded-lg" type="text" maxlength="1290" placeholder="nudity, graphic-media" name="blueskyLabels" data-bluesky-labels>
                 </label>
-                <p class="m-0 text-muted">In a thread, the quote goes on the first post and labels apply to every post.</p>
+                <p class="m-0 text-muted">{{ composerText.blueskyThreadHelp }}</p>
               </div>
             </details>
           </form>
         </div>
 
         <details class="mb-3 mx-3 text-ui" x-show="showLinkedInComment() || showInstagramComment()" data-first-comments>
-          <summary class="w-fit text-muted cursor-pointer">First comments</summary>
+          <summary class="w-fit text-muted cursor-pointer">{{ composerText.firstComments }}</summary>
           <div class="grid gap-2 mt-2">
             <label class="grid gap-1 text-muted text-xs" x-show="showLinkedInComment()">
-              <span>LinkedIn first comment</span>
+              <span>{{ composerText.linkedinComment }}</span>
               <textarea class="p-2 w-full text-ink text-ui bg-panel border border-field-line rounded-lg focus:border-info-solid" rows="2" maxlength="1250" x-model="linkedinFirstComment" @input="queueDraftSave()"></textarea>
             </label>
             <label class="grid gap-1 text-muted text-xs" x-show="showInstagramComment()">
-              <span>Instagram first comment</span>
+              <span>{{ composerText.instagramComment }}</span>
               <textarea class="p-2 w-full text-ink text-ui bg-panel border border-field-line rounded-lg focus:border-info-solid" rows="2" maxlength="1250" x-model="instagramFirstComment" @input="queueDraftSave()"></textarea>
             </label>
-            <p class="m-0 text-muted text-xs">Each comment goes on the first post, after it publishes.</p>
+            <p class="m-0 text-muted text-xs">{{ composerText.firstCommentHelp }}</p>
           </div>
         </details>
 
         <footer class="flex flex-col gap-3 items-stretch justify-between sm:flex-row sm:items-center p-3 border-line border-t">
           <div class="flex gap-2 items-center min-w-0">
-            <span class="min-w-0 text-xs truncate" data-bluesky-count :class="countSummary().tone === 'danger' ? 'text-danger' : countSummary().tone === 'warning' ? 'text-warning' : 'text-muted'" :title="countSummary().text" :text="countSummary().text">0 / 300 characters</span>
+            <span class="min-w-0 text-xs truncate" data-bluesky-count :class="countSummary().tone === 'danger' ? 'text-danger' : countSummary().tone === 'warning' ? 'text-warning' : 'text-muted'" :title="countSummary().text" :text="countSummary().text">{{ composerText.initialCount }}</span>
           </div>
           <div class="flex flex-wrap gap-2 items-center justify-end w-full sm:w-auto">
             <ComposerPresetLibrary :disabled="submitting()" @insert="insertSavedText" />
-            <input class="hidden" type="file" :accept="composerAttachmentTypes" multiple aria-label="Attach images or video" ref="attachInput" @change="chooseImages" data-attach-input>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach images or video" title="Attach up to four images or one MP4 video" :disabled="submitting()" @click="openImageChooser" data-attach-button>
+            <input class="hidden" type="file" :accept="composerAttachmentTypes" multiple aria-label="{{ composerText.attach }}" ref="attachInput" @change="chooseImages" data-attach-input>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="{{ composerText.attach }}" title="{{ composerText.attachHelp }}" :disabled="submitting()" @click="openImageChooser" data-attach-button>
               <span class="h-4 w-4 i-hugeicons-image-01" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Add post" title="Add post" data-add-post :disabled="submitting()" x-show="!editingQueued() || composerFormat() === 'thread'" @click="appendSegment">
+            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="{{ composerText.addPost }}" title="{{ composerText.addPost }}" data-add-post :disabled="submitting()" x-show="!editingQueued() || composerFormat() === 'thread'" @click="appendSegment">
               <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
             </button>
             <div class="inline-flex ml-auto sm:ml-0 text-on-accent bg-accent rounded-xl">
               <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold hover:bg-accent-hover rounded-l-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" ref="publishTrigger" data-bluesky-publish aria-keyshortcuts="Meta+Enter Control+Enter" :disabled="!canPublish() || submitting() || attaching() || mediaWarnings().length > 0" @click="runPostAction">
                 <span class="shrink-0 h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
-                <span data-bluesky-publish-label :text="postActionLabel()">Publish</span>
+                <span data-bluesky-publish-label :text="postActionLabel()">{{ composerText.publish }}</span>
               </button>
               <details class="relative border-current border-l" ref="publishActions" data-composer-actions @keydown="closePublishActionsOnEscape">
-                <summary class="grid place-items-center h-9 w-9 list-none hover:bg-accent-hover rounded-r-xl cursor-pointer" aria-label="Publishing actions" ref="publishMenuTrigger">
+                <summary class="grid place-items-center h-9 w-9 list-none hover:bg-accent-hover rounded-r-xl cursor-pointer" aria-label="{{ composerText.publishMenu }}" ref="publishMenuTrigger">
                   <span class="h-4 w-4 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
                 </summary>
                 <div class="grid absolute bottom-full right-0 z-30 gap-1 mb-1 p-1.5 min-w-40 text-ink text-ui bg-panel border border-line rounded-xl shadow-lg">
-                  <button class="px-3 py-2 text-left hover:bg-hover rounded-lg" type="button" x-show="!editingQueued()" @click="choosePostAction('publish')">Publish now</button>
-                  <PostlineSchedulePicker :value="scheduledIso" :timeZone="scheduleZone" label="Schedule" @change="selectSchedule" />
-                  <button class="px-3 py-2 text-left hover:bg-hover rounded-lg disabled:opacity-50" type="button" x-show="!editingQueued() || editingDraft()" :disabled="!canPublish() || submitting() || attaching() || mediaWarnings().length > 0" @click="addToQueue">Add to queue</button>
-                  <button class="px-3 py-2 text-left hover:bg-hover rounded-lg" type="button" aria-keyshortcuts="Meta+S Control+S" @click="choosePostAction('draft')">Save draft</button>
+                  <button class="px-3 py-2 text-left hover:bg-hover rounded-lg" type="button" x-show="!editingQueued()" @click="choosePostAction('publish')">{{ composerText.publishNow }}</button>
+                  <PostlineSchedulePicker :value="scheduledIso" :timeZone="scheduleZone" label="{{ composerText.schedule }}" @change="selectSchedule" />
+                  <button class="px-3 py-2 text-left hover:bg-hover rounded-lg disabled:opacity-50" type="button" x-show="!editingQueued() || editingDraft()" :disabled="!canPublish() || submitting() || attaching() || mediaWarnings().length > 0" @click="addToQueue">{{ composerText.queuePost }}</button>
+                  <button class="px-3 py-2 text-left hover:bg-hover rounded-lg" type="button" aria-keyshortcuts="Meta+S Control+S" @click="choosePostAction('draft')">{{ composerText.saveDraft }}</button>
                 </div>
               </details>
             </div>
@@ -249,8 +258,8 @@
       </section>
 
       <aside class="grid content-start gap-3 min-w-0" aria-labelledby="composer-preview-title">
-        <h2 id="composer-preview-title" class="m-0 font-semibold text-ink text-sm">Live preview</h2>
-        <p :if="providersLoaded() && !selectedNetworks().length" class="m-0 p-4 text-muted text-ui bg-panel border border-line rounded-2xl">Select a publishing channel to preview your post.</p>
+        <h2 id="composer-preview-title" class="m-0 font-semibold text-ink text-sm">{{ composerText.livePreview }}</h2>
+        <p :if="providersLoaded() && !selectedNetworks().length" class="m-0 p-4 text-muted text-ui bg-panel border border-line rounded-2xl">{{ composerText.selectPreviewChannel }}</p>
         <section x-for="card in previewCards()" :key="card.provider" :data-network-preview="card.provider" class="grid overflow-hidden min-w-0 bg-panel border border-line rounded-2xl">
           <header class="flex gap-2.5 items-center p-3 bg-panel-2 border-b border-line">
             <span class="shrink-0 h-4 w-4 text-ink" :class="card.icon" aria-hidden="true"></span>
@@ -262,7 +271,7 @@
               <span :if="card.posts.length > 1" :text="card.chained && index > 0 ? 'Reply ' + index : 'Post ' + (index + 1)"></span>
               <span class="inline-flex gap-1.5 items-center ml-auto tabular-nums">
                 <span class="shrink-0 h-4 w-4" :data-preview-count-ring="post.progress" aria-hidden="true"></span>
-                <span class="sr-only">Characters</span>
+                <span class="sr-only">{{ composerText.characters }}</span>
                 <span :text="post.count" data-preview-count></span>
               </span>
             </div>
@@ -296,7 +305,7 @@
     import { COMPOSER_AUTOSAVE_KEY, COMPOSER_DEFAULT_FORMAT_KEY, COMPOSER_DRAFT_KEY, readComposerDraft, writeComposerDraft } from '../functions/composer-draft'
     import type { ComposerImage } from '../functions/composer-media'
     import { composerAttachmentTypes, composerImageFiles } from '../functions/composer-media'
-    import { composerActionText, composerQueueTimestamp, composerScheduleIso } from '../functions/composer-schedule'
+    import { composerQueueTimestamp, composerScheduleIso } from '../functions/composer-schedule'
     import { composerPreviewCards, previewImageUrl } from '../functions/composer-preview'
     import { composerKeyForSpec, composerSelection, composerTargetRows, composerTargets, uniqueComposerNetworks } from '../functions/composer-targets'
     import type { ComposerVariants } from '../functions/composer-variants'
@@ -308,6 +317,7 @@
     import type { ProviderStatus } from '../functions/social-client'
     import { fetchProviders, fetchWorkspace, targetLabel } from '../functions/social-client'
 
+    const copy = {{ composerMessages }}
     const providersFailed = state(false)
     const query = useRoute().query
     const editParam = query.edit || null
@@ -335,7 +345,17 @@
     const publishActions = useRef('publishActions')
     const publishMenuTrigger = useRef('publishMenuTrigger')
 
-    const postActionLabel = derived(() => composerActionText(postAction(), scheduledIso(), scheduleZone(), editingQueued(), submitting()))
+    const postActionLabel = derived(() => {
+      const selectedAction = postAction()
+      if (submitting()) return selectedAction === 'publish' && !editingQueued() ? copy.publishing : copy.saving
+      const iso = scheduledIso()
+      if (selectedAction === 'schedule' && iso) {
+        const when = new Date(iso).toLocaleString({{ composerLocale }}, { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: scheduleZone() })
+        return copy.scheduleFor.replace('{when}', () => when)
+      }
+      if (selectedAction === 'draft') return copy.saveDraft
+      return editingQueued() ? copy.updatePost : copy.publish
+    })
     const chooseFormat = (format: ComposerFormat) => {
       if (!editingQueued() && !submitting()) setMode(format)
     }
@@ -842,10 +862,7 @@
      */
     const unthreadedNote = (posts) => {
       if (posts < 2) return ''
-      const names = selectedConnected()
-        .filter(target => ['instagram', 'linkedin'].includes(target.provider))
-        .map(target => providerLabel(target.provider))
-        .filter((name, index, list) => list.indexOf(name) === index)
+      const names = selectedNetworkIds().filter(provider => provider === 'instagram' || provider === 'linkedin').map(providerLabel)
       return names.length ? ` - ${names.join(' and ')} will post each part separately` : ''
     }
 

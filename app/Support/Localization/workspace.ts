@@ -39,3 +39,4 @@ export const workspaceCampaignText = workspaceI18n.tm('workspace.campaigns') as 
 export const workspaceSettingsText = workspaceI18n.tm('workspace.settings') as typeof en.workspace.settings
 export const workspaceLoginText = workspaceI18n.tm('workspace.login') as typeof en.workspace.login
 export const workspaceSetupText = workspaceI18n.tm('workspace.setup') as typeof en.workspace.setup
+export const workspaceComposerText = workspaceI18n.tm('workspace.composer') as typeof en.workspace.composer
