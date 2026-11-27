@@ -1,5 +1,6 @@
 <script client>
 const provider = useReactiveProp('provider', '')
+const guide = useReactiveProp('guide', null, { parse: value => value })
 const bootstrap = workspaceBootstrapQuery()
 const sending = state(false)
 const busyAccount = state(0)
@@ -157,12 +158,14 @@ function confirmDisconnect(id: number) {
       </div>
       <details x-show="manual()">
         <summary class="inline-flex items-center justify-center h-9 w-full font-semibold list-none text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl cursor-pointer" :text="'Manage ' + name()"></summary>
+        <ol class="grid gap-1 mb-0 mt-3 pl-5 text-body text-xs">
+          <li x-for="step in guide()?.steps ?? []" :text="step"></li>
+        </ol>
+        <a class="inline-block mt-2 text-info text-xs underline" :href="guide()?.url" :aria-label="'Full ' + name() + ' setup guide'" target="_blank" rel="noopener noreferrer" x-show="guide()">Full setup guide</a>
         <form class="grid gap-2 pt-3" @submit.prevent="connect($event)">
           <input class="px-3 h-9 text-ink text-xs bg-raised border border-field-line rounded-xl" :name="provider() === 'bluesky' ? 'identifier' : 'instance'" :placeholder="provider() === 'bluesky' ? 'name.bsky.social' : 'mastodon.social'" :autocomplete="provider() === 'bluesky' ? 'username' : 'url'" :aria-label="provider() === 'bluesky' ? 'Bluesky handle' : 'Mastodon instance'" :value="provider() === 'mastodon' ? status()?.instance : null" required>
           <input class="px-3 h-9 text-ink text-xs bg-raised border border-field-line rounded-xl" type="password" :name="provider() === 'bluesky' ? 'password' : 'access_token'" :placeholder="provider() === 'bluesky' ? 'App password' : 'Access token'" :autocomplete="provider() === 'bluesky' ? 'current-password' : 'off'" :aria-label="provider() === 'bluesky' ? 'Bluesky app password' : 'Mastodon access token'" required>
           <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="submit" :disabled="sending()" :text="sending() ? 'Connecting…' : connectLabel()"></button>
-          <p class="m-0 text-muted text-xs" x-show="provider() === 'bluesky'">Create an app password in Bluesky Settings. Add another handle to connect a second account.</p>
-          <p class="m-0 text-muted text-xs" x-show="provider() === 'mastodon'">Create an access token with read:accounts, write:statuses and write:media permissions in your instance settings.</p>
         </form>
       </details>
       <p class="m-0 text-xs" role="status" x-show="message()" :class="failed() ? 'text-danger' : 'text-success'" :text="message()"></p>

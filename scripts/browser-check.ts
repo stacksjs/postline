@@ -861,6 +861,18 @@ async function checkChannels(cdp: Cdp): Promise<void> {
       ${twitterApp}.querySelector('[data-x-read-usage]')?.getClientRects().length > 0
         && ${twitterApp}.querySelector('[data-x-read-usage]').textContent.includes('Resets at midnight UTC.')`), 5_000)
     await evaluate(cdp, `${twitterApp}.querySelector('summary').click()`)
+    const linkedInApp = `document.querySelector('[data-network-app=linkedin]')`
+    await evaluate(cdp, `${linkedInApp}.querySelector('summary').click()`)
+    await waitUntil('Channels shows the LinkedIn setup guide', () => evaluate<boolean>(cdp, `
+      ${linkedInApp}.querySelector('ol').innerText.includes('Sign In with LinkedIn using OpenID Connect')
+        && ${linkedInApp}.querySelector('[aria-label="Full LinkedIn setup guide"]')?.href.endsWith('/docs/networks/linkedin.md')`), 5_000)
+    await evaluate(cdp, `${linkedInApp}.querySelector('summary').click()`)
+
+    await evaluate(cdp, `${card}.querySelector('summary').click()`)
+    await waitUntil('Channels shows the Bluesky app password guide', () => evaluate<boolean>(cdp, `
+      ${card}.querySelector('ol').innerText.includes('Allow access to your direct messages')
+        && ${card}.querySelector('[aria-label="Full Bluesky setup guide"]')?.href.endsWith('/docs/networks/bluesky.md')`), 5_000)
+    await evaluate(cdp, `${card}.querySelector('summary').click()`)
 
     await evaluate(cdp, `${card}.querySelector('[aria-label="Publish to @radio.example by default"]').click()`)
     await waitUntil('The new default channel account', () => evaluate<boolean>(cdp, `

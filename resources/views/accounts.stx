@@ -2,6 +2,12 @@
 
 @section('title', 'Postline - Settings - Channels')
 
+<script server>
+import { loadNetworkSetupGuides } from '../../app/Support/Social/network-setup-guides'
+
+const networkSetupGuides = await loadNetworkSetupGuides()
+</script>
+
 @section('content')
   @meta('description', 'Connect and manage publishing channels in Postline settings.')
   <section class="grid gap-4" data-postline-page="accounts" data-testid="accounts-page">
@@ -44,7 +50,7 @@
         </EmptyState>
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" x-cloak x-show="channelsReady()" data-publishing-channels>
           <div class="min-w-0" x-for="provider in channelProviders()" :key="provider">
-            <NetworkChannelCard :provider="provider" />
+            <NetworkChannelCard :provider="provider" :guide="guides[provider]" />
           </div>
         </div>
       </Card>
@@ -75,6 +81,7 @@
               <ol class="grid gap-1 m-0 pl-5 text-body text-xs">
                 <li x-for="step in app.steps" :text="step"></li>
               </ol>
+              <a class="w-fit text-info text-xs underline" :href="app.guideUrl" :aria-label="'Full ' + app.label + ' setup guide'" target="_blank" rel="noopener noreferrer" x-show="app.guideUrl">Full setup guide</a>
               <p class="m-0 text-body text-xs" x-show="app.readUsage" :text="app.readUsage" data-x-read-usage></p>
               <div class="grid gap-1">
                 <span class="font-medium text-muted text-xs">Redirect address to give the network</span>
@@ -207,53 +214,16 @@
     // Network app forms keep unsaved credentials in this view only.
     const appDrafts = state({})
     const appBusy = state('')
-    const APP_GUIDES = {
-      twitter: {
-        label: 'X',
-        steps: [
-          'Open developer.x.com, sign in, and open your project\'s app (create one if you have none).',
-          'Under User authentication settings, choose Set up: OAuth 2.0, app type Web App.',
-          'Paste the redirect address below as the Callback URI, and your site as the Website URL.',
-          'Under Keys and tokens, copy the OAuth 2.0 Client ID and Client Secret into the fields below.',
-        ],
-      },
-      linkedin: {
-        label: 'LinkedIn',
-        steps: [
-          'Open linkedin.com/developers/apps and create an app, linked to a LinkedIn Page you manage.',
-          'Under Products, add "Sign In with LinkedIn using OpenID Connect" and "Share on LinkedIn".',
-          'Under Auth, add the redirect address below as an Authorized redirect URL.',
-          'Copy the Client ID and Primary Client Secret from the Auth tab into the fields below.',
-          'To post as a company Page too, add the "Community Management API" product, then tick the box below.',
-        ],
-      },
-      instagram: {
-        label: 'Instagram',
-        steps: [
-          'Your Instagram account must be a Business or Creator account linked to a Facebook Page.',
-          'Open developers.facebook.com/apps, create a Business app, and add Facebook Login for Business and the Instagram Graph API.',
-          'Under Facebook Login settings, add the redirect address below as a Valid OAuth Redirect URI.',
-          'Under App settings, Basic, copy the App ID and App Secret into the fields below.',
-        ],
-      },
-      threads: {
-        label: 'Threads',
-        steps: [
-          'Open developers.facebook.com/apps and create an app with the "Access the Threads API" use case.',
-          'In the Threads API settings, add the redirect address below as a Redirect Callback URL.',
-          'Add your Threads account as a Threads tester and accept the invite in the Threads app.',
-          'Copy the Threads App ID and Threads App Secret into the fields below.',
-        ],
-      },
-    }
+    const guides = {{ networkSetupGuides }}
     const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 3 })
     const appRows = derived(() => networkApps().map((app) => {
-      const guide = APP_GUIDES[app.provider] || { label: app.provider, steps: [] }
+      const guide = guides[app.provider]
       const draft = appDrafts()[app.provider] || {}
       return {
         provider: app.provider,
-        label: guide.label,
-        steps: guide.steps,
+        label: guide?.label ?? app.provider,
+        steps: guide?.steps ?? [],
+        guideUrl: guide?.url ?? '',
         configured: app.configured,
         readUsage: app.readUsage
           ? `Estimated X API reads today: ${usd.format(app.readUsage.estimatedUsd)} of ${usd.format(app.readUsage.limitUsd)}. Resets at midnight UTC.`
