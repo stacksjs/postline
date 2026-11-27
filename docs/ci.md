@@ -100,6 +100,28 @@ tail -f ~/.local/share/reviewos/postline/runner.log
 of. The runner needs 8 GB of free disk before it takes a job, and this Mac has
 run close to that.
 
+## Updating the Postline runner
+
+Wait for the Postline runner’s current jobs to finish. In the ReviewOS checkout,
+use its locked dependencies and the project’s Bun to build the replacement.
+
+```bash
+./buddy build:runner --target macos-arm64
+```
+
+Record the ReviewOS source commit and the binary’s SHA-256. Keep a copy of the
+installed binary, then replace `~/.local/share/reviewos/postline/reviewos-runner`
+with the new executable using an atomic rename in that directory. The existing
+LaunchAgent uses the runner’s registration and credentials in the same directory.
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/org.reviewos.postline-runner"
+```
+
+Check the runner log for `Waiting for work` and confirm its next Postline CI job
+checks out the requested commit. If startup fails, restore the saved executable
+and restart the LaunchAgent with the same command.
+
 ## Bringing up a replacement Mac runner
 
 Use another Apple Silicon Mac with enough disk space for Pantry, Chrome, the
