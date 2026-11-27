@@ -1,3 +1,4 @@
+import type { InstagramPageAccount } from '@stacksjs/socials'
 import type { NetworkOAuthExchangeOptions } from '../../Support/Social/network-oauth'
 import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, PublishContent } from '../../Support/Social/types'
@@ -27,6 +28,7 @@ type SocialIdentityRow = {
   access_token?: string | null
   refresh_token?: string | null
   insights_access_token?: string | null
+  instagram_page_id?: string | null
   token_expires_at?: string | null
   account_id?: number | null
   social_driver_id?: number | null
@@ -50,6 +52,11 @@ interface InstagramConfig {
   userId: string
   username: string
   scopes: string[]
+}
+
+export interface InstagramPageSelection {
+  pages: InstagramPageAccount[]
+  insightsAccessToken?: string
 }
 
 export class InstagramService {
@@ -148,7 +155,7 @@ export class InstagramService {
     return { url }
   }
 
-  async exchangeAuthorizationCode(code: string, { testOnly }: NetworkOAuthExchangeOptions = {}) {
+  async exchangeAuthorizationCode(code: string, { testOnly }: NetworkOAuthExchangeOptions = {}): Promise<InstagramPageSelection | undefined> {
     const cfg = (await this.config())
     if (!code) throw new Error('Facebook did not return an authorization code.')
 
@@ -170,13 +177,19 @@ export class InstagramService {
       throw new UserFacingError('Facebook could not authorize a lasting Instagram connection. Check your Meta app settings, then try connecting again.', 'instagram_token_exchange_failed')
     }
 
-    const account = await this.driver.resolveAccount(userToken)
+    const pages = await this.driver.listAccounts(userToken)
+    if (!pages.length) throw new UserFacingError('Facebook did not return a Page linked to an Instagram professional account.')
     if (testOnly) return
+    return { pages, insightsAccessToken: cfg.engagementMetrics ? userToken : undefined }
+  }
+
+  async connectAuthorizedPage(page: InstagramPageAccount, insightsAccessToken?: string) {
     const identity = await this.saveSession({
-      accessToken: account.pageAccessToken,
-      insightsAccessToken: cfg.engagementMetrics ? userToken : undefined,
-      igUserId: account.igUserId,
-      username: account.username,
+      accessToken: page.pageAccessToken,
+      insightsAccessToken,
+      igUserId: page.igUserId,
+      username: page.username,
+      pageId: page.pageId,
     })
     return this.publicIdentity(identity)
   }
@@ -353,7 +366,7 @@ export class InstagramService {
    * id: reconnecting an account refreshes its row, a different one is added.
    */
   private async saveSession(
-    input: { accessToken: string, insightsAccessToken?: string, igUserId: string, username?: string },
+    input: { accessToken: string, insightsAccessToken?: string, igUserId: string, username?: string, pageId?: string },
     options: { revive?: boolean } = {},
   ): Promise<SocialIdentityRow> {
     const accountId = await ensureAccount()
@@ -365,6 +378,7 @@ export class InstagramService {
       display_name: input.username || null,
       provider: 'instagram',
       external_id: input.igUserId,
+      ...(input.pageId && { instagram_page_id: input.pageId }),
       auth_status: 'connected',
       access_token: input.accessToken,
       refresh_token: null,

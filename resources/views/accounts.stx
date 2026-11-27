@@ -25,6 +25,8 @@ const networkSetupGuides = await loadNetworkSetupGuides()
       <a class="inline-flex items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel border border-line rounded-lg shadow-sm" href="/accounts" data-stx-link aria-current="page">Channels</a>
     </nav>
 
+    <InstagramPagePicker />
+
     <section aria-labelledby="publishing-channels-title" :aria-busy="!channelsReady() && !bootstrap.error()">
       <Card padding="none" className="shadow-sm">
         <header class="flex gap-3 items-start justify-between px-4 py-3.5 border-b border-line">

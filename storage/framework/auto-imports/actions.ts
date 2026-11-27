@@ -56,6 +56,8 @@ export const actions = {
   'Actions/Postline/InstagramAuthAction': '../../../app/Actions/Postline/InstagramAuthAction.ts',
   'Actions/Postline/InstagramCallbackAction': '../../../app/Actions/Postline/InstagramCallbackAction.ts',
   'Actions/Postline/InstagramConnectAction': '../../../app/Actions/Postline/InstagramConnectAction.ts',
+  'Actions/Postline/InstagramPageOptionsAction': '../../../app/Actions/Postline/InstagramPageOptionsAction.ts',
+  'Actions/Postline/InstagramPageSelectAction': '../../../app/Actions/Postline/InstagramPageSelectAction.ts',
   'Actions/Postline/InstagramStatusAction': '../../../app/Actions/Postline/InstagramStatusAction.ts',
   'Actions/Postline/KeywordMentionReadAction': '../../../app/Actions/Postline/KeywordMentionReadAction.ts',
   'Actions/Postline/KeywordMonitorDeleteAction': '../../../app/Actions/Postline/KeywordMonitorDeleteAction.ts',

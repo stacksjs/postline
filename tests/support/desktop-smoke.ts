@@ -153,6 +153,11 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
       && cancel.headers.get('Set-Cookie')?.includes('Max-Age=0') === true)
   }
 
+  const instagramPages = await call('GET', '/api/postline/instagram/pages')
+  check('the compiled agent requires a bound Instagram Page selection', instagramPages.status === 422
+    && JSON.parse(instagramPages.text)?.error?.includes('Connect Instagram again from Channels') === true,
+  `${instagramPages.status} ${instagramPages.type}`)
+
   const browserSessionPath = '/api/postline/twitter/browser-session'
   const session = await call('GET', browserSessionPath)
   const initialProfile = JSON.parse(session.text).data

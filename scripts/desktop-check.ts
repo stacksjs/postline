@@ -50,7 +50,11 @@ try {
     cwd: root, stdout: 'inherit', stderr: 'inherit',
   })
   if (await compile.exited !== 0) throw new Error('Could not compile the desktop check.')
-  const run = Bun.spawn([outfile], { cwd: scratch, stdout: 'inherit', stderr: 'inherit' })
+  // The launcher sets its own workspace and keys. A checkout's OAuth
+  // redirects and other application settings must not leak into the fixture.
+  const run = Bun.spawn([outfile], {
+    cwd: scratch, env: { PATH: process.env.PATH }, stdout: 'inherit', stderr: 'inherit',
+  })
   if (await run.exited !== 0) throw new Error('The compiled desktop check failed.')
 }
 finally {

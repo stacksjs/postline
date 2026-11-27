@@ -106,6 +106,8 @@ route.group({ prefix: '/postline/instagram' }, () => {
   route.post('/connect', 'Actions/Postline/InstagramConnectAction').middleware('auth').rateLimit(10, 'minute')
   route.get('/auth', 'Actions/Postline/InstagramAuthAction').middleware('auth').rateLimit(10, 'minute')
   route.get('/callback', 'Actions/Postline/InstagramCallbackAction').middleware('auth').rateLimit(10, 'minute')
+  route.get('/pages', 'Actions/Postline/InstagramPageOptionsAction').middleware('auth').rateLimit(20, 'minute')
+  route.post('/pages', 'Actions/Postline/InstagramPageSelectAction').middleware('auth').rateLimit(10, 'minute')
 })
 
 route.group({ prefix: '/postline/threads' }, () => {

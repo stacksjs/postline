@@ -1958,6 +1958,15 @@
             "isUnique": false,
             "isNullable": true,
             "hasDefault": false
+          },
+          {
+            "name": "instagram_page_id",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 255
           }
         ],
         "indexes": [
@@ -3391,7 +3400,7 @@
       }
     ]
   },
-  "hash": "bdb8edbeb1d3c037d84a6a604b35b4ae39882a86d525d9344d30c70f9c04965d",
+  "hash": "0afb7618a0f105e56bcde226787d6a8d4b15252d1fd79511adae98d48cb6c061",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-27T08:22:14.759Z"
+  "updatedAt": "2026-11-27T10:31:40.375Z"
 }

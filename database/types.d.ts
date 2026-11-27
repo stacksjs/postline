@@ -1974,6 +1974,7 @@ declare module '@stacksjs/database' {
       auth_status: "connected" | "expired" | "revoked" | "missing"
       access_token: string
       refresh_token: string
+      instagram_page_id: string
       insights_access_token: string
       token_expires_at: string
       account_id: number

@@ -208,7 +208,10 @@ describe('optional engagement drivers', () => {
   test('Instagram OAuth keeps the Page token for publishing and the User token for Insights', async () => {
     const exchange = spyOn(InstagramDriver.prototype, 'exchangeCode').mockResolvedValue({ accessToken: 'short-user-token' })
     const longLived = spyOn(InstagramDriver.prototype, 'exchangeLongLivedUserToken').mockResolvedValue({ accessToken: 'long-user-token' })
-    const profile = spyOn(InstagramDriver.prototype, 'resolveAccount').mockResolvedValue({ igUserId: '801', pageAccessToken: 'page-publish-token' })
+    const profile = spyOn(InstagramDriver.prototype, 'listAccounts').mockResolvedValue([
+      { pageId: '600', igUserId: '803', pageAccessToken: 'other-page-token' },
+      { pageId: '601', igUserId: '801', pageAccessToken: 'page-publish-token' },
+    ])
     const publish = spyOn(InstagramDriver.prototype, 'publish').mockResolvedValue({ provider: 'instagram', uri: '802' })
     const metrics = spyOn(InstagramDriver.prototype, 'metrics').mockResolvedValue([{ uri: '802', likes: 6 }])
     let id: number | undefined
@@ -219,8 +222,10 @@ describe('optional engagement drivers', () => {
       expect(profile).toHaveBeenCalledWith('long-user-token')
       expect(await database.selectFrom('social_identities').select('id')
         .where('provider', '=', 'instagram').where('external_id', '=', '801').executeTakeFirst()).toBeUndefined()
-      const identity = await instagram.exchangeAuthorizationCode('test-code')
-      if (!identity?.id) throw new Error('Instagram did not return its connected account.')
+      const selection = await instagram.exchangeAuthorizationCode('test-code')
+      if (!selection?.pages[1]) throw new Error('Instagram did not return the authorized Page.')
+      const identity = await instagram.connectAuthorizedPage(selection.pages[1], selection.insightsAccessToken)
+      if (!identity.id) throw new Error('Instagram did not return its connected account.')
       id = identity.id
       const draft = await postQueue.save({ text: 'A post for the Insights test', providers: [`instagram:${id}`] })
       postId = draft.postId
@@ -230,7 +235,8 @@ describe('optional engagement drivers', () => {
       expect(await instagram.syncMetrics()).toEqual({ synced: 1 })
       expect(metrics.mock.calls[0]?.[0].accessToken).toBe('long-user-token')
 
-      const stored = await database.selectFrom('social_identities').select('insights_access_token').where('id', '=', id).executeTakeFirstOrThrow()
+      const stored = await database.selectFrom('social_identities').select(['insights_access_token', 'instagram_page_id']).where('id', '=', id).executeTakeFirstOrThrow()
+      expect(stored.instagram_page_id).toBe('601')
       expect(stored.insights_access_token).toStartWith('enc:v1:')
       await revokeIdentityRow('instagram', id)
       expect((await database.selectFrom('social_identities').select('insights_access_token').where('id', '=', id).executeTakeFirstOrThrow()).insights_access_token).toBeNull()

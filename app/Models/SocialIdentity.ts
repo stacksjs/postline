@@ -90,6 +90,13 @@ export default defineModel({
       validation: { rule: schema.string().max(4000).optional() },
       factory: () => null,
     },
+    /** Facebook Page selected for this connected Instagram account. */
+    instagramPageId: {
+      required: false,
+      fillable: true,
+      validation: { rule: schema.string().max(255).optional() },
+      factory: () => null,
+    },
     /** Facebook User token for Instagram Insights. Publishing uses the Page token. */
     insightsAccessToken: {
       required: false,

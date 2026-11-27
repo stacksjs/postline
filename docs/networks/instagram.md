@@ -14,6 +14,8 @@ Free.
 4. Under **App settings > Basic**, copy the **App ID** and **App Secret** into
    Postline under **Settings > Channels > Your network apps > Instagram**,
    save, and connect.
+5. After Meta sends you back to Postline, select the Facebook Page linked to
+   the Instagram account you want to use, then choose **Connect account**.
 
 Postline asks for `instagram_basic`, `instagram_content_publish`,
 `pages_show_list` and `pages_read_engagement`.

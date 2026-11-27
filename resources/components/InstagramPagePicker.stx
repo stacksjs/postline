@@ -1,0 +1,77 @@
+<script client>
+import { requestJson } from '../functions/postline-client'
+
+type AuthorizedPage = { pageId: string, pageName?: string, username?: string, igUserId: string }
+
+const route = useRoute()
+const instagramState = route.query.instagram === 'choose' && typeof route.query.instagram_state === 'string'
+  ? route.query.instagram_state
+  : ''
+const authorizedPages = state<AuthorizedPage[]>([])
+const selectedPage = state('')
+const pickerWaiting = state(Boolean(instagramState))
+const pickerError = state('')
+const pageInput = useRef('pageInput')
+const endpoint = '/api/postline/instagram/pages'
+
+onMount(async () => {
+  if (!instagramState) return
+  try {
+    const { data } = await requestJson(`${endpoint}?state=${encodeURIComponent(instagramState)}`, { cache: 'no-store' }, 'Could not load Facebook Pages.')
+    authorizedPages.set(data)
+    if (data.length === 1) selectedPage.set(data[0].pageId)
+    nextTick(() => pageInput.current?.focus())
+  }
+  catch (error) {
+    pickerError.set(error instanceof Error ? error.message : 'Could not load Facebook Pages.')
+  }
+  finally {
+    pickerWaiting.set(false)
+  }
+})
+
+async function completePageSelection(cancel = false) {
+  if (!instagramState || pickerWaiting() || (!cancel && !selectedPage())) return
+  pickerWaiting.set(true)
+  pickerError.set('')
+  try {
+    await requestJson(endpoint, {
+      method: 'POST',
+      body: JSON.stringify({ state: instagramState, ...(cancel ? { cancel: true } : { page_id: selectedPage() }) }),
+    }, 'Could not connect the Instagram account.')
+    navigate(cancel ? '/accounts' : '/accounts?instagram=connected', { reload: true, replace: true })
+  }
+  catch (error) {
+    pickerError.set(error instanceof Error ? error.message : 'Could not connect the Instagram account.')
+  }
+  finally {
+    pickerWaiting.set(false)
+  }
+}
+</script>
+
+<template>
+  <section :if="instagramState" aria-labelledby="instagram-page-choice-title">
+    <Card padding="sm" className="shadow-sm">
+      <form class="grid gap-3" @submit.prevent="completePageSelection()" :aria-busy="pickerWaiting()">
+        <h2 class="m-0 font-semibold text-ink text-sm" id="instagram-page-choice-title">Choose a Facebook Page</h2>
+        <p class="m-0 text-body text-ui">Postline will connect the professional Instagram account linked to this Page.</p>
+        <div class="grid gap-1 max-w-md w-full" :show="authorizedPages().length">
+          <label class="font-medium text-ink text-ui" for="instagram-page-choice">Facebook Page</label>
+          <select class="px-2.5 min-h-9 w-full text-ink text-ui bg-panel border border-line rounded-lg"
+            id="instagram-page-choice" ref="pageInput" :disabled="pickerWaiting()" :value="selectedPage()" @change="selectedPage.set($event.target.value)">
+            <option value="">Select a Page</option>
+            <option x-for="page in authorizedPages()" :key="page.pageId" :value="page.pageId"
+              :text="(page.pageName || 'Page ' + page.pageId) + ' · ' + (page.username ? '@' + page.username : page.igUserId)"></option>
+          </select>
+        </div>
+        <p :show="pickerError()" :text="pickerError()" role="alert" class="m-0 text-danger text-ui"></p>
+        <p :show="pickerWaiting() && !authorizedPages().length" role="status" class="m-0 text-body text-ui">Loading Facebook Pages…</p>
+        <div class="flex flex-wrap gap-2">
+          <Button type="submit" variant="primary" size="sm" :disabled="pickerWaiting() || !selectedPage()">Connect account</Button>
+          <Button type="button" variant="secondary" size="sm" :disabled="pickerWaiting()" @click="completePageSelection(true)">Cancel</Button>
+        </div>
+      </form>
+    </Card>
+  </section>
+</template>

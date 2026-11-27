@@ -34,7 +34,7 @@ async function start(provider: AppNetwork, codeVerifier?: string, testOnly = fal
 describe('network OAuth flow state', () => {
   test.each(APP_NETWORKS)('%s completes only a pending browser-bound flow', async (provider) => {
     const { state, cookie } = await start(provider)
-    const exchange = mock<(code: string, options: NetworkOAuthExchangeOptions) => Promise<void>>(async () => {})
+    const exchange = mock<(code: string, options: NetworkOAuthExchangeOptions, owner: number | null) => Promise<void>>(async () => {})
     const fields = { code: 'test-code', state }
     const unbound = await finishNetworkConsent(request(fields), provider, exchange)
     expect(unbound.headers.get('Location')).toContain(`?${provider}=error`)
@@ -44,7 +44,7 @@ describe('network OAuth flow state', () => {
     expect(finished.headers.get('Location')).toBe(`/accounts?${provider}=connected`)
     expect(finished.headers.get('Set-Cookie')).toContain('Max-Age=0')
     expect(exchange).toHaveBeenCalledTimes(1)
-    expect(exchange).toHaveBeenCalledWith('test-code', { codeVerifier: undefined, testOnly: false })
+    expect(exchange).toHaveBeenCalledWith('test-code', { codeVerifier: undefined, testOnly: false }, 7)
 
     const repeated = await finishNetworkConsent(request(fields, cookie), provider, exchange)
     expect(repeated.headers.get('Location')).toContain(`?${provider}=error`)
@@ -61,14 +61,14 @@ describe('network OAuth flow state', () => {
     expect(rows).toHaveLength(2)
     expect(rows.every(row => row.user_id === 7)).toBe(true)
 
-    const exchange = mock<(code: string, options: NetworkOAuthExchangeOptions) => Promise<void>>(async () => {})
+    const exchange = mock<(code: string, options: NetworkOAuthExchangeOptions, owner: number | null) => Promise<void>>(async () => {})
     const one = await finishNetworkConsent(request({ code: 'one', state: first.state }, first.cookie), 'twitter', exchange)
     const two = await finishNetworkConsent(request({ code: 'two', state: second.state }, second.cookie), 'twitter', exchange)
     expect(one.headers.get('Location')).toBe('/accounts?twitter=connected')
     expect(two.headers.get('Location')).toBe('/accounts?twitter=connected')
     expect(exchange.mock.calls).toEqual([
-      ['one', { codeVerifier: 'first-verifier', testOnly: false }],
-      ['two', { codeVerifier: 'second-verifier', testOnly: false }],
+      ['one', { codeVerifier: 'first-verifier', testOnly: false }, 7],
+      ['two', { codeVerifier: 'second-verifier', testOnly: false }, 7],
     ])
   })
 
@@ -97,6 +97,6 @@ describe('network OAuth flow state', () => {
     const exchange = mock(async () => {})
     const reply = await finishNetworkConsent(request({ state, code: 'test-code' }, cookie), 'twitter', exchange)
     expect(reply.headers.get('Location')).toBe('/accounts?twitter=tested')
-    expect(exchange).toHaveBeenCalledWith('test-code', { codeVerifier: 'test-verifier', testOnly: true })
+    expect(exchange).toHaveBeenCalledWith('test-code', { codeVerifier: 'test-verifier', testOnly: true }, 7)
   })
 })

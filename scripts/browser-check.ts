@@ -1024,6 +1024,53 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkInstagramPagePicker(cdp: Cdp): Promise<void> {
+  const state = 'a'.repeat(64)
+  const picker = `document.querySelector('[aria-labelledby="instagram-page-choice-title"]')`
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const send = window.fetch.bind(window)
+    window.fetch = (input, options) => {
+      const url = new URL(input instanceof Request ? input.url : input, location.href)
+      if (url.pathname !== '/api/postline/instagram/pages') return send(input, options)
+      if (options?.method === 'POST') {
+        const selection = JSON.parse(options.body)
+        if (selection.state !== '${state}' || selection.page_id !== '701')
+          return Promise.resolve(Response.json({ ok: false, error: 'Unexpected Page selection' }, { status: 422 }))
+        sessionStorage.setItem('test-instagram-page', selection.page_id)
+        return Promise.resolve(Response.json({ ok: true, data: { handle: 'second.page' } }))
+      }
+      if (url.searchParams.get('state') !== '${state}')
+        return Promise.resolve(Response.json({ ok: false, error: 'Missing connection state' }, { status: 422 }))
+      return Promise.resolve(Response.json({ ok: true, data: [
+        { pageId: '700', pageName: 'First Page', username: 'first.page', igUserId: '9001' },
+        { pageId: '701', pageName: 'Second Page', username: 'second.page', igUserId: '9002' },
+      ] }))
+    }
+  ` })
+  try {
+    await auditPage(`${site}/accounts?instagram=choose&instagram_state=${state}`, { cdp })
+    await waitUntil('The Instagram Page picker shows both authorized Pages', () => evaluate<boolean>(cdp, `
+      Boolean(${picker}?.getClientRects().length
+        && ${picker}.querySelector('select')?.options[2]?.textContent.includes('Second Page · @second.page')
+        && ${picker}.querySelector('button[type="submit"]').disabled)`), 5_000)
+    await evaluate(cdp, `(() => {
+      const select = ${picker}.querySelector('select')
+      select.value = '701'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+      ${picker}.querySelector('button[type="submit"]').focus()
+    })()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Instagram connects the selected Page and clears the picker', () => evaluate<boolean>(cdp, `
+      sessionStorage.getItem('test-instagram-page') === '701'
+        && document.querySelector('[data-testid="accounts-page"] [role="status"]')?.textContent.includes('Instagram connected.')
+        && !document.querySelector('#instagram-page-choice-title')?.getClientRects().length`), 5_000)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+    await evaluate(cdp, "sessionStorage.removeItem('test-instagram-page')")
+  }
+}
+
 async function checkChannels(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const send = window.fetch.bind(window)
@@ -2240,6 +2287,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkWorkspaceBootstrap(cdp)
   await checkChannels(cdp)
   await checkXBrowserSession(cdp)
+  await checkInstagramPagePicker(cdp)
   await checkNetworkComponents(cdp)
   await checkLocalComposerDraft(cdp)
   await checkComposerThreadDraft(cdp)
