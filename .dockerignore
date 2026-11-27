@@ -22,7 +22,6 @@
 **/.DS_Store
 **/*.sqlite*
 **/node_modules
-app/Desktop/bundle.generated.js
 storage/framework/.cache
 storage/framework/browser-check
 storage/framework/cache

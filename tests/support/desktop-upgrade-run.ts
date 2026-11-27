@@ -1,6 +1,6 @@
 /**
  * One upgrade for tests/unit/desktop-upgrade.test.ts, in a process of its
- * own: prepareData changes the working directory and the environment, which
+ * own: the prepare hook changes the working directory and the environment, which
  * must not happen to the test runner.
  *
  *   bun tests/support/desktop-upgrade-run.ts <dataDir> <migrated-db-with-ledger>
@@ -9,7 +9,8 @@ import { Database } from 'bun:sqlite'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
-import { prepareData } from '../../app/Desktop/data'
+import { migrateCompiledDatabase } from '@stacksjs/database/compiled-migrations'
+import prepare, { finishWorkspacePreparation } from '../../app/Desktop/Prepare'
 import { testKeychain } from './workspace-keychain'
 
 const [dataDir, ledgerDb] = process.argv.slice(2)
@@ -23,6 +24,9 @@ const migrations = Object.fromEntries(names.map(name => [name, readFileSync(join
 
 const legacyKey = `base64:${Buffer.alloc(32, 9).toString('base64')}`
 writeFileSync(join(dataDir!, 'app.key'), legacyKey, { mode: 0o600 })
-const prepared = await prepareData({ dataDir: dataDir!, template: join(dataDir!, 'unused.sqlite'), migrations, keychain: testKeychain() })
+const databasePath = join(dataDir!, 'postline.sqlite')
+await prepare({ dataDir: dataDir!, databasePath, origin: 'http://127.0.0.1:4100', appName: 'Postline', port: 4100, version: '0.0.0' }, testKeychain())
+const prepared = migrateCompiledDatabase({ databasePath, migrations })
+finishWorkspacePreparation()
 if (process.env.APP_KEY !== legacyKey) throw new Error('The workspace key changed during upgrade.')
 console.log(JSON.stringify({ applied: prepared.applied, created: prepared.created }))

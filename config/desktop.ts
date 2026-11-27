@@ -47,6 +47,10 @@ export default {
     },
     agent: {
       entry: 'app/Desktop/Agent.ts',
+      prepare: 'app/Desktop/Prepare.ts',
+      database: { filename: 'postline.sqlite' },
+      config: true,
+      appRoutes: true,
       views: 'resources/views',
       // The window opens on the workspace. `/` is the marketing site, which
       // is drawn for a browser and has no business inside the app.

@@ -23,39 +23,26 @@ The log is `~/Library/Logs/Postline.log`.
 | File | What it does |
 |---|---|
 | `config/desktop.ts` | The `webview` app: name, bundle id, window, where the agent and the views are |
-| `app/Desktop/Agent.ts` | The agent's own code: answers `/api/*` with the app's routes, starts the recurring jobs |
-| `app/Desktop/data.ts` | Prepares the data directory before any framework code loads: database, app key, working directory |
+| `app/Desktop/Agent.ts` | Redirects the window to Composer and starts the recurring jobs |
+| `app/Desktop/Prepare.ts` | Loads the workspace key and sets the working directory and environment during startup |
 | `app/Desktop/keychain.ts` | Loads or creates the workspace key in the login Keychain and migrates the legacy key file after a successful upgrade |
 | `app/Desktop/schedule.ts` | Runs the recurring jobs on timers while the app is open |
-| `scripts/desktop-bundle.ts` | Writes what the agent carries: routes, actions, middleware, jobs, migrations, and a migrated empty database |
 | `app/Desktop/build-views.ts` | Builds the pages the app carries: the workspace, without the marketing site |
 | `scripts/desktop-check.ts` | Compiled and run from an empty directory, proves the agent serves the API and writes to its database. The release runs it before imaging |
 | `resources/views/settings.stx`, `resources/layouts/settings.stx` | The Settings window |
-| `app/Desktop/bundle.generated.js`, `database.template.sqlite` | That script's output. Build products, not committed |
 | `app/Desktop/icon.svg`, `AppIcon.icns`, `scripts/app-icon.ts` | The icon, and the script that draws it |
 
-Three things about a compiled agent shape all of this:
+Stacks embeds the routes, actions, middleware, migrations, client scripts
+and configuration in the agent. Its launcher calls `Prepare.ts` before
+database migration and config loading. The agent removes the legacy key
+file after migrations succeed and starts the recurring jobs.
 
-- **It has no project tree.** The framework finds routes, actions, middleware
-  and migrations by reading files off disk. The agent is one binary, so
-  `scripts/desktop-bundle.ts` names each of them as a static import the
-  bundler can follow.
-- **Order matters at startup.** The framework reads the database path and the
-  app key when its modules are first evaluated. `Agent.ts` therefore imports
-  nothing from the framework at the top: it prepares the data directory, then
-  imports the rest.
-- **Nobody signs in.** The framework's launcher gives the window a one-time
-  token for a cookie and refuses any request without it, or with a Host that
-  is not the agent's own port. A request that reaches the router is already
-  the person at the Mac. `app/Desktop/data.ts` sets `POSTLINE_DESKTOP_AGENT`,
-  and the auth middleware lets those requests through; the flag is read from
-  the environment, never from a request.
+The launcher trades the window's one-time token for a session cookie and
+requires it on later requests. `Prepare.ts` sets `POSTLINE_DESKTOP_AGENT`
+so workspace routes recognize the desktop owner once the request passes
+the launcher's session check.
 
 ## Build and run
-
-```bash
-bun scripts/desktop-bundle.ts
-```
 
 ```bash
 ./buddy build:desktop
@@ -66,13 +53,12 @@ open storage/framework/desktop/webview/darwin-arm64/Postline.app
 ```
 
 `./buddy dev:desktop` runs the same agent from source, with the views rendered
-live. Run `bun scripts/desktop-bundle.ts` again after adding a route, an
-action, a middleware or a migration.
+live.
 
 To check the compiled agent the way the release does:
 
 ```bash
-bun build --compile scripts/desktop-check.ts --outfile /tmp/postline-check && (cd /tmp && ./postline-check)
+bun scripts/desktop-check.ts
 ```
 
 ## Settings
@@ -95,11 +81,9 @@ To start over as a new install, quit the app and move
 
 ## First launch and upgrades
 
-A first launch writes the database the build made: already migrated, and
-empty. Every later launch compares the migrations the build carries with the
-ones the database has had, copies the database aside if any are pending, and
-applies them one at a time, each in a transaction with its ledger row. A
-migration that fails leaves no half of itself behind.
+On first launch, Stacks creates the database and applies the migrations in
+the build. On upgrades it backs up the database before applying any pending
+migrations and restores the backup if a migration fails.
 
 The ledger is the framework's own `migrations` table, so the database is one
 `./buddy migrate` would recognise.

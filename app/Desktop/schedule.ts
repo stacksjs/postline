@@ -10,10 +10,9 @@
  * Intervals mirror `app/Scheduler.ts`. A job never overlaps itself: one that
  * is still running when its next turn comes skips that turn.
  */
-interface Runnable {
-  name: string
-  handle?: (...args: any[]) => unknown
-}
+import type { Job } from '@stacksjs/queue'
+
+type Runnable = Pick<Job, 'name' | 'handle'>
 
 interface Entry {
   job: Runnable
@@ -60,17 +59,18 @@ export function startSchedule(jobs: {
   const timers: Array<ReturnType<typeof setInterval>> = []
 
   const run = async (job: Runnable): Promise<void> => {
-    if (running.has(job.name) || typeof job.handle !== 'function') return
-    running.add(job.name)
+    const name = job.name
+    if (!name || running.has(name) || typeof job.handle !== 'function') return
+    running.add(name)
     try {
-      await job.handle()
+      await job.handle(undefined)
     }
     catch (error) {
       // A job that fails must not take the app down, or stop the next run.
-      options.say?.(`[schedule] ${job.name} failed: ${error instanceof Error ? error.message : String(error)}`)
+      options.say?.(`[schedule] ${name} failed: ${error instanceof Error ? error.message : String(error)}`)
     }
     finally {
-      running.delete(job.name)
+      running.delete(name)
     }
   }
 
@@ -105,7 +105,7 @@ export function startSchedule(jobs: {
 /** Whether a job should run at launch: it never ran, or its last run is older than its interval. */
 export function isOverdue(entry: Entry, lastRuns: Record<string, string | null> | null, now: number): boolean {
   if (!lastRuns) return entry.everyMs >= 24 * 60 * MINUTE
-  const last = lastRuns[entry.job.name]
+  const last = entry.job.name ? lastRuns[entry.job.name] : null
   if (!last) return true
   const at = Date.parse(last)
   return Number.isNaN(at) || now - at >= entry.everyMs

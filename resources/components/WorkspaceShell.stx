@@ -14,7 +14,8 @@ type WorkspaceBridge = CraftBridgeAPI & {
 const shell = useRef('shell')
 const collapsed = useLocalStorage('postline.sidebar.collapsed', false)
 const desktop = useNativeDesktop()
-const bridge = state<WorkspaceBridge | null>(desktop() as WorkspaceBridge | null)
+const native = state(Boolean(desktop()))
+const bridge = () => desktop() as WorkspaceBridge | null
 const colorMode = useColorMode()
 let settingsChannel: BroadcastChannel | null = null
 let unbindSettingsMenu: (() => void) | undefined
@@ -54,7 +55,7 @@ function toggleSidebar() {
 
 effect(() => {
   const value = collapsed()
-  void bridge()?.window?.setWebSidebarCollapsed?.(value).catch(() => {})
+  if (native()) void bridge()?.window?.setWebSidebarCollapsed?.(value).catch(() => {})
 })
 
 function openSettings() {
@@ -95,15 +96,6 @@ function handleLink(event: MouseEvent) {
   }
 }
 
-function startWindowDrag(event: PointerEvent) {
-  const windowApi = bridge()?.window
-  if (!windowApi?.startDrag || event.button !== 0 || !(event.target instanceof Element)) return
-  if (!event.target.closest('[data-window-drag-region]')) return
-  if (event.target.closest('a, button, input, textarea, select, label, summary, dialog, [contenteditable], [role="button"], [data-no-window-drag]')) return
-  event.preventDefault()
-  void windowApi.startDrag().catch(() => {})
-}
-
 function receiveSettings(event: MessageEvent) {
   const message = event.data
   if (message?.type === 'navigate' && typeof message.path === 'string') {
@@ -121,7 +113,7 @@ function receiveSettings(event: MessageEvent) {
 }
 
 desktop.onReady((host) => {
-  bridge.set(host as WorkspaceBridge)
+  native.set(true)
   unbindSettingsMenu = (host as WorkspaceBridge).settings?.onOpen(openSettings)
   unbindDesktopAlerts = bindDesktopAlerts(host)
 })
@@ -148,10 +140,9 @@ onDestroy(() => {
     data-postline-app
     data-postline-shell
     :data-sidebar-collapsed="collapsed() ? 'true' : 'false'"
-    :data-shell-native="bridge() ? 'true' : 'false'"
+    :data-shell-native="native() ? 'true' : 'false'"
     ref="shell"
     @click.capture="handleLink($event)"
-    @pointerdown="startWindowDrag($event)"
   >
     <AppSidebar :collapsed="collapsed()" @toggle-sidebar="toggleSidebar" />
 
@@ -164,12 +155,12 @@ onDestroy(() => {
         aria-expanded="false"
         title="Expand sidebar"
         data-sidebar-expand-fab
-        data-no-window-drag
+        data-craft-no-drag
         @click="toggleSidebar"
       >
         <span class="h-[18px] w-[18px] i-hugeicons-sidebar-right" aria-hidden="true"></span>
       </button>
-      <section class="overflow-hidden lg:overflow-y-auto min-h-screen min-w-0 lg:h-screen bg-bg border-line border-t lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_var(--workspace-shadow)]" aria-label="Postline workspace" data-postline-workspace data-postline-router data-window-drag-region>
+      <section class="overflow-hidden lg:overflow-y-auto min-h-screen min-w-0 lg:h-screen bg-bg border-line border-t lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_var(--workspace-shadow)]" aria-label="Postline workspace" data-postline-workspace data-postline-router data-craft-drag>
         <div class="flex justify-end pt-3.5 px-3.5 sm:pt-4 sm:px-4">
           <WorkspaceCommands />
         </div>

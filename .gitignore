@@ -93,9 +93,6 @@ storage/framework/desktop-dmg/
 .claude/scheduled_tasks.lock
 storage/app/postline-media/
 
-# Desktop agent build products (bun scripts/desktop-bundle.ts)
-app/Desktop/bundle.generated.js
-app/Desktop/database.template.sqlite
 storage/framework/desktop/
 
 # Posts published to the Blog channel. They are the workspace's data, written

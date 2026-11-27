@@ -4,7 +4,7 @@
  * intact, after a copy is put aside and the new migrations are applied.
  *
  * tests/fixtures/desktop-v0.1.1.sqlite is the database v0.1.1's own build
- * made (`git worktree add <dir> v0.1.1 && bun scripts/desktop-bundle.ts`),
+ * made with the desktop build at the v0.1.1 tag,
  * with that owner data added.
  */
 import { describe, expect, test } from 'bun:test'

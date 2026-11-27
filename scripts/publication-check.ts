@@ -13,17 +13,14 @@
  *
  */
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import process from 'node:process'
 
 const REPOSITORY = 'stacksjs/postline'
 const CI_CONTEXT = 'ReviewOS / CI'
 
-function run(label: string, command: string, args: string[], options: { cwd?: string } = {}): void {
+function run(label: string, command: string, args: string[]): void {
   console.log(`\n▸ ${label}`)
-  const result = spawnSync(command, args, { stdio: 'inherit', cwd: options.cwd, env: process.env })
+  const result = spawnSync(command, args, { stdio: 'inherit', env: process.env })
   if (result.status !== 0)
     fail(`${label} failed.`)
 }
@@ -77,17 +74,7 @@ if (import.meta.main) {
   run('Lint stx templates', './buddy', ['lint', '--stx'])
   run('Type check', 'bun', ['run', 'typecheck:app'])
   run('Tests', './buddy', ['test'])
-  run('Desktop bundle', 'bun', ['scripts/desktop-bundle.ts'])
-
-  const scratch = mkdtempSync(join(tmpdir(), 'postline-release-check-'))
-  try {
-    const binary = join(scratch, 'postline-check')
-    run('Compile desktop check', 'bun', ['build', '--compile', 'scripts/desktop-check.ts', '--outfile', binary])
-    run('Desktop check', binary, [], { cwd: scratch })
-  }
-  finally {
-    rmSync(scratch, { recursive: true, force: true })
-  }
+  run('Desktop check', 'bun', ['scripts/desktop-check.ts'])
 
   console.log('\n✓ Release checks passed.')
 }

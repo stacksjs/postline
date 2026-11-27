@@ -7,7 +7,7 @@
  * reaches the router it has already been proven to come from the person
  * sitting at the Mac, whose data this is, so there is nobody to sign in.
  *
- * `app/Desktop/data.ts` sets the flag. It is read from the environment and
+ * `app/Desktop/Prepare.ts` sets the flag. It is read from the environment and
  * never from a request, so nothing a caller sends can claim it.
  */
 export function isDesktopAgent(env: Record<string, string | undefined> = process.env): boolean {

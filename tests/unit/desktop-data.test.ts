@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
-import { backupDatabase, databaseVersion, managesOwnTransaction, migrate, pendingMigrations, prepareData as prepareWorkspace, schemaVersion } from '../../app/Desktop/data'
+import { backupDatabase, databaseVersion, managesOwnTransaction, migrateCompiledDatabase, MigrationRestoredError, NewerSchemaError, pendingMigrations, schemaVersion } from '@stacksjs/database/compiled-migrations'
+import prepare, { finishWorkspacePreparation } from '../../app/Desktop/Prepare'
 import { WORKSPACE_KEY_ID_FILE, WORKSPACE_KEY_SERVICE, workspaceKey } from '../../app/Desktop/keychain'
 import { testKeychain } from '../support/workspace-keychain'
 
@@ -18,30 +19,28 @@ const FIRST = { '0001-create-notes.sql': 'CREATE TABLE notes (id INTEGER PRIMARY
 const SECOND = { ...FIRST, '0002-add-pinned.sql': 'ALTER TABLE notes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;' }
 
 let dir = ''
-let template = ''
 let keychain = testKeychain()
 const legacyKey = `base64:${Buffer.alloc(32, 9).toString('base64')}`
 
-function prepareData(options: Parameters<typeof prepareWorkspace>[0]): ReturnType<typeof prepareWorkspace> {
-  return prepareWorkspace({ keychain, ...options })
-}
 const cwd = process.cwd()
 const env = { ...process.env }
+const origin = 'http://127.0.0.1:4100'
 
-/** A database as the build makes it: migrated, and empty. */
-function buildTemplate(migrations: Record<string, string>): string {
-  const file = join(dir, 'template.sqlite')
-  migrate(file, migrations)
-  const database = new Database(file)
-  database.exec('PRAGMA wal_checkpoint(TRUNCATE)')
-  database.exec('PRAGMA journal_mode = DELETE')
-  database.close()
-  return file
+function migrate(databasePath: string, migrations: Record<string, string>): string[] {
+  return migrateCompiledDatabase({ databasePath, migrations }).applied
+}
+
+async function prepareData({ dataDir, migrations }: { dataDir: string, migrations: Record<string, string> }) {
+  mkdirSync(dataDir, { recursive: true })
+  const databasePath = join(dataDir, 'postline.sqlite')
+  await prepare({ dataDir, databasePath, origin, appName: 'Postline', port: 4100, version: '0.0.0' }, keychain)
+  const result = migrateCompiledDatabase({ databasePath, migrations })
+  finishWorkspacePreparation()
+  return { databasePath, ...result }
 }
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'postline-desktop-'))
-  template = buildTemplate(FIRST)
   keychain = testKeychain()
 })
 
@@ -112,7 +111,8 @@ describe('migrating', () => {
     const file = join(dir, 'broken.sqlite')
     const broken = { ...FIRST, '0002-broken.sql': 'CREATE TABLE extra (id INTEGER); INSERT INTO missing VALUES (1);' }
 
-    expect(() => migrate(file, broken)).toThrow()
+    migrate(file, FIRST)
+    expect(() => migrate(file, broken)).toThrow(MigrationRestoredError)
 
     const database = new Database(file, { readonly: true })
     const tables = (database.query('SELECT name FROM sqlite_master WHERE type = \'table\'').all() as Array<{ name: string }>).map(row => row.name)
@@ -125,39 +125,37 @@ describe('migrating', () => {
 })
 
 describe('preparing the data directory', () => {
-  test('a first launch starts from the built database', async () => {
+  test('a first launch applies the compiled migrations', async () => {
     const data = join(dir, 'data')
-    const prepared = await prepareData({ dataDir: data, template, migrations: FIRST, origin: 'http://127.0.0.1:4100' })
+    const prepared = await prepareData({ dataDir: data, migrations: FIRST })
 
     expect(prepared.created).toBe(true)
-    expect(prepared.applied).toEqual([])
+    expect(prepared.applied).toEqual(Object.keys(FIRST))
     expect(statSync(prepared.databasePath).mode & 0o777).toBe(0o600)
     expect(pendingMigrations(prepared.databasePath, FIRST)).toEqual([])
   })
 
   test('points the process at the data directory before anything else loads', async () => {
     const data = join(dir, 'data')
-    const prepared = await prepareData({ dataDir: data, template, migrations: FIRST, origin: 'http://127.0.0.1:4100' })
+    await prepareData({ dataDir: data, migrations: FIRST })
 
     // Uploaded media and blog posts are kept relative to the working directory.
     const name = readFileSync(join(process.cwd(), WORKSPACE_KEY_ID_FILE), 'utf8').trim()
     expect(await keychain.get({ service: WORKSPACE_KEY_SERVICE, name })).toBe(String(process.env.APP_KEY))
-    expect(process.env.DB_CONNECTION).toBe('sqlite')
-    expect(process.env.DB_DATABASE_PATH).toBe(prepared.databasePath)
     expect(process.env.POSTLINE_DESKTOP_AGENT).toBe('1')
     expect(process.env.APP_URL).toBe('http://127.0.0.1:4100')
   })
 
   test('an upgrade migrates the existing database and keeps what is in it', async () => {
     const data = join(dir, 'data')
-    const first = await prepareData({ dataDir: data, template, migrations: FIRST })
+    const first = await prepareData({ dataDir: data, migrations: FIRST })
     process.chdir(cwd)
 
     const before = new Database(first.databasePath)
     before.run('INSERT INTO notes (body) VALUES (?)', ['queued for Friday'])
     before.close()
 
-    const upgraded = await prepareData({ dataDir: data, template, migrations: SECOND })
+    const upgraded = await prepareData({ dataDir: data, migrations: SECOND })
 
     expect(upgraded.created).toBe(false)
     expect(upgraded.applied).toEqual(['0002-add-pinned.sql'])
@@ -169,18 +167,18 @@ describe('preparing the data directory', () => {
 
   test('an upgrade copies the database aside first', async () => {
     const data = join(dir, 'data')
-    await prepareData({ dataDir: data, template, migrations: FIRST })
+    await prepareData({ dataDir: data, migrations: FIRST })
     process.chdir(cwd)
-    await prepareData({ dataDir: data, template, migrations: SECOND })
+    await prepareData({ dataDir: data, migrations: SECOND })
 
     expect(readdirSync(data)).toContain('postline.before-0002-add-pinned.sqlite')
   })
 
   test('a launch with nothing to migrate copies nothing', async () => {
     const data = join(dir, 'data')
-    await prepareData({ dataDir: data, template, migrations: FIRST })
+    await prepareData({ dataDir: data, migrations: FIRST })
     process.chdir(cwd)
-    const again = await prepareData({ dataDir: data, template, migrations: FIRST })
+    const again = await prepareData({ dataDir: data, migrations: FIRST })
 
     expect(again.applied).toEqual([])
     expect(readdirSync(data).filter(name => name.includes('before-'))).toEqual([])
@@ -305,7 +303,7 @@ describe('the copy made before an upgrade', () => {
 describe('an upgrade that goes wrong', () => {
   test('puts the database back exactly as it was', async () => {
     const data = join(dir, 'data')
-    const first = await prepareData({ dataDir: data, template, migrations: FIRST })
+    const first = await prepareData({ dataDir: data, migrations: FIRST })
     process.chdir(cwd)
     const seed = new Database(first.databasePath)
     seed.run('INSERT INTO notes (body) VALUES (?)', ['must survive'])
@@ -318,7 +316,7 @@ describe('an upgrade that goes wrong', () => {
     }
     // Simulate the legacy key still present when a pre-Keychain app is upgraded.
     writeFileSync(join(data, 'app.key'), String(process.env.APP_KEY))
-    await expect(prepareData({ dataDir: data, template, migrations: broken })).rejects.toThrow(/put it back as it was/)
+    await expect(prepareData({ dataDir: data, migrations: broken })).rejects.toThrow(MigrationRestoredError)
     expect(readFileSync(join(data, 'app.key'), 'utf8')).toBe(String(process.env.APP_KEY))
     process.chdir(cwd)
 
@@ -337,12 +335,12 @@ describe('opening data from a newer version', () => {
   test('is refused, and nothing is changed', async () => {
     const data = join(dir, 'data')
     const newer = { ...SECOND, '0009-from-the-future.sql': 'CREATE TABLE later (id INTEGER PRIMARY KEY);' }
-    await prepareData({ dataDir: data, template, migrations: FIRST })
+    await prepareData({ dataDir: data, migrations: FIRST })
     process.chdir(cwd)
-    await prepareData({ dataDir: data, template, migrations: newer })
+    await prepareData({ dataDir: data, migrations: newer })
     process.chdir(cwd)
 
-    await expect(prepareData({ dataDir: data, template, migrations: SECOND })).rejects.toThrow(/newer version of Postline/)
+    await expect(prepareData({ dataDir: data, migrations: SECOND })).rejects.toThrow(NewerSchemaError)
     process.chdir(cwd)
 
     const database = new Database(join(data, 'postline.sqlite'), { readonly: true })
@@ -353,13 +351,13 @@ describe('opening data from a newer version', () => {
 
   test('a database made before versions were recorded still opens', async () => {
     const data = join(dir, 'data')
-    const first = await prepareData({ dataDir: data, template, migrations: FIRST })
+    const first = await prepareData({ dataDir: data, migrations: FIRST })
     process.chdir(cwd)
     const database = new Database(first.databasePath)
     database.exec('PRAGMA user_version = 0')
     database.close()
 
-    await expect(prepareData({ dataDir: data, template, migrations: FIRST })).resolves.toMatchObject({ created: false })
+    await expect(prepareData({ dataDir: data, migrations: FIRST })).resolves.toMatchObject({ created: false })
     process.chdir(cwd)
     expect(databaseVersion(first.databasePath)).toBe(schemaVersion(FIRST))
   })
@@ -368,12 +366,12 @@ describe('opening data from a newer version', () => {
 describe('old pre-upgrade copies', () => {
   test('are pruned to the newest three', async () => {
     const data = join(dir, 'data')
-    await prepareData({ dataDir: data, template, migrations: FIRST })
+    await prepareData({ dataDir: data, migrations: FIRST })
     process.chdir(cwd)
     let migrations: Record<string, string> = { ...FIRST }
     for (let step = 2; step <= 6; step++) {
       migrations = { ...migrations, [`000${step}-step.sql`]: `CREATE TABLE step_${step} (id INTEGER PRIMARY KEY);` }
-      await prepareData({ dataDir: data, template, migrations })
+      await prepareData({ dataDir: data, migrations })
       process.chdir(cwd)
     }
 

@@ -21,7 +21,7 @@
         <header class="flex flex-wrap gap-3 items-center justify-between p-3 border-b border-line">
           <div class="flex gap-2 items-center">
             <strong class="text-ui" :text="editHeading() || 'New post'" data-composer-heading>New post</strong>
-            <a class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-xs hover:bg-raised border rounded-xl transition-colors" :class="accountsConnected() ? 'text-success bg-success-soft border-success-line' : 'text-muted bg-panel-2 border-line'" href="/accounts" data-stx-link data-bluesky-connection data-no-window-drag>
+            <a class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-xs hover:bg-raised border rounded-xl transition-colors" :class="accountsConnected() ? 'text-success bg-success-soft border-success-line' : 'text-muted bg-panel-2 border-line'" href="/accounts" data-stx-link data-bluesky-connection data-craft-no-drag>
               <span class="h-2 w-2 rounded-full" :class="accountsConnected() ? 'bg-success-solid' : 'bg-line-strong'" aria-hidden="true"></span>
               <span :text="connectionLabel()">Checking accounts…</span>
             </a>

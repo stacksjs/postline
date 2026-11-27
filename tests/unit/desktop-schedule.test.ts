@@ -127,7 +127,7 @@ describe('overdue jobs at launch (#197)', () => {
   test('the Mac app runs all workspace jobs and leaves off-site backups to configured servers', () => {
     const root = join(import.meta.dir, '../..')
     const scheduled = [...readFileSync(join(root, 'app/Scheduler.ts'), 'utf8').matchAll(/\.job\('(\w+)'\)/g)].map(match => match[1]).sort()
-    const bundled = [...readFileSync(join(root, 'scripts/desktop-bundle.ts'), 'utf8').matchAll(/import\('\.\.\/Jobs\/(\w+)\.ts'\)/g)].map(match => match[1]).sort()
+    const bundled = [...readFileSync(join(root, 'app/Desktop/Agent.ts'), 'utf8').matchAll(/import\('\.\.\/Jobs\/(\w+)\.ts'\)/g)].map(match => match[1]).sort()
     expect(scheduled).toEqual([...bundled, 'BackupWorkspace'].sort())
   })
 })

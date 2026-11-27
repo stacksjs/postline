@@ -17,7 +17,7 @@
  */
 import type { Cdp } from '@stacksjs/testing/browser'
 import { randomBytes } from 'node:crypto'
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -47,7 +47,6 @@ const MODES = [
 
 const work = mkdtempSync(join(tmpdir(), 'postline-browser-check-'))
 const database = join(work, 'postline.sqlite')
-copyFileSync(join(root, 'app/Desktop/database.template.sqlite'), database)
 
 const env = {
   ...process.env,
@@ -64,11 +63,6 @@ const env = {
   MAIL_MAILER: 'log',
   PASSKEY_ORIGIN: site,
 }
-
-const servers = [
-  Bun.spawn(production ? ['./buddy', 'serve:api', '--port', String(API_PORT)] : ['./buddy', 'dev:api'], { cwd: root, env, stdout: 'ignore', stderr: 'pipe' }),
-  Bun.spawn(['./buddy', production ? 'serve' : 'dev:frontend'], { cwd: root, env, stdout: 'ignore', stderr: 'pipe' }),
-]
 
 async function waitUntil(what: string, ready: () => Promise<boolean>, timeoutMs = 300_000): Promise<void> {
   const deadline = Date.now() + timeoutMs
@@ -217,7 +211,7 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
 
   await evaluate(cdp, `(() => {
     const calls = window.postlineShellCalls = {
-      collapsed: [], settings: [], drags: 0, focus: 0, appearance: '',
+      collapsed: [], settings: [], focus: 0, appearance: '',
       notifications: [], badge: 0, menu: [], login: false, loginChanges: 0,
       deadlines: [], alertQueued: false,
     }
@@ -236,7 +230,6 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
     window.craft = {
       window: {
         setWebSidebarCollapsed: async value => calls.collapsed.push(value),
-        startDrag: async () => { calls.drags++ },
         open: async options => calls.settings.push(options),
         focus: async () => { calls.focus++ },
         setAppearance: async mode => { calls.appearance = mode },
@@ -308,17 +301,22 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
   await evaluate(cdp, `${collapse}.click()`)
   await waitUntil('The Craft titlebar toggle expands the sidebar', () => evaluate<boolean>(cdp, `
     ${shell}.dataset.sidebarCollapsed === 'false' && window.postlineShellCalls.collapsed.at(-1) === false`), 5_000)
+  if (!await evaluate<boolean>(cdp, `
+    Boolean(document.querySelector('[data-postline-workspace][data-craft-drag]'))
+      && Boolean(document.querySelector('[data-postline-sidebar][data-craft-drag]'))
+      && ${collapse}.hasAttribute('data-craft-no-drag')
+      && document.querySelector('a[data-command-destination="Settings"]').hasAttribute('data-craft-no-drag')`))
+    fail('queue', 'shell', 'Craft drag regions or interactive exclusions are missing')
+
   await evaluate(cdp, `(() => {
-    document.querySelector('[data-postline-workspace]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
-    ${collapse}.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
     document.querySelector('a[data-command-destination="Settings"]').click()
     window.postlineShellCalls.openSettingsFromMenu()
   })()`)
   if (!await evaluate<boolean>(cdp, `
-    window.postlineShellCalls.drags === 1 && location.pathname === '/queue'
+    location.pathname === '/queue'
       && window.postlineShellCalls.settings.length === 2
       && window.postlineShellCalls.settings.every(options => options.name === 'settings' && options.url === location.origin + '/settings')`))
-    fail('queue', 'shell', 'native dragging or opening Settings through the link and menu failed')
+    fail('queue', 'shell', 'opening native Settings through the link and menu failed')
 
   await evaluate(cdp, `(() => {
     const settings = new BroadcastChannel('postline:settings')
@@ -2242,7 +2240,17 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
 }
 
 let exitCode = 0
+const servers: Bun.Subprocess<'ignore', 'ignore', 'pipe'>[] = []
 try {
+  const migration = Bun.spawnSync(['./buddy', 'migrate', '--no-generate'], { cwd: root, env })
+  if (migration.exitCode !== 0)
+    throw new Error(`Could not migrate the browser fixture.
+${migration.stdout.toString()}
+${migration.stderr.toString()}`)
+  servers.push(
+    Bun.spawn(production ? ['./buddy', 'serve:api', '--port', String(API_PORT)] : ['./buddy', 'dev:api'], { cwd: root, env, stdout: 'ignore', stderr: 'pipe' }),
+    Bun.spawn(['./buddy', production ? 'serve' : 'dev:frontend'], { cwd: root, env, stdout: 'ignore', stderr: 'pipe' }),
+  )
   await waitUntil('The API', async () => (await fetch(`http://localhost:${API_PORT}/api/postline/health`)).status < 500)
   await waitUntil('The site', async () => (await fetch(`${site}/login`)).ok)
   mkdirSync(out, { recursive: true })
