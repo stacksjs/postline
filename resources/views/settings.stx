@@ -10,7 +10,7 @@
     workspace opens this page in a window of its own (craft.window.open, from
     layouts/app.stx); in a browser it is the whole page, with a way back.
   --}}
-  <section data-postline-page="settings" data-testid="settings-page">
+  <main id="workspace-content" tabindex="-1" data-postline-page="settings" data-testid="settings-page">
     <SettingsWindow id="postline-settings" title="Settings" storageKey="postline" v-model:pane="pane">
       <template #account>
         <a class="inline-flex gap-1.5 items-center px-2 py-1 text-muted text-ui hover:text-ink" href="/composer" x-show="!ownWindow()" data-settings-back>
@@ -311,7 +311,7 @@
         </SettingsGroup>
       </SettingsPane>
     </SettingsWindow>
-  </section>
+  </main>
 
 
   <script client>

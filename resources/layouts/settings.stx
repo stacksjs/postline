@@ -12,6 +12,7 @@
   <FontFaces />
 @endhead
 
+<WorkspaceSkipLink />
 <div class="fixed right-3 top-2 z-20">
   <WorkspaceCommands />
 </div>

@@ -90,6 +90,27 @@ async function pressKey(cdp: Cdp, key: string, keyCode: number, modifiers = 0): 
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...event })
 }
 
+interface AccessibleControl {
+  ignored: boolean
+  role?: { value?: string }
+  name?: { value?: string }
+  backendDOMNodeId?: number
+}
+
+const namedRoles = new Set(['button', 'link', 'checkbox', 'combobox', 'DisclosureTriangle', 'listbox', 'menuitem', 'radio', 'searchbox', 'slider', 'spinbutton', 'switch', 'tab', 'textbox'])
+
+async function checkAccessibleControls(cdp: Cdp, view: string): Promise<void> {
+  const { nodes } = await cdp.send<{ nodes: AccessibleControl[] }>('Accessibility.getFullAXTree')
+  for (const node of nodes) {
+    const role = node.role?.value
+    if (node.ignored || !role || !namedRoles.has(role) || node.name?.value?.trim()) continue
+    const { outerHTML } = node.backendDOMNodeId
+      ? await cdp.send<{ outerHTML: string }>('DOM.getOuterHTML', { backendNodeId: node.backendDOMNodeId })
+      : { outerHTML: '' }
+    fail(view, 'accessibility', `unnamed ${role} ${outerHTML.slice(0, 280)}`)
+  }
+}
+
 async function checkWorkspaceCommands(cdp: Cdp): Promise<void> {
   await auditPage(`${site}/queue`, { cdp })
   const dialog = "document.getElementById('workspace-commands')"
@@ -282,14 +303,16 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
       && window.postlineShellCalls.menu.some(item => item.action === 'toggle-login' && item.checked === true)`), 5_000)
 }
 
-async function checkQueueKeyboard(cdp: Cdp): Promise<void> {
+async function checkWorkspaceSkipLink(cdp: Cdp, view: string): Promise<void> {
   await pressKey(cdp, 'Tab', 9)
   const skip = await evaluate<string>(cdp, 'document.activeElement?.getAttribute("href")')
-  if (skip !== '#workspace-content') fail('queue', 'keyboard', 'the skip link is not the first tab stop')
+  if (skip !== '#workspace-content') fail(view, 'keyboard', 'the skip link is not the first tab stop')
   await pressKey(cdp, 'Enter', 13)
   if (await evaluate<string>(cdp, 'document.activeElement?.id') !== 'workspace-content')
-    fail('queue', 'keyboard', 'the skip link did not focus the main content')
+    fail(view, 'keyboard', 'the skip link did not focus the main content')
+}
 
+async function checkQueueKeyboard(cdp: Cdp): Promise<void> {
   await evaluate(cdp, 'document.getElementById("queue-tab-scheduled")?.focus()')
   await pressKey(cdp, 'ArrowRight', 39)
   const selected = await evaluate<boolean>(cdp, `document.activeElement?.id === 'queue-tab-drafts'
@@ -583,6 +606,10 @@ async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
     if (${blog}.getAttribute('aria-pressed') !== 'true') ${blog}.click()
     ${format}.focus()
   })()`)
+  const rich = "document.querySelector('[data-richtext-host] [contenteditable=true]')"
+  await waitUntil('The Blog editor is named and multiline', () => evaluate<boolean>(cdp, `
+    ${rich}?.matches('[role=textbox][aria-multiline=true][aria-label="Post body 1"]')`), 5_000)
+  await checkAccessibleControls(cdp, 'composer (Blog)')
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Keyboard selection of Thread opens two editors', () => evaluate<boolean>(cdp, `
     ${format}.getAttribute('aria-pressed') === 'true' && ${editors}.length === 2`), 5_000)
@@ -1051,7 +1078,8 @@ async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
     await auditPage(`${site}/campaigns`, { cdp })
     const post = `[...document.querySelectorAll('article[role=button]')].find(item => item.textContent.includes('Plan the scheduling fixture') && item.getClientRects().length > 0)`
     await waitUntil('The planned campaign post', () => evaluate<boolean>(cdp, `Boolean(${post})`), 5_000)
-    await evaluate(cdp, `${post}.click()`)
+    await evaluate(cdp, `${post}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
     const picker = `document.querySelector('[data-postline-schedule-picker] [data-date-time-trigger]')`
     await waitUntil('The campaign scheduling picker is present', () => evaluate<boolean>(cdp, `Boolean(${picker}?.getClientRects().length)`), 5_000)
     await evaluate(cdp, `${picker}.click()`)
@@ -1127,7 +1155,11 @@ try {
 
         const shot = await cdp.send<{ data: string }>('Page.captureScreenshot', { format: 'png' })
         writeFileSync(join(out, `${view}-${mode.name}.png`), Buffer.from(shot.data, 'base64'))
-        if (view === 'queue' && mode.name === 'light') await checkQueueKeyboard(cdp)
+        if (mode.name === 'light') {
+          await checkAccessibleControls(cdp, view)
+          await checkWorkspaceSkipLink(cdp, view)
+          if (view === 'queue') await checkQueueKeyboard(cdp)
+        }
       }
     }
     await checkDesktopUpdateControls(cdp)

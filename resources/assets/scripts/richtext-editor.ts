@@ -76,6 +76,10 @@ function setupRichText(): void {
     host.innerHTML = ''
     const surface = document.createElement('div')
     surface.className = 'min-h-36 w-full leading-relaxed text-[18px] text-ink outline-none medium-editor-element'
+    surface.setAttribute('role', 'textbox')
+    surface.setAttribute('aria-multiline', 'true')
+    surface.setAttribute('aria-label', textarea.getAttribute('aria-label') || 'Post body')
+    surface.setAttribute('data-focus-outline', '')
     host.appendChild(surface)
 
     // Seed from whatever the writer already had, so switching modes never
