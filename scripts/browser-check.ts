@@ -2782,6 +2782,25 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
         && document.querySelector('[aria-label="Abrir publicación en Bluesky"]')?.title === 'Abrir en Bluesky'
         && document.querySelector('[data-testid="timeline-page"] time')?.innerText.startsWith('hace ')
     `), 5_000)
+
+    const writing = await auditPage(`${site}/writing`, { cdp })
+    for (const error of writing.errors) fail('writing', 'Spanish', error)
+    for (const request of writing.failed) fail('writing', 'Spanish', request)
+    await waitUntil('Spanish Blog management shows the published post and controls', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-testid="blog-page"][lang="es"] h1')?.textContent === 'Publicaciones de formato largo'
+        && document.querySelector('[aria-label="Publicaciones del blog"] [data-blog-row]')?.innerText.includes('Publicada')
+        && document.getElementById('import-heading')?.textContent === 'Importar publicaciones'
+    `), 5_000)
+    await evaluate(cdp, `(() => {
+      const transfer = new DataTransfer()
+      transfer.items.add(new File(['title,body\\nOtra entrada,Texto de prueba\\n'], 'entradas.csv', { type: 'text/csv' }))
+      const input = document.querySelector('[aria-labelledby="import-heading"] input[type="file"]')
+      input.files = transfer.files
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    await waitUntil('Spanish Blog import preview uses the server report', () => evaluate<boolean>(cdp, `
+      document.querySelector('[aria-labelledby="import-heading"] [role="status"]')?.innerText === 'Vista previa: crear 1, actualizar 0, omitir 0.'
+    `), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
@@ -2935,7 +2954,7 @@ else {
   // eslint-disable-next-line no-console
   console.log(marketingScreenshots
     ? `Product screenshots written to ${productImages}.`
-    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, and Timeline passed.'
+    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, and Blog passed.'
     : `Every view opened clean in ${MODES.map(mode => mode.name).join(', ')}. Screenshots in ${out}.`)
 }
 process.exit(exitCode)

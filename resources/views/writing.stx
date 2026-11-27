@@ -1,34 +1,42 @@
 @extends('layouts/app')
 
-@section('title', 'Postline - Blog')
+<script server cache>
+import { workspaceLocale, workspaceWritingText } from '../../app/Support/Localization/workspace'
+
+export const writingLocale = workspaceLocale
+export const writingText = workspaceWritingText
+export const writingClient = { locale: workspaceLocale, messages: workspaceWritingText }
+</script>
+
+@section('title')Postline - {{ writingText.blog }}@endsection
 
 @section('content')
   @meta('description', 'Manage long-form posts published through Postline.')
-  <section class="grid gap-4" data-postline-page="blog" data-testid="blog-page">
+  <section class="grid gap-4" data-postline-page="blog" data-testid="blog-page" lang="{{ writingLocale }}">
     <WorkspacePageHeader titleKey="workspace.pages.writing.title">
-      <template #description><span :text="summaryText()"></span> · <a class="underline hover:text-ink" href="/blog" target="_blank" rel="noopener">View published Blog</a></template>
+      <template #description><span :text="summaryText()"></span> · <a class="underline hover:text-ink" href="/blog" target="_blank" rel="noopener">{{ writingText.viewPublished }}</a></template>
       <a class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors" href="/composer" data-stx-link data-craft-no-drag x-show="!loaded() || items().length > 0">
         <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>
-        Write a post
+        {{ writingText.writePost }}
       </a>
     </WorkspacePageHeader>
 
-    <section aria-label="Published blog posts">
+    <section aria-label="{{ writingText.publishedPosts }}">
       <Card padding="none" className="shadow-sm">
         <header class="flex gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
           <div>
-            <h2 class="m-0 font-semibold text-ink text-sm">Posts</h2>
+            <h2 class="m-0 font-semibold text-ink text-sm">{{ writingText.posts }}</h2>
           </div>
           <button class="inline-flex gap-2 items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg disabled:opacity-50 transition-colors" type="button" :disabled="loading()" @click="loadPosts">
             <span class="h-3.5 w-3.5 i-hugeicons-refresh" aria-hidden="true"></span>
-            Refresh
+            {{ writingText.refresh }}
           </button>
         </header>
 
-        <WorkspaceListSkeleton :show="loading()" label="Loading blog posts" />
-        <ErrorState :show="errorMessage() && !loading()" title="Could not load blog posts" :message="errorMessage()" @retry="loadPosts()" />
-        <EmptyState :show="showEmpty()" variant="bare" title="No blog posts yet" description="Choose Blog as a publishing channel in Composer.">
-          <StxLink class="text-info text-ui underline" to="/composer">Open Composer</StxLink>
+        <WorkspaceListSkeleton :show="loading()" label="{{ writingText.loading }}" />
+        <ErrorState :show="errorMessage() && !loading()" title="{{ writingText.loadFailure }}" :message="errorMessage()" @retry="loadPosts()" />
+        <EmptyState :show="showEmpty()" variant="bare" title="{{ writingText.empty }}" description="{{ writingText.emptyDescription }}">
+          <StxLink class="text-info text-ui underline" to="/composer">{{ writingText.openComposer }}</StxLink>
         </EmptyState>
 
         <div class="divide-line divide-y" x-show="!loading() && items().length">
@@ -36,7 +44,7 @@
             <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" x-show="!item.editing">
               <div class="min-w-0">
                 <div class="flex gap-2 items-center mb-1.5">
-                  <span class="px-2 py-0.5 font-semibold text-xs border rounded-full" :class="item.published ? 'text-success bg-success-soft border-success-line' : 'text-muted bg-panel-2 border-line'" :text="item.published ? 'Published' : 'Taken down'"></span>
+                  <span class="px-2 py-0.5 font-semibold text-xs border rounded-full" :class="item.published ? 'text-success bg-success-soft border-success-line' : 'text-muted bg-panel-2 border-line'" :text="item.published ? copy.published : copy.takenDown"></span>
                   <time class="text-muted text-xs" :datetime="item.publishedAt" :text="item.date"></time>
                 </div>
                 <h3 class="m-0 font-semibold text-ink text-sm" :text="item.title"></h3>
@@ -44,20 +52,20 @@
               </div>
               <div class="flex flex-wrap gap-1.5 items-center justify-end">
                 <a class="inline-flex gap-1.5 items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" x-show="item.published" :href="item.url" target="_blank" rel="noopener noreferrer">
-                  View live
+                  {{ writingText.viewLive }}
                   <span class="h-3.5 w-3.5 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span>
                 </a>
-                <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :disabled="busyId() === item.id" @click="startEdit(item.id)">Edit</button>
-                <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :disabled="busyId() === item.id" @click="toggleLive(item.id)" :text="item.published ? 'Take down' : 'Put back'"></button>
-                <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-danger text-xs bg-panel hover:bg-danger-soft border border-line rounded-lg disabled:opacity-50" type="button" :disabled="busyId() === item.id" @click="removePost(item.id)">Delete</button>
+                <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :disabled="busyId() === item.id" @click="startEdit(item.id)">{{ writingText.edit }}</button>
+                <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :disabled="busyId() === item.id" @click="toggleLive(item.id)" :text="item.published ? copy.takeDown : copy.putBack"></button>
+                <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-danger text-xs bg-panel hover:bg-danger-soft border border-line rounded-lg disabled:opacity-50" type="button" :disabled="busyId() === item.id" @click="removePost(item.id)">{{ writingText.deleteAction }}</button>
               </div>
             </div>
             <form class="grid gap-2" x-show="item.editing" @submit.prevent="saveEdit(item.id)">
-              <input class="px-3 h-9 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="200" aria-label="Title" :value="item.draftTitle" @input="setDraft(item.id, 'title', $event)" data-blog-edit-title>
-              <textarea class="px-3 py-2 min-h-40 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft resize-y" aria-label="Text" :value="item.draftBody" @input="setDraft(item.id, 'body', $event)" data-blog-edit-body></textarea>
+              <input class="px-3 h-9 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="200" aria-label="{{ writingText.title }}" :value="item.draftTitle" @input="setDraft(item.id, 'title', $event)" data-blog-edit-title>
+              <textarea class="px-3 py-2 min-h-40 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft resize-y" aria-label="{{ writingText.text }}" :value="item.draftBody" @input="setDraft(item.id, 'body', $event)" data-blog-edit-body></textarea>
               <div class="flex gap-2 justify-end">
-                <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" type="button" @click="cancelEdit()">Cancel</button>
-                <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="submit" :disabled="busyId() === item.id">Save</button>
+                <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" type="button" @click="cancelEdit()">{{ writingText.cancel }}</button>
+                <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="submit" :disabled="busyId() === item.id">{{ writingText.save }}</button>
               </div>
             </form>
           </article>
@@ -73,26 +81,32 @@
     --}}
     <section class="grid gap-3 p-4 bg-panel border border-line rounded-2xl shadow-sm" aria-labelledby="import-heading">
       <div>
-        <h2 id="import-heading" class="m-0 font-semibold text-ink text-sm">Import posts</h2>
-        <p class="m-0 mt-1 text-muted text-xs">A CSV export (title, body, and optionally slug and date columns) or a JSON array. Up to 5,000 posts at a time; running it again updates posts instead of duplicating them.</p>
+        <h2 id="import-heading" class="m-0 font-semibold text-ink text-sm">{{ writingText.importPosts }}</h2>
+        <p class="m-0 mt-1 text-muted text-xs">{{ writingText.importDescription }}</p>
       </div>
       <div class="flex flex-wrap gap-2 items-center">
         <label class="inline-flex gap-2 items-center px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg cursor-pointer">
           <span class="h-3.5 w-3.5 i-hugeicons-file-import" aria-hidden="true"></span>
-          <span :text="importName() || 'Choose a file'">Choose a file</span>
+          <span :text="importName() || copy.chooseFile">{{ writingText.chooseFile }}</span>
           <input class="sr-only" type="file" accept=".csv,.json,text/csv,application/json" @change="chooseImport($event)">
         </label>
-        <button class="inline-flex items-center px-3 h-8 font-semibold text-on-accent text-xs bg-accent rounded-lg disabled:opacity-50" type="button" x-show="importPreview() && !importPreview().done" :disabled="importing()" @click="runImport" :text="importing() ? 'Importing…' : 'Import'">Import</button>
+        <button class="inline-flex items-center px-3 h-8 font-semibold text-on-accent text-xs bg-accent rounded-lg disabled:opacity-50" type="button" x-show="importPreview() && !importPreview().done" :disabled="importing()" @click="runImport" :text="importing() ? copy.importing : copy.importAction">{{ writingText.importAction }}</button>
       </div>
       <p class="m-0 text-xs" x-show="importMessage()" :class="importTone() === 'error' ? 'text-danger' : 'text-body'" :text="importMessage()" role="status" aria-live="polite"></p>
       <ul class="grid gap-1 m-0 pl-5 list-disc text-muted text-xs" x-show="importSkipped().length">
-        <li x-for="item in importSkipped()" :text="`Row ${item.row}: ${item.reason}`"></li>
+        <li x-for="item in importSkipped()" :text="words.t('skippedRow', { row: item.row, reason: item.reason })"></li>
       </ul>
     </section>
   </section>
 
   <script client>
+    import { createI18n } from '@stacksjs/i18n/client'
     import { showNotification } from '../functions/notification'
+
+    const { locale: language, messages: copy } = {{ writingClient }}
+    const words = createI18n({ locale: language, messages: { [language]: copy } })
+    const dateLocale = language === 'en' ? undefined : language
+
     const items = state([])
     const loading = state(true)
     const loaded = state(false)
@@ -105,16 +119,17 @@
     const publishedCount = derived(() => items().filter(item => item.status === 'published').length)
     const showEmpty = derived(() => loaded() && !loading() && !errorMessage() && items().length === 0)
     const summaryText = derived(() => {
-      if (errorMessage()) return 'Posts unavailable'
-      const down = items().length - publishedCount()
-      return `${publishedCount()} published${down ? `, ${down} taken down` : ''}`
+      if (errorMessage()) return copy.unavailable
+      const published = publishedCount()
+      const takenDown = items().length - published
+      return takenDown ? words.t('bothCounts', { published, takenDown }) : words.t('publishedCount', { count: published })
     })
 
     const dateLabel = (value: string | null | undefined): string => {
       const date = new Date(value)
       return Number.isNaN(date.getTime())
-        ? 'Published'
-        : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+        ? copy.published
+        : date.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric', year: 'numeric' })
     }
 
     // Import (#117): the chosen file's text, a preview report, then the real run.
@@ -137,13 +152,8 @@
       if (dryRun) body.set('dry_run', '1')
       const response = await fetch('/api/postline/import/posts', { method: 'POST', body })
       const payload = await response.json()
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'The file could not be read.')
+      if (!response.ok || !payload.ok) throw new Error(payload.error || copy.fileFailure)
       return payload.data.report
-    }
-
-    const describeImport = (report, dryRun: boolean): string => {
-      const verb = dryRun ? ['would be created', 'would be updated', 'would be skipped'] : ['created', 'updated', 'skipped']
-      return `${report.imported} ${verb[0]}, ${report.updated} ${verb[1]}, ${report.skipped} ${verb[2]}.`
     }
 
     const chooseImport = async (event) => {
@@ -151,13 +161,13 @@
       if (!file) return
       importName.set(file.name)
       importPreview.set(null)
-      importMessage.set('Reading the file…')
+      importMessage.set(copy.readingFile)
       importTone.set('neutral')
       try {
         importText.set(await file.text())
         const report = await sendImport(true)
         importPreview.set(report)
-        importMessage.set(`Preview: ${describeImport(report, true)}`)
+        importMessage.set(words.t('previewReport', report))
       }
       catch (error) {
         importMessage.set(error instanceof Error ? error.message : String(error))
@@ -171,7 +181,7 @@
       try {
         const report = await sendImport(false)
         importPreview.set({ ...report, done: true })
-        importMessage.set(`Imported: ${describeImport(report, false)}`)
+        importMessage.set(words.t('importReport', report))
         await loadPosts()
       }
       catch (error) {
@@ -189,7 +199,7 @@
       try {
         const response = await fetch('/api/postline/blog')
         const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load blog posts.')
+        if (!response.ok || !payload.ok) throw new Error(payload.error || copy.loadFailure)
         items.set(Array.isArray(payload.data?.items) ? payload.data.items : [])
       }
       catch (error) {
@@ -213,7 +223,7 @@
     })))
 
     const toast = (message: string, tone: 'success' | 'error' = 'success'): void => {
-      showNotification({ message, tone, title: tone === 'error' ? 'Blog' : 'Done' })
+      showNotification({ message, tone, title: tone === 'error' ? copy.blog : copy.completed })
     }
 
     const send = async (path: string, fields: Record<string, string>) => {
@@ -221,7 +231,7 @@
       for (const [key, value] of Object.entries(fields)) body.set(key, value)
       const response = await fetch(`/api/postline/blog/${path}`, { method: 'POST', body })
       const payload = await response.json()
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'That did not work.')
+      if (!response.ok || !payload.ok) throw new Error(payload.error || copy.requestFailure)
       return payload.data
     }
 
@@ -243,7 +253,7 @@
         await send('update', { id: String(id), title: drafts().title, body: drafts().body })
         editingId.set(0)
         await loadPosts()
-        toast('Saved. A published post changes on the site too.')
+        toast(copy.saved)
       }
       catch (error) {
         toast(error instanceof Error ? error.message : String(error), 'error')
@@ -260,7 +270,7 @@
       try {
         await send(item.status === 'published' ? 'unpublish' : 'republish', { id: String(id) })
         await loadPosts()
-        toast(item.status === 'published' ? 'Taken off the site. It is still here.' : 'Back on the site.')
+        toast(item.status === 'published' ? copy.removedFromSite : copy.backOnSite)
       }
       catch (error) {
         toast(error instanceof Error ? error.message : String(error), 'error')
@@ -272,12 +282,12 @@
 
     const removePost = async (id: number) => {
       const item = items().find(entry => entry.id === id)
-      if (!item || !await stxConfirm(`The page for "${item.title}" will also be deleted. This cannot be undone.`, { title: 'Delete this blog post?', type: 'error', confirmText: 'Delete post' })) return
+      if (!item || !await stxConfirm(words.t('confirmMessage', { title: item.title }), { title: copy.confirmTitle, type: 'error', confirmText: copy.confirmAction, cancelText: copy.cancel })) return
       busyId.set(id)
       try {
         await send('delete', { id: String(id) })
         await loadPosts()
-        toast('Deleted.')
+        toast(copy.deleted)
       }
       catch (error) {
         toast(error instanceof Error ? error.message : String(error), 'error')
