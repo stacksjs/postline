@@ -19,7 +19,7 @@ import { raw } from '@stacksjs/query-builder'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { dedupeTargets, isAccountProvider, parseTargets, targetKey, targetProviders } from '../../Support/Social/targets'
 import { hydrateStoredContent, MissingMediaError, parseStoredContent } from '../../Support/Social/stored-content'
-import { isSafeMediaFilename, MEDIA_DIR } from '../../Support/Social/uploads'
+import { isSafeMediaFilename, MEDIA_DIR, storedImageResponse } from '../../Support/Social/uploads'
 import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/variants'
 import { crosspost, crosspostProviders } from './CrosspostService'
 import { findIdentityRow, unavailableAccountError } from './identities'
@@ -316,7 +316,7 @@ export interface QueueEditView {
   /** The first image, as before. */
   image: { kind: 'file' | 'url', url: string | null } | null
   /** Every image, in order, with its alt text. */
-  images: Array<{ kind: 'file' | 'url', url: string | null, altText: string | null }>
+  images: Array<{ kind: 'file' | 'url', url: string | null, altText: string | null, previewUrl: string | null }>
   /** Per-provider overrides, so an edit round-trips them instead of dropping them. */
   variants: VariantMap | null
   options: PostOptions | null
@@ -740,6 +740,12 @@ export class QueueService {
     return post?.status ?? null
   }
 
+  async previewImage(id: number, index: number): Promise<Response | null> {
+    const post = await this.findActionable(id)
+    const image = parseStoredContent(await storedContentOf(post))?.media?.[index]
+    return image?.path ? storedImageResponse(image.path, 'private, no-store') : null
+  }
+
   /**
    * Full editable state for one draft/scheduled/failed post, for prefilling
    * the composer. Media is described (present/kind), not returned as bytes —
@@ -758,7 +764,8 @@ export class QueueService {
     const thread = segments.length > 1 && segments.every(segment => segment.status === 'draft' || segment.status === 'scheduled')
       ? { postIds: segments.map(segment => Number(segment.id)), texts: segments.map(segment => segment.body) }
       : null
-    const stored = parseStoredContent(await storedContentOf(thread ? segments[0] : post))
+    const lead = thread ? segments[0] : post
+    const stored = parseStoredContent(await storedContentOf(lead))
     const media = stored?.media?.[0]
     return {
       id: Number(post.id),
@@ -770,7 +777,12 @@ export class QueueService {
       targets: targets.map(targetKey),
       external: stored?.external || null,
       image: media ? { kind: media.path ? 'file' : 'url', url: media.url || null } : null,
-      images: (stored?.media || []).map(item => ({ kind: item.path ? 'file' as const : 'url' as const, url: item.url || null, altText: item.altText || null })),
+      images: (stored?.media || []).map((item, index) => ({
+        kind: item.path ? 'file' as const : 'url' as const,
+        url: item.url || null,
+        altText: item.altText || null,
+        previewUrl: item.path ? `/api/postline/queue/image?id=${lead.id}&index=${index}` : null,
+      })),
       variants: sanitizeVariants(stored?.variants) || null,
       options: sanitizePostOptions(stored?.options) || null,
       thread,

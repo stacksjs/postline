@@ -6,6 +6,7 @@ import { db } from '@stacksjs/database'
 import { ensureAccount, now, uuid } from './support'
 import { classifyFailure } from '../../Support/Social/retry'
 import { blogBodyWithAttachments, readBlogAttachments, removeBlogAttachments, saveBlogAttachments } from '../../Support/Social/blog-attachments'
+import { blogArticle } from '../../Support/Social/blog-article'
 import { blogFile, writePublishedBlogFile } from '../../Support/Social/blog-files'
 import { UserFacingError } from '../../Support/Http/user-error'
 
@@ -106,18 +107,11 @@ export class BlogService {
     try {
       // Explicit title (long-form composer) keeps the whole text as body;
       // otherwise the first line doubles as the title and is stripped.
-      const explicitTitle = content?.title?.trim()
-      const lines = post.body.split('\n').map(line => line.trim())
-      const title = (explicitTitle || lines.find(Boolean) || 'Untitled post').slice(0, 200)
+      const { title, body: articleText } = blogArticle(post.body, content?.title)
       const body = post.body.trim()
       const slug = await uniqueSlug(slugify(title))
       const accountId = await ensureAccount()
       const publishedAt = now()
-
-      const firstContentIndex = post.body.split('\n').findIndex(line => line.trim())
-      const articleText = explicitTitle
-        ? body
-        : post.body.split('\n').slice(firstContentIndex + 1).join('\n').trim() || body
 
       attachments = await saveBlogAttachments(content?.media || [])
       const markdownBody = blogBodyWithAttachments(articleText, slug, attachments)

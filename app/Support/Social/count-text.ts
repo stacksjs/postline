@@ -27,6 +27,7 @@ const URL_LENGTH = 23
 // domain straight after an @ is the server of a mention, not a link.
 const URL_PATTERN = /\bhttps?:\/\/[^\s<>]+|(?<![@\w.-])(?:[a-z0-9-]+\.)+(?:com|org|net|io|dev|app|co|social|blog|ai|me|info|xyz|tv|fm|us|uk|de|fr|jp|ca|au|nl|ch|se|no|es|it)\b(?:\/[^\s<>]*)?/gi
 const TRAILING_PUNCTUATION = /[.,;:!?)\]}'"]+$/
+const MASTODON_MENTIONS = /(?<![\w/])(@[\w.-]+)@[\w.-]+\.[a-z]{2,}/gi
 
 let segmenter: Intl.Segmenter | undefined
 
@@ -85,7 +86,7 @@ function countForMastodon(text: string): number {
   return splitLinks(text).reduce((sum, part) => {
     if (part.link) return sum + URL_LENGTH
     // The server part of a mention is not counted.
-    return sum + graphemes(part.value.replace(/(^|[^\w/])(@[\w.-]+)@[\w.-]+\.[a-z]{2,}/gi, '$1$2'))
+    return sum + graphemes(part.value.replace(MASTODON_MENTIONS, '$1'))
   }, 0)
 }
 
@@ -108,4 +109,39 @@ export function countText(provider: string, text: string): number {
 /** Whether `text` is longer than `limit` on `provider`. A limit of 0 means none. */
 export function exceedsLimit(provider: string, text: string, limit: number): boolean {
   return limit > 0 && countText(provider, text) > limit
+}
+
+/** A prefix that fits the limit, keeping emoji, links and remote mentions intact. */
+export function textWithinLimit(provider: string, text: string, limit: number): string {
+  if (!exceedsLimit(provider, text, limit)) return text
+  segmenter ??= new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+  const pieces = provider === 'mastodon' || provider === 'twitter' ? splitLinks(text) : [{ link: false, value: text }]
+  let offset = 0
+  let remaining = limit
+
+  for (const piece of pieces) {
+    const cost = piece.link ? URL_LENGTH : countText(provider, piece.value)
+    if (cost <= remaining) {
+      offset += piece.value.length
+      remaining -= cost
+      continue
+    }
+    if (piece.link) break
+
+    const mentions = provider === 'mastodon'
+      ? new Map([...piece.value.matchAll(MASTODON_MENTIONS)].map(match => [match.index, { value: match[0], cost: graphemes(match[1]!) }]))
+      : new Map<number, { value: string, cost: number }>()
+    let nextIndex = 0
+    for (const { segment, index } of segmenter.segment(piece.value)) {
+      if (index < nextIndex) continue
+      const mention = mentions.get(index)
+      const size = mention?.cost ?? countText(provider, segment)
+      if (size > remaining) break
+      nextIndex = index + (mention?.value.length ?? segment.length)
+      remaining -= size
+    }
+    offset += nextIndex
+    break
+  }
+  return text.slice(0, offset)
 }

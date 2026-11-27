@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { countText, exceedsLimit } from '../../app/Support/Social/count-text'
+import { countText, exceedsLimit, textWithinLimit } from '../../app/Support/Social/count-text'
 
 const family = '👨‍👩‍👧‍👦'
 const flag = '🇩🇪'
@@ -38,5 +38,13 @@ describe('counting a post the way its network does', () => {
 
   test('a limit of zero means no limit', () => {
     expect(exceedsLimit('blog', 'x'.repeat(50_000), 0)).toBe(false)
+  })
+
+  test('a preview preserves whole graphemes, weighted links and Mastodon mentions', () => {
+    expect(textWithinLimit('bluesky', 'a' + family + 'b', 2)).toBe('a' + family)
+    expect(textWithinLimit('linkedin', 'a' + family + 'b', family.length)).toBe('a')
+    expect(textWithinLimit('twitter', `Read ${longUrl} tomorrow`, 28)).toBe(`Read ${longUrl}`)
+    expect(textWithinLimit('twitter', `Read ${longUrl} tomorrow`, 27)).toBe('Read ')
+    expect(textWithinLimit('mastodon', 'Hi @chris@example.social!', 9)).toBe('Hi @chris@example.social')
   })
 })

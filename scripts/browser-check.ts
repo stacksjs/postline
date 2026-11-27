@@ -436,6 +436,9 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
         await publishGate
         return Response.json({ ok: true, data: { postId: 1, results: [{ provider: 'bluesky', ok: true, url: ${JSON.stringify(publishedUrl)} }] } })
       })
+      if (path === '/api/postline/bluesky/link-preview') return Promise.resolve(Response.json({
+        ok: true, data: { url: 'https://example.com/article', title: 'A preview article', description: 'Article summary' },
+      }))
       if (path === '/api/postline/inbox') return Promise.resolve(Response.json({ ok: true, data: { conversations } }))
       if (path === '/api/postline/inbox/read') inboxUnread = 2
       if (path === '/api/postline/inbox/thread' || path === '/api/postline/inbox/read') return Promise.resolve(Response.json({ ok: true, data: {} }))
@@ -502,13 +505,20 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
     await waitUntil('Typing preserves the override caret and updates the network limit', () => evaluate<boolean>(cdp, `
       ${variant}.selectionStart === 3 && ${variant}.value.startsWith('aaZ')
         && ${target}.getAttribute('data-over') === 'true'
-        && document.querySelector('[data-bluesky-count]').textContent.includes('too long for Bluesky')`), 5_000)
+        && document.querySelector('[data-bluesky-count]').textContent.includes('too long for Bluesky')
+        && document.querySelector('[data-network-preview=bluesky] [data-preview-overflow]')?.textContent === 'Over the limit by 2 characters'
+        && document.querySelector('[data-network-preview=bluesky] [data-preview-copy]')?.textContent === 'aaZ' + 'a'.repeat(297) + '…'`), 5_000)
     await evaluate(cdp, "document.querySelector('[data-variant-action=reset][data-variant-provider=bluesky]').click()")
     await waitUntil('Resetting the override restores the shared copy and count', () => evaluate<boolean>(cdp, `
       !${variant} && ${target}.getAttribute('data-over') !== 'true'
         && document.querySelector('[data-bluesky-count]').textContent.includes('1 / 300')`), 5_000)
     await evaluate(cdp, `${variantToggle}.click()`)
     const instagram = "document.querySelector('[data-provider-toggle=\"instagram:102\"]')"
+    const linkCard = "document.querySelector('[data-network-preview=bluesky] [data-link-preview]')"
+    const editor = "document.querySelector('[data-bluesky-text]')"
+    await evaluate(cdp, `${editor}.value = 'Read https://example.com/article'; ${editor}.dispatchEvent(new Event('input', { bubbles: true }))`)
+    await waitUntil('Typing a link updates the Bluesky card without a Preview button', () => evaluate<boolean>(cdp, `
+      ${linkCard}?.textContent.includes('A preview article') && !document.querySelector('[data-preview-post]')`), 5_000)
     await evaluate(cdp, `(() => {
       ${instagram}.click()
       const bytes = Uint8Array.from(atob('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'), char => char.charCodeAt(0))
@@ -519,14 +529,20 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
     await waitUntil('Pasted GIF shows an inline warning specific to Instagram', () => evaluate<boolean>(cdp, `
       !!document.querySelector('[data-image-alt]')
         && document.querySelector('[data-image-warnings]').textContent.includes('Instagram takes JPEG')
+        && document.querySelector('[data-network-preview=instagram] [data-preview-copy]')?.textContent === 'Read https://example.com/article'
+        && document.querySelector('[data-network-preview=instagram] [data-preview-images] img')?.naturalWidth === 1
+        && !${linkCard}
         && document.querySelector('[data-bluesky-publish]').disabled`), 5_000)
     await evaluate(cdp, `${instagram}.click()`)
     await waitUntil('Deselecting Instagram clears its warning without removing the image', () => evaluate<boolean>(cdp, `
       !!document.querySelector('[data-image-alt]')
         && !document.querySelector('[data-image-warnings]').textContent.trim()
+        && !document.querySelector('[data-network-preview=instagram]')
         && !document.querySelector('[data-bluesky-publish]').disabled`), 5_000)
     await evaluate(cdp, `document.querySelector('[aria-label="Remove Pasted.gif"]').click()
-      document.querySelector('[data-bluesky-text]').focus()`)
+      ${editor}.value = ${JSON.stringify(text)}
+      ${editor}.dispatchEvent(new Event('input', { bubbles: true }))
+      ${editor}.focus()`)
     await pressKey(cdp, 'Enter', 13, 4)
     await waitUntil('The imported publish function', () => evaluate<boolean>(cdp, `
       window.composerPublish?.text === ${JSON.stringify(text)} && window.composerPublish.providers === 'bluesky:101'`), 5_000)
@@ -623,7 +639,7 @@ async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
   const blog = "document.querySelector('[data-provider-toggle=blog]')"
   const format = "document.querySelector('[data-composer-mode=thread]')"
   const editors = "document.querySelectorAll('[data-bluesky-text]')"
-  const segments = ['Keyboard thread draft opening', 'Keyboard thread draft conclusion']
+  const segments = ['Keyboard thread draft opening\n\nAn **emphasized** note.', 'Keyboard thread draft conclusion']
   await waitUntil('The Blog is available in the composer', () => evaluate<boolean>(cdp, `Boolean(${blog}?.getClientRects().length)`), 5_000)
   await evaluate(cdp, `(() => {
     for (const chip of document.querySelectorAll('[data-provider-toggle][aria-pressed=true]'))
@@ -646,6 +662,10 @@ async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
     })
     ${editors}[1].focus()
   })()`)
+  await waitUntil('Blog previews both thread segments as individual posts and formats Markdown', () => evaluate<boolean>(cdp, `
+    document.querySelectorAll('[data-network-preview=blog] [data-preview-segment]').length === 2
+      && document.querySelector('[data-network-preview=blog] [data-preview-copy] strong')?.textContent === 'emphasized'
+      && document.querySelector('[data-network-preview=blog] [data-preview-segment]:nth-of-type(2)')?.textContent.includes('Post 2')`), 5_000)
   await evaluate(cdp, "document.querySelector('[data-composer-mode=single]').focus()")
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Single format shows the opening without dropping the second segment', () => evaluate<boolean>(cdp, `
@@ -685,7 +705,9 @@ async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
   await pressKey(cdp, 'Enter', 13)
   const orderedAlts = ['Description 1', 'Description 2', 'Description 4', 'Description 3']
   await waitUntil('Keyboard reordering moves images with their alt text', () => evaluate<boolean>(cdp, `
-    JSON.stringify([...${alts}].map(input => input.value)) === ${JSON.stringify(JSON.stringify(orderedAlts))}`), 5_000)
+    JSON.stringify([...${alts}].map(input => input.value)) === ${JSON.stringify(JSON.stringify(orderedAlts))}
+      && JSON.stringify([...document.querySelectorAll('[data-network-preview=blog] [data-preview-images] img')].map(image => image.alt))
+        === ${JSON.stringify(JSON.stringify(orderedAlts))}`), 5_000)
   await evaluate(cdp, `(() => {
     const bytes = Uint8Array.from(atob('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'), char => char.charCodeAt(0))
     const clipboardData = new DataTransfer()
@@ -718,6 +740,7 @@ async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
     await waitUntil('Reopening a queued thread restores every segment in order', () => evaluate<boolean>(cdp, `
       ${format}.getAttribute('aria-pressed') === 'true'
         && JSON.stringify([...${editors}].map(editor => editor.value)) === ${JSON.stringify(JSON.stringify(segments))}
+        && document.querySelector('[data-network-preview=blog] [data-preview-images] img')?.naturalWidth === 1
         && document.querySelector('[data-bluesky-publish-label]').textContent === 'Save draft'`), 5_000)
   }
   finally {

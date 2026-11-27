@@ -39,6 +39,7 @@ describe('postline api — auth', () => {
     ['/api/postline/analytics'],
     ['/api/postline/queue'],
     ['/api/postline/setup/post-status?id=1'],
+    ['/api/postline/queue/image?id=1&index=0'],
     ['/api/postline/campaigns'],
     ['/api/postline/listening'],
     ['/api/postline/activity'],
@@ -54,6 +55,16 @@ describe('postline api — auth', () => {
 })
 
 describe('postline api — reads', () => {
+  test('Blog previews use the publishing renderer behind authentication', async () => {
+    const body = { bodies: ['An **emphasized** note.', '# A second segment'] }
+    ;(await featureTest().post('/api/postline/blog/preview', body)).assertStatus(401)
+    const preview = await featureTest().actingAs(await actingUser()).post('/api/postline/blog/preview', body)
+    preview.assertStatus(200)
+    expect(await preview.json()).toEqual({
+      ok: true, data: { html: ['<p>An <strong>emphasized</strong> note.</p>\n', '<h1>A second segment</h1>\n'] },
+    })
+  })
+
   test('setup looks up the specified post even after it is published', async () => {
     const client = featureTest().actingAs(await actingUser())
     const path = '/api/postline/setup/post-status?id='

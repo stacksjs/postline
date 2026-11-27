@@ -12,8 +12,8 @@
         <p class="mb-0 mt-1.5 text-muted text-ui">Draft once, then publish to every connected account.</p>
       </div>
     </header>
-    <div class="grid">
-      <section class="grid content-start grid-rows-[auto_auto_auto] self-start bg-panel border border-line rounded-2xl shadow-sm" aria-label="Post composer" :class="dragDepth() > 0 ? 'ring-2 ring-accent' : ''" @input="markEdited" @change="markEdited" @dragenter="enterImageDrop" @dragleave="leaveImageDrop" @dragover="overImageDrop" @drop="dropImages" @paste="pasteImages" data-composer-image-drop>
+    <div class="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <section class="grid content-start grid-rows-[auto_auto_auto] self-start min-w-0 bg-panel border border-line rounded-2xl shadow-sm" aria-label="Post composer" :class="dragDepth() > 0 ? 'ring-2 ring-accent' : ''" @input="markEdited" @change="markEdited" @dragenter="enterImageDrop" @dragleave="leaveImageDrop" @dragover="overImageDrop" @drop="dropImages" @paste="pasteImages" data-composer-image-drop>
         <div :if="setupActive" class="flex flex-wrap gap-2 items-center justify-between px-3 py-2 text-info text-xs bg-info-soft border-b border-line" data-setup-composer>
           <span class="font-semibold" :text="setupTargetUnavailable() ? 'The channel chosen in setup is unavailable.' : 'Write and publish or schedule your first post.'">Write and publish or schedule your first post.</span>
           <a class="underline" href="/setup?step=channels" data-stx-link>Choose a different channel</a>
@@ -110,18 +110,10 @@
               </header>
               <ComposerSegmentField :text="row.text" :label="`Post body ${row.number}`" :placeholder="row.number === 1 ? 'What do you want to share?' : ''" :focusRequest="segmentFocus().id === row.id ? segmentFocus().revision : 0" :readonly="submitting()" @activate="activateSegment(row.id)" @edit="editSegment(row.id, $event)" />
               <div :if="row.number === 1" class="hidden" data-richtext-host></div>
-              <div :if="row.preview" class="overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview>
-                <img :if="row.preview.image" class="object-cover h-28 w-full bg-panel-3 border-b border-line" :src="row.preview.image" alt="">
-                <div class="grid gap-1 p-3">
-                  <div class="font-semibold text-muted text-xs uppercase" :text="row.preview.domain"></div>
-                  <div class="font-semibold text-ink text-sm" :text="row.preview.title"></div>
-                  <div :if="row.preview.description" class="leading-normal line-clamp-2 text-muted text-ui" :text="row.preview.description"></div>
-                </div>
-              </div>
             </article>
           </div>
           {{-- Bluesky shows images or a link card, never both (#132). --}}
-          <p class="m-0 mt-2 text-muted text-xs" :class="linkCardShown() && attachedImages().length ? '' : 'hidden'" data-card-replaced>The attached image is shown on Bluesky instead of the link card.</p>
+          <p class="m-0 mt-2 text-muted text-xs" :class="linkCardShown() && previewImages().length ? '' : 'hidden'" data-card-replaced>The attached image is shown on Bluesky instead of the link card.</p>
         </div>
 
         {{--
@@ -191,9 +183,6 @@
             <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Add post" title="Add post" data-add-post :disabled="submitting()" x-show="!editingQueued() || composerFormat() === 'thread'" @click="appendSegment">
               <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Preview post" title="Preview post" data-preview-post @click="previewPost">
-              <span class="h-4 w-4 i-hugeicons-view" aria-hidden="true"></span>
-            </button>
             <div class="inline-flex ml-auto sm:ml-0 text-on-accent bg-accent rounded-xl">
               <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold hover:bg-accent-hover rounded-l-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" ref="publishTrigger" data-bluesky-publish aria-keyshortcuts="Meta+Enter Control+Enter" :disabled="!canPublish() || submitting() || mediaWarnings().length > 0" @click="runPostAction">
                 <span class="shrink-0 h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
@@ -214,6 +203,43 @@
         </footer>
       </section>
 
+      <aside class="grid content-start gap-3 min-w-0" aria-labelledby="composer-preview-title">
+        <h2 id="composer-preview-title" class="m-0 font-semibold text-ink text-sm">Live preview</h2>
+        <p :if="providersLoaded() && !previewCards().length" class="m-0 p-4 text-muted text-ui bg-panel border border-line rounded-2xl">Select a publishing channel to preview your post.</p>
+        <section x-for="card in previewCards()" :key="card.provider" :data-network-preview="card.provider" class="grid min-w-0 overflow-hidden bg-panel border border-line rounded-2xl">
+          <header class="flex gap-2.5 items-center p-3 bg-panel-2 border-b border-line">
+            <span class="shrink-0 h-4 w-4 text-ink" :class="card.icon" aria-hidden="true"></span>
+            <h3 class="m-0 font-semibold text-ink text-sm" :text="card.name"></h3>
+            <span :if="card.handle" class="min-w-0 truncate text-muted text-xs" :text="card.handle"></span>
+          </header>
+          <article x-for="(post, index) in card.posts" :key="post.id" class="grid gap-2 min-w-0 p-3 border-b border-line last:border-b-0" data-preview-segment>
+            <div class="flex gap-2 items-center justify-between text-xs" :class="post.overflow ? 'text-danger' : 'text-muted'">
+              <span :if="card.posts.length > 1" :text="card.chained && index > 0 ? 'Reply ' + index : 'Post ' + (index + 1)"></span>
+              <span class="inline-flex gap-1.5 items-center ml-auto tabular-nums">
+                <span class="shrink-0 h-4 w-4" :data-preview-count-ring="post.progress" aria-hidden="true"></span>
+                <span class="sr-only">Characters</span>
+                <span :text="post.count" data-preview-count></span>
+              </span>
+            </div>
+            <p :if="post.spoiler" class="m-0 px-2 py-1 rounded-md bg-panel-2 text-ui text-muted" :text="post.spoiler"></p>
+            <h4 :if="post.title" class="m-0 break-words font-semibold text-lg text-ink" :text="post.title"></h4>
+            <div :if="post.html" class="max-w-none break-words prose text-ui" x-html="post.html" data-preview-copy></div>
+            <p :if="!post.html" class="m-0 whitespace-pre-wrap [overflow-wrap:anywhere] text-ui leading-normal" :class="post.text ? 'text-ink' : 'text-muted'" :text="post.text ? post.text + (post.overflow ? '…' : '') : 'Your post will appear here.'" data-preview-copy></p>
+            <p :if="post.overflow" class="m-0 text-danger text-xs" :text="'Over the limit by ' + post.overflow + (post.overflow === 1 ? ' character' : ' characters')" data-preview-overflow></p>
+            <div :if="post.images.length" class="grid gap-1 overflow-hidden rounded-lg" :class="post.images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'" data-preview-images>
+              <img x-for="image in post.images" :key="image.id" class="block aspect-[4/3] w-full object-cover bg-panel-2" :src="image.src" :alt="image.alt" referrerpolicy="no-referrer">
+            </div>
+            <div :if="post.card" class="overflow-hidden bg-panel-2 border border-line rounded-lg" data-link-preview>
+              <img :if="post.card.image" class="block object-cover aspect-[2/1] w-full bg-panel-3 border-b border-line" :src="post.card.image" alt="" referrerpolicy="no-referrer">
+              <div class="grid gap-1 p-2.5">
+                <span class="font-semibold text-muted text-xs uppercase truncate" :text="post.card.domain"></span>
+                <span class="font-semibold text-ink text-sm break-words" :text="post.card.title"></span>
+                <span :if="post.card.description" class="line-clamp-2 text-muted text-ui break-words" :text="post.card.description"></span>
+              </div>
+            </div>
+          </article>
+        </section>
+      </aside>
     </div>
   </section>
 
@@ -226,9 +252,13 @@
     import type { ComposerImage } from '../functions/composer-media'
     import { appendComposerImages, composerFileError, composerImageFiles, composerImageTypes, composerMediaWarnings } from '../functions/composer-media'
     import { composerActionText, composerQueueTimestamp, composerScheduleIso } from '../functions/composer-schedule'
+    import { composerPreviewCards, previewImageUrl } from '../functions/composer-preview'
+    import { blogArticle } from '../../app/Support/Social/blog-article'
     import { composerKeyForSpec, composerSelection, composerTargetRows, composerTargets, uniqueComposerNetworks } from '../functions/composer-targets'
     import type { ComposerVariants } from '../functions/composer-variants'
     import { composerVariantRows, composerVariantsPayload } from '../functions/composer-variants'
+    import { requestJson } from '../functions/postline-client'
+    import type { ComposerPreviewImage } from '../functions/composer-preview'
     import type { ComposerSegment } from '../functions/composer-thread'
     import { composerLinkPreview, firstComposerLink } from '../functions/composer-thread'
     import { providerLabel } from '../functions/networks'
@@ -315,7 +345,7 @@
       const posts = segments()
       return posts.map((post, index) => ({ ...post, number: index + 1, canRemove: posts.length > 1 }))
     })
-    const linkCardShown = derived(() => Boolean(segments()[0]?.preview))
+    const linkCardShown = derived(() => selectedNetworkIds().includes('bluesky') && Boolean(segments()[0]?.preview))
 
     function editSegment(id: number, { value }: { value: string }) {
       if (submitting()) return
@@ -378,6 +408,7 @@
     const dragDepth = state(0)
     const imageError = state('')
     const attachedImages = state<ComposerImage[]>([])
+    const savedPreviewImages = state<ComposerPreviewImage[]>([])
     let nextImageId = 0
     const mediaWarnings = derived(() => composerMediaWarnings(selectedNetworkIds(), attachedImages()))
     const imageWarnings = derived(() => imageError() ? [imageError(), ...mediaWarnings()] : mediaWarnings())
@@ -866,6 +897,10 @@
       // Existing image → show a "kept" chip; attaching a new file replaces,
       // clearing it marks removal.
       const saved = item.images?.length || (item.image ? 1 : 0)
+      savedPreviewImages.set((item.images || []).flatMap((image, index) => {
+        const src = image.previewUrl || previewImageUrl(image.url || '')
+        return src ? [{ id: `saved-${index}`, src, alt: image.altText || '' }] : []
+      }))
       editRemoveImage = false
       postLanguage.set(item.options?.language || '')
       mastodonVisibility.set(item.options?.mastodon?.visibility || 'public')
@@ -890,6 +925,59 @@
 
     const segmentsToSend = () => (composerFormat() === 'thread' ? segments() : segments().slice(0, 1))
       .filter(post => post.text.trim())
+
+    const previewSegments = derived(() => {
+      const ready = segmentsToSend()
+      return ready.length ? ready : segments().slice(0, 1)
+    })
+    const previewImages = derived(() => {
+      const images = attachedImages()
+      if (images.some(image => image.kept)) return savedPreviewImages()
+      const files = images.flatMap(image => image.preview ? [{ id: image.id, src: image.preview, alt: image.alt }] : [])
+      const url = previewImageUrl(postImageUrl())
+      return files.length || !url ? files : [{ id: 'image-url', src: url, alt: '' }]
+    })
+    const blogPreviewHtml = state<ReadonlyMap<string, string>>(new Map())
+    const blogPreviewBodies = derived(() => {
+      if (!selectedNetworkIds().includes('blog')) return []
+      return [...new Set(previewSegments().map((post, index) => blogArticle(
+        (variantsPayload().blog || post.text).trim(), index === 0 ? composedTitle() : undefined,
+      ).body).filter(Boolean))]
+    })
+    const previewCards = derived(() => composerPreviewCards({
+      networks: selectedNetworks(), segments: previewSegments(), variants: variantsPayload(), images: previewImages(),
+      title: composedTitle() || '', spoiler: mastodonSpoiler(), blogHtml: blogPreviewHtml(),
+    }))
+
+    let blogPreviewRequest: AbortController | undefined
+    const renderBlogPreview = useDebounce(async (bodies: string[]) => {
+      if (!bodies.length) {
+        blogPreviewHtml.set(new Map())
+        return
+      }
+      const controller = new AbortController()
+      blogPreviewRequest = controller
+      try {
+        const payload = await requestJson('/api/postline/blog/preview', {
+          method: 'POST', body: JSON.stringify({ bodies }), signal: controller.signal,
+        })
+        if (!controller.signal.aborted)
+          blogPreviewHtml.set(new Map(bodies.map((body, index) => [body, payload.data.html[index]])))
+      }
+      catch {
+        // The plain text stays visible if the formatted preview is unavailable.
+      }
+    }, 250)
+
+    effect(() => {
+      const bodies = blogPreviewBodies()
+      blogPreviewRequest?.abort()
+      renderBlogPreview(bodies)
+    })
+    onDestroy(() => {
+      blogPreviewRequest?.abort()
+      renderBlogPreview.cancel()
+    })
 
     function clearSentSegments(sent: ComposerSegment[]) {
       const texts = new Map(sent.map(post => [post.id, post.text]))
@@ -1167,11 +1255,6 @@
       setMode('thread', { skipSave: true, skipThreadPost: true })
       addPost()
       markEdited()
-    }
-
-    function previewPost() {
-      if (sharedCopy().trim()) void updateLinkPreview()
-      else setStatus('Nothing to preview yet.', 'error')
     }
 
     function variantChanged() {
