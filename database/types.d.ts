@@ -2069,6 +2069,14 @@ declare module '@stacksjs/database' {
       member_count: number
       status: string
     }
+    thread_publish_claims: {
+      // columns
+      id: number
+      uuid: string
+      created_at: string
+      updated_at: string | null
+      thread_key: string
+    }
     timeline_items: {
       // columns
       id: number

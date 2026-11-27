@@ -3841,10 +3841,72 @@
             "type": "unique"
           }
         ]
+      },
+      {
+        "table": "thread_publish_claims",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "thread_key",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "UTC_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "thread_publish_claims_thread_key_unique",
+            "columns": [
+              "thread_key"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "thread_publish_claims_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
       }
     ]
   },
-  "hash": "1e6ee40b0db19c67199c228acdb7b19d3c06b4acc69d472cfecc657e816ee3c3",
+  "hash": "a53b4466ed75cd9576895ad60a8d2be6ed598efb62c6fe4fc6e926e5c2e8b7b3",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-27T23:08:14.547Z"
+  "updatedAt": "2026-11-27T23:21:45.631Z"
 }

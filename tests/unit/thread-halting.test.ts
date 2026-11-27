@@ -164,6 +164,65 @@ describe('resuming a thread (#100)', () => {
     expect((await rows(postIds)).map(row => row.status)).toEqual(['published', 'published', 'published', 'published', 'published'])
   })
 
+  test('concurrent retries of a partially published thread share one claim', async () => {
+    const { QueueService } = await import('../../app/Services/Social/QueueService')
+    const failed = network('mastodon', [1])
+    const initial = new CrosspostService({ blog: network('blog').publisher, mastodon: failed.publisher })
+    const { postIds } = await initial.publishThread(['First segment', 'Second segment'], ['blog', 'mastodon'])
+    const [lead, reply] = postIds as [number, number]
+    const started = Promise.withResolvers<void>()
+    const finish = Promise.withResolvers<void>()
+    const mastodon = network('mastodon')
+    let calls = 0
+    const retryPublisher: ProviderPublisher = {
+      async publishToPost(post, content, identityId) {
+        if (++calls === 1) {
+          started.resolve()
+          await finish.promise
+        }
+        return mastodon.publisher.publishToPost(post, content, identityId)
+      },
+    }
+    const first = new QueueService(new CrosspostService({ mastodon: retryPublisher }))
+    const second = new QueueService(new CrosspostService({ mastodon: retryPublisher }))
+
+    const retry = first.publishNow(lead)
+    try {
+      await started.promise
+      await expect(second.publishNow(reply)).rejects.toThrow('already being published')
+    }
+    finally {
+      finish.resolve()
+      await retry
+    }
+    expect(mastodon.sent).toEqual(['First segment', 'Second segment'])
+    expect((await rows(postIds)).filter(target => target.status === 'published')).toHaveLength(4)
+  })
+
+  test('recovering an interrupted retry keeps sent copies and marks an unfinished account for review', async () => {
+    const { QueueService, STRANDED_REASON } = await import('../../app/Services/Social/QueueService')
+    const original = new CrosspostService({ blog: network('blog').publisher, mastodon: network('mastodon', [1]).publisher })
+    const { postIds } = await original.publishThread(['First segment', 'Second segment'], ['blog', 'mastodon'])
+    const [lead] = postIds as [number, number]
+    const recorded = await database.selectFrom('posts').select(['thread_key', 'published_at']).where('id', '=', lead).executeTakeFirstOrThrow()
+    const stale = '2000-01-01 00:00:00'
+    await database.insertInto('thread_publish_claims').values({
+      uuid: crypto.randomUUID(), thread_key: recorded.thread_key, created_at: stale, updated_at: stale,
+    }).execute()
+    await database.updateTable('post_targets').set({ status: 'publishing' })
+      .where('post_id', '=', lead).where('provider', '=', 'mastodon').execute()
+    const queue = new QueueService()
+
+    await queue.recoverStranded()
+    expect(await database.selectFrom('thread_publish_claims').select('id').where('thread_key', '=', recorded.thread_key).executeTakeFirst()).toBeUndefined()
+    expect(await database.selectFrom('posts').select(['status', 'published_at']).where('id', '=', lead).executeTakeFirst())
+      .toEqual({ status: 'published', published_at: recorded.published_at })
+    expect(await rows([lead])).toEqual([
+      expect.objectContaining({ provider: 'blog', status: 'published' }),
+      expect.objectContaining({ provider: 'mastodon', status: 'failed', failure_reason: STRANDED_REASON }),
+    ])
+  })
+
   test('the queue offers "resume from 3" for that thread', async () => {
     const { QueueService } = await import('../../app/Services/Social/QueueService')
     const first = chaining([3])

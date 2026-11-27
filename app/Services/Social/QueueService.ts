@@ -34,6 +34,9 @@ import { alerts } from '../AlertService'
 import { postWebhooks } from '../PostWebhookService'
 import { defaultTimeZone, workspace } from '../WorkspaceService'
 import { ensureAccount, expiresAt, now, uuid } from './support'
+import { AlreadyPublishingError, recoverThreadClaims, STRANDED_REASON, ThreadRemovalPendingError } from './thread-publish'
+
+export { AlreadyPublishingError, STRANDED_REASON } from './thread-publish'
 
 const database = db as any
 
@@ -112,8 +115,6 @@ export interface QueueRemovalReceipt {
  */
 export const STRANDED_AFTER_MINUTES = 15
 
-export const STRANDED_REASON = 'Postline stopped while this was being sent. Check the network before retrying: it may have gone out.'
-
 /**
  * How late a scheduled post may be and still go out by itself. A post that is
  * later than this was missed: Postline was not running when it was due. A
@@ -182,19 +183,6 @@ export async function removeRecurringMedia(segments: readonly RecurringSegment[]
 }
 
 export { MissingMediaError } from '../../Support/Social/stored-content'
-
-/** Thrown when a post is already being published by another run. */
-export class AlreadyPublishingError extends UserFacingError {
-  constructor() {
-    super('This post is already being published.')
-  }
-}
-
-class ThreadRemovalPendingError extends UserFacingError {
-  constructor() {
-    super('Undo the removal or wait for it to expire before publishing this thread.', 'queue_thread_removal_pending')
-  }
-}
 
 /** How many rows a write changed, whichever shape the query builder reports it in. */
 function affected(result: unknown): number {
@@ -892,6 +880,8 @@ export class QueueService {
     await database.transaction((tx: typeof database) => {
       const unchanged = tx.selectFrom('posts').select('id').where('id', '=', post.id).where('status', '=', post.status).executeTakeFirst()
       if (!unchanged) throw new UserFacingError('This post changed before it could be removed.', 'queue_removal_changed')
+      if (post.thread_key && tx.selectFrom('thread_publish_claims').select('id').where('thread_key', '=', post.thread_key).executeTakeFirst())
+        throw new AlreadyPublishingError()
       this.deletePostRows(tx, Number(post.id))
     })
     await this.removeStoredMedia(post)
@@ -904,8 +894,8 @@ export class QueueService {
       if (posts.length !== ids.length || posts.some(post => !ACTIONABLE.has(post.status)))
         throw new UserFacingError('Only draft, scheduled, or failed posts can be removed from the queue.', 'queue_removal_changed')
       const threads = [...new Set(posts.map(post => post.thread_key).filter(Boolean))]
-      if (threads.length && tx.selectFrom('posts').select('id').where('thread_key', 'in', threads)
-        .where('status', '=', 'publishing').executeTakeFirst())
+      if (threads.length && (tx.selectFrom('thread_publish_claims').select('id').where('thread_key', 'in', threads).executeTakeFirst()
+        || tx.selectFrom('posts').select('id').where('thread_key', 'in', threads).where('status', '=', 'publishing').executeTakeFirst()))
         throw new UserFacingError('Wait until the thread finishes publishing before removing a post.', 'queue_removal_changed')
       const token = uuid()
       const until = expiresAt(QUEUE_UNDO_SECONDS)!
@@ -1268,26 +1258,8 @@ export class QueueService {
     // that went out in part resumes from where each account stopped (#100, #255).
     if (post.thread_key) {
       const threadKey = String(post.thread_key)
-      await database.transaction((tx: typeof database) => {
-        if (this.pendingThreadRemoval(threadKey, tx)) throw new ThreadRemovalPendingError()
-        if (expected && !tx.selectFrom('posts').select('id').where('id', '=', post.id)
-          .where('status', '=', 'scheduled').where('scheduled_at', '=', expected).executeTakeFirst())
-          throw new AlreadyPublishingError()
-
-        const segments = this.threadPosts(threadKey, tx)
-        bindRestoredTargets(tx, tx.selectFrom('post_targets').select(['id', 'social_identity_id', 'archived_account'])
-          .where('post_id', 'in', segments.map((row: any) => row.id)).where('archived_account', 'is not', null).execute())
-
-        if (post.status === 'scheduled' || post.status === 'draft') {
-          const claimed = affected(tx.updateTable('posts').set({ status: 'publishing', updated_at: now() })
-            .where('thread_key', '=', threadKey).where('status', 'in', ['scheduled', 'draft']).execute())
-          if (claimed === 0) throw new AlreadyPublishingError()
-        }
-      }, sqliteWriteOptions())
-      const { results } = await this.publisher.resumeThread(threadKey)
-      // A segment still marked publishing did not go out anywhere.
-      await database.updateTable('posts').set({ status: 'failed', updated_at: now() })
-        .where('thread_key', '=', threadKey).where('status', '=', 'publishing').execute()
+      const { results } = await this.publisher.resumeThread(threadKey,
+        expected ? { postId: Number(post.id), scheduledAt: expected } : undefined)
       if (results.length && results.every(result => result.ok)) {
         const [lead] = await this.threadPosts(threadKey)
         if (lead) await this.removePublishedImages(lead)
@@ -1458,14 +1430,15 @@ export class QueueService {
    */
   async recoverStranded(olderThanMinutes = STRANDED_AFTER_MINUTES): Promise<number> {
     const cutoff = new Date(Date.now() - olderThanMinutes * 60_000).toISOString().slice(0, 19).replace('T', ' ')
+    let recovered = await recoverThreadClaims(cutoff)
     const stranded = await database
       .selectFrom('posts')
       .select(['id'])
       .where('status', '=', 'publishing')
       .where('updated_at', '<=', cutoff)
+      .whereRaw(raw`NOT EXISTS (SELECT 1 FROM thread_publish_claims WHERE thread_publish_claims.thread_key = posts.thread_key)`)
       .execute()
 
-    let recovered = 0
     for (const post of stranded) {
       const rows = await database.selectFrom('post_targets').selectAll().where('post_id', '=', post.id).execute()
       const sent = new Set(rows
@@ -1673,6 +1646,8 @@ export class QueueService {
       throw new AlreadyPublishingError()
     if (!post)
       throw new Error('Post not found.')
+    if (post.thread_key && await database.selectFrom('thread_publish_claims').select('id').where('thread_key', '=', post.thread_key).executeTakeFirst())
+      throw new AlreadyPublishingError()
     if (ACTIONABLE.has(String(post.status)))
       return post
 

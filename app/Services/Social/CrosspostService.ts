@@ -30,6 +30,7 @@ import { assertVideoAllowed, checkVideoBytes } from '../../Support/Social/video-
 import { ensureAccount, now, uuid } from './support'
 import { postFirstComments } from './PostFirstCommentService'
 import { bindRestoredTargets } from './identities'
+import { AlreadyPublishingError, claimThread, refreshThreadClaim, runClaimedThread, ThreadRemovalPendingError } from './thread-publish'
 
 const database = db as any
 
@@ -243,83 +244,87 @@ export class CrosspostService {
     validateVideo(selected, content)
     const accountId = await ensureAccount()
     const threadKey = uuid()
-    const postIds: number[] = []
-    const results: CrosspostTargetResult[] = []
-    // Chain refs per target, not per provider: two Bluesky accounts each get
-    // their own thread, and segment 2 on one must never reply to segment 1 on
-    // the other. Only populated for results that carry a cid (Bluesky).
-    const chains = new Map<string, ThreadChain>()
-    // The segment each target stopped at. Once a segment fails on an account,
-    // nothing after it is sent there: the rest would arrive as a thread with
-    // a hole in it, or as unrelated posts. Other accounts carry on.
-    const halted = new Map<string, number>()
+    const claim: ReturnType<typeof claimThread> = await database.transaction((tx: typeof database) => claimThread(tx, threadKey), sqliteWriteOptions())
+    return await runClaimedThread(claim, async () => {
+      const postIds: number[] = []
+      const results: CrosspostTargetResult[] = []
+      // Chain refs per target, not per provider: two Bluesky accounts each get
+      // their own thread, and segment 2 on one must never reply to segment 1 on
+      // the other. Only populated for results that carry a cid (Bluesky).
+      const chains = new Map<string, ThreadChain>()
+      // The segment each target stopped at. Once a segment fails on an account,
+      // nothing after it is sent there: the rest would arrive as a thread with
+      // a hole in it, or as unrelated posts. Other accounts carry on.
+      const halted = new Map<string, number>()
 
-    for (const [index, body] of segments.entries()) {
-      const postUuid = uuid()
-      const createdAt = now()
-      const timezone = await workspace.timezone()
-      // On resume, the lead keeps its video and each segment keeps its options.
-      const stored: StoredContent = { options: threadPostOptions(index, content?.options) }
-      if (index === 0 && content?.video) stored.media = await storeAttachments(postUuid, [content.video])
+      for (const [index, body] of segments.entries()) {
+        const postUuid = uuid()
+        const createdAt = now()
+        const timezone = await workspace.timezone()
+        // On resume, the lead keeps its video and each segment keeps its options.
+        const stored: StoredContent = { options: threadPostOptions(index, content?.options) }
+        if (index === 0 && content?.video) stored.media = await storeAttachments(postUuid, [content.video])
 
-      try {
-        await database.insertInto('posts').values({
-          uuid: postUuid,
-          title: body.slice(0, 80),
-          body,
-          status: 'publishing',
-          timezone,
-          source: 'composer',
-          thread_key: threadKey,
-          ...(stored.options || stored.media ? { content: JSON.stringify(stored) } : {}),
-          account_id: accountId,
-          created_at: createdAt,
-          updated_at: createdAt,
-        }).execute()
-      }
-      catch (error) {
-        await removeMediaFiles(stored.media)
-        throw error
-      }
-
-      const post = await database
-        .selectFrom('posts')
-        .selectAll()
-        .where('uuid', '=', postUuid)
-        .executeTakeFirstOrThrow()
-      postIds.push(Number(post.id))
-
-      const segmentResults: CrosspostTargetResult[] = []
-      for (const target of selected) {
-        const key = targetKey(target)
-        const chain = chains.get(key)
-
-        const stoppedAt = halted.get(key)
-        if (stoppedAt !== undefined) {
-          segmentResults.push(await this.recordHeldBack(target, Number(post.id), stoppedAt, segments.length))
-          continue
+        try {
+          await database.insertInto('posts').values({
+            uuid: postUuid,
+            title: body.slice(0, 80),
+            body,
+            status: 'publishing',
+            timezone,
+            source: 'composer',
+            thread_key: threadKey,
+            ...(stored.options || stored.media ? { content: JSON.stringify(stored) } : {}),
+            account_id: accountId,
+            created_at: createdAt,
+            updated_at: createdAt,
+          }).execute()
+        }
+        catch (error) {
+          await removeMediaFiles(stored.media)
+          throw error
         }
 
-        const result = await this.publishTarget(
-          target,
-          { id: Number(post.id), body },
-          threadSegmentContent(index, content, chain),
-        )
-        segmentResults.push(result)
-        if (!result.ok)
-          halted.set(key, index)
+        const post = await database
+          .selectFrom('posts')
+          .selectAll()
+          .where('uuid', '=', postUuid)
+          .executeTakeFirstOrThrow()
+        postIds.push(Number(post.id))
 
-        // A provider that returns no cid cannot be replied to, so its chain
-        // stays undefined and its segments publish independently.
-        const advanced = advanceChain(chain, result)
-        if (advanced) chains.set(key, advanced)
+        const segmentResults: CrosspostTargetResult[] = []
+        for (const target of selected) {
+          await refreshThreadClaim(claim)
+          const key = targetKey(target)
+          const chain = chains.get(key)
+
+          const stoppedAt = halted.get(key)
+          if (stoppedAt !== undefined) {
+            segmentResults.push(await this.recordHeldBack(target, Number(post.id), stoppedAt, segments.length))
+            continue
+          }
+
+          const result = await this.publishTarget(
+            target,
+            { id: Number(post.id), body },
+            threadSegmentContent(index, content, chain),
+          )
+          segmentResults.push(result)
+          if (!result.ok)
+            halted.set(key, index)
+
+          // A provider that returns no cid cannot be replied to, so its chain
+          // stays undefined and its segments publish independently.
+          const advanced = advanceChain(chain, result)
+          if (advanced) chains.set(key, advanced)
+        }
+
+        results.push(...segmentResults)
+        await this.finishAttempt(Number(post.id), segmentResults)
       }
 
-      results.push(...segmentResults)
-      await this.finishAttempt(Number(post.id), segmentResults)
-    }
-
-    return { postIds, results }
+      return { postIds, results }
+    })
   }
 
   /**
@@ -330,68 +335,115 @@ export class CrosspostService {
    * follow, with the same rule as the first run: a failure stops that
    * account there. Accounts that already have every segment are left alone.
    */
-  async resumeThread(threadKey: string): Promise<{ resumed: number, results: CrosspostTargetResult[] }> {
-    const posts = await database.selectFrom('posts').selectAll().where('thread_key', '=', threadKey)
-      .where('status', '!=', 'archived').orderBy('id', 'asc').execute()
-    if (!posts.length) throw new UserFacingError('That thread is not in the queue any more.')
-
-    const rows = await database.transaction((tx: typeof database) => bindRestoredTargets(tx, tx.selectFrom('post_targets')
-      .selectAll().where('post_id', 'in', posts.map((post: any) => post.id)).execute()), sqliteWriteOptions())
-    const keyOf = (row: any) => targetKey({ provider: row.provider, identityId: row.social_identity_id ? Number(row.social_identity_id) : null })
-    const targets = new Map<string, PublishTarget>()
-    for (const row of rows) targets.set(keyOf(row), { provider: row.provider, identityId: row.social_identity_id ? Number(row.social_identity_id) : null })
-
-    const savedOptions = parseStoredContent(posts[0].content)?.options
-    let lead: Promise<PublishContent | undefined> | undefined
-
-    const results: CrosspostTargetResult[] = []
-    let resumed = 0
-    for (const [key, target] of targets) {
-      const forTarget = (postId: number) => rows.filter((row: any) => Number(row.post_id) === postId && keyOf(row) === key)
-      const start = posts.findIndex((post: any) => !forTarget(Number(post.id)).some((row: any) => row.status === 'published'))
-      if (start === -1) continue
-      resumed++
-
-      // The chain so far: the first segment as root, the last sent as parent.
-      let chain: ThreadChain | undefined
-      for (const post of posts.slice(0, start)) {
-        const sent = forTarget(Number(post.id)).find((row: any) => row.status === 'published')
-        if (sent?.remote_uri && sent?.remote_cid)
-          chain = advanceChain(chain, { ok: true, uri: String(sent.remote_uri), cid: String(sent.remote_cid) })
-      }
-
-      let halted: number | undefined
-      for (const [index, post] of posts.entries()) {
-        if (index < start || forTarget(Number(post.id)).some((row: any) => row.status === 'published')) continue
-        // The failed and held-back rows from before give way to this attempt.
-        let stale = database.deleteFrom('post_targets').where('post_id', '=', post.id).where('status', '!=', 'published').where('provider', '=', target.provider)
-        stale = target.identityId ? stale.where('social_identity_id', '=', target.identityId) : stale.where('social_identity_id', 'is', null)
-        await stale.execute()
-        if (halted !== undefined) {
-          results.push(await this.recordHeldBack(target, Number(post.id), halted, posts.length))
-          continue
-        }
-        const publishingPost = { id: Number(post.id), body: String(post.body) }
-        let result: CrosspostTargetResult
-        try {
-          const content = index === 0
-            ? await (lead ??= hydrateStoredContent(post.content))
-            : { options: requireStoredPostOptions(savedOptions) }
-          result = await this.publishTarget(target, publishingPost, threadSegmentContent(index, content, chain))
-        }
-        catch (error) {
-          if (!(error instanceof MissingMediaError || error instanceof InvalidStoredPostOptionsError)) throw error
-          result = await this.recordThreadFailure(target, publishingPost.id, error.message)
-        }
-        results.push(result)
-        if (!result.ok) halted = index
-        const advanced = advanceChain(chain, result)
-        if (advanced) chain = advanced
-        await this.finishAttempt(Number(post.id), [result], true)
-      }
+  async resumeThread(threadKey: string, expected?: { postId: number, scheduledAt: string }): Promise<{ resumed: number, results: CrosspostTargetResult[] }> {
+    const prepare = (tx: typeof database) => {
+      const claim = claimThread(tx, threadKey)
+      if (tx.selectFrom('posts').select('id').where('thread_key', '=', threadKey).where('status', '=', 'archived')
+        .where('queue_undo_until', '>', now()).executeTakeFirst())
+        throw new ThreadRemovalPendingError()
+      const posts: Array<{ id: number, status: string, body: string, content: string | null, scheduled_at: string | null }> = tx
+        .selectFrom('posts').selectAll().where('thread_key', '=', threadKey).where('status', '!=', 'archived').orderBy('id', 'asc').execute()
+      if (!posts.length) throw new UserFacingError('That thread is not in the queue any more.')
+      if (posts.some(post => post.status === 'publishing')) throw new AlreadyPublishingError()
+      if (expected && !posts.some(post => Number(post.id) === expected.postId && post.status === 'scheduled' && post.scheduled_at === expected.scheduledAt))
+        throw new AlreadyPublishingError()
+      const rows = bindRestoredTargets(tx, tx.selectFrom('post_targets').selectAll().where('post_id', 'in', posts.map(post => post.id)).execute()) as Array<{
+        id: number, post_id: number, provider: SocialProvider, social_identity_id: number | null, status: string, remote_uri: string | null, remote_cid: string | null
+      }>
+      tx.updateTable('posts').set({ status: 'publishing', updated_at: now() })
+        .where('thread_key', '=', threadKey).where('status', 'in', ['scheduled', 'draft']).execute()
+      return { claim, posts, rows }
     }
+    const { claim, posts, rows }: ReturnType<typeof prepare> = await database.transaction(prepare, sqliteWriteOptions())
 
-    return { resumed, results }
+    return await runClaimedThread(claim, async () => {
+      const keyOf = (row: typeof rows[number]) => targetKey({ provider: row.provider, identityId: Number(row.social_identity_id) || null })
+      const targets = new Map<string, PublishTarget>()
+      for (const row of rows) targets.set(keyOf(row), { provider: row.provider, identityId: Number(row.social_identity_id) || null })
+      const savedOptions = parseStoredContent(posts[0]?.content)?.options
+      let lead: Promise<PublishContent | undefined> | undefined
+      const results: CrosspostTargetResult[] = []
+      let resumed = 0
+      for (const [key, target] of targets) {
+        const forTarget = (postId: number) => rows.filter(row => Number(row.post_id) === postId && keyOf(row) === key)
+        const start = posts.findIndex(post => !forTarget(Number(post.id)).some(row => row.status === 'published'))
+        if (start === -1) continue
+        resumed++
+
+        // The first sent segment is the root and the last sent one is the parent.
+        let chain: ThreadChain | undefined
+        for (const post of posts.slice(0, start)) {
+          const sent = forTarget(Number(post.id)).find(row => row.status === 'published')
+          if (sent?.remote_uri && sent?.remote_cid)
+            chain = advanceChain(chain, { ok: true, uri: sent.remote_uri, cid: sent.remote_cid })
+        }
+
+        let halted: number | undefined
+        for (const [index, post] of posts.entries()) {
+          const previous = forTarget(Number(post.id))
+          if (index < start || previous.some(row => row.status === 'published')) continue
+          await refreshThreadClaim(claim)
+          // Keep a record of the current destination until its outcome is durable.
+          const placeholders = previous.map(row => Number(row.id))
+          if (placeholders.length) {
+            await database.updateTable('post_targets').set({ status: 'publishing', updated_at: now() })
+              .where('id', 'in', placeholders).execute()
+          }
+          else {
+            const pending = await database.insertInto('post_targets').values({
+              uuid: uuid(), post_id: post.id, provider: target.provider, social_identity_id: target.identityId,
+              status: 'publishing', created_at: now(), updated_at: now(),
+            }).returning('id').executeTakeFirstOrThrow()
+            placeholders.push(Number(pending.id))
+          }
+
+          let result: CrosspostTargetResult
+          if (halted !== undefined) {
+            result = await this.recordHeldBack(target, Number(post.id), halted, posts.length)
+          }
+          else {
+            try {
+              const content = index === 0
+                ? await (lead ??= hydrateStoredContent(post.content))
+                : { options: requireStoredPostOptions(savedOptions) }
+              result = await this.publishTarget(target, { id: Number(post.id), body: post.body }, threadSegmentContent(index, content, chain))
+            }
+            catch (error) {
+              if (!(error instanceof MissingMediaError || error instanceof InvalidStoredPostOptionsError)) throw error
+              result = await this.recordThreadFailure(target, Number(post.id), error.message)
+            }
+            if (!result.ok) halted = index
+            const advanced = advanceChain(chain, result)
+            if (advanced) chain = advanced
+            await this.finishAttempt(Number(post.id), [result], true)
+          }
+          const existingIds = rows.filter(row => row.post_id === post.id && row.provider === target.provider).map(row => Number(row.id))
+          await this.finishThreadTarget(Number(post.id), target, result, placeholders, existingIds)
+          results.push(result)
+        }
+      }
+
+      return { resumed, results }
+    })
+  }
+
+  private async finishThreadTarget(postId: number, target: PublishTarget, result: CrosspostTargetResult, placeholders: number[], oldRows: number[]): Promise<void> {
+    const identityId = result.identityId ?? target.identityId
+    await database.transaction((tx: typeof database) => {
+      const saved = tx.selectFrom('post_targets').select('id').where('post_id', '=', postId).where('provider', '=', target.provider)
+        .where('social_identity_id', identityId ? '=' : 'is', identityId)
+        .where('id', 'not in', [...new Set([...oldRows, ...placeholders])]).where('status', '=', result.ok ? 'published' : 'failed')
+        .executeTakeFirst()
+      if (!saved) {
+        tx.updateTable('post_targets').set({
+          status: result.ok ? 'published' : 'failed', social_identity_id: identityId,
+          remote_uri: result.uri || null, remote_cid: result.cid || null, remote_url: result.url || null,
+          failure_reason: result.ok ? null : result.error || 'Publishing failed.', next_attempt_at: null, updated_at: now(),
+        }).where('id', '=', placeholders[0]).execute()
+      }
+      const superseded = saved ? placeholders : placeholders.slice(1)
+      if (superseded.length) tx.deleteFrom('post_targets').where('id', 'in', superseded).execute()
+    }, sqliteWriteOptions())
   }
 
   private async finishAttempt(postId: number, results: CrosspostTargetResult[], resume = false): Promise<void> {
@@ -399,9 +451,10 @@ export class CrosspostService {
     const at = now()
     await database.transaction((tx: typeof database) => {
       if (published || !resume) {
+        const previous = resume && tx.selectFrom('posts').select('published_at').where('id', '=', postId).executeTakeFirst()
         tx.updateTable('posts').set({
           status: published ? 'published' : 'failed',
-          ...(published ? { published_at: at } : {}),
+          ...(published && !previous?.published_at ? { published_at: at } : {}),
           updated_at: at,
         }).where('id', '=', postId).execute()
       }
