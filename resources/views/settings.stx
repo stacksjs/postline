@@ -139,38 +139,38 @@ export const settingsAppearanceOptions = [
         key is sealed on the server and never sent back to this page.
       --}}
       <SettingsPane id="ai" title="{{ settingsText.ai }}">
-        <SettingsGroup footer="Campaign planning sends your brief and the channels it is for to this provider. Without one, plans come from Postline's built-in planner and are labelled that way.">
-          <SettingsRow label="Provider" setting="ai-provider" keywords="anthropic openai ollama">
+        <SettingsGroup footer="{{ settingsText.aiHelp }}">
+          <SettingsRow label="{{ settingsText.provider }}" setting="ai-provider" keywords="anthropic openai ollama">
             <Select variant="mac" v-model:value="aiProvider" placeholder="" :options="aiProviderOptions" data-ai-provider />
           </SettingsRow>
           <div x-show="aiProvider() === 'anthropic' || aiProvider() === 'openai'">
-            <SettingsRow label="API key" :description="aiKeyDescription()" setting="ai-key" keywords="api key secret">
-              <TextInput variant="mac" type="password" autocomplete="off" v-model:value="aiKey" :placeholder="aiHasKey() ? 'Saved' : 'Paste a key'" data-ai-key />
+            <SettingsRow label="{{ settingsText.apiKey }}" :description="aiKeyDescription()" setting="ai-key" keywords="{{ settingsText.keyKeywords }}">
+              <TextInput variant="mac" type="password" autocomplete="off" v-model:value="aiKey" :placeholder="aiHasKey() ? copy.savedKey : copy.pasteKey" data-ai-key />
             </SettingsRow>
           </div>
           <div x-show="aiProvider()">
-            <SettingsRow label="Model" description="Leave empty for the default." setting="ai-model" keywords="model claude gpt llama">
+            <SettingsRow label="{{ settingsText.model }}" description="{{ settingsText.defaultModel }}" setting="ai-model" keywords="{{ settingsText.modelKeywords }}">
               <TextInput variant="mac" v-model:value="aiModel" maxlength="120" :placeholder="aiModelPlaceholder()" data-ai-model />
             </SettingsRow>
           </div>
-          <SettingsRow label="Planning uses" setting="ai-active"><span :text="aiActiveText()" data-ai-active>—</span></SettingsRow>
+          <SettingsRow label="{{ settingsText.planningUses }}" setting="ai-active"><span :text="aiActiveText()" data-ai-active>—</span></SettingsRow>
         </SettingsGroup>
         <div class="flex gap-2 items-center justify-end mt-3">
           <p class="m-0 mr-auto text-xs" :data-tone="aiTone()" x-show="aiMessage()" :text="aiMessage()" role="status" aria-live="polite" data-ai-message></p>
-          <div x-show="aiHasKey()"><Button appearance="mac" :disabled="aiSaving()" @click="removeAiKey">Remove key</Button></div>
-          <Button appearance="mac" variant="primary" :disabled="aiSaving()" @click="saveAi">Save</Button>
+          <div x-show="aiHasKey()"><Button appearance="mac" :disabled="aiSaving()" @click="removeAiKey">{{ settingsText.removeKey }}</Button></div>
+          <Button appearance="mac" variant="primary" :disabled="aiSaving()" @click="saveAi">{{ settingsText.save }}</Button>
         </div>
       </SettingsPane>
 
       <SettingsPane id="composer" title="{{ settingsText.composer }}">
-        <SettingsGroup footer="The limit is the tightest one among the channels that can publish.">
-          <SettingsRow label="Character limit" :description="charLimitSource()" setting="character-limit">
+        <SettingsGroup footer="{{ settingsText.characterHelp }}">
+          <SettingsRow label="{{ settingsText.characterLimit }}" :description="charLimitSource()" setting="character-limit">
             <span :text="charLimitText()">—</span>
           </SettingsRow>
-          <SettingsRow label="Default mode" description="Format for a new post on this device." setting="default-mode" keywords="single thread post format">
+          <SettingsRow label="{{ settingsText.defaultFormat }}" description="{{ settingsText.defaultFormatHelp }}" setting="default-mode" keywords="{{ settingsText.formatKeywords }}">
             <Select variant="mac" v-model:value="composerFormat" placeholder="" :options="composerFormatOptions" />
           </SettingsRow>
-          <SettingsRow label="Auto-save drafts" description="Keep unfinished text on this device." setting="auto-save" keywords="draft save local">
+          <SettingsRow label="{{ settingsText.autosave }}" description="{{ settingsText.autosaveHelp }}" setting="auto-save" keywords="{{ settingsText.draftKeywords }}">
             <Switch variant="mac" v-model:checked="composerAutosave" />
           </SettingsRow>
         </SettingsGroup>
@@ -182,22 +182,22 @@ export const settingsAppearanceOptions = [
         tool under Channels, so it has the same caps and audit trail.
       --}}
       <SettingsPane id="deletion" title="{{ settingsText.cleanup }}">
-        <SettingsGroup footer="Checked once a day. A post whose date can't be read is always kept.">
-          <SettingsRow label="Delete my posts automatically" :description="statusPill()" setting="auto-delete" keywords="retention cleanup">
+        <SettingsGroup footer="{{ settingsText.retentionCheck }}">
+          <SettingsRow label="{{ settingsText.enableRetention }}" :description="statusPill()" setting="auto-delete" keywords="{{ settingsText.retentionKeywords }}">
             <Switch variant="mac" v-model:checked="autoEnabled" data-retention-enabled />
           </SettingsRow>
-          <SettingsRow label="Delete posts older than" description="Days, from 1 to 3650." setting="auto-delete-days">
+          <SettingsRow label="{{ settingsText.olderThan }}" description="{{ settingsText.daysRange }}" setting="auto-delete-days">
             <NumberInput variant="mac" v-model:value="autoDaysText" min="1" max="3650" step="1" data-retention-days />
           </SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup footer="Everything includes posts made outside Postline. Otherwise anything you posted elsewhere stays.">
-          <SettingsRow label="Posts to delete" setting="auto-delete-scope" keywords="scope which">
-            <Select variant="mac" v-model:value="autoScope" placeholder="" :options="[{ value: 'all', label: 'Everything on the account' }, { value: 'tracked', label: 'Only posts Postline published' }]" />
+        <SettingsGroup footer="{{ settingsText.scopeHelp }}">
+          <SettingsRow label="{{ settingsText.scope }}" setting="auto-delete-scope" keywords="{{ settingsText.retentionScopeKeywords }}">
+            <Select variant="mac" v-model:value="autoScope" placeholder="" :options="retentionScopeOptions" />
           </SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup header="Networks" footer="Every connected account on a network that is on is included. Instagram and Threads can't delete posts through their APIs.">
+        <SettingsGroup header="{{ settingsText.networks }}" footer="{{ settingsText.retentionNetworksHelp }}">
           <SettingsRow label="Bluesky" setting="auto-delete-bluesky"><Switch variant="mac" size="mini" v-model:checked="onBluesky" /></SettingsRow>
           <SettingsRow label="X" setting="auto-delete-twitter"><Switch variant="mac" size="mini" v-model:checked="onTwitter" /></SettingsRow>
           <SettingsRow label="Mastodon" setting="auto-delete-mastodon"><Switch variant="mac" size="mini" v-model:checked="onMastodon" /></SettingsRow>
@@ -206,15 +206,15 @@ export const settingsAppearanceOptions = [
 
         <div x-show="needsAcknowledgement()">
           <SettingsGroup>
-            <SettingsRow label="I understand" description="Matching posts are permanently deleted from the networks every day, and cannot be restored." multiline destructive setting="auto-delete-acknowledge">
+            <SettingsRow label="{{ settingsText.acknowledge }}" description="{{ settingsText.acknowledgeHelp }}" multiline destructive setting="auto-delete-acknowledge">
               <Switch variant="mac" v-model:checked="acknowledged" data-retention-ack />
             </SettingsRow>
           </SettingsGroup>
         </div>
 
         <div class="flex flex-wrap gap-2 items-center justify-end">
-          <Button appearance="mac" :disabled="previewing() || !retentionLoaded()" @click="previewRetention">Preview What Would Be Deleted</Button>
-          <Button appearance="mac" variant="primary" :disabled="!canSave()" @click="saveRetention">Save</Button>
+          <Button appearance="mac" :disabled="previewing() || !retentionLoaded()" @click="previewRetention">{{ settingsText.retentionPreview }}</Button>
+          <Button appearance="mac" variant="primary" :disabled="!canSave()" @click="saveRetention">{{ settingsText.save }}</Button>
         </div>
 
         <p class="m-0 mt-3 text-xs" :data-tone="retentionTone()" x-show="retentionMessage()" :text="retentionMessage()" role="status" aria-live="polite" data-retention-message></p>
@@ -330,21 +330,21 @@ export const settingsAppearanceOptions = [
         </SettingsGroup>
       </SettingsPane>
       <SettingsPane id="about" title="{{ settingsText.about }}">
-        <SettingsPaneHeader icon="i-hugeicons-sent" tone="red" title="Postline" description="Draft once, then publish to every connected account." />
+        <SettingsPaneHeader icon="i-hugeicons-sent" tone="red" title="Postline" description="{{ settingsText.aboutDescription }}" />
         <SettingsGroup>
-          <SettingsRow label="Postline version" setting="desktop-version" keywords="version update" :description="desktopUpdate()?.currentVersion || '{{ buildVersion }}'">
-            <Button appearance="mac" x-show="ownWindow()" :disabled="checkingDesktopUpdate()" @click="checkDesktopUpdate">Check for updates</Button>
+          <SettingsRow label="{{ settingsText.versionLabel }}" setting="desktop-version" keywords="{{ settingsText.updateKeywords }}" :description="desktopUpdate()?.currentVersion || '{{ buildVersion }}'">
+            <Button appearance="mac" x-show="ownWindow()" :disabled="checkingDesktopUpdate()" @click="checkDesktopUpdate">{{ settingsText.checkUpdates }}</Button>
           </SettingsRow>
-          <SettingsRow label="Update available" setting="desktop-install" :description="desktopUpdate()?.version || ''" x-show="desktopUpdate()?.state === 'available' && desktopUpdate()?.selfUpdating">
-            <Button appearance="mac" :disabled="checkingDesktopUpdate()" @click="installDesktopUpdate">Install update</Button>
+          <SettingsRow label="{{ settingsText.updateAvailable }}" setting="desktop-install" :description="desktopUpdate()?.version || ''" x-show="desktopUpdate()?.state === 'available' && desktopUpdate()?.selfUpdating">
+            <Button appearance="mac" :disabled="checkingDesktopUpdate()" @click="installDesktopUpdate">{{ settingsText.installUpdate }}</Button>
           </SettingsRow>
         </SettingsGroup>
         <p class="mt-2 text-muted text-xs" x-show="desktopUpdateMessage()" :text="desktopUpdateMessage()" role="status" aria-live="polite"></p>
         {{-- The Mac app's log, for a bug report (#202). Only the app has one. --}}
         <div class="mt-4" :class="ownWindow() ? '' : 'hidden'">
-          <SettingsGroup title="Troubleshooting" footer="The log is private to your Mac account, holds no passwords or sign-in links, and is kept to a few megabytes.">
-            <SettingsRow label="Log" setting="reveal-log" keywords="log logs debug bug report finder">
-              <Button appearance="mac" @click="revealLog">Show in Finder</Button>
+          <SettingsGroup title="{{ settingsText.troubleshooting }}" footer="{{ settingsText.logHelp }}">
+            <SettingsRow label="{{ settingsText.logLabel }}" setting="reveal-log" keywords="{{ settingsText.logKeywords }}">
+              <Button appearance="mac" @click="revealLog">{{ settingsText.finder }}</Button>
             </SettingsRow>
           </SettingsGroup>
         </div>
@@ -382,11 +382,13 @@ export const settingsAppearanceOptions = [
 
     const { locale: language, messages: copy } = {{ settingsCopy }}
     const numbers = new Intl.NumberFormat(language)
+    const plural = new Intl.PluralRules(language)
+    const age = new Intl.NumberFormat(language, { style: 'unit', unit: 'day', unitDisplay: 'long' })
     const themePref = state(readStoredTheme())
     const pane = state('general')
     const composerFormat = useLocalStorage<ComposerFormat>(COMPOSER_DEFAULT_FORMAT_KEY, 'single')
     const composerAutosave = useLocalStorage(COMPOSER_AUTOSAVE_KEY, true)
-    const composerFormatOptions = [{ value: 'single', label: 'Single post' }, { value: 'thread', label: 'Thread' }]
+    const composerFormatOptions = [{ value: 'single', label: copy.singlePost }, { value: 'thread', label: copy.thread }]
 
     /**
      * Whether this page is the desktop app's Settings window.
@@ -402,12 +404,12 @@ export const settingsAppearanceOptions = [
     const desktopUpdateError = state('')
     const desktopUpdateMessage = derived(() => {
       const update = desktopUpdate()
-      if (checkingDesktopUpdate()) return 'Contacting the update service…'
+      if (checkingDesktopUpdate()) return copy.contactingUpdate
       if (desktopUpdateError()) return desktopUpdateError()
       if (!update) return ''
-      if (update.state === 'current') return 'Postline is up to date.'
-      if (update.state === 'installed') return 'Update installed. Quit Postline to open the new version.'
-      if (update.state === 'available') return update.selfUpdating ? `Version ${update.version} is ready to install.` : `Version ${update.version} is available from the Postline download page.`
+      if (update.state === 'current') return copy.upToDate
+      if (update.state === 'installed') return copy.updateInstalled
+      if (update.state === 'available') return update.selfUpdating ? copy.readyToInstall.replace('{version}', () => update.version || '') : copy.readyToDownload.replace('{version}', () => update.version || '')
       return update.error || update.message || ''
     })
 
@@ -421,11 +423,11 @@ export const settingsAppearanceOptions = [
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action }),
         } : undefined)
-        if (!response.ok) throw new Error('The update service could not be reached.')
+        if (!response.ok) throw new Error(copy.updateUnreachable)
         desktopUpdate.set(await response.json())
       }
       catch (error) {
-        if (action) desktopUpdateError.set(error instanceof Error ? error.message : 'Could not check for a Postline update.')
+        if (action) desktopUpdateError.set(error instanceof Error ? error.message : copy.updateFailed)
       }
       finally {
         checkingDesktopUpdate.set(false)
@@ -947,10 +949,10 @@ export const settingsAppearanceOptions = [
     // AI provider for campaign planning (#138). The key field starts empty and
     // stays empty after saving: the saved key never comes back to the page.
     const aiProviderOptions = [
-      { value: '', label: 'From the environment' },
+      { value: '', label: copy.providerFromEnvironment },
       { value: 'anthropic', label: 'Anthropic' },
       { value: 'openai', label: 'OpenAI' },
-      { value: 'ollama', label: 'Ollama (on this machine)' },
+      { value: 'ollama', label: copy.localOllama },
     ]
     const aiProvider = state('')
     const aiKey = state('')
@@ -960,12 +962,12 @@ export const settingsAppearanceOptions = [
     const aiSaving = state(false)
     const aiMessage = state('')
     const aiTone = state('neutral')
-    const aiKeyDescription = derived(() => aiHasKey() ? 'A key is saved. Paste a new one to replace it.' : 'Stored encrypted on this machine.')
+    const aiKeyDescription = derived(() => aiHasKey() ? copy.replaceKey : copy.encryptedKey)
     const aiModelPlaceholder = derived(() => aiProvider() === 'anthropic' ? 'claude-sonnet-5-5' : aiProvider() === 'openai' ? 'gpt-5.6-terra' : aiProvider() === 'ollama' ? 'llama3.2' : '')
     const aiActiveText = derived(() => {
       const active = aiActive()
       if (!active) return '—'
-      if (!active.configured) return 'The built-in planner (no provider set up)'
+      if (!active.configured) return copy.builtInPlanner
       const name = active.provider === 'openai' ? 'OpenAI' : active.provider === 'ollama' ? 'Ollama' : active.provider === 'anthropic' ? 'Anthropic' : String(active.provider)
       return active.model ? `${name}, ${active.model}` : name
     })
@@ -982,7 +984,7 @@ export const settingsAppearanceOptions = [
       try {
         const response = await fetch('/api/postline/settings/ai')
         const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the AI settings.')
+        if (!response.ok || !payload.ok) throw new Error(payload.error || copy.loadAiFailed)
         applyAi(payload.data)
       }
       catch (error) {
@@ -998,7 +1000,7 @@ export const settingsAppearanceOptions = [
         for (const [key, value] of Object.entries(fields)) body.set(key, value)
         const response = await fetch('/api/postline/settings/ai', { method: 'POST', body })
         const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save.')
+        if (!response.ok || !payload.ok) throw new Error(payload.error || copy.saveFailed)
         applyAi(payload.data)
         aiMessage.set(done)
         aiTone.set('success')
@@ -1012,9 +1014,13 @@ export const settingsAppearanceOptions = [
       }
     }
 
-    const saveAi = (): Promise<void> => sendAi({ provider: aiProvider(), model: aiModel().trim(), apiKey: aiKey().trim() }, 'Saved.')
-    const removeAiKey = (): Promise<void> => sendAi({ clearKey: '1' }, 'Key removed.')
+    const saveAi = (): Promise<void> => sendAi({ provider: aiProvider(), model: aiModel().trim(), apiKey: aiKey().trim() }, copy.saved)
+    const removeAiKey = (): Promise<void> => sendAi({ clearKey: '1' }, copy.keyRemoved)
 
+    const retentionScopeOptions = [
+      { value: 'all', label: copy.retentionAll },
+      { value: 'tracked', label: copy.retentionTracked },
+    ]
     const retentionLoaded = state(false)
     const savedEnabled = state(false)
     const savedDays = state(7)
@@ -1042,7 +1048,7 @@ export const settingsAppearanceOptions = [
     const retentionTone = state('')
     const lastRunText = state('')
 
-    const statusPill = derived(() => savedEnabled() ? copy.retention.replace('{count}', numbers.format(savedDays())) : copy.off)
+    const statusPill = derived(() => savedEnabled() ? copy.retention.replace('{age}', age.format(savedDays())) : copy.off)
     const daysValid = derived(() => Number.isInteger(autoDays()) && autoDays() >= 1 && autoDays() <= 3650)
     // Consent is asked for whenever a change makes it delete more: switching
     // it on, a shorter age limit, another network, or the wider scope. The
@@ -1068,8 +1074,11 @@ export const settingsAppearanceOptions = [
     const describeLastRun = (run: RetentionLastRun | null): string => {
       if (!run) return ''
       const when = new Date(`${run.at.replace(' ', 'T')}Z`)
-      const at = Number.isNaN(when.getTime()) ? run.at : when.toLocaleString()
-      return `Last automatic run ${at}: ${run.deleted} deleted${run.failed ? `, ${run.failed} failed` : ''}.`
+      const at = Number.isNaN(when.getTime()) ? run.at : when.toLocaleString(language)
+      return copy.retentionLastRun
+        .replace('{date}', () => at)
+        .replace('{deleted}', numbers.format(run.deleted))
+        .replace('{failed}', run.failed ? copy.retentionFailedCount.replace('{count}', numbers.format(run.failed)) : '')
     }
 
     const applyRetention = (settings: RetentionSettings, defaults: string[], lastRun: RetentionLastRun | null): void => {
@@ -1095,7 +1104,7 @@ export const settingsAppearanceOptions = [
       try {
         const response = await fetch('/api/postline/settings/retention')
         const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the deletion settings.')
+        if (!response.ok || !payload.ok) throw new Error(payload.error || copy.retentionLoadFailed)
         defaultProviders = payload.data.defaultProviders || defaultProviders
         applyRetention(payload.data.settings, defaultProviders, payload.data.lastRun)
         retentionLoaded.set(true)
@@ -1118,12 +1127,12 @@ export const settingsAppearanceOptions = [
 
         const response = await fetch('/api/postline/settings/retention', { method: 'POST', body })
         const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save.')
+        if (!response.ok || !payload.ok) throw new Error(payload.error || copy.saveFailed)
 
         applyRetention(payload.data.settings, defaultProviders, payload.data.lastRun)
         say(payload.data.settings.enabled
-          ? `Saved. Posts older than ${payload.data.settings.days} days will be deleted daily.`
-          : 'Saved. Automatic deletion is off.', 'success')
+          ? copy.retentionEnabled.replace('{age}', age.format(payload.data.settings.days))
+          : copy.retentionDisabled, 'success')
       }
       catch (error) {
         say(error instanceof Error ? error.message : String(error), 'error')
@@ -1136,16 +1145,16 @@ export const settingsAppearanceOptions = [
     /** Count what a run right now would delete, through the purge preview. */
     const previewRetention = async (): Promise<void> => {
       if (!daysValid()) {
-        say('Enter a number of days between 1 and 3650.', 'error')
+        say(copy.retentionInvalidDays, 'error')
         return
       }
       if (!autoProviders().length) {
-        say('Pick at least one network.', 'error')
+        say(copy.retentionNeedNetwork, 'error')
         return
       }
 
       previewing.set(true)
-      say('Counting…')
+      say(copy.retentionCounting)
       try {
         const query = new URLSearchParams({
           scope: autoScope(),
@@ -1154,13 +1163,17 @@ export const settingsAppearanceOptions = [
         })
         const response = await fetch(`/api/postline/purge/preview?${query.toString()}`)
         const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Preview failed.')
+        if (!response.ok || !payload.ok) throw new Error(payload.error || copy.retentionPreviewFailed)
 
         const parts = (payload.data.providers || [])
           .filter((row: { connected: boolean }) => row.connected)
           .map((row: { provider: string, handle: string | null, matched: number, skippedReason?: string }) =>
             row.skippedReason ? `${row.handle || row.provider}: ${row.skippedReason}` : `${row.handle || row.provider}: ${row.matched}`)
-        say(`${payload.data.matched} post${payload.data.matched === 1 ? ' is' : 's are'} older than ${autoDays()} days right now${parts.length ? ` (${parts.join(' · ')})` : ''}. Nothing was deleted.`)
+        const matched = payload.data.matched
+        const summary = plural.select(matched) === 'one' ? copy.retentionPreviewOne : copy.retentionPreviewMany
+        say(summary.replace('{count}', numbers.format(matched))
+          .replace('{age}', age.format(autoDays()))
+          .replace('{accounts}', () => parts.length ? ' (' + parts.join(' · ') + ')' : ''))
       }
       catch (error) {
         say(error instanceof Error ? error.message : String(error), 'error')
@@ -1240,7 +1253,7 @@ export const settingsAppearanceOptions = [
         }
         else {
           charLimitText.set('—')
-          charLimitSource.set('No channels connected')
+          charLimitSource.set(copy.noCharacterLimit)
         }
       }).catch(() => {
         channelSummary.set(copy.channelStatusFailed)

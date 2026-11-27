@@ -3072,6 +3072,55 @@ async function checkSpanishSettings(cdp: Cdp): Promise<void> {
       && ${tab('appearance')}.getAttribute('aria-selected') === 'true'
   `), 5_000)
 
+  await evaluate(cdp, `${tab('ai')}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The Spanish AI settings show the provider and planner status', () => evaluate<boolean>(cdp, `
+    ${tab('ai')}.getAttribute('aria-selected') === 'true'
+      && ${settings}.querySelector('[data-setting=ai-provider]')?.innerText.includes('Proveedor')
+      && ${settings}.querySelector('[data-setting=ai-active]')?.innerText.includes('Planificador activo')
+      && ${settings}.querySelector('[data-ai-active]')?.textContent.trim() !== '—'
+  `), 5_000)
+
+  await evaluate(cdp, `${tab('composer')}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  const autosave = `${settings}.querySelector('[data-setting=auto-save] button[role=switch]')`
+  await waitUntil('Spanish Composer preferences expose the autosave switch', () => evaluate<boolean>(cdp, `
+    Boolean(${autosave}?.getClientRects().length)
+      && ${settings}.querySelector('[data-setting=auto-save]')?.innerText.includes('Guardar borradores automáticamente')
+  `), 5_000)
+  const before = await evaluate<string>(cdp, `${autosave}.getAttribute('aria-checked')`)
+  await evaluate(cdp, `${autosave}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The autosave switch changes from the keyboard', () => evaluate<boolean>(cdp, `
+    ${autosave}.getAttribute('aria-checked') !== ${JSON.stringify(before)}
+  `), 5_000)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The autosave switch restores the original choice', () => evaluate<boolean>(cdp, `
+    ${autosave}.getAttribute('aria-checked') === ${JSON.stringify(before)}
+  `), 5_000)
+
+  await evaluate(cdp, `${tab('deletion')}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  const preview = `[...${settings}.querySelectorAll('[data-settings-pane=deletion] button')].find(button =>
+    button.textContent.trim() === 'Ver qué publicaciones se eliminarían')`
+  await waitUntil('Spanish retention preview is ready', () => evaluate<boolean>(cdp, `(${preview})?.disabled === false`), 5_000)
+  await evaluate(cdp, `(${preview}).focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Spanish retention preview reports zero matches and keeps deletion disabled', () => evaluate<boolean>(cdp, `(async () => {
+    const response = await fetch('/api/postline/settings/retention').then(value => value.json())
+    return response.data?.settings.enabled === false
+      && ${settings}.querySelector('[data-retention-message]')?.textContent.trim()
+        === 'Hay 0 publicaciones con más de 7 días. No se eliminó nada.'
+  })()`), 5_000)
+
+  await evaluate(cdp, `${tab('about')}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Spanish About shows the Postline version in the browser', () => evaluate<boolean>(cdp, `
+    ${tab('about')}.getAttribute('aria-selected') === 'true'
+      && ${settings}.querySelector('[data-setting=desktop-version]')?.innerText.includes('Versión de Postline')
+      && ${settings}.querySelector('[data-setting=desktop-version]')?.innerText.match(/[0-9]+[.][0-9]+[.][0-9]+/)
+  `), 5_000)
+
   await evaluate(cdp, `${tab('notifications')}.focus()`)
   await pressKey(cdp, 'Enter', 13)
   const activity = `${settings}.querySelector('[data-setting=activity-alerts] button')`
