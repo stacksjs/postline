@@ -39,7 +39,17 @@ useEventListener('online', () => {
 })
 
 function toggleSidebar() {
-  collapsed.set(!collapsed())
+  const isCollapsed = collapsed()
+  const root = shell.current
+  const collapseButton = root?.querySelector<HTMLButtonElement>('[data-sidebar-collapse]')
+  const expandButton = root?.querySelector<HTMLButtonElement>('[data-sidebar-expand-fab]')
+  const trigger = isCollapsed ? expandButton : collapseButton
+  const moveFocus = trigger && trigger.ownerDocument.activeElement === trigger && !bridge()
+  collapsed.set(!isCollapsed)
+  if (moveFocus) {
+    const next = isCollapsed ? collapseButton : expandButton
+    nextTick(() => next?.focus())
+  }
 }
 
 effect(() => {
@@ -150,10 +160,12 @@ onDestroy(() => {
         class="inline-flex fixed left-3.5 top-3.5 z-[90] items-center justify-center h-9 w-9 text-body hover:text-ink bg-glass-strong hover:bg-raised border border-line rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus shadow-lg backdrop-blur-sm"
         type="button"
         aria-label="Expand sidebar"
+        aria-controls="workspace-sidebar"
+        aria-expanded="false"
         title="Expand sidebar"
         data-sidebar-expand-fab
         data-no-window-drag
-        @click="collapsed.set(false)"
+        @click="toggleSidebar"
       >
         <span class="h-[18px] w-[18px] i-hugeicons-sidebar-right" aria-hidden="true"></span>
       </button>

@@ -184,17 +184,23 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
 
   await auditPage(`${site}/queue`, { cdp })
   await waitUntil('Workspace sidebar hydration', () => evaluate<boolean>(cdp, `${shell}?.dataset.sidebarCollapsed === 'false'`), 5_000)
-  await evaluate(cdp, `${collapse}.click()`)
+  await evaluate(cdp, `${collapse}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
   await waitUntil('The browser sidebar is collapsed', () => evaluate<boolean>(cdp, `
     ${shell}.dataset.sidebarCollapsed === 'true' && ${width} === 0
-      && getComputedStyle(${expand}).visibility === 'visible'`), 5_000)
+      && getComputedStyle(${expand}).visibility === 'visible'
+      && ${expand}.getAttribute('aria-expanded') === 'false'
+      && document.activeElement === ${expand}`), 5_000)
   await auditPage(`${site}/queue`, { cdp })
   if (!await evaluate<boolean>(cdp, `${shell}.dataset.sidebarCollapsed === 'true' && ${width} === 0`))
     fail('queue', 'shell', 'a sidebar collapsed before reload was restored expanded')
-  await evaluate(cdp, `${expand}.click()`)
+  await evaluate(cdp, `${expand}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
   await waitUntil('The expanded sidebar is visible again', () => evaluate<boolean>(cdp, `
     ${shell}.dataset.sidebarCollapsed === 'false' && ${width} === 286
-      && getComputedStyle(${expand}).visibility === 'hidden'`), 5_000)
+      && getComputedStyle(${expand}).visibility === 'hidden'
+      && ${collapse}.getAttribute('aria-expanded') === 'true'
+      && document.activeElement === ${collapse}`), 5_000)
 
   const offlineNotice = "document.querySelector('[data-stx-toast-key=postline-offline]')"
   await evaluate(cdp, "window.dispatchEvent(new Event('offline')); window.dispatchEvent(new Event('offline'))")
