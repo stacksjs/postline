@@ -1,0 +1,22 @@
+<script server cache>
+export const label = String($props.label || '').trim()
+if (!label) throw new Error('WorkspaceIconButton requires an accessible label')
+export const icon = $props.icon
+export const variant = $props.variant || 'ghost'
+export const size = $props.size || 'xs'
+export const position = $props.position || 'bottom'
+</script>
+
+<script client>
+const emit = defineEmits(['activate'])
+
+function activate(event) {
+  emit('activate', event)
+}
+</script>
+
+<Tooltip content="{{ label }}" position="{{ position }}">
+  <Button variant="{{ variant }}" size="{{ size }}" aria-label="{{ label }}" @click="activate">
+    <span class="size-4 {{ icon }}" aria-hidden="true"></span>
+  </Button>
+</Tooltip>

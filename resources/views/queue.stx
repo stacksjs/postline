@@ -92,9 +92,15 @@
           <footer class="flex flex-wrap gap-1.5 items-center justify-end" x-show="row.liveUrl || row.actionable || row.partial || row.resumeLabel">
             <div class="group-focus-within:opacity-100 group-hover:opacity-100 transition-opacity" :class="row.attention ? '' : 'pointer-fine:opacity-0'">
               <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl && !row.actionable && !row.partial && !row.resumeLabel" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View post</a>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.resumeLabel" :disabled="busyId() === row.id" @click="resumeItem(row.id)" :text="row.resumeLabel"></button>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" x-show="row.partial && !row.resumeLabel" :disabled="busyId() === row.id" @click="retryItem(row.id)">Retry failed networks</button>
-              <button class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50 transition-colors" type="button" x-show="row.actionable && !row.partial && !row.resumeLabel" :disabled="busyId() === row.id" @click="publishItem(row.id)" :text="row.status === 'failed' ? 'Try again now' : 'Publish now'">Publish now</button>
+              <span x-show="row.resumeLabel">
+                <Button variant="secondary" size="xs" :loading="busyId() === row.id" :label="row.resumeLabel" @click="resumeItem(row.id)" />
+              </span>
+              <span x-show="row.partial && !row.resumeLabel">
+                <Button variant="secondary" size="xs" :loading="busyId() === row.id" @click="retryItem(row.id)">Retry failed networks</Button>
+              </span>
+              <span x-show="row.actionable && !row.partial && !row.resumeLabel">
+                <Button variant="ghost" size="xs" :loading="busyId() === row.id" :label="row.status === 'failed' ? 'Try again now' : 'Publish now'" @click="publishItem(row.id)" />
+              </span>
             </div>
             <details class="relative" x-show="row.actionable || (row.liveUrl && (row.partial || row.resumeLabel))" @keydown="closeActionsOnEscape($event)">
               <summary class="grid place-items-center h-7 w-8 list-none text-muted bg-panel hover:bg-hover border border-line rounded-lg cursor-pointer" aria-label="More post actions" title="More post actions">

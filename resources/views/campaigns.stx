@@ -45,9 +45,9 @@
       <section class="overflow-hidden min-w-0 bg-panel border border-line rounded-2xl shadow-sm" aria-label="Campaign plan" x-show="campaign()">
         <header class="flex flex-wrap gap-3 items-center justify-between px-3 py-2.5 min-h-14 border-b border-line">
           <div class="flex gap-2 items-center">
-            <Button variant="ghost" size="xs" aria-label="Previous six weeks" @click="shiftCalendar(-42)"><span class="size-4 i-hugeicons-arrow-left-02" aria-hidden="true"></span></Button>
+            <WorkspaceIconButton label="Previous six weeks" icon="i-hugeicons-arrow-left-02" @activate="shiftCalendar(-42)" />
             <Button variant="secondary" size="xs" @click="goToCampaign">Campaign start</Button>
-            <Button variant="ghost" size="xs" aria-label="Next six weeks" @click="shiftCalendar(42)"><span class="size-4 i-hugeicons-arrow-right-02" aria-hidden="true"></span></Button>
+            <WorkspaceIconButton label="Next six weeks" icon="i-hugeicons-arrow-right-02" @activate="shiftCalendar(42)" />
           </div>
           <div class="min-w-0 text-right">
             <strong class="block text-ink text-ui" :text="calendarTitle()">Six-week plan</strong>

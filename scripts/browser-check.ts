@@ -1034,6 +1034,17 @@ async function checkQueueRescheduling(cdp: Cdp): Promise<void> {
     [...document.querySelectorAll('[aria-label="Queue view"] button')].find(button => button.textContent.trim() === 'List').click()
     document.getElementById('queue-tab-scheduled').click()
   `)
+  const publishBlog = `[...document.querySelectorAll('#queue-results article')]
+    .find(row => row.textContent.includes('Keyboard scheduling fixture'))
+    ?.querySelector('button[class*="hover:bg-surface-hover"]')`
+  await waitUntil('The scheduled Blog post has a quiet Publish now button', () => evaluate<boolean>(cdp, `
+    ${publishBlog}?.textContent.trim() === 'Publish now' && !(${publishBlog}).disabled`), 5_000)
+  await evaluate(cdp, `${publishBlog}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The Queue button publishes the Blog post', () => evaluate<boolean>(cdp, `(async () => {
+    const { data } = await (await fetch('/api/postline/queue')).json()
+    return data.items.some(item => item.body === 'Keyboard scheduling fixture' && item.status === 'published')
+  })()`), 5_000)
   const select = `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Select posts')`
   const checkboxes = `[...document.querySelectorAll('#queue-results input[type=checkbox][aria-label^="Select Bulk move fixture"]')]`
   await waitUntil('Five scheduled posts with the selection control', () => evaluate<boolean>(cdp, `
@@ -1292,6 +1303,22 @@ async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
       const shot = await cdp.send<{ data: string }>('Page.captureScreenshot', { format: 'png' })
       writeFileSync(join(out, `campaigns-planned-${mode.name}.png`), Buffer.from(shot.data, 'base64'))
     }
+    const previous = `document.querySelector('button[aria-label="Previous six weeks"]')`
+    const calendarTitle = `document.querySelector('[aria-label="Campaign plan"] > header strong').textContent`
+    const startWindow = await evaluate<string>(cdp, calendarTitle)
+    await evaluate(cdp, `${previous}.focus()`)
+    const tooltip = `document.getElementById(${previous}.getAttribute('aria-describedby'))`
+    await waitUntil('The calendar arrow shows its tooltip on focus', () => evaluate<boolean>(cdp, `
+      Boolean(${tooltip}?.getClientRects().length) && ${tooltip}.textContent.includes('Previous six weeks')`), 5_000)
+    await pressKey(cdp, 'Escape', 27)
+    await waitUntil('Escape hides the arrow tooltip and keeps focus', () => evaluate<boolean>(cdp, `
+      !${tooltip}?.getClientRects().length && document.activeElement === ${previous}`), 5_000)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The keyboard shifts the campaign calendar', () => evaluate<boolean>(cdp, `
+      ${calendarTitle} !== ${JSON.stringify(startWindow)}`), 5_000)
+    await evaluate(cdp, `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Campaign start').click()`)
+    await waitUntil('Campaign start restores the calendar window', () => evaluate<boolean>(cdp, `
+      ${calendarTitle} === ${JSON.stringify(startWindow)}`), 5_000)
     await evaluate(cdp, `${post}.focus()`)
     await pressKey(cdp, 'Enter', 13)
     const picker = `document.querySelector('[data-postline-schedule-picker] [data-date-time-trigger]')`
