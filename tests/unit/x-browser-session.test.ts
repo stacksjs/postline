@@ -36,6 +36,17 @@ describe('X session browser reads', () => {
     expect(inspectXPage(document, 'https://example.test/postline_test', 'metrics')).toEqual({ state: 'unavailable' })
   })
 
+  test('stops at login and account checks even when the account sidebar is still mounted', () => {
+    const document = {
+      querySelector: (selector: string) => selector.includes('Profile_Link') ? { getAttribute: () => '/postline_test' } : null,
+      querySelectorAll: () => { throw new Error('Reading posts at a sign-in gate') },
+    } as unknown as Document
+    expect(inspectXPage(document, 'https://x.com/i/flow/login', 'metrics')).toEqual({ state: 'signed-out' })
+    expect(inspectXPage(document, 'https://x.com/login', 'listening')).toEqual({ state: 'signed-out' })
+    expect(inspectXPage(document, 'https://x.com/account/access/', 'metrics')).toEqual({ state: 'needs-attention' })
+    expect(inspectXPage(document, 'https://x.com/account/accessibility')).toMatchObject({ state: 'connected' })
+  })
+
   test('reads rendered search and mention posts on the expected X pages', () => {
     const stamp = '2026-11-27T05:00:00.000Z'
     const article = (href: string, visible = true) => ({

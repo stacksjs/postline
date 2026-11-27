@@ -7,6 +7,7 @@ const xSessionDesktop = useNativeDesktop()
 const xBrowser = state<XBrowserWindow | null>(null)
 const xSession = state<{ profile: string, handle: string | null } | null>(null)
 const xSessionBusy = state(false)
+const xSessionNeedsCheck = state(false)
 const xSessionFeedback = state('')
 
 const xSessionEndpoint = '/api/postline/twitter/browser-session'
@@ -45,6 +46,14 @@ async function openSession() {
   }
 }
 
+async function returnToX(browser: XBrowserWindow, profile: string, reason: 'needs-attention' | 'signed-out') {
+  xSessionNeedsCheck.set(true)
+  xSessionFeedback.set(reason === 'needs-attention'
+    ? 'X needs your attention. Complete the check in X, then select Check sign-in.'
+    : 'Sign in to X, then select Check sign-in before importing again.')
+  await openXBrowser(browser, profile).catch(() => {})
+}
+
 async function checkSignIn() {
   const windowApi = xBrowser()
   const current = xSession()
@@ -53,7 +62,7 @@ async function checkSignIn() {
   try {
     const status = await readXBrowserSession(windowApi, current.profile)
     if (status.state === 'needs-attention') {
-      xSessionFeedback.set('X needs your attention. Open X to continue there.')
+      await returnToX(windowApi, current.profile, status.state)
       return
     }
     if (status.state === 'unavailable') {
@@ -64,6 +73,7 @@ async function checkSignIn() {
     const body = status.state === 'connected' ? { handle: status.handle } : { signed_out: true }
     const { data } = await requestJson(xSessionEndpoint, { method: 'POST', body: JSON.stringify(body) }, 'Could not save the X sign-in.')
     xSession.set({ ...current, handle: data.handle })
+    xSessionNeedsCheck.set(false)
     xSessionFeedback.set(data.handle ? `Signed in to X as @${data.handle}.` : 'Signed out of X. Open X to sign in.')
   }
   catch (error) {
@@ -74,17 +84,29 @@ async function checkSignIn() {
   }
 }
 
+async function readConfirmedSession(browser: XBrowserWindow, profile: string, handle: string, kind: 'metrics' | 'listening') {
+  const result = await readXBrowserSession(browser, profile, kind)
+  if (result.state === 'needs-attention' || result.state === 'signed-out') {
+    await returnToX(browser, profile, result.state)
+    return
+  }
+  if (result.state === 'connected') {
+    if (result.handle.toLowerCase() === handle.toLowerCase()) return result
+    xSessionNeedsCheck.set(true)
+    xSessionFeedback.set('The X window is signed in to a different account. Select Check sign-in before importing.')
+    return
+  }
+  xSessionFeedback.set('Open X and wait for the page to finish loading before importing.')
+}
+
 async function captureMetrics() {
   const windowApi = xBrowser()
   const current = xSession()
-  if (!windowApi || !current?.handle || xSessionBusy()) return
+  if (!windowApi || !current?.handle || xSessionBusy() || xSessionNeedsCheck()) return
   xSessionBusy.set(true)
   try {
-    const result = await readXBrowserSession(windowApi, current.profile, 'metrics')
-    if (result.state !== 'connected' || result.handle.toLowerCase() !== current.handle.toLowerCase()) {
-      xSessionFeedback.set('Open X and check the sign-in before reading engagement.')
-      return
-    }
+    const result = await readConfirmedSession(windowApi, current.profile, current.handle, 'metrics')
+    if (!result) return
     const { data } = await requestJson(`${xSessionEndpoint}/metrics`, {
       method: 'POST',
       body: JSON.stringify({ handle: result.handle, measurements: result.measurements }),
@@ -104,14 +126,11 @@ async function captureMetrics() {
 async function captureListening() {
   const windowApi = xBrowser()
   const current = xSession()
-  if (!windowApi || !current?.handle || xSessionBusy()) return
+  if (!windowApi || !current?.handle || xSessionBusy() || xSessionNeedsCheck()) return
   xSessionBusy.set(true)
   try {
-    const result = await readXBrowserSession(windowApi, current.profile, 'listening')
-    if (result.state !== 'connected' || result.handle.toLowerCase() !== current.handle.toLowerCase()) {
-      xSessionFeedback.set('Open X and check the sign-in before importing posts.')
-      return
-    }
+    const result = await readConfirmedSession(windowApi, current.profile, current.handle, 'listening')
+    if (!result) return
     if (!result.posts) {
       xSessionFeedback.set('Open Search or Mentions in the X window first.')
       return
@@ -143,8 +162,8 @@ async function captureListening() {
         <div class="flex flex-wrap gap-2 items-center">
           <Button variant="secondary" size="xs" label="Open X" :disabled="!xSession() || xSessionBusy()" @click="openSession" />
           <Button variant="secondary" size="xs" label="Check sign-in" :disabled="!xSession() || xSessionBusy()" @click="checkSignIn" />
-          <Button variant="secondary" size="xs" label="Read visible engagement" :show="xSession()?.handle" :disabled="xSessionBusy()" @click="captureMetrics" />
-          <Button variant="secondary" size="xs" label="Import visible mentions" :show="xSession()?.handle" :disabled="xSessionBusy()" @click="captureListening" />
+          <Button variant="secondary" size="xs" label="Read visible engagement" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="captureMetrics" />
+          <Button variant="secondary" size="xs" label="Import visible mentions" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="captureListening" />
           <a class="text-info text-xs underline" href="https://help.x.com/en/rules-and-policies/x-automation" target="_blank" rel="noopener noreferrer">X automation rules</a>
         </div>
         <p class="m-0 text-body text-xs" role="status" :show="xSessionFeedback()" :text="xSessionFeedback()"></p>

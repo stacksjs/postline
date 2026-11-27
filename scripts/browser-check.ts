@@ -908,6 +908,7 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     const send = window.fetch.bind(window)
     const profile = 'postline-x-12345678-1234-5678-9012-123456789012'
     window.xSessionWrites = 0
+    window.xSessionImports = 0
     window.xSessionOpens = []
     window.xSessionState = { state: 'connected', handle: 'postline_test', measurements: [{ id: '4321', counts: { likes: 2 } }] }
     window.craft = { app: { nativePlatformControls: false }, capabilities: { nativePlatformControls: false }, window: {
@@ -926,12 +927,14 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     window.fetch = (input, options) => {
       const url = new URL(input instanceof Request ? input.url : input, location.href)
       if (url.pathname === '${endpoint}/listening') {
+        window.xSessionImports++
         const { handle, posts } = JSON.parse(options.body)
         if (options.method !== 'POST' || handle !== 'postline_test' || posts[0]?.authorHandle !== 'fixture_author')
           return Promise.resolve(Response.json({ ok: false, error: 'Invalid session Listening request' }, { status: 422 }))
         return Promise.resolve(Response.json({ ok: true, data: { watches: 1, created: 1 } }))
       }
       if (url.pathname === '${endpoint}/metrics') {
+        window.xSessionImports++
         const { handle, measurements } = JSON.parse(options.body)
         if (options.method !== 'POST' || handle !== 'postline_test' || measurements[0]?.counts.likes !== 2)
           return Promise.resolve(Response.json({ ok: false, error: 'Invalid session metrics request' }, { status: 422 }))
@@ -986,17 +989,34 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     await waitUntil('The confirmed handle survives a reload', () => evaluate<boolean>(cdp, `
       ${section}?.textContent.includes('Last confirmed as @postline_test')`), 5_000)
 
-    await evaluate(cdp, `window.xSessionState = { state: 'needs-attention' }; ${check}.focus()`)
+    await evaluate(cdp, `window.xSessionState = { state: 'needs-attention' }; ${section}.querySelectorAll('button')[2].focus()`)
     await pressKey(cdp, 'Enter', 13)
-    await waitUntil('An account challenge stops the X check', () => evaluate<boolean>(cdp, `
-      ${section}.textContent.includes('X needs your attention') && window.xSessionWrites === 0`), 5_000)
+    await waitUntil('An account challenge stops imports and reopens the same named window', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('X needs your attention')
+        && ${section}.querySelectorAll('button')[2].disabled && ${section}.querySelectorAll('button')[3].disabled
+        && window.xSessionWrites === 0 && window.xSessionImports === 0
+        && window.xSessionOpens.length === 1 && window.xSessionOpens[0].name === window.xSessionOpens[0].dataStore`), 5_000)
 
-    await evaluate(cdp, `window.xSessionState = { state: 'signed-out' }; ${check}.focus()`)
+    await evaluate(cdp, `window.xSessionState = { state: 'connected', handle: 'postline_test' }; ${check}.focus()`)
     await pressKey(cdp, 'Enter', 13)
-    await waitUntil('Signing out clears the confirmed handle', () => evaluate<boolean>(cdp, `
+    await waitUntil('Confirming sign-in enables X imports again', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('Signed in to X as @postline_test.')
+        && !${section}.querySelectorAll('button')[2].disabled && !${section}.querySelectorAll('button')[3].disabled
+        && window.xSessionWrites === 1`), 5_000)
+
+    await evaluate(cdp, `window.xSessionState = { state: 'signed-out' }; ${section}.querySelectorAll('button')[3].focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('A signed-out page stops Listening imports', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('Sign in to X, then select Check sign-in')
+        && ${section}.querySelectorAll('button')[3].disabled && window.xSessionWrites === 1
+        && window.xSessionImports === 0 && window.xSessionOpens.length === 2`), 5_000)
+
+    await evaluate(cdp, `${check}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Checking after signing out clears the confirmed handle', () => evaluate<boolean>(cdp, `
       ${section}.textContent.includes('Signed out of X.')
         && !${section}.querySelectorAll('button')[2].getClientRects().length
-        && !${section}.querySelectorAll('button')[3].getClientRects().length && window.xSessionWrites === 1`), 5_000)
+        && !${section}.querySelectorAll('button')[3].getClientRects().length && window.xSessionWrites === 2`), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })

@@ -39,8 +39,11 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
   const url = new URL(href)
   if (!['https://x.com', 'https://twitter.com'].includes(url.origin))
     return { state: 'unavailable' }
-  if (url.pathname.startsWith('/account/access') || page.querySelector('[data-testid="ocfEnterTextTextInput"]'))
+  if (/^\/account\/access(?:\/|$)/.test(url.pathname) || page.querySelector('[data-testid="ocfEnterTextTextInput"]'))
     return { state: 'needs-attention' }
+  // X can keep the account sidebar mounted while opening its sign-in flow.
+  if (/^\/(?:login|i\/flow\/login)(?:\/|$)/.test(url.pathname))
+    return { state: 'signed-out' }
 
   const profileLink = page.querySelector('a[data-testid="AppTabBar_Profile_Link"]')?.getAttribute('href')
   if (profileLink) {
@@ -93,7 +96,7 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
     }
   }
 
-  if (url.pathname === '/login' || url.pathname === '/i/flow/login' || page.querySelector('[data-testid="loginButton"]'))
+  if (page.querySelector('[data-testid="loginButton"]'))
     return { state: 'signed-out' }
   return { state: 'unavailable' }
 }
