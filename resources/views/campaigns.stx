@@ -1,70 +1,79 @@
 @extends('layouts/app')
 
-@section('title', 'Postline - Campaigns')
+<script server cache>
+import { workspaceCampaignText, workspaceLocale } from '../../app/Support/Localization/workspace'
+
+export const campaignLocale = workspaceLocale
+export const campaignText = workspaceCampaignText.labels
+export const campaignCopy = workspaceCampaignText.client
+export const campaignClient = { locale: workspaceLocale, messages: campaignCopy }
+</script>
+
+@section('title'){{ campaignText.title }}@endsection
 
 @section('content')
-  @meta('description', 'Plan multi-week social launches, draft campaign posts with AI, and send them into Postline queue.')
-  <section class="grid gap-4" data-postline-page="campaigns" data-testid="campaigns-page">
+  @meta('description', campaignText.description)
+  <section class="grid gap-4" data-postline-page="campaigns" data-testid="campaigns-page" lang="{{ campaignLocale }}">
     <WorkspacePageHeader titleKey="workspace.navigation.campaigns" descriptionKey="workspace.pages.campaigns.description">
       <template #status>
         <span x-show="campaign()">
-          <Badge size="sm" className="capitalize" :variant="postStatusVariant(campaign()?.status)">{{ campaign()?.status }}</Badge>
+          <Badge size="sm" className="capitalize" :variant="postStatusVariant(campaign()?.status)">{{ campaignStatus(campaign()?.status) }}</Badge>
         </span>
       </template>
       <div class="flex flex-wrap gap-2 items-center">
-        <label class="sr-only" for="campaign-picker">Current campaign</label>
+        <label class="sr-only" for="campaign-picker">{{ campaignText.campaignPicker }}</label>
         <select id="campaign-picker" class="px-3 h-9 min-w-44 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus" x-show="campaignsList().length" @change="selectCampaign($event)">
           <option x-for="option in campaignsList()" :value="option.id" :selected="option.id === campaign()?.id">{{ option.name }}</option>
         </select>
-        <SegmentedControl label="Campaign view" size="sm" :show="campaign()" v-model:value="view" :options="[{ value: 'calendar', label: 'Calendar' }, { value: 'list', label: 'List' }]" />
+        <SegmentedControl label="{{ campaignText.view }}" size="sm" :show="campaign()" v-model:value="view" :options="[{ value: 'calendar', label: copy.calendar }, { value: 'list', label: copy.list }]" />
         <span x-show="campaign()">
           <Button variant="primary" size="sm" @click="openCampaignForm()">
             <span class="size-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
-            New campaign
+            {{ campaignCopy.newCampaign }}
           </Button>
         </span>
       </div>
     </WorkspacePageHeader>
 
     <dl class="grid overflow-hidden gap-px grid-cols-2 sm:grid-cols-4 m-0 bg-line border border-line rounded-2xl" x-show="campaign()">
-      <div class="grid gap-1 px-3.5 py-3 min-w-0 bg-panel"><dt class="text-muted text-xs">Window</dt><dd class="m-0 font-semibold text-ink text-sm truncate" :text="campaignWindow()"></dd></div>
-      <div class="grid gap-1 px-3.5 py-3 bg-panel"><dt class="text-muted text-xs">Planned</dt><dd class="m-0 font-semibold text-ink text-sm">{{ posts().length }}</dd></div>
-      <div class="grid gap-1 px-3.5 py-3 bg-panel"><dt class="text-muted text-xs">Ready</dt><dd class="m-0 font-semibold text-ink text-sm">{{ readyCount() }}</dd></div>
-      <div class="grid gap-1 px-3.5 py-3 bg-panel"><dt class="text-muted text-xs">In queue</dt><dd class="m-0 font-semibold text-ink text-sm">{{ queuedCount() }}</dd></div>
+      <div class="grid gap-1 px-3.5 py-3 min-w-0 bg-panel"><dt class="text-muted text-xs">{{ campaignText.window }}</dt><dd class="m-0 font-semibold text-ink text-sm truncate" :text="campaignWindow()"></dd></div>
+      <div class="grid gap-1 px-3.5 py-3 bg-panel"><dt class="text-muted text-xs">{{ campaignText.planned }}</dt><dd class="m-0 font-semibold text-ink text-sm">{{ numbers.format(posts().length) }}</dd></div>
+      <div class="grid gap-1 px-3.5 py-3 bg-panel"><dt class="text-muted text-xs">{{ campaignText.ready }}</dt><dd class="m-0 font-semibold text-ink text-sm">{{ numbers.format(readyCount()) }}</dd></div>
+      <div class="grid gap-1 px-3.5 py-3 bg-panel"><dt class="text-muted text-xs">{{ campaignText.inQueue }}</dt><dd class="m-0 font-semibold text-ink text-sm">{{ numbers.format(queuedCount()) }}</dd></div>
     </dl>
 
-    <WorkspaceListSkeleton :show="loading()" label="Loading campaigns" />
-    <ErrorState :show="!loading() && loadError()" title="Could not load campaigns" :message="loadError()" @retry="retryLoad()" />
-    <EmptyState :show="!loading() && !loadError() && !campaign() && panelMode() !== 'campaign'" title="Plan your first campaign" description="Set a launch window and add posts to the campaign calendar.">
+    <WorkspaceListSkeleton :show="loading()" label="{{ campaignText.loading }}" />
+    <ErrorState :show="!loading() && loadError()" title="{{ campaignText.loadFailed }}" :message="loadError()" @retry="retryLoad()" />
+    <EmptyState :show="!loading() && !loadError() && !campaign() && panelMode() !== 'campaign'" title="{{ campaignText.firstCampaign }}" description="{{ campaignText.firstDescription }}">
       <Button variant="primary" size="sm" @click="openCampaignForm()">
         <span class="size-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
-        Create a campaign
+        {{ campaignText.create }}
       </Button>
     </EmptyState>
 
     <div class="grid gap-3.5 items-start lg:grid-cols-[minmax(0,1fr)_minmax(18rem,21rem)]" x-show="!loading() && (campaign() || panelMode() === 'campaign')">
-      <section class="overflow-hidden min-w-0 bg-panel border border-line rounded-2xl shadow-sm" aria-label="Campaign plan" x-show="campaign()">
+      <section class="overflow-hidden min-w-0 bg-panel border border-line rounded-2xl shadow-sm" aria-label="{{ campaignText.plan }}" x-show="campaign()">
         <header class="flex flex-wrap gap-3 items-center justify-between px-3 py-2.5 min-h-14 border-b border-line">
           <div class="flex gap-2 items-center">
-            <WorkspaceIconButton label="Previous six weeks" icon="i-hugeicons-arrow-left-02" @activate="shiftCalendar(-42)" />
-            <Button variant="secondary" size="xs" @click="goToCampaign">Campaign start</Button>
-            <WorkspaceIconButton label="Next six weeks" icon="i-hugeicons-arrow-right-02" @activate="shiftCalendar(42)" />
+            <WorkspaceIconButton label="{{ campaignText.previous }}" icon="i-hugeicons-arrow-left-02" @activate="shiftCalendar(-42)" />
+            <Button variant="secondary" size="xs" @click="goToCampaign">{{ campaignText.campaignStart }}</Button>
+            <WorkspaceIconButton label="{{ campaignText.next }}" icon="i-hugeicons-arrow-right-02" @activate="shiftCalendar(42)" />
           </div>
           <div class="min-w-0 text-right">
-            <strong class="block text-ink text-ui" :text="calendarTitle()">Six-week plan</strong>
-            <span class="hidden sm:block mt-0.5 text-muted text-xs" x-show="view() === 'calendar'">Drag any unqueued post to move it</span>
+            <strong class="block text-ink text-ui" :text="calendarTitle()">{{ campaignCopy.sixWeekPlan }}</strong>
+            <span class="hidden sm:block mt-0.5 text-muted text-xs" x-show="view() === 'calendar'">{{ campaignText.moveHint }}</span>
           </div>
         </header>
 
         <div class="overflow-x-auto" x-show="view() === 'calendar'">
           <div class="grid gap-px grid-cols-7 min-w-[38rem] bg-line">
-            <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">Sun</div>
-            <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">Mon</div>
-            <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">Tue</div>
-            <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">Wed</div>
-            <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">Thu</div>
-            <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">Fri</div>
-            <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">Sat</div>
+            <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">{{ campaignText.sunday }}</div>
+            <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">{{ campaignText.monday }}</div>
+            <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">{{ campaignText.tuesday }}</div>
+            <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">{{ campaignText.wednesday }}</div>
+            <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">{{ campaignText.thursday }}</div>
+            <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">{{ campaignText.friday }}</div>
+            <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">{{ campaignText.saturday }}</div>
             <div
               class="p-2 min-h-36 bg-panel data-[drop-active=true]:bg-info-soft data-[outside=true]:bg-panel-2 data-[drop-active=true]:ring-2 data-[drop-active=true]:ring-focus data-[drop-active=true]:ring-inset transition-colors group"
               x-for="cell in calendarCells()"
@@ -76,7 +85,7 @@
             >
               <header class="flex items-center justify-between mb-1 font-medium text-muted text-xs">
                 <span class="grid place-items-center size-6 data-[today=true]:text-on-accent data-[today=true]:bg-accent rounded-full" :data-today="cell.today" :aria-current="cell.today ? 'date' : null">{{ cell.day }}</span>
-                <button class="grid place-items-center size-6 text-muted hover:text-ink hover:bg-hover rounded-lg group-focus-within:opacity-100 group-hover:opacity-100 pointer-fine:opacity-0 transition-opacity" type="button" :aria-label="`Add post on ${cell.label}`" @click="openPostForm(null, cell.key)"><span class="size-3.5 i-hugeicons-plus-sign" aria-hidden="true"></span></button>
+                <button class="grid place-items-center size-6 text-muted hover:text-ink hover:bg-hover rounded-lg group-focus-within:opacity-100 group-hover:opacity-100 pointer-fine:opacity-0 transition-opacity" type="button" :aria-label="copy.addOn.replace('{date}', cell.label)" @click="openPostForm(null, cell.key)"><span class="size-3.5 i-hugeicons-plus-sign" aria-hidden="true"></span></button>
               </header>
               <div class="grid gap-1.5">
                 <article
@@ -94,13 +103,13 @@
                 >
                   <div class="flex flex-wrap gap-1 justify-between capitalize text-muted text-xs">
                     <span>{{ timeLabel(item.scheduledAt) }}</span>
-                    <span>{{ item.pillar }}</span>
+                    <span>{{ campaignStatus(item.pillar) }}</span>
                   </div>
                   <strong class="text-ink text-xs truncate">{{ item.title }}</strong>
                   <p class="m-0 line-clamp-2 text-body text-xs">{{ item.body }}</p>
                   <footer class="flex flex-wrap gap-1 items-center justify-between">
                     <span class="flex pl-0.5"><span class="grid place-items-center -ml-0.5 size-5 font-medium text-body text-xs bg-panel-3 border border-panel rounded-full" x-for="provider in item.providers.slice(0, 3)" :title="providerLabel(provider)">{{ providerInitial(provider) }}</span></span>
-                    <Badge size="sm" className="capitalize" :variant="postStatusVariant(item.status)">{{ item.status }}</Badge>
+                    <Badge size="sm" className="capitalize" :variant="postStatusVariant(item.status)">{{ campaignStatus(item.status) }}</Badge>
                   </footer>
                 </article>
               </div>
@@ -109,7 +118,7 @@
         </div>
 
         <div x-show="view() === 'list'">
-          <EmptyState :show="posts().length === 0" variant="bare" title="No posts planned yet" description="Add a post or ask the planner to draft a sequence." />
+          <EmptyState :show="posts().length === 0" variant="bare" title="{{ campaignText.noPosts }}" description="{{ campaignText.noPostsDescription }}" />
           <article class="grid gap-3 grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center sm:grid-cols-[5rem_minmax(0,1fr)_auto_auto] xl:grid-cols-[5rem_minmax(0,1fr)_auto_minmax(0,7rem)_auto] px-3.5 py-3 focus-visible:bg-hover hover:bg-hover border-b border-line last:border-b-0 transition-colors cursor-pointer" data-campaign-list-row x-for="item in posts()" @click="openPostForm(item)" @keydown="openOnKey($event, item)" tabindex="0" role="button">
             <div class="grid gap-0.5 min-w-0">
               <strong class="text-ink text-ui truncate">{{ shortDate(item.scheduledAt) }}</strong>
@@ -119,19 +128,19 @@
               <strong class="text-ink text-ui truncate">{{ item.title }}</strong>
               <p class="m-0 text-body text-xs truncate">{{ item.body }}</p>
             </div>
-            <span class="hidden sm:inline-flex px-2 py-0.5 capitalize text-muted text-xs bg-panel-3 rounded-full">{{ item.pillar }}</span>
+            <span class="hidden sm:inline-flex px-2 py-0.5 capitalize text-muted text-xs bg-panel-3 rounded-full">{{ campaignStatus(item.pillar) }}</span>
             <span class="hidden xl:block text-muted text-xs truncate">{{ item.providers.map(providerLabel).join(', ') }}</span>
-            <Badge size="sm" className="capitalize" :variant="postStatusVariant(item.status)">{{ item.status }}</Badge>
+            <Badge size="sm" className="capitalize" :variant="postStatusVariant(item.status)">{{ campaignStatus(item.status) }}</Badge>
           </article>
         </div>
       </section>
 
-      <aside class="overflow-y-auto lg:order-none lg:sticky lg:top-3.5 min-w-0 lg:max-h-[calc(100dvh-1.75rem)] bg-panel border border-line rounded-2xl shadow-sm -order-1" aria-label="Campaign tools">
+      <aside class="overflow-y-auto lg:order-none lg:sticky lg:top-3.5 min-w-0 lg:max-h-[calc(100dvh-1.75rem)] bg-panel border border-line rounded-2xl shadow-sm -order-1" aria-label="{{ campaignText.tools }}">
         <section class="grid gap-3 p-4" x-show="panelMode() === 'planner' && campaign()">
           <div class="flex flex-wrap gap-2.5 items-start justify-between">
             <header class="flex flex-1 gap-2.5 items-start min-w-40">
               <span class="grid place-items-center shrink-0 size-9 text-info bg-info-soft rounded-xl" aria-hidden="true"><span class="size-5 i-hugeicons-ai-beautify"></span></span>
-              <div><h2 class="m-0 font-semibold text-ink text-ui">Campaign Assistant</h2><p class="m-0 mt-0.5 text-muted text-xs">Turn the brief into a launch sequence you can edit.</p></div>
+              <div><h2 class="m-0 font-semibold text-ink text-ui">{{ campaignText.assistant }}</h2><p class="m-0 mt-0.5 text-muted text-xs">{{ campaignText.assistantDescription }}</p></div>
             </header>
             <span class="inline-flex gap-1.5 items-center shrink-0 px-2 py-1 data-[mode=ai]:text-info text-muted text-xs bg-panel-3 data-[mode=ai]:bg-info-soft border border-line data-[mode=ai]:border-info-line rounded-full" :data-mode="aiStatus().mode">
               <span class="size-3" :class="aiStatus().mode === 'ai' ? 'i-hugeicons-ai-beautify' : 'i-hugeicons-cpu'" aria-hidden="true"></span>
@@ -140,11 +149,11 @@
           </div>
 
           <div class="grid gap-2.5 p-3 bg-panel-2 border border-line rounded-xl">
-            <div><span class="font-medium text-muted text-xs">Goal</span><p class="m-0 text-body text-ui" :text="campaign()?.objective || 'Add a campaign goal to focus the plan.'"></p></div>
-            <div><span class="font-medium text-muted text-xs">Audience</span><p class="m-0 text-body text-ui" :text="campaign()?.audience || 'Your existing social audience.'"></p></div>
+            <div><span class="font-medium text-muted text-xs">{{ campaignText.goal }}</span><p class="m-0 text-body text-ui" :text="campaign()?.objective || copy.emptyGoal"></p></div>
+            <div><span class="font-medium text-muted text-xs">{{ campaignText.audience }}</span><p class="m-0 text-body text-ui" :text="campaign()?.audience || copy.defaultAudience"></p></div>
             <dl class="grid gap-2 grid-cols-2 m-0 pt-2.5 border-line border-t">
-              <div><dt class="text-muted text-xs">Tone</dt><dd class="m-0 capitalize font-medium text-ink text-ui" :text="campaign()?.tone"></dd></div>
-              <div><dt class="text-muted text-xs">Duration</dt><dd class="m-0 font-medium text-ink text-ui" :text="`${campaignDuration()} days`"></dd></div>
+              <div><dt class="text-muted text-xs">{{ campaignText.tone }}</dt><dd class="m-0 capitalize font-medium text-ink text-ui" :text="campaignStatus(campaign()?.tone)"></dd></div>
+              <div><dt class="text-muted text-xs">{{ campaignText.duration }}</dt><dd class="m-0 font-medium text-ink text-ui" :text="withCount(campaignDuration(), copy.oneDay, copy.days)"></dd></div>
             </dl>
           </div>
 
@@ -164,11 +173,11 @@
             </article>
             <article class="flex gap-2 items-start" x-show="busyAction() === 'generate'">
               <span class="grid place-items-center shrink-0 size-6 text-info bg-info-soft rounded-lg motion-safe:animate-pulse" aria-hidden="true"><span class="size-3.5 i-hugeicons-ai-beautify"></span></span>
-              <p class="m-0 px-2 py-1.5 text-body text-xs bg-panel border border-line rounded-xl">Reading the brief, checking the calendar, and shaping the sequence…</p>
+              <p class="m-0 px-2 py-1.5 text-body text-xs bg-panel border border-line rounded-xl">{{ campaignText.reading }}</p>
             </article>
           </div>
 
-          <div class="flex flex-wrap gap-1.5" role="group" aria-label="Assistant shortcuts">
+          <div class="flex flex-wrap gap-1.5" role="group" aria-label="{{ campaignText.shortcuts }}">
             <button class="inline-flex gap-1.5 items-center px-2 py-1 font-medium text-muted text-xs aria-pressed:text-info bg-panel aria-pressed:bg-info-soft hover:bg-hover border border-line rounded-lg aria-pressed:border-info-line" type="button" x-for="suggestion in assistantSuggestions" :aria-pressed="assistantStrategy() === suggestion.id" @click="chooseAssistantPrompt(suggestion)">
               <span class="size-3" :class="suggestion.icon" aria-hidden="true"></span>
               <span>{{ suggestion.label }}</span>
@@ -177,39 +186,39 @@
 
           {{-- A group, not a <label>: a label names one control, and wrapping
               a row of buttons in one gave none of them a name (#160). --}}
-          <div class="grid gap-1.5" role="group" aria-label="Channels">
-            <span class="font-medium text-body text-ui" aria-hidden="true">Channels</span>
+          <div class="grid gap-1.5" role="group" aria-label="{{ campaignText.channels }}">
+            <span class="font-medium text-body text-ui" aria-hidden="true">{{ campaignText.channels }}</span>
             <div class="flex flex-wrap gap-1.5" x-show="connectedProviders().length">
               <button class="inline-flex gap-1.5 items-center px-2 py-1 font-medium text-muted text-xs aria-pressed:text-info bg-panel aria-pressed:bg-info-soft hover:bg-hover border border-line rounded-lg aria-pressed:border-info-line group" type="button" x-for="provider in connectedProviders()" :aria-pressed="plannerProviders().includes(provider.provider)" @click="togglePlannerProvider(provider.provider)">
                 <span class="grid place-items-center size-5 text-body text-xs group-aria-pressed:text-info bg-panel-3 group-aria-pressed:bg-panel rounded">{{ providerInitial(provider.provider) }}</span><span>{{ providerLabel(provider.provider) }}</span>
               </button>
             </div>
-            <a class="text-info text-xs underline underline-offset-2" href="/accounts" data-stx-link x-show="providersLoaded() && connectedProviders().length === 0">Connect a social account before planning posts.</a>
-            <small class="text-muted text-xs" x-show="!providersLoaded()">Checking connected accounts…</small>
+            <a class="text-info text-xs underline underline-offset-2" href="/accounts" data-stx-link x-show="providersLoaded() && connectedProviders().length === 0">{{ campaignText.connectAccount }}</a>
+            <small class="text-muted text-xs" x-show="!providersLoaded()">{{ campaignText.checkingAccounts }}</small>
           </div>
 
           <label class="grid gap-1.5 font-medium text-body text-ui">
-            <span>Ask the assistant <small class="font-normal text-muted text-xs">optional</small></span>
-            <textarea class="px-2.5 py-2 w-full font-normal text-ink text-ui bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus resize-y" rows="4" maxlength="2000" placeholder="What should this sequence emphasize, avoid, or teach?" x-model="direction"></textarea>
+            <span>{{ campaignText.askAssistant }} <small class="font-normal text-muted text-xs">{{ campaignText.optional }}</small></span>
+            <textarea class="px-2.5 py-2 w-full font-normal text-ink text-ui bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus resize-y" rows="4" maxlength="2000" placeholder="{{ campaignText.directionPlaceholder }}" x-model="direction"></textarea>
           </label>
           <label class="flex gap-2 items-center justify-between font-medium text-body text-ui">
-            <span>Number of posts</span>
+            <span>{{ campaignText.postCount }}</span>
             <select class="px-2.5 h-9 font-normal text-ink text-ui bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus" x-model="generationCount">
-              <option value="6">6 posts</option><option value="8">8 posts</option><option value="12">12 posts</option><option value="16">16 posts</option>
+              <option value="6">{{ campaignText.sixPosts }}</option><option value="8">{{ campaignText.eightPosts }}</option><option value="12">{{ campaignText.twelvePosts }}</option><option value="16">{{ campaignText.sixteenPosts }}</option>
             </select>
           </label>
 
-          <Button variant="primary" size="sm" fullWidth="true" :loading="busyAction() === 'generate'" :disabled="busy() || plannerProviders().length === 0" :label="busyAction() === 'generate' ? 'Building your plan…' : posts().length ? 'Ask for another sequence' : 'Build campaign plan'" @click="generatePlan">Build campaign plan</Button>
-          <p class="m-0 text-muted text-xs" x-show="lastPlanMode()" :text="lastPlanMode() === 'ai' ? 'Generated with Stacks AI and your configured provider.' : 'Generated with Postline\'s local planning engine.'"></p>
+          <Button variant="primary" size="sm" fullWidth="true" :loading="busyAction() === 'generate'" :disabled="busy() || plannerProviders().length === 0" :label="busyAction() === 'generate' ? copy.generating : posts().length ? copy.anotherSequence : copy.buildPlan" @click="generatePlan">{{ campaignCopy.buildPlan }}</Button>
+          <p class="m-0 text-muted text-xs" x-show="lastPlanMode()" :text="lastPlanMode() === 'ai' ? copy.modeAI : copy.modeTemplate"></p>
 
           <div class="grid gap-2 grid-cols-2" x-show="posts().length">
-            <Button variant="secondary" size="sm" @click="openCampaignForm(campaign())">Edit brief</Button>
-            <Button variant="secondary" size="sm" @click="openPostForm(null)">Add post</Button>
+            <Button variant="secondary" size="sm" @click="openCampaignForm(campaign())">{{ campaignText.editBrief }}</Button>
+            <Button variant="secondary" size="sm" @click="openPostForm(null)">{{ campaignText.addPost }}</Button>
           </div>
 
           <div class="grid gap-2.5 p-3 bg-info-soft border border-info-line rounded-xl" x-show="unqueuedCount()">
-            <div><strong class="text-info text-ui">Ready for the queue?</strong><p class="m-0 mt-0.5 text-body text-xs">Mark every post ready and give it a future date. Once scheduled, edit posts in Queue.</p></div>
-            <Button variant="primary" size="sm" :loading="busyAction() === 'activate'" :disabled="busy()" :label="busyAction() === 'activate' ? 'Scheduling…' : `Schedule ${unqueuedCount()} posts`" @click="activateCampaign">Schedule posts</Button>
+            <div><strong class="text-info text-ui">{{ campaignText.readyForQueue }}</strong><p class="m-0 mt-0.5 text-body text-xs">{{ campaignText.readyForQueueDescription }}</p></div>
+            <Button variant="primary" size="sm" :loading="busyAction() === 'activate'" :disabled="busy()" :label="busyAction() === 'activate' ? copy.scheduling : withCount(unqueuedCount(), copy.scheduleOne, copy.scheduleMany)" @click="activateCampaign">{{ campaignText.schedulePosts }}</Button>
           </div>
         </section>
 
@@ -217,45 +226,45 @@
         <section class="grid gap-4 p-4">
           <header class="flex gap-2.5 items-start">
             <span class="grid place-items-center shrink-0 size-9 text-info bg-info-soft rounded-xl" aria-hidden="true"><span class="size-5 i-hugeicons-rocket-01"></span></span>
-            <div><h2 class="m-0 font-semibold text-ink text-ui" :text="campaignDraftId() ? 'Edit campaign brief' : 'New campaign'"></h2><p class="m-0 mt-0.5 text-muted text-xs">The brief keeps every post pointed at the same outcome.</p></div>
+            <div><h2 class="m-0 font-semibold text-ink text-ui" :text="campaignDraftId() ? copy.editCampaign : copy.newCampaign"></h2><p class="m-0 mt-0.5 text-muted text-xs">{{ campaignText.briefHelp }}</p></div>
           </header>
           <form class="grid gap-3" @submit="saveCampaign($event)">
             <button class="flex gap-2.5 items-center p-2.5 text-ink text-left bg-info-soft border border-info-line rounded-xl hover:border-info transition-colors" type="button" x-show="!campaignDraftId()" @click="applyStacksLaunchPreset">
               <span class="shrink-0 size-5 text-info i-hugeicons-source-code" aria-hidden="true"></span>
-              <span class="flex-1"><strong class="block text-ui">Use the Stacks launch brief</strong><small class="block mt-0.5 text-muted text-xs">Pre-alpha story, technical builders, eight weeks of useful proof.</small></span>
+              <span class="flex-1"><strong class="block text-ui">{{ campaignText.useStacksBrief }}</strong><small class="block mt-0.5 text-muted text-xs">{{ campaignText.stacksBriefDescription }}</small></span>
               <span class="shrink-0 size-4 text-info i-hugeicons-arrow-right-02" aria-hidden="true"></span>
             </button>
             <label class="grid gap-1.5 font-medium text-body text-ui">
-              <span>Name</span>
-              <input class="px-2.5 h-9 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus" required maxlength="120" placeholder="Autumn product launch" x-model="campaignName">
+              <span>{{ campaignText.name }}</span>
+              <input class="px-2.5 h-9 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus" required maxlength="120" placeholder="{{ campaignText.namePlaceholder }}" x-model="campaignName">
             </label>
             <label class="grid gap-1.5 font-medium text-body text-ui">
-              <span>Goal</span>
-              <textarea class="px-2.5 py-2 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus resize-y" required rows="4" placeholder="What should this campaign make happen?" x-model="campaignObjective"></textarea>
+              <span>{{ campaignText.goal }}</span>
+              <textarea class="px-2.5 py-2 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus resize-y" required rows="4" placeholder="{{ campaignText.goalPlaceholder }}" x-model="campaignObjective"></textarea>
             </label>
             <label class="grid gap-1.5 font-medium text-body text-ui">
-              <span>Audience</span>
-              <input class="px-2.5 h-9 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus" placeholder="Founders planning a launch" x-model="campaignAudience">
+              <span>{{ campaignText.audience }}</span>
+              <input class="px-2.5 h-9 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus" placeholder="{{ campaignText.audiencePlaceholder }}" x-model="campaignAudience">
             </label>
             <label class="grid gap-1.5 font-medium text-body text-ui">
-              <span>Tone</span>
+              <span>{{ campaignText.tone }}</span>
               <select class="px-2.5 h-9 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus" x-model="campaignTone">
-                <option value="clear">Clear</option><option value="bold">Bold</option><option value="warm">Warm</option><option value="technical">Technical</option><option value="playful">Playful</option>
+                <option value="clear">{{ campaignCopy.clear }}</option><option value="bold">{{ campaignCopy.bold }}</option><option value="warm">{{ campaignCopy.warm }}</option><option value="technical">{{ campaignCopy.technical }}</option><option value="playful">{{ campaignCopy.playful }}</option>
               </select>
             </label>
             <div class="grid gap-2.5 sm:grid-cols-2">
               <label class="grid gap-1.5 min-w-0 font-medium text-body text-ui">
-                <span>Start</span>
+                <span>{{ campaignText.start }}</span>
                 <input class="px-2.5 h-9 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus" required type="date" x-model="campaignStartDate">
               </label>
               <label class="grid gap-1.5 min-w-0 font-medium text-body text-ui">
-                <span>End</span>
+                <span>{{ campaignText.end }}</span>
                 <input class="px-2.5 h-9 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus" required type="date" x-model="campaignEndDate">
               </label>
             </div>
             <div class="flex flex-wrap gap-2 justify-end pt-3 border-line border-t">
-              <Button variant="secondary" size="sm" :disabled="busy()" @click="closePanel">Cancel</Button>
-              <Button variant="primary" size="sm" type="submit" :loading="busyAction() === 'campaign'" :disabled="busy()" :label="busyAction() === 'campaign' ? 'Saving…' : 'Save campaign'">Save campaign</Button>
+              <Button variant="secondary" size="sm" :disabled="busy()" @click="closePanel">{{ campaignText.cancel }}</Button>
+              <Button variant="primary" size="sm" type="submit" :loading="busyAction() === 'campaign'" :disabled="busy()" :label="busyAction() === 'campaign' ? copy.saving : copy.saveCampaign">{{ campaignCopy.saveCampaign }}</Button>
             </div>
           </form>
         </section>
@@ -265,37 +274,37 @@
         <section class="grid gap-4 p-4">
           <header class="flex gap-2.5 items-start">
             <span class="grid place-items-center shrink-0 size-9 text-info bg-info-soft rounded-xl" aria-hidden="true"><span class="size-5 i-hugeicons-edit-02"></span></span>
-            <div><h2 class="m-0 font-semibold text-ink text-ui" :text="postDraftId() ? 'Edit planned post' : 'Add planned post'"></h2><p class="m-0 mt-0.5 text-muted text-xs" x-show="!queuedPostId()">Tune the copy, channels, pillar, and timing.</p><p class="m-0 mt-0.5 text-muted text-xs" x-show="queuedPostId()">This post is already in Queue.</p></div>
+            <div><h2 class="m-0 font-semibold text-ink text-ui" :text="postDraftId() ? copy.editPlannedPost : copy.addPlannedPost"></h2><p class="m-0 mt-0.5 text-muted text-xs" x-show="!queuedPostId()">{{ campaignText.editPostHelp }}</p><p class="m-0 mt-0.5 text-muted text-xs" x-show="queuedPostId()">{{ campaignText.alreadyQueued }}</p></div>
           </header>
           <form class="grid gap-3" @submit="savePost($event)">
             <div class="flex gap-2 items-start p-2.5 text-success bg-success-soft border border-success-line rounded-xl" x-show="queuedPostId()">
               <span class="shrink-0 size-4 i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-              <p class="grid gap-1 m-0 text-ui"><strong>{{ postTitle() }}</strong><span class="text-ink">{{ postBody() }}</span><small class="text-xs">Open it in Queue to edit or reschedule.</small></p>
+              <p class="grid gap-1 m-0 text-ui"><strong>{{ postTitle() }}</strong><span class="text-ink">{{ postBody() }}</span><small class="text-xs">{{ campaignText.editInQueue }}</small></p>
             </div>
             <div class="grid gap-3" x-show="!queuedPostId()">
               <label class="grid gap-1.5 font-medium text-body text-ui">
-                <span>Working title</span>
-                <input class="px-2.5 h-9 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus" required maxlength="160" placeholder="The first signal" x-model="postTitle">
+                <span>{{ campaignText.workingTitle }}</span>
+                <input class="px-2.5 h-9 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus" required maxlength="160" placeholder="{{ campaignText.postTitlePlaceholder }}" x-model="postTitle">
               </label>
               <label class="grid gap-1.5 font-medium text-body text-ui">
-                <span>Post copy</span>
-                <textarea class="px-2.5 py-2 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus resize-y" required rows="8" maxlength="4000" placeholder="Write the post…" x-model="postBody"></textarea>
-                <small class="font-normal text-muted text-xs">{{ postBody().length }} characters</small>
+                <span>{{ campaignText.postBody }}</span>
+                <textarea class="px-2.5 py-2 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus resize-y" required rows="8" maxlength="4000" placeholder="{{ campaignText.postBodyPlaceholder }}" x-model="postBody"></textarea>
+                <small class="font-normal text-muted text-xs">{{ withCount(postBody().length, copy.character, copy.characters) }}</small>
               </label>
               <div class="grid gap-2.5">
                 <div class="grid gap-1.5">
-                  <span class="font-medium text-body text-ui" aria-hidden="true">Date and time</span>
-                  <PostlineSchedulePicker :value="postScheduledAt" :timeZone="postScheduleZone" label="Date and time" placeholder="Choose date and time" :allowPast="true" :clearable="false" @change="selectPostSchedule" />
+                  <span class="font-medium text-body text-ui" aria-hidden="true">{{ campaignText.dateTime }}</span>
+                  <PostlineSchedulePicker :value="postScheduledAt" :timeZone="postScheduleZone" label="{{ campaignText.dateTime }}" placeholder="{{ campaignText.dateTimePlaceholder }}" :allowPast="true" :clearable="false" @change="selectPostSchedule" />
                 </div>
                 <label class="grid gap-1.5 font-medium text-body text-ui">
-                  <span>Pillar</span>
+                  <span>{{ campaignText.pillar }}</span>
                   <select class="px-2.5 h-9 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus" x-model="postPillar">
-                    <option value="teaser">Teaser</option><option value="story">Story</option><option value="education">Education</option><option value="proof">Proof</option><option value="launch">Launch</option><option value="follow-up">Follow-up</option>
+                    <option value="teaser">{{ campaignCopy.teaser }}</option><option value="story">{{ campaignCopy.story }}</option><option value="education">{{ campaignCopy.education }}</option><option value="proof">{{ campaignCopy.proof }}</option><option value="launch">{{ campaignCopy.launch }}</option><option value="follow-up">{{ campaignCopy['follow-up'] }}</option>
                   </select>
                 </label>
               </div>
-              <div class="grid gap-1.5" role="group" aria-label="Channels">
-                <span class="font-medium text-body text-ui" aria-hidden="true">Channels</span>
+              <div class="grid gap-1.5" role="group" aria-label="{{ campaignText.channels }}">
+                <span class="font-medium text-body text-ui" aria-hidden="true">{{ campaignText.channels }}</span>
                 <div class="flex flex-wrap gap-1.5">
                   <button class="inline-flex gap-1.5 items-center px-2 py-1 font-medium text-muted text-xs aria-pressed:text-info bg-panel aria-pressed:bg-info-soft hover:bg-hover border border-line rounded-lg aria-pressed:border-info-line group" type="button" x-for="provider in connectedProviders()" :aria-pressed="postProviders().includes(provider.provider)" @click="togglePostProvider(provider.provider)">
                     <span class="grid place-items-center size-5 text-body text-xs group-aria-pressed:text-info bg-panel-3 group-aria-pressed:bg-panel rounded">{{ providerInitial(provider.provider) }}</span><span>{{ providerLabel(provider.provider) }}</span>
@@ -304,17 +313,17 @@
               </div>
               <label class="flex gap-2 items-start p-2.5 bg-panel-2 border border-line rounded-xl">
                 <input class="mt-1 accent-info" type="checkbox" :checked="postStatus() === 'ready'" @change="postStatus.set($event.target.checked ? 'ready' : 'idea')">
-                <span><strong class="block text-ink text-ui">Mark ready</strong><small class="block text-muted text-xs">Ready posts still stay in the plan until you schedule the campaign.</small></span>
+                <span><strong class="block text-ink text-ui">{{ campaignText.markReady }}</strong><small class="block text-muted text-xs">{{ campaignText.markReadyDescription }}</small></span>
               </label>
             </div>
             <div class="flex flex-wrap gap-2 items-center justify-end pt-3 border-line border-t">
               <span class="mr-auto" x-show="postDraftId() && !queuedPostId()">
-                <Button variant="danger" size="sm" :loading="busyAction() === 'delete'" :disabled="busy()" :label="busyAction() === 'delete' ? 'Removing…' : 'Delete'" @click="deletePost">Delete</Button>
+                <Button variant="danger" size="sm" :loading="busyAction() === 'delete'" :disabled="busy()" :label="busyAction() === 'delete' ? copy.deleting : copy.deletePostLabel" @click="deletePost">{{ campaignCopy.deletePostLabel }}</Button>
               </span>
-              <Button variant="secondary" size="sm" :disabled="busy()" @click="closePanel">Close</Button>
-              <a class="inline-flex px-3 py-1.5 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors" x-show="queuedPostId()" :href="`/composer?edit=${queuedPostId()}`" data-stx-link>Edit in Composer</a>
+              <Button variant="secondary" size="sm" :disabled="busy()" @click="closePanel">{{ campaignText.close }}</Button>
+              <a class="inline-flex px-3 py-1.5 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors" x-show="queuedPostId()" :href="`/composer?edit=${queuedPostId()}`" data-stx-link>{{ campaignText.editInComposer }}</a>
               <span x-show="!queuedPostId()">
-                <Button variant="primary" size="sm" type="submit" :loading="busyAction() === 'post'" :disabled="busy() || !postScheduledAt()" :label="busyAction() === 'post' ? 'Saving…' : 'Save post'">Save post</Button>
+                <Button variant="primary" size="sm" type="submit" :loading="busyAction() === 'post'" :disabled="busy() || !postScheduledAt()" :label="busyAction() === 'post' ? copy.saving : copy.savePost">{{ campaignCopy.savePost }}</Button>
               </span>
             </div>
           </form>
@@ -329,6 +338,13 @@
     import { instantFromWallTime, systemTimeZone, wallTimeInZone } from '../../app/Support/time'
     import { fetchProviders } from '../functions/social-client'
     import { postStatusVariant } from '../functions/status-badge'
+
+    const { locale: language, messages: copy } = {{ campaignClient }}
+    const numbers = new Intl.NumberFormat(language)
+    const plural = new Intl.PluralRules(language)
+    const clock = new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' })
+    const withCount = (value, one, many) => (plural.select(value) === 'one' ? one : many).replace('{count}', numbers.format(value))
+    const campaignStatus = (value) => copy[value] ?? value ?? ''
 
     const campaignsList = state([])
     const campaign = state(null)
@@ -384,25 +400,25 @@
     const queuedCount = derived(() => posts().filter(item => item.postId).length)
     const unqueuedCount = derived(() => posts().filter(item => !item.postId && item.status !== 'skipped').length)
     const assistantSuggestions = [
-      { id: 'stacks-launch', label: 'Stacks playbook', prompt: 'Build an eight-week Stacks launch story. Teach the value of one cohesive TypeScript toolkit, show Buddy, STX, Craft, the ORM, queues, AI, and cloud deployment in action, and be candid that the project is pre-alpha with alpha and beta ahead. Emphasize useful engineering lessons over hype.', icon: 'i-hugeicons-source-code' },
-      { id: 'full-launch', label: 'Full launch', prompt: 'Build a balanced story from early awareness through launch and follow-up.', icon: 'i-hugeicons-rocket-01' },
-      { id: 'launch-week', label: 'Launch week', prompt: 'Focus this sequence around launch week, with anticipation, launch-day clarity, and follow-up.', icon: 'i-hugeicons-calendar-03' },
-      { id: 'education', label: 'Teach first', prompt: 'Lead with useful lessons for our audience and keep direct promotion secondary.', icon: 'i-hugeicons-book-open-02' },
-      { id: 'proof', label: 'Show proof', prompt: 'Emphasize demonstrations, credible evidence, and concrete outcomes.', icon: 'i-hugeicons-chart-evaluation' },
-      { id: 'fill-gaps', label: 'Fill gaps', prompt: 'Study the posts already planned and fill missing pillars or quiet dates without repeating ideas.', icon: 'i-hugeicons-grid-table' },
+      { id: 'stacks-launch', label: copy.stacksPlaybook, prompt: copy.stacksPrompt, icon: 'i-hugeicons-source-code' },
+      { id: 'full-launch', label: copy.fullLaunch, prompt: copy.fullPrompt, icon: 'i-hugeicons-rocket-01' },
+      { id: 'launch-week', label: copy.launchWeek, prompt: copy.launchPrompt, icon: 'i-hugeicons-calendar-03' },
+      { id: 'education', label: copy.teachFirst, prompt: copy.educationPrompt, icon: 'i-hugeicons-book-open-02' },
+      { id: 'proof', label: copy.showProof, prompt: copy.proofPrompt, icon: 'i-hugeicons-chart-evaluation' },
+      { id: 'fill-gaps', label: copy.fillGaps, prompt: copy.fillPrompt, icon: 'i-hugeicons-grid-table' },
     ]
 
     const aiProviderLabel = derived(() => {
       const status = aiStatus()
-      if (status.mode === 'checking') return 'Checking AI'
-      if (status.mode !== 'ai') return 'Local planner'
+      if (status.mode === 'checking') return copy.checkingAI
+      if (status.mode !== 'ai') return copy.localPlanner
       const provider = `${status.provider || 'AI'}`
       return `${provider.charAt(0).toUpperCase()}${provider.slice(1)}`
     })
 
     const assistantIntro = derived(() => aiStatus().mode === 'ai'
-      ? 'I can use your campaign brief, connected channels, and existing calendar to build a structured plan with Stacks AI.'
-      : 'I can build a reliable local plan now. Configure OpenAI, Anthropic, or Ollama to make the drafts respond more deeply to your direction.')
+      ? copy.assistantIntroAI
+      : copy.assistantIntroLocal)
 
     // A calendar date, from the date's own day. toISOString() gave the UTC
     // day, which in an evening west of Greenwich is already tomorrow.
@@ -443,19 +459,18 @@
     function timeLabel(value) {
       const raw = String(value || '')
       const parts = raw.slice(11, 16).split(':')
-      const hour = Number(parts[0] || 0)
-      return `${hour % 12 || 12}:${parts[1] || '00'} ${hour >= 12 ? 'PM' : 'AM'}`
+      return clock.format(Date.UTC(2000, 0, 1, Number(parts[0] || 0), Number(parts[1] || 0)))
     }
 
     function shortDate(value) {
-      return parseDay(String(value).slice(0, 10)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', weekday: 'short' })
+      return parseDay(String(value).slice(0, 10)).toLocaleDateString(language, { month: 'short', day: 'numeric', weekday: 'short' })
     }
 
     const campaignWindow = derived(() => {
       const current = campaign()
       if (!current) return '-'
-      const start = parseDay(current.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-      const end = parseDay(current.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      const start = parseDay(current.startDate).toLocaleDateString(language, { month: 'short', day: 'numeric' })
+      const end = parseDay(current.endDate).toLocaleDateString(language, { month: 'short', day: 'numeric' })
       return `${start} - ${end}`
     })
 
@@ -466,11 +481,11 @@
     })
 
     const calendarTitle = derived(() => {
-      if (!calendarStart()) return 'Six-week plan'
+      if (!calendarStart()) return copy.sixWeekPlan
       const start = parseDay(calendarStart())
       const end = parseDay(addDays(calendarStart(), 41))
-      const first = start.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })
-      const last = end.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+      const first = start.toLocaleDateString(language, { month: 'long', day: 'numeric' })
+      const last = end.toLocaleDateString(language, { month: 'long', day: 'numeric', year: 'numeric' })
       return `${first} - ${last}`
     })
 
@@ -484,7 +499,7 @@
         return {
           key,
           day: date.getDate(),
-          label: date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' }),
+          label: date.toLocaleDateString(language, { month: 'long', day: 'numeric' }),
           today: key === today,
           outside: current ? key < current.startDate || key > current.endDate : false,
           posts: posts().filter(item => item.scheduledAt.slice(0, 10) === key),
@@ -499,7 +514,7 @@
       }
       const response = await fetch(path, method === 'GET' ? undefined : { method, body })
       const payload = await response.json()
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Request failed.')
+      if (!response.ok || !payload.ok) throw new Error(payload.error || copy.requestFailed)
       return payload.data
     }
 
@@ -526,7 +541,7 @@
         // already on screen the notice is enough.
         const message = error instanceof Error ? error.message : String(error)
         if (!campaignsList().length) loadError.set(message)
-        else showNotice('Could not open campaigns', message, 'error')
+        else showNotice(copy.openFailed, message, 'error')
       }
       finally {
         loading.set(false)
@@ -641,7 +656,7 @@
       if (!formChanged()) return true
       confirmingDiscard = true
       try {
-        return await stxConfirm('Your unsaved edits will be lost.', { title: 'Discard changes?', type: 'error', confirmText: 'Discard changes' })
+        return await stxConfirm(copy.unsaved, { title: copy.discardTitle, type: 'error', confirmText: copy.discard })
       }
       finally {
         confirmingDiscard = false
@@ -682,10 +697,10 @@
         })
         await loadCampaigns(data.campaign.id)
         panelMode.set('planner')
-        showNotice(campaignDraftId() ? 'Brief updated' : 'Campaign created', `${data.campaign.name} is ready to plan.`)
+        showNotice(campaignDraftId() ? copy.briefUpdated : copy.campaignCreated, copy.campaignPlannable.replace('{name}', () => data.campaign.name))
       }
       catch (error) {
-        showNotice('Could not save campaign', error instanceof Error ? error.message : String(error), 'error')
+        showNotice(copy.campaignSaveFailed, error instanceof Error ? error.message : String(error), 'error')
       }
       finally {
         busyAction.set('')
@@ -721,10 +736,10 @@
         })
         await loadCampaigns(campaign().id)
         panelMode.set('planner')
-        showNotice(postDraftId() ? 'Post updated' : 'Post added', 'The campaign plan is up to date.')
+        showNotice(postDraftId() ? copy.postUpdated : copy.postAdded, copy.planCurrent)
       }
       catch (error) {
-        showNotice('Could not save post', error instanceof Error ? error.message : String(error), 'error')
+        showNotice(copy.postSaveFailed, error instanceof Error ? error.message : String(error), 'error')
       }
       finally {
         busyAction.set('')
@@ -735,16 +750,16 @@
       const id = postDraftId()
       const campaignId = campaign()?.id
       if (!id || !campaignId || queuedPostId()) return
-      if (!await stxConfirm('This removes the post from the campaign plan.', { title: 'Delete this planned post?', type: 'error', confirmText: 'Delete post' })) return
+      if (!await stxConfirm(copy.postDeleteDescription, { title: copy.postDeleteTitle, type: 'error', confirmText: copy.postDelete })) return
       busyAction.set('delete')
       try {
         await api('/api/postline/campaigns/post/delete', { campaign_id: campaignId, id })
         await loadCampaigns(campaignId)
         panelMode.set('planner')
-        showNotice('Post removed', 'The rest of the campaign is unchanged.')
+        showNotice(copy.postRemoved, copy.remainingPlan)
       }
       catch (error) {
-        showNotice('Could not remove post', error instanceof Error ? error.message : String(error), 'error')
+        showNotice(copy.postRemoveFailed, error instanceof Error ? error.message : String(error), 'error')
       }
       finally {
         busyAction.set('')
@@ -754,7 +769,7 @@
     async function generatePlan() {
       if (!campaign() || plannerProviders().length === 0) return
       busyAction.set('generate')
-      const requestText = direction().trim() || assistantSuggestions.find(item => item.id === assistantStrategy())?.prompt || 'Build a balanced campaign plan.'
+      const requestText = direction().trim() || assistantSuggestions.find(item => item.id === assistantStrategy())?.prompt || copy.defaultPrompt
       assistantMessages.set([...assistantMessages(), { role: 'user', text: requestText, meta: '' }])
       try {
         const data = await api('/api/postline/campaigns/generate', {
@@ -777,19 +792,21 @@
           {
             role: 'assistant',
             text: data.assistant,
-            meta: `${data.posts.length} posts added${data.model ? ` with ${data.model}` : ''}${data.promptAdjusted ? '. Unsafe prompt-like instructions were removed.' : ''}`,
+            meta: withCount(data.posts.length, copy.generatedOne, copy.generatedMany)
+              + (data.model ? copy.generatedWith.replace('{model}', () => data.model) : '')
+              + (data.promptAdjusted ? copy.promptAdjusted : ''),
           },
         ])
         direction.set('')
         await loadCampaigns(campaign().id)
-        showNotice('Plan drafted', `${data.posts.length} posts were added across the campaign window.`)
+        showNotice(copy.planDrafted, withCount(data.posts.length, copy.draftOne, copy.draftMany))
       }
       catch (error) {
         assistantMessages.set([
           ...assistantMessages(),
-          { role: 'assistant', text: error instanceof Error ? error.message : String(error), meta: 'No posts were added.' },
+          { role: 'assistant', text: error instanceof Error ? error.message : String(error), meta: copy.noPostsAdded },
         ])
-        showNotice('Could not draft the plan', error instanceof Error ? error.message : String(error), 'error')
+        showNotice(copy.draftFailed, error instanceof Error ? error.message : String(error), 'error')
       }
       finally {
         busyAction.set('')
@@ -805,12 +822,12 @@
         // Activation is all or nothing: with any problem, nothing was queued,
         // and every problem is listed so they can be fixed in one pass.
         if (data.errors.length)
-          showNotice('Nothing was scheduled', data.errors.join(' · '), 'error')
+          showNotice(copy.nothingScheduled, data.errors.join(' · '), 'error')
         else
-          showNotice('Campaign scheduled', `${data.queued} posts are now in Queue.`, 'success')
+          showNotice(copy.campaignScheduled, withCount(data.queued, copy.queuedOne, copy.queuedMany), 'success')
       }
       catch (error) {
-        showNotice('Could not schedule campaign', error instanceof Error ? error.message : String(error), 'error')
+        showNotice(copy.scheduleFailed, error instanceof Error ? error.message : String(error), 'error')
       }
       finally {
         busyAction.set('')
@@ -847,11 +864,11 @@
       posts.set(posts().map(candidate => candidate.id === id ? { ...candidate, scheduledAt: next } : candidate))
       try {
         await api('/api/postline/campaigns/post/move', { campaign_id: campaign().id, id, scheduled_at: next })
-        showNotice('Post moved', `${item.title} is now planned for ${shortDate(next)}.`)
+        showNotice(copy.postMoved, copy.dateChanged.replace('{date}', shortDate(next)).replace('{title}', () => item.title))
       }
       catch (error) {
         posts.set(posts().map(candidate => candidate.id === id ? { ...candidate, scheduledAt: previous } : candidate))
-        showNotice('Could not move post', error instanceof Error ? error.message : String(error), 'error')
+        showNotice(copy.moveFailed, error instanceof Error ? error.message : String(error), 'error')
       }
     }
 

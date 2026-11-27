@@ -2985,6 +2985,54 @@ async function checkSpanishChannels(cdp: Cdp): Promise<void> {
   `), 5_000)
 }
 
+async function checkSpanishCampaigns(cdp: Cdp): Promise<void> {
+  const report = await auditPage(`${site}/campaigns`, { cdp })
+  for (const error of report.errors) fail('campaigns', 'Spanish', error)
+  for (const request of report.failed) fail('campaigns', 'Spanish', request)
+  const page = `document.querySelector('[data-testid="campaigns-page"][lang="es"]')`
+  const create = `[...${page}.querySelectorAll('button')].find(button => button.textContent.trim() === 'Crear una campaña')`
+  await waitUntil('The Spanish Campaigns empty state offers creation', () => evaluate<boolean>(cdp, `
+    document.title === 'Postline - Campañas'
+      && ${page}?.querySelector('h1')?.textContent === 'Campañas'
+      && Boolean((${create})?.getClientRects().length)
+  `), 5_000)
+  await evaluate(cdp, `(${create}).focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  const input = (placeholder: string) => `${page}.querySelector('[placeholder=' + ${JSON.stringify(JSON.stringify(placeholder))} + ']')`
+  const name = input('Lanzamiento de otoño')
+  const goal = input('¿Qué quieres lograr con esta campaña?')
+  await waitUntil('The Spanish campaign brief is ready to edit', () => evaluate<boolean>(cdp, `Boolean(${name}?.getClientRects().length)`), 5_000)
+  await evaluate(cdp, `${name}.focus()`)
+  await cdp.send('Input.insertText', { text: 'Campaña de prueba' })
+  await evaluate(cdp, `${goal}.focus()`)
+  await cdp.send('Input.insertText', { text: 'Explicar el lanzamiento' })
+  await evaluate(cdp, `${name}.form.querySelector('button[type=submit]').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  const plan = `${page}.querySelector('[aria-label="Plan de campaña"]')`
+  const add = `${plan}.querySelector('[aria-current=date]')?.parentElement.querySelector('button')`
+  await waitUntil('The saved campaign shows the Spanish calendar and action names', () => evaluate<boolean>(cdp, `
+    ${page}.querySelector('#campaign-picker option:checked')?.textContent === 'Campaña de prueba'
+      && ${plan}?.querySelector('[aria-label="Seis semanas anteriores"]')?.getClientRects().length > 0
+      && ${add}?.getAttribute('aria-label')?.startsWith('Añadir una publicación el ')
+      && ${page}.querySelector('[aria-label="Herramientas de campaña"]')?.innerText.includes('Asistente de campaña')
+  `), 5_000)
+  await evaluate(cdp, `(${add}).focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  const postTitle = input('Primer anuncio')
+  const postBody = input('Escribe la publicación…')
+  await waitUntil('The Spanish planned post editor opens from the calendar', () => evaluate<boolean>(cdp, `Boolean(${postTitle}?.getClientRects().length)`), 5_000)
+  await evaluate(cdp, `${postTitle}.focus()`)
+  await cdp.send('Input.insertText', { text: 'Anuncio de prueba' })
+  await evaluate(cdp, `${postBody}.focus()`)
+  await cdp.send('Input.insertText', { text: 'Una publicación para el plan.' })
+  await evaluate(cdp, `${postTitle}.form.querySelector('button[type=submit]').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The Spanish calendar shows the saved planned post', () => evaluate<boolean>(cdp, `
+    [...${plan}.querySelectorAll('article')].some(item => item.innerText.includes('Anuncio de prueba')
+      && item.innerText.includes('Historia') && item.innerText.includes('idea'))
+  `), 5_000)
+}
+
 async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
@@ -3156,6 +3204,7 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
     await checkSpanishListening(cdp)
     await checkSpanishAnalytics(cdp)
     await checkSpanishChannels(cdp)
+    await checkSpanishCampaigns(cdp)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
@@ -3309,7 +3358,7 @@ else {
   // eslint-disable-next-line no-console
   console.log(marketingScreenshots
     ? `Product screenshots written to ${productImages}.`
-    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, Blog, Inbox, Listening, Analytics, and Channels passed.'
+    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, Blog, Inbox, Listening, Analytics, Channels, and Campaigns passed.'
     : `Every view opened clean in ${MODES.map(mode => mode.name).join(', ')}. Screenshots in ${out}.`)
 }
 process.exit(exitCode)
