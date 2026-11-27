@@ -6,6 +6,12 @@ Choose **Settings > General > Time zone** before scheduling. The composer interp
 
 Scheduled posts need a running scheduler. Closing the Mac window leaves Postline running in the menu bar. Quitting Postline or putting the Mac to sleep can delay publishing. For a server installation, keep `./buddy schedule:run` running beside the web and API processes. A scheduler warning appears in the Queue when it stops checking in.
 
+## Fill recurring posting slots
+
+Open **Queue > Posting slots** and add the weekdays and times you want for each network. In the Composer’s publishing menu, choose **Add to queue** for a new post or a saved draft. Postline takes the next free time in the workspace time zone for each selected network. Multiple accounts on one network share a slot. If you select several networks, each appears separately in the Queue, so you can move or edit them independently.
+
+A time that disappears when the clocks go forward is skipped. Adding or removing slots applies to future uses of **Add to queue**. Already scheduled times stay in the Queue.
+
 ## Pause, resume, and handle missed posts
 
 Use **Settings > General > Pause scheduled publishing** or the Mac menu-bar control. Scheduled posts stay in the Queue until you resume. You can still publish manually while paused.

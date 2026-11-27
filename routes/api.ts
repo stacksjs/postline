@@ -161,6 +161,8 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/blog/republish', 'Actions/Postline/BlogRepublishAction').middleware('auth').rateLimit(30, 'minute')
   route.post('/blog/delete', 'Actions/Postline/BlogDeleteAction').middleware('auth').rateLimit(30, 'minute')
   route.get('/queue', 'Actions/Postline/QueueListAction').middleware('auth')
+  route.get('/posting-slots', 'Actions/Postline/PostingSlotListAction').middleware('auth')
+  route.post('/posting-slots', 'Actions/Postline/PostingSlotSaveAction').middleware('auth').rateLimit(60, 'minute')
   route.get('/draft-feeds', 'Actions/Postline/DraftFeedListAction').middleware('auth')
   route.post('/draft-feeds', 'Actions/Postline/DraftFeedSubscribeAction').middleware('auth').rateLimit(10, 'minute')
   route.post('/draft-feeds/check', 'Actions/Postline/DraftFeedCheckAction').middleware('auth').rateLimit(10, 'minute')

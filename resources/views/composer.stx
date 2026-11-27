@@ -189,6 +189,7 @@
                 <div class="grid absolute bottom-full right-0 z-30 gap-1 mb-1 p-1.5 min-w-40 text-ink text-ui bg-panel border border-line rounded-xl shadow-lg">
                   <button class="px-3 py-2 text-left hover:bg-hover rounded-lg" type="button" x-show="!editingQueued()" @click="choosePostAction('publish')">Publish now</button>
                   <PostlineSchedulePicker :value="scheduledIso" :timeZone="scheduleZone" label="Schedule" @change="selectSchedule" />
+                  <button class="px-3 py-2 text-left hover:bg-hover rounded-lg disabled:opacity-50" type="button" x-show="!editingQueued() || editingDraft()" :disabled="!canPublish() || submitting() || mediaWarnings().length > 0" @click="addToQueue">Add to queue</button>
                   <button class="px-3 py-2 text-left hover:bg-hover rounded-lg" type="button" aria-keyshortcuts="Meta+S Control+S" @click="choosePostAction('draft')">Save draft</button>
                 </div>
               </details>
@@ -268,6 +269,7 @@
       if (setupActive && Number.isSafeInteger(postId) && postId > 0) navigate(`/setup?step=complete&post=${postId}`)
     }
     const editingId = state<number | null>(null)
+    const editingDraft = state(false)
     const defaultFormat = useLocalStorage<ComposerFormat>(COMPOSER_DEFAULT_FORMAT_KEY, 'single')
     const autosave = useLocalStorage(COMPOSER_AUTOSAVE_KEY, true)
     const composerFormat = state<ComposerFormat>(!editParam && !setupActive && defaultFormat() === 'thread' ? 'thread' : 'single')
@@ -290,6 +292,10 @@
       if (!editingQueued() && !submitting()) setMode(format)
     }
     const runPostAction = () => void submitPost()
+    const addToQueue = () => {
+      closePublishActions(true)
+      void submitPost(true)
+    }
 
     function closePublishActions(restoreMenuFocus = false) {
       if (publishActions.current) publishActions.current.open = false
@@ -868,6 +874,7 @@
 
     const enterEditMode = (item) => {
       editingId.set(item.id)
+      editingDraft.set(item.status === 'draft')
       editHeading.set(item.thread ? 'Editing thread' : `Editing post #${item.id}`)
 
       if (item.thread) {
@@ -1012,7 +1019,7 @@
       form.set('external_description', external.description)
     }
 
-    function queueForm(posts: ComposerSegment[], targetProviders: string[], schedule: string | null, id?: number | null) {
+    function queueForm(posts: ComposerSegment[], targetProviders: string[], schedule: string | null, id: number | null, nextSlot: boolean) {
       const form = new FormData()
       if (id) form.set('id', String(id))
       form.set('text', posts[0].text.trim())
@@ -1020,7 +1027,8 @@
       form.set('providers', targetProviders.join(','))
       const title = composedTitle()
       if (title) form.set('title', title)
-      if (schedule) form.set('scheduled_at', composerQueueTimestamp(schedule))
+      if (nextSlot) form.set('next_slot', '1')
+      else if (schedule) form.set('scheduled_at', composerQueueTimestamp(schedule))
       appendLinkCard(form, posts[0])
       const imageUrl = postImageUrl().trim()
       if (imageUrl) form.set('image_url', imageUrl)
@@ -1032,7 +1040,7 @@
       return form
     }
 
-    const updateQueued = async () => {
+    const updateQueued = async (nextSlot: boolean) => {
       const posts = segmentsToSend()
       const isThread = composerFormat() === 'thread'
       if (isThread && posts.length < 2) {
@@ -1052,12 +1060,12 @@
       }
 
       try {
-        const form = queueForm(posts, targetProviders, scheduledIso(), editingId())
+        const form = queueForm(posts, targetProviders, scheduledIso(), editingId(), nextSlot)
         const response = await fetch('/api/postline/queue/update', { method: 'POST', body: form })
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not update the post.')
         editDirty = false
-        setStatus(isThread ? 'Thread updated.' : 'Post updated.', 'success', { title: 'Updated' })
+        setStatus(nextSlot ? 'Added to queue.' : isThread ? 'Thread updated.' : 'Post updated.', 'success', { title: nextSlot ? 'Scheduled' : 'Updated' })
         // Back to the queue to see the change. A router visit, not a full
         // load: a reload took the "Post updated" toast down with the page.
         navigate('/queue')
@@ -1069,7 +1077,7 @@
 
     // Draft mode and schedule-time both save to the server-side queue
     // instead of publishing immediately.
-    const saveToQueue = async (scheduleValue) => {
+    const saveToQueue = async (scheduleValue: string | null, nextSlot: boolean) => {
       const posts = segmentsToSend()
       if (!posts.length) {
         setStatus('Write something before saving.', 'error')
@@ -1082,14 +1090,14 @@
         return
       }
       try {
-        const form = queueForm(posts, targetProviders, scheduleValue)
+        const form = queueForm(posts, targetProviders, scheduleValue, null, nextSlot)
         const response = await fetch('/api/postline/queue', { method: 'POST', body: form })
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save to the queue.')
 
         clearSentSegments(posts)
         scheduledIso.set(null)
-        if (scheduleValue) postAction.set('publish')
+        if (scheduleValue || nextSlot) postAction.set('publish')
         postTitle.set('')
         clearAttachment()
         resetPostOptions()
@@ -1197,13 +1205,13 @@
       }
     }
 
-    async function submitPost() {
+    async function submitPost(nextSlot = false) {
       if (!canPublish() || submitting() || mediaWarnings().length) return
       submitting.set(true)
       try {
-        if (editingId()) await updateQueued()
-        else if (postAction() === 'publish') await publish()
-        else await saveToQueue(postAction() === 'schedule' ? scheduledIso() : null)
+        if (editingId()) await updateQueued(nextSlot)
+        else if (!nextSlot && postAction() === 'publish') await publish()
+        else await saveToQueue(postAction() === 'schedule' ? scheduledIso() : null, nextSlot)
       }
       finally {
         submitting.set(false)

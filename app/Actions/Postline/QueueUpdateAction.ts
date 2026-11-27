@@ -73,12 +73,12 @@ export default new Action({
 
     try {
       const texts = readQueuedThread(request.get('thread'))
-      if (texts) {
-        if (variants) throw new UserFacingError('Per-network text is available for single posts.')
-        const data = await postQueue.updateThread(id, { texts, providers, scheduledAt, title, external, images, options: sendsOptions ? (readOptions.options ?? null) : undefined })
-        return response.json({ ok: true, data })
-      }
-      const data = await postQueue.update(id, { text, providers, title, scheduledAt, external, images, variants, options: sendsOptions ? (readOptions.options ?? null) : undefined })
+      if (texts && variants) throw new UserFacingError('Per-network text is available for single posts.')
+      const options = sendsOptions ? (readOptions.options ?? null) : undefined
+      const input = { text, providers, title, scheduledAt, external, images, variants, options }
+      const data = String(request.get('next_slot') || '') === '1'
+        ? await postQueue.enqueueAtNextSlot({ ...input, texts: texts ?? undefined }, id)
+        : texts ? await postQueue.updateThread(id, { ...input, texts }) : await postQueue.update(id, input)
       return response.json({ ok: true, data })
     }
     catch (error) {

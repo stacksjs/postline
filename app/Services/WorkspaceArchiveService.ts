@@ -21,6 +21,7 @@ import { UserFacingError } from '../Support/Http/user-error'
 import { readBlogAttachments } from '../Support/Social/blog-attachments'
 import { checkImageBytes } from '../Support/Social/image-input'
 import { MAX_IMAGE_BYTES, MAX_POST_IMAGES } from '../Support/Social/media-rules'
+import type { PostingSlot } from '../Support/Social/posting-slots'
 import { referencedMediaFiles } from '../Support/Social/stored-content'
 import { isSafeMediaFilename, MEDIA_DIR } from '../Support/Social/uploads'
 import type { ComposerPreset } from './ComposerPresetService'
@@ -28,6 +29,7 @@ import type { ArchivedDraftFeed } from './DraftFeedService'
 import type { TrackedLink } from './TrackedLinkService'
 import { composerPresets, readComposerPreset } from './ComposerPresetService'
 import { draftFeeds, readArchivedDraftFeed } from './DraftFeedService'
+import { addPostingSlot, listPostingSlots, readPostingSlot } from './PostingSlotService'
 import { blog } from './Social/BlogService'
 import { ensureAccount, now } from './Social/support'
 import { readArchivedTrackedLink, trackedLinks } from './TrackedLinkService'
@@ -35,7 +37,7 @@ import { readArchivedTrackedLink, trackedLinks } from './TrackedLinkService'
 const database = db as any
 
 export const ARCHIVE_FORMAT = 'postline-workspace'
-export const ARCHIVE_VERSION = 6
+export const ARCHIVE_VERSION = 7
 
 /** Typed to delete everything, so a stray click cannot. */
 export const DELETE_EVERYTHING_PHRASE = 'DELETE EVERYTHING'
@@ -74,6 +76,7 @@ export interface WorkspaceArchive {
   composerPresets: ComposerPreset[]
   trackedLinks: TrackedLink[]
   draftFeeds: ArchivedDraftFeed[]
+  postingSlots: PostingSlot[]
   /** Images attached to queued posts, by file name, as base64. */
   media: Record<string, string>
 }
@@ -88,6 +91,7 @@ export interface ImportReport {
   composerPresets: number
   trackedLinks: number
   draftFeeds: number
+  postingSlots: number
   media: number
   /** Rows already here (same uuid), left as they are. */
   skipped: number
@@ -111,9 +115,10 @@ export class WorkspaceArchiveService {
     const account = await database.selectFrom('accounts').selectAll().where('id', '=', accountId).executeTakeFirst()
     // A feed check saves its draft and receipt together. Export them from the
     // same snapshot so a restore cannot miss or recreate that draft.
-    const { posts, feeds } = await database.transaction((tx: typeof database) => ({
+    const { posts, feeds, slots } = await database.transaction((tx: typeof database) => ({
       posts: tx.selectFrom('posts').selectAll().where('status', '!=', 'archived').orderBy('id', 'asc').execute(),
       feeds: draftFeeds.export(accountId, tx),
+      slots: listPostingSlots(accountId, tx),
     }))
     const postUuid = new Map<number, string>(posts.map((post: any) => [Number(post.id), String(post.uuid)]))
     const targets = posts.length ? await database.selectFrom('post_targets').selectAll().where('post_id', 'in', [...postUuid.keys()]).execute() : []
@@ -168,6 +173,7 @@ export class WorkspaceArchiveService {
       composerPresets: await composerPresets.list(accountId),
       trackedLinks: await trackedLinks.export(accountId),
       draftFeeds: feeds,
+      postingSlots: slots,
       media,
     }
   }
@@ -191,6 +197,9 @@ export class WorkspaceArchiveService {
     if (version >= 6 && !Array.isArray(archive.draftFeeds))
       throw new UserFacingError('That export is missing its draft feeds.')
     const feeds = version >= 6 ? archive.draftFeeds.map(readArchivedDraftFeed) : []
+    if (version >= 7 && !Array.isArray(archive.postingSlots))
+      throw new UserFacingError('That export is missing its posting slots.')
+    const slots = version >= 7 ? archive.postingSlots.map(readPostingSlot) : []
 
     const monitors = (archive.monitors || []).map((monitor) => {
       // Browser-session watches first appeared in version 3. Require the source
@@ -227,7 +236,7 @@ export class WorkspaceArchiveService {
         return { ...post, images }
       })
 
-    const report: ImportReport = { posts: 0, targets: 0, campaigns: 0, campaignPosts: 0, blogPosts: 0, monitors: 0, composerPresets: 0, trackedLinks: 0, draftFeeds: 0, media: 0, skipped: 0 }
+    const report: ImportReport = { posts: 0, targets: 0, campaigns: 0, campaignPosts: 0, blogPosts: 0, monitors: 0, composerPresets: 0, trackedLinks: 0, draftFeeds: 0, postingSlots: 0, media: 0, skipped: 0 }
     const accountId = await ensureAccount()
     const exists = async (table: string, uuid: unknown) => Boolean(uuid) && Boolean(await database.selectFrom(table).select(['id']).where('uuid', '=', String(uuid)).executeTakeFirst())
     const idOf = async (table: string, uuid: unknown): Promise<number | null> => {
@@ -310,6 +319,12 @@ export class WorkspaceArchiveService {
       else report.skipped++
     }
 
+    if (slots.length) {
+      report.postingSlots = await database.transaction((tx: typeof database) =>
+        slots.filter(slot => addPostingSlot(accountId, slot, tx)).length)
+      report.skipped += slots.length - report.postingSlots
+    }
+
     await mkdir(MEDIA_DIR, { recursive: true })
     for (const [name, bytes] of media) {
       const path = join(MEDIA_DIR, name)
@@ -342,7 +357,7 @@ export class WorkspaceArchiveService {
     for (const post of blogPosts) await blog.remove(Number(post.id)).catch(() => {})
 
     await database.transaction((tx: typeof database) => {
-      for (const table of ['draft_feed_entries', 'draft_feeds']) {
+      for (const table of ['draft_feed_entries', 'draft_feeds', 'posting_slots']) {
         const result = tx.deleteFrom(table).executeTakeFirst()
         deleted[table] = Number(result?.numDeletedRows ?? result?.changes ?? 0)
       }

@@ -3186,10 +3186,72 @@
             "type": "unique"
           }
         ]
+      },
+      {
+        "table": "posting_slots",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "provider",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 24
+          },
+          {
+            "name": "weekday",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "minute",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "account_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "accounts",
+              "column": "id"
+            }
+          }
+        ],
+        "indexes": [
+          {
+            "name": "posting_slots_network_weekday_minute_unique",
+            "columns": [
+              "account_id",
+              "provider",
+              "weekday",
+              "minute"
+            ],
+            "type": "unique"
+          }
+        ]
       }
     ]
   },
-  "hash": "e61d96cf12185a0c5697ca38c1a21936ea9442bf478b7941a204308e2a0439e5",
+  "hash": "de1ba1c0fe5d9940cc1bb8cb3ac3d730e03d019b40073fb79631fda008c2915d",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-27T07:38:19.213Z"
+  "updatedAt": "2026-11-27T07:54:43.148Z"
 }

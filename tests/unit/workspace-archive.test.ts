@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { db } from '@stacksjs/database'
 import { composerPresets } from '../../app/Services/ComposerPresetService'
 import { draftFeeds } from '../../app/Services/DraftFeedService'
+import { changePostingSlot, listPostingSlots } from '../../app/Services/PostingSlotService'
 import { keywordMonitoring } from '../../app/Services/KeywordMonitoringService'
 import { ensureAccount } from '../../app/Services/Social/support'
 import { trackedLinks } from '../../app/Services/TrackedLinkService'
@@ -45,8 +46,11 @@ describe('workspace archive', () => {
     await trackedLinks.restore(accountId, link)
     const feed = { uuid: crypto.randomUUID(), name: 'Draft feed', url: `https://example.org/${tag}.atom`, active: false, initialized: true, seen: ['a'.repeat(64)] }
     await draftFeeds.restore(accountId, feed)
+    const slot = { provider: 'blog', weekday: 5, minute: 540 } as const
+    await changePostingSlot(slot, false)
     const archive = await workspaceArchive.export()
-    expect(archive.version).toBe(6)
+    expect(archive.version).toBe(7)
+    expect(archive.postingSlots).toContainEqual(slot)
     expect(archive.composerPresets).toContainEqual(preset)
     expect(archive.trackedLinks).toContainEqual(link)
     expect(archive.draftFeeds).toContainEqual(feed)
@@ -61,6 +65,7 @@ describe('workspace archive', () => {
     expect(await composerPresets.list()).toEqual([])
     expect(await trackedLinks.export(accountId)).toEqual([])
     expect(await draftFeeds.list()).toEqual([])
+    expect(await listPostingSlots(accountId)).toEqual([])
     expect(await database.selectFrom('posts').select(['id']).where('uuid', '=', postUuid).executeTakeFirst()).toBeUndefined()
     expect(existsSync(join(MEDIA_DIR, `${tag}.png`))).toBe(false)
 
@@ -72,6 +77,8 @@ describe('workspace archive', () => {
     expect(report.composerPresets).toBe(1)
     expect(report.trackedLinks).toBe(1)
     expect(report.draftFeeds).toBe(1)
+    expect(report.postingSlots).toBe(1)
+    expect(await listPostingSlots(accountId)).toContainEqual(slot)
     expect(await composerPresets.list()).toContainEqual(preset)
     expect(await trackedLinks.export(accountId)).toContainEqual(link)
     expect((await workspaceArchive.export()).draftFeeds).toContainEqual(feed)
@@ -95,6 +102,7 @@ describe('workspace archive', () => {
     expect(again.composerPresets).toBe(0)
     expect(again.trackedLinks).toBe(0)
     expect(again.draftFeeds).toBe(0)
+    expect(again.postingSlots).toBe(0)
     expect(again.skipped).toBeGreaterThan(0)
   })
 

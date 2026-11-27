@@ -22,6 +22,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { auditPage, closeSharedBrowsers, launch } from '@stacksjs/testing/browser'
+import { nextPostingSlot } from '../app/Support/Social/posting-slots'
+import { wallTimeInZone } from '../app/Support/time'
 
 const production = process.argv.includes('--production')
 const root = join(import.meta.dir, '..')
@@ -1434,6 +1436,56 @@ async function checkQueueCalendar(cdp: Cdp): Promise<void> {
   })()`), 5_000)
 }
 
+async function checkPostingSlots(cdp: Cdp): Promise<void> {
+  await auditPage(`${site}/queue`, { cdp })
+  const panel = "document.querySelector('[data-posting-slots]')"
+  const form = `${panel}.querySelector('[data-posting-slot-form]')`
+  await evaluate(cdp, `${panel}.querySelector('summary').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Posting slots open from the keyboard', () => evaluate<boolean>(cdp, `
+    ${panel}?.open && ${form}.querySelector('option[value=blog]') && ${form}.getClientRects().length > 0`), 5_000)
+  const timezone = await evaluate<string>(cdp, `(async () => {
+    return (await (await fetch('/api/postline/posting-slots')).json()).data.timezone
+  })()`)
+  const from = new Date()
+  const day = new Date(wallTimeInZone(from, timezone).slice(0, 10) + 'T00:00:00Z')
+  const weekday = (day.getUTCDay() + 2) % 7
+  const expected = nextPostingSlot([{ provider: 'blog', weekday, minute: 555 }], timezone, from, new Set())
+  await evaluate(cdp, `
+    ${form}.elements.provider.value = 'blog'
+    ${form}.elements.weekday.value = '${weekday}'
+    ${form}.elements.time.value = '09:15'
+    ${form}.requestSubmit()
+  `)
+  await waitUntil('The weekly time is saved and displayed', () => evaluate<boolean>(cdp, `
+    ${panel}.querySelector('[role=status]')?.innerText === 'Posting slot saved.'
+      && ${panel}.querySelector('li')?.innerText.includes('Blog')
+      && ${panel}.querySelector('li')?.innerText.includes('09:15')`), 5_000)
+
+  await auditPage(`${site}/composer`, { cdp })
+  const actions = "document.querySelector('[data-composer-actions]')"
+  const blog = "document.querySelector('[data-provider-toggle=blog]')"
+  const body = 'Weekly posting slot fixture'
+  await waitUntil('Composer has a Blog channel', () => evaluate<boolean>(cdp, `Boolean(${blog})`), 5_000)
+  await evaluate(cdp, `(() => {
+    for (const chip of document.querySelectorAll('[data-provider-toggle][aria-pressed=true]'))
+      if (chip !== ${blog}) chip.click()
+    if (${blog}.getAttribute('aria-pressed') !== 'true') ${blog}.click()
+    const editor = document.querySelector('[data-bluesky-text]')
+    editor.value = ${JSON.stringify(body)}
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
+    ${actions}.querySelector('summary').click()
+    const add = [...${actions}.querySelectorAll('button')].find(button => button.textContent.trim() === 'Add to queue')
+    add.focus()
+  })()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Add to queue schedules the post for the weekly time', () => evaluate<boolean>(cdp, `(async () => {
+    const { data } = await (await fetch('/api/postline/queue')).json()
+    return data.items.some(item => item.body === ${JSON.stringify(body)} && item.status === 'scheduled'
+      && item.scheduledAt === ${JSON.stringify(expected)})
+  })()`), 5_000)
+}
+
 async function checkDraftFeeds(cdp: Cdp): Promise<void> {
   await auditPage(`${site}/queue`, { cdp })
   const panel = "document.querySelector('[data-draft-feeds]')"
@@ -2089,6 +2141,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkPhoneNavigation(cdp)
   await checkQueueRescheduling(cdp)
   await checkQueueCalendar(cdp)
+  await checkPostingSlots(cdp)
   await checkDraftFeeds(cdp)
   await checkCampaignScheduling(cdp)
   await checkCampaignLocalDates(cdp)

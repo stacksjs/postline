@@ -14,12 +14,14 @@
  * sign-in is currently broken (#45), and these tests pass regardless, because
  * they exercise the API rather than the cookie the client cannot read.
  */
+import type { PostingSlot } from '../../app/Support/Social/posting-slots'
 import type { TrackedLink } from '../../app/Services/TrackedLinkService'
 import { describe, expect, test } from 'bun:test'
 import process from 'node:process'
 import { db } from '@stacksjs/database'
 import { featureTest } from '@stacksjs/testing'
 import { postQueue } from '../../app/Services/Social/QueueService'
+import { nextPostingSlot } from '../../app/Support/Social/posting-slots'
 import User from '../../storage/framework/defaults/app/Models/User'
 
 /** Every Postline endpoint below is behind `middleware('auth')`. */
@@ -41,6 +43,7 @@ describe('postline api — auth', () => {
     ['/api/postline/analytics'],
     ['/api/postline/analytics/links'],
     ['/api/postline/draft-feeds'],
+    ['/api/postline/posting-slots'],
     ['/api/postline/queue'],
     ['/api/postline/setup/post-status?id=1'],
     ['/api/postline/queue/image?id=1&index=0'],
@@ -270,6 +273,63 @@ describe('postline api — reads', () => {
     finally {
       await database.deleteFrom('post_targets').where('post_id', 'in', [current, earlier]).execute()
       await database.deleteFrom('posts').where('id', 'in', [current, earlier]).execute()
+    }
+  })
+})
+
+describe('weekly posting slots', () => {
+  test('assigns simultaneous queue requests distinct minutes and schedules a draft per network', async () => {
+    type Queued = { provider: string, scheduledAt: string, postIds: number[] }
+    const client = featureTest().actingAs(await actingUser())
+    const endpoint = '/api/postline/posting-slots'
+    const database = db as any
+    const tag = crypto.randomUUID()
+    const blog: PostingSlot = { provider: 'blog', weekday: 2, minute: 537 }
+    const bluesky: PostingSlot = { provider: 'bluesky', weekday: 3, minute: 822 }
+    const body = { text: tag, providers: 'blog,bluesky', next_slot: '1' }
+    const draft = await postQueue.save({ text: tag, providers: ['blog'] })
+    const original = await client.get(endpoint)
+    original.assertStatus(200)
+    const { data: { timezone, slots } } = await original.json<{ data: { timezone: string, slots: PostingSlot[] } }>()
+    const from = new Date()
+    const blogAt = nextPostingSlot([blog], timezone, from, new Set())!
+    const nextBlog = nextPostingSlot([blog], timezone, from, new Set([blogAt.slice(0, 16)]))!
+    const blueskyAt = nextPostingSlot([bluesky], timezone, from, new Set())!
+    try {
+      ;(await featureTest().post(endpoint, blog)).assertStatus(401)
+      ;(await client.post(endpoint, { ...blog, minute: 1440 })).assertStatus(422)
+      ;(await client.post(endpoint, blog)).assertStatus(200)
+      const duplicate = await client.post(endpoint, blog)
+      expect((await duplicate.json<{ data: PostingSlot[] }>()).data.filter(item => item.weekday === blog.weekday
+        && item.minute === blog.minute && item.provider === blog.provider)).toHaveLength(1)
+
+      // No network should get a post when any selected network has no slot.
+      ;(await client.post('/api/postline/queue/update', { ...body, id: draft.postId })).assertStatus(422)
+      expect(await postQueue.status(draft.postId)).toBe('draft')
+      expect(await database.selectFrom('posts').select('id').where('body', '=', tag).execute()).toHaveLength(1)
+      ;(await client.post(endpoint, bluesky)).assertStatus(200)
+
+      const [edited, created] = await Promise.all([
+        client.post('/api/postline/queue/update', { ...body, id: draft.postId }),
+        client.post('/api/postline/queue', { ...body, providers: 'blog' }),
+      ])
+      edited.assertStatus(200)
+      created.assertStatus(200)
+      const editResult = await edited.json<{ data: { slots: Queued[] } }>()
+      const createdResult = await created.json<{ data: { slots: Queued[] } }>()
+      const networks = Object.fromEntries(editResult.data.slots.map(item => [item.provider, item]))
+      expect(networks.blog?.postIds).toEqual([draft.postId])
+      expect(networks.bluesky?.scheduledAt).toBe(blueskyAt)
+      expect([networks.blog?.scheduledAt, createdResult.data.slots[0]?.scheduledAt].sort()).toEqual([blogAt, nextBlog])
+    }
+    finally {
+      for (const slot of [blog, bluesky]) {
+        if (!slots.some(item => item.provider === slot.provider && item.weekday === slot.weekday && item.minute === slot.minute))
+          await client.post(endpoint, { ...slot, remove: true })
+      }
+      const posts = await database.selectFrom('posts').select('id').where('body', '=', tag).execute() as { id: number }[]
+      await database.deleteFrom('post_targets').where('post_id', 'in', posts.map(post => post.id)).execute()
+      await database.deleteFrom('posts').where('body', '=', tag).execute()
     }
   })
 })

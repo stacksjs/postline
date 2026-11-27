@@ -23,9 +23,11 @@ import { isSafeMediaFilename, MEDIA_DIR, storedImageResponse } from '../../Suppo
 import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/variants'
 import { crosspost, crosspostProviders } from './CrosspostService'
 import { findIdentityRow, unavailableAccountError } from './identities'
-import { isRealTimestamp } from '../../Support/time'
+import { nextPostingSlot } from '../../Support/Social/posting-slots'
+import { isRealTimestamp, isValidTimeZone } from '../../Support/time'
+import { listPostingSlots } from '../PostingSlotService'
 import { alerts } from '../AlertService'
-import { workspace } from '../WorkspaceService'
+import { defaultTimeZone, workspace } from '../WorkspaceService'
 import { ensureAccount, expiresAt, now, uuid } from './support'
 
 const database = db as any
@@ -394,6 +396,123 @@ export class QueueService {
     this.writePlaceholders(Number(post.id), targets, status, scheduledAt, createdAt)
 
     return { postId: Number(post.id), status, scheduledAt }
+  }
+
+  /**
+   * Assign one time per network. Targets on the same network share a post
+   * (or thread) so they never take more than one slot.
+   */
+  async enqueueAtNextSlot(input: SaveQueueInput & { texts?: readonly string[] }, draftId?: number) {
+    if (input.scheduledAt) throw new UserFacingError('Choose a posting slot or a specific time.')
+    const bodies = (input.texts ?? [input.text]).map(body => body.trim()).filter(Boolean)
+    if (!bodies.length) throw new UserFacingError('Post text is required.')
+    if (input.texts && bodies.length < 2) throw new UserFacingError('A thread needs at least two posts.')
+
+    const column = await contentColumn()
+    const draft = draftId ? await this.findActionable(draftId) : null
+    if (draft && draft.status !== 'draft') throw new UserFacingError('Only drafts can use a posting slot.')
+    if (draft && Boolean(draft.thread_key) !== Boolean(input.texts))
+      throw new UserFacingError('Keep the draft’s post format to add it to the queue.')
+    const accountId = draft ? Number(draft.account_id) : await ensureAccount()
+    const targets = await this.validTargets(input.providers)
+    const networks = targetProviders(targets)
+    const drafts: any[] = draft?.thread_key ? await this.threadPosts(draft.thread_key) : draft ? [draft] : []
+    const suppliedImages = imagesOf(input)
+    const keptMedia = suppliedImages === undefined ? parseStoredContent(drafts[0]?.[column])?.media : undefined
+    const images = keptMedia?.length ? (await hydrateStoredContent(drafts[0][column]))?.media : suppliedImages
+    assertMediaAllowed(networks, images)
+    const stagedMedia = new Map<SocialProvider, StoredContent['media']>()
+
+    try {
+      for (const [index, provider] of networks.entries()) {
+        // Copies can be edited, published, and deleted independently.
+        if (index === 0 && keptMedia?.length) continue
+        if (images?.length) stagedMedia.set(provider, await storeImages(uuid(), images))
+      }
+
+      const result = await database.transaction((tx: typeof database) => {
+        const clock = new Date()
+        const at = clock.toISOString().slice(0, 19).replace('T', ' ')
+        const row = tx.selectFrom('accounts').select('timezone').where('id', '=', accountId).executeTakeFirstOrThrow()
+        const timezone = isValidTimeZone(row.timezone) ? row.timezone : defaultTimeZone()
+        const slots = listPostingSlots(accountId, tx)
+        const current = draft?.thread_key
+          ? this.threadPosts(draft.thread_key, tx)
+          : draft ? [tx.selectFrom('posts').selectAll().where('id', '=', draft.id).executeTakeFirst()] : []
+        if (current.length !== drafts.length
+          || drafts.some((before, index) => {
+            const after = current[index]
+            return !after || after.id !== before.id || after.status !== 'draft'
+              || after.updated_at !== before.updated_at || after.body !== before.body || after[column] !== before[column]
+          })
+          || (draft?.thread_key && this.pendingThreadRemoval(draft.thread_key, tx)))
+          throw new UserFacingError('This draft changed while you were editing. Reopen it from the queue.', 'queue_post_changed')
+
+        const queued = networks.map((provider, groupIndex) => {
+          const times = tx.selectFrom('posts').select('scheduled_at').where('account_id', '=', accountId)
+            .where('scheduled_at', '>=', at.slice(0, 16) + ':00')
+            .whereRaw(raw`(status IN ('scheduled', 'publishing') OR (status = 'archived' AND queue_undo_status = 'scheduled' AND queue_undo_until > ${at}))`)
+            .whereRaw(raw`EXISTS (SELECT 1 FROM post_targets WHERE post_id = posts.id AND provider = ${provider})`)
+            .execute() as Array<{ scheduled_at: string }>
+          const occupied = new Set(times.map(item => item.scheduled_at.slice(0, 16)))
+          const scheduledAt = nextPostingSlot(slots.filter(slot => slot.provider === provider), timezone, clock, occupied)
+          if (!scheduledAt)
+            throw new UserFacingError(`Add a weekly posting slot for ${providerName(provider)} under Queue → Posting slots.`)
+
+          const threadKey = input.texts ? (groupIndex === 0 ? draft?.thread_key : null) ?? uuid() : null
+          const networkTargets = targets.filter(target => target.provider === provider)
+          const postIds = bodies.map((body, index) => {
+            const original = drafts[index]
+            const stored = parseStoredContent(original?.[column]) ?? {}
+            if (index === 0) {
+              if (input.title?.trim()) stored.title = input.title.trim()
+              else delete stored.title
+              if (input.external?.uri && input.external.title) stored.external = input.external
+              else delete stored.external
+              stored.media = (groupIndex === 0 ? keptMedia : undefined) ?? stagedMedia.get(provider)
+              stored.variants = input.texts ? undefined : resolveStoredVariants(input.variants, stored.variants) ?? undefined
+            }
+            const options = input.options === undefined ? stored.options : input.options
+            stored.options = sanitizePostOptions(options) ?? undefined
+            const values = {
+              title: stored.title || body.slice(0, 80),
+              body,
+              status: 'scheduled',
+              [column]: JSON.stringify(stored),
+              scheduled_at: scheduledAt,
+              timezone,
+              thread_key: threadKey,
+              updated_at: at,
+            }
+            let id: number
+            if (groupIndex === 0 && original) {
+              id = Number(original.id)
+              tx.updateTable('posts').set(values).where('id', '=', id).execute()
+              tx.deleteFrom('post_targets').where('post_id', '=', id).execute()
+            }
+            else {
+              const postUuid = uuid()
+              tx.insertInto('posts').values({ ...values, uuid: postUuid, source: 'composer', account_id: accountId, created_at: at }).execute()
+              id = Number(tx.selectFrom('posts').select('id').where('uuid', '=', postUuid).executeTakeFirstOrThrow().id)
+            }
+            this.writePlaceholders(id, networkTargets, 'scheduled', scheduledAt, at, tx)
+            return id
+          })
+          return { provider, scheduledAt, postIds }
+        })
+
+        for (const removed of drafts.slice(bodies.length)) this.deletePostRows(tx, Number(removed.id))
+        const first = queued[0]!
+        return { status: 'scheduled' as const, postId: first.postIds[0]!, scheduledAt: first.scheduledAt, slots: queued }
+      })
+      if (drafts[0] && !keptMedia) await this.removeStoredMedia(drafts[0])
+      for (const removed of drafts.slice(bodies.length)) await this.removeStoredMedia(removed)
+      return result
+    }
+    catch (error) {
+      for (const media of stagedMedia.values()) await removeMediaFiles(media)
+      throw error
+    }
   }
 
   /**
@@ -1435,6 +1554,7 @@ function providerName(provider: SocialProvider): string {
     linkedin: 'LinkedIn',
     instagram: 'Instagram',
     threads: 'Threads',
+    blog: 'Blog',
   }
   return names[provider] || provider
 }
