@@ -118,7 +118,7 @@ export async function fetchProviders(): Promise<ProviderStatus[]> {
   return (await fetchWorkspaceBootstrap()).providers
 }
 
-export async function publishCrosspost(input: CrosspostInput): Promise<{ postId: number, results: CrosspostResultItem[] }> {
+export async function publishCrosspost(input: CrosspostInput): Promise<{ postId?: number, postIds?: number[], results: CrosspostResultItem[] }> {
   const body = new FormData()
   body.set('text', input.text)
   body.set('providers', input.providers.join(','))

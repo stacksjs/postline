@@ -125,6 +125,7 @@ route.group({ prefix: '/postline/mastodon' }, () => {
 
 route.group({ prefix: '/postline' }, () => {
   route.get('/bootstrap', 'Actions/Postline/WorkspaceBootstrapAction').middleware('auth')
+  route.get('/setup/post-status', 'Actions/Postline/SetupPostStatusAction').middleware('auth')
   route.get('/providers', 'Actions/Postline/ProvidersStatusAction').middleware('auth')
   // Connected accounts across networks (several per network allowed).
   // Disconnecting drops the tokens but keeps the row, so post history stays

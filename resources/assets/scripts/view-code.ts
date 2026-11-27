@@ -22,7 +22,7 @@ interface ViewCode {
 }
 
 const VIEWS: ViewCode[] = [
-  { selector: '[data-postline-page="composer"] [data-richtext-host]', url: '/assets/scripts/richtext-editor.ts', start: 'setupRichText' },
+  { selector: '[data-postline-page="composer"]', url: '/assets/scripts/richtext-editor.ts', start: 'setupRichText' },
   { selector: '[data-analytics-chart]', url: '/assets/scripts/analytics-chart.ts', start: 'mountAnalyticsIfShown' },
 ]
 

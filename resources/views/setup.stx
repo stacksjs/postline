@@ -167,12 +167,16 @@ const availableHere = !isMarketingSite()
         workspaceName.set(data.workspace.workspaceName)
         timezone.set(data.workspace.timezone)
         loadChannels(data.providers)
-        if (query.step === 'complete') {
-          const queue = await readJson(await fetch('/api/postline/queue'), 'Could not check your first post.')
-          if (queue.items.some(item => item.status === 'published' || item.status === 'scheduled')) {
-            setupInProgress.set(false)
-            showStage('complete')
-            return
+        const postId = Number(query.post)
+        if (query.step === 'complete' && Number.isSafeInteger(postId) && postId > 0) {
+          const post = await fetch(`/api/postline/setup/post-status?id=${postId}`)
+          if (post.status !== 404) {
+            const item = await readJson(post, 'Could not check your first post.')
+            if (item.status === 'published' || item.status === 'scheduled') {
+              setupInProgress.set(false)
+              showStage('complete')
+              return
+            }
           }
         }
         showStage(query.step === 'channels' || query.step === 'complete' ? 'channels' : 'workspace')

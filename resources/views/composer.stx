@@ -5,15 +5,6 @@
 @section('content')
   @meta('description', 'Write, schedule, publish, and review social posts from a clean personal workspace.')
   <section class="grid gap-5" data-postline-page="composer" data-testid="composer-page">
-    {{-- Crosswind safelist: utilities applied dynamically from the script below
-        (provider toggles, active-post highlight, connection summary, char
-        counter, per-network override rows) must appear in static markup so the
-        CSS scanner emits them.
-        display:none is inline, not a hidden class: this list now carries
-        layout utilities of its own (grid, min-h-20, p-3), and relying on
-        hidden to out-rank them would leave a visible empty block if the
-        generated stylesheet ever ordered them the other way. --}}
-    <div class="grid gap-2 mt-2 p-2 p-3 min-h-20 min-h-7 leading-relaxed text-danger text-ink text-muted text-muted text-muted text-on-accent text-sm text-success text-warning bg-accent bg-danger-solid bg-line-strong bg-panel bg-panel-2 bg-panel-3 bg-success-soft bg-success-solid bg-success-solid hover:bg-raised border-info-line border-ink border-line border-success-line outline-none rounded-lg rounded-xl shadow-sm cursor-not-allowed resize-none" style="display:none" aria-hidden="true"></div>
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
         <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Composer</p>
@@ -22,9 +13,9 @@
       </div>
     </header>
     <div class="grid">
-      <section class="grid content-start grid-rows-[auto_auto_auto] self-start bg-panel border border-line rounded-2xl shadow-sm" aria-label="Post composer" :class="dragDepth() > 0 ? 'ring-2 ring-accent' : ''" @dragenter="enterImageDrop" @dragleave="leaveImageDrop" @dragover="overImageDrop" @drop="dropImages" @paste="pasteImages" data-composer-image-drop>
+      <section class="grid content-start grid-rows-[auto_auto_auto] self-start bg-panel border border-line rounded-2xl shadow-sm" aria-label="Post composer" :class="dragDepth() > 0 ? 'ring-2 ring-accent' : ''" @input="markEdited" @change="markEdited" @dragenter="enterImageDrop" @dragleave="leaveImageDrop" @dragover="overImageDrop" @drop="dropImages" @paste="pasteImages" data-composer-image-drop>
         <div :if="setupActive" class="flex flex-wrap gap-2 items-center justify-between px-3 py-2 text-info text-xs bg-info-soft border-b border-line" data-setup-composer>
-          <span class="font-semibold">Write and publish or schedule your first post.</span>
+          <span class="font-semibold" :text="setupTargetUnavailable() ? 'The channel chosen in setup is unavailable.' : 'Write and publish or schedule your first post.'">Write and publish or schedule your first post.</span>
           <a class="underline" href="/setup?step=channels" data-stx-link>Choose a different channel</a>
         </div>
         <div class="hidden flex-wrap gap-3 items-center justify-between px-3 py-2 text-xs bg-info-soft border-b border-info-line" :class="{ 'hidden': !editHeading(), 'flex': !!editHeading() }" data-edit-banner>
@@ -34,9 +25,9 @@
         <header class="flex flex-wrap gap-3 items-center justify-between p-3 border-b border-line">
           <div class="flex gap-2 items-center">
             <strong class="text-ui" :text="editHeading() || 'New post'" data-composer-heading>New post</strong>
-            <a class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg transition-colors" href="/accounts" data-stx-link data-bluesky-connection data-no-window-drag>
-              <span class="h-2 w-2 bg-line-strong rounded-full" data-bluesky-connection-dot aria-hidden="true"></span>
-              <span data-bluesky-connection-label>Checking accounts…</span>
+            <a class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-xs hover:bg-raised border rounded-xl transition-colors" :class="accountsConnected() ? 'text-success bg-success-soft border-success-line' : 'text-muted bg-panel-2 border-line'" href="/accounts" data-stx-link data-bluesky-connection data-no-window-drag>
+              <span class="h-2 w-2 rounded-full" :class="accountsConnected() ? 'bg-success-solid' : 'bg-line-strong'" aria-hidden="true"></span>
+              <span :text="connectionLabel()">Checking accounts…</span>
             </a>
           </div>
           <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Post format">
@@ -107,22 +98,26 @@
           </label>
           <input class="hidden mb-2 w-full font-semibold leading-snug text-2xl text-ink placeholder:text-muted bg-transparent border-0 outline-none rounded-md" :class="{ 'hidden': !showTitle(), 'block': showTitle() }" data-focus-outline type="text" maxlength="200" placeholder="Post title" aria-label="Blog post title" x-model="postTitle" data-compose-title>
           <div class="grid overflow-y-auto content-start gap-4 pr-1 max-h-72" data-composer-posts>
-            <article class="grid gap-2 pb-3 last:pb-0 border-b border-line last:border-b-0" data-composer-post data-active="true">
-              <header class="flex gap-3 items-center justify-between">
-                <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-on-accent text-xs bg-accent rounded-lg" type="button" data-select-post>
+            <article class="gap-2 pb-3 last:pb-0 border-b border-line last:border-b-0" x-for="row in postRows()" :key="row.id" :class="composerFormat() === 'thread' || row.number === 1 ? 'grid' : 'hidden'" data-composer-post :data-active="row.id === activeSegmentId()">
+              <header class="flex gap-3 items-center justify-between" x-show="composerFormat() === 'thread'">
+                <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-xs rounded-lg" type="button" data-select-post :class="row.id === activeSegmentId() ? 'text-on-accent bg-accent' : 'text-muted bg-panel-3'" :aria-pressed="row.id === activeSegmentId()" @click="activateSegment(row.id)">
                   <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
-                  <span data-post-label>Post 1</span>
+                  <span :text="`Post ${row.number}`"></span>
                 </button>
-                <button class="hidden items-center justify-center h-7 w-7 text-muted hover:text-ink bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Remove post" title="Remove post" data-remove-post>
+                <button :if="row.canRemove" class="inline-flex items-center justify-center h-7 w-7 text-muted hover:text-ink bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" :aria-label="`Remove post ${row.number}`" :disabled="submitting()" @click="removeSegment(row.id)" data-remove-post>
                   <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
                 </button>
               </header>
-              <textarea class="min-h-36 w-full leading-relaxed text-ink text-xl placeholder:text-muted bg-transparent border-0 outline-none rounded-md resize-none" data-focus-outline spellcheck="true" aria-label="Post body 1" placeholder="What do you want to share?" data-bluesky-text></textarea>
-              {{-- Long-form rich text mounts here and writes Markdown back into
-                  the textarea above, which stays the source of truth. Hidden
-                  until the blog is a target. --}}
-              <div class="hidden" data-richtext-host></div>
-              <div class="hidden overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview></div>
+              <ComposerSegmentField :text="row.text" :label="`Post body ${row.number}`" :placeholder="row.number === 1 ? 'What do you want to share?' : ''" :focusRequest="segmentFocus().id === row.id ? segmentFocus().revision : 0" :readonly="submitting()" @activate="activateSegment(row.id)" @edit="editSegment(row.id, $event)" />
+              <div :if="row.number === 1" class="hidden" data-richtext-host></div>
+              <div :if="row.preview" class="overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview>
+                <img :if="row.preview.image" class="object-cover h-28 w-full bg-panel-3 border-b border-line" :src="row.preview.image" alt="">
+                <div class="grid gap-1 p-3">
+                  <div class="font-semibold text-muted text-xs uppercase" :text="row.preview.domain"></div>
+                  <div class="font-semibold text-ink text-sm" :text="row.preview.title"></div>
+                  <div :if="row.preview.description" class="leading-normal line-clamp-2 text-muted text-ui" :text="row.preview.description"></div>
+                </div>
+              </div>
             </article>
           </div>
           {{-- Bluesky shows images or a link card, never both (#132). --}}
@@ -186,17 +181,17 @@
 
         <footer class="flex flex-col gap-3 items-stretch justify-between sm:flex-row sm:items-center p-3 border-line border-t">
           <div class="flex gap-2 items-center min-w-0">
-            <span class="min-w-0 text-muted text-xs truncate" data-bluesky-count>0 / 300 characters</span>
+            <span class="min-w-0 text-xs truncate" data-bluesky-count :class="countSummary().tone === 'danger' ? 'text-danger' : countSummary().tone === 'warning' ? 'text-warning' : 'text-muted'" :title="countSummary().text" :text="countSummary().text">0 / 300 characters</span>
           </div>
           <div class="flex flex-wrap gap-2 items-center justify-end w-full sm:w-auto">
             <input class="hidden" type="file" :accept="acceptedImageTypes" multiple aria-label="Attach images" ref="attachInput" @change="chooseImages" data-attach-input>
             <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach images" title="Choose, drop, or paste up to four images" :disabled="submitting()" @click="openImageChooser" data-attach-button>
               <span class="h-4 w-4 i-hugeicons-image-01" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Add post" title="Add post" data-add-post :disabled="editingQueued() && composerFormat() === 'single'" x-show="!editingQueued() || composerFormat() === 'thread'">
+            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Add post" title="Add post" data-add-post :disabled="submitting()" x-show="!editingQueued() || composerFormat() === 'thread'" @click="appendSegment">
               <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Preview post" title="Preview post" data-preview-post>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Preview post" title="Preview post" data-preview-post @click="previewPost">
               <span class="h-4 w-4 i-hugeicons-view" aria-hidden="true"></span>
             </button>
             <div class="inline-flex ml-auto sm:ml-0 text-on-accent bg-accent rounded-xl">
@@ -225,30 +220,33 @@
   <script client>
     import { dismissPostlineToast, showPostlineToast } from '../functions/postline-toast'
     import { countText } from '../../app/Support/Social/count-text'
-    import { MAX_IMAGE_BYTES, MAX_POST_IMAGES, mediaObjections, POST_IMAGE_FORMATS } from '../../app/Support/Social/media-rules'
     import { instantFromWallTime, systemTimeZone } from '../../app/Support/time'
     import type { ComposerAction, ComposerDraft, ComposerFormat } from '../functions/composer-draft'
     import { COMPOSER_DRAFT_KEY, readComposerDraft, writeComposerDraft } from '../functions/composer-draft'
-    import { fetchLinkPreview, fetchProviders, fetchWorkspace, formatHandle, publishCrosspost, targetLabel } from '../functions/social-client'
+    import type { ComposerImage } from '../functions/composer-media'
+    import { appendComposerImages, composerFileError, composerImageFiles, composerImageTypes, composerMediaWarnings } from '../functions/composer-media'
+    import { composerActionText, composerQueueTimestamp, composerScheduleIso } from '../functions/composer-schedule'
+    import { composerKeyForSpec, composerSelection, composerTargetRows, composerTargets, uniqueComposerNetworks } from '../functions/composer-targets'
+    import type { ComposerVariants } from '../functions/composer-variants'
+    import { composerVariantRows, composerVariantsPayload } from '../functions/composer-variants'
+    import type { ComposerSegment } from '../functions/composer-thread'
+    import { composerLinkPreview, firstComposerLink } from '../functions/composer-thread'
+    import { providerLabel } from '../functions/networks'
+    import type { ProviderStatus } from '../functions/social-client'
+    import { fetchLinkPreview, fetchProviders, fetchWorkspace, publishCrosspost, targetLabel } from '../functions/social-client'
 
-    // What the template reads lives at the top level: stx binds `x-for`,
-    // `:class` and `@click` to top-level declarations, so the chips stayed on
-    // "Loading accounts…" while their signals were declared inside the IIFE
-    // below. That IIFE still computes them (they depend on its DOM helpers)
-    // and mirrors the results into these with effect().
-    const providerRows = state([])
-    const providersPending = state(true)
-    const providersEmpty = state(false)
-    // The accounts could not be read (offline, a server error): not the same
-    // as having none, so it says so and offers to try again.
     const providersFailed = state(false)
-    const composerHandlers = { toggleProvider: null, retryProviders: null, scheduleChanged: null, setFormat: null, publish: null, variantChanged: null }
-    const setupTarget = useRoute().query.target
-    const setupActive = useRoute().query.setup === '1'
-    const finishSetup = () => { if (setupActive) navigate('/setup?step=complete') }
+    const query = useRoute().query
+    const editParam = query.edit || null
+    const setupActive = query.setup === '1' && !editParam
+    const setupTarget = query.target
+    const finishSetup = (postId: number) => {
+      if (setupActive && Number.isSafeInteger(postId) && postId > 0) navigate(`/setup?step=complete&post=${postId}`)
+    }
+    const editingId = state<number | null>(null)
     const composerFormat = state<ComposerFormat>('single')
-    const editingQueued = state(Boolean(useRoute().query.edit))
-    const canPublish = state(false)
+    const editingQueued = () => Boolean(editParam)
+    const canPublish = derived(() => selectedConnected().length > 0 && (!editParam || editingId() !== null))
     const submitting = state(false)
     const postAction = state<ComposerAction>('publish')
     const savedDraft = useLocalStorage<ComposerDraft | null>(COMPOSER_DRAFT_KEY, null, {
@@ -261,20 +259,11 @@
     const publishActions = useRef('publishActions')
     const publishMenuTrigger = useRef('publishMenuTrigger')
 
-    const postActionLabel = derived(() => {
-      if (submitting()) return postAction() === 'publish' && !editingQueued() ? 'Publishing…' : 'Saving…'
-      const iso = scheduledIso()
-      if (postAction() === 'schedule' && iso) {
-        const when = new Date(iso).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: scheduleZone() })
-        return `Schedule for ${when}`
-      }
-      if (editingQueued() && postAction() !== 'draft') return 'Update post'
-      return postAction() === 'draft' ? 'Save draft' : 'Publish'
-    })
+    const postActionLabel = derived(() => composerActionText(postAction(), scheduledIso(), scheduleZone(), editingQueued(), submitting()))
     const chooseFormat = (format: ComposerFormat) => {
-      if (!editingQueued() && !submitting()) composerHandlers.setFormat?.(format)
+      if (!editingQueued() && !submitting()) setMode(format)
     }
-    const runPostAction = () => composerHandlers.publish?.()
+    const runPostAction = () => void submitPost()
 
     function closePublishActions(restoreMenuFocus = false) {
       if (publishActions.current) publishActions.current.open = false
@@ -291,14 +280,14 @@
     function choosePostAction(action: 'publish' | 'draft') {
       scheduledIso.set(null)
       postAction.set(action)
-      composerHandlers.scheduleChanged?.()
+      scheduleChanged()
       closePublishActions()
     }
 
     const selectSchedule = ({ value }: { value: string | null }) => {
       scheduledIso.set(value)
       postAction.set(value ? 'schedule' : editingQueued() ? 'draft' : 'publish')
-      composerHandlers.scheduleChanged?.()
+      scheduleChanged()
       void nextTick(() => closePublishActions())
     }
 
@@ -315,55 +304,48 @@
         runPostAction()
       }
     })
-    const toggleProvider = key => composerHandlers.toggleProvider?.(key)
-    const retryProviders = () => composerHandlers.retryProviders?.()
 
-    interface ComposerImage {
-      id: string
-      file: File | null
-      name: string
-      alt: string
-      preview?: string
-      kept?: boolean
+    const selectedNetworkIds = derived(() => selectedNetworks().map(target => target.provider))
+    const segments = state<ComposerSegment[]>([{ id: 1, text: '', preview: null }])
+    const activeSegmentId = state(1)
+    const segmentFocus = state({ id: 0, revision: 0 })
+    const activeSegment = derived(() => segments().find(post => post.id === activeSegmentId()) ?? segments()[0])
+    const sharedCopy = derived(() => activeSegment()?.text || '')
+    const postRows = derived(() => {
+      const posts = segments()
+      return posts.map((post, index) => ({ ...post, number: index + 1, canRemove: posts.length > 1 }))
+    })
+    const linkCardShown = derived(() => Boolean(segments()[0]?.preview))
+
+    function editSegment(id: number, { value }: { value: string }) {
+      if (submitting()) return
+      activeSegmentId.set(id)
+      const link = firstComposerLink(value)
+      segments.update(posts => posts.map(post => post.id === id
+        ? { ...post, text: value, preview: post.preview?.source === link ? post.preview : null }
+        : post))
+      segmentEdited(id)
     }
 
-    const selectedNetworkIds = state<string[]>([])
-    const sharedCopy = state('')
-    const variants = state<Record<string, { text: string, shared: string }>>({})
+    function activateSegment(id: number) {
+      activeSegmentId.set(id)
+      segmentActivated(id)
+    }
+
+    function focusSegment(id = activeSegmentId()) {
+      segmentFocus.update(value => ({ id, revision: value.revision + 1 }))
+    }
+    const variants = state<ComposerVariants>({})
     const variantsOpen = state(false)
     const newVariant = state('')
     const variantsAvailable = derived(() => selectedNetworkIds().length > 0 && composerFormat() === 'single')
-    const variantsPayload = derived(() => variantsAvailable()
-      ? Object.fromEntries(Object.entries(variants()).filter(([, entry]) => entry.text.trim()).map(([provider, entry]) => [provider, entry.text]))
-      : {})
+    const variantsPayload = derived(() => variantsAvailable() ? composerVariantsPayload(variants()) : {})
     const variantToggleLabel = derived(() => {
       if (variantsOpen()) return 'Hide per-network text'
       const count = Object.keys(variantsPayload()).length
       return count ? `Customize per network (${count})` : 'Customize per network'
     })
-    const variantRows = derived(() => {
-      const selected = providerRows().filter(target => target.selected)
-      return selected.filter((target, index) => selected.findIndex(other => other.provider === target.provider) === index)
-        .map(({ provider, characterLimit: limit }) => {
-          const entry = variants()[provider]
-          const text = entry?.text ?? sharedCopy()
-          const length = countText(provider, text)
-          const count = limit ? `${length} / ${limit}` : String(length)
-          const name = providerLabel(provider)
-          const over = Boolean(limit) && length > limit
-          const description = entry
-            ? `${count} characters`
-            : `Uses the shared text${limit ? ` · ${count}` : ''}${over ? ` · Too long for ${name}` : ''}`
-          return { provider, name, text, description, over, custom: Boolean(entry), stale: Boolean(entry && entry.shared !== sharedCopy()) }
-        })
-    })
-
-    effect(() => {
-      if (!variantsAvailable()) {
-        variantsOpen.set(false)
-        newVariant.set('')
-      }
-    })
+    const variantRows = derived(() => composerVariantRows(selectedNetworks(), variants(), sharedCopy()))
 
     function toggleVariantPanel() {
       newVariant.set('')
@@ -381,30 +363,25 @@
         newVariant.set(provider)
       }
       variants.set(entries)
-      composerHandlers.variantChanged?.()
+      variantChanged()
     }
 
     function editVariant(provider: string, { value }: { value: string }) {
       const entry = variants()[provider]
       if (!entry) return
       variants.set({ ...variants(), [provider]: { ...entry, text: value } })
-      composerHandlers.variantChanged?.()
+      variantChanged()
     }
 
-    const acceptedImageTypes = POST_IMAGE_FORMATS.join(',')
+    const acceptedImageTypes = composerImageTypes
     const attachInput = useRef('attachInput')
     const dragDepth = state(0)
     const imageError = state('')
     const attachedImages = state<ComposerImage[]>([])
     let nextImageId = 0
-    const mediaWarnings = derived(() => mediaObjections(
-      selectedNetworkIds(),
-      attachedImages().flatMap(image => image.file ? [{ bytes: image.file.size, mimeType: image.file.type }] : []),
-    ))
+    const mediaWarnings = derived(() => composerMediaWarnings(selectedNetworkIds(), attachedImages()))
     const imageWarnings = derived(() => imageError() ? [imageError(), ...mediaWarnings()] : mediaWarnings())
 
-    /** Whether the first post carries a link card, for the note that an image replaces it. */
-    const linkCardShown = state(false)
     const imageRows = derived(() => attachedImages().map((image, index) => ({
       id: image.id,
       name: image.name,
@@ -416,12 +393,11 @@
       altLabel: `Alt text for image ${index + 1}`,
       removeLabel: image.kept ? 'Remove the saved images' : `Remove ${image.name}`,
     })))
-    const imageHandlers = { removeSaved: null, changed: null }
 
     function setImageAlt(id: string, event: Event) {
       const alt = (event.target as HTMLInputElement).value
       attachedImages.set(attachedImages().map(image => image.id === id ? { ...image, alt } : image))
-      imageHandlers.changed?.()
+      markEdited()
     }
 
     function clearImagePreviews() {
@@ -435,10 +411,10 @@
       const removed = attachedImages().find(image => image.id === id)
       if (!removed) return
       if (removed.preview) URL.revokeObjectURL(removed.preview)
-      if (removed.kept) imageHandlers.removeSaved?.()
+      if (removed.kept && editingId()) editRemoveImage = true
       attachedImages.set(attachedImages().filter(image => image.id !== id))
       imageError.set('')
-      imageHandlers.changed?.()
+      markEdited()
     }
 
     function moveImage(id: string, offset: -1 | 1) {
@@ -450,25 +426,16 @@
       const [moved] = images.splice(index, 1)
       images.splice(next, 0, moved)
       attachedImages.set(images)
-      imageHandlers.changed?.()
+      markEdited()
     }
 
     function addImages(files: FileList | null | undefined) {
       if (!files?.length || submitting()) return
       const picked = [...files]
       const images = attachedImages().filter(image => !image.kept)
-      if (images.length + picked.length > MAX_POST_IMAGES) {
-        imageError.set(`A post can carry up to ${MAX_POST_IMAGES} images. Remove one first.`)
-        return
-      }
-      const invalid = picked.find(file => !file.size || (file.type && !POST_IMAGE_FORMATS.includes(file.type)))
-      if (invalid) {
-        imageError.set(`${invalid.name} could not be attached. Choose a JPEG, PNG, WebP, or GIF image.`)
-        return
-      }
-      const oversized = picked.find(file => file.size > MAX_IMAGE_BYTES)
-      if (oversized) {
-        imageError.set(`${oversized.name} is larger than ${MAX_IMAGE_BYTES / 1024 / 1024} MB.`)
+      const error = composerFileError(picked, images.length)
+      if (error) {
+        imageError.set(error)
         return
       }
       attachedImages.set([...images, ...picked.map(file => ({
@@ -479,7 +446,7 @@
         preview: URL.createObjectURL(file),
       }))])
       imageError.set('')
-      imageHandlers.changed?.()
+      markEdited()
     }
 
     const openImageChooser = () => attachInput.current?.click()
@@ -545,1072 +512,707 @@
       return [{ value: '', label: 'Not set' }, ...ordered.map(code => ({ value: code, label: names?.of(code) || code }))]
     })()
 
-    ;(() => {
-      const root = document.querySelector('[data-testid="composer-page"]')
-      if (!root) return
-      if (root.dataset.composerReady === 'true') return
-      root.dataset.composerReady = 'true'
+    const attachedFiles = () => composerImageFiles(attachedImages())
+    const appendImages = (form: FormData) => appendComposerImages(form, attachedImages())
 
-      const count = root.querySelector('[data-bluesky-count]')
-      const connection = root.querySelector('[data-bluesky-connection]')
-      const connectionDot = root.querySelector('[data-bluesky-connection-dot]')
-      const connectionLabel = root.querySelector('[data-bluesky-connection-label]')
+    /** The options that apply to the selected networks; the rest go as empty, which clears them. */
+    const postOptions = () => ({
+      language: showLanguage() ? postLanguage() : '',
+      mastodonVisibility: showMastodonOptions() ? mastodonVisibility() : '',
+      mastodonSpoiler: showMastodonOptions() ? mastodonSpoiler().trim() : '',
+    })
+    const appendOptions = (form) => {
+      const options = postOptions()
+      form.set('language', options.language)
+      form.set('mastodon_visibility', options.mastodonVisibility)
+      form.set('mastodon_spoiler', options.mastodonSpoiler)
+    }
+    /** After a post goes out: the content warning was for that post. The language is kept. */
+    const resetPostOptions = () => {
+      mastodonVisibility.set('public')
+      mastodonSpoiler.set('')
+    }
+    const composedTitle = () => postTitle().trim() || undefined
 
-      /** The images attached in this session, with their alt text; saved ones are not included. */
-      const attachedFiles = () => attachedImages().filter(image => image.file).map(image => ({ file: image.file, alt: image.alt.trim() }))
-      /** Add the attached images to a request: repeated `images`, alt text as a list in the same order. */
-      const appendImages = (form) => {
-        const files = attachedFiles()
-        for (const entry of files) form.append('images', entry.file, entry.file.name)
-        if (files.length) form.set('image_alts', JSON.stringify(files.map(entry => entry.alt)))
-        return files.length
-      }
-      /** The options that apply to the selected networks; the rest go as empty, which clears them. */
-      const postOptions = () => ({
-        language: showLanguage() ? postLanguage() : '',
-        mastodonVisibility: showMastodonOptions() ? mastodonVisibility() : '',
-        mastodonSpoiler: showMastodonOptions() ? mastodonSpoiler().trim() : '',
+    const clearAttachment = () => {
+      clearImagePreviews()
+      attachedImages.set([])
+      imageError.set('')
+      postImageUrl.set('')
+    }
+    let postCounter = 1
+
+    // Signals, not plain values: the provider chips render from these through
+    // x-for, so every mutation repaints with no hand-written render pass.
+    // `selected` is an array rather than a Set because a Set mutates in place
+    // and would never trip the signal. It holds target keys — `bluesky:12`
+    // for an account, `blog` for our own targets — not network names, so two
+    // accounts on one network can be picked independently.
+    const providers = state<ProviderStatus[]>([])
+    const selectedList = state<string[]>([])
+    const providersLoaded = state(false)
+
+    const selectedHas = (key) => selectedList().includes(key)
+    const selectedAdd = (key) => { if (!selectedHas(key)) selectedList.set([...selectedList(), key]) }
+    const selectedDelete = (key) => selectedList.set(selectedList().filter(entry => entry !== key))
+    const selectedClear = () => selectedList.set([])
+
+    // Edit mode: /?edit=<id> loads a queued post into the composer.
+    let editRemoveImage = false
+
+    const setStatus = (message, tone = 'neutral', options = {}) => {
+      showPostlineToast({
+        title: options.title,
+        message,
+        tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info',
+        url: options.url,
+        id: options.id,
+        action: options.action,
+        dedupeMs: options.dedupeMs,
+        durationMs: options.durationMs,
       })
-      const appendOptions = (form) => {
-        const options = postOptions()
-        form.set('language', options.language)
-        form.set('mastodon_visibility', options.mastodonVisibility)
-        form.set('mastodon_spoiler', options.mastodonSpoiler)
+    }
+
+    const publishTargets = derived(() => composerTargets(providers()))
+    const connectedProviders = derived(() => publishTargets().filter(target => target.canPublish))
+    const selectedConnected = derived(() => connectedProviders().filter(target => selectedHas(target.key)))
+    const selectedNetworks = derived(() => uniqueComposerNetworks(selectedConnected()))
+
+    // The tightest limit among selected targets. Used for the counter's
+    // denominator only — it is never enforced on the textarea, because
+    // capping input at the shortest network's limit would silently shorten
+    // the post for every other network too.
+    const effectiveLimit = () => {
+      const limits = selectedConnected().map(provider => provider.characterLimit).filter(Boolean)
+      return limits.length ? Math.min(...limits) : 300
+    }
+
+    /** The selected network with the tightest limit: the one the counter counts for. */
+    const tightestProvider = () => selectedConnected()
+      .filter(provider => provider.characterLimit)
+      .sort((a, b) => a.characterLimit - b.characterLimit)[0]?.provider || ''
+
+    /**
+     * Selected targets that would reject what they are actually going to
+     * receive. A provider with an override is measured against that override,
+     * not the shared body — otherwise the advisory reports on text the
+     * provider will never see, and is wrong in both directions.
+     */
+    const overLimitProviders = () => selectedConnected()
+      .filter(provider => provider.characterLimit && countText(provider.provider, bodyFor(provider.provider)) > provider.characterLimit)
+    const overLimitNetworks = () => uniqueComposerNetworks(overLimitProviders())
+    const providerRows = derived(() => composerTargetRows(publishTargets(), selectedList(), overLimitProviders()))
+
+    const providersPending = derived(() => !providersLoaded())
+    const providersEmpty = derived(() => providersLoaded() && providers().length === 0 && !providersFailed())
+
+    function toggleProvider(key: string) {
+      // A network with no account is a way to connect one, not a dead chip.
+      if (!publishTargets().find(target => target.key === key)?.canPublish) {
+        navigate('/accounts')
+        return
       }
-      /** After a post goes out: the content warning was for that post. The language is kept. */
-      const resetPostOptions = () => {
-        mastodonVisibility.set('public')
-        mastodonSpoiler.set('')
+      if (selectedHas(key)) selectedDelete(key)
+      else selectedAdd(key)
+      markEdited()
+    }
+
+    const bodyFor = provider => variantsPayload()[provider] || sharedCopy()
+
+    const accountsConnected = derived(() => connectedProviders().length > 0)
+    const connectionLabel = derived(() => {
+      if (!providersLoaded()) return 'Checking accounts…'
+      const connected = connectedProviders()
+      if (!connected.length) return 'Connect an account'
+      const counts = new Map<string, number>()
+      for (const target of connected) counts.set(target.provider, (counts.get(target.provider) || 0) + 1)
+      return `${[...counts].map(([provider, total]) => total > 1 ? `${providerLabel(provider)} (${total})` : providerLabel(provider)).join(', ')} ready`
+    })
+
+    let setupTargetPending = setupActive
+    const setupTargetUnavailable = derived(() => setupActive && providersLoaded() && !providersFailed()
+      && !connectedProviders().some(target => target.key === setupTarget))
+    const applyConnection = (list: ProviderStatus[]) => {
+      providers.set(Array.isArray(list) ? list : [])
+      if (setupTargetPending) {
+        const target = connectedProviders().find(target => target.key === setupTarget)
+        selectedList.set(target ? [target.key] : [])
+        if (target) setupTargetPending = false
       }
-      const composedTitle = () => postTitle().trim() || undefined
-
-      const clearAttachment = () => {
-        clearImagePreviews()
-        attachedImages.set([])
-        imageError.set('')
-        postImageUrl.set('')
+      else if (setupActive) {
+        const keys = new Set(connectedProviders().map(target => target.key))
+        selectedList.set(selectedList().filter(key => keys.has(key)))
       }
-      const postsRoot = root.querySelector('[data-composer-posts]')
-      const addPostButton = root.querySelector('[data-add-post]')
-      const previewButton = root.querySelector('[data-preview-post]')
-      const refreshButton = root.querySelector('[data-composer-refresh]')
-      const searchButton = root.querySelector('[data-composer-search]')
-      const urlPattern = /https?:\/\/[^\s<>"']+/i
-      let activePost = root.querySelector('[data-composer-post]')
-      let postCounter = root.querySelectorAll('[data-composer-post]').length
-      let savedActiveIndex = 0
-
-      // Signals, not plain values: the provider chips render from these through
-      // x-for, so every mutation repaints with no hand-written render pass.
-      // `selected` is an array rather than a Set because a Set mutates in place
-      // and would never trip the signal. It holds target keys — `bluesky:12`
-      // for an account, `blog` for our own targets — not network names, so two
-      // accounts on one network can be picked independently.
-      const providers = state([])
-      const selectedList = state([])
-      const providersLoaded = state(false)
-
-      const selectedHas = (key) => selectedList().includes(key)
-      const selectedAdd = (key) => { if (!selectedHas(key)) selectedList.set([...selectedList(), key]) }
-      const selectedDelete = (key) => selectedList.set(selectedList().filter(entry => entry !== key))
-      const selectedClear = () => selectedList.set([])
-
-      // Edit mode: /?edit=<id> loads a queued post into the composer.
-      const editParam = useRoute().query.edit || null
-      let editingId = null
-      let editHadImage = false
-      let editRemoveImage = false
-
-      const setStatus = (message, tone = 'neutral', options = {}) => {
-        showPostlineToast({
-          title: options.title,
-          message,
-          tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info',
-          url: options.url,
-          id: options.id,
-          action: options.action,
-          dedupeMs: options.dedupeMs,
-          durationMs: options.durationMs,
-        })
+      else {
+        selectedList.set(composerSelection(connectedProviders(), selectedList()))
       }
+      providersLoaded.set(true)
+    }
 
-      /**
-       * Publish targets, flattened from the network statuses.
-       *
-       * A network with one connected account (or none) stays one target and one
-       * chip, exactly as before accounts were plural — keyed to that account so
-       * the server publishes through it. A network with several becomes one
-       * target per account. Each target keeps its network's fields (limit,
-       * provider) so the counter, the limit checks and the per-network text
-       * all keep working unchanged.
-       */
-      const publishTargets = derived(() => providers().flatMap((status) => {
-        const live = (status.accounts || []).filter(account => account.connected)
-        if (live.length <= 1) {
-          const account = live[0]
-          return [{
-            ...status,
-            key: account ? `${status.provider}:${account.id}` : status.provider,
-            account: account || null,
-            multi: false,
-          }]
-        }
-        return live.map(account => ({
-          ...status,
-          key: `${status.provider}:${account.id}`,
-          canPublish: account.canPublish,
-          handle: account.handle,
-          account,
-          multi: true,
-        }))
-      }))
-      const connectedProviders = () => publishTargets().filter(target => target.canPublish)
-      const selectedConnected = () => connectedProviders().filter(target => selectedHas(target.key))
-      /** One selected target per network — what per-network overrides are keyed on. */
-      const selectedNetworks = () => selectedConnected().filter((target, index, list) =>
-        list.findIndex(other => other.provider === target.provider) === index)
-
-      /**
-       * The chip key a stored target spec maps to. An account spec maps to its
-       * own chip; a bare network (a campaign post, or one saved before accounts
-       * were plural) maps to that network's default account.
-       */
-      const keyForSpec = (spec) => {
-        const value = String(spec || '')
-        const exact = publishTargets().find(target => target.key === value)
-        if (exact) return exact.key
-        const provider = value.split(':')[0]
-        const candidates = publishTargets().filter(target => target.provider === provider)
-        return (candidates.find(target => target.account?.isDefault) || candidates[0])?.key || null
+    const refreshConnection = async () => {
+      providersFailed.set(false)
+      try {
+        applyConnection(await fetchProviders())
       }
-
-      // The tightest limit among selected targets. Used for the counter's
-      // denominator only — it is never enforced on the textarea, because
-      // capping input at the shortest network's limit would silently shorten
-      // the post for every other network too.
-      const effectiveLimit = () => {
-        const limits = selectedConnected().map(provider => provider.characterLimit).filter(Boolean)
-        return limits.length ? Math.min(...limits) : 300
-      }
-
-      /**
-       * A text's length as `provider` measures it: graphemes on Bluesky, a
-       * weighted count on X, links as 23 on X and Mastodon. These are the
-       * same rules the server uses.
-       */
-      const lengthFor = (provider, text) => {
-        const value = String(text || '')
-        return countText(provider, value)
-      }
-
-      /** The selected network with the tightest limit: the one the counter counts for. */
-      const tightestProvider = () => selectedConnected()
-        .filter(provider => provider.characterLimit)
-        .sort((a, b) => a.characterLimit - b.characterLimit)[0]?.provider || ''
-
-      /**
-       * Selected targets that would reject what they are actually going to
-       * receive. A provider with an override is measured against that override,
-       * not the shared body — otherwise the advisory reports on text the
-       * provider will never see, and is wrong in both directions.
-       */
-      const overLimitProviders = () => selectedConnected()
-        .filter(provider => provider.characterLimit && lengthFor(provider.provider, bodyFor(provider.provider)) > provider.characterLimit)
-      /** Over-limit targets named once per network, for the counter's message. */
-      const overLimitNetworks = () => overLimitProviders().filter((target, index, list) =>
-        list.findIndex(other => other.provider === target.provider) === index)
-
-      /**
-       * Everything one provider chip renders, as plain data.
-       *
-       * State rides on data-attributes and is styled from config/css.ts
-       * rather than by composing a class string here. The Crosswind extractor
-       * only pulls single-quoted literals out of a :class value, so a computed
-       * class string generates no utilities at all and would need a
-       * hand-maintained safelist entry to survive.
-       *
-       * The over-limit flag is folded in here too, replacing a pass that used to
-       * walk the rendered chips and toggle dot classes by hand.
-       */
-      const providerRowsView = derived(() => {
-        const overKeys = new Set(overLimitProviders().map(entry => entry.key))
-        return publishTargets().map((target) => {
-          const connected = Boolean(target.canPublish)
-          const isSelected = connected && selectedHas(target.key)
-          const network = providerLabel(target.provider)
-          // A per-account chip reads as icon + handle; the network name moves
-          // to the tooltip so a row of three Bluesky chips stays scannable.
-          const label = target.multi ? formatHandle(target.provider, target.account?.handle) : network
-          const full = target.multi ? targetLabel(target.provider, target.account?.handle) : network
-          const over = isSelected && overKeys.has(target.key)
-          return {
-            key: target.key,
-            provider: target.provider,
-            characterLimit: target.characterLimit,
-            icon: target.multi ? providerIcon(target.provider) : '',
-            label,
-            connected,
-            selected: isSelected,
-            over,
-            title: !connected
-              ? `Opens Channels, where ${network} is connected.`
-              : over
-                ? `Too long for ${network}. Shorten this version before publishing.`
-                : target.multi ? full : '',
-          }
-        })
-      })
-
-      effect(() => providerRows.set(providerRowsView()))
-      effect(() => selectedNetworkIds.set(selectedNetworks().map(target => target.provider)))
-      effect(() => providersPending.set(!providersLoaded()))
-      effect(() => providersEmpty.set(providersLoaded() && providers().length === 0 && !providersFailed()))
-
-      composerHandlers.toggleProvider = (key) => {
-        // A network with no account is a way to connect one, not a dead chip.
-        if (!publishTargets().find(target => target.key === key)?.canPublish) {
-          navigate('/accounts')
-          return
-        }
-        if (selectedHas(key)) selectedDelete(key)
-        else selectedAdd(key)
-        markEdited()
-        updatePublishability()
-      }
-
-      
-      
-      const bodyFor = provider => variantsPayload()[provider] || sharedCopy()
-
-      const renderConnectionSummary = () => {
-        const connected = connectedProviders()
-        const ready = connected.length > 0
-        if (connectionLabel) {
-          // Named per network; a network with several accounts says how many.
-          const counts = new Map()
-          connected.forEach(target => counts.set(target.provider, (counts.get(target.provider) || 0) + 1))
-          connectionLabel.textContent = ready
-            ? `${[...counts].map(([provider, total]) => total > 1 ? `${providerLabel(provider)} (${total})` : providerLabel(provider)).join(', ')} ready`
-            : 'Connect an account'
-        }
-        connection?.classList.toggle('border-success-line', ready)
-        connection?.classList.toggle('bg-success-soft', ready)
-        connection?.classList.toggle('text-success', ready)
-        connectionDot?.classList.toggle('bg-success-solid', ready)
-        connectionDot?.classList.toggle('bg-line-strong', !ready)
-      }
-
-      const updatePublishability = () => {
-        canPublish.set(selectedConnected().length > 0 && (!editParam || editingId !== null))
-        updateCount()
-      }
-
-      const applyConnection = (list) => {
-        providers.set(Array.isArray(list) ? list : [])
+      catch (error) {
+        // Inline, not a toast: a toast on every load would be noise, and an
+        // expired session is sent to sign-in by the session script anyway.
+        // It is not "no accounts", though, so it does not say that.
+        providersFailed.set(true)
+        providers.set([])
         providersLoaded.set(true)
-        const connectedKeys = connectedProviders().map(target => target.key)
-        // Default to every connected network — through its default account
-        // only. A second account on a network is opt-in per post: posting the
-        // same words from two of your own accounts should be a choice, never
-        // what happens because nobody unticked a chip. Otherwise drop any
-        // selected target that is no longer connected.
-        if (selectedList().length === 0) {
-          connectedProviders()
-            .filter(target => !target.multi || target.account?.isDefault)
-            .forEach(target => selectedAdd(target.key))
+        console.warn('[postline] provider status failed:', error)
+      }
+    }
+    function retryProviders() {
+      // A failed read is never cached, so asking again really asks.
+      providersLoaded.set(false)
+      void refreshConnection()
+    }
+
+    const createSegment = (text = ''): ComposerSegment => ({ id: ++postCounter, text, preview: null })
+
+    function replaceSegments(texts: string[], focusIndex = 0) {
+      const posts = texts.map(createSegment)
+      segments.set(posts)
+      activeSegmentId.set((posts[focusIndex] ?? posts[0]).id)
+    }
+
+    const saveDraft = () => {
+      if (editParam) return
+      const posts = segments()
+      savedDraft.set({
+        activeIndex: Math.max(0, posts.findIndex(post => post.id === activeSegmentId())),
+        mode: composerFormat(),
+        action: postAction(),
+        scheduledIso: scheduledIso(),
+        posts: posts.map(post => ({ text: post.text })),
+        variants: Object.entries(variants())
+          .map(([provider, entry]) => ({ provider, text: entry.text, shared: entry.shared })),
+      })
+    }
+
+    const queueDraftSave = useDebounce(saveDraft, 100)
+
+    const restoreDraft = () => {
+      const draft = savedDraft()
+      if (!draft) return
+      composerFormat.set(draft.mode)
+      postAction.set(draft.action)
+      scheduledIso.set(draft.scheduledIso)
+      replaceSegments(draft.posts.map(post => post.text), draft.mode === 'thread' ? draft.activeIndex : 0)
+      variants.set(Object.fromEntries(draft.variants.map(entry => [entry.provider, { text: entry.text, shared: entry.shared }])))
+    }
+
+    /**
+     * Said before publishing, not found out after: these networks have no
+     * replies to chain on, so each part of a thread lands as its own post.
+     */
+    const unthreadedNote = (posts) => {
+      if (posts < 2) return ''
+      const names = selectedConnected()
+        .filter(target => ['instagram', 'linkedin'].includes(target.provider))
+        .map(target => providerLabel(target.provider))
+        .filter((name, index, list) => list.indexOf(name) === index)
+      return names.length ? ` - ${names.join(' and ')} will post each part separately` : ''
+    }
+
+    const countSummary = derived(() => {
+      const length = countText(tightestProvider(), sharedCopy())
+      const limit = effectiveLimit()
+      const over = overLimitNetworks()
+      const count = composerFormat() === 'thread' ? segments().length : 1
+      const text = over.length
+        ? `${length} characters - too long for ${over.map(provider => providerLabel(provider.provider)).join(', ')}`
+        : `${length} / ${limit} characters - ${count} post${count === 1 ? '' : 's'}${unthreadedNote(count)}`
+      return { text, tone: over.length ? 'danger' : length > limit - 40 ? 'warning' : 'muted' }
+    })
+
+    const updateLinkPreview = async (id = activeSegmentId()) => {
+      const post = segments().find(item => item.id === id)
+      if (!post) return
+      const source = firstComposerLink(post.text)
+      if (!source || post.preview?.source === source) return
+
+      const data = await fetchLinkPreview(source).catch(() => undefined)
+      const preview = composerLinkPreview(source, data)
+      segments.update(posts => posts.map(item => item.id === id && firstComposerLink(item.text) === source
+        ? { ...item, preview }
+        : item))
+    }
+
+    const queuePreviewUpdate = useDebounce((id: number) => { void updateLinkPreview(id) }, 250)
+
+    const addPost = (options = {}) => {
+      const post = createSegment()
+      segments.update(posts => [...posts, post])
+      activeSegmentId.set(post.id)
+      if (options.focus !== false) focusSegment(post.id)
+      if (options.save !== false) saveDraft()
+    }
+
+    function removeSegment(id: number) {
+      if (submitting()) return
+      const posts = segments()
+      const index = posts.findIndex(post => post.id === id)
+      if (index < 0 || posts.length === 1) return
+      const removed = posts[index]
+      const before = posts[index + 1]
+      const remaining = posts.filter(post => post.id !== id)
+      markEdited()
+      segments.set(remaining)
+      activeSegmentId.set((remaining[index] ?? remaining[index - 1]).id)
+      saveDraft()
+      if (!removed.text.trim()) return
+      setStatus(`Post ${index + 1} removed.`, 'neutral', {
+        title: 'Removed',
+        id: 'composer-post-removed',
+        dedupeMs: 0,
+        durationMs: 10000,
+        action: {
+          label: 'Undo',
+          run: () => {
+            const restored = [...segments()]
+            const at = restored.findIndex(post => post.id === before?.id)
+            restored.splice(at < 0 ? restored.length : at, 0, removed)
+            segments.set(restored)
+            if (composerFormat() === 'thread') activeSegmentId.set(id)
+            saveDraft()
+          },
+        },
+      })
+    }
+
+    const zoneReady = fetchWorkspace()
+      .then((workspace) => {
+        if (workspace?.timezone) scheduleZone.set(workspace.timezone)
+      })
+      .catch(() => {})
+
+    // Unsaved changes to a queued post. Edits never go to the local draft
+    // (saveDraft refuses in edit mode), so leaving would drop them silently.
+    let editDirty = false
+    const markEdited = () => { if (editingId()) editDirty = true }
+    function scheduleChanged() {
+      markEdited()
+      queueDraftSave()
+    }
+    // A link or navigate() that would drop them is held, and the toast says
+    // why and offers the way out. Back and forward cannot be held (the URL
+    // has already moved); closing the window gets the browser's own prompt.
+    useEventListener('stx:before-navigate', (event) => {
+      if (!editingId() || !editDirty || !event.cancelable) return
+      event.preventDefault()
+      const destination = event.detail?.url
+      setStatus(`Your changes to post #${editingId()} are not saved yet.`, 'neutral', {
+        title: 'Unsaved changes',
+        id: 'composer-unsaved',
+        dedupeMs: 0,
+        durationMs: 10000,
+        action: {
+          label: 'Leave without saving',
+          run: () => {
+            editDirty = false
+            if (typeof destination === 'string') navigate(destination)
+          },
+        },
+      })
+    })
+    useEventListener('beforeunload', (event) => {
+      if (!editingId() || !editDirty) return
+      event.preventDefault()
+      event.returnValue = ''
+    })
+
+    const enterEditMode = (item) => {
+      editingId.set(item.id)
+      editHeading.set(item.thread ? 'Editing thread' : `Editing post #${item.id}`)
+
+      if (item.thread) {
+        composerFormat.set('thread')
+        replaceSegments(item.thread.texts, item.thread.postIds.indexOf(item.id))
+      }
+      else {
+        replaceSegments([item.text || ''])
+      }
+      postTitle.set(item.title || '')
+
+      // Overrides. `shared` is seeded from the stored body so a restored
+      // override only reads as stale once this edit actually changes the text.
+      variants.set(Object.fromEntries(Object.entries(item.variants || {}).flatMap(([provider, text]) =>
+        typeof text === 'string' && text.trim() ? [[provider, { text, shared: item.text || '' }]] : [])))
+
+      // Targets: select exactly the post's accounts (intersected with what is
+      // still connected). `targets` holds specs; older payloads only had
+      // network names, which map to each network's default account.
+      selectedClear()
+      for (const spec of item.targets || item.providers || []) {
+        const key = composerKeyForSpec(publishTargets(), String(spec))
+        if (key) selectedAdd(key)
+      }
+
+      // Schedule.
+      scheduledIso.set(composerScheduleIso(item.scheduledAt))
+      postAction.set(scheduledIso() ? 'schedule' : item.status === 'draft' ? 'draft' : 'publish')
+
+      // Link card.
+      if (item.external?.uri) {
+        const source = firstComposerLink(segments()[0].text) ?? item.external.uri
+        const preview = composerLinkPreview(source, { ...item.external, url: item.external.uri })
+        segments.update(([lead, ...rest]) => [{ ...lead, preview }, ...rest])
+      }
+
+      // Existing image → show a "kept" chip; attaching a new file replaces,
+      // clearing it marks removal.
+      const saved = item.images?.length || (item.image ? 1 : 0)
+      editRemoveImage = false
+      postLanguage.set(item.options?.language || '')
+      mastodonVisibility.set(item.options?.mastodon?.visibility || 'public')
+      mastodonSpoiler.set(item.options?.mastodon?.spoilerText || '')
+      attachedImages.set(saved ? [{ id: 'saved', file: null, name: saved === 1 ? '1 saved image' : `${saved} saved images`, alt: '', kept: true }] : [])
+
+      for (const post of segments()) void updateLinkPreview(post.id)
+    }
+
+    const loadEditPost = async (id) => {
+      try {
+        const response = await fetch(`/api/postline/queue/item?id=${encodeURIComponent(id)}`)
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the post.')
+        await zoneReady
+        enterEditMode(payload.data)
+      }
+      catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Edit' })
+      }
+    }
+
+    const segmentsToSend = () => (composerFormat() === 'thread' ? segments() : segments().slice(0, 1))
+      .filter(post => post.text.trim())
+
+    function clearSentSegments(sent: ComposerSegment[]) {
+      const texts = new Map(sent.map(post => [post.id, post.text]))
+      segments.update(posts => posts.map(post => texts.get(post.id) === post.text
+        ? { ...post, text: '', preview: null }
+        : post))
+    }
+
+    const linkCardFor = (post: ComposerSegment) => post.preview
+      ? {
+          uri: post.preview.url,
+          title: post.preview.title,
+          description: post.preview.description,
         }
-        else {
-          ;[...selectedList()].forEach((key) => {
-            if (!connectedKeys.includes(key)) selectedDelete(key)
-          })
-        }
-        renderConnectionSummary()
-        updatePublishability()
+      : undefined
+
+    function appendLinkCard(form: FormData, post: ComposerSegment) {
+      const external = linkCardFor(post)
+      if (!external) return
+      form.set('external_uri', external.uri)
+      form.set('external_title', external.title)
+      form.set('external_description', external.description)
+    }
+
+    const updateQueued = async () => {
+      const posts = segmentsToSend()
+      const isThread = composerFormat() === 'thread'
+      if (isThread && posts.length < 2) {
+        setStatus('Write at least two posts before updating the thread.', 'error')
+        focusSegment()
+        return
+      }
+      if (!posts.length) {
+        setStatus('Write something before updating.', 'error')
+        focusSegment()
+        return
+      }
+      const targetProviders = selectedConnected().map(target => target.key)
+      if (targetProviders.length === 0) {
+        setStatus('Select a connected account.', 'error', { title: 'Not connected' })
+        return
       }
 
-      const refreshConnection = async () => {
-        providersFailed.set(false)
-        try {
-          applyConnection(await fetchProviders())
-        }
-        catch (error) {
-          // Inline, not a toast: a toast on every load would be noise, and an
-          // expired session is sent to sign-in by the session script anyway.
-          // It is not "no accounts", though, so it does not say that.
-          providersFailed.set(true)
-          applyConnection([])
-          console.warn('[postline] provider status failed:', error)
-        }
+      const form = new FormData()
+      form.set('id', String(editingId()))
+      form.set('text', posts[0].text.trim())
+      if (isThread) form.set('thread', JSON.stringify(posts.map(post => post.text.trim())))
+      form.set('providers', targetProviders.join(','))
+      const editTitle = composedTitle()
+      if (editTitle) form.set('title', editTitle)
+      const scheduled = scheduledIso()
+      if (scheduled) form.set('scheduled_at', composerQueueTimestamp(scheduled))
+      appendLinkCard(form, posts[0])
+      const editImageUrl = postImageUrl().trim()
+      if (editImageUrl) form.set('image_url', editImageUrl)
+      // New images replace the saved ones; with none, the saved ones stay
+      // unless their row was removed.
+      if (!appendImages(form) && editRemoveImage) form.set('remove_image', '1')
+      appendOptions(form)
+      // Always sent, never conditional: the server treats an absent field as
+      // "keep what is stored", so clearing every override has to be explicit.
+      form.set('variants', JSON.stringify(variantsPayload()))
+
+      try {
+        const response = await fetch('/api/postline/queue/update', { method: 'POST', body: form })
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not update the post.')
+        editDirty = false
+        setStatus(isThread ? 'Thread updated.' : 'Post updated.', 'success', { title: 'Updated' })
+        // Back to the queue to see the change. A router visit, not a full
+        // load: a reload took the "Post updated" toast down with the page.
+        navigate('/queue')
       }
-      composerHandlers.retryProviders = () => {
-        // A failed read is never cached, so asking again really asks.
-        providersLoaded.set(false)
-        void refreshConnection()
+      catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Update failed' })
       }
+    }
 
-      const textareaFor = post => post?.querySelector('[data-bluesky-text]')
-      const previewFor = post => post?.querySelector('[data-link-preview]')
-      const allPosts = () => Array.from(root.querySelectorAll('[data-composer-post]'))
-      const activeTextarea = () => textareaFor(activePost) || root.querySelector('[data-bluesky-text]')
-      const activePreview = () => previewFor(activePost)
-      const firstUrl = value => value.match(urlPattern)?.[0]?.replace(/[),.;]+$/, '')
-
-      const postTemplate = (number, text = '') => `
-        <header class="flex gap-3 items-center justify-between">
-          <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel-3 rounded-lg" type="button" data-select-post>
-            <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
-            <span data-post-label>Post ${number}</span>
-          </button>
-          <button class="inline-flex items-center justify-center h-7 w-7 text-muted hover:text-ink bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" aria-label="Remove post" title="Remove post" data-remove-post>
-            <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
-          </button>
-        </header>
-          <textarea class="min-h-36 w-full leading-relaxed text-ink text-xl bg-transparent border-0 outline-none rounded-md resize-none" data-focus-outline spellcheck="true" aria-label="Post body ${number}" data-bluesky-text>${escapeHtml(text)}</textarea>
-        ${number === 1 ? '<div class="hidden" data-richtext-host></div>' : ''}
-        <div class="hidden overflow-hidden bg-panel-2 border border-line rounded-2xl" data-link-preview></div>
-      `
-
-      const createPost = (number, text = '') => {
-        const post = document.createElement('article')
-        post.className = 'grid gap-2 pb-4 last:pb-0 border-b border-line last:border-b-0'
-        post.dataset.composerPost = ''
-        post.dataset.active = 'false'
-        post.innerHTML = postTemplate(number, text)
-        return post
+    // Draft mode and schedule-time both save to the server-side queue
+    // instead of publishing immediately.
+    const saveToQueue = async (scheduleValue) => {
+      const posts = segmentsToSend()
+      if (!posts.length) {
+        setStatus('Write something before saving.', 'error')
+        focusSegment()
+        return
       }
-
-      const saveDraft = () => {
-        if (editParam) return
-        const posts = allPosts()
-        savedDraft.set({
-          activeIndex: Math.max(0, posts.indexOf(activePost)),
-          mode: composerFormat(),
-          action: postAction(),
-          scheduledIso: scheduledIso(),
-          posts: posts.map(post => ({ text: textareaFor(post)?.value || '' })),
-          variants: Object.entries(variants())
-            .map(([provider, entry]) => ({ provider, text: entry.text, shared: entry.shared })),
-        })
+      const targetProviders = selectedConnected().map(target => target.key)
+      if (targetProviders.length === 0) {
+        setStatus('Select a connected account before saving to the queue.', 'error', { title: 'Not connected' })
+        return
       }
+      const form = new FormData()
+      if (posts.length > 1) form.set('thread', JSON.stringify(posts.map(post => post.text.trim())))
+      form.set('text', posts[0].text.trim())
+      form.set('providers', targetProviders.join(','))
+      const queueTitle = composedTitle()
+      if (queueTitle) form.set('title', queueTitle)
+      if (scheduleValue) form.set('scheduled_at', composerQueueTimestamp(scheduleValue))
+      appendLinkCard(form, posts[0])
+      const queueImageUrl = postImageUrl().trim()
+      if (queueImageUrl) form.set('image_url', queueImageUrl)
+      appendImages(form)
+      appendOptions(form)
+      const queueVariants = variantsPayload()
+      if (Object.keys(queueVariants).length) form.set('variants', JSON.stringify(queueVariants))
 
-      // useDebounce, not a bare timer: it cancels its own pending call and is
-      // torn down with the scope, so a pending save cannot fire against a
-      // detached DOM after an SPA swap.
-      const queueDraftSave = useDebounce(saveDraft, 100)
+      try {
+        const response = await fetch('/api/postline/queue', { method: 'POST', body: form })
+        const payload = await response.json()
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save to the queue.')
 
-      const restoreDraft = () => {
-        const draft = savedDraft()
-        if (!draft || !postsRoot) return
-
-        postsRoot.replaceChildren(...draft.posts.map((post, index) => createPost(index + 1, post.text)))
-        composerFormat.set(draft.mode)
-        postAction.set(draft.action)
-        scheduledIso.set(draft.scheduledIso)
-        savedActiveIndex = draft.mode === 'thread' ? Math.max(0, Math.min(draft.activeIndex, draft.posts.length - 1)) : 0
-        postCounter = draft.posts.length
-        activePost = allPosts()[savedActiveIndex] || root.querySelector('[data-composer-post]')
-        variants.set(Object.fromEntries(draft.variants.map(entry => [entry.provider, { text: entry.text, shared: entry.shared }])))
-      }
-
-      
-      /**
-       * Said before publishing, not found out after: these networks have no
-       * replies to chain on, so each part of a thread lands as its own post.
-       */
-      const unthreadedNote = (posts) => {
-        if (posts < 2) return ''
-        const names = selectedConnected()
-          .filter(target => ['instagram', 'linkedin'].includes(target.provider))
-          .map(target => providerLabel(target.provider))
-          .filter((name, index, list) => list.indexOf(name) === index)
-        return names.length ? ` - ${names.join(' and ')} will post each part separately` : ''
-      }
-
-      const updateCount = () => {
-        const textarea = activeTextarea()
-        if (!textarea || !count) return
-        sharedCopy.set(textarea.value)
-        const length = lengthFor(tightestProvider(), textarea.value)
-        const limit = effectiveLimit()
-        const over = overLimitProviders()
-        const posts = composerFormat() === 'thread' ? allPosts().length : 1
-
-        // Over-limit names the networks rather than the number, because with
-        // mixed targets "over" is only true for some of them.
-        count.textContent = over.length
-          ? `${length} characters - too long for ${overLimitNetworks().map(provider => providerLabel(provider.provider)).join(', ')}`
-          : `${length} / ${limit} characters - ${posts} post${posts === 1 ? '' : 's'}${unthreadedNote(posts)}`
-        // The span truncates, and the network names are at the end — keep the
-        // full message reachable when several targets are over at once.
-        count.title = count.textContent
-
-        count.classList.toggle('text-danger', over.length > 0)
-        count.classList.toggle('text-warning', over.length === 0 && length > limit - 40)
-        count.classList.toggle('text-muted', over.length === 0 && length <= limit - 40)
-
-      }
-
-      const renderLinkPreview = (post, preview) => {
-        const container = previewFor(post)
-        if (!container) return
-
-        if (post === allPosts()[0]) linkCardShown.set(Boolean(preview))
-        if (!preview) {
-          container.classList.add('hidden')
-          container.innerHTML = ''
-          delete post.dataset.externalUri
-          delete post.dataset.externalTitle
-          delete post.dataset.externalDescription
-          return
-        }
-
-        post.dataset.externalUri = preview.url
-        post.dataset.externalTitle = preview.title
-        post.dataset.externalDescription = preview.description || ''
-        container.classList.remove('hidden')
-        container.innerHTML = `
-          ${preview.image ? `<div class="h-28 bg-center bg-cover bg-panel-3 border-b border-line" style="background-image:url('${escapeHtml(preview.image)}')"></div>` : ''}
-          <div class="grid gap-1 p-3">
-            <div class="font-semibold text-muted text-xs uppercase">${escapeHtml(preview.domain)}</div>
-            <div class="font-semibold text-ink text-sm">${escapeHtml(preview.title)}</div>
-            ${preview.description ? `<div class="leading-normal line-clamp-2 text-muted text-ui">${escapeHtml(preview.description)}</div>` : ''}
-          </div>
-        `
-      }
-
-      const updateLinkPreview = async (post = activePost) => {
-        const textarea = textareaFor(post)
-        if (!post || !textarea) return
-        const url = firstUrl(textarea.value)
-        if (!url) {
-          renderLinkPreview(post, null)
-          return
-        }
-
-        if (post.dataset.previewUrl === url && post.dataset.externalTitle) return
-        post.dataset.previewUrl = url
-
-        try {
-          // Shared and cached, so a redraw or a second visit does not ask again.
-          const preview = await fetchLinkPreview(url)
-          renderLinkPreview(post, preview)
-        }
-        catch {
-          renderLinkPreview(post, {
-            url,
-            domain: new URL(url).hostname.replace(/^www\./, ''),
-            title: url,
-            description: '',
-          })
-        }
-      }
-
-      const runPreviewUpdate = useDebounce((post) => { void updateLinkPreview(post) }, 250)
-      const queuePreviewUpdate = (post = activePost) => runPreviewUpdate(post)
-
-      const renamePosts = () => {
-        const posts = allPosts()
-        const canRemove = composerFormat() === 'thread' && posts.length > 1
-        posts.forEach((post, index) => {
-          const number = index + 1
-          const select = post.querySelector('[data-select-post]')
-          const label = select?.querySelector('[data-post-label]')
-          const remove = post.querySelector('[data-remove-post]')
-          const textarea = textareaFor(post)
-          if (label) label.textContent = `Post ${number}`
-          if (textarea) textarea.setAttribute('aria-label', `Post body ${number}`)
-          remove?.classList.toggle('hidden', !canRemove)
-          remove?.classList.toggle('inline-flex', canRemove)
-        })
-      }
-
-      const selectPost = (post, options = {}) => {
-        if (!post) return
-        activePost = post
-        allPosts().forEach((item) => {
-          const active = item === post
-          item.hidden = !active && composerFormat() === 'single'
-          item.classList.toggle('grid', !item.hidden)
-          const select = item.querySelector('[data-select-post]')
-          item.dataset.active = active ? 'true' : 'false'
-          item.classList.toggle('border-ink', active)
-          item.classList.toggle('border-info-line', active)
-          item.classList.toggle('shadow-sm', active)
-          item.classList.toggle('border-line', !active)
-          select?.classList.toggle('bg-accent', active)
-          select?.classList.toggle('text-on-accent', active)
-          select?.classList.toggle('bg-panel-3', !active)
-          select?.classList.toggle('text-muted', !active)
-        })
-        updateCount()
-        void updateLinkPreview(post)
-        if (!options.skipSave) queueDraftSave()
-      }
-
-      const addPost = (options = {}) => {
-        postCounter += 1
-        const post = createPost(postCounter, options.text || '')
-        postsRoot?.append(post)
-        renamePosts()
-        selectPost(post, { skipSave: true })
-        if (options.focus !== false) textareaFor(post)?.focus()
-        if (options.save !== false) saveDraft()
-        return post
-      }
-
-      const removePost = (post) => {
-        if (!post || allPosts().length === 1) return
-        markEdited()
-        const label = post.querySelector('[data-post-label]')?.textContent || 'Post'
-        const hadText = Boolean(textareaFor(post)?.value.trim())
-        const parent = post.parentElement
-        const before = post.nextElementSibling
-        const next = before?.matches('[data-composer-post]')
-          ? before
-          : post.previousElementSibling
-        post.remove()
-        renamePosts()
-        selectPost(next || root.querySelector('[data-composer-post]'), { skipSave: true })
+        clearSentSegments(posts)
+        scheduledIso.set(null)
+        if (scheduleValue) postAction.set('publish')
+        postTitle.set('')
+        clearAttachment()
+        resetPostOptions()
+        // Same reason as the publish path: the overrides went with that post.
+        variants.set({})
         saveDraft()
-        // An empty post goes without a word. One with writing in it can come
-        // back: the node is kept, so Undo puts back exactly what was there.
-        if (!hadText || !parent) return
-        setStatus(`${label} removed.`, 'neutral', {
-          title: 'Removed',
-          id: 'composer-post-removed',
-          dedupeMs: 0,
-          durationMs: 10000,
-          action: {
-            label: 'Undo',
-            run: () => {
-              parent.insertBefore(post, before?.isConnected ? before : null)
-              renamePosts()
-              selectPost(post, { skipSave: true })
-              saveDraft()
-            },
-          },
-        })
-      }
-
-      const zoneReady = fetchWorkspace()
-        .then((workspace) => {
-          if (workspace?.timezone) scheduleZone.set(workspace.timezone)
-        })
-        .catch(() => {})
-
-      const scheduleTimestamp = (iso: string): string => new Date(iso).toISOString().slice(0, 19).replace('T', ' ')
-
-      // Unsaved changes to a queued post. Edits never go to the local draft
-      // (saveDraft refuses in edit mode), so leaving would drop them silently.
-      let editDirty = false
-      const markEdited = () => { if (editingId) editDirty = true }
-      composerHandlers.scheduleChanged = () => {
-        markEdited()
-        queueDraftSave()
-      }
-      root.addEventListener('input', markEdited)
-      root.addEventListener('change', markEdited)
-      // A link or navigate() that would drop them is held, and the toast says
-      // why and offers the way out. Back and forward cannot be held (the URL
-      // has already moved); closing the window gets the browser's own prompt.
-      useEventListener('stx:before-navigate', (event) => {
-        if (!editingId || !editDirty || !event.cancelable) return
-        event.preventDefault()
-        const destination = event.detail?.url
-        setStatus(`Your changes to post #${editingId} are not saved yet.`, 'neutral', {
-          title: 'Unsaved changes',
-          id: 'composer-unsaved',
-          dedupeMs: 0,
-          durationMs: 10000,
-          action: {
-            label: 'Leave without saving',
-            run: () => {
-              editDirty = false
-              if (typeof destination === 'string') navigate(destination)
-            },
-          },
-        })
-      }, { target: window })
-      useEventListener('beforeunload', (event) => {
-        if (!editingId || !editDirty) return
-        event.preventDefault()
-        event.returnValue = ''
-      }, { target: window })
-
-      const enterEditMode = (item) => {
-        editingId = item.id
-        editHeading.set(item.thread ? 'Editing thread' : `Editing post #${item.id}`)
-
-        if (item.thread && postsRoot) {
-          const posts = item.thread.texts.map((text, index) => createPost(index + 1, text))
-          postsRoot.replaceChildren(...posts)
-          postCounter = posts.length
-          composerFormat.set('thread')
-          renamePosts()
-          selectPost(posts[item.thread.postIds.indexOf(item.id)] || posts[0], { skipSave: true })
-        }
-        else {
-          const textarea = activeTextarea()
-          if (textarea) textarea.value = item.text || ''
-        }
-        postTitle.set(item.title || '')
-
-        // Overrides. `shared` is seeded from the stored body so a restored
-        // override only reads as stale once this edit actually changes the text.
-        variants.set(Object.fromEntries(Object.entries(item.variants || {}).flatMap(([provider, text]) =>
-          typeof text === 'string' && text.trim() ? [[provider, { text, shared: item.text || '' }]] : [])))
-
-        // Targets: select exactly the post's accounts (intersected with what is
-        // still connected). `targets` holds specs; older payloads only had
-        // network names, which map to each network's default account.
-        selectedClear()
-        for (const spec of item.targets || item.providers || []) {
-          const key = keyForSpec(spec)
-          if (key) selectedAdd(key)
-        }
-        updatePublishability()
-
-        // Schedule.
-        const savedSchedule = item.scheduledAt ? new Date(`${item.scheduledAt.replace(' ', 'T')}Z`) : null
-        scheduledIso.set(savedSchedule && Number.isFinite(savedSchedule.getTime()) ? savedSchedule.toISOString() : null)
-        postAction.set(scheduledIso() ? 'schedule' : item.status === 'draft' ? 'draft' : 'publish')
-
-        // Link card.
-        const lead = item.thread ? allPosts()[0] : activePost
-        if (item.external?.uri && lead) {
-          lead.dataset.externalUri = item.external.uri
-          lead.dataset.externalTitle = item.external.title || ''
-          lead.dataset.externalDescription = item.external.description || ''
-        }
-
-        // Existing image → show a "kept" chip; attaching a new file replaces,
-        // clearing it marks removal.
-        const saved = item.images?.length || (item.image ? 1 : 0)
-        editHadImage = saved > 0
-        editRemoveImage = false
-        postLanguage.set(item.options?.language || '')
-        mastodonVisibility.set(item.options?.mastodon?.visibility || 'public')
-        mastodonSpoiler.set(item.options?.mastodon?.spoilerText || '')
-        attachedImages.set(saved ? [{ id: 'saved', file: null, name: saved === 1 ? '1 saved image' : `${saved} saved images`, alt: '', kept: true }] : [])
-
-        updateCount()
-        void updateLinkPreview(activePost)
-        if (lead !== activePost) void updateLinkPreview(lead)
-      }
-
-      const loadEditPost = async (id) => {
-        try {
-          const response = await fetch(`/api/postline/queue/item?id=${encodeURIComponent(id)}`)
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the post.')
-          await zoneReady
-          enterEditMode(payload.data)
-        }
-        catch (error) {
-          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Edit' })
-        }
-      }
-
-      const composedThread = () => composerFormat() === 'thread'
-        ? allPosts().map(post => textareaFor(post)?.value.trim()).filter(Boolean)
-        : []
-
-      const leadingPost = () => allPosts().find(post => textareaFor(post)?.value.trim())
-
-      const linkCardFor = post => post?.dataset.externalUri && post.dataset.externalTitle
-        ? {
-            uri: post.dataset.externalUri,
-            title: post.dataset.externalTitle,
-            description: post.dataset.externalDescription || '',
-          }
-        : undefined
-
-      function appendLinkCard(form: FormData, post) {
-        const external = linkCardFor(post)
-        if (!external) return
-        form.set('external_uri', external.uri)
-        form.set('external_title', external.title)
-        form.set('external_description', external.description)
-      }
-
-      const updateQueued = async () => {
-        const threadTexts = composedThread()
-        if (composerFormat() === 'thread' && threadTexts.length < 2) {
-          setStatus('Write at least two posts before updating the thread.', 'error')
-          activeTextarea()?.focus()
-          return
-        }
-        const text = threadTexts[0] || activeTextarea()?.value.trim()
-        if (!text) {
-          setStatus('Write something before updating.', 'error')
-          activeTextarea()?.focus()
-          return
-        }
-        const targetProviders = selectedConnected().map(target => target.key)
-        if (targetProviders.length === 0) {
-          setStatus('Select a connected account.', 'error', { title: 'Not connected' })
-          return
-        }
-
-        const form = new FormData()
-        form.set('id', String(editingId))
-        form.set('text', text)
-        if (threadTexts.length) form.set('thread', JSON.stringify(threadTexts))
-        form.set('providers', targetProviders.join(','))
-        const editTitle = composedTitle()
-        if (editTitle) form.set('title', editTitle)
-        const scheduled = scheduledIso()
-        if (scheduled) form.set('scheduled_at', scheduleTimestamp(scheduled))
-        appendLinkCard(form, threadTexts.length ? leadingPost() : activePost)
-        const editImageUrl = postImageUrl().trim()
-        if (editImageUrl) form.set('image_url', editImageUrl)
-        // New images replace the saved ones; with none, the saved ones stay
-        // unless their row was removed.
-        if (!appendImages(form) && editRemoveImage) form.set('remove_image', '1')
-        appendOptions(form)
-        // Always sent, never conditional: the server treats an absent field as
-        // "keep what is stored", so clearing every override has to be explicit.
-        form.set('variants', JSON.stringify(variantsPayload()))
-
-        try {
-          const response = await fetch('/api/postline/queue/update', { method: 'POST', body: form })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not update the post.')
-          editDirty = false
-          setStatus(threadTexts.length ? 'Thread updated.' : 'Post updated.', 'success', { title: 'Updated' })
-          // Back to the queue to see the change. A router visit, not a full
-          // load: a reload took the "Post updated" toast down with the page.
-          navigate('/queue')
-        }
-        catch (error) {
-          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Update failed' })
-        }
-      }
-
-      // Draft mode and schedule-time both save to the server-side queue
-      // instead of publishing immediately.
-      const saveToQueue = async (scheduleValue) => {
-        const threadTexts = composedThread()
-        const text = threadTexts[0] || activeTextarea()?.value.trim()
-        if (!text) {
-          setStatus('Write something before saving.', 'error')
-          activeTextarea()?.focus()
-          return
-        }
-        const targetProviders = selectedConnected().map(target => target.key)
-        if (targetProviders.length === 0) {
-          setStatus('Select a connected account before saving to the queue.', 'error', { title: 'Not connected' })
-          return
-        }
-        const form = new FormData()
-        if (threadTexts.length > 1) form.set('thread', JSON.stringify(threadTexts))
-        form.set('text', text)
-        form.set('providers', targetProviders.join(','))
-        const queueTitle = composedTitle()
-        if (queueTitle) form.set('title', queueTitle)
-        if (scheduleValue) form.set('scheduled_at', scheduleTimestamp(scheduleValue))
-        appendLinkCard(form, threadTexts.length > 1 ? leadingPost() : activePost)
-        const queueImageUrl = postImageUrl().trim()
-        if (queueImageUrl) form.set('image_url', queueImageUrl)
-        appendImages(form)
-        appendOptions(form)
-        const queueVariants = variantsPayload()
-        if (Object.keys(queueVariants).length) form.set('variants', JSON.stringify(queueVariants))
-
-        try {
-          const response = await fetch('/api/postline/queue', { method: 'POST', body: form })
-          const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save to the queue.')
-
-          // Clear every segment committed to the queue.
-          if (threadTexts.length > 1) {
-            allPosts().forEach((post) => {
-              const segment = textareaFor(post)
-              if (segment) segment.value = ''
-              renderLinkPreview(post, null)
-            })
-          }
-          const textarea = activeTextarea()
-          if (textarea) textarea.value = ''
-          scheduledIso.set(null)
-          if (scheduleValue) postAction.set('publish')
-          postTitle.set('')
-          clearAttachment()
-          resetPostOptions()
-          renderLinkPreview(activePost, null)
-          // Same reason as the publish path: the overrides went with that post.
-          variants.set({})
-          updateCount()
-          saveDraft()
-          setStatus(
-            payload.data.status === 'scheduled'
-              ? `Scheduled. Check the Queue page to manage it.`
-              : 'Draft saved to the queue.',
-            'success',
-            { title: payload.data.status === 'scheduled' ? 'Scheduled' : 'Draft saved' },
-          )
-          if (payload.data.status === 'scheduled') finishSetup()
-        }
-        catch (error) {
-          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Queue' })
-        }
-      }
-
-      const setMode = (mode, options = {}) => {
-        composerFormat.set(mode)
-        if (mode === 'thread' && allPosts().length === 1 && !options.skipThreadPost) {
-          addPost({ focus: false, save: false })
-        }
-        else {
-          renamePosts()
-          selectPost(mode === 'single' ? allPosts()[0] : activePost, { skipSave: true })
-        }
-        updatePublishability()
-        if (!options.skipSave) saveDraft()
-      }
-
-      const publishOne = async (post, targetProviders) => {
-        const textarea = textareaFor(post)
-        if (!textarea) throw new Error('Missing post body.')
-        const text = textarea.value.trim()
-        if (!text) throw new Error('Write something before publishing.')
-        const external = linkCardFor(post)
-        const imageUrl = postImageUrl().trim()
-        const image = imageUrl ? { url: imageUrl } : undefined
-        return await publishCrosspost({ text, title: composedTitle(), providers: targetProviders, external, image, imageFiles: attachedFiles(), variants: variantsPayload(), options: postOptions() })
-      }
-
-      const publish = async () => {
-        const targetProviders = selectedConnected().map(target => target.key)
-        if (targetProviders.length === 0) {
-          setStatus('Select a connected account in Settings → Channels before publishing.', 'error', { title: 'Not connected' })
-          return
-        }
-
-        const targets = composerFormat() === 'thread'
-          ? allPosts().filter(post => textareaFor(post)?.value.trim())
-          : [activePost].filter(Boolean)
-
-        if (targets.length === 0) {
-          setStatus('Write something before publishing.', 'error')
-          activeTextarea()?.focus()
-          return
-        }
-
-        const providerNames = selectedConnected()
-          .map(target => target.multi ? targetLabel(target.provider, target.account?.handle) : providerLabel(target.provider))
-          .join(', ')
         setStatus(
-          targets.length > 1 ? `Publishing ${targets.length} posts to ${providerNames}…` : `Publishing to ${providerNames}…`,
-          'info',
-          { title: 'Publishing', id: 'publish' },
+          payload.data.status === 'scheduled'
+            ? `Scheduled. Check the Queue page to manage it.`
+            : 'Draft saved to the queue.',
+          'success',
+          { title: payload.data.status === 'scheduled' ? 'Scheduled' : 'Draft saved' },
         )
+        if (payload.data.status === 'scheduled') finishSetup(payload.data.postId ?? payload.data.postIds?.[0])
+      }
+      catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Queue' })
+      }
+    }
 
-        try {
-          let lastUrl
-          const failures = []
-          let successCount = 0
-          const collect = (data) => {
-            for (const result of data.results || []) {
-              if (result.ok) {
-                successCount += 1
-                if (result.url) lastUrl = result.url
-              }
-              else {
-                failures.push(`${targetLabel(result.provider, result.handle)}: ${result.error || 'failed'}`)
-              }
+    const setMode = (mode, options = {}) => {
+      composerFormat.set(mode)
+      if (mode === 'thread' && segments().length === 1 && !options.skipThreadPost) {
+        addPost({ focus: false, save: false })
+      }
+      else if (mode === 'single') activeSegmentId.set(segments()[0].id)
+      if (!options.skipSave) saveDraft()
+    }
+
+    const publishOne = async (post: ComposerSegment, targetProviders: string[]) => {
+      const text = post.text.trim()
+      const external = linkCardFor(post)
+      const imageUrl = postImageUrl().trim()
+      const image = imageUrl ? { url: imageUrl } : undefined
+      return await publishCrosspost({ text, title: composedTitle(), providers: targetProviders, external, image, imageFiles: attachedFiles(), variants: variantsPayload(), options: postOptions() })
+    }
+
+    const publish = async () => {
+      const targetProviders = selectedConnected().map(target => target.key)
+      if (targetProviders.length === 0) {
+        setStatus('Select a connected account in Settings → Channels before publishing.', 'error', { title: 'Not connected' })
+        return
+      }
+
+      const targets = segmentsToSend()
+
+      if (targets.length === 0) {
+        setStatus('Write something before publishing.', 'error')
+        focusSegment()
+        return
+      }
+
+      const providerNames = selectedConnected()
+        .map(target => target.multi ? targetLabel(target.provider, target.account?.handle) : providerLabel(target.provider))
+        .join(', ')
+      setStatus(
+        targets.length > 1 ? `Publishing ${targets.length} posts to ${providerNames}…` : `Publishing to ${providerNames}…`,
+        'info',
+        { title: 'Publishing', id: 'publish' },
+      )
+
+      try {
+        let lastUrl
+        const failures = []
+        let successCount = 0
+        let publishedPostId = 0
+        const collect = (data: Awaited<ReturnType<typeof publishCrosspost>>) => {
+          publishedPostId = data.postId ?? data.postIds?.[0] ?? 0
+          for (const result of data.results || []) {
+            if (result.ok) {
+              successCount += 1
+              if (result.url) lastUrl = result.url
+            }
+            else {
+              failures.push(`${targetLabel(result.provider, result.handle)}: ${result.error || 'failed'}`)
             }
           }
-
-          if (targets.length > 1) {
-            // Threads go up in one request so the server can reply-chain the
-            // segments on providers that support it (Bluesky).
-            const first = targets[0]
-            const external = linkCardFor(first)
-            const imageUrl = postImageUrl().trim()
-            const thread = targets.map(post => textareaFor(post)?.value.trim() || '')
-            collect(await publishCrosspost({
-              text: thread[0],
-              title: composedTitle(),
-              thread,
-              providers: targetProviders,
-              external,
-              image: imageUrl ? { url: imageUrl } : undefined,
-              imageFiles: attachedFiles(),
-              options: postOptions(),
-            }))
-          }
-          else {
-            collect(await publishOne(targets[0], targetProviders))
-          }
-
-          if (targets.length > 1) {
-            allPosts().forEach((post) => {
-              const textarea = textareaFor(post)
-              if (textarea) textarea.value = ''
-              renderLinkPreview(post, null)
-            })
-          }
-          else {
-            const textarea = textareaFor(targets[0])
-            if (textarea) textarea.value = ''
-            renderLinkPreview(targets[0], null)
-          }
-
-          // Overrides belong to the post that just went out. Leaving them set
-          // would send the previous post's per-network copy with the next one,
-          // while the shared body reads as empty — before saveDraft persists it.
-          variants.set({})
-          updateCount()
-          saveDraft()
-          clearAttachment()
-          resetPostOptions()
-          postTitle.set('')
-          dismissPostlineToast('publish')
-          if (failures.length && successCount === 0) {
-            setStatus(`Publish failed. ${failures.join('; ')}`, 'error', { title: 'Publish failed' })
-          }
-          else if (failures.length) {
-            setStatus(`Published to some channels. ${failures.join('; ')}`, 'info', { title: 'Partially published', url: lastUrl })
-          }
-          else {
-            setStatus(
-              targets.length > 1
-                ? `Published ${targets.length} posts to ${providerNames}.`
-                : `Your post is live on ${providerNames}.`,
-              'success',
-              { title: 'Published', url: lastUrl },
-            )
-          }
-          if (successCount > 0) finishSetup()
         }
-        catch (error) {
-          dismissPostlineToast('publish')
-          setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Publish failed' })
-        }
-      }
 
-      composerHandlers.setFormat = setMode
-      composerHandlers.publish = async () => {
-        if (!canPublish() || submitting() || mediaWarnings().length) return
-        submitting.set(true)
-        try {
-          if (editingId) await updateQueued()
-          else if (postAction() === 'publish') await publish()
-          else await saveToQueue(postAction() === 'schedule' ? scheduledIso() : null)
+        if (targets.length > 1) {
+          // Threads go up in one request so the server can reply-chain the
+          // segments on providers that support it (Bluesky).
+          const first = targets[0]
+          const external = linkCardFor(first)
+          const imageUrl = postImageUrl().trim()
+          const thread = targets.map(post => post.text.trim())
+          collect(await publishCrosspost({
+            text: thread[0],
+            title: composedTitle(),
+            thread,
+            providers: targetProviders,
+            external,
+            image: imageUrl ? { url: imageUrl } : undefined,
+            imageFiles: attachedFiles(),
+            options: postOptions(),
+          }))
         }
-        finally {
-          submitting.set(false)
+        else {
+          collect(await publishOne(targets[0], targetProviders))
         }
-      }
 
-      postsRoot?.addEventListener('click', (event) => {
-        const target = event.target
-        if (!(target instanceof HTMLElement)) return
-        const post = target.closest('[data-composer-post]')
-        if (target.closest('[data-select-post]')) selectPost(post)
-        if (target.closest('[data-remove-post]')) removePost(post)
-      })
-      postsRoot?.addEventListener('input', (event) => {
-        const target = event.target
-        if (!(target instanceof HTMLTextAreaElement)) return
-        const post = target.closest('[data-composer-post]')
-        selectPost(post, { skipSave: true })
-        queuePreviewUpdate(post)
-        queueDraftSave()
-      })
-      postsRoot?.addEventListener('focusin', (event) => {
-        const target = event.target
-        if (!(target instanceof HTMLTextAreaElement)) return
-        const post = target.closest('[data-composer-post]')
-        selectPost(post)
-        updateCount()
-      })
-      imageHandlers.changed = markEdited
-      imageHandlers.removeSaved = () => {
-        if (editingId && editHadImage) editRemoveImage = true
-      }
-      addPostButton?.addEventListener('click', () => {
-        if (submitting() || (editingQueued() && composerFormat() === 'single')) return
-        setMode('thread', { skipSave: true, skipThreadPost: true })
-        addPost()
-        markEdited()
-      })
-      previewButton?.addEventListener('click', () => {
-        const text = activeTextarea()?.value.trim()
-        void updateLinkPreview()
-        // This used to toast the entire post body back at its author under the
-        // word "Preview:", which is neither a preview nor news to the person
-        // who typed it. What the button does is refresh the link card, and
-        // that shows up in the card.
-        //
-        // The empty case keeps its message, because there the button genuinely
-        // does nothing and silence would read as broken — `updateLinkPreview`
-        // only touches a link card, so plain text with no URL has no effect at
-        // all. That is a missing feature the toast was covering for.
-        if (!text) setStatus('Nothing to preview yet.', 'error')
-      })
-      refreshButton?.addEventListener('click', async () => {
-        refreshButton.setAttribute('disabled', 'disabled')
-        try {
-          await refreshConnection()
+        clearSentSegments(targets)
+
+        // Overrides belong to the post that just went out. Leaving them set
+        // would send the previous post's per-network copy with the next one,
+        // while the shared body reads as empty — before saveDraft persists it.
+        variants.set({})
+        saveDraft()
+        clearAttachment()
+        resetPostOptions()
+        postTitle.set('')
+        dismissPostlineToast('publish')
+        if (failures.length && successCount === 0) {
+          setStatus(`Publish failed. ${failures.join('; ')}`, 'error', { title: 'Publish failed' })
+        }
+        else if (failures.length) {
+          setStatus(`Published to some channels. ${failures.join('; ')}`, 'info', { title: 'Partially published', url: lastUrl })
+        }
+        else {
           setStatus(
-            canPublish() ? 'Accounts are ready to publish.' : 'Connect an account in Settings → Channels.',
-            canPublish() ? 'success' : 'error',
-            { title: 'Channels' },
+            targets.length > 1
+              ? `Published ${targets.length} posts to ${providerNames}.`
+              : `Your post is live on ${providerNames}.`,
+            'success',
+            { title: 'Published', url: lastUrl },
           )
         }
-        finally {
-          refreshButton.removeAttribute('disabled')
-        }
-      })
-      composerHandlers.variantChanged = () => {
-        markEdited()
-        updateCount()
-        queueDraftSave()
+        if (successCount > 0) finishSetup(publishedPostId)
       }
-      searchButton?.addEventListener('click', () => {
-        const text = activeTextarea()?.value.trim()
-        setStatus(text ? `Searching local drafts for: ${text.slice(0, 80)}` : 'Write a phrase first, then search local drafts.', text ? 'success' : 'error')
-      })
-      // Editing a queued post — don't restore a local draft over it. The
-      // reciprocal guard (never writing an edit back into the draft) lives in
-      // saveDraft itself, so it holds for every caller.
-      if (!editParam) {
-        useEventListener('beforeunload', saveDraft, { target: window })
-        restoreDraft()
+      catch (error) {
+        dismissPostlineToast('publish')
+        setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Publish failed' })
       }
-      renamePosts()
-      selectPost(allPosts()[savedActiveIndex] || activePost, { skipSave: true })
-      updateCount()
-      void updateLinkPreview(activePost)
-      // Load the edit post only after connection so provider toggles resolve.
-      // The queue calendar prefills 09:00 on the chosen workspace date.
-      const scheduleParam = useRoute().query.schedule || null
-      const applyScheduleParam = () => {
-        if (!scheduleParam || !/^\d{4}-\d{2}-\d{2}$/.test(scheduleParam)) return
-        const instant = instantFromWallTime(`${scheduleParam} 09:00:00`, scheduleZone())
-        if (instant) {
-          scheduledIso.set(instant.toISOString())
-          postAction.set('schedule')
-        }
-        activeTextarea()?.focus()
-      }
+    }
 
-      const start = async () => {
-        await refreshConnection()
-        if (setupActive && !editParam) {
-          selectedClear()
-          if (connectedProviders().some(target => target.key === setupTarget)) selectedAdd(setupTarget)
-          updatePublishability()
-        }
-        if (editParam) await loadEditPost(editParam)
-        else {
-          await zoneReady
-          applyScheduleParam()
-        }
+    async function submitPost() {
+      if (!canPublish() || submitting() || mediaWarnings().length) return
+      submitting.set(true)
+      try {
+        if (editingId()) await updateQueued()
+        else if (postAction() === 'publish') await publish()
+        else await saveToQueue(postAction() === 'schedule' ? scheduledIso() : null)
       }
-      onMount(() => { void start() })
-    })()
+      finally {
+        submitting.set(false)
+      }
+    }
+
+    function segmentEdited(id: number) {
+      markEdited()
+      queuePreviewUpdate(id)
+      queueDraftSave()
+    }
+    function segmentActivated(id: number) {
+      void updateLinkPreview(id)
+      queueDraftSave()
+    }
+    function appendSegment() {
+      if (submitting() || (editingQueued() && composerFormat() === 'single')) return
+      setMode('thread', { skipSave: true, skipThreadPost: true })
+      addPost()
+      markEdited()
+    }
+
+    function previewPost() {
+      if (sharedCopy().trim()) void updateLinkPreview()
+      else setStatus('Nothing to preview yet.', 'error')
+    }
+
+    function variantChanged() {
+      markEdited()
+      queueDraftSave()
+    }
+    // Editing a queued post — don't restore a local draft over it. The
+    // reciprocal guard (never writing an edit back into the draft) lives in
+    // saveDraft itself, so it holds for every caller.
+    if (!editParam) {
+      useEventListener('beforeunload', saveDraft)
+      restoreDraft()
+    }
+    for (const post of segments()) void updateLinkPreview(post.id)
+    // Load the edit post only after connection so provider toggles resolve.
+    // The queue calendar prefills 09:00 on the chosen workspace date.
+    const scheduleParam = query.schedule || null
+    const applyScheduleParam = () => {
+      if (!scheduleParam || !/^\d{4}-\d{2}-\d{2}$/.test(scheduleParam)) return
+      const instant = instantFromWallTime(`${scheduleParam} 09:00:00`, scheduleZone())
+      if (instant) {
+        scheduledIso.set(instant.toISOString())
+        postAction.set('schedule')
+      }
+      focusSegment()
+    }
+
+    const start = async () => {
+      await refreshConnection()
+      if (editParam) await loadEditPost(editParam)
+      else {
+        await zoneReady
+        applyScheduleParam()
+      }
+    }
+    effect(() => {
+      if (!variantsAvailable()) {
+        variantsOpen.set(false)
+        newVariant.set('')
+      }
+    })
+
+    onMount(() => { void start() })
   </script>
 @endsection

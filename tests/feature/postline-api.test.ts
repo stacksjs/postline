@@ -38,6 +38,7 @@ describe('postline api — auth', () => {
     ['/api/postline/providers'],
     ['/api/postline/analytics'],
     ['/api/postline/queue'],
+    ['/api/postline/setup/post-status?id=1'],
     ['/api/postline/campaigns'],
     ['/api/postline/listening'],
     ['/api/postline/activity'],
@@ -53,6 +54,19 @@ describe('postline api — auth', () => {
 })
 
 describe('postline api — reads', () => {
+  test('setup looks up the specified post even after it is published', async () => {
+    const client = featureTest().actingAs(await actingUser())
+    const path = '/api/postline/setup/post-status?id='
+    const earlier = await postQueue.save({ text: 'An earlier publication', providers: ['blog'] })
+    await (db as any).updateTable('posts').set({ status: 'published' }).where('id', '=', earlier.postId).execute()
+    const first = await postQueue.save({ text: 'First post from setup', providers: ['blog'] })
+
+    expect(await (await client.get(path + first.postId)).json()).toEqual({ ok: true, data: { status: 'draft' } })
+    expect(await (await client.get(path + earlier.postId)).json()).toEqual({ ok: true, data: { status: 'published' } })
+    ;(await client.get(path + '0')).assertStatus(422)
+    ;(await client.get(path + Number.MAX_SAFE_INTEGER)).assertStatus(404)
+  })
+
   test('bootstrap returns the workspace profile, channels, and unread counts together', async () => {
     const response = await featureTest().actingAs(await actingUser()).get('/api/postline/bootstrap')
 

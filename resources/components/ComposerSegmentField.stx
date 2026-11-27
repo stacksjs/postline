@@ -1,0 +1,45 @@
+<script client>
+const label = useReactiveProp('label', 'Post body')
+const placeholder = useReactiveProp('placeholder', '')
+const text = useReactiveProp('text', '')
+const focusRequest = useReactiveProp('focusRequest', 0)
+const readonly = useReactiveProp('readonly', false)
+const body = state(text())
+const field = useRef('field')
+const emit = defineEmits(['edit', 'activate'])
+
+watch(text, (value) => {
+  if (body() === value) return
+  body.set(value)
+  field.current?.dispatchEvent(new CustomEvent('postline:composer-text', { detail: value }))
+})
+
+function focusField() {
+  if (!focusRequest()) return
+  void nextTick(() => {
+    const editor = field.current
+    if (editor?.dispatchEvent(new Event('postline:composer-focus', { cancelable: true }))) editor.focus()
+  })
+}
+
+watch(focusRequest, focusField)
+onMount(focusField)
+
+function updateBody(event: Event) {
+  emit('edit', { value: (event.target as HTMLTextAreaElement).value })
+}
+</script>
+
+<textarea
+  class="min-h-36 w-full leading-relaxed text-ink text-xl placeholder:text-muted bg-transparent border-0 outline-none rounded-md resize-none"
+  ref="field"
+  data-focus-outline
+  data-bluesky-text
+  spellcheck="true"
+  :aria-label="label()"
+  :placeholder="placeholder()"
+  :readonly="readonly()"
+  x-model="body"
+  @input="updateBody"
+  @focus="emit('activate', {})"
+></textarea>

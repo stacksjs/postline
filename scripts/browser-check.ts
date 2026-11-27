@@ -569,6 +569,7 @@ async function checkLocalComposerDraft(cdp: Cdp): Promise<void> {
   const original = 'A local draft from before the composer format switch'
   const edited = 'Updated local draft'
   const editor = "document.querySelector('[data-bluesky-text]')"
+  const richEditor = "document.querySelector('[data-richtext-host] [contenteditable=true]')"
   await evaluate(cdp, `localStorage.setItem('${draftKey}', JSON.stringify({
     activeIndex: 0, mode: 'draft', posts: [{ text: ${JSON.stringify(original)} }], version: 1,
   }))`)
@@ -577,15 +578,25 @@ async function checkLocalComposerDraft(cdp: Cdp): Promise<void> {
     await waitUntil('Legacy local draft text and intent are restored', () => evaluate<boolean>(cdp, `
       ${editor}?.value === ${JSON.stringify(original)}
         && document.querySelector('[data-bluesky-publish-label]').textContent === 'Save draft'`), 5_000)
-    await evaluate(cdp, `${editor}.value = ${JSON.stringify(edited)}
-      ${editor}.dispatchEvent(new Event('input', { bubbles: true }))`)
+    await waitUntil('The long-form editor loads the restored text', () => evaluate<boolean>(cdp, `
+      ${richEditor}?.textContent === ${JSON.stringify(original)}`), 5_000)
+    await evaluate(cdp, `(() => {
+      const editor = ${richEditor}
+      editor.focus()
+      const range = new Range()
+      range.selectNodeContents(editor)
+      const selection = getSelection()
+      selection.removeAllRanges()
+      selection.addRange(range)
+    })()`)
+    await cdp.send('Input.insertText', { text: edited })
     await waitUntil('Edited local draft is saved in the current format', () => evaluate<boolean>(cdp, `(() => {
       const draft = JSON.parse(localStorage.getItem('${draftKey}') || '{}')
       return draft.posts?.[0]?.text === ${JSON.stringify(edited)} && draft.mode === 'single' && draft.action === 'draft'
     })()`), 5_000)
     await auditPage(`${site}/composer`, { cdp })
     await waitUntil('Updated composer draft survives a reload', () => evaluate<boolean>(cdp, `
-      ${editor}?.value === ${JSON.stringify(edited)}`), 5_000)
+      ${editor}?.value === ${JSON.stringify(edited)} && ${richEditor}?.textContent === ${JSON.stringify(edited)}`), 5_000)
   }
   finally {
     await auditPage(`${site}/queue`, { cdp })
@@ -624,10 +635,21 @@ async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
   await evaluate(cdp, "document.querySelector('[data-composer-mode=single]').focus()")
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Single format shows the opening without dropping the second segment', () => evaluate<boolean>(cdp, `
-    [...${editors}].filter(editor => editor.closest('[data-composer-post]').getClientRects().length).length === 1
-      && ${editors}[1].value === ${JSON.stringify(segments[1])}`), 5_000)
+    ${editors}.length === 2
+      && [...${editors}].filter(editor => editor.closest('[data-composer-post]').getClientRects().length).length === 1
+      && ${editors}[0].value === ${JSON.stringify(segments[0])}`), 5_000)
   await evaluate(cdp, `${format}.focus()`)
   await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Returning to Thread restores the second segment', () => evaluate<boolean>(cdp, `
+    ${editors}.length === 2 && ${editors}[1].value === ${JSON.stringify(segments[1])}
+      && ${editors}[1].getClientRects().length > 0`), 5_000)
+  await evaluate(cdp, `document.querySelector('[aria-label="Remove post 2"]').click()`)
+  const undoSegment = "document.querySelector('[data-toast-id=composer-post-removed] [data-toast-action]')"
+  await waitUntil('Removing a thread segment offers Undo', () => evaluate<boolean>(cdp, `
+    ${editors}.length === 1 && ${undoSegment}?.textContent === 'Undo'`), 5_000)
+  await evaluate(cdp, `${undoSegment}.click()`)
+  await waitUntil('Undo restores the removed text in one editor', () => evaluate<boolean>(cdp, `
+    ${editors}.length === 2 && ${editors}[1].value === ${JSON.stringify(segments[1])}`), 5_000)
   await evaluate(cdp, `(() => {
     const bytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD1sAAAAASUVORK5CYII='), char => char.charCodeAt(0))
     const transfer = new DataTransfer()
@@ -1197,6 +1219,8 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
         && !document.querySelector('[data-bluesky-publish]')?.disabled`), 5_000)
     await click("document.querySelector('[data-bluesky-publish]')")
     await heading('Your first post is ready')
+    if (!await evaluate<boolean>(cdp, `Number(new URLSearchParams(location.search).get('post')) > 0`))
+      throw new Error('Setup did not persist the post ID returned by publishing.')
   }
   catch (error) {
     const state = await evaluate(cdp, `(async () => ({
@@ -1222,6 +1246,41 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
   await click("document.getElementById('queue-tab-scheduled')")
 }
 
+async function checkSetupProviderRetry(cdp: Cdp): Promise<void> {
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const actualFetch = window.fetch.bind(window)
+    window.resumeProviderBootstrap = false
+    window.fetch = (input, options) => {
+      const request = new Request(input, options)
+      if (new URL(request.url).pathname !== '/api/postline/bootstrap') return actualFetch(input, options)
+      if (!window.resumeProviderBootstrap) {
+        return Promise.resolve(Response.json({ ok: false, error: 'Temporarily unavailable' }, { status: 503 }))
+      }
+      return actualFetch(input, options).then(async response => {
+        const payload = await response.json()
+        const providers = payload.data.providers.map(provider => provider.provider !== 'bluesky' ? provider : {
+          ...provider, connected: true, canPublish: true,
+          accounts: [{ id: 101, provider: 'bluesky', handle: 'second-channel.example', connected: true, canPublish: true, isDefault: true }],
+        })
+        return Response.json({ ...payload, data: { ...payload.data, providers } })
+      })
+    }
+  ` })
+  try {
+    await auditPage(`${site}/composer?setup=1&target=blog`, { cdp })
+    const retry = "[...document.querySelectorAll('button')].find(button => button.textContent.includes('Try again') && button.getClientRects().length)"
+    await waitUntil('The first registration provider read presents Retry', () => evaluate<boolean>(cdp, `Boolean(${retry})`), 5_000)
+    await evaluate(cdp, `window.resumeProviderBootstrap = true; ${retry}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Retry preserves the chosen Blog and leaves Bluesky unselected', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-provider-toggle=blog]')?.getAttribute('aria-pressed') === 'true'
+        && document.querySelector('[data-provider-toggle="bluesky:101"]')?.getAttribute('aria-pressed') === 'false'`), 5_000)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+  }
+}
+
 let exitCode = 0
 try {
   await waitUntil('The API', async () => (await fetch(`http://localhost:${API_PORT}/api/postline/health`)).status < 500)
@@ -1231,6 +1290,7 @@ try {
   const { cdp, close } = await launch({ viewport: { width: 1280, height: 800 } })
   try {
     await checkFirstRun(cdp)
+    await checkSetupProviderRetry(cdp)
     const fixturesReady = await evaluate<string>(cdp, `(async () => {
       const draft = await fetch('/api/postline/queue', { method: 'POST', body: new URLSearchParams({ text: 'A draft for the keyboard smoke test', providers: 'bluesky' }) })
       if (!draft.ok) return 'could not create the queue fixture: ' + await draft.text()

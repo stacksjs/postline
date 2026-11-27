@@ -735,6 +735,11 @@ export class QueueService {
     tx.deleteFrom('posts').where('id', '=', id).execute()
   }
 
+  async status(id: number): Promise<string | null> {
+    const post = await database.selectFrom('posts').select(['status']).where('id', '=', id).executeTakeFirst()
+    return post?.status ?? null
+  }
+
   /**
    * Full editable state for one draft/scheduled/failed post, for prefilling
    * the composer. Media is described (present/kind), not returned as bytes —

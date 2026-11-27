@@ -1,26 +1,4 @@
-/**
- * Rich-text editing for long-form posts, on ts-medium-editor.
- *
- * The composer's textarea stays the source of truth. Around twenty places read
- * `textarea.value` — character counting, per-network variants, thread mode,
- * drafts, the publish payload — and rewriting all of them to read from a
- * contenteditable would be a large change with a lot of ways to be subtly
- * wrong.
- *
- * So the editor is a *view* over the textarea rather than a replacement for
- * it. It mounts alongside, and every change is serialized back to Markdown
- * with `toMarkdown` and written into the textarea, which then dispatches its
- * normal `input` event. Every existing consumer keeps working, unmodified, and
- * the stored body stays the Markdown the blog already expects.
- *
- * Only long-form gets it. A 300-character Bluesky post does not want a
- * formatting toolbar, and the Markdown a rich editor emits would be published
- * literally by networks that do not render it.
- *
- * The editor is about 30 KB, so only the composer downloads it: view-code.ts,
- * which every workspace page loads, imports this file when it finds one.
- */
-
+/** Mount the lazy long-form editor against the composer's controlled textarea. */
 import { isEmptyHtml, toMarkdown } from 'ts-medium-editor'
 import { mountMediumEditor } from 'ts-medium-editor/stx'
 
@@ -50,84 +28,101 @@ function markdownToHtml(markdown: string): string {
     .join('')
 }
 
+const boundComposers = new WeakSet<HTMLElement>()
+
 function setupRichText(): void {
   const root = document.querySelector<HTMLElement>('[data-postline-page="composer"]')
-  if (!root || root.dataset.richtextBound === 'true') return
-  root.dataset.richtextBound = 'true'
+  if (!root || boundComposers.has(root)) return
+  const posts = root.querySelector('[data-composer-posts]')
+  const title = root.querySelector('[data-compose-title]')
+  if (!posts || !title) return
+  boundComposers.add(root)
 
-  const textarea = root.querySelector<HTMLTextAreaElement>('[data-bluesky-text]')
-  const host = root.querySelector<HTMLElement>('[data-richtext-host]')
-  const toggle = root.querySelector<HTMLElement>('[data-richtext-toggle]')
-  if (!textarea || !host) return
+  let mountedField: HTMLTextAreaElement | null = null
+  let unmount = () => {}
 
-  let teardown: (() => void) | null = null
-  let syncing = false
-
-  const unmount = (): void => {
-    teardown?.()
-    teardown = null
-    host.classList.add('hidden')
-    textarea.classList.remove('hidden')
-  }
-
-  const mount = (): void => {
-    if (teardown) return
-
-    host.innerHTML = ''
+  function mount(field: HTMLTextAreaElement, host: HTMLElement): void {
     const surface = document.createElement('div')
     surface.className = 'min-h-36 w-full leading-relaxed text-[18px] text-ink outline-none medium-editor-element'
     surface.setAttribute('role', 'textbox')
     surface.setAttribute('aria-multiline', 'true')
-    surface.setAttribute('aria-label', textarea.getAttribute('aria-label') || 'Post body')
+    surface.setAttribute('aria-label', field.getAttribute('aria-label') || 'Post body')
     surface.setAttribute('data-focus-outline', '')
-    host.appendChild(surface)
-
-    // Seed from whatever the writer already had, so switching modes never
-    // costs them a draft.
-    surface.innerHTML = markdownToHtml(textarea.value)
-
+    surface.innerHTML = markdownToHtml(field.value)
+    host.replaceChildren(surface)
     host.classList.remove('hidden')
-    textarea.classList.add('hidden')
+    field.classList.add('hidden')
+    mountedField = field
 
-    teardown = mountMediumEditor({
+    let applyingModel = false
+    const teardown = mountMediumEditor({
       element: surface,
-      // The textarea already carries the draft, and the composer persists it.
-      // A second copy in localStorage would be a second source of truth.
       storageKey: false,
       editorOptions: { placeholder: { text: 'Write the piece…' } },
       onChange(html: string) {
-        if (syncing) return
-        syncing = true
-        textarea.value = isEmptyHtml(html) ? '' : toMarkdown(html)
-        // The composer listens on `input` for counting, variants and drafts.
-        textarea.dispatchEvent(new Event('input', { bubbles: true }))
-        syncing = false
+        if (applyingModel || field.readOnly) return
+        field.value = isEmptyHtml(html) ? '' : toMarkdown(html)
+        field.dispatchEvent(new Event('input', { bubbles: true }))
       },
     })
-  }
 
-  // Long-form is signalled by the title field being visible, which the
-  // composer already toggles when the blog is a selected target. Reading that
-  // rather than re-deriving it keeps one definition of "this is an essay".
-  const title = root.querySelector<HTMLElement>('[data-compose-title]')
-  const isLongForm = (): boolean => Boolean(title && !title.classList.contains('hidden'))
+    function updateFromModel(event: Event): void {
+      const value: unknown = (event as CustomEvent).detail
+      if (typeof value !== 'string') return
+      applyingModel = true
+      try { surface.innerHTML = markdownToHtml(value) }
+      finally { applyingModel = false }
+    }
+
+    function focus(event: Event): void {
+      event.preventDefault()
+      surface.focus()
+    }
+
+    const updateReadonly = () => {
+      surface.setAttribute('contenteditable', String(!field.readOnly))
+      surface.setAttribute('aria-readonly', String(field.readOnly))
+    }
+    const readOnly = new MutationObserver(updateReadonly)
+    readOnly.observe(field, { attributes: true, attributeFilter: ['readonly'] })
+    updateReadonly()
+    field.addEventListener('postline:composer-text', updateFromModel)
+    field.addEventListener('postline:composer-focus', focus)
+    unmount = () => {
+      readOnly.disconnect()
+      field.removeEventListener('postline:composer-text', updateFromModel)
+      field.removeEventListener('postline:composer-focus', focus)
+      teardown()
+      host.replaceChildren()
+      host.classList.add('hidden')
+      field.classList.remove('hidden')
+      mountedField = null
+      unmount = () => {}
+    }
+  }
 
   const sync = (): void => {
-    if (isLongForm()) mount()
-    else unmount()
+    if (title.classList.contains('hidden')) {
+      unmount()
+      return
+    }
+    const host = posts.querySelector<HTMLElement>('[data-richtext-host]')
+    const field = host?.closest('[data-composer-post]')?.querySelector<HTMLTextAreaElement>('[data-bluesky-text]')
+    if (!host || !field || field === mountedField) return
+    unmount()
+    mount(field, host)
   }
 
-  if (title) {
-    // The composer toggles the title's `hidden` class rather than firing an
-    // event, so the class is what there is to observe.
-    new MutationObserver(sync).observe(title, { attributes: true, attributeFilter: ['class'] })
+  const observer = new MutationObserver(sync)
+  observer.observe(title, { attributes: true, attributeFilter: ['class'] })
+  observer.observe(posts, { childList: true, subtree: true })
+  const disposeAfterNavigation = (): void => {
+    if (root.isConnected) return
+    observer.disconnect()
+    unmount()
+    window.removeEventListener('stx:load', disposeAfterNavigation)
   }
-
-  toggle?.addEventListener('click', () => {
-    if (teardown) unmount()
-    else mount()
-  })
-
+  window.addEventListener('stx:load', disposeAfterNavigation)
   sync()
 }
 
