@@ -2716,6 +2716,12 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
     }
   ` })
   try {
+    const seeded = await evaluate<number>(cdp, `(async () => {
+      const future = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 19).replace('T', ' ')
+      const body = new URLSearchParams({ title: 'Publicación de prueba', text: 'Publicación de prueba', providers: 'blog', scheduled_at: future })
+      return (await fetch('/api/postline/queue', { method: 'POST', body })).status
+    })()`)
+    if (seeded < 200 || seeded >= 300) throw new Error(`Could not schedule the Spanish date-picker fixture (HTTP ${seeded}).`)
     const report = await auditPage(`${site}/queue`, { cdp })
     for (const error of report.errors) fail('queue', 'Spanish', error)
     for (const request of report.failed) fail('queue', 'Spanish', request)
@@ -2740,6 +2746,28 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
           node.textContent === 'Aún no hay fuentes de borradores.' && node.getClientRects().length))
     `), 5_000)
     await evaluate(cdp, "document.querySelector('[data-draft-feeds] summary').click()")
+
+    const select = `[...document.querySelectorAll('button[aria-pressed]')].find(button => button.textContent.trim() === 'Seleccionar publicaciones')`
+    await waitUntil('Spanish scheduled post can be selected', () => evaluate<boolean>(cdp, `
+      ${select} && !${select}.disabled && document.getElementById('queue-results')?.innerText.includes('Publicación de prueba')
+    `), 5_000)
+    await evaluate(cdp, `${select}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const picker = `document.querySelector('[data-schedule-day-details]')`
+    const summary = `${picker}?.querySelector('summary')`
+    await waitUntil('Spanish date picker is available', () => evaluate<boolean>(cdp, `Boolean(${summary}?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, `${summary}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Spanish date picker exposes localized month buttons', () => evaluate<boolean>(cdp, `
+      ${picker}?.open && Boolean(${picker}.querySelector('button[aria-label="Mes anterior"]')?.getClientRects().length
+        && ${picker}.querySelector('button[aria-label="Mes siguiente"]')?.getClientRects().length)
+    `), 5_000)
+    await pressKey(cdp, 'Escape', 27)
+    await waitUntil('Escape closes the date picker and restores focus', () => evaluate<boolean>(cdp, `
+      !${picker}.open && document.activeElement === ${summary}
+    `), 5_000)
+    await evaluate(cdp, `${select}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
 
     await evaluate(cdp, "document.querySelector('[data-queue-tab][aria-selected=true]').focus()")
     await pressKey(cdp, 'ArrowRight', 39)

@@ -1,8 +1,10 @@
 <script server cache>
-import { workspaceLocale, workspaceQueuePanelsText } from '../../app/Support/Localization/workspace'
+import { workspaceLocale, workspaceQueuePanelsText, workspaceQueueText } from '../../app/Support/Localization/workspace'
 
 export const panelLocale = workspaceLocale
 export const panelText = workspaceQueuePanelsText.picker
+export const previousMonthLabel = workspaceQueueText.previousMonth
+export const nextMonthLabel = workspaceQueueText.nextMonth
 export const panelClient = { locale: workspaceLocale, messages: panelText }
 </script>
 
@@ -60,6 +62,6 @@ function selectDay(date: Date) {
   <summary class="px-3 py-2 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg cursor-pointer" :aria-label="words.t('label', { day: dayLabel() })" ref="dateTrigger">{{ dayLabel() }}</summary>
   <div :if="dateOpen()" class="pt-2">
     <p class="m-0 pb-2 text-muted text-xs">{{ panelText.timeZone }} <span :text="timeZone()"></span></p>
-    <Calendar locale="{{ panelLocale }}" :value="dayValue" :minDate="dayMinimum" @change="selectDay" />
+    <Calendar locale="{{ panelLocale }}" previousMonthLabel="{{ previousMonthLabel }}" nextMonthLabel="{{ nextMonthLabel }}" :value="dayValue" :minDate="dayMinimum" @change="selectDay" />
   </div>
 </details>
