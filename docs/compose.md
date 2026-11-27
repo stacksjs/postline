@@ -6,6 +6,10 @@ Open **Composer** and select the connected accounts you want to publish to. If y
 
 Write the shared text in **Single** mode. The character count reflects the selected networks. If one network's copy needs a shorter version, different wording, or a different link, open **Customize per network** and enter its text. A variant applies to every selected account on that network. Review the variants again after changing the shared text. Removing a variant restores the shared text for that network.
 
+## Reuse saved text
+
+Open **Saved text** in Composer to create, edit, or delete a snippet, post template, or hashtag set. For hashtags, enter names with or without `#` and separate them with spaces or commas. Select an item and choose **Insert in post** to add it to the active post or thread segment. The copy in your post is editable and stays there if you change or delete the saved item later.
+
 ## Threads
 
 Select **Thread** and add one segment for each post. Check the limits while editing each segment. Thread-capable networks publish subsequent segments as replies. The composer identifies channels that can only receive the first segment. Variants are available in Single mode. In a thread, each segment uses the shared text.

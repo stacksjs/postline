@@ -1,0 +1,142 @@
+<script client>
+import type { ComposerPreset, ComposerPresetKind } from '../../app/Services/ComposerPresetService'
+import { requestJson } from '../functions/postline-client'
+
+const endpoint = '/api/postline/composer/presets'
+const disabled = useReactiveProp('disabled', false)
+const dialog = useRef<HTMLDialogElement>('library')
+const nameInput = useRef<HTMLInputElement>('nameInput')
+const title = useId('saved-text')
+const emit = defineEmits(['insert'])
+const items = state<ComposerPreset[]>([])
+const selectedId = state('')
+const selected = derived(() => items().find(item => item.uuid === selectedId()))
+const busy = state(false)
+const message = state('')
+const mode = state<'browse' | 'edit' | 'delete'>('browse')
+const id = state('')
+const name = state('')
+const body = state('')
+const kind = state<ComposerPresetKind>('snippet')
+const labels = { snippet: 'Snippet', template: 'Template', hashtags: 'Hashtag set' }
+
+async function run(work: () => Promise<void>) {
+  if (busy()) return
+  message.set('')
+  busy.set(true)
+  try { await work() }
+  catch (error) { message.set(error instanceof Error ? error.message : String(error)) }
+  finally { busy.set(false) }
+}
+
+async function load() {
+  const { data } = await requestJson(endpoint, { cache: 'no-store' }, 'Could not load saved text.')
+  items.set(data)
+  if (!selected()) selectedId.set(data[0]?.uuid || '')
+}
+
+function open() {
+  if (disabled()) return
+  mode.set('browse')
+  dialog.current?.showModal()
+  void run(load)
+}
+
+function edit(item?: ComposerPreset) {
+  id.set(item?.uuid || '')
+  kind.set(item?.kind || 'snippet')
+  name.set(item?.name || '')
+  body.set(item?.body || '')
+  message.set('')
+  mode.set('edit')
+  void nextTick(() => nameInput.current?.focus())
+}
+
+function save() {
+  void run(async () => {
+    const { data } = await requestJson(endpoint, {
+      method: 'POST',
+      body: JSON.stringify({ ...(id() && { uuid: id() }), name: name(), kind: kind(), body: body() }),
+    }, 'Could not save the text.')
+    items.update(current => [...current.filter(item => item.uuid !== data.uuid), data].sort((a, b) => a.name.localeCompare(b.name)))
+    selectedId.set(data.uuid)
+    mode.set('browse')
+  })
+}
+
+function remove() {
+  const item = selected()
+  if (!item) return
+  void run(async () => {
+    await requestJson(`${endpoint}/delete`, { method: 'POST', body: JSON.stringify({ uuid: item.uuid }) }, 'Could not delete the saved text.')
+    items.update(current => current.filter(preset => preset.uuid !== item.uuid))
+    selectedId.set(items()[0]?.uuid || '')
+    mode.set('browse')
+  })
+}
+
+function insert() {
+  const item = selected()
+  if (!item || disabled()) return
+  dialog.current?.close()
+  emit('insert', item)
+}
+</script>
+
+<template>
+  <div>
+    <button class="px-3 h-9 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg" type="button" aria-haspopup="dialog" :disabled="disabled()" @click="open" data-composer-saved-text>Saved text</button>
+    <dialog class="m-auto p-5 max-h-[85vh] max-w-md w-11/12 text-ink bg-panel backdrop:bg-black/40 border border-line rounded-2xl shadow-xl" role="dialog" :aria-labelledby="title" ref="library" data-saved-text-library>
+      <header class="flex gap-3 items-center justify-between mb-3">
+        <h2 class="m-0 font-semibold text-base text-ink" :id="title">Saved text</h2>
+        <form method="dialog"><button class="text-info text-ui" type="submit">Close</button></form>
+      </header>
+
+      <p class="mb-2 text-danger text-ui" role="alert" x-show="message()" :text="message()"></p>
+      <p class="text-muted text-ui" role="status" x-show="busy()">Working…</p>
+
+      <div class="grid gap-3" x-show="mode() === 'browse'">
+        <label class="grid gap-1 text-ui" x-show="items().length">
+          Saved item
+          <select class="px-2 h-9 min-w-0 text-ink bg-panel-2 border border-line rounded-lg" x-model="selectedId" :disabled="busy()" data-saved-text-select>
+            <option x-for="item in items()" :key="item.uuid" :value="item.uuid" :text="item.name + ' · ' + labels[item.kind]"></option>
+          </select>
+        </label>
+        <p class="m-0 text-muted text-ui" x-show="!busy() && !message() && !items().length">Save a snippet, template, or hashtag set to reuse it in a post.</p>
+        <p class="overflow-auto m-0 p-2 max-h-32 break-words text-ui whitespace-pre-wrap bg-panel-2 rounded-lg" x-show="selected()" :text="selected()?.body || ''"></p>
+        <div class="flex flex-wrap gap-3 items-center text-ui">
+          <button class="px-3 h-8 font-semibold text-on-accent bg-accent rounded-lg" type="button" :disabled="busy() || !selected()" x-show="selected()" @click="insert" data-saved-text-insert>Insert in post</button>
+          <button class="text-info" type="button" :disabled="busy()" @click="edit()" data-saved-text-new>New item</button>
+          <button class="text-info" type="button" :disabled="busy() || !selected()" x-show="selected()" @click="edit(selected())" data-saved-text-edit>Edit</button>
+          <button class="text-danger" type="button" :disabled="busy() || !selected()" x-show="selected()" @click="mode.set('delete')" data-saved-text-delete>Delete…</button>
+        </div>
+      </div>
+
+      <form class="grid gap-3 text-ui" x-show="mode() === 'edit'" @submit.prevent="save" data-saved-text-form>
+        <label class="grid gap-1">
+          Type
+          <select class="px-2 h-9 text-ink bg-panel-2 border border-line rounded-lg" x-model="kind" name="kind">
+            <option value="snippet">Snippet</option>
+            <option value="template">Template</option>
+            <option value="hashtags">Hashtag set</option>
+          </select>
+        </label>
+        <label class="grid gap-1">Name <input class="px-2 h-9 text-ink bg-panel-2 border border-line rounded-lg" type="text" x-model="name" name="name" maxlength="80" ref="nameInput" required></label>
+        <label class="grid gap-1">Text <textarea class="p-2 min-h-24 text-ink bg-panel-2 border border-line rounded-lg" x-model="body" name="body" maxlength="10000" required></textarea></label>
+        <p class="m-0 text-muted text-xs" x-show="kind() === 'hashtags'">Separate tags with spaces or commas.</p>
+        <div class="flex gap-3 items-center">
+          <button class="px-3 h-8 font-semibold text-on-accent bg-accent rounded-lg" type="submit" :disabled="busy()">Save</button>
+          <button class="text-info" type="button" :disabled="busy()" @click="mode.set('browse')">Cancel</button>
+        </div>
+      </form>
+
+      <div class="grid gap-3 text-ui" x-show="mode() === 'delete'">
+        <p class="m-0" :text="'Delete “' + (selected()?.name || '') + '” from saved text?'"></p>
+        <div class="flex gap-3 items-center">
+          <button class="text-danger" type="button" :disabled="busy()" @click="remove" data-saved-text-confirm-delete>Delete item</button>
+          <button class="text-info" type="button" :disabled="busy()" @click="mode.set('browse')">Cancel</button>
+        </div>
+      </div>
+    </dialog>
+  </div>
+</template>

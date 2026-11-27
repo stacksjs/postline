@@ -169,6 +169,7 @@
             <span class="min-w-0 text-xs truncate" data-bluesky-count :class="countSummary().tone === 'danger' ? 'text-danger' : countSummary().tone === 'warning' ? 'text-warning' : 'text-muted'" :title="countSummary().text" :text="countSummary().text">0 / 300 characters</span>
           </div>
           <div class="flex flex-wrap gap-2 items-center justify-end w-full sm:w-auto">
+            <ComposerPresetLibrary :disabled="submitting()" @insert="insertSavedText" />
             <input class="hidden" type="file" :accept="acceptedImageTypes" multiple aria-label="Attach images" ref="attachInput" @change="chooseImages" data-attach-input>
             <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach images" title="Choose, drop, or paste up to four images" :disabled="submitting()" @click="openImageChooser" data-attach-button>
               <span class="h-4 w-4 i-hugeicons-image-01" aria-hidden="true"></span>
@@ -359,6 +360,14 @@
 
     function focusSegment(id = activeSegmentId()) {
       segmentFocus.update(value => ({ id, revision: value.revision + 1 }))
+    }
+    function insertSavedText({ body, kind }: { body: string, kind: string }) {
+      const segment = activeSegment()
+      if (!segment || submitting()) return
+      const text = segment.text
+      const separator = kind === 'hashtags' ? '\n' : '\n\n'
+      editSegment(segment.id, { value: text + (text && !text.endsWith('\n') ? separator : '') + body })
+      focusSegment(segment.id)
     }
     const variants = state<ComposerVariants>({})
     const variantsOpen = state(false)

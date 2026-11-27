@@ -737,6 +737,51 @@ async function checkComposerPreferences(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkSavedComposerText(cdp: Cdp): Promise<void> {
+  const trigger = "document.querySelector('[data-composer-saved-text]')"
+  const library = "document.querySelector('[data-saved-text-library]')"
+  const field = (name: string) => `${library}.querySelector('[name=${name}]')`
+  const select = `${library}.querySelector('[data-saved-text-select]')`
+  const editor = "document.querySelector('[data-bluesky-text]')"
+  const button = (name: string) => `${library}.querySelector('[data-saved-text-${name}]')`
+  const click = (name: string) => evaluate(cdp, `${button(name)}.click()`)
+
+  await auditPage(`${site}/composer`, { cdp })
+  await evaluate(cdp, `${trigger}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The saved Composer text dialog opens', () => evaluate<boolean>(cdp, `${library}.open && !${button('new')}.disabled`), 5_000)
+  await click('new')
+  await waitUntil('Creating saved text focuses its name', () => evaluate<boolean>(cdp, `document.activeElement === ${field('name')}`), 5_000)
+  await evaluate(cdp, `(() => {
+    const fill = (field, value) => { field.value = value; field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true })) }
+    fill(${field('kind')}, 'hashtags')
+    fill(${field('name')}, 'Build tags')
+    fill(${field('body')}, '#Postline, OpenSource')
+    ${library}.querySelector('[data-saved-text-form]').requestSubmit()
+  })()`)
+  await waitUntil('The saved hashtag set is selected', () => evaluate<boolean>(cdp, `
+    ${select}.selectedOptions[0]?.textContent === 'Build tags · Hashtag set'
+      && ${library}.textContent.includes('#Postline #OpenSource') && !${button('insert')}.disabled`), 5_000)
+
+  await auditPage(`${site}/composer`, { cdp })
+  await evaluate(cdp, `${editor}.value = 'Update copy'; ${editor}.dispatchEvent(new Event('input', { bubbles: true }))`)
+  await evaluate(cdp, `${trigger}.click()`)
+  await waitUntil('Saved text is available after a reload', () => evaluate<boolean>(cdp, `${select}.selectedOptions[0]?.textContent === 'Build tags · Hashtag set'`), 5_000)
+  await click('insert')
+  await waitUntil('Inserting saved text returns focus to the post', () => evaluate<boolean>(cdp, `
+    !${library}.open && ${editor}.value === 'Update copy\\n#Postline #OpenSource'
+      && (document.activeElement === ${editor} || Boolean(document.activeElement?.closest('[data-richtext-host]')))`), 5_000)
+
+  await evaluate(cdp, `${trigger}.click()`)
+  await waitUntil('The saved text can be removed independently', () => evaluate<boolean>(cdp, `!${button('delete')}.disabled`), 5_000)
+  await click('delete')
+  await click('confirm-delete')
+  await waitUntil('Deleting saved text preserves the post copy', () => evaluate<boolean>(cdp, `
+    !${select}.options.length && ${editor}.value.endsWith('#Postline #OpenSource')`), 5_000)
+  await pressKey(cdp, 'Escape', 27)
+  await evaluate(cdp, `localStorage.removeItem('postline:composer-draft:v1')`)
+}
+
 async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
   await auditPage(`${site}/composer`, { cdp })
   const blog = "document.querySelector('[data-provider-toggle=blog]')"
@@ -2002,6 +2047,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkLocalComposerDraft(cdp)
   await checkComposerThreadDraft(cdp)
   await checkComposerPreferences(cdp)
+  await checkSavedComposerText(cdp)
   await checkBrowserPasskey(cdp)
   await checkPhoneNavigation(cdp)
   await checkQueueRescheduling(cdp)
