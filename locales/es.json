@@ -634,6 +634,19 @@
       "invalidMetrics": "Postline no pudo leer las métricas visibles de las publicaciones de X.",
       "invalidPosts": "Postline no pudo leer las publicaciones visibles de X."
     },
+    "postOptionsErrors": {
+      "invalidLanguage": "\"{language}\" no es un código de idioma que Postline reconozca, como en o pt-BR.",
+      "mastodonVisibility": "En Mastodon, elige una publicación pública, sin listar, solo para seguidores o solo para las personas mencionadas.",
+      "warningLength": "La advertencia de contenido puede tener hasta {limit} caracteres.",
+      "mastodonQuote": "Introduce un enlace HTTPS a una publicación de Mastodon.",
+      "mastodonPoll": "Una encuesta de Mastodon necesita al menos dos opciones distintas y una duración.",
+      "mastodonPollOrQuote": "Elige una encuesta o una publicación citada en Mastodon.",
+      "blueskyQuote": "Introduce un enlace a una publicación de Bluesky o un URI de AT para citarla.",
+      "blueskyLabels": "Elige hasta diez etiquetas de contenido válidas de Bluesky.",
+      "firstCommentLength": "El primer comentario puede tener hasta {limit} caracteres.",
+      "reviewStored": "Abre esta publicación en Redactar para revisar sus opciones.",
+      "invalidStored": "No se pudieron leer las opciones guardadas de la publicación. {reason}"
+    },
     "analytics": {
       "title": "Estadísticas",
       "description": "Consulta las estadísticas de publicación de Postline.",

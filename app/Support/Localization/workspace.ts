@@ -36,6 +36,7 @@ export const workspaceChannelCardText = workspaceI18n.tm('workspace.channelCard'
 export const workspaceInstagramPagePickerText = workspaceI18n.tm('workspace.instagramPagePicker') as typeof en.workspace.instagramPagePicker
 export const workspaceXBrowserSessionText = workspaceI18n.tm('workspace.xBrowserSession') as typeof en.workspace.xBrowserSession
 export const workspaceXBrowserErrors = workspaceI18n.tm('workspace.xBrowserErrors') as typeof en.workspace.xBrowserErrors
+export const workspacePostOptionsErrors = workspaceI18n.tm('workspace.postOptionsErrors') as typeof en.workspace.postOptionsErrors
 export const workspaceCampaignText = workspaceI18n.tm('workspace.campaigns') as typeof en.workspace.campaigns
 export const workspaceSettingsText = workspaceI18n.tm('workspace.settings') as typeof en.workspace.settings
 export const workspaceLoginText = workspaceI18n.tm('workspace.login') as typeof en.workspace.login

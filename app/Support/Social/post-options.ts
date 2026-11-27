@@ -9,6 +9,7 @@
  */
 
 import { UserFacingError } from '../Http/user-error'
+import { workspaceLocale, workspacePostOptionsErrors, workspaceText } from '../Localization/workspace'
 
 export type MastodonVisibility = 'public' | 'unlisted' | 'private' | 'direct'
 
@@ -102,25 +103,25 @@ export function readPostOptions(get: (key: string) => unknown): PostOptionsResul
 
   const language = text('language')
   if (language) {
-    if (!LANGUAGE.test(language)) return { ok: false, error: `"${language}" is not a language code Postline knows, such as en or pt-BR.` }
+    if (!LANGUAGE.test(language)) return { ok: false, error: workspaceText('workspace.postOptionsErrors.invalidLanguage', { language }) }
     options.language = language
   }
 
   const visibility = text('mastodon_visibility')
   const spoilerText = text('mastodon_spoiler')
   if (visibility && !VISIBILITIES.includes(visibility as MastodonVisibility))
-    return { ok: false, error: 'Mastodon visibility must be public, unlisted, followers only or mentioned people only.' }
+    return { ok: false, error: workspacePostOptionsErrors.mastodonVisibility }
   if (spoilerText.length > MAX_SPOILER_LENGTH)
-    return { ok: false, error: `A content warning can be up to ${MAX_SPOILER_LENGTH} characters.` }
+    return { ok: false, error: workspaceText('workspace.postOptionsErrors.warningLength', { limit: MAX_SPOILER_LENGTH }) }
   const mastodonAddress = text('mastodon_quote')
   const mastodonQuote = mastodonAddress ? quoteLink(mastodonAddress, false) : undefined
-  if (mastodonAddress && !mastodonQuote) return { ok: false, error: 'Enter an HTTPS link to a Mastodon post.' }
+  if (mastodonAddress && !mastodonQuote) return { ok: false, error: workspacePostOptionsErrors.mastodonQuote }
   const rawPoll = jsonField(get('mastodon_poll'))
   const poll = pollFrom(rawPoll)
   if (rawPoll !== undefined && !poll)
-    return { ok: false, error: 'A Mastodon poll needs at least two distinct choices and a duration.' }
+    return { ok: false, error: workspacePostOptionsErrors.mastodonPoll }
   if (poll && mastodonQuote)
-    return { ok: false, error: 'Choose a poll or a quoted post on Mastodon.' }
+    return { ok: false, error: workspacePostOptionsErrors.mastodonPollOrQuote }
 
   if ((visibility && visibility !== 'public') || spoilerText || poll || mastodonQuote) {
     options.mastodon = {
@@ -133,11 +134,11 @@ export function readPostOptions(get: (key: string) => unknown): PostOptionsResul
 
   const blueskyAddress = text('bluesky_quote')
   const blueskyQuote = blueskyAddress ? quoteLink(blueskyAddress, true) : undefined
-  if (blueskyAddress && !blueskyQuote) return { ok: false, error: 'Enter a Bluesky post link or AT URI to quote.' }
+  if (blueskyAddress && !blueskyQuote) return { ok: false, error: workspacePostOptionsErrors.blueskyQuote }
   const labels = jsonField(get('bluesky_labels'))
   if (labels !== undefined && (!Array.isArray(labels) || labels.length > 10
     || labels.some(label => typeof label !== 'string' || label.length > 128 || !/^!?[a-z]+(?:-[a-z]+)*$/.test(label)))) {
-    return { ok: false, error: 'Choose up to ten valid Bluesky content labels.' }
+    return { ok: false, error: workspacePostOptionsErrors.blueskyLabels }
   }
   if (blueskyQuote || labels?.length) {
     options.bluesky = {
@@ -150,7 +151,7 @@ export function readPostOptions(get: (key: string) => unknown): PostOptionsResul
     const raw = get(`${provider}_first_comment`)
     if (raw == null || raw === '') continue
     if (typeof raw !== 'string' || raw.trim().length > MAX_FIRST_COMMENT_LENGTH)
-      return { ok: false, error: `A first comment can be up to ${MAX_FIRST_COMMENT_LENGTH.toLocaleString('en-US')} characters.` }
+      return { ok: false, error: workspaceText('workspace.postOptionsErrors.firstCommentLength', { limit: MAX_FIRST_COMMENT_LENGTH.toLocaleString(workspaceLocale) }) }
     if (raw.trim()) (options.firstComments ??= {})[provider] = raw.trim()
   }
 
@@ -168,7 +169,7 @@ function readStoredPostOptions(value: unknown): PostOptionsResult {
   const raw = value as PostOptions | undefined
   if ([raw, raw?.mastodon, raw?.bluesky, raw?.firstComments].some(option =>
     option != null && (typeof option !== 'object' || Array.isArray(option)),
-  )) return { ok: false, error: 'Open this post in Composer to review its options.' }
+  )) return { ok: false, error: workspacePostOptionsErrors.reviewStored }
 
   const fields: Record<typeof POST_OPTION_FIELDS[number], unknown> = {
     language: raw?.language,
@@ -187,7 +188,7 @@ function readStoredPostOptions(value: unknown): PostOptionsResult {
 /** Publishing must refuse to send a post whose stored options are invalid. */
 export class InvalidStoredPostOptionsError extends UserFacingError {
   constructor(reason: string) {
-    super(`The saved post options could not be read. ${reason}`)
+    super(workspaceText('workspace.postOptionsErrors.invalidStored', { reason }))
   }
 }
 

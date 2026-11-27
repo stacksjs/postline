@@ -634,6 +634,19 @@
       "invalidMetrics": "Postline could not read the visible X post counts.",
       "invalidPosts": "Postline could not read the visible X posts."
     },
+    "postOptionsErrors": {
+      "invalidLanguage": "\"{language}\" is not a language code Postline knows, such as en or pt-BR.",
+      "mastodonVisibility": "Mastodon visibility must be public, unlisted, followers only or mentioned people only.",
+      "warningLength": "A content warning can be up to {limit} characters.",
+      "mastodonQuote": "Enter an HTTPS link to a Mastodon post.",
+      "mastodonPoll": "A Mastodon poll needs at least two distinct choices and a duration.",
+      "mastodonPollOrQuote": "Choose a poll or a quoted post on Mastodon.",
+      "blueskyQuote": "Enter a Bluesky post link or AT URI to quote.",
+      "blueskyLabels": "Choose up to ten valid Bluesky content labels.",
+      "firstCommentLength": "A first comment can be up to {limit} characters.",
+      "reviewStored": "Open this post in Composer to review its options.",
+      "invalidStored": "The saved post options could not be read. {reason}"
+    },
     "analytics": {
       "title": "Analytics",
       "description": "Review lightweight publishing analytics in Postline.",

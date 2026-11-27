@@ -3559,6 +3559,14 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
       !${menu}.parentElement.open
         && ${editor}.querySelector('[data-bluesky-publish-label]')?.textContent.startsWith('Programar para ')
     `), 5_000)
+    const optionError = await evaluate<{ status: number, message: string }>(cdp, `(async () => {
+      const body = new URLSearchParams({ providers: 'blog', text: 'Validación de opciones', language: 'english' })
+      const response = await fetch('/api/postline/queue', { method: 'POST', body })
+      return { status: response.status, message: (await response.json()).error }
+    })()`)
+    if (optionError.status !== 422
+      || optionError.message !== '"english" no es un código de idioma que Postline reconozca, como en o pt-BR.')
+      throw new Error('The Queue API did not return the Spanish validation message for the language option.')
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
