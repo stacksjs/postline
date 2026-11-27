@@ -3,7 +3,6 @@ import type { CrosspostTargetResult, PublishContent } from '../../Support/Social
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
-import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { InstagramDriver } from './Drivers/InstagramDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { exceedsLimit } from '../../Support/Social/count-text'
@@ -54,9 +53,6 @@ interface InstagramConfig {
 
 export class InstagramService {
   private driver: InstagramDriver
-  // OAuth CSRF states between the auth redirect and the callback, keyed by
-  // state so two accounts can be connected concurrently.
-  private pending = new PendingOAuthStates()
 
   constructor() {
     this.driver = new InstagramDriver({ graphVersion: String(env.INSTAGRAM_GRAPH_VERSION ?? '').trim() || DEFAULT_GRAPH_VERSION })
@@ -133,7 +129,7 @@ export class InstagramService {
     return toPublicAccount(await revokeIdentityRow('instagram', identityId))
   }
 
-  async getAuthUrl(): Promise<string> {
+  async prepareAuthorization(): Promise<{ url: string }> {
     const cfg = (await this.config())
     if (!cfg.clientId || !cfg.clientSecret) {
       throw new UserFacingError('Add your Instagram app under Settings, Channels first: its client id and secret.')
@@ -142,23 +138,18 @@ export class InstagramService {
       throw new UserFacingError('Postline could not work out its address for the Instagram redirect. Set it under Settings, Channels.')
     }
 
-    return this.driver.getAuthUrl({
+    const url = this.driver.getAuthUrl({
       clientId: cfg.clientId,
       redirectUrl: cfg.redirectUrl,
       scopes: cfg.scopes,
-      state: this.pending.issue(true),
+      state: '',
     })
+    return { url }
   }
 
-  async handleCallback(code: string, state: string) {
+  async exchangeAuthorizationCode(code: string) {
     const cfg = (await this.config())
     if (!code) throw new Error('Facebook did not return an authorization code.')
-    // Strict: a callback is honoured only for a state this process issued and
-    // has not yet consumed. A restart mid-consent costs one retry.
-    const pending = this.pending.take(state)
-    if (!pending.found) {
-      throw new Error('Instagram OAuth state mismatch. Please start the connection again.')
-    }
 
     const token = await this.driver.exchangeCode({
       clientId: cfg.clientId,

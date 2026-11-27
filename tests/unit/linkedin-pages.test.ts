@@ -39,7 +39,7 @@ describe('LinkedIn company Pages', () => {
     expect(linkedInScopes(false)).toEqual(['openid', 'profile', 'w_member_social'])
     expect(linkedInScopes(true)).toEqual(['openid', 'profile', 'w_member_social', 'w_organization_social', 'r_organization_admin'])
 
-    const scope = async (): Promise<string> => new URL(await linkedin.getAuthUrl()).searchParams.get('scope') ?? ''
+    const scope = async (): Promise<string> => new URL((await linkedin.prepareAuthorization()).url).searchParams.get('scope') ?? ''
     await networkApps.save('linkedin', { clientId: 'li-app', clientSecret: 'li-secret', organizationPages: false })
     expect(await scope()).not.toContain('w_organization_social')
     await networkApps.save('linkedin', { clientId: 'li-app', organizationPages: true })

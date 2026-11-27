@@ -3,7 +3,6 @@ import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
-import { PendingOAuthStates, randomOAuthState } from '../../Support/Social/oauth-state'
 import { TwitterDriver } from './Drivers/TwitterDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
 import { refreshOnce } from '../../Support/Social/token-refresh'
@@ -49,9 +48,6 @@ interface TwitterConfig {
 
 export class TwitterService {
   private driver = new TwitterDriver()
-  // OAuth CSRF state -> PKCE verifier, between the auth redirect and the
-  // callback. Keyed by state so two accounts can be connected concurrently.
-  private pending = new PendingOAuthStates<{ codeVerifier: string }>()
 
   /**
    * The owner's Twitter app (client id, secret, redirect address): from
@@ -111,40 +107,30 @@ export class TwitterService {
   }
 
   /**
-   * Build the X consent URL (with PKCE) and remember the CSRF state + verifier.
+   * Build the X consent URL and its PKCE verifier for the browser-bound flow.
    *
    * X signs in whichever account the browser is logged into, so connecting a
    * second account means switching accounts on x.com first; the callback then
    * adds it alongside the first rather than replacing it.
    */
-  async getAuthUrl(): Promise<string> {
+  async prepareAuthorization(): Promise<{ url: string, codeVerifier: string }> {
     const cfg = (await this.config())
     if (!cfg.clientId) throw new UserFacingError('Add your X app under Settings, Channels first: its client id and secret.')
     if (!cfg.redirectUrl) throw new UserFacingError('Postline could not work out its address for the X redirect. Set it under Settings, Channels.')
 
-    const state = randomOAuthState()
-    const { url, codeVerifier } = await this.driver.createAuthorization({
+    return await this.driver.createAuthorization({
       clientId: cfg.clientId,
       redirectUrl: cfg.redirectUrl,
       scopes: cfg.scopes,
-      state,
+      state: '',
     })
-    this.pending.issue({ codeVerifier }, state)
-    return url
   }
 
   /** Handle the OAuth redirect: exchange the code and store the tokens. */
-  async handleCallback(code: string, state: string) {
+  async exchangeAuthorizationCode(code: string, codeVerifier?: string) {
     const cfg = (await this.config())
     if (!code) throw new Error('X/Twitter did not return an authorization code.')
-    const pending = this.pending.take(state)
-    // Strict either way: without the verifier minted for this exact state the
-    // code exchange cannot succeed, so there is no lenient path to keep.
-    if (!pending.found) {
-      throw new Error('X/Twitter OAuth state mismatch. Please start the connection again.')
-    }
-    const codeVerifier = pending.value?.codeVerifier
-    if (!codeVerifier) throw new Error('Missing PKCE verifier — please start the X/Twitter connection again.')
+    if (!codeVerifier) throw new UserFacingError('Start a new X connection from Channels to continue.')
 
     const token = await this.driver.exchangeCode({
       clientId: cfg.clientId,

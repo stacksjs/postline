@@ -1,20 +1,14 @@
+import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
-import { response } from '@stacksjs/router'
-import { publicMessage } from '../../Support/Http/action-error'
 import { instagram } from '../../Services/Social/InstagramService'
+import { redirectToNetworkConsent } from '../../Support/Social/network-oauth'
 
 export default new Action({
   name: 'Postline Instagram Auth',
-  description: 'Redirect to Facebook for Instagram publishing consent.',
+  description: 'Redirect the owner to Instagram for OAuth consent.',
   method: 'GET',
 
-  async handle() {
-    try {
-      return response.redirect(await instagram.getAuthUrl())
-    }
-    catch (error) {
-      const message = publicMessage(error)
-      return response.redirect(`/accounts?instagram=error&message=${encodeURIComponent(message)}`)
-    }
+  async handle(request: RequestInstance) {
+    return redirectToNetworkConsent(request, 'instagram', () => instagram.prepareAuthorization())
   },
 })

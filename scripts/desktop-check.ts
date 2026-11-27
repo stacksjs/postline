@@ -39,15 +39,16 @@ function check(what: string, passed: boolean, detail = ''): void {
   if (!passed) failures.push(what)
 }
 
-async function call(method: string, path: string, form?: Record<string, string>): Promise<{ status: number | null, type: string, text: string }> {
+async function call(method: string, path: string, form?: Record<string, string>, cookie?: string): Promise<{ status: number | null, type: string, text: string, headers: Headers }> {
   const body = form
     ? Object.entries(form).reduce((data, [key, value]) => (data.set(key, value), data), new FormData())
     : undefined
   // A write has to carry the CSRF token the way the window's own `fetch`
   // wrapper does: the cookie's value echoed in a header.
   const headers: Record<string, string> = { origin }
+  if (cookie) headers.cookie = cookie
   if (csrfToken && method !== 'GET') {
-    headers.cookie = `X-CSRF-Token=${csrfToken}`
+    headers.cookie = [headers.cookie, `X-CSRF-Token=${csrfToken}`].filter(Boolean).join('; ')
     headers['x-csrf-token'] = csrfToken
   }
   const response = await agent.fetch!(new Request(`${origin}${path}`, { method, body, headers })) as Response | undefined
@@ -59,6 +60,7 @@ async function call(method: string, path: string, form?: Record<string, string>)
     status: response ? response.status : null,
     type: response?.headers.get('content-type')?.split(';')[0] ?? '',
     text: response ? await response.text() : '',
+    headers: response?.headers ?? new Headers(),
   }
 }
 
@@ -100,6 +102,26 @@ const refused = await call('POST', '/api/postline/queue', { text: 'Sent without 
 check('a write without the CSRF token is refused', refused.status === 403, `${refused.status} ${refused.text.slice(0, 160)}`)
 csrfToken = unsigned
 check('the agent issued a CSRF token', csrfToken.length === 64, String(csrfToken.length))
+
+const app = await call('POST', '/api/postline/network-apps', {
+  provider: 'twitter',
+  client_id: 'postline-desktop-test',
+  client_secret: 'test-only',
+})
+check('saving a network app from the desktop workspace', app.status === 200)
+const consent = await call('GET', '/api/postline/twitter/auth')
+const location = new URL(consent.headers.get('Location') ?? '/', origin)
+const state = location.searchParams.get('state')
+const flowCookie = consent.headers.get('Set-Cookie')?.split(';')[0]
+check('desktop opens X consent with a loopback callback and browser-bound state', consent.status === 302
+  && location.searchParams.get('redirect_uri') === `${origin}/api/postline/twitter/callback`
+  && /^[a-f0-9]{64}$/.test(state ?? '') && Boolean(flowCookie))
+if (state && flowCookie) {
+  const cancel = await call('GET', `/api/postline/twitter/callback?error=access_denied&state=${state}`, undefined, flowCookie)
+  check('desktop clears the flow when consent is cancelled', cancel.status === 302
+    && cancel.headers.get('Location')?.startsWith('/accounts?twitter=error') === true
+    && cancel.headers.get('Set-Cookie')?.includes('Max-Age=0') === true)
+}
 
 const published = await call('POST', '/api/postline/publish', { text: 'Published by the desktop check.', title: 'Desktop check', providers: 'blog' })
 check('publishing to the blog', published.status === 200 && JSON.parse(published.text)?.data?.results?.[0]?.ok === true, `${published.status} ${published.text.slice(0, 200)}`)

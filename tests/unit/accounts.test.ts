@@ -3,7 +3,6 @@ import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../.
 import { describe, expect, test } from 'bun:test'
 import { CrosspostService } from '../../app/Services/Social/CrosspostService'
 import { matchIdentity, pickDefaultIdentity, toPublicAccount } from '../../app/Support/Social/accounts'
-import { PendingOAuthStates } from '../../app/Support/Social/oauth-state'
 import { dedupeTargets, parseTarget, parseTargets, resolveTargets, targetKey, targetProviders } from '../../app/Support/Social/targets'
 
 /**
@@ -208,37 +207,6 @@ describe('default account', () => {
     const account = toPublicAccount(row({ id: 9, access_token: 'secret', display_name: 'Nine' }), { isDefault: true })
     expect(JSON.stringify(account)).not.toContain('secret')
     expect(account).toMatchObject({ id: 9, handle: 'user9.bsky.social', displayName: 'Nine', connected: true, isDefault: true })
-  })
-})
-
-describe('pending OAuth states', () => {
-  test('two concurrent flows on one network both complete', () => {
-    const pending = new PendingOAuthStates<{ codeVerifier: string }>()
-    const first = pending.issue({ codeVerifier: 'one' })
-    const second = pending.issue({ codeVerifier: 'two' })
-
-    expect(pending.take(first)).toMatchObject({ found: true, value: { codeVerifier: 'one' } })
-    expect(pending.take(second)).toMatchObject({ found: true, value: { codeVerifier: 'two' } })
-  })
-
-  test('a state is single-use', () => {
-    const pending = new PendingOAuthStates()
-    const state = pending.issue(true)
-    pending.issue(true)
-    expect(pending.take(state).found).toBe(true)
-    expect(pending.take(state)).toMatchObject({ found: false, noneOutstanding: false })
-  })
-
-  test('expires after the TTL', () => {
-    let clock = 0
-    const pending = new PendingOAuthStates(1000, () => clock)
-    const state = pending.issue(true)
-    clock = 1001
-    expect(pending.take(state)).toEqual({ found: false, noneOutstanding: true })
-  })
-
-  test('reports when nothing at all was outstanding', () => {
-    expect(new PendingOAuthStates().take('anything')).toEqual({ found: false, noneOutstanding: true })
   })
 })
 

@@ -155,9 +155,9 @@ describe('optional engagement drivers', () => {
     try {
       for (const { provider, scope } of sources) {
         await networkApps.save(provider, { clientId: 'test-client', clientSecret: 'test-secret', organizationPages: provider === 'linkedin' })
-        expect(new URL(await services[provider].getAuthUrl()).searchParams.get('scope')).not.toContain(scope)
+        expect(new URL((await services[provider].prepareAuthorization()).url).searchParams.get('scope')).not.toContain(scope)
         await networkApps.save(provider, { clientId: 'test-client', engagementMetrics: true })
-        expect(new URL(await services[provider].getAuthUrl()).searchParams.get('scope')).toContain(scope)
+        expect(new URL((await services[provider].prepareAuthorization()).url).searchParams.get('scope')).toContain(scope)
       }
       const [ig, li, th] = await Promise.all(sources.map(source => observedPost(source.provider, source.account, source.uri)))
       const missing = await observedPost('instagram', '402', '403', { likes: 2 })
@@ -215,8 +215,7 @@ describe('optional engagement drivers', () => {
     let postId: number | undefined
     try {
       await networkApps.save('instagram', { clientId: 'test-client', clientSecret: 'test-secret', engagementMetrics: true })
-      const state = new URL(await instagram.getAuthUrl()).searchParams.get('state')!
-      const identity = await instagram.handleCallback('test-code', state)
+      const identity = await instagram.exchangeAuthorizationCode('test-code')
       if (!identity.id) throw new Error('Instagram did not return its connected account.')
       id = identity.id
       const draft = await postQueue.save({ text: 'A post for the Insights test', providers: [`instagram:${id}`] })

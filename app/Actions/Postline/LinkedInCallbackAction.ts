@@ -1,31 +1,14 @@
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
-import { response } from '@stacksjs/router'
-import { publicMessage } from '../../Support/Http/action-error'
 import { linkedin } from '../../Services/Social/LinkedInService'
+import { finishNetworkConsent } from '../../Support/Social/network-oauth'
 
 export default new Action({
   name: 'Postline LinkedIn Callback',
-  description: 'Handle the LinkedIn OAuth redirect and store the access token.',
+  description: 'Finish LinkedIn OAuth consent and store the connected account.',
   method: 'GET',
 
   async handle(request: RequestInstance) {
-    const code = String(request.get('code') || '')
-    const state = String(request.get('state') || '')
-    const oauthError = String(request.get('error') || '')
-
-    if (oauthError) {
-      const description = String(request.get('error_description') || oauthError)
-      return response.redirect(`/accounts?linkedin=error&message=${encodeURIComponent(description)}`)
-    }
-
-    try {
-      await linkedin.handleCallback(code, state)
-      return response.redirect('/accounts?linkedin=connected')
-    }
-    catch (error) {
-      const message = publicMessage(error)
-      return response.redirect(`/accounts?linkedin=error&message=${encodeURIComponent(message)}`)
-    }
+    return finishNetworkConsent(request, 'linkedin', code => linkedin.exchangeAuthorizationCode(code))
   },
 })

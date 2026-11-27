@@ -57,7 +57,6 @@ describe('Instagram connection', () => {
   test('rejects the connection when Facebook cannot issue a long-lived token', async () => {
     await networkApps.save('instagram', { clientId: 'test-app', clientSecret: 'test-secret' })
     const service = new InstagramService()
-    const state = new URL(await service.getAuthUrl()).searchParams.get('state')!
     const cap: Captured[] = []
     mockGraphApi(cap, (url) => {
       if (url.includes('fb_exchange_token'))
@@ -66,7 +65,7 @@ describe('Instagram connection', () => {
       return null
     })
 
-    await expect(service.handleCallback('valid-code', state)).rejects.toMatchObject({ code: 'instagram_token_exchange_failed' })
+    await expect(service.exchangeAuthorizationCode('valid-code')).rejects.toMatchObject({ code: 'instagram_token_exchange_failed' })
     expect(cap).toHaveLength(2)
     expect(cap.every(call => call.url.includes('/oauth/access_token'))).toBe(true)
   })

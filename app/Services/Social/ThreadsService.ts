@@ -4,7 +4,6 @@ import { db } from '@stacksjs/database'
 import { log } from '@stacksjs/logging'
 import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
-import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { ThreadsDriver } from './Drivers/ThreadsDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
 import { refreshOnce } from '../../Support/Social/token-refresh'
@@ -53,9 +52,6 @@ interface ThreadsConfig {
 
 export class ThreadsService {
   private driver: ThreadsDriver
-  // OAuth CSRF states between the auth redirect and the callback, keyed by
-  // state so two accounts can be connected concurrently.
-  private pending = new PendingOAuthStates()
 
   constructor() {
     this.driver = new ThreadsDriver({ graphVersion: String(env.THREADS_GRAPH_VERSION || 'v1.0').trim() })
@@ -122,7 +118,7 @@ export class ThreadsService {
     return toPublicAccount(await revokeIdentityRow('threads', identityId))
   }
 
-  async getAuthUrl(): Promise<string> {
+  async prepareAuthorization(): Promise<{ url: string }> {
     const cfg = (await this.config())
     if (!cfg.clientId || !cfg.clientSecret) {
       throw new UserFacingError('Add your Threads app under Settings, Channels first: its client id and secret.')
@@ -131,23 +127,18 @@ export class ThreadsService {
       throw new UserFacingError('Postline could not work out its address for the Threads redirect. Set it under Settings, Channels.')
     }
 
-    return this.driver.getAuthUrl({
+    const url = this.driver.getAuthUrl({
       clientId: cfg.clientId,
       redirectUrl: cfg.redirectUrl,
       scopes: cfg.scopes,
-      state: this.pending.issue(true),
+      state: '',
     })
+    return { url }
   }
 
-  async handleCallback(code: string, state: string) {
+  async exchangeAuthorizationCode(code: string) {
     const cfg = (await this.config())
     if (!code) throw new Error('Threads did not return an authorization code.')
-    // Strict: a callback is honoured only for a state this process issued and
-    // has not yet consumed. A restart mid-consent costs one retry.
-    const pending = this.pending.take(state)
-    if (!pending.found) {
-      throw new Error('Threads OAuth state mismatch. Please start the connection again.')
-    }
 
     const token = await this.driver.exchangeCode({
       clientId: cfg.clientId,

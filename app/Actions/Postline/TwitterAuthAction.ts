@@ -1,20 +1,14 @@
+import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
-import { response } from '@stacksjs/router'
-import { publicMessage } from '../../Support/Http/action-error'
 import { twitter } from '../../Services/Social/TwitterService'
+import { redirectToNetworkConsent } from '../../Support/Social/network-oauth'
 
 export default new Action({
   name: 'Postline Twitter Auth',
-  description: 'Redirect the user to X/Twitter for OAuth consent.',
+  description: 'Redirect the owner to X/Twitter for OAuth consent.',
   method: 'GET',
 
-  async handle() {
-    try {
-      return response.redirect(await twitter.getAuthUrl())
-    }
-    catch (error) {
-      const message = publicMessage(error)
-      return response.redirect(`/accounts?twitter=error&message=${encodeURIComponent(message)}`)
-    }
+  async handle(request: RequestInstance) {
+    return redirectToNetworkConsent(request, 'twitter', () => twitter.prepareAuthorization())
   },
 })

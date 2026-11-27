@@ -4,7 +4,6 @@ import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { log } from '@stacksjs/logging'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
-import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { LinkedInDriver } from './Drivers/LinkedInDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
 import { resolveLinkedInVersion } from '../../Support/Social/linkedin-text'
@@ -62,9 +61,6 @@ export function linkedInScopes(organizationPages: boolean, engagementMetrics = f
 
 export class LinkedInService {
   private driver: LinkedInDriver
-  // OAuth CSRF states between the auth redirect and the callback, keyed by
-  // state so two accounts can be connected concurrently.
-  private pending = new PendingOAuthStates()
 
   constructor() {
     this.driver = new LinkedInDriver({ apiVersion: resolveLinkedInVersion(env.LINKEDIN_API_VERSION) })
@@ -130,8 +126,8 @@ export class LinkedInService {
     return toPublicAccount(await revokeIdentityRow('linkedin', identityId))
   }
 
-  /** Build the LinkedIn consent URL and remember the CSRF state. */
-  async getAuthUrl(): Promise<string> {
+  /** Prepare the LinkedIn consent URL before the action binds it to the browser. */
+  async prepareAuthorization(): Promise<{ url: string }> {
     const cfg = (await this.config())
     if (!cfg.clientId || !cfg.clientSecret) {
       throw new UserFacingError('Add your LinkedIn app under Settings, Channels first: its client id and secret.')
@@ -140,24 +136,19 @@ export class LinkedInService {
       throw new UserFacingError('Postline could not work out its address for the LinkedIn redirect. Set it under Settings, Channels.')
     }
 
-    return this.driver.getAuthUrl({
+    const url = this.driver.getAuthUrl({
       clientId: cfg.clientId,
       redirectUrl: cfg.redirectUrl,
       scopes: cfg.scopes,
-      state: this.pending.issue(true),
+      state: '',
     })
+    return { url }
   }
 
   /** Handle the OAuth redirect: exchange the code and store the token. */
-  async handleCallback(code: string, state: string) {
+  async exchangeAuthorizationCode(code: string) {
     const cfg = (await this.config())
     if (!code) throw new Error('LinkedIn did not return an authorization code.')
-    // Strict: a callback is honoured only for a state this process issued and
-    // has not yet consumed. A restart mid-consent costs one retry.
-    const pending = this.pending.take(state)
-    if (!pending.found) {
-      throw new Error('LinkedIn OAuth state mismatch. Please start the connection again.')
-    }
 
     const token = await this.driver.exchangeCode({
       clientId: cfg.clientId,

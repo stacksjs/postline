@@ -113,7 +113,7 @@ describe('X API read budget', () => {
   test('requests the image upload scope through Postline consent', async () => {
     try {
       await networkApps.save('twitter', { clientId: 'test-client', clientSecret: 'test-secret' })
-      const scopes = new URL(await twitter.getAuthUrl()).searchParams.get('scope')?.split(' ')
+      const scopes = new URL((await twitter.prepareAuthorization()).url).searchParams.get('scope')?.split(' ')
       expect(scopes).toContain('media.write')
     }
     finally {

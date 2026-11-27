@@ -1,31 +1,14 @@
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
-import { response } from '@stacksjs/router'
-import { publicMessage } from '../../Support/Http/action-error'
 import { threads } from '../../Services/Social/ThreadsService'
+import { finishNetworkConsent } from '../../Support/Social/network-oauth'
 
 export default new Action({
   name: 'Postline Threads Callback',
-  description: 'Handle the Threads OAuth redirect and store the access token.',
+  description: 'Finish Threads OAuth consent and store the connected account.',
   method: 'GET',
 
   async handle(request: RequestInstance) {
-    const code = String(request.get('code') || '')
-    const state = String(request.get('state') || '')
-    const oauthError = String(request.get('error') || '')
-
-    if (oauthError) {
-      const description = String(request.get('error_description') || oauthError)
-      return response.redirect(`/accounts?threads=error&message=${encodeURIComponent(description)}`)
-    }
-
-    try {
-      await threads.handleCallback(code, state)
-      return response.redirect('/accounts?threads=connected')
-    }
-    catch (error) {
-      const message = publicMessage(error)
-      return response.redirect(`/accounts?threads=error&message=${encodeURIComponent(message)}`)
-    }
+    return finishNetworkConsent(request, 'threads', code => threads.exchangeAuthorizationCode(code))
   },
 })
