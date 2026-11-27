@@ -31,7 +31,7 @@ useHead(marketingHead('/features/listening', '/images/og/feature-listening.png')
       <div class="grid gap-10">
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">Automatic keyword checks</h2>
-          <p class="m-0 leading-relaxed text-[16px] text-body">Give a rule up to twenty keywords and choose whether any or all of them must appear. Postline checks active rules every five minutes while it is running.</p>
+          <p class="m-0 leading-relaxed text-[16px] text-body">Give a rule up to twenty keywords and match any word, all words or the exact phrase. Postline checks active rules every five minutes while it is running.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">A mention inbox</h2>

@@ -132,6 +132,7 @@ jobs:
       secrets: []
       artifact-paths:
         - test-results/marketing-lighthouse/*
+        - public/images/product/*.webp
     runs-on: [self-hosted, macos-arm64, postline]
     timeout-minutes: 20
     # As for the tests: a runner has no `.env`, and anything the build reads
@@ -148,6 +149,10 @@ jobs:
           packages: bun.sh@${{ env.BUN_VERSION }} git-scm.org@2.53.0
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Capture current Composer and Queue screenshots
+        run: |
+          bun scripts/desktop-bundle.ts
+          bun scripts/browser-check.ts --marketing-screenshots
       - name: Build the site
         run: bun run build:frontend
       - name: Marketing metadata and sitemap

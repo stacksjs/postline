@@ -39,7 +39,7 @@ useHead(marketingHead('/features/cleanup', '/images/og/feature-cleanup.png'))
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">Scoped to what a network allows</h2>
-          <p class="m-0 leading-relaxed text-[16px] text-body">Networks that cannot delete, or cannot list an account's history, are reported as skipped with the reason.</p>
+          <p class="m-0 leading-relaxed text-[16px] text-body">LinkedIn cleanup covers posts sent through Postline. When a network cannot delete or list its history, the preview explains what will be skipped.</p>
         </div>
       </div>
 

@@ -42,9 +42,8 @@ describe('the site says only what is true', () => {
     })
   }
 
-  test('the hero draft that fits Instagram carries an image', () => {
+  test('the hero labels the two destination previews shown in the screenshot', () => {
     const home = readFileSync(join(root, 'resources/views/index.stx'), 'utf8')
-    expect(home).toContain('fits all of them')
-    expect(home).toContain('i-hugeicons-image-01')
+    expect(home).toContain('alt="Postline Composer showing one draft and live previews for Bluesky and LinkedIn"')
   })
 })

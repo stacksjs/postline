@@ -2,7 +2,7 @@
  * Open every workspace view in a real browser and fail on what a person
  * would see break (#80).
  *
- *   bun scripts/browser-check.ts
+ *   bun scripts/browser-check.ts [--marketing-screenshots]
  *
  * Starts the API and the site on ports of their own against a fresh, migrated
  * database in a temporary directory, creates the workspace account, signs in,
@@ -24,6 +24,8 @@ import { auditPage, closeSharedBrowsers, launch } from '@stacksjs/testing/browse
 
 const root = join(import.meta.dir, '..')
 const out = join(root, 'storage/framework/browser-check')
+const productImages = join(root, 'public/images/product')
+const marketingScreenshots = process.argv.includes('--marketing-screenshots')
 const ports = [0, 0].map(() => Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response() }))
 const API_PORT = Number(process.env.BROWSER_CHECK_API_PORT) || ports[0]!.port
 const SITE_PORT = Number(process.env.BROWSER_CHECK_PORT) || ports[1]!.port
@@ -46,6 +48,7 @@ copyFileSync(join(root, 'app/Desktop/database.template.sqlite'), database)
 const env = {
   ...process.env,
   APP_ENV: 'local',
+  POSTLINE_SITE: '',
   DB_CONNECTION: 'sqlite',
   DB_DATABASE_PATH: database,
   PORT: String(SITE_PORT),
@@ -1205,8 +1208,9 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
   await waitUntil('Setup is available from sign-in', () => evaluate<boolean>(cdp, `Boolean(${setupLink}?.getClientRects().length)`), 10_000)
   await click(setupLink)
   await heading('Create the owner account')
-  await type(input('name'), 'Browser Check')
-  await type(input('email'), 'check@postline.test')
+  const workspaceName = marketingScreenshots ? 'Northstar Studio' : 'Browser Workspace'
+  await type(input('name'), marketingScreenshots ? 'Alex Rivera' : 'Browser Check')
+  await type(input('email'), marketingScreenshots ? 'alex@northstar.example' : 'check@postline.test')
   await type(input('password'), 'browser-check-password')
   await type(input('password_confirmation'), 'wrong-confirmation')
   await click(`${setup}.querySelector('button[type=submit]')`)
@@ -1214,13 +1218,13 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
   await type(input('password_confirmation'), 'browser-check-password')
   await click(`${setup}.querySelector('button[type=submit]')`)
   await heading('Name your workspace')
-  await type(input('workspaceName'), 'Browser Workspace')
+  await type(input('workspaceName'), workspaceName)
   await type(input('timezone'), 'America/New_York')
   await click(`${setup}.querySelector('button[type=submit]')`)
   await heading('Choose a publishing channel')
   const profileSaved = await evaluate<boolean>(cdp, `(async () => {
     const { data } = await (await fetch('/api/postline/settings/workspace')).json()
-    return data.workspaceName === 'Browser Workspace' && data.timezone === 'America/New_York'
+    return data.workspaceName === ${JSON.stringify(workspaceName)} && data.timezone === 'America/New_York'
   })()`)
   if (!profileSaved) throw new Error('Setup did not save the workspace name and time zone.')
 
@@ -1318,6 +1322,160 @@ async function checkSetupProviderRetry(cdp: Cdp): Promise<void> {
   }
 }
 
+async function captureMarketingScreenshots(cdp: Cdp): Promise<void> {
+  const draft = 'Our spring field guide is out. We spent a weekend walking the coastline to find the trails worth taking slowly.\n\nhttps://northstar.example/field-notes'
+  const posts = [
+    'The spring field guide is live. A weekend on the coast, mapped one trail at a time.',
+    'Three things we packed for the coast, and one we would leave at home.',
+    'The next field guide follows the river inland. Here’s a look at the route.',
+  ]
+  const seeded = await evaluate<boolean>(cdp, `(async () => {
+    for (const [index, text] of ${JSON.stringify(posts)}.entries()) {
+      const response = await fetch('/api/postline/queue', { method: 'POST', body: new URLSearchParams({
+        text, providers: 'bluesky,linkedin,blog', scheduled_at: '2099-04-' + (12 + index) + ' 13:00:00',
+      }) })
+      if (!response.ok) return false
+    }
+    return true
+  })()`)
+  if (!seeded) throw new Error('Could not seed the photographed Queue.')
+
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const actualFetch = window.fetch.bind(window)
+    const channels = {
+      bluesky: { id: 101, handle: 'northstar.example' },
+      linkedin: { id: 102, handle: 'Northstar Studio' },
+    }
+    window.fetch = (input, options) => {
+      const url = new URL(typeof input === 'string' ? input : input.url, location.href)
+      if (url.pathname === '/api/postline/bluesky/link-preview') return Promise.resolve(Response.json({
+        ok: true, data: { title: 'Northstar Field Notes', description: 'Trail notes and maps from the coast.', url: 'https://northstar.example/field-notes' },
+      }))
+      if (url.pathname === '/api/postline/system') return actualFetch(input, options).then(async response => {
+        if (!response.ok) return response
+        const payload = await response.json()
+        return Response.json({ ...payload, data: { ...payload.data, scheduler: { state: 'ok', lastRunAt: new Date().toISOString() } } })
+      })
+      if (url.pathname !== '/api/postline/bootstrap') return actualFetch(input, options)
+      return actualFetch(input, options).then(async response => {
+        if (!response.ok) return response
+        const payload = await response.json()
+        const providers = payload.data.providers.map(provider => {
+          const channel = channels[provider.provider]
+          if (!channel) return provider
+          const account = { ...channel, provider: provider.provider, connected: true, canPublish: true, isDefault: true }
+          return { ...provider, ...account, accounts: [account] }
+        })
+        return Response.json({ ...payload, data: { ...payload.data, providers } })
+      })
+    }
+  ` })
+  const captures: Array<{ name: string, bytes: Buffer }> = []
+  async function capture(name: string, clip: { x: number, y: number, width: number, height: number }) {
+    await evaluate(cdp, 'document.fonts.ready')
+    const shot = await cdp.send<{ data: string }>('Page.captureScreenshot', {
+      format: 'webp', quality: 88, clip: { ...clip, scale: 1 }, captureBeyondViewport: false,
+    })
+    captures.push({ name, bytes: Buffer.from(shot.data, 'base64') })
+  }
+  try {
+    await cdp.send('Emulation.setTimezoneOverride', { timezoneId: 'America/New_York' })
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
+    for (const scheme of ['light', 'dark']) {
+      await cdp.send('Emulation.setEmulatedMedia', {
+        features: [{ name: 'prefers-color-scheme', value: scheme }, { name: 'prefers-reduced-motion', value: 'reduce' }],
+      })
+      const composer = await auditPage(`${site}/composer`, { cdp })
+      for (const error of [...composer.errors, ...composer.failed]) fail('composer', scheme, error)
+      await waitUntil('Sample Composer channels', () => evaluate<boolean>(cdp, `
+        document.querySelector('[data-provider-toggle="bluesky:101"]')?.getAttribute('aria-pressed') === 'true'
+          && document.querySelector('[data-provider-toggle="linkedin:102"]')?.getAttribute('aria-pressed') === 'true'`), 10_000)
+      await evaluate(cdp, `(() => {
+        const blog = document.querySelector('[data-provider-toggle=blog]')
+        if (blog?.getAttribute('aria-pressed') === 'true') blog.click()
+        const field = document.querySelector('[data-bluesky-text]')
+        field.value = ${JSON.stringify(draft)}
+        field.dispatchEvent(new Event('input', { bubbles: true }))
+      })()`)
+      await waitUntil('Rendered Composer draft and link preview', () => evaluate<boolean>(cdp, `
+        document.querySelector('[data-network-preview=bluesky] [data-link-preview]')?.textContent.includes('Northstar Field Notes')
+          && document.querySelector('[data-network-preview=linkedin] [data-preview-copy]')?.textContent.includes('spring field guide')
+          && document.documentElement.classList.contains('dark') === ${scheme === 'dark'}`), 10_000)
+      await capture(`composer-${scheme}.webp`, { x: 0, y: 0, width: 1280, height: 685 })
+
+      const queue = await auditPage(`${site}/queue`, { cdp })
+      for (const error of [...queue.errors, ...queue.failed]) fail('queue', scheme, error)
+      await waitUntil('The photographed Queue has its three scheduled posts', () => evaluate<boolean>(cdp, `
+        [...document.querySelectorAll('#queue-results article')].filter(row => row.getClientRects().length).length === 3
+          && document.querySelector('#queue-results').textContent.includes('spring field guide')
+          && !document.querySelector('[data-scheduler-warning]').getClientRects().length`), 10_000)
+      const origin = await evaluate<{ x: number, y: number }>(cdp, `(() => {
+        const screen = document.querySelector('[data-testid=queue-page]').getBoundingClientRect()
+        return { x: Math.floor(screen.x) - 12, y: Math.floor(screen.y) - 10 }
+      })()`)
+      await capture(`queue-${scheme}.webp`, { ...origin, width: 985, height: 680 })
+    }
+    if (failures.length) return
+    mkdirSync(productImages, { recursive: true })
+    for (const { name, bytes } of captures) writeFileSync(join(productImages, name), bytes)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+  }
+}
+
+async function checkWorkspace(cdp: Cdp): Promise<void> {
+  await checkSetupProviderRetry(cdp)
+  const fixturesReady = await evaluate<string>(cdp, `(async () => {
+    const draft = await fetch('/api/postline/queue', { method: 'POST', body: new URLSearchParams({ text: 'A draft for the keyboard smoke test', providers: 'bluesky' }) })
+    if (!draft.ok) return 'could not create the queue fixture: ' + await draft.text()
+    const current = new Date()
+    const upcoming = new Date(current.getFullYear(), current.getMonth() + 1, 15, 12).toISOString().slice(0, 19).replace('T', ' ')
+    for (let index = 1; index <= 4; index++) {
+      const scheduled = await fetch('/api/postline/queue', { method: 'POST', body: new URLSearchParams({ text: 'Phone agenda fixture ' + index, providers: 'bluesky', scheduled_at: upcoming }) })
+      if (!scheduled.ok) return 'could not create the agenda fixture: ' + await scheduled.text()
+    }
+    return 'ok'
+  })()`)
+  if (fixturesReady !== 'ok') throw new Error(fixturesReady)
+
+  for (const mode of MODES) {
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: mode.width, height: mode.height, deviceScaleFactor: 1, mobile: mode.mobile })
+    await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: mode.scheme }] })
+    for (const view of VIEWS) {
+      const report = await auditPage(`${site}/${view}`, { cdp })
+      for (const error of report.errors) fail(view, mode.name, `console: ${error}`)
+      for (const request of report.failed) fail(view, mode.name, `request failed: ${request}`)
+      if (report.finalUrl && !report.finalUrl.includes(`/${view}`)) fail(view, mode.name, `landed on ${report.finalUrl}`)
+
+      const overflow = await evaluate<number>(cdp, 'document.documentElement.scrollWidth - window.innerWidth')
+      if (overflow > 1) fail(view, mode.name, `${overflow}px wider than the screen`)
+
+      const shot = await cdp.send<{ data: string }>('Page.captureScreenshot', { format: 'png' })
+      writeFileSync(join(out, `${view}-${mode.name}.png`), Buffer.from(shot.data, 'base64'))
+      if (mode.name === 'light') {
+        await checkAccessibleControls(cdp, view)
+        await checkWorkspaceSkipLink(cdp, view)
+        if (view === 'queue') await checkQueueKeyboard(cdp)
+      }
+    }
+  }
+  await checkDesktopUpdateControls(cdp)
+  await checkWorkspaceShell(cdp)
+  await checkWorkspaceCommands(cdp)
+  await checkWorkspaceBootstrap(cdp)
+  await checkChannels(cdp)
+  await checkNetworkComponents(cdp)
+  await checkLocalComposerDraft(cdp)
+  await checkComposerThreadDraft(cdp)
+  await checkBrowserPasskey(cdp)
+  await checkPhoneNavigation(cdp)
+  await checkQueueRescheduling(cdp)
+  await checkQueueCalendar(cdp)
+  await checkCampaignScheduling(cdp)
+  await checkEngagementCountLabels(cdp)
+}
+
 let exitCode = 0
 try {
   await waitUntil('The API', async () => (await fetch(`http://localhost:${API_PORT}/api/postline/health`)).status < 500)
@@ -1327,55 +1485,8 @@ try {
   const { cdp, close } = await launch({ viewport: { width: 1280, height: 800 } })
   try {
     await checkFirstRun(cdp)
-    await checkSetupProviderRetry(cdp)
-    const fixturesReady = await evaluate<string>(cdp, `(async () => {
-      const draft = await fetch('/api/postline/queue', { method: 'POST', body: new URLSearchParams({ text: 'A draft for the keyboard smoke test', providers: 'bluesky' }) })
-      if (!draft.ok) return 'could not create the queue fixture: ' + await draft.text()
-      const current = new Date()
-      const upcoming = new Date(current.getFullYear(), current.getMonth() + 1, 15, 12).toISOString().slice(0, 19).replace('T', ' ')
-      for (let index = 1; index <= 4; index++) {
-        const scheduled = await fetch('/api/postline/queue', { method: 'POST', body: new URLSearchParams({ text: 'Phone agenda fixture ' + index, providers: 'bluesky', scheduled_at: upcoming }) })
-        if (!scheduled.ok) return 'could not create the agenda fixture: ' + await scheduled.text()
-      }
-      return 'ok'
-    })()`)
-    if (fixturesReady !== 'ok') throw new Error(fixturesReady)
-
-    for (const mode of MODES) {
-      await cdp.send('Emulation.setDeviceMetricsOverride', { width: mode.width, height: mode.height, deviceScaleFactor: 1, mobile: mode.mobile })
-      await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: mode.scheme }] })
-      for (const view of VIEWS) {
-        const report = await auditPage(`${site}/${view}`, { cdp })
-        for (const error of report.errors) fail(view, mode.name, `console: ${error}`)
-        for (const request of report.failed) fail(view, mode.name, `request failed: ${request}`)
-        if (report.finalUrl && !report.finalUrl.includes(`/${view}`)) fail(view, mode.name, `landed on ${report.finalUrl}`)
-
-        const overflow = await evaluate<number>(cdp, 'document.documentElement.scrollWidth - window.innerWidth')
-        if (overflow > 1) fail(view, mode.name, `${overflow}px wider than the screen`)
-
-        const shot = await cdp.send<{ data: string }>('Page.captureScreenshot', { format: 'png' })
-        writeFileSync(join(out, `${view}-${mode.name}.png`), Buffer.from(shot.data, 'base64'))
-        if (mode.name === 'light') {
-          await checkAccessibleControls(cdp, view)
-          await checkWorkspaceSkipLink(cdp, view)
-          if (view === 'queue') await checkQueueKeyboard(cdp)
-        }
-      }
-    }
-    await checkDesktopUpdateControls(cdp)
-    await checkWorkspaceShell(cdp)
-    await checkWorkspaceCommands(cdp)
-    await checkWorkspaceBootstrap(cdp)
-    await checkChannels(cdp)
-    await checkNetworkComponents(cdp)
-    await checkLocalComposerDraft(cdp)
-    await checkComposerThreadDraft(cdp)
-    await checkBrowserPasskey(cdp)
-    await checkPhoneNavigation(cdp)
-    await checkQueueRescheduling(cdp)
-    await checkQueueCalendar(cdp)
-    await checkCampaignScheduling(cdp)
-    await checkEngagementCountLabels(cdp)
+    if (marketingScreenshots) await captureMarketingScreenshots(cdp)
+    else await checkWorkspace(cdp)
   }
   finally {
     await close()
@@ -1402,6 +1513,8 @@ if (failures.length) {
 }
 else {
   // eslint-disable-next-line no-console
-  console.log(`Every view opened clean in ${MODES.map(mode => mode.name).join(', ')}. Screenshots in ${out}.`)
+  console.log(marketingScreenshots
+    ? `Product screenshots written to ${productImages}.`
+    : `Every view opened clean in ${MODES.map(mode => mode.name).join(', ')}. Screenshots in ${out}.`)
 }
 process.exit(exitCode)

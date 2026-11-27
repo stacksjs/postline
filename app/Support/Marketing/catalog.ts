@@ -73,7 +73,7 @@ export const FEATURES: MarketingEntry[] = [
     intro: 'X gives you 280 characters. Bluesky gives you 300, Mastodon 500, LinkedIn 3000. Writing to the tightest limit makes every post worse. Variants let one network differ without forking the draft.',
     sections: [
       { heading: 'Override only what needs it', body: 'The shared body is the default. Any network you give a variant to publishes that instead, and the rest keep inheriting, so a small tweak stays a small tweak.' },
-      { heading: 'Counted against the right limit', body: 'The composer checks each variant against its network’s limit before publishing.' },
+      { heading: 'See what each network gets', body: 'Live previews show each network’s text and character count, with its images, thread breaks and supported link cards.' },
     ],
     points: [
       'One shared body, optional per-network overrides',
@@ -124,7 +124,7 @@ export const FEATURES: MarketingEntry[] = [
     icon: 'radar-02',
     intro: 'Most mentions never tag you. A listening rule is a set of keywords and the networks to watch them on, checked on a schedule, with every match collected where you will read it.',
     sections: [
-      { heading: 'Automatic keyword checks', body: 'Give a rule up to twenty keywords and choose whether any or all of them must appear. Postline checks active rules every five minutes while it is running.' },
+      { heading: 'Automatic keyword checks', body: 'Give a rule up to twenty keywords and match any word, all words or the exact phrase. Postline checks active rules every five minutes while it is running.' },
       { heading: 'A mention inbox', body: 'Matches arrive in one list, unread until you open them, filterable by rule. Scan now when you do not want to wait for the next check.' },
     ],
     points: [
@@ -161,7 +161,7 @@ export const FEATURES: MarketingEntry[] = [
     sections: [
       { heading: 'Preview before anything is deleted', body: 'A dry run reports the exact count per network and a sample of what matched. The delete button stays locked until you have previewed the selection you are about to act on.' },
       { heading: 'Automatic deletion', body: 'Turn on a retention period and posts older than it are deleted daily, on the networks you choose. Limit it to posts Postline published, or include everything on the account.' },
-      { heading: 'Scoped to what a network allows', body: 'Networks that cannot delete, or cannot list an account\'s history, are reported as skipped with the reason.' },
+      { heading: 'Scoped to what a network allows', body: 'LinkedIn cleanup covers posts sent through Postline. When a network cannot delete or list its history, the preview explains what will be skipped.' },
     ],
     points: [
       'Dry-run preview with per-network counts',

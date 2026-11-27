@@ -32,6 +32,20 @@ for (const path of paths) {
     throw new Error(`${path} has inconsistent canonical or share URLs.`)
 
   if (path === '/') {
+    for (const view of ['composer', 'queue']) {
+      const photo = `picture img[src*="/product/${view}-light"]`
+      const alternate = `picture source[srcset*="/product/${view}-dark"]`
+      const alt = attribute(photo, 'alt')
+      const light = attribute(photo, 'src')
+      const dark = attribute(alternate, 'srcset')
+      if (!alt.includes('Postline') || attribute(alternate, 'media') !== '(prefers-color-scheme: dark)')
+        throw new Error(`The ${view} screenshot needs descriptive text and a dark version.`)
+      for (const image of [light, dark]) {
+        const file = Bun.file(join(dist, image))
+        if (!image.startsWith('/images/product/') || !await file.exists() || file.size === 0)
+          throw new Error(`Missing built product screenshot ${image}.`)
+      }
+    }
     const json = html.match(/<script\b[^>]*type="application\/ld\+json"[^>]*>([^<]*)<\/script>/)?.[1]
     const graph = json ? JSON.parse(json)['@graph'] : null
     if (!Array.isArray(graph) || !graph.some(entry => entry['@type'] === 'SoftwareApplication' && entry.url === canonical)
