@@ -174,16 +174,44 @@ describe('postline api — reads', () => {
     expect(typeof body.data.unread).toBe('number')
   })
 
-  test('analytics answers with stats and a series', async () => {
-    const response = await featureTest().actingAs(await actingUser()).get('/api/postline/analytics')
-
-    response.assertStatus(200)
-    const body = await response.json<{ ok: boolean, data: { stats: unknown, series: unknown[] } }>()
-    expect(body.ok).toBe(true)
-    // fillStats() reads `stats` straight off this payload. It guards the
-    // absence now, but a response without it still means a blank dashboard.
-    expect(body.data.stats).toBeDefined()
-    expect(Array.isArray(body.data.series)).toBe(true)
+  test('analytics filters the series and reported post metrics to the selected dates', async () => {
+    const client = featureTest().actingAs(await actingUser())
+    const database = db as any
+    const now = Date.now()
+    const publish = async (text: string, daysAgo: number) => {
+      const { postId } = await postQueue.save({ text, providers: ['bluesky'] })
+      const sentAt = new Date(now - daysAgo * 86_400_000).toISOString().slice(0, 19).replace('T', ' ')
+      await database.updateTable('posts').set({ status: 'published', published_at: sentAt }).where('id', '=', postId).execute()
+      await database.updateTable('post_targets').set({ status: 'published', metrics: '{"likes":0,"views":12}' }).where('post_id', '=', postId).execute()
+      return postId
+    }
+    const current = await publish('A post in both ranges', 2)
+    const earlier = await publish('A post in the longer range only', 10)
+    try {
+      const path = '/api/postline/analytics'
+      const defaultSummary = await client.get(path)
+      defaultSummary.assertStatus(200)
+      expect((await defaultSummary.json<{ data: { series: unknown[] } }>()).data.series).toHaveLength(30)
+      for (const days of [7, 30, 90]) {
+        const result = await client.get(`${path}?days=${days}&page=1`)
+        result.assertStatus(200)
+        const { data } = await result.json<{ data: {
+          totalPosts: number
+          series: Array<{ value: number }>
+          posts: Array<{ id: number, targets: unknown[] }>
+        } }>()
+        expect(data.series).toHaveLength(days)
+        expect(data.series.reduce((total, point) => total + point.value, 0)).toBe(data.totalPosts)
+        expect(data.posts.find(post => post.id === current)?.targets).toContainEqual(expect.objectContaining({ provider: 'bluesky', counts: { likes: 0, views: 12 } }))
+        expect(data.posts.some(post => post.id === earlier)).toBe(days !== 7)
+      }
+      ;(await client.get(`${path}?days=999&page=1`)).assertStatus(422)
+      ;(await client.get(`${path}?days=7&page=-1`)).assertStatus(422)
+    }
+    finally {
+      await database.deleteFrom('post_targets').where('post_id', 'in', [current, earlier]).execute()
+      await database.deleteFrom('posts').where('id', 'in', [current, earlier]).execute()
+    }
   })
 })
 

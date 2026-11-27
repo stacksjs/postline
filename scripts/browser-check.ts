@@ -891,13 +891,10 @@ async function checkPhoneNavigation(cdp: Cdp): Promise<void> {
   await evaluate(cdp, `document.querySelector('#workspace-more a[href="/analytics"]').click()`)
   await waitUntil('The Analytics view opens and closes the menu', () => evaluate<boolean>(cdp, `
     location.pathname === '/analytics' && !document.querySelector('#workspace-more').open`), 10_000)
-  await waitUntil('The chart has readable phone labels', () => evaluate<boolean>(cdp, `
-    (() => {
-      const chart = document.querySelector('[data-analytics-chart]')
-      const tick = chart?.querySelector('[data-chart-x-axis] text')
-      return tick && chart.viewBox.baseVal.width <= 375
-        && chart.getScreenCTM().a * Number.parseFloat(getComputedStyle(tick).fontSize) >= 11
-    })()`), 5_000)
+  await waitUntil('Analytics explains when there is too little data and fits the phone', () => evaluate<boolean>(cdp, `
+    document.querySelector('[aria-labelledby=analytics-chart-title] p')?.textContent.includes('Publish on at least two days')
+      && document.querySelector('[aria-labelledby=analytics-chart-title] p').getClientRects().length > 0
+      && document.documentElement.scrollWidth - innerWidth <= 1`), 5_000)
 
   await auditPage(`${site}/composer`, { cdp })
   const picker = '[data-postline-schedule-picker] [data-date-time-trigger]'
@@ -1109,43 +1106,68 @@ async function checkQueueCalendar(cdp: Cdp): Promise<void> {
   })()`), 5_000)
 }
 
-async function checkEngagementCountLabels(cdp: Cdp): Promise<void> {
+async function checkAnalytics(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
+    window.analyticsReads = 0
     window.fetch = (input, options) => {
-      if (new URL(input instanceof Request ? input.url : input, location.href).pathname !== '/api/postline/analytics')
-        return actualFetch(input, options)
+      const url = new URL(input instanceof Request ? input.url : input, location.href)
+      if (url.pathname !== '/api/postline/analytics' || !url.searchParams.has('page')) return actualFetch(input, options)
+      const days = Number(url.searchParams.get('days'))
+      const page = Number(url.searchParams.get('page'))
+      window.analyticsReads++
+      const counts = { likes: 1, replies: 0, views: 12 }
       return Promise.resolve(Response.json({ ok: true, data: {
+        totalPosts: days === 7 ? 1 : 26,
         stats: {
-          postsThisWeek: 1, postsLastWeek: 0, minSample: 3,
-          engagement: {
-            likes: 1, replies: 0, reposts: 0, syncedTargets: 1, providers: ['instagram'],
-            countsByProvider: [{ provider: 'instagram', measured: 1, likes: 1, replies: 0, views: 12 }],
-          },
+          minSample: 3,
+          engagement: { likes: 1, replies: 0, reposts: 0, countsByProvider: [{ provider: 'instagram', ...counts }] },
         },
-        series: [{ label: 'Monday', value: 0 }, { label: 'Tuesday', value: 1 }],
-        channelMix: [{ provider: 'instagram', published: 1, share: 100 }],
+        series: [{ label: 'Monday', value: days === 7 ? 0 : 25 }, { label: 'Tuesday', value: 1 }],
+        channelMix: [{ provider: 'instagram', published: days === 7 ? 1 : 26, share: 100 }],
+        posts: [{ id: page, title: page === 1 ? 'First example' : 'Next example', publishedAt: '2026-11-25 10:00:00', targets: [{ id: page, provider: 'instagram', handle: null, counts }] }],
+        page,
+        pageCount: days === 7 ? 1 : 2,
       } }))
     }
   ` })
   try {
     await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] })
     await auditPage(`${site}/analytics`, { cdp })
-    await waitUntil('Analytics shows measured zero and omits unavailable reposts', () => evaluate<boolean>(cdp, `
+    await waitUntil('Analytics shows measured zero and omits unavailable reposts in both tables', () => evaluate<boolean>(cdp, `
       document.querySelector('[data-analytics-engagement]')?.textContent === '1'
         && document.querySelector('[data-analytics-engagement-trend]')?.textContent === '1 like or reaction · 0 replies'
-        && document.querySelector('[data-analytics-network-engagement] li')?.textContent.includes('1 like · 0 replies · 12 views')`), 10_000)
-    await waitUntil('Analytics paints the chart with dark theme tokens', () => evaluate<boolean>(cdp, `(() => {
-      const chart = document.querySelector('[data-analytics-chart]')
-      const background = chart?.querySelector('[data-chart-background]')
-      const tick = chart?.querySelector('[data-chart-y-axis] text')
-      if (!document.documentElement.classList.contains('dark') || !background || !tick) return false
-      const root = getComputedStyle(document.documentElement)
-      const color = (value) => value.startsWith('#') ? value.slice(1).match(/../g).map(part => parseInt(part, 16)).join(',') : value.match(/\\d+/g).join(',')
-      return color(getComputedStyle(background).fill) === color(root.getPropertyValue('--panel-2').trim())
-        && color(getComputedStyle(tick).fill) === color(root.getPropertyValue('--muted').trim())
-        && Boolean(chart.querySelector('[data-chart-line]').getAttribute('d'))
+        && document.querySelector('[data-analytics-network-engagement] li')?.textContent.includes('1 like · 0 replies · 12 views')
+        && document.querySelector('[aria-labelledby=published-posts-title] tbody').textContent.includes('First example')
+        && document.querySelector('[aria-labelledby=published-posts-title] tbody').textContent.includes('1 like · 0 replies · 12 views')`), 10_000)
+    await waitUntil('The chart is drawn with the dark theme series colour', () => evaluate<boolean>(cdp, `(() => {
+      const canvas = document.querySelector('[data-analytics-chart]')
+      if (!document.documentElement.classList.contains('dark') || !canvas?.clientWidth || !canvas?.clientHeight) return false
+      const [r, g, b] = getComputedStyle(canvas).getPropertyValue('--info').trim().slice(1).match(/../g).map(part => parseInt(part, 16))
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i] === r && pixels[i + 1] === g && pixels[i + 2] === b && pixels[i + 3] === 255) return true
+      }
+      return false
     })()`), 5_000)
+    await evaluate(cdp, "[...document.querySelectorAll('[aria-label=\"Published posts pages\"] button')].find(button => button.textContent === 'Next').focus()")
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The next page shows its posts and restores keyboard focus', () => evaluate<boolean>(cdp, `
+      document.querySelector('[aria-labelledby=published-posts-title] tbody').textContent.includes('Next example')
+        && document.activeElement.id === 'published-posts-title'`), 5_000)
+    await evaluate(cdp, `
+      const range = document.querySelector('[data-postline-page=analytics] select')
+      range.value = '7'; range.dispatchEvent(new Event('change', { bubbles: true }))`)
+    await waitUntil('A short range updates the totals, restarts paging and explains the missing trend', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-analytics-total]')?.textContent === '1'
+        && document.querySelector('[aria-labelledby=published-posts-title] tbody').textContent.includes('First example')
+        && !document.querySelector('[data-analytics-chart]').getClientRects().length`), 5_000)
+    await evaluate(cdp, `document.querySelector('aside a[href="/queue"]').click()`)
+    await waitUntil('Leaving Analytics for Queue', () => evaluate<boolean>(cdp, "location.pathname === '/queue'"), 5_000)
+    await evaluate(cdp, `document.querySelector('aside a[href="/analytics"]').click()`)
+    await waitUntil('Analytics reloads its data on revisit', () => evaluate<boolean>(cdp, `
+      location.pathname === '/analytics' && window.analyticsReads === 4
+        && document.querySelector('[data-analytics-total]')?.textContent === '26'`), 5_000)
   }
   finally {
     await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] })
@@ -1346,7 +1368,7 @@ async function checkListStates(cdp: Cdp): Promise<void> {
     { route: 'campaigns', path: '/api/postline/campaigns', title: 'Plan your first campaign', loading: 'Loading campaigns', data: { campaigns: [], selected: null } },
     {
       route: 'analytics', path: '/api/postline/analytics', title: 'No publishing activity in the last 30 days', loading: 'Loading analytics',
-      data: { stats: { postsThisWeek: 0, postsLastWeek: 0 }, series: [], channelMix: [], windows: [] },
+      data: { stats: { minSample: 3 }, totalPosts: 0, series: [], channelMix: [], windows: [], posts: [], page: 1, pageCount: 0 },
     },
   ]
   for (const view of views) {
@@ -1542,7 +1564,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkQueueRescheduling(cdp)
   await checkQueueCalendar(cdp)
   await checkCampaignScheduling(cdp)
-  await checkEngagementCountLabels(cdp)
+  await checkAnalytics(cdp)
   await checkListStates(cdp)
 }
 

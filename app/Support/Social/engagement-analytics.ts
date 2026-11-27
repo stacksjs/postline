@@ -18,7 +18,7 @@ const metricFields = ['likes', 'reposts', 'replies', 'quotes', 'views', 'shares'
 type MetricField = typeof metricFields[number]
 export type EngagementCounts = Partial<Record<MetricField, number>>
 
-function readMetrics(value: string | null): EngagementCounts {
+export function readEngagementMetrics(value: string | null): EngagementCounts {
   if (!value) return {}
   try {
     const counts = JSON.parse(value) as Partial<Record<MetricField, unknown>> | null
@@ -66,7 +66,7 @@ export function summarizeEngagement(targets: readonly PublishedTarget[], timezon
       postsByHour.set(hour, posts)
     }
 
-    const metrics = readMetrics(target.metrics)
+    const metrics = readEngagementMetrics(target.metrics)
     if (!Object.keys(metrics).length) continue
     engagement.syncedTargets++
     const providerCounts = countsByProvider.get(target.provider) ?? { measured: 0 }

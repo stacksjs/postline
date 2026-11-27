@@ -6,6 +6,7 @@
       "name": "postline",
       "dependencies": {
         "@stacksjs/ai": "^0.75.695",
+        "@stacksjs/charts": "0.75.695",
         "@stacksjs/socials": "^0.75.695",
         "@stacksjs/stx": "0.2.954",
         "@stacksjs/ts-cloud": "^0.16.157",

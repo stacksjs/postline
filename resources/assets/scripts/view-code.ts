@@ -4,9 +4,8 @@
  * Every workspace page loads this file, because the router swaps views in
  * under a layout that stays put: a visit from Queue to the composer runs no
  * new layout script. The long-form editor (about 30 KB with ts-medium-editor)
- * and the analytics chart are each used by one view, so each is imported the
- * first time its view appears, and started again after every navigation that
- * lands on it. Queue, Inbox and the rest never download either.
+ * is imported when Composer appears, and started again after every navigation
+ * that lands there. Queue, Inbox and the rest never download it.
  *
  * Each URL is absolute. The dev server and the desktop agent answer it as
  * they answer every other script, and the site build bundles the file on its
@@ -23,7 +22,6 @@ interface ViewCode {
 
 const VIEWS: ViewCode[] = [
   { selector: '[data-postline-page="composer"]', url: '/assets/scripts/richtext-editor.ts', start: 'setupRichText' },
-  { selector: '[data-analytics-chart]', url: '/assets/scripts/analytics-chart.ts', start: 'mountAnalyticsIfShown' },
 ]
 
 const loaded = new Map<string, Promise<Record<string, unknown>>>()
@@ -42,8 +40,8 @@ function startViews(): void {
         if (typeof start === 'function') start()
       })
       .catch((error) => {
-        // The view still works without it (the composer's textarea, the
-        // analytics numbers); say why the extra is missing, and try again on
+        // The view still works without it (the composer's
+        // plain-text field); say why the editor is missing, and try again on
         // the next visit.
         console.error(`${view.url} did not load.`, error)
         loaded.delete(view.url)
