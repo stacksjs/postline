@@ -45,7 +45,7 @@ export function escapeHtml(value: string | null | undefined): string {
     .replaceAll("'", '&#39;')
 }
 
-export function relativeTime(value: string | null | undefined, options: { compact?: boolean, fallback?: string } = {}): string {
+export function relativeTime(value: string | null | undefined, options: { compact?: boolean, fallback?: string, formatter?: Intl.RelativeTimeFormat } = {}): string {
   if (!value) return options.fallback ?? ''
   const timestamp = value.replace(' ', 'T')
   // SQLite timestamps without a zone are UTC. Preserve offsets supplied by providers.
@@ -53,12 +53,19 @@ export function relativeTime(value: string | null | undefined, options: { compac
   if (Number.isNaN(date.getTime())) return options.fallback ?? ''
 
   const minutes = Math.floor((Date.now() - date.getTime()) / 60_000)
+  const formatter = options.formatter
   const suffix = options.compact ? '' : ' ago'
-  if (minutes < 1) return options.compact ? 'now' : 'just now'
-  if (minutes < 60) return `${minutes}m${suffix}`
-  if (minutes < 1440) return `${Math.floor(minutes / 60)}h${suffix}`
-  if (minutes < 10080) return `${Math.floor(minutes / 1440)}d${suffix}`
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  if (minutes < 1) return formatter?.format(0, 'second') ?? (options.compact ? 'now' : 'just now')
+  if (minutes < 60) return formatter?.format(-minutes, 'minute') ?? `${minutes}m${suffix}`
+  if (minutes < 1440) {
+    const hours = Math.floor(minutes / 60)
+    return formatter?.format(-hours, 'hour') ?? `${hours}h${suffix}`
+  }
+  if (minutes < 10080) {
+    const days = Math.floor(minutes / 1440)
+    return formatter?.format(-days, 'day') ?? `${days}d${suffix}`
+  }
+  return date.toLocaleDateString(formatter?.resolvedOptions().locale, { month: 'short', day: 'numeric' })
 }
 
 export async function requestJson(url: string, options: RequestInit = {}, errorMessage?: string) {

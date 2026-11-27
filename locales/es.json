@@ -82,6 +82,32 @@
         "description": "Envíos a redes y última ejecución de cada tarea en segundo plano."
       }
     },
+    "timeline": {
+      "title": "Cronología",
+      "region": "Cronología de Bluesky",
+      "compose": "Redactar",
+      "refresh": "Actualizar",
+      "following": "Siguiendo",
+      "loadingFeed": "Cargando publicaciones…",
+      "loadingTimeline": "Cargando cronología",
+      "loadError": "No se pudo cargar la cronología",
+      "emptyFeed": "Aún no hay publicaciones en tu cronología",
+      "emptyDescription": "Actualiza para buscar publicaciones nuevas en Bluesky.",
+      "connectBluesky": "Conecta Bluesky para ver tu cronología",
+      "openChannels": "Abrir Canales",
+      "openPost": "Abrir publicación en Bluesky",
+      "openOnBluesky": "Abrir en Bluesky",
+      "replies": "respuestas",
+      "reposts": "republicaciones",
+      "likes": "Me gusta",
+      "refreshing": "Actualizando…",
+      "syncing": "Sincronizando…",
+      "syncError": "No se pudo sincronizar la cronología de Bluesky.",
+      "noAccount": "Ninguna cuenta conectada",
+      "loadFeedError": "No se pudieron cargar las publicaciones",
+      "postCount": "{count} publicaciones | {count} publicación | {count} publicaciones",
+      "loadedPosts": "Se cargaron {count} publicaciones. | Se cargó {count} publicación. | Se cargaron {count} publicaciones."
+    },
     "activity": {
       "region": "Actividad",
       "sendStatus": "Estado del envío",

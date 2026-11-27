@@ -2652,9 +2652,15 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
     window.fetch = async (input, init) => {
+      const path = new URL(input instanceof Request ? input.url : input, location.href).pathname
+      if (path === '/api/postline/bluesky/timeline') {
+        return Response.json({ ok: true, data: { connected: true, items: [{
+          authorHandle: 'alice.example', authorName: 'Alice Example', body: 'Mi primera publicación.',
+          postedAt: new Date(Date.now() - 10 * 60_000).toISOString(), postUrl: 'https://bsky.app/profile/alice.example/post/first',
+        }] } })
+      }
       const response = await actualFetch(input, init)
-      if (new URL(input instanceof Request ? input.url : input, location.href).pathname !== '/api/postline/bootstrap' || !response.ok)
-        return response
+      if (path !== '/api/postline/bootstrap' || !response.ok) return response
       const payload = await response.json()
       return Response.json({ ...payload, data: { ...payload.data, unread: { inbox: 1, listening: 2 } } })
     }
@@ -2749,6 +2755,18 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
     await waitUntil('Spanish Activity failed-sends keyboard filter', () => evaluate<boolean>(cdp, `
       document.activeElement?.getAttribute('aria-pressed') === 'true'
         && document.querySelector('[aria-label="Envíos"]')?.innerText.includes('No hay envíos fallidos')
+    `), 5_000)
+
+    const timeline = await auditPage(`${site}/timeline`, { cdp })
+    for (const error of timeline.errors) fail('timeline', 'Spanish', error)
+    for (const request of timeline.failed) fail('timeline', 'Spanish', request)
+    await waitUntil('Spanish Bluesky Timeline shows the localized count and date', () => evaluate<boolean>(cdp, `
+      document.title === 'Postline - Cronología'
+        && document.querySelector('[data-testid="timeline-page"][lang="es"] h1')?.textContent === 'Cronología de Bluesky'
+        && document.querySelector('[aria-label="Cronología de Bluesky"]')?.innerText.includes('1 publicación')
+        && document.querySelector('[data-timeline-copy]')?.innerText === 'Mi primera publicación.'
+        && document.querySelector('[aria-label="Abrir publicación en Bluesky"]')?.title === 'Abrir en Bluesky'
+        && document.querySelector('[data-testid="timeline-page"] time')?.innerText.startsWith('hace ')
     `), 5_000)
   }
   finally {
@@ -2903,7 +2921,7 @@ else {
   // eslint-disable-next-line no-console
   console.log(marketingScreenshots
     ? `Product screenshots written to ${productImages}.`
-    : spanishWorkspace ? 'Spanish workspace navigation, Queue, and Activity passed.'
+    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, and Timeline passed.'
     : `Every view opened clean in ${MODES.map(mode => mode.name).join(', ')}. Screenshots in ${out}.`)
 }
 process.exit(exitCode)

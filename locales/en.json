@@ -82,6 +82,32 @@
         "description": "Every send to a network and when each background job last ran."
       }
     },
+    "timeline": {
+      "title": "Timeline",
+      "region": "Bluesky timeline",
+      "compose": "Compose",
+      "refresh": "Refresh",
+      "following": "Following",
+      "loadingFeed": "Loading feed…",
+      "loadingTimeline": "Loading timeline",
+      "loadError": "Could not load the timeline",
+      "emptyFeed": "No posts in your feed yet",
+      "emptyDescription": "Refresh to check for new posts on Bluesky.",
+      "connectBluesky": "Connect Bluesky to see your timeline",
+      "openChannels": "Open Channels",
+      "openPost": "Open post on Bluesky",
+      "openOnBluesky": "Open on Bluesky",
+      "replies": "replies",
+      "reposts": "reposts",
+      "likes": "likes",
+      "refreshing": "Refreshing…",
+      "syncing": "Syncing…",
+      "syncError": "Bluesky timeline sync failed.",
+      "noAccount": "No account connected",
+      "loadFeedError": "Could not load feed",
+      "postCount": "{count} posts | {count} post | {count} posts",
+      "loadedPosts": "Loaded {count} posts. | Loaded {count} post. | Loaded {count} posts."
+    },
     "activity": {
       "region": "Activity",
       "sendStatus": "Send status",

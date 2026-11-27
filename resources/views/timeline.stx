@@ -1,37 +1,45 @@
 @extends('layouts/app')
 
-@section('title', 'Postline - Timeline')
+<script server cache>
+import { workspaceLocale, workspaceTimelineText } from '../../app/Support/Localization/workspace'
+
+export const timelineLocale = workspaceLocale
+export const timelineText = workspaceTimelineText
+export const timelineClient = { locale: workspaceLocale, messages: workspaceTimelineText }
+</script>
+
+@section('title')Postline - {{ timelineText.title }}@endsection
 
 @section('content')
   @meta('description', 'Read your Bluesky home timeline in Postline.')
-  <section class="grid gap-4" data-postline-page="timeline" data-testid="timeline-page">
+  <section class="grid gap-4" data-postline-page="timeline" data-testid="timeline-page" lang="{{ timelineLocale }}">
     <WorkspacePageHeader titleKey="workspace.pages.timeline.title" descriptionKey="workspace.pages.timeline.description">
       <div class="grid sm:flex gap-2 grid-cols-2 items-center">
-        <a class="inline-flex items-center justify-center px-4 h-9 font-semibold text-ink text-sm bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" href="/composer" data-stx-link>Compose</a>
+        <a class="inline-flex items-center justify-center px-4 h-9 font-semibold text-ink text-sm bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" href="/composer" data-stx-link>{{ timelineText.compose }}</a>
         <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="busy()" @click="refreshManual">
           <span class="h-4 w-4 i-hugeicons-refresh" aria-hidden="true"></span>
-          <span :text="refreshLabel()">Refresh</span>
+          <span :text="refreshLabel()">{{ timelineText.refresh }}</span>
         </button>
       </div>
     </WorkspacePageHeader>
 
-    <section aria-label="Bluesky timeline">
+    <section aria-label="{{ timelineText.region }}">
       <Card padding="none" className="shadow-sm">
         <div class="flex gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
           <div>
-            <strong class="font-semibold text-ink text-sm">Following</strong>
-            <p class="m-0 mt-0.5 text-muted text-xs" :text="metaText()">Loading feed…</p>
+            <strong class="font-semibold text-ink text-sm">{{ timelineText.following }}</strong>
+            <p class="m-0 mt-0.5 text-muted text-xs" :text="metaText()">{{ timelineText.loadingFeed }}</p>
           </div>
           <span class="px-2.5 py-1 font-semibold text-info text-xs bg-info-soft border border-info-line rounded-full">Bluesky</span>
         </div>
         <div class="grid">
-          <WorkspaceListSkeleton :show="busy()" label="Loading timeline" />
-          <ErrorState :show="feedError()" title="Could not load the timeline" :message="feedError()" @retry="refresh()" />
-          <EmptyState :show="showEmpty() && !busy()" variant="bare" title="No posts in your feed yet" description="Refresh to check for new posts on Bluesky.">
-            <button class="text-info text-ui underline" type="button" @click="refresh()">Refresh</button>
+          <WorkspaceListSkeleton :show="busy()" label="{{ timelineText.loadingTimeline }}" />
+          <ErrorState :show="feedError()" title="{{ timelineText.loadError }}" :message="feedError()" @retry="refresh()" />
+          <EmptyState :show="showEmpty() && !busy()" variant="bare" title="{{ timelineText.emptyFeed }}" description="{{ timelineText.emptyDescription }}">
+            <button class="text-info text-ui underline" type="button" @click="refresh()">{{ timelineText.refresh }}</button>
           </EmptyState>
-          <EmptyState :show="notConnected() && !busy() && !feedError()" variant="bare" title="Connect Bluesky to see your timeline">
-            <StxLink class="text-info text-ui underline" to="/accounts">Open Channels</StxLink>
+          <EmptyState :show="notConnected() && !busy() && !feedError()" variant="bare" title="{{ timelineText.connectBluesky }}">
+            <StxLink class="text-info text-ui underline" to="/accounts">{{ timelineText.openChannels }}</StxLink>
           </EmptyState>
 
           <article class="grid px-4 py-3.5 hover:bg-hover border-b border-line last:border-b-0 transition-colors" x-for="item in items()">
@@ -50,20 +58,20 @@
                     </div>
                     <span class="font-semibold text-info text-xs tracking-wider uppercase">Bluesky</span>
                   </div>
-                  <a class="inline-flex items-center justify-center shrink-0 h-8 w-8 text-muted hover:text-ink hover:bg-panel-2 rounded-lg transition-colors" :href="item.url" target="_blank" rel="noopener noreferrer" aria-label="Open post on Bluesky" title="Open on Bluesky">
+                  <a class="inline-flex items-center justify-center shrink-0 h-8 w-8 text-muted hover:text-ink hover:bg-panel-2 rounded-lg transition-colors" :href="item.url" target="_blank" rel="noopener noreferrer" aria-label="{{ timelineText.openPost }}" title="{{ timelineText.openOnBluesky }}">
                     <span class="h-4 w-4 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span>
                   </a>
                 </div>
                 <p class="m-0 break-words text-base text-body whitespace-pre-wrap" data-timeline-copy><template x-for="part in item.body"><a class="break-all text-info underline-offset-2 hover:underline" x-if="part.href" :href="part.href" target="_blank" rel="noopener noreferrer" :text="part.text"></a><span x-else :text="part.text"></span></template></p>
                 <div class="flex flex-wrap gap-x-4 gap-y-1 items-center">
                   <a class="inline-flex gap-1.5 items-center px-1.5 py-1 font-semibold text-muted text-xs hover:text-info hover:bg-info-soft rounded-lg transition-colors" :href="item.url" target="_blank" rel="noopener noreferrer">
-                    <span class="h-4 w-4 i-hugeicons-comment-02" aria-hidden="true"></span><span>{{ item.replies }}</span><span class="sr-only"> replies</span>
+                    <span class="h-4 w-4 i-hugeicons-comment-02" aria-hidden="true"></span><span>{{ item.replies }}</span><span class="sr-only"> {{ timelineText.replies }}</span>
                   </a>
                   <span class="inline-flex gap-1.5 items-center px-1.5 py-1 font-semibold text-muted text-xs rounded-lg">
-                    <span class="h-4 w-4 i-hugeicons-repeat" aria-hidden="true"></span><span>{{ item.reposts }}</span><span class="sr-only"> reposts</span>
+                    <span class="h-4 w-4 i-hugeicons-repeat" aria-hidden="true"></span><span>{{ item.reposts }}</span><span class="sr-only"> {{ timelineText.reposts }}</span>
                   </span>
                   <span class="inline-flex gap-1.5 items-center px-1.5 py-1 font-semibold text-muted text-xs rounded-lg">
-                    <span class="h-4 w-4 i-hugeicons-favourite" aria-hidden="true"></span><span>{{ item.likes }}</span><span class="sr-only"> likes</span>
+                    <span class="h-4 w-4 i-hugeicons-favourite" aria-hidden="true"></span><span>{{ item.likes }}</span><span class="sr-only"> {{ timelineText.likes }}</span>
                   </span>
                 </div>
               </div>
@@ -75,6 +83,7 @@
   </section>
 
   <script client>
+    import { createI18n } from '@stacksjs/i18n/client'
     import { showNotification } from '../functions/notification'
     /**
      * Wire shapes for `/api/postline/timeline`, declared where they are used.
@@ -113,9 +122,14 @@
       likes: string
     }
 
+    const { locale: language, messages: copy } = {{ timelineClient }}
+    const words = createI18n({ locale: language, messages: { [language]: copy } })
+    const elapsed = language === 'en' ? undefined : new Intl.RelativeTimeFormat(language, { numeric: 'auto', style: 'short' })
+    const compactCounts = language === 'en' ? undefined : new Intl.NumberFormat(language, { notation: 'compact', maximumFractionDigits: 1 })
+
     const items = state([])
-    const metaText = state('Loading feed…')
-    const refreshLabel = state('Refresh')
+    const metaText = state(copy.loadingFeed)
+    const refreshLabel = state(copy.refresh)
     const busy = state(false)
     const feedError = state('')
     const loaded = state(false)
@@ -126,6 +140,7 @@
 
     const formatCount = (value: number | null | undefined): string => {
       const n = Number(value) || 0
+      if (compactCounts) return compactCounts.format(n)
       if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
       if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`
       return String(n)
@@ -158,7 +173,7 @@
         url: postUrl(item),
         avatar: item.authorAvatar || '',
         postedAt: item.postedAt || '',
-        relativeTime: relativeTime(item.postedAt, { compact: true }),
+        relativeTime: relativeTime(item.postedAt, { compact: true, formatter: elapsed }),
         body: bodyParts(item.body || ''),
         replies: formatCount(item.replyCount),
         reposts: formatCount(item.repostCount),
@@ -173,23 +188,23 @@
      */
     const refresh = async ({ manual = false } = {}) => {
       busy.set(true)
-      refreshLabel.set('Refreshing…')
+      refreshLabel.set(copy.refreshing)
       feedError.set('')
-      metaText.set('Syncing…')
+      metaText.set(copy.syncing)
 
       try {
         const response = await fetch('/api/postline/bluesky/timeline?limit=30')
         const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Bluesky timeline sync failed.')
+        if (!response.ok || !payload.ok) throw new Error(payload.error || copy.syncError)
 
         notConnected.set(payload.data.connected === false)
         const rows = Array.isArray(payload.data.items) ? payload.data.items.map(toRow) : []
         items.set(rows)
-        metaText.set(notConnected() ? 'No account connected' : `${rows.length} post${rows.length === 1 ? '' : 's'}`)
+        metaText.set(notConnected() ? copy.noAccount : words.t('postCount', { count: rows.length }))
         if (manual) {
           showNotification({
-            title: 'Timeline',
-            message: `Loaded ${rows.length} posts.`,
+            title: copy.title,
+            message: words.t('loadedPosts', { count: rows.length }),
             tone: 'success',
             durationMs: 3200,
           })
@@ -199,14 +214,14 @@
         const message = error instanceof Error ? error.message : String(error)
         items.set([])
         feedError.set(message)
-        metaText.set('Could not load feed')
+        metaText.set(copy.loadFeedError)
         if (manual)
-          showNotification({ title: 'Timeline', message, tone: 'error', id: 'timeline-load' })
+          showNotification({ title: copy.title, message, tone: 'error', id: 'timeline-load' })
       }
       finally {
         busy.set(false)
         loaded.set(true)
-        refreshLabel.set('Refresh')
+        refreshLabel.set(copy.refresh)
       }
     }
 
