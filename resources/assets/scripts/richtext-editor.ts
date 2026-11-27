@@ -14,9 +14,8 @@ function renderDraft(surface: HTMLElement, markdown: string): void {
 
 const boundComposers = new WeakSet<HTMLElement>()
 
-function setupRichText(): void {
-  const root = document.querySelector<HTMLElement>('[data-postline-page="composer"]')
-  if (!root || boundComposers.has(root)) return
+export function setupRichText(root: HTMLElement): void {
+  if (boundComposers.has(root)) return
   const posts = root.querySelector('[data-composer-posts]')
   const title = root.querySelector('[data-compose-title]')
   if (!posts || !title) return
@@ -26,6 +25,7 @@ function setupRichText(): void {
   let unmount = () => {}
 
   function mount(field: HTMLTextAreaElement, host: HTMLElement): void {
+    const hadFocus = field.ownerDocument.activeElement === field
     const surface = document.createElement('div')
     surface.className = 'min-h-36 w-full leading-relaxed text-[18px] text-ink outline-none medium-editor-element'
     surface.setAttribute('role', 'textbox')
@@ -70,6 +70,7 @@ function setupRichText(): void {
     const readOnly = new MutationObserver(updateReadonly)
     readOnly.observe(field, { attributes: true, attributeFilter: ['readonly'] })
     updateReadonly()
+    if (hadFocus) surface.focus()
     field.addEventListener('postline:composer-text', updateFromModel)
     field.addEventListener('postline:composer-focus', focus)
     unmount = () => {
@@ -109,7 +110,3 @@ function setupRichText(): void {
   window.addEventListener('stx:load', disposeAfterNavigation)
   sync()
 }
-
-// view-code.ts imports this module the first time a composer is on the page
-// and calls setupRichText itself, on that load and after each navigation.
-export { setupRichText }

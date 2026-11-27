@@ -656,6 +656,7 @@ async function checkComposerPreferences(cdp: Cdp): Promise<void> {
   const format = `document.querySelector('[data-setting=default-mode] select')`
   const autosave = `document.querySelector('[data-setting=auto-save] button[role=switch]')`
   const thread = `document.querySelector('[data-stx-segmented-control][aria-label="Post format"] [aria-label=Thread]')`
+  const editorRequested = `performance.getEntriesByType('resource').some(entry => new URL(entry.name).pathname.includes('/richtext-editor'))`
   try {
     await auditPage(`${site}/settings`, { cdp })
     await evaluate(cdp, `localStorage.removeItem('postline:composer-draft:v1'); ${tab}.click()`)
@@ -683,6 +684,14 @@ async function checkComposerPreferences(cdp: Cdp): Promise<void> {
     await auditPage(`${site}/composer`, { cdp })
     await waitUntil('A fresh Composer opens without an autosaved draft', () => evaluate<boolean>(cdp, `
       ${thread}?.getAttribute('aria-pressed') === 'true' && ${editor}?.value === ''`), 5_000)
+    if (await evaluate<boolean>(cdp, editorRequested)) fail('composer', 'Thread', 'downloaded the Blog editor before it was needed')
+    await evaluate(cdp, `(() => {
+      const blog = document.querySelector('[data-provider-toggle=blog]')
+      if (blog.getAttribute('aria-pressed') !== 'true') blog.click()
+      document.querySelector('[data-stx-segmented-control][aria-label="Post format"] [aria-label=Single]').click()
+    })()`)
+    await waitUntil('Switching from Thread to Blog loads the long-form editor', () => evaluate<boolean>(cdp, `
+      ${editorRequested} && Boolean(document.querySelector('[data-richtext-host] [contenteditable=true]'))`), 5_000)
   }
   finally {
     await auditPage(`${site}/settings`, { cdp })
