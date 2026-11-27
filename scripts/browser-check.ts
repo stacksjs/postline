@@ -607,10 +607,13 @@ async function checkWorkspaceBootstrap(cdp: Cdp): Promise<void> {
 async function checkLocalComposerDraft(cdp: Cdp): Promise<void> {
   await auditPage(`${site}/queue`, { cdp })
   const draftKey = 'postline:composer-draft:v1'
-  const original = 'A local draft from before the composer format switch'
-  const edited = 'Updated local draft'
+  const original = 'A **local draft** from before the format switch.\n\n- [Guide](/docs/first-run)\n- `code`'
+  const addition = ' Updated on reopen.'
   const editor = "document.querySelector('[data-bluesky-text]')"
   const richEditor = "document.querySelector('[data-richtext-host] [contenteditable=true]')"
+  const formatted = `${richEditor}?.querySelector('strong')?.textContent === 'local draft'
+    && ${richEditor}?.querySelector('ul a')?.getAttribute('href') === '/docs/first-run'
+    && ${richEditor}?.querySelector('ul code')?.textContent === 'code'`
   await evaluate(cdp, `localStorage.setItem('${draftKey}', JSON.stringify({
     activeIndex: 0, mode: 'draft', posts: [{ text: ${JSON.stringify(original)} }], version: 1,
   }))`)
@@ -619,25 +622,27 @@ async function checkLocalComposerDraft(cdp: Cdp): Promise<void> {
     await waitUntil('Legacy local draft text and intent are restored', () => evaluate<boolean>(cdp, `
       ${editor}?.value === ${JSON.stringify(original)}
         && document.querySelector('[data-bluesky-publish-label]').textContent === 'Save draft'`), 5_000)
-    await waitUntil('The long-form editor loads the restored text', () => evaluate<boolean>(cdp, `
-      ${richEditor}?.textContent === ${JSON.stringify(original)}`), 5_000)
+    await waitUntil('The long-form editor restores bold, links, lists and code', () => evaluate<boolean>(cdp, formatted), 5_000)
     await evaluate(cdp, `(() => {
       const editor = ${richEditor}
       editor.focus()
       const range = new Range()
-      range.selectNodeContents(editor)
+      range.selectNodeContents(editor.querySelector('p'))
+      range.collapse(false)
       const selection = getSelection()
       selection.removeAllRanges()
       selection.addRange(range)
     })()`)
-    await cdp.send('Input.insertText', { text: edited })
+    await cdp.send('Input.insertText', { text: addition })
     await waitUntil('Edited local draft is saved in the current format', () => evaluate<boolean>(cdp, `(() => {
       const draft = JSON.parse(localStorage.getItem('${draftKey}') || '{}')
-      return draft.posts?.[0]?.text === ${JSON.stringify(edited)} && draft.mode === 'single' && draft.action === 'draft'
+      const saved = draft.posts?.[0]?.text || ''
+      return saved.includes('**local draft**') && saved.includes(${JSON.stringify(addition)})
+        && saved.includes('[Guide](/docs/first-run)') && draft.mode === 'single' && draft.action === 'draft'
     })()`), 5_000)
     await auditPage(`${site}/composer`, { cdp })
-    await waitUntil('Updated composer draft survives a reload', () => evaluate<boolean>(cdp, `
-      ${editor}?.value === ${JSON.stringify(edited)} && ${richEditor}?.textContent === ${JSON.stringify(edited)}`), 5_000)
+    await waitUntil('Updated draft keeps its formatting after reload', () => evaluate<boolean>(cdp, `
+      ${formatted} && ${richEditor}.querySelector('p').textContent.includes(${JSON.stringify(addition.trim())})`), 5_000)
   }
   finally {
     await auditPage(`${site}/queue`, { cdp })

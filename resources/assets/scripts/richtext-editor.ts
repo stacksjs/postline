@@ -1,31 +1,15 @@
 /** Mount the lazy long-form editor against the composer's controlled textarea. */
+import { sanitize } from '@stacksjs/sanitizer'
+import { marked } from 'marked'
 import { isEmptyHtml, toMarkdown } from 'ts-medium-editor'
 import { mountMediumEditor } from 'ts-medium-editor/stx'
+import { safeMarkdown } from '../../../app/Support/Social/safe-markdown'
 
-/** Minimal Markdown to HTML, for seeding the editor from an existing draft. */
-function markdownToHtml(markdown: string): string {
-  const escape = (value: string): string => value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-
-  return markdown
-    .split(/\n{2,}/)
-    .map(block => block.trim())
-    .filter(Boolean)
-    .map((block) => {
-      const heading = block.match(/^(#{1,6})\s+(.*)$/)
-      if (heading) {
-        const level = heading[1]!.length
-        return `<h${level}>${escape(heading[2]!)}</h${level}>`
-      }
-      if (block.startsWith('> ')) {
-        return `<blockquote><p>${escape(block.replace(/^>\s?/gm, ''))}</p></blockquote>`
-      }
-      // Single newlines inside a block are soft wraps, which is what <br> is.
-      return `<p>${escape(block).replace(/\n/g, '<br>')}</p>`
-    })
-    .join('')
+/** Seed or refresh an editor from the Markdown stored in a draft. */
+function renderDraft(surface: HTMLElement, markdown: string): void {
+  const html = marked.parse(safeMarkdown(markdown), { async: false, breaks: true })
+  // security-ignore: code/inner-html The Markdown renderer's output passes through the shared sanitizer.
+  surface.innerHTML = sanitize(html, 'markdown').trim()
 }
 
 const boundComposers = new WeakSet<HTMLElement>()
@@ -48,7 +32,7 @@ function setupRichText(): void {
     surface.setAttribute('aria-multiline', 'true')
     surface.setAttribute('aria-label', field.getAttribute('aria-label') || 'Post body')
     surface.setAttribute('data-focus-outline', '')
-    surface.innerHTML = markdownToHtml(field.value)
+    renderDraft(surface, field.value)
     host.replaceChildren(surface)
     host.classList.remove('hidden')
     field.classList.add('hidden')
@@ -70,7 +54,7 @@ function setupRichText(): void {
       const value: unknown = (event as CustomEvent).detail
       if (typeof value !== 'string') return
       applyingModel = true
-      try { surface.innerHTML = markdownToHtml(value) }
+      try { renderDraft(surface, value) }
       finally { applyingModel = false }
     }
 
@@ -128,4 +112,4 @@ function setupRichText(): void {
 
 // view-code.ts imports this module the first time a composer is on the page
 // and calls setupRichText itself, on that load and after each navigation.
-export { markdownToHtml, setupRichText }
+export { setupRichText }
