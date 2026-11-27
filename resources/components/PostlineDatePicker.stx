@@ -1,0 +1,53 @@
+<script client>
+import { wallTimeInZone } from '../../app/Support/time'
+
+const emit = defineEmits(['change'])
+const value = useReactiveProp<string | null>('value', null, { parse: value => value })
+const timeZone = useReactiveProp('timeZone', 'UTC')
+const dateOpen = state(false)
+const dateTrigger = useRef('dateTrigger')
+const today = state(new Date())
+
+function calendarDate(key: string | null): Date | null {
+  if (!key) return null
+  const [year, month, day] = key.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+const dayValue = derived(() => calendarDate(value()))
+const dayMinimum = derived(() => calendarDate(wallTimeInZone(today(), timeZone()).slice(0, 10)))
+const dayLabel = derived(() => dayValue()?.toLocaleDateString(undefined, { dateStyle: 'medium' }) || 'Choose a date')
+
+function onDayToggle(event: Event) {
+  const open = (event.currentTarget as HTMLDetailsElement).open
+  dateOpen.set(open)
+  if (open) today.set(new Date())
+}
+
+function closeDay() {
+  dateOpen.set(false)
+  dateTrigger.current?.focus()
+}
+
+function escapeDay(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || !dateOpen()) return
+  event.preventDefault()
+  event.stopPropagation()
+  closeDay()
+}
+
+function selectDay(date: Date) {
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  emit('change', { value: `${date.getFullYear()}-${month}-${day}` })
+  closeDay()
+}
+</script>
+
+<details class="min-w-0" :open="dateOpen()" @toggle="onDayToggle" @keydown="escapeDay" data-schedule-day-details>
+  <summary class="px-3 py-2 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg cursor-pointer" :aria-label="'New date, ' + dayLabel()" ref="dateTrigger">{{ dayLabel() }}</summary>
+  <div :if="dateOpen()" class="pt-2">
+    <p class="m-0 pb-2 text-muted text-xs">Time zone <span :text="timeZone()"></span></p>
+    <Calendar :value="dayValue" :minDate="dayMinimum" @change="selectDay" />
+  </div>
+</details>

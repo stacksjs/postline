@@ -49,7 +49,7 @@
           Move one week later
         </button>
         <form class="flex flex-wrap gap-2 items-end" x-show="hasScheduledRows()" @submit.prevent="rescheduleSelection({ date: rescheduleDate() })">
-          <PostlineSchedulePicker :value="rescheduleDate" :timeZone="zone" :dateOnly="true" label="New date" placeholder="Choose a date" @change="selectRescheduleDate" />
+          <PostlineDatePicker :value="rescheduleDate" :timeZone="zone" @change="selectRescheduleDate" />
           <button class="px-3 h-9 font-semibold text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg disabled:opacity-50" type="submit" :disabled="!canReschedule() || !rescheduleDate() || queueChanging()">
             Move to date
           </button>

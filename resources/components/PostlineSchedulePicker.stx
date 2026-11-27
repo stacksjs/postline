@@ -3,7 +3,6 @@ export const value = $props.value || null
 export const timeZone = $props.timeZone || 'UTC'
 export const label = $props.label || 'Schedule post'
 export const placeholder = $props.placeholder || 'Schedule'
-export const dateOnly = $bool($props.dateOnly)
 export const allowPast = $bool($props.allowPast)
 export const clearable = $bool($props.clearable, true)
 </script>
@@ -17,13 +16,10 @@ const value = useReactiveProp('value', {{ value }}, { parse: value => value })
 const timeZone = useReactiveProp('timeZone', {{ timeZone }})
 const label = useReactiveProp('label', {{ label }})
 const placeholder = useReactiveProp('placeholder', {{ placeholder }})
-const dateOnly = useReactiveProp('dateOnly', {{ dateOnly }})
 const allowPast = useReactiveProp('allowPast', {{ allowPast }})
 const clearable = useReactiveProp('clearable', {{ clearable }})
 const minimum = state(new Date().toISOString())
 const pickerMinimum = derived(() => allowPast() ? null : minimum())
-const dateOpen = state(false)
-const dateTrigger = useRef('dateTrigger')
 
 const analytics = cachedQuery<{ hour: number, timeZone: string } | null>('postline:schedule-best-hour', {
   scope: false,
@@ -53,46 +49,9 @@ const suggestedTime = derived(() => {
   return null
 })
 
-function calendarDate(key: string | null): Date | null {
-  if (!key) return null
-  const [year, month, day] = key.split('-').map(Number)
-  return new Date(year, month - 1, day)
-}
-
-const dayValue = derived(() => dateOnly() ? calendarDate(value()) : null)
-const dayMinimum = derived(() => dateOnly() && !allowPast()
-  ? calendarDate(wallTimeInZone(new Date(minimum()), timeZone()).slice(0, 10))
-  : null)
-const dayLabel = derived(() => dayValue()?.toLocaleDateString(undefined, { dateStyle: 'medium' }) || placeholder())
-
 function prepare() {
   minimum.set(new Date().toISOString())
   void analytics.load()
-}
-
-function onDayToggle(event: Event) {
-  const open = (event.currentTarget as HTMLDetailsElement).open
-  dateOpen.set(open)
-  if (open) minimum.set(new Date().toISOString())
-}
-
-function closeDay() {
-  dateOpen.set(false)
-  dateTrigger.current?.focus()
-}
-
-function escapeDay(event: KeyboardEvent) {
-  if (event.key !== 'Escape' || !dateOpen()) return
-  event.preventDefault()
-  event.stopPropagation()
-  closeDay()
-}
-
-function selectDay(date: Date) {
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  emit('change', { value: `${date.getFullYear()}-${month}-${day}` })
-  closeDay()
 }
 
 function change(detail: { value: string | null }) {
@@ -102,17 +61,6 @@ function change(detail: { value: string | null }) {
 
 <template>
   <div class="min-w-0" data-postline-schedule-picker>
-    <template :if="dateOnly()">
-      <details :open="dateOpen()" @toggle="onDayToggle" @keydown="escapeDay" data-schedule-day-details>
-        <summary class="px-3 py-2 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg cursor-pointer" :aria-label="label() + ', ' + dayLabel()" ref="dateTrigger">{{ dayLabel() }}</summary>
-        <div :if="dateOpen()" class="pt-2">
-          <p class="m-0 pb-2 text-muted text-xs">Time zone <span :text="timeZone()"></span></p>
-          <Calendar :value="dayValue" :minDate="dayMinimum" @change="selectDay" />
-        </div>
-      </details>
-    </template>
-    <template :else>
-      <DateTimePicker :value="value" :timeZone="timeZone" :minDate="pickerMinimum" :label="label" :placeholder="placeholder" :suggestedTime="suggestedTime" :clearable="clearable" @open="prepare" @change="change" />
-    </template>
+    <DateTimePicker :value="value" :timeZone="timeZone" :minDate="pickerMinimum" :label="label" :placeholder="placeholder" :suggestedTime="suggestedTime" :clearable="clearable" @open="prepare" @change="change" />
   </div>
 </template>
