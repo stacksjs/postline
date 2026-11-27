@@ -12,11 +12,12 @@
  *
  * Migrating takes a few seconds, so a migrated template is cached under
  * `storage/framework/cache/` and keyed on the migration files. Each run works
- * on a fresh copy in the system temp directory and removes it on exit.
+ * on a fresh copy in the system temp directory and removes it after the tests.
  */
+import { afterAll } from 'bun:test'
 import { spawnSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
@@ -60,18 +61,21 @@ const template = join(cacheDir, `${migrationsFingerprint()}.sqlite`)
 if (!existsSync(template))
   buildTemplate(template)
 
-const database = join(tmpdir(), `postline-test-${process.pid}-${Date.now()}.sqlite`)
+const fixtureDirectory = mkdtempSync(join(tmpdir(), `postline-test-${process.pid}-`))
+// Bun's isolated test files run their suite hooks but do not emit a process
+// exit event for the preload's isolated realm.
+afterAll(() => rmSync(fixtureDirectory, { recursive: true, force: true }))
+const database = join(fixtureDirectory, 'postline.sqlite')
 copyFileSync(template, database)
 
 process.env.DB_CONNECTION = 'sqlite'
 process.env.DB_DATABASE_PATH = database
 process.env.POSTLINE_TEST_DATABASE = database
 // Publishing to the blog writes Markdown files; keep them out of the project.
-const blogDir = join(tmpdir(), `postline-test-blog-${process.pid}-${Date.now()}`)
-process.env.POSTLINE_BLOG_DIR = blogDir
+process.env.POSTLINE_BLOG_DIR = join(fixtureDirectory, 'blog')
 // Images attached to queued posts, too: tests store and delete them, and the
 // project's own storage/app/postline-media is the developer's.
-process.env.POSTLINE_MEDIA_DIR = join(tmpdir(), `postline-test-media-${process.pid}-${Date.now()}`)
+process.env.POSTLINE_MEDIA_DIR = join(fixtureDirectory, 'media')
 // Mail goes nowhere. A developer's `.env` may name a real mailer, and the
 // suite raises alerts, which are emailed to the owner when mail is set up.
 process.env.MAIL_MAILER = 'log'
@@ -87,9 +91,3 @@ process.env.STACKS_TEST_DATABASE_PATH = database
 // the suite gets a throwaway key of its own when none is set.
 if (!process.env.APP_KEY)
   process.env.APP_KEY = `base64:${randomBytes(32).toString('base64')}`
-
-process.on('exit', () => {
-  for (const suffix of ['', '-wal', '-shm'])
-    rmSync(`${database}${suffix}`, { force: true })
-  rmSync(blogDir, { recursive: true, force: true })
-})
