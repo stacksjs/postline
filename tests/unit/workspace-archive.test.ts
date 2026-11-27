@@ -155,6 +155,43 @@ describe('workspace archive', () => {
     await expect(workspaceArchive.import({ hello: 'world' })).rejects.toThrow('not a Postline workspace export')
   })
 
+  test('restores queue rows, settings and attachments together when retried after a failed target insert', async () => {
+    const tag = crypto.randomUUID()
+    const filename = `${tag}.png`
+    const path = join(MEDIA_DIR, filename)
+    const targetUuid = crypto.randomUUID()
+    const before = (await workspaceArchive.export()).settings
+    const target = { uuid: targetUuid, post: tag, provider: 'blog', account: null, status: 'scheduled', attempts: 0, created_at: at, updated_at: at }
+    const archive = {
+      format: 'postline-workspace',
+      version: 1,
+      settings: { workspace_name: 'Queue import fixture' },
+      posts: [{ uuid: tag, body: tag, status: 'scheduled', scheduled_at: '2099-01-01 10:00:00', timezone: 'UTC', source: 'composer', created_at: at, updated_at: at, content: JSON.stringify({ media: [{ path: filename, mimeType: 'image/png' }] }) }],
+      targets: [target],
+      media: { [filename]: png },
+    }
+
+    try {
+      await expect(workspaceArchive.import({ ...archive, targets: [...archive.targets, { ...target, uuid: crypto.randomUUID(), status: null }] })).rejects.toThrow('post_targets.status')
+      expect(await database.selectFrom('posts').select('id').where('uuid', '=', tag).executeTakeFirst()).toBeUndefined()
+      expect(await database.selectFrom('post_targets').select('id').where('uuid', '=', targetUuid).executeTakeFirst()).toBeUndefined()
+      expect((await workspaceArchive.export()).settings).toEqual(before)
+      expect(existsSync(path)).toBe(false)
+
+      const reports = await Promise.all([workspaceArchive.import(archive), workspaceArchive.import(archive)])
+      expect(reports.map(report => report.posts).sort()).toEqual([0, 1])
+      expect(reports.map(report => report.targets).sort()).toEqual([0, 1])
+      expect(reports.map(report => report.media).sort()).toEqual([0, 1])
+      expect(Buffer.from(await Bun.file(path).arrayBuffer()).toString('base64')).toBe(png)
+    }
+    finally {
+      await database.deleteFrom('post_targets').where('uuid', '=', targetUuid).execute()
+      await database.deleteFrom('posts').where('uuid', '=', tag).execute()
+      await workspaceArchive.import({ format: 'postline-workspace', version: 1, settings: before })
+      if (existsSync(path)) await Bun.file(path).delete()
+    }
+  })
+
   test('invalid saved text is rejected before settings or posts are written', async () => {
     const uuid = crypto.randomUUID()
     const before = await workspaceArchive.export()

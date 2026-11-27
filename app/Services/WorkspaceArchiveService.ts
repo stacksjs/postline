@@ -13,10 +13,10 @@
  * reconnected on the next one; an archive that held them would be a file
  * that can post as you.
  */
-import { existsSync } from 'node:fs'
-import { mkdir, readFile, rm } from 'node:fs/promises'
+import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { db } from '@stacksjs/database'
+import { db, sqliteWriteOptions } from '@stacksjs/database'
 import { UserFacingError } from '../Support/Http/user-error'
 import { readBlogAttachments } from '../Support/Social/blog-attachments'
 import { checkImageBytes } from '../Support/Social/image-input'
@@ -126,21 +126,50 @@ function readArchivedMedia(name: string, data: unknown): Uint8Array {
   return checked.video.bytes
 }
 
+/** Called under the queue restore write lock. Existing files belong to the workspace. */
+function installArchivedMedia(media: ReadonlyArray<readonly [string, Uint8Array]>): number {
+  const missing = media.filter(([name]) => !existsSync(join(MEDIA_DIR, name)))
+  if (!missing.length) return 0
+
+  mkdirSync(MEDIA_DIR, { recursive: true })
+  const staging = mkdtempSync(join(MEDIA_DIR, '.archive-'))
+  const installed: string[] = []
+  try {
+    for (const [name, bytes] of missing) {
+      const temporary = join(staging, name)
+      const path = join(MEDIA_DIR, name)
+      writeFileSync(temporary, bytes)
+      renameSync(temporary, path)
+      installed.push(path)
+    }
+    return installed.length
+  }
+  catch (error) {
+    for (const path of installed) rmSync(path, { force: true })
+    throw error
+  }
+  finally {
+    rmSync(staging, { recursive: true, force: true })
+  }
+}
+
 export class WorkspaceArchiveService {
   async export(): Promise<WorkspaceArchive> {
     const accountId = await ensureAccount()
     const account = await database.selectFrom('accounts').selectAll().where('id', '=', accountId).executeTakeFirst()
-    // A feed check saves its draft and receipt together. Export them from the
-    // same snapshot so a restore cannot miss or recreate that draft.
-    const { posts, feeds, slots, repeats } = await database.transaction((tx: typeof database) => ({
-      posts: tx.selectFrom('posts').selectAll().where('status', '!=', 'archived').orderBy('id', 'asc').execute(),
-      feeds: draftFeeds.export(accountId, tx),
-      slots: listPostingSlots(accountId, tx),
-      repeats: recurringPosts.export(accountId, tx),
-    }))
+    // Read posts with their targets and feed receipts from one snapshot.
+    const { posts, targets, identities, feeds, slots, repeats } = await database.transaction((tx: typeof database) => {
+      const posts = tx.selectFrom('posts').selectAll().where('status', '!=', 'archived').orderBy('id', 'asc').execute()
+      return {
+        posts,
+        targets: posts.length ? tx.selectFrom('post_targets').selectAll().where('post_id', 'in', posts.map((post: any) => post.id)).execute() : [],
+        identities: tx.selectFrom('social_identities').select(['id', 'provider', 'handle']).execute(),
+        feeds: draftFeeds.export(accountId, tx),
+        slots: listPostingSlots(accountId, tx),
+        repeats: recurringPosts.export(accountId, tx),
+      }
+    })
     const postUuid = new Map<number, string>(posts.map((post: any) => [Number(post.id), String(post.uuid)]))
-    const targets = posts.length ? await database.selectFrom('post_targets').selectAll().where('post_id', 'in', [...postUuid.keys()]).execute() : []
-    const identities = await database.selectFrom('social_identities').select(['id', 'provider', 'handle']).execute()
     const identityOf = new Map<number, { provider: string, handle: string }>(identities.map((row: any) => [Number(row.id), { provider: String(row.provider), handle: String(row.handle) }]))
     const campaigns = await database.selectFrom('launch_campaigns').selectAll().orderBy('id', 'asc').execute()
     const campaignUuid = new Map<number, string>(campaigns.map((row: any) => [Number(row.id), String(row.uuid)]))
@@ -259,53 +288,56 @@ export class WorkspaceArchiveService {
 
     const report: ImportReport = { posts: 0, targets: 0, campaigns: 0, campaignPosts: 0, blogPosts: 0, monitors: 0, composerPresets: 0, trackedLinks: 0, draftFeeds: 0, postingSlots: 0, recurringPosts: 0, media: 0, skipped: 0 }
     const accountId = await ensureAccount()
-    const exists = async (table: string, uuid: unknown) => Boolean(uuid) && Boolean(await database.selectFrom(table).select(['id']).where('uuid', '=', String(uuid)).executeTakeFirst())
-    const idOf = async (table: string, uuid: unknown): Promise<number | null> => {
-      const row = uuid ? await database.selectFrom(table).select(['id']).where('uuid', '=', String(uuid)).executeTakeFirst() : null
+    const idOf = (table: string, uuid: unknown, tx = database): number | null => {
+      const row = uuid ? tx.selectFrom(table).select(['id']).where('uuid', '=', String(uuid)).executeTakeFirst() : null
       return row ? Number(row.id) : null
     }
+    const exists = (table: string, uuid: unknown, tx = database) => idOf(table, uuid, tx) !== null
 
-    // The archive's settings (name, time zone, retention) replace this workspace's.
-    if (archive.settings && Object.keys(archive.settings).length) {
-      const allowed = Object.fromEntries(Object.entries(archive.settings).filter(([key]) => (SETTINGS_COLUMNS as readonly string[]).includes(key)))
-      await database.updateTable('accounts').set({ ...allowed, updated_at: now() }).where('id', '=', accountId).execute()
-    }
-
-    for (const post of archive.posts || []) {
-      if (await exists('posts', post.uuid)) { report.skipped++; continue }
-      await database.insertInto('posts').values({ ...pick(post, POST_COLUMNS), account_id: accountId }).execute()
-      report.posts++
-    }
-
-    const identities = await database.selectFrom('social_identities').select(['id', 'provider', 'handle']).execute()
-    for (const target of archive.targets || []) {
-      if (await exists('post_targets', target.uuid)) { report.skipped++; continue }
-      const postId = await idOf('posts', target.post)
-      if (!postId) continue
-      // The same account on this install, by network and handle; otherwise the
-      // result keeps its network and loses only the account it went through.
-      const identity = target.account ? identities.find((row: any) => row.provider === target.account!.provider && row.handle === target.account!.handle) : null
-      const restored = pick(target, TARGET_COLUMNS)
-      if (restored.first_comment_status && restored.first_comment_status !== 'sent') {
-        // The original installation may have sent it after the archive was made.
-        restored.first_comment_status = 'uncertain'
-        restored.first_comment_error = 'Check for the first comment on the published post after restoring this workspace.'
+    // Make settings, posts and targets visible only after local attachments
+    // are installed. The write lock also serializes concurrent imports.
+    await database.transaction((tx: typeof database) => {
+      if (archive.settings && Object.keys(archive.settings).length) {
+        const allowed = Object.fromEntries(Object.entries(archive.settings).filter(([key]) => (SETTINGS_COLUMNS as readonly string[]).includes(key)))
+        tx.updateTable('accounts').set({ ...allowed, updated_at: now() }).where('id', '=', accountId).execute()
       }
-      await database.insertInto('post_targets').values({ ...restored, post_id: postId, social_identity_id: identity ? Number(identity.id) : null }).execute()
-      report.targets++
-    }
+
+      for (const post of archive.posts || []) {
+        if (exists('posts', post.uuid, tx)) { report.skipped++; continue }
+        tx.insertInto('posts').values({ ...pick(post, POST_COLUMNS), account_id: accountId }).execute()
+        report.posts++
+      }
+
+      const identities = tx.selectFrom('social_identities').select(['id', 'provider', 'handle']).execute()
+      for (const target of archive.targets || []) {
+        if (exists('post_targets', target.uuid, tx)) { report.skipped++; continue }
+        const postId = idOf('posts', target.post, tx)
+        if (!postId) continue
+        const identity = target.account ? identities.find((row: any) => row.provider === target.account!.provider && row.handle === target.account!.handle) : null
+        const restored = pick(target, TARGET_COLUMNS)
+        if (restored.first_comment_status && restored.first_comment_status !== 'sent') {
+          // The original installation may have sent it after the archive was made.
+          restored.first_comment_status = 'uncertain'
+          restored.first_comment_error = 'Check for the first comment on the published post after restoring this workspace.'
+        }
+        tx.insertInto('post_targets').values({ ...restored, post_id: postId, social_identity_id: identity ? Number(identity.id) : null }).execute()
+        report.targets++
+      }
+
+      report.media += installArchivedMedia(media)
+    }, sqliteWriteOptions())
 
     for (const campaign of archive.campaigns || []) {
-      if (await exists('launch_campaigns', campaign.uuid)) { report.skipped++; continue }
+      if (exists('launch_campaigns', campaign.uuid)) { report.skipped++; continue }
       await database.insertInto('launch_campaigns').values({ ...pick(campaign, CAMPAIGN_COLUMNS), account_id: accountId }).execute()
       report.campaigns++
     }
 
     for (const item of archive.campaignPosts || []) {
-      if (await exists('campaign_posts', item.uuid)) { report.skipped++; continue }
-      const campaignId = await idOf('launch_campaigns', item.campaign)
+      if (exists('campaign_posts', item.uuid)) { report.skipped++; continue }
+      const campaignId = idOf('launch_campaigns', item.campaign)
       if (!campaignId) continue
-      await database.insertInto('campaign_posts').values({ ...pick(item, CAMPAIGN_POST_COLUMNS), launch_campaign_id: campaignId, post_id: await idOf('posts', item.post) }).execute()
+      await database.insertInto('campaign_posts').values({ ...pick(item, CAMPAIGN_POST_COLUMNS), launch_campaign_id: campaignId, post_id: idOf('posts', item.post) }).execute()
       report.campaignPosts++
     }
 
@@ -326,7 +358,7 @@ export class WorkspaceArchiveService {
     }
 
     for (const monitor of monitors) {
-      if (await exists('keyword_monitors', monitor.uuid)) { report.skipped++; continue }
+      if (exists('keyword_monitors', monitor.uuid)) { report.skipped++; continue }
       await database.insertInto('keyword_monitors').values({ ...monitor, account_id: accountId }).execute()
       report.monitors++
     }
@@ -350,14 +382,6 @@ export class WorkspaceArchiveService {
       report.postingSlots = await database.transaction((tx: typeof database) =>
         slots.filter(slot => addPostingSlot(accountId, slot, tx)).length)
       report.skipped += slots.length - report.postingSlots
-    }
-
-    await mkdir(MEDIA_DIR, { recursive: true })
-    for (const [name, bytes] of media) {
-      const path = join(MEDIA_DIR, name)
-      if (existsSync(path)) continue
-      await Bun.write(path, bytes)
-      report.media++
     }
 
     for (const repeat of repeats) {
