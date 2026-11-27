@@ -1,3 +1,4 @@
+import type { EngagementCounts } from '../../../app/Support/Social/engagement-analytics'
 import { providerLabel } from '../../functions/networks'
 import { escapeHtml } from '../../functions/postline-client'
 
@@ -45,7 +46,7 @@ interface AnalyticsPayload {
       replies: number
       syncedTargets: number
       providers: string[]
-      countsByProvider?: Array<{ provider: string, measured: number, likes?: number, reposts?: number, replies?: number }>
+      countsByProvider?: Array<EngagementCounts & { provider: string, measured: number }>
     }
     minSample: number
   }
@@ -64,8 +65,21 @@ const text = '#18181b'
 const muted = '#71717a'
 const rule = '#e4e4e7'
 
-function engagementCount(value: number | undefined, noun: string): string | null {
-  return value === undefined ? null : `${value.toLocaleString()} ${noun}${value === 1 ? '' : 's'}`
+function engagementCount(value: number | undefined, singular: string, plural = `${singular}s`): string | null {
+  return value === undefined ? null : `${value.toLocaleString()} ${value === 1 ? singular : plural}`
+}
+
+function engagementLabels(counts: EngagementCounts, likes = 'like', reactions = `${likes}s`): string[] {
+  return [
+    engagementCount(counts.likes, likes, reactions),
+    engagementCount(counts.reposts, 'repost'),
+    engagementCount(counts.replies, 'reply', 'replies'),
+    engagementCount(counts.quotes, 'quote'),
+    engagementCount(counts.views, 'view'),
+    engagementCount(counts.shares, 'share'),
+    engagementCount(counts.reach, 'account reached', 'accounts reached'),
+    engagementCount(counts.saves, 'save'),
+  ].filter((label): label is string => label !== null)
 }
 
 function formatTick(value: number): string {
@@ -281,14 +295,17 @@ function fillStats(payload: AnalyticsPayload): void {
   set('[data-analytics-posts-trend]', `${delta >= 0 ? '+' : ''}${delta} from last week`)
 
   const engagement = stats.engagement
-  const interactions = engagement ? engagement.likes + engagement.reposts + engagement.replies : 0
-  set('[data-analytics-engagement]', engagement?.syncedTargets ? String(interactions) : 'Not available')
-  const measuredNetworks = engagement?.providers?.map(providerLabel).join(', ')
+  const reported = engagement?.countsByProvider ?? []
+  const known: EngagementCounts = {}
+  for (const field of ['likes', 'reposts', 'replies'] as const) {
+    if (reported.some(counts => counts[field] !== undefined)) known[field] = engagement?.[field]
+  }
+  const interactions = (known.likes ?? 0) + (known.reposts ?? 0) + (known.replies ?? 0)
+  const totals = engagementLabels(known, 'like or reaction', 'likes and reactions')
+  set('[data-analytics-engagement]', totals.length ? interactions.toLocaleString() : 'Not available')
   set(
     '[data-analytics-engagement-trend]',
-    engagement?.syncedTargets
-      ? `${measuredNetworks || 'Measured posts'} · ${engagement.likes} likes · ${engagement.reposts} reposts · ${engagement.replies} replies`
-      : 'Waiting for a supported network to report engagement',
+    totals.length ? totals.join(' · ') : 'Waiting for a supported network to report likes, reposts or replies',
   )
   const sampleLabel = ({ average, count }: { average: number, count: number }): string =>
     `${average.toLocaleString(undefined, { maximumFractionDigits: 1 })} interactions per post across ${count} posts`
@@ -299,16 +316,21 @@ function fillStats(payload: AnalyticsPayload): void {
 
   const networkEngagement = page.querySelector('[data-analytics-network-engagement]')
   if (networkEngagement && payload.channelMix?.length) {
-    const byProvider = new Map(engagement?.countsByProvider?.map(counts => [counts.provider, counts]))
-    networkEngagement.innerHTML = payload.channelMix.map(({ provider }) => {
+    const byProvider = new Map(reported.map(counts => [counts.provider, counts]))
+    const rows = payload.channelMix.map(({ provider }) => {
+      const row = document.createElement('li')
+      const name = document.createElement('strong')
+      name.className = 'block text-ink'
+      name.textContent = providerLabel(provider)
+      const details = document.createElement('span')
       const counts = byProvider.get(provider)
-      const summary = counts ? [
-        engagementCount(counts.likes, provider === 'linkedin' ? 'reaction' : 'like'),
-        engagementCount(counts.reposts, 'repost'),
-        counts.replies === undefined ? null : `${counts.replies.toLocaleString()} ${counts.replies === 1 ? 'reply' : 'replies'}`,
-      ].filter(Boolean).join(' · ') : 'No reported metrics'
-      return `<li><strong class="block text-ink">${escapeHtml(providerLabel(provider))}</strong><span>${escapeHtml(summary)}</span></li>`
-    }).join('')
+      details.textContent = counts
+        ? engagementLabels(counts, provider === 'linkedin' ? 'reaction' : 'like').join(' · ')
+        : 'No reported metrics'
+      row.append(name, details)
+      return row
+    })
+    networkEngagement.replaceChildren(...rows)
   }
 
   const mix = page.querySelector('[data-analytics-channel-mix]')

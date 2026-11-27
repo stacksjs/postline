@@ -43,7 +43,7 @@ export default new Action({
       // target ever published (#105).
       const targets = await database
         .selectFrom('post_targets')
-        .select(['provider', 'status', 'created_at', 'metrics'])
+        .select(['post_id', 'provider', 'status', 'created_at', 'metrics'])
         .where('status', '=', 'published')
         .where('created_at', '>=', sinceKey)
         .where('created_at', '<=', untilKey)

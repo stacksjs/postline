@@ -1047,6 +1047,36 @@ async function checkQueueCalendar(cdp: Cdp): Promise<void> {
   })()`), 5_000)
 }
 
+async function checkEngagementCountLabels(cdp: Cdp): Promise<void> {
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const actualFetch = window.fetch.bind(window)
+    window.fetch = (input, options) => {
+      if (new URL(input instanceof Request ? input.url : input, location.href).pathname !== '/api/postline/analytics')
+        return actualFetch(input, options)
+      return Promise.resolve(Response.json({ ok: true, data: {
+        stats: {
+          postsThisWeek: 1, postsLastWeek: 0, minSample: 3,
+          engagement: {
+            likes: 1, replies: 0, reposts: 0, syncedTargets: 1, providers: ['instagram'],
+            countsByProvider: [{ provider: 'instagram', measured: 1, likes: 1, replies: 0, views: 12 }],
+          },
+        },
+        channelMix: [{ provider: 'instagram', published: 1, share: 100 }],
+      } }))
+    }
+  ` })
+  try {
+    await auditPage(`${site}/analytics`, { cdp })
+    await waitUntil('Analytics shows measured zero and omits unavailable reposts', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-analytics-engagement]')?.textContent === '1'
+        && document.querySelector('[data-analytics-engagement-trend]')?.textContent === '1 like or reaction · 0 replies'
+        && document.querySelector('[data-analytics-network-engagement] li')?.textContent.includes('1 like · 0 replies · 12 views')`), 10_000)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+  }
+}
+
 async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
   const fixture = await evaluate<{ campaignId: number, postId: number }>(cdp, `(async () => {
@@ -1248,6 +1278,7 @@ try {
     await checkQueueRescheduling(cdp)
     await checkQueueCalendar(cdp)
     await checkCampaignScheduling(cdp)
+    await checkEngagementCountLabels(cdp)
   }
   finally {
     await close()
