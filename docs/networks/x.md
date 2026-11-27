@@ -1,5 +1,7 @@
 # X
 
+## API connection
+
 **You need:** an X developer app with OAuth 2.0, and credits: X charges for
 API use per post.
 

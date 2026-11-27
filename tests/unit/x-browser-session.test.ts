@@ -68,6 +68,13 @@ describe('X session browser reads', () => {
       expect(await metrics(own)).toMatchObject({ likes: 0, views: 15 })
       expect(await metrics(own)).not.toHaveProperty('text')
       expect(await metrics(foreign)).toEqual({ likes: 8 })
+
+      const writes = await Promise.all([
+        saveTwitterBrowserMetrics('postline_test', [{ id: '51', counts: { replies: 3 } }]),
+        saveTwitterBrowserMetrics('postline_test', [{ id: '51', counts: { reposts: 2 } }]),
+      ])
+      expect(writes).toEqual([1, 1])
+      expect(await metrics(own)).toMatchObject({ likes: 0, views: 15, replies: 3, reposts: 2 })
       expect((await twitterBrowserSession()).profile).toBe(previous.profile)
     }
     finally {

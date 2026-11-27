@@ -2,16 +2,13 @@ import type { PostMetrics, SocialIdentityCredentials, SocialMetricsDriver } from
 import type { IdentityLike } from '../../Support/Social/accounts'
 import { db } from '@stacksjs/database'
 import { isUsableIdentity } from '../../Support/Social/accounts'
+import { engagementCounts } from '../../Support/Social/engagement-analytics'
 import { describeNetworkError } from '../../Support/Social/network-errors'
 import { findIdentityRow, listIdentityRows } from './identities'
+import { saveTargetEngagement } from './save-target-engagement'
 import { now } from './support'
 
 type MetricsSource = Extract<SocialMetricsDriver['provider'], 'linkedin' | 'instagram' | 'threads'>
-type TargetMetrics = Omit<PostMetrics, 'uri'>
-
-function measuredCounts(counts: PostMetrics): TargetMetrics {
-  return Object.fromEntries(Object.entries(counts).filter(([field, value]) => field !== 'uri' && typeof value === 'number' && Number.isSafeInteger(value) && value >= 0))
-}
 
 /** Read private metrics only with the identity that published the post. */
 export async function syncConnectedMetrics<T extends IdentityLike>(
@@ -49,20 +46,13 @@ export async function syncConnectedMetrics<T extends IdentityLike>(
       continue
     }
 
-    const byUri = new Map(counts.map(count => [count.uri, measuredCounts(count)]))
+    const byUri = new Map(counts.map(count => [count.uri, engagementCounts(count)]))
     const syncedAt = now()
     for (const target of references) {
       const count = byUri.get(target.uri)
       // A missing post or response with no counts cannot erase a measurement.
-      if (!count || !Object.keys(count).length) continue
-      const updated = await db.updateTable('post_targets').set({ metrics: JSON.stringify({ ...count, syncedAt }) })
-        .where('id', '=', target.id)
-        .where('status', '=', 'published')
-        .where('social_identity_id', '=', Number(identity.id))
-        .where('remote_uri', '=', target.uri)
-        .returning('id')
-        .executeTakeFirst()
-      if (updated) synced++
+      if (count && await saveTargetEngagement({ ...target, identityId: Number(identity.id) }, count, syncedAt))
+        synced++
     }
   }
   return { synced, ...(errors.length ? { errors } : {}) }

@@ -1,7 +1,8 @@
 import type { EngagementCounts } from '../../Support/Social/engagement-analytics'
 import { db } from '@stacksjs/database'
 import { UserFacingError } from '../../Support/Http/user-error'
-import { engagementCounts, readEngagementMetrics } from '../../Support/Social/engagement-analytics'
+import { engagementCounts } from '../../Support/Social/engagement-analytics'
+import { saveTargetEngagement } from './save-target-engagement'
 import { ensureAccount, now } from './support'
 
 export async function twitterBrowserSession(): Promise<{ profile: string, handle: string | null }> {
@@ -36,7 +37,7 @@ export async function saveTwitterBrowserMetrics(handle: unknown, reports: unknow
 
   const targets = await db.selectFrom('post_targets')
     .innerJoin('social_identities', 'social_identities.id', '=', 'post_targets.social_identity_id')
-    .select(['post_targets.id', 'post_targets.remote_uri', 'post_targets.metrics', 'post_targets.social_identity_id', 'social_identities.handle'])
+    .select(['post_targets.id', 'post_targets.remote_uri', 'post_targets.social_identity_id', 'social_identities.handle'])
     .where('post_targets.provider', '=', 'twitter')
     .where('post_targets.status', '=', 'published')
     .where('post_targets.remote_uri', 'in', [...measurements.keys()])
@@ -48,12 +49,8 @@ export async function saveTwitterBrowserMetrics(handle: unknown, reports: unknow
     if (typeof target.handle !== 'string' || target.handle.toLowerCase() !== handle.toLowerCase()
       || typeof target.remote_uri !== 'string' || typeof target.social_identity_id !== 'number') continue
     const counts = measurements.get(target.remote_uri)
-    const previous = typeof target.metrics === 'string' ? readEngagementMetrics(target.metrics) : {}
-    const metrics = JSON.stringify({ ...previous, ...counts, syncedAt })
-    const updated = await db.updateTable('post_targets').set({ metrics })
-      .where('id', '=', target.id).where('status', '=', 'published').where('remote_uri', '=', target.remote_uri)
-      .where('social_identity_id', '=', target.social_identity_id).returning('id').executeTakeFirst()
-    if (updated) synced++
+    if (counts && await saveTargetEngagement({ id: Number(target.id), identityId: target.social_identity_id, uri: target.remote_uri }, counts, syncedAt))
+      synced++
   }
   return synced
 }

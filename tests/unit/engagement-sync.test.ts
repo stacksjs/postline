@@ -159,7 +159,7 @@ describe('optional engagement drivers', () => {
         await networkApps.save(provider, { clientId: 'test-client', engagementMetrics: true })
         expect(new URL((await services[provider].prepareAuthorization()).url).searchParams.get('scope')).toContain(scope)
       }
-      const [ig, li, th] = await Promise.all(sources.map(source => observedPost(source.provider, source.account, source.uri)))
+      const [ig, li, th] = await Promise.all(sources.map(source => observedPost(source.provider, source.account, source.uri, { quotes: 3 })))
       const missing = await observedPost('instagram', '402', '403', { likes: 2 })
       const denied = await observedPost('threads', '602', '603', { replies: 7 })
       const legacy = await observedPost('threads', '604', '605', { replies: 6 }, true)
@@ -186,7 +186,7 @@ describe('optional engagement drivers', () => {
       })
       expect(requests.map(({ authorization }) => authorization).sort()).toEqual(['Bearer insights-400', 'Bearer insights-402', 'Bearer test-600', 'Bearer test-602', 'Bearer test-urn:li:organization:500'])
       expect(requests.some(({ url }) => url.searchParams.get('ids') === 'List(urn:li:share:501)')).toBe(true)
-      expect(await savedCounts(ig!)).toMatchObject({ likes: 3, replies: 1 })
+      expect(await savedCounts(ig!)).toMatchObject({ likes: 3, replies: 1, quotes: 3 })
       expect(await savedCounts(ig!)).not.toHaveProperty('reposts')
       expect(await savedCounts(li!)).toMatchObject({ likes: 9, replies: 4 })
       expect(await savedCounts(th!)).toMatchObject({ replies: 2, reposts: 0 })
