@@ -57,5 +57,9 @@ describe('why the provider did not answer', () => {
 
   test('a key in an error message is never repeated', () => {
     expect(aiFailureReason(new Error('bad request for sk-ant-abcdefghijklmnop'), 'anthropic')).not.toContain('sk-ant-abcdefghijklmnop')
+    const custom = 'provider-credential-without-standard-prefix'
+    expect(aiFailureReason(new Error(`invalid model parameter in request for ${custom}`), 'anthropic', custom)).toBe(
+      'Anthropic returned an error: invalid model parameter in request for [key]',
+    )
   })
 })

@@ -1,5 +1,5 @@
 import type { ConfiguredAIClient } from '@stacksjs/ai'
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, spyOn, test } from 'bun:test'
 import { CampaignAIService } from '../../app/Services/CampaignAIService'
 import { buildCampaignFallbackPlan, campaignBodyLimit, fitCampaignBody, normalizeProviders, scheduleFromOffset, zonedTimestampToUtc } from '../../app/Services/CampaignService'
 
@@ -121,6 +121,27 @@ describe('campaign AI assistant', () => {
     expect(result.mode).toBe('template')
     expect(result.provider).toBe('template')
     expect(result.suggestions).toEqual(baseInput.fallback)
+  })
+
+  test('reports a provider failure without logging the response body', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => {})
+    const fixtureKey = 'sk-ant-test-fixture-key-not-a-secret'
+    const client = {
+      provider: 'anthropic',
+      configuration: { provider: 'anthropic', configured: true, source: 'config' },
+      generateObject: async () => { throw new Error(`request failed with key ${fixtureKey}`) },
+    } as unknown as ConfiguredAIClient
+
+    try {
+      const result = await new CampaignAIService().plan({ ...baseInput, client })
+      expect(result.mode).toBe('template')
+      expect(result.assistant).toContain('request failed with key [key]')
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(fixtureKey)
+      expect(warn).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      warn.mockRestore()
+    }
   })
 
   test('wraps structured Stacks AI generation and returns provider metadata', async () => {
