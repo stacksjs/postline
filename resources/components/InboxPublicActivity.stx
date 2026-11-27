@@ -22,6 +22,13 @@ const loadError = state('')
 const syncFeedback = state('')
 const syncErrors = state<Array<{ provider: string, handle: string, message: string }>>([])
 const marking = state(0)
+const replyDialog = useRef<HTMLDialogElement>('replyDialog')
+const replyEntry = state<PublicEntry | null>(null)
+const replyText = state('')
+const replyError = state('')
+const sendingReply = state(false)
+const replyFeedback = state('')
+const replyInQueue = state(false)
 const endpoint = '/api/postline/inbox/mentions'
 
 async function load(offset = 0) {
@@ -74,6 +81,39 @@ async function markRead(id: number) {
   }
 }
 
+function openReply(item: PublicEntry) {
+  replyEntry.set(item)
+  replyText.set(item.provider === 'mastodon' ? `@${item.author.replace(/^@/, '')} ` : '')
+  replyError.set('')
+  replyDialog.current?.showModal()
+}
+
+function closeReply() {
+  if (!sendingReply()) replyDialog.current?.close()
+}
+
+async function sendReply() {
+  const item = replyEntry()
+  const text = replyText().trim()
+  if (!item || !text || sendingReply()) return
+  sendingReply.set(true)
+  replyError.set('')
+  replyFeedback.set('')
+  try {
+    const { data } = await requestJson(`${endpoint}/reply`, { method: 'POST', body: JSON.stringify({ id: item.id, text }) })
+    entries.set(entries().map(entry => entry.id === item.id ? { ...entry, read: true } : entry))
+    replyInQueue.set(data.status !== 'sent')
+    replyFeedback.set(data.status === 'sent' ? 'Public reply sent.' : data.status === 'sending' ? 'Public reply is sending. Check Queue for the result.' : 'Check Queue for the status of your public reply.')
+    replyDialog.current?.close()
+  }
+  catch (error) {
+    replyError.set(error instanceof Error ? error.message : 'Could not send the public reply.')
+  }
+  finally {
+    sendingReply.set(false)
+  }
+}
+
 onMount(() => { void load() })
 </script>
 
@@ -91,6 +131,10 @@ onMount(() => { void load() })
           <li x-for="error in syncErrors()" :text="`${providerLabel(error.provider)} · ${error.handle}: ${error.message}`"></li>
         </ul>
       </div>
+      <div class="px-4 py-3 text-body text-ui" :show="replyFeedback()">
+        <span role="status" :text="replyFeedback()"></span>
+        <a class="ml-2 text-info underline" href="/queue" data-stx-link :show="replyInQueue()">Open Queue</a>
+      </div>
       <WorkspaceListSkeleton :show="loading() && !entries().length" label="Loading public activity" />
       <EmptyState :show="!loading() && !loadError() && !entries().length" variant="bare" title="No replies or mentions yet"
         description="Sync to collect recent public activity for connected Bluesky and Mastodon accounts.">
@@ -106,12 +150,28 @@ onMount(() => { void load() })
           </div>
           <p class="m-0 break-words text-body text-ui whitespace-pre-line" :show="item.body" :text="item.body"></p>
           <div class="flex flex-wrap gap-3 items-center">
+            <button class="text-info text-ui underline" type="button" data-open-public-reply @click="openReply(item)">Reply</button>
             <a class="text-info text-ui underline" :href="item.url" target="_blank" rel="noopener noreferrer">Open original post</a>
-            <button class="text-muted text-ui underline" type="button" :show="!item.read" :disabled="marking() !== 0" @click="markRead(item.id)">Mark as read</button>
+            <button class="text-muted text-ui underline" type="button" data-public-mark-read :show="!item.read" :disabled="marking() !== 0" @click="markRead(item.id)">Mark as read</button>
           </div>
         </article>
       </div>
       <button class="p-3 w-full text-center text-muted text-ui hover:text-ink hover:bg-panel-2" type="button" :show="nextOffset() !== null" :disabled="loading()" @click="load(nextOffset() ?? 0)">Load more activity</button>
     </Card>
+    <dialog ref="replyDialog" class="p-0 max-w-lg w-[calc(100%_-_2rem)] text-ink bg-panel border border-line rounded-2xl shadow-xl" aria-labelledby="public-reply-title" aria-describedby="public-reply-account" @cancel.prevent="closeReply">
+      <form class="grid gap-3 p-4" @submit.prevent="sendReply">
+        <h2 id="public-reply-title" class="m-0 font-semibold text-base">Public reply</h2>
+        <p id="public-reply-account" class="m-0 text-muted text-ui" :text="replyEntry() ? `Reply from ${replyEntry().account} on ${providerLabel(replyEntry().provider)}.` : ''"></p>
+        <label class="grid gap-1 text-body text-ui">
+          Reply text
+          <textarea class="p-2 w-full text-ink bg-panel border border-field-line rounded-xl" rows="4" maxlength="4000" autofocus required x-model="replyText" :disabled="sendingReply()"></textarea>
+        </label>
+        <p class="m-0 text-danger text-ui" role="alert" :show="replyError()" :text="replyError()"></p>
+        <div class="flex gap-2 justify-end">
+          <Button size="sm" variant="quiet" type="button" :disabled="sendingReply()" @click="closeReply">Cancel</Button>
+          <Button size="sm" type="submit" :disabled="sendingReply() || !replyText().trim()"><span :text="sendingReply() ? 'Sending…' : 'Send public reply'">Send public reply</span></Button>
+        </div>
+      </form>
+    </dialog>
   </section>
 </template>

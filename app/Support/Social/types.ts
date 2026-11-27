@@ -114,11 +114,13 @@ export interface PublishContent {
   }>
   /** The post's language, and Mastodon's visibility and content warning. */
   options?: import('./post-options').PostOptions
-  /** Thread chaining refs — only honored by providers that support replies. */
+  /** Conversation references for a public reply or a chained thread segment. */
   reply?: {
     root: { uri: string, cid: string }
     parent: { uri: string, cid: string }
   }
+  /** A persisted public reply can only be sent through this original target. */
+  replyTarget?: string
   /**
    * Per-provider body overrides. A provider listed here publishes its own text
    * instead of the shared body; every other provider inherits. Resolved once in

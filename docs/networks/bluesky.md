@@ -15,5 +15,8 @@ with another handle.
 - **Limits:** 300 characters per post, up to four images. Links get a preview
   card with its picture, unless the post has an image, which Bluesky shows
   instead.
+- In **Inbox > Replies and mentions**, choose **Reply** to answer publicly
+  from the account that received the item. Postline keeps the reply in the
+  original conversation. If delivery needs attention, check Queue.
 - **Never** give Postline your account password: an app password can be
   revoked on its own at any time from the same screen.

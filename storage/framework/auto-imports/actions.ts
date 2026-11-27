@@ -81,6 +81,7 @@ export const actions = {
   'Actions/Postline/ProvidersStatusAction': '../../../app/Actions/Postline/ProvidersStatusAction.ts',
   'Actions/Postline/PublicInboxListAction': '../../../app/Actions/Postline/PublicInboxListAction.ts',
   'Actions/Postline/PublicInboxReadAction': '../../../app/Actions/Postline/PublicInboxReadAction.ts',
+  'Actions/Postline/PublicInboxReplyAction': '../../../app/Actions/Postline/PublicInboxReplyAction.ts',
   'Actions/Postline/PublicInboxSyncAction': '../../../app/Actions/Postline/PublicInboxSyncAction.ts',
   'Actions/Postline/PurgeCancelAction': '../../../app/Actions/Postline/PurgeCancelAction.ts',
   'Actions/Postline/PurgePreviewAction': '../../../app/Actions/Postline/PurgePreviewAction.ts',

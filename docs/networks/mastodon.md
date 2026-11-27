@@ -12,7 +12,9 @@
   images. Visibility and content warnings are set per post in the composer.
 - **Inbox:** direct conversations (posts with Mentioned people only visibility)
   appear in Direct messages. Public replies and mentions use the token’s
-  `read:notifications` scope, which is included in `read`.
+  `read:notifications` scope, which is included in `read`. Choose **Reply**
+  in **Inbox > Replies and mentions** to answer from the receiving account.
+  Replies to unlisted posts stay unlisted.
 - **Analytics:** Postline reads likes, boosts and replies through the account
   that published each post. Private posts require the token's read scope.
   [Mastodon status API](https://docs.joinmastodon.org/methods/statuses/#get).

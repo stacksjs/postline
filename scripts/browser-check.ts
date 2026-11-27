@@ -1098,13 +1098,50 @@ async function checkPublicInbox(cdp: Cdp): Promise<void> {
       && ${inbox}?.querySelector('article p')?.textContent === 'A public reply fixture'
       && ${inbox}?.querySelector('article a')?.href === 'https://bsky.app/profile/fixture-author.example/post/abc'
       && Boolean(${inbox}?.querySelector('article time')?.textContent)`), 5000)
-  await evaluate(cdp, `${inbox}.querySelector('article button').focus()`)
+  await evaluate(cdp, `${inbox}.querySelector('[data-public-mark-read]').focus()`)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Inbox marks the reply as read in the database', () => evaluate<boolean>(cdp, `(async () => {
     const payload = await fetch('/api/postline/inbox/mentions').then(response => response.json())
-    return !${inbox}?.querySelector('article button')?.getClientRects().length
+    return !${inbox}?.querySelector('[data-public-mark-read]')?.getClientRects().length
       && payload.data?.entries?.some(entry => entry.author === 'fixture-author.example' && entry.read)
   })()`), 5000)
+  await evaluate(cdp, `(() => {
+    const original = window.fetch.bind(window)
+    window.publicReplyAttempts = []
+    window.fetch = (input, options) => {
+      if (new URL(input instanceof Request ? input.url : input, location.href).pathname !== '/api/postline/inbox/mentions/reply')
+        return original(input, options)
+      window.publicReplyAttempts.push(JSON.parse(options.body))
+      return Promise.resolve(window.publicReplyAttempts.length === 1
+        ? Response.json({ ok: false, error: 'The original post is unavailable.' }, { status: 422 })
+        : Response.json({ ok: true, data: { postId: 42, status: 'sent' } }))
+    }
+  })()`)
+  const reply = `${inbox}.querySelector('dialog')`
+  await evaluate(cdp, `${inbox}.querySelector('[data-open-public-reply]').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Inbox opens the public reply editor and names the receiving account', () => evaluate<boolean>(cdp, `
+    ${reply}.open && document.activeElement === ${reply}.querySelector('textarea')
+      && ${reply}.querySelector('#public-reply-account').textContent.includes('inbox-check.example')`), 5000)
+  await evaluate(cdp, `(() => {
+    const text = ${reply}.querySelector('textarea')
+    text.value = 'Reply from the browser fixture'
+    text.dispatchEvent(new Event('input', { bubbles: true }))
+  })()`)
+  await waitUntil('The public reply can be sent', () => evaluate<boolean>(cdp, `!${reply}.querySelector('button[type=submit]').disabled`), 5000)
+  await evaluate(cdp, `${reply}.querySelector('button[type=submit]').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('A rejected public reply keeps the authored text', () => evaluate<boolean>(cdp, `
+    ${reply}.open && ${reply}.querySelector('[role=alert]').textContent === 'The original post is unavailable.'
+      && ${reply}.querySelector('textarea').value === 'Reply from the browser fixture'
+      && !${reply}.querySelector('button[type=submit]').disabled`), 5000)
+  await evaluate(cdp, `${reply}.querySelector('button[type=submit]').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Inbox confirms the public reply and restores focus', () => evaluate<boolean>(cdp, `
+    !${reply}.open && document.activeElement === ${inbox}.querySelector('[data-open-public-reply]')
+      && [...${inbox}.querySelectorAll('[role=status]')].some(el => el.innerText === 'Public reply sent.')
+      && window.publicReplyAttempts.length === 2 && window.publicReplyAttempts.every(attempt =>
+        Number.isInteger(attempt.id) && attempt.text === 'Reply from the browser fixture')`), 5000)
   await evaluate(cdp, `${sections}[0].focus()`)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Inbox returns to direct messages', () => evaluate<boolean>(cdp, `

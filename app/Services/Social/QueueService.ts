@@ -301,6 +301,7 @@ export interface SaveQueueInput {
   options?: PostOptions | null
   /** Per-provider body overrides; providers without one publish `text`. */
   variants?: VariantMap | null
+  reply?: StoredContent['reply']
 }
 
 interface QueueReceipt {
@@ -310,11 +311,17 @@ interface QueueReceipt {
 }
 
 interface PostSubmission {
+  origin?: 'inbox'
   requestKey: string
   fingerprint: string
 }
 
-function findSubmission(submission: PostSubmission, tx = database): QueueReceipt | null {
+function assertReplyTarget(target: string | undefined, targets: readonly PublishTarget[]): void {
+  if (target && (targets.length !== 1 || targetKey(targets[0]!) !== target))
+    throw new UserFacingError('This reply must use the account that received the original conversation.')
+}
+
+export function findPostSubmission(submission: PostSubmission, tx = database): QueueReceipt | null {
   const previous = tx.selectFrom('post_submissions').select(['fingerprint', 'receipt'])
     .where('request_key', '=', submission.requestKey).executeTakeFirst()
   if (!previous) return null
@@ -398,7 +405,7 @@ export class QueueService {
    * at publish time.
    */
   async save(input: SaveQueueInput, submission?: PostSubmission): Promise<QueueReceipt> {
-    const previous = submission && findSubmission(submission)
+    const previous = submission && findPostSubmission(submission)
     if (previous) return previous
 
     const body = input.text.trim()
@@ -406,6 +413,7 @@ export class QueueService {
       throw new Error('Post text is required.')
 
     const targets = await this.validTargets(input.providers)
+    assertReplyTarget(input.reply?.target, targets)
     const images = imagesOf(input)
     assertMediaAllowed(targets.map(target => target.provider), images)
 
@@ -425,6 +433,7 @@ export class QueueService {
     const createdAt = now()
 
     const stored: StoredContent = {}
+    if (input.reply) stored.reply = input.reply
     if (input.title?.trim()) stored.title = input.title.trim()
     if (input.external?.uri && input.external.title) stored.external = input.external
     const savedVariants = sanitizeVariants(input.variants)
@@ -437,7 +446,7 @@ export class QueueService {
     const timezone = await workspace.timezone()
     try {
       return await database.transaction((tx: typeof database) => {
-        const existing = submission && findSubmission(submission, tx)
+        const existing = submission && findPostSubmission(submission, tx)
         if (existing) return existing
 
         tx.insertInto('posts').values({
@@ -448,7 +457,7 @@ export class QueueService {
           [column]: Object.keys(stored).length ? JSON.stringify(stored) : null,
           scheduled_at: scheduledAt,
           timezone,
-          source: submission ? 'api' : 'composer',
+          source: submission && !submission.origin ? 'api' : 'composer',
           account_id: accountId,
           created_at: createdAt,
           updated_at: createdAt,
@@ -465,14 +474,14 @@ export class QueueService {
             created_at: createdAt,
             updated_at: createdAt,
           }).execute()
-          postWebhooks.enqueue(tx, 'post.created', receipt)
+          if (!submission.origin) postWebhooks.enqueue(tx, 'post.created', receipt)
         }
         return receipt
       })
     }
     catch (error) {
       // A competing process can finish the same submission first.
-      const existing = submission && findSubmission(submission)
+      const existing = submission && findPostSubmission(submission)
       if (existing) return existing
       throw error
     }
@@ -495,6 +504,7 @@ export class QueueService {
       throw new UserFacingError('Keep the draft’s post format to add it to the queue.')
     const accountId = draft ? Number(draft.account_id) : await ensureAccount()
     const targets = await this.validTargets(input.providers)
+    assertReplyTarget(parseStoredContent(draft?.[column])?.reply?.target, targets)
     const networks = targetProviders(targets)
     const drafts: any[] = draft?.thread_key ? await this.threadPosts(draft.thread_key) : draft ? [draft] : []
     const suppliedImages = imagesOf(input)
@@ -1052,7 +1062,9 @@ export class QueueService {
     const status = scheduledAt ? 'scheduled' as const : 'draft' as const
     const column = await contentColumn()
     const existing = parseStoredContent(post[column])
+    assertReplyTarget(existing?.reply?.target, targets)
     const stored: StoredContent = {}
+    if (existing?.reply) stored.reply = existing.reply
     if (input.title?.trim()) stored.title = input.title.trim()
     if (input.external?.uri && input.external.title) stored.external = input.external
 
@@ -1260,6 +1272,13 @@ export class QueueService {
     // Read before the claim: a post whose image is gone is refused here, with
     // nothing changed, instead of being claimed and then failing halfway.
     const content = await hydrateStoredContent(await storedContentOf(post))
+    if (content?.replyTarget) {
+      // A workspace archive can restore a target without its connected account.
+      // Refuse before taking a publishing claim or resolving a default account.
+      const bound = await database.selectFrom('post_targets').select(['provider', 'social_identity_id'])
+        .where('post_id', '=', post.id).where('status', 'in', ['draft', 'scheduled', 'failed']).execute()
+      assertReplyTarget(content.replyTarget, targetsOf(bound))
+    }
     await this.claim(post, expected)
 
     const pending: any[] = await database

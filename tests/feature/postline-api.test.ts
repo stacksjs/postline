@@ -68,7 +68,7 @@ describe('postline api — auth', () => {
 })
 
 describe('public inbox API', () => {
-  test.each(['sync', 'read'])('requires authentication for %s', async (action) => {
+  test.each(['sync', 'read', 'reply'])('requires authentication for %s', async (action) => {
     const request = await featureTest().post(`/api/postline/inbox/mentions/${action}`, { id: 1 })
     request.assertStatus(401)
   })

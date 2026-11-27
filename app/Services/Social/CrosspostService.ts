@@ -420,6 +420,11 @@ export class CrosspostService {
     content?: PublishContent,
   ): Promise<CrosspostTargetResult[]> {
     const results: CrosspostTargetResult[] = []
+    if (content?.replyTarget) {
+      const explicit = targets.length === 1 ? parseTarget(targets[0]) : null
+      if (!explicit?.identityId || targetKey(explicit) !== content.replyTarget)
+        throw new UserFacingError('This reply must use the account that received the original conversation.')
+    }
     for (const target of await this.resolve(targets)) {
       const body = resolveVariantBody(post.body, target.provider, content)
       results.push(await this.publishTarget(target, { id: post.id, body }, content))

@@ -192,6 +192,10 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   check('the imported X post appears in Listening', savedMentions.status === 200
     && JSON.parse(savedMentions.text)?.data?.mentions?.[0]?.url === 'https://x.com/fixture_author/status/8724')
 
+  const missingReply = await call('POST', '/api/postline/inbox/mentions/reply', { id: '99999', text: 'A fixture reply' })
+  check('the compiled agent rejects a public reply without a saved mention', missingReply.status === 422
+    && JSON.parse(missingReply.text)?.error === 'That reply or mention is no longer in Inbox.')
+
   const published = await call('POST', '/api/postline/publish', { text: 'Published by the desktop check.', title: 'Desktop check', providers: 'blog' })
   check('publishing to the blog', published.status === 200 && JSON.parse(published.text)?.data?.results?.[0]?.ok === true, `${published.status} ${published.text.slice(0, 200)}`)
 

@@ -208,6 +208,7 @@ route.group({ prefix: '/postline' }, () => {
   route.get('/inbox/mentions', 'Actions/Postline/PublicInboxListAction').middleware('auth')
   route.post('/inbox/mentions/sync', 'Actions/Postline/PublicInboxSyncAction').middleware('auth').rateLimit(20, 'hour')
   route.post('/inbox/mentions/read', 'Actions/Postline/PublicInboxReadAction').middleware('auth').rateLimit(120, 'minute')
+  route.post('/inbox/mentions/reply', 'Actions/Postline/PublicInboxReplyAction').middleware('auth').rateLimit(30, 'minute')
 
   route.get('/listening', 'Actions/Postline/KeywordMonitorListAction').middleware('auth')
   route.post('/listening', 'Actions/Postline/KeywordMonitorSaveAction').middleware('auth').rateLimit(30, 'minute')

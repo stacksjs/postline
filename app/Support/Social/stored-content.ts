@@ -14,6 +14,7 @@ export interface StoredContent {
   media?: Array<{ url?: string, path?: string, mimeType?: string, altText?: string }>
   variants?: VariantMap
   options?: PostOptions
+  reply?: NonNullable<PublishContent['reply']> & { target: string }
 }
 
 export function parseStoredContent(raw: unknown): StoredContent | null {
@@ -58,6 +59,13 @@ export async function hydrateStoredContent(raw: unknown): Promise<PublishContent
   if (variants) content.variants = variants
   const options = sanitizePostOptions(stored.options)
   if (options) content.options = options
+  if (stored.reply !== undefined) {
+    const { root, parent, target } = stored.reply ?? {}
+    if (!root?.uri || !root.cid || !parent?.uri || !parent.cid || !target)
+      throw new UserFacingError('The original conversation is missing. This reply was not sent.')
+    content.reply = { root, parent }
+    content.replyTarget = target
+  }
 
   const media: NonNullable<PublishContent['media']> = []
   for (const item of stored.media || []) {

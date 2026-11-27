@@ -1,9 +1,12 @@
+import type { PublishContent } from '../../app/Support/Social/types'
 import type { PublicNotification } from '../../app/Services/Social/public-notifications'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { db } from '@stacksjs/database'
+import { CrosspostService } from '../../app/Services/Social/CrosspostService'
+import { QueueService } from '../../app/Services/Social/QueueService'
 import { PublicInboxService } from '../../app/Services/PublicInboxService'
 import { upsertIdentityRow } from '../../app/Services/Social/identities'
-import { blueskyNotification, mastodonNotification } from '../../app/Services/Social/public-notifications'
+import { blueskyNotification, blueskyReplyParent, mastodonNotification, mastodonReplyParent } from '../../app/Services/Social/public-notifications'
 
 const identities: number[] = []
 
@@ -151,5 +154,90 @@ describe('public inbox sync', () => {
     expect(await service.sync()).toEqual({ added: 12, errors: [] })
     expect(requests).toBe(12)
     expect((await service.list()).entries.some(entry => entry.body === backlog[0]!.body)).toBe(true)
+  })
+})
+
+
+describe('replying to public activity', () => {
+  const parent = { uri: 'at://did:plc:parent/app.bsky.feed.post/first-reply', cid: 'bafyreiparent' }
+  const root = { uri: 'at://did:plc:root/app.bsky.feed.post/original', cid: 'bafyreiroot' }
+
+  test('uses the current parent CID and pins a nested Bluesky reply to its original root', () => {
+    expect(blueskyReplyParent({ posts: [parent] }, parent.uri)).toEqual({ reply: { root: parent, parent } })
+    const post = { ...parent, record: { reply: { root } } }
+    expect(blueskyReplyParent({ posts: [post] }, parent.uri)).toEqual({ reply: { root, parent } })
+    expect(() => blueskyReplyParent({ posts: [post] }, root.uri)).toThrow('could not find')
+    expect(() => blueskyReplyParent({ posts: [{ ...post, viewer: { replyDisabled: true } }] }, parent.uri)).toThrow('disabled replies')
+    expect(() => blueskyReplyParent({ posts: [{ ...post, record: { reply: {} } }] }, parent.uri)).toThrow('original conversation')
+  })
+
+  test('uses the receiving Mastodon instance’s status ID and retains unlisted visibility', () => {
+    const status = { id: '4321', url: 'https://remote.social/@author/789', visibility: 'unlisted' }
+    const notification = { id: '1234', type: 'mention', account: { acct: 'author@remote.social' }, status }
+    const ref = { uri: '4321', cid: '4321' }
+    expect(mastodonReplyParent(notification, '1234', status.url)).toEqual({ reply: { root: ref, parent: ref }, visibility: 'unlisted' })
+    expect(() => mastodonReplyParent(notification, '1235', status.url)).toThrow('could not find')
+    expect(() => mastodonReplyParent(notification, '1234', 'https://another.social/status/4321')).toThrow('could not find')
+    expect(() => mastodonReplyParent({ ...notification, status: { ...status, visibility: 'private' } }, '1234', status.url)).toThrow('original public post')
+  })
+
+  test('keeps the original conversation and receiving account through queue failure and replay', async () => {
+    const identity = await account()
+    const otherIdentity = await account()
+    const sent: Array<{ postId: number, identityId: number | null | undefined, content: PublishContent | undefined }> = []
+    let lookups = 0
+    const queue = new QueueService(new CrosspostService({
+      bluesky: {
+        async publishToPost(post, content, identityId) {
+          sent.push({ postId: post.id, identityId, content })
+          const ok = sent.length > 1
+          await db.insertInto('post_targets').values({
+            uuid: crypto.randomUUID(), post_id: post.id, provider: 'bluesky', social_identity_id: identityId,
+            status: ok ? 'published' : 'failed', failure_reason: ok ? null : 'Fixture rejection',
+          }).execute()
+          return { provider: 'bluesky', ok, identityId: identityId ?? undefined }
+        },
+      },
+    }))
+    const service = new PublicInboxService(
+      async (provider, identityId) => ({ items: provider === 'bluesky' && identityId === identity ? [mention('Original post')] : [] }),
+      async (provider, identityId) => {
+        expect(provider).toBe('bluesky')
+        expect(identityId).toBe(identity)
+        lookups++
+        return { reply: { root, parent } }
+      },
+      queue,
+    )
+    await service.sync()
+    const entry = (await service.list()).entries.find(item => item.body === 'Original post')!
+    let postId: number | undefined
+    try {
+      const initial = await service.reply(entry.id, 'A public reply')
+      expect(initial.status).toBe('queued')
+      postId = initial.postId
+      const expected = { reply: { root, parent }, replyTarget: `bluesky:${identity}` }
+      expect(sent).toEqual([{ postId, identityId: identity, content: expected }])
+      await expect(queue.update(postId, { text: 'Try another account', providers: [`bluesky:${otherIdentity}`] })).rejects.toThrow('account that received')
+      expect(await service.reply(entry.id, ' A public reply ')).toEqual(initial)
+      expect(sent).toHaveLength(1)
+      await db.updateTable('post_targets').set({ social_identity_id: null }).where('post_id', '=', postId).execute()
+      await expect(queue.publishNow(postId)).rejects.toThrow('account that received')
+      expect(sent).toHaveLength(1)
+      await db.updateTable('post_targets').set({ social_identity_id: identity }).where('post_id', '=', postId).execute()
+      await queue.publishNow(postId)
+      expect(sent[1]).toEqual(sent[0])
+      expect(await service.reply(entry.id, 'A public reply')).toEqual({ postId, status: 'sent' })
+      expect(sent).toHaveLength(2)
+      expect(lookups).toBe(1)
+      expect((await service.list()).entries.find(item => item.id === entry.id)?.read).toBe(true)
+    }
+    finally {
+      if (postId) {
+        await db.deleteFrom('post_submissions').where('receipt', 'like', `%"postId":${postId},%`).execute()
+        await db.deleteFrom('post_targets').where('post_id', '=', postId).execute()
+        await db.deleteFrom('posts').where('id', '=', postId).execute()
+      }
+    }
   })
 })
