@@ -8,6 +8,7 @@
 !public/**
 !resources/**
 !routes/**
+!scripts/migrate-workspace.ts
 !scripts/serve-container.ts
 !storage/framework/**
 !buddy
