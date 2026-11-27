@@ -235,7 +235,7 @@
         "description": "Planifica campañas de varias semanas, redacta publicaciones con IA y prográmalas en Postline.",
         "campaignPicker": "Campaña actual",
         "view": "Vista de campaña",
-        "window": "Periodo",
+        "launchWindow": "Periodo",
         "planned": "Planificadas",
         "ready": "Listas",
         "inQueue": "En cola",

@@ -235,7 +235,7 @@
         "description": "Plan multi-week social launches, draft campaign posts with AI, and send them into Postline queue.",
         "campaignPicker": "Current campaign",
         "view": "Campaign view",
-        "window": "Window",
+        "launchWindow": "Window",
         "planned": "Planned",
         "ready": "Ready",
         "inQueue": "In queue",

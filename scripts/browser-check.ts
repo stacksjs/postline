@@ -3012,6 +3012,7 @@ async function checkSpanishCampaigns(cdp: Cdp): Promise<void> {
   const add = `${plan}.querySelector('[aria-current=date]')?.parentElement.querySelector('button')`
   await waitUntil('The saved campaign shows the Spanish calendar and action names', () => evaluate<boolean>(cdp, `
     ${page}.querySelector('#campaign-picker option:checked')?.textContent === 'Campaña de prueba'
+      && [...${page}.querySelectorAll('dt')].some(label => label.innerText === 'Periodo')
       && ${plan}?.querySelector('[aria-label="Seis semanas anteriores"]')?.getClientRects().length > 0
       && ${add}?.getAttribute('aria-label')?.startsWith('Añadir una publicación el ')
       && ${page}.querySelector('[aria-label="Herramientas de campaña"]')?.innerText.includes('Asistente de campaña')
@@ -3020,7 +3021,10 @@ async function checkSpanishCampaigns(cdp: Cdp): Promise<void> {
   await pressKey(cdp, 'Enter', 13)
   const postTitle = input('Primer anuncio')
   const postBody = input('Escribe la publicación…')
-  await waitUntil('The Spanish planned post editor opens from the calendar', () => evaluate<boolean>(cdp, `Boolean(${postTitle}?.getClientRects().length)`), 5_000)
+  await waitUntil('The Spanish planned post editor opens from the calendar', () => evaluate<boolean>(cdp, `
+    Boolean(${postTitle}?.getClientRects().length)
+      && ${page}.querySelector('option[value="follow-up"]')?.textContent.trim() === 'Seguimiento'
+  `), 5_000)
   await evaluate(cdp, `${postTitle}.focus()`)
   await cdp.send('Input.insertText', { text: 'Anuncio de prueba' })
   await evaluate(cdp, `${postBody}.focus()`)

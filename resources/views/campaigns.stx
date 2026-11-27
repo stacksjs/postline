@@ -6,6 +6,7 @@ import { workspaceCampaignText, workspaceLocale } from '../../app/Support/Locali
 export const campaignLocale = workspaceLocale
 export const campaignText = workspaceCampaignText.labels
 export const campaignCopy = workspaceCampaignText.client
+export const followUpPostLabel = campaignCopy['follow-up']
 export const campaignClient = { locale: workspaceLocale, messages: campaignCopy }
 </script>
 
@@ -36,7 +37,7 @@ export const campaignClient = { locale: workspaceLocale, messages: campaignCopy 
     </WorkspacePageHeader>
 
     <dl class="grid overflow-hidden gap-px grid-cols-2 sm:grid-cols-4 m-0 bg-line border border-line rounded-2xl" x-show="campaign()">
-      <div class="grid gap-1 px-3.5 py-3 min-w-0 bg-panel"><dt class="text-muted text-xs">{{ campaignText.window }}</dt><dd class="m-0 font-semibold text-ink text-sm truncate" :text="campaignWindow()"></dd></div>
+      <div class="grid gap-1 px-3.5 py-3 min-w-0 bg-panel"><dt class="text-muted text-xs">{{ campaignText.launchWindow }}</dt><dd class="m-0 font-semibold text-ink text-sm truncate" :text="campaignWindow()"></dd></div>
       <div class="grid gap-1 px-3.5 py-3 bg-panel"><dt class="text-muted text-xs">{{ campaignText.planned }}</dt><dd class="m-0 font-semibold text-ink text-sm">{{ numbers.format(posts().length) }}</dd></div>
       <div class="grid gap-1 px-3.5 py-3 bg-panel"><dt class="text-muted text-xs">{{ campaignText.ready }}</dt><dd class="m-0 font-semibold text-ink text-sm">{{ numbers.format(readyCount()) }}</dd></div>
       <div class="grid gap-1 px-3.5 py-3 bg-panel"><dt class="text-muted text-xs">{{ campaignText.inQueue }}</dt><dd class="m-0 font-semibold text-ink text-sm">{{ numbers.format(queuedCount()) }}</dd></div>
@@ -299,7 +300,7 @@ export const campaignClient = { locale: workspaceLocale, messages: campaignCopy 
                 <label class="grid gap-1.5 font-medium text-body text-ui">
                   <span>{{ campaignText.pillar }}</span>
                   <select class="px-2.5 h-9 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus" x-model="postPillar">
-                    <option value="teaser">{{ campaignCopy.teaser }}</option><option value="story">{{ campaignCopy.story }}</option><option value="education">{{ campaignCopy.education }}</option><option value="proof">{{ campaignCopy.proof }}</option><option value="launch">{{ campaignCopy.launch }}</option><option value="follow-up">{{ campaignCopy['follow-up'] }}</option>
+                    <option value="teaser">{{ campaignCopy.teaser }}</option><option value="story">{{ campaignCopy.story }}</option><option value="education">{{ campaignCopy.education }}</option><option value="proof">{{ campaignCopy.proof }}</option><option value="launch">{{ campaignCopy.launch }}</option><option value="follow-up">{{ followUpPostLabel }}</option>
                   </select>
                 </label>
               </div>
