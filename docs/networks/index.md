@@ -35,7 +35,9 @@ that counts against the workspace's daily read budget.
 |---|---|---|---|---|---|---|---|
 | Bluesky | Yes | Yes | Up to 4 | Yes | Yes | Yes | Yes |
 | Mastodon | Yes | Yes | Up to 4 | Yes | Yes | Yes | Yes |
-| X | Yes | Yes | Up to 4 | Yes | No | API or Mac browser session | Paid API refresh or visible counts from the Mac browser session |
+| X | Yes | Yes | Up to 4 | Yes | With paid API messaging enabled | API or Mac browser session | Paid API refresh or visible counts from the Mac browser session |
 | LinkedIn | Yes | No | Up to 4 | Yes | No | No | With approved scopes |
 | Threads | Yes | No | Up to 4 | Up to 100 a day | No | No | With insights access |
 | Instagram | Yes, with an image | No | Required, up to 4 | No | No | No | With insights access |
+
+Engagement appears in **Analytics** after Postline receives a measurement for a published post. Bluesky and Mastodon counts refresh through the Scheduler. LinkedIn, Threads, and Instagram need the permissions in their setup guides. For X, use the paid **Refresh engagement** action or import counts visible in your Mac browser session. A measured zero is shown as zero. Posts still awaiting a measurement show no count.

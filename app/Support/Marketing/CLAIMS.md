@@ -41,14 +41,14 @@ Last checked 24 November 2026.
 | Instagram messages not supported (Meta app review) | `direct-messages.ts` (`DM_UNAVAILABLE.instagram`) |
 | Direct messages from X through an opted-in developer app, with a daily read cap | `app/Services/Social/TwitterDmInbox.ts`, `docs/networks/x.md` |
 | Keyword listening on Bluesky, X, Mastodon, every five minutes, up to 20 keywords | `app/Jobs/ScanKeywordMonitors.ts:13`, `KeywordMonitoringService.ts:48` |
-| Engagement synced for Bluesky posts only | `app/Jobs/SyncEngagementMetrics.ts:17` |
+| Engagement refreshed for Bluesky and Mastodon posts | `app/Services/Social/EngagementService.ts`, `app/Jobs/SyncEngagementMetrics.ts` |
 | Thirty days of activity, channel mix, posting windows | `app/Actions/Postline/AnalyticsAction.ts` |
 | Campaign plans from OpenAI, Anthropic, Ollama, or the built-in planner | `config/ai.ts`, `app/Services/CampaignAIService.ts` |
 | Cleanup previews before deleting, daily retention, audit log | `app/Services/Social/PurgeService.ts`, `app/Jobs/AutoDeletePosts.ts` |
 
 ## Not on the site until they are true
 
-- Engagement for X, LinkedIn, Instagram, Threads and Mastodon.
+- Engagement claims for X, LinkedIn, Instagram and Threads await live checks with the required account permissions.
 - Instagram direct messages and X direct messages through a browser session.
 - Revoking a token at the network on disconnect.
 - Team seats.
