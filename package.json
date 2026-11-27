@@ -87,6 +87,7 @@
   "devDependencies": {
     "@iconify-json/hugeicons": "^1.2.36",
     "@iconify-json/simple-icons": "^1.2.92",
+    "@stacksjs/browser-extension": "0.75.705",
     "@stacksjs/components": "0.2.957",
     "better-dx": "^0.2.22",
     "bun-plugin-stx": "0.2.957",

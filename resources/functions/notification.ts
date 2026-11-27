@@ -10,7 +10,7 @@ interface NotificationOptions {
   durationMs?: number
   id?: string
   dedupeMs?: number
-  action?: { label: string, run: () => void }
+  action?: { label: string, run: () => void, dismiss?: boolean }
   loading?: boolean
 }
 
@@ -79,7 +79,7 @@ export function showNotification(options: NotificationOptions): void {
     })
   }
   else if (options.action) {
-    actions.push({ label: options.action.label, onClick: options.action.run })
+    actions.push({ label: options.action.label, onClick: options.action.run, dismiss: options.action.dismiss })
   }
 
   const duration = options.durationMs ?? (tone === 'error' ? 12000 : tone === 'info' ? 0 : 8000)

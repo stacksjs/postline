@@ -58,10 +58,13 @@ const allowsFirstRun = !isMarketingSite()
   </main>
 
   <script client>
+    import { shareComposerPath, sharedPage } from '../functions/composer-share'
     import { passkeys } from '../functions/passkeys'
 
     const setupAvailable = state(false)
-    const returnToSetup = useRoute().query.return === 'setup'
+    const route = useRoute()
+    const returnToSetup = route.query.return === 'setup'
+    const pendingShare = sharedPage(route.hash)
     const errorMessage = state('')
     const busy = state(false)
 
@@ -81,7 +84,10 @@ const allowsFirstRun = !isMarketingSite()
     const passkeysOffered = derived(() => webAuthn && !challenge())
 
     const heading = derived(() => challenge() ? 'Verify your sign-in' : 'Sign in to Postline')
-    const subtitle = derived(() => challenge() ? 'Enter a code from your authenticator app.' : 'Compose once, publish everywhere.')
+    const subtitle = derived(() => {
+      if (challenge()) return 'Enter a code from your authenticator app.'
+      return pendingShare ? 'Sign in to add the shared link to a post.' : 'Compose once, publish everywhere.'
+    })
     const submitLabel = derived(() => challenge() ? 'Verify' : 'Sign in')
 
     onMount(async () => {
@@ -117,7 +123,7 @@ const allowsFirstRun = !isMarketingSite()
     const enterApp = (expiresIn?: number | string | null): void => {
       const maxAge = Number(expiresIn) > 0 ? Number(expiresIn) : 60 * 60 * 24 * 30
       useCookie('postline-signed-in', { maxAge }).set('1')
-      navigate(returnToSetup ? '/setup' : '/composer', { reload: true, replace: true })
+      navigate(returnToSetup ? '/setup' : shareComposerPath(pendingShare), { reload: true, replace: true })
     }
 
     const cancelChallenge = () => {

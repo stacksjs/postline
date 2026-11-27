@@ -17,7 +17,12 @@
       // yet, and waiting for them would paint the protected page first, which
       // is the one thing this guard exists to prevent.
       // stx-strict-ignore-next-line window.location
-      const host = window.location.hostname
+      const page = window.location
+      const host = page.hostname
+      const goToLogin = () => {
+        const share = page.pathname === '/composer' && page.hash.startsWith('#postline-share=') ? page.hash : ''
+        page.replace('/login' + share)
+      }
       const isLoopback = host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host.endsWith('.localhost')
 
       // The marker login.stx leaves behind, NOT the session itself. The session
@@ -31,27 +36,10 @@
       if (!(isNativeApp && isLoopback) && !/(?:^|;\s*)postline-signed-in=1\b/.test(document.cookie)) {
         // replace(), not assign(), so Back does not return to a page the
         // viewer was just bounced off.
-        // stx-strict-ignore-next-line location.replace window.location
-        window.location.replace('/login')
+        goToLogin()
       }
-    })()
-  </script>
-  <script>
-    // Fetch wrapper for same-origin /api/ calls (app-owned so framework
-    // upgrades can't clobber it).
-    //
-    // This used to be a cookie → bearer bridge, reading the session out of
-    // `document.cookie` and attaching it as an Authorization header. It could
-    // never have worked: the session cookie is httpOnly, so `readToken()`
-    // returned undefined on every call and every /api/ request went out
-    // unauthenticated (#45). The cookie is now honoured by the API directly
-    // (app/Middleware/Auth.ts), and the browser attaches it to same-origin
-    // requests by itself, so there is nothing left to bridge.
-    //
-    // One job remains: notice when the API says the session is over — the
-    // marker the guard above reads is set by the login page and could
-    // otherwise outlive the session it stands for.
-    ;(() => {
+
+      // The fetch wrapper covers same-origin /api/ calls.
       const nativeFetch = window.fetch.bind(window)
       let leaving = false
       const sessionEnded = () => {
@@ -63,8 +51,7 @@
         // not available yet.
         // stx-strict-ignore-next-line document.cookie
         document.cookie = 'postline-signed-in=; path=/; max-age=0; SameSite=Lax'
-        // stx-strict-ignore-next-line location.replace window.location
-        window.location.replace('/login')
+        goToLogin()
       }
 
       // The API is the authority on the session, so its answer is what ends
@@ -81,10 +68,7 @@
         let sameOriginApi = false
         try {
           const url = typeof input === 'string' ? input : input?.url || ''
-          // Reading the origin to classify a URL, not navigating — useRoute()
-          // answers a different question.
-          // stx-strict-ignore-next-line window.location
-          sameOriginApi = url.startsWith('/api/') || url.startsWith(`${window.location.origin}/api/`)
+          sameOriginApi = url.startsWith('/api/') || url.startsWith(`${page.origin}/api/`)
         } catch {}
         return watchForSignOut(nativeFetch(input, init), sameOriginApi)
       }

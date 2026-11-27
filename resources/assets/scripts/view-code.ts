@@ -1,4 +1,4 @@
-/** Load the long-form editor when Composer first shows its Blog title field. */
+/** Load Composer’s optional browser modules when the current visit needs them. */
 const editorUrl = new URL('/assets/scripts/richtext-editor.ts', import.meta.url)
 let loaded: Promise<typeof import('./richtext-editor')> | undefined
 let composer: HTMLElement | null = null
@@ -6,6 +6,11 @@ let observer: MutationObserver | undefined
 
 function watchComposer(): void {
   const root = document.querySelector<HTMLElement>('[data-postline-page="composer"]')
+  if (root && location.hash.startsWith('#postline-share=') && !location.search) {
+    const shareUrl = new URL('/assets/scripts/browser-share.ts', import.meta.url)
+    void import(shareUrl.href).then(({ offerBrowserShare }) => offerBrowserShare(root)).catch(console.error)
+  }
+
   if (root === composer) return
   observer?.disconnect()
   observer = undefined
@@ -36,3 +41,4 @@ else watchComposer()
 
 // The persistent layout stays in place across workspace navigation.
 window.addEventListener('stx:load', watchComposer)
+window.addEventListener('hashchange', watchComposer)

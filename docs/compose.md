@@ -20,6 +20,21 @@ Use the image button to attach images to a post or thread segment. Add a descrip
 
 To track a link, open **Analytics > Tracked links**. Enter the full destination address and the UTM tags your destination's analytics expects. **Build tagged URL** gives you a link to copy into a post. On a server with a public HTTPS `APP_URL`, you can also name the link and choose **Create short link**. Postline reports all-time redirects for each short link, including repeat visits and automated previews. Disabling a short link stops it from working wherever it was shared.
 
+## Share a page from your browser
+
+Build **Share to Postline** from the Postline checkout after installing its dependencies.
+
+```bash
+./buddy extension:package
+```
+
+- In Chrome or Chromium, open **Extensions**, turn on **Developer mode**, choose **Load unpacked**, and select `dist-extension/chrome`.
+- To try it in Firefox 142 or later, open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on**, and select the generated `share-to-postline-<version>-firefox.zip`. Firefox removes temporary add-ons when it restarts.
+
+On a page you want to share, open **Share to Postline** from the toolbar. Enter the HTTPS address of your web workspace and choose **Open in Composer**. The extension remembers that address in your browser. Sign in if asked, review the link, then choose **Add link to post**. It appends to the active post or thread segment and leaves the rest of your work intact.
+
+The extension reads the current tab when you open its popup. The link stays in the browser during the handoff. After you add it, Postline can request a link preview and sends the link with any post you save or publish.
+
 ## Draft, schedule, or publish
 
 - Choose **Draft** and save to put a post in **Queue > Drafts**. The composer also keeps an in-progress draft in the current browser or Mac app.

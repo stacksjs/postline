@@ -1,0 +1,29 @@
+@nolayout
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="/styles.css">
+  <title>Share to Postline</title>
+</head>
+<body class="m-0 max-w-full w-80 font-sans text-zinc-950 dark:text-zinc-50 bg-white dark:bg-zinc-950">
+  <main class="grid gap-4 p-4">
+    <header class="flex gap-2 items-center">
+      <img src="/icons/icon-32.png" alt="" width="24" height="24">
+      <h1 class="m-0 font-semibold text-base">Share to Postline</h1>
+    </header>
+    <p class="m-0 break-all text-sm text-zinc-700 dark:text-zinc-300" id="shared-page">Checking the current tab…</p>
+    <form class="grid gap-3" id="share-form">
+      <label class="grid gap-1.5 font-medium text-sm">
+        Workspace URL
+        <input class="px-2 py-1.5 min-w-0 text-sm bg-transparent border border-zinc-400 rounded-lg" name="workspace" type="url" placeholder="https://postline.example.org" required>
+      </label>
+      <button class="px-3 py-2 font-semibold text-sm text-white dark:text-zinc-950 bg-zinc-950 dark:bg-zinc-100 rounded-lg disabled:opacity-50" type="submit" disabled>Open in Composer</button>
+      <p class="empty:hidden m-0 text-red-700 text-sm dark:text-red-300" id="share-error" role="status"></p>
+    </form>
+  </main>
+  <script src="/popup.js"></script>
+</body>
+</html>

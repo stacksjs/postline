@@ -25,6 +25,11 @@ declare global {
   const composerScheduleIso: typeof autoImports.composerScheduleIso
   const composerQueueTimestamp: typeof autoImports.composerQueueTimestamp
   const composerActionText: typeof autoImports.composerActionText
+  const shareablePage: typeof autoImports.shareablePage
+  const shareWorkspace: typeof autoImports.shareWorkspace
+  const sharedPage: typeof autoImports.sharedPage
+  const shareComposerPath: typeof autoImports.shareComposerPath
+  const takeSharedPage: typeof autoImports.takeSharedPage
   const composerTargets: typeof autoImports.composerTargets
   const uniqueComposerNetworks: typeof autoImports.uniqueComposerNetworks
   const composerSelection: typeof autoImports.composerSelection

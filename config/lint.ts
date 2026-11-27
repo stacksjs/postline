@@ -11,7 +11,7 @@ export default {
   stx: {
     baselines: {
       // Direct DOM access in the composer, Settings and Channels purge controls.
-      'dom-guard': 18,
+      'dom-guard': 14,
       'style-block': 1,
       // Marketing links that are plain anchors.
       'plain-internal-anchor': 4,

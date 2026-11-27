@@ -375,6 +375,11 @@
       editSegment(segment.id, { value: text + (text && !text.endsWith('\n') ? separator : '') + body })
       focusSegment(segment.id)
     }
+    useEventListener('postline:browser-share', (event: CustomEvent<string>) => {
+      if (submitting()) return
+      insertSavedText({ body: event.detail, kind: 'snippet' })
+      toast.dismiss('browser-share')
+    })
     const variants = state<ComposerVariants>({})
     const variantsOpen = state(false)
     const newVariant = state('')
@@ -992,6 +997,7 @@
       renderBlogPreview(bodies)
     })
     onDestroy(() => {
+      toast.dismiss('browser-share')
       blogPreviewRequest?.abort()
       renderBlogPreview.cancel()
     })

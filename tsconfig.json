@@ -31,7 +31,8 @@
     "tests/**/*.ts",
     "database/**/*.ts",
     "resources/assets/scripts/**/*.ts",
-    "resources/functions/**/*.ts"
+    "resources/functions/**/*.ts",
+    "resources/extension/**/*.ts"
   ],
   "exclude": [
     "cloud/**",

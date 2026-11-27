@@ -25,6 +25,7 @@ import process from 'node:process'
 import { auditPage, closeSharedBrowsers, launch } from '@stacksjs/testing/browser'
 import { nextPostingSlot } from '../app/Support/Social/posting-slots'
 import { wallTimeInZone } from '../app/Support/time'
+import { shareComposerPath } from '../resources/functions/composer-share'
 
 const production = process.argv.includes('--production')
 const root = join(import.meta.dir, '..')
@@ -685,6 +686,52 @@ async function checkLocalComposerDraft(cdp: Cdp): Promise<void> {
   finally {
     await auditPage(`${site}/queue`, { cdp })
     await evaluate(cdp, `localStorage.removeItem('${draftKey}')`)
+  }
+}
+
+async function checkBrowserShare(cdp: Cdp): Promise<void> {
+  const shared = 'https://example.invalid/article?q=red+blue#section'
+  const draft = 'A draft written before sharing.'
+  const draftKey = 'postline:composer-draft:v1'
+  const share = `document.querySelector('[data-stx-toast-key="browser-share"]:not([data-stx-toast-exiting])')`
+  const editor = `document.querySelector('[data-bluesky-text]')`
+  const path = shareComposerPath(shared)
+
+  await auditPage(`${site}/queue`, { cdp })
+  await evaluate(cdp, `localStorage.setItem(${JSON.stringify(draftKey)}, JSON.stringify({
+    activeIndex: 0, mode: 'single', action: 'draft', posts: [{ text: ${JSON.stringify(draft)} }],
+  }))`)
+  try {
+    await cdp.send('Network.clearBrowserCookies')
+    await auditPage(`${site}${path}`, { cdp })
+    await waitUntil('Browser share carries the private fragment into sign-in', () => evaluate<boolean>(cdp, `
+      location.pathname === '/login' && location.hash === ${JSON.stringify(new URL(path, site).hash)}
+        && document.querySelector('[data-testid=login-page]')?.textContent.includes('add the shared link')`), 5000)
+    await evaluate(cdp, `document.querySelector('[name=email]').focus()`)
+    await cdp.send('Input.insertText', { text: 'check@postline.test' })
+    await evaluate(cdp, `document.querySelector('[name=password]').focus()`)
+    await cdp.send('Input.insertText', { text: 'browser-check-password' })
+    await pressKey(cdp, 'Enter', 13)
+
+    await waitUntil('Signing in offers the link and preserves the existing draft', () => evaluate<boolean>(cdp, `
+      location.pathname === '/composer' && Boolean(${share}?.getClientRects().length)
+        && ${share}?.textContent.includes(${JSON.stringify(shared)}) && ${editor}?.value === ${JSON.stringify(draft)}`), 10000)
+    await evaluate(cdp, `${share}.querySelector('[data-stx-toast-action]').focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const combined = `${draft}\n\n${shared}`
+    await waitUntil('Adding the link appends it once and clears the handoff', () => evaluate<boolean>(cdp, `
+      location.hash === '' && !${share}?.getClientRects().length && ${editor}?.value === ${JSON.stringify(combined)}`), 5000)
+
+    await auditPage(`${site}${path}`, { cdp })
+    await waitUntil('A signed-in workspace can also review the link', () => evaluate<boolean>(cdp, `
+      Boolean(${share}?.getClientRects().length) && ${editor}?.value === ${JSON.stringify(combined)}`), 5000)
+    await evaluate(cdp, `${share}.querySelector('[aria-label="Dismiss notification"]').click()`)
+    await waitUntil('Dismissing a share keeps the draft as it was', () => evaluate<boolean>(cdp, `
+      location.hash === '' && !${share}?.getClientRects().length && ${editor}?.value === ${JSON.stringify(combined)}`), 5000)
+  }
+  finally {
+    await auditPage(`${site}/queue`, { cdp })
+    await evaluate(cdp, `localStorage.removeItem(${JSON.stringify(draftKey)})`)
   }
 }
 
@@ -2333,6 +2380,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkInstagramPagePicker(cdp)
   await checkNetworkComponents(cdp)
   await checkLocalComposerDraft(cdp)
+  await checkBrowserShare(cdp)
   await checkComposerThreadDraft(cdp)
   await checkComposerPreferences(cdp)
   await checkSavedComposerText(cdp)

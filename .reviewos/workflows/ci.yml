@@ -175,6 +175,7 @@ jobs:
       secrets: []
       artifact-paths:
         - storage/framework/browser-check/*.png
+        - share-to-postline-*.zip
     runs-on: [self-hosted, macos-arm64, postline]
     timeout-minutes: 25
     steps:
@@ -197,5 +198,9 @@ jobs:
           check_readme
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Package the browser share extension
+        run: ./buddy extension:package
+      - name: Share a page from the Chrome extension
+        run: bun scripts/browser-extension-check.ts
       - name: Open every view under the production security policy
         run: bun scripts/browser-check.ts --production
