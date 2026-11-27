@@ -60,10 +60,10 @@ let points: Point[] = []
 let analyticsPromise: Promise<AnalyticsPayload | null> | null = null
 
 const drawn = new WeakMap<SVGSVGElement, { width: number, points: Point[], events: AbortController }>()
-const blue = '#2563eb'
-const text = '#18181b'
-const muted = '#71717a'
-const rule = '#e4e4e7'
+const lineColor = 'var(--info)'
+const text = 'var(--ink)'
+const muted = 'var(--muted)'
+const rule = 'var(--line)'
 
 function engagementCount(value: number | undefined, singular: string, plural = `${singular}s`): string | null {
   return value === undefined ? null : `${value.toLocaleString()} ${value === 1 ? singular : plural}`
@@ -169,9 +169,9 @@ function renderAnalyticsChart(): void {
   const legend = chart.querySelector<SVGGElement>('[data-chart-legend]')
   if (legend) {
     legend.innerHTML = compact ? '' : [
-      `<circle cx="${width - 212}" cy="22" r="4" fill="${blue}"></circle>`,
+      `<circle cx="${width - 212}" cy="22" r="4" fill="${lineColor}"></circle>`,
       `<text x="${width - 202}" y="26" fill="${text}" font-size="11" font-weight="700">Publishing activity</text>`,
-      `<rect x="${width - 82}" y="16" width="22" height="8" rx="4" fill="rgba(37, 99, 235, 0.12)"></rect>`,
+      `<rect x="${width - 82}" y="16" width="22" height="8" rx="4" fill="var(--info-soft)"></rect>`,
       `<text x="${width - 28}" y="26" fill="${muted}" font-size="11" text-anchor="end">30 days</text>`,
     ].join('')
   }
@@ -179,7 +179,7 @@ function renderAnalyticsChart(): void {
   const pointLayer = chart.querySelector<SVGGElement>('[data-chart-points]')
   if (pointLayer) {
     pointLayer.innerHTML = points
-      .map((point, index) => `<circle cx="${x(index)}" cy="${y(point.value)}" r="4" fill="#fff" stroke="${blue}" stroke-width="3"><title>${escapeHtml(point.label)}: ${point.value} post${point.value === 1 ? '' : 's'} published</title></circle>`)
+      .map((point, index) => `<circle cx="${x(index)}" cy="${y(point.value)}" r="4" fill="var(--panel)" stroke="${lineColor}" stroke-width="3"><title>${escapeHtml(point.label)}: ${point.value} post${point.value === 1 ? '' : 's'} published</title></circle>`)
       .join('')
   }
 
@@ -201,10 +201,10 @@ function renderAnalyticsChart(): void {
 
     if (hoverLayer) {
       hoverLayer.innerHTML = [
-        `<line x1="${xx}" x2="${xx}" y1="${inset.top}" y2="${baseline}" stroke="${blue}" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.55"></line>`,
-        `<circle cx="${xx}" cy="${yy}" r="7" fill="#fff" stroke="${blue}" stroke-width="3"></circle>`,
+        `<line x1="${xx}" x2="${xx}" y1="${inset.top}" y2="${baseline}" stroke="${lineColor}" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.55"></line>`,
+        `<circle cx="${xx}" cy="${yy}" r="7" fill="var(--panel)" stroke="${lineColor}" stroke-width="3"></circle>`,
         `<g transform="translate(${tooltipX} ${tooltipY})" data-chart-tooltip>`,
-        `<rect width="${tooltipWidth}" height="${tooltipHeight}" rx="12" fill="#fff" stroke="#d4d4d8" stroke-width="1.2"></rect>`,
+        `<rect width="${tooltipWidth}" height="${tooltipHeight}" rx="12" fill="var(--panel)" stroke="var(--line-strong)" stroke-width="1.2"></rect>`,
         `<text x="12" y="22" fill="${text}" font-size="12" font-weight="800">${escapeHtml(point.label)}</text>`,
         `<text x="12" y="38" fill="${muted}" font-size="11">${point.value} post${point.value === 1 ? '' : 's'} published</text>`,
         '</g>',

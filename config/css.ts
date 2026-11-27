@@ -23,11 +23,9 @@ import { defaultConfig } from '@cwcss/crosswind'
  * one `<style data-crosswind="generated">` tag the router treats as durable.
  *
  * ORDERING NOTE: because preflights come BEFORE the generated utilities, a
- * preflight rule that merely TIES a utility on specificity now loses to it —
- * whereas a page `<style>` block used to win by coming later. Every rule below
- * was checked against that: the `.dark .*` layer survives on specificity
- * (0,2,0 vs 0,1,0), and the data-attribute rules have no competing colour
- * utility on the same element. The marketing layout's hand-written `.font-mono`
+ * preflight rule that ties a utility on specificity loses to it. Status
+ * colours are set on data attributes whose elements have no competing colour
+ * utility. The marketing layout's hand-written `.font-mono`
  * was dropped rather than moved — crosswind's own defaults are already Geist /
  * Geist Mono, so it never did anything.
  *
@@ -73,6 +71,7 @@ const APP_LIGHT: string = `
   --hover: #fafafa;
   --line-strong: #d4d4d8;
   --field-line: #86868f;
+  --workspace-shadow: rgb(24 31 42 / 0.08);
   --focus-ring: #2563eb;
   --accent-hover: #262626;
   --glass: rgba(255, 255, 255, 0.72);
@@ -125,6 +124,7 @@ const APP_DARK: string = `
   --hover: #26262a;
   --line-strong: #52525b;
   --field-line: #6e6e78;
+  --workspace-shadow: rgb(0 0 0 / 0.40);
   --focus-ring: #60a5fa;
   --accent-hover: #d4d4d8;
   --glass: rgba(63, 63, 70, 0.72);
@@ -208,58 +208,6 @@ html.dark body { color: var(--ink); }
 `
 
 /**
- * Dark-mode override layer for RAW colour utilities.
- *
- * DEBT, tracked in stacksjs/postline#141: none of this should exist. It
- * shadows generated utilities by hand because the markup still uses raw palette
- * classes (`bg-blue-50`, `text-red-700`) instead of semantic status tokens. The
- * fix is to add success/warning/danger/info surface, border and text tokens
- * above and rewrite the markup to use them.
- *
- * WHY EVERY DECLARATION HERE IS !important
- *
- * Crosswind emits preflights inside `@layer cw-base` and the generated
- * utilities unlayered, and an unlayered rule beats a layered one before
- * specificity is consulted. So `.dark .bg-blue-50` (0,2,0, layered) lost to a
- * plain `.bg-blue-50` (0,1,0, unlayered), and this whole block did nothing:
- * the dark theme kept a light sidebar, white pills and pastel tiles.
- * `!important` is the only weight that crosses a layer boundary. It is added
- * to the block as a whole by `overriding()` below, not written per line, so a
- * rule added here cannot forget it.
- */
-/** Mark every declaration in a block of CSS `!important`. */
-function overriding(css: string): string {
-  return css
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/([^;{}]+:[^;{}]+?)\s*(?:!important)?\s*;/g, '$1 !important;')
-}
-
-const DARK_OVERRIDES: string = overriding(`
-
-.dark input, .dark textarea, .dark select { color: #f4f4f5; }
-.dark input::placeholder, .dark textarea::placeholder { color: #8b8b94; }
-.dark code { background-color: #26262a; color: #e4e4e7; }
-
-.dark [data-postline-content-shell],
-.dark [data-postline-workspace],
-.dark [data-postline-sidebar] { background-color: #0a0a0c; }
-.dark [data-postline-workspace] {
-  border-color: #2a2a2e;
-  box-shadow: -10px 0 36px rgba(0, 0, 0, 0.4);
-}
-.dark [data-postline-sidebar] { background-color: #0f0f12; }
-.dark [data-postline-sidebar] > .absolute { opacity: 0.35; }
-
-/* Analytics chart — CSS fill/stroke beat SVG presentation attributes, so the
-  chart is not a light island on a dark page. */
-.dark [data-analytics-chart] rect[rx="16"] { fill: #101014; }
-.dark [data-analytics-chart] line[stroke="#e4e4e7"] { stroke: #2a2a2e; }
-.dark [data-analytics-chart] text[fill="#18181b"] { fill: #e4e4e7; }
-.dark [data-analytics-chart] rect[fill="#fff"] { fill: #26262a; stroke: #3f3f46; }
-`)
-
-/** App shell: sidebar collapse animation, native-window chrome, focus rings. */
-/**
  * Motion (#152): three durations for everything that moves, and one guard.
  *
  * With reduced motion asked for, nothing moves but opacity: animations run a
@@ -314,16 +262,12 @@ html.has-native-sidebar body {
   background: transparent !important;
 }
 
+[data-postline-sidebar] { background-color: var(--panel-2); }
+
 html.has-native-sidebar [data-postline-sidebar] {
-  background-color: rgba(246, 246, 244, 0.18) !important;
+  background-color: var(--glass);
   -webkit-backdrop-filter: blur(24px) saturate(1.08);
   backdrop-filter: blur(24px) saturate(1.08);
-}
-
-${collapsedWorkspaceShell} [data-postline-content-shell],
-html.has-native-sidebar [data-postline-content-shell],
-html.has-native-sidebar [data-postline-workspace] {
-  background: #f3f3f1 !important;
 }
 
 ${collapsedWorkspaceShell} [data-postline-workspace] {
@@ -406,10 +350,6 @@ html:not(.has-native-sidebar) ${collapsedWorkspaceShell}:not([data-shell-native=
 
 [data-postline-app] :is(input, textarea)::placeholder { color: var(--muted); }
 
-html.dark.has-native-sidebar [data-postline-content-shell],
-html.dark.has-native-sidebar [data-postline-workspace] {
-  background: #0a0a0c !important;
-}
 `
 
 /** Shared product UI rhythm: one radius scale, one surface language, and compact pages. */
@@ -484,27 +424,21 @@ const QUEUE_STATUS: string = `
 [data-target-chip][data-state="failed"] [data-target-dot] { background: var(--danger); }
 
 [data-status-pill] { color: var(--muted); background: var(--panel-3); border-color: var(--line); }
-[data-status-pill][data-status="published"] { color: rgb(4 120 87); background: rgb(236 253 245); border-color: rgb(167 243 208); }
-[data-status-pill][data-status="scheduled"] { color: rgb(29 78 216); background: rgb(239 246 255); border-color: rgb(191 219 254); }
-[data-status-pill][data-status="publishing"] { color: rgb(146 64 14); background: rgb(255 251 235); border-color: rgb(253 230 138); }
-[data-status-pill][data-status="failed"] { color: rgb(185 28 28); background: rgb(254 242 242); border-color: rgb(254 202 202); }
-html.dark [data-status-pill][data-status="published"] { color: rgb(110 231 183); background: rgb(6 78 59 / 0.3); border-color: rgb(6 78 59); }
-html.dark [data-status-pill][data-status="scheduled"] { color: rgb(147 197 253); background: rgb(30 58 138 / 0.3); border-color: rgb(30 58 138); }
-html.dark [data-status-pill][data-status="publishing"] { color: rgb(252 211 77); background: rgb(120 53 15 / 0.3); border-color: rgb(120 53 15); }
-html.dark [data-status-pill][data-status="failed"] { color: rgb(252 165 165); background: rgb(127 29 29 / 0.3); border-color: rgb(127 29 29); }
+[data-status-pill][data-status="published"] { color: var(--success); background: var(--success-soft); border-color: var(--success-line); }
+[data-status-pill][data-status="scheduled"] { color: var(--info); background: var(--info-soft); border-color: var(--info-line); }
+[data-status-pill][data-status="publishing"] { color: var(--warning); background: var(--warning-soft); border-color: var(--warning-line); }
+[data-status-pill][data-status="failed"] { color: var(--danger); background: var(--danger-soft); border-color: var(--danger-line); }
 
-[data-cal-dot] { background: rgb(161 161 170); }
-[data-cal-dot][data-status="published"] { background: rgb(16 185 129); }
-[data-cal-dot][data-status="failed"] { background: rgb(239 68 68); }
-[data-cal-dot][data-status="scheduled"] { background: rgb(59 130 246); }
+[data-cal-dot] { background: var(--muted); }
+[data-cal-dot][data-status="published"] { background: var(--success); }
+[data-cal-dot][data-status="failed"] { background: var(--danger); }
+[data-cal-dot][data-status="scheduled"] { background: var(--info); }
 
 [data-cal-cell] { background: var(--panel); }
 [data-cal-cell][data-blank]:not([data-blank="false"]) { background: var(--panel-2); }
-[data-cal-cell][data-today]:not([data-today="false"]) { background: rgb(239 246 255 / 0.6); }
-html.dark [data-cal-cell][data-today]:not([data-today="false"]) { background: rgb(30 58 138 / 0.2); }
+[data-cal-cell][data-today]:not([data-today="false"]) { background: var(--info-soft); }
 [data-cal-day] { color: var(--muted); }
-[data-cal-cell][data-today]:not([data-today="false"]) [data-cal-day] { color: rgb(29 78 216); }
-html.dark [data-cal-cell][data-today]:not([data-today="false"]) [data-cal-day] { color: rgb(147 197 253); }
+[data-cal-cell][data-today]:not([data-today="false"]) [data-cal-day] { color: var(--info); }
 `
 
 /**
@@ -527,17 +461,14 @@ html.dark [data-cal-cell][data-today]:not([data-today="false"]) [data-cal-day] {
  */
 const COMPOSER_CHIPS: string = `
 [data-provider-toggle] { border-color: var(--line); background: var(--panel-2); color: var(--muted); }
-[data-provider-toggle]:not([disabled]):hover { background: #ffffff; }
-[data-provider-toggle][data-selected]:not([data-selected="false"]) { border-color: #0a0a0a; background: var(--accent); color: var(--on-accent); }
-[data-provider-toggle][disabled] { color: #a1a1aa; cursor: not-allowed; }
+[data-provider-toggle]:not([disabled]):hover { background: var(--raised); }
+[data-provider-toggle][data-selected]:not([data-selected="false"]) { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+[data-provider-toggle][disabled] { color: var(--muted); cursor: not-allowed; }
 [data-provider-toggle][data-connect="true"] { border-style: dashed; color: var(--body); }
 
-[data-provider-toggle] [data-provider-dot] { background: #d4d4d8; }
-[data-provider-toggle][data-selected]:not([data-selected="false"]) [data-provider-dot] { background: #34d399; }
-[data-provider-toggle][data-over]:not([data-over="false"]) [data-provider-dot] { background: #ef4444; }
-
-html.dark [data-provider-toggle]:not([disabled]):hover { background: #26262a; }
-html.dark [data-provider-toggle][disabled] { color: #52525b; }
+[data-provider-toggle] [data-provider-dot] { background: var(--line-strong); }
+[data-provider-toggle][data-selected]:not([data-selected="false"]) [data-provider-dot] { background: var(--success-solid); }
+[data-provider-toggle][data-over]:not([data-over="false"]) [data-provider-dot] { background: var(--danger-solid); }
 
 [data-preview-count-ring] {
   border-radius: 50%;
@@ -684,7 +615,6 @@ export default {
     // from every page.
     ...(defaultConfig.preflights ?? []),
     { getCSS: (): string => TOKENS },
-    { getCSS: (): string => DARK_OVERRIDES },
     { getCSS: (): string => MOTION },
     { getCSS: (): string => APP_SHELL },
     { getCSS: (): string => APP_UI },

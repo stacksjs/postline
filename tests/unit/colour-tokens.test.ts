@@ -16,11 +16,12 @@ const files = [
   ...readdirSync(join(root, 'resources/assets/scripts'), { recursive: true, encoding: 'utf8' }).filter(name => name.endsWith('.ts')).map(name => `resources/assets/scripts/${name}`),
   ...readdirSync(join(root, 'resources/functions'), { recursive: true, encoding: 'utf8' }).filter(name => name.endsWith('.ts')).map(name => `resources/functions/${name}`),
   'resources/components/AppSidebar.stx',
+  'resources/components/WorkspaceShell.stx',
   'resources/layouts/app.stx',
   'resources/layouts/settings.stx',
 ]
 
-const PALETTE = /(?<![\w/-])(?:[a-z-]+:)*(?:text|bg|border|ring|divide|outline|placeholder|fill|stroke)-(?:white|black|(?:zinc|gray|slate|neutral|stone|red|amber|emerald|blue|violet|green|yellow|orange|sky|indigo|rose|pink|purple|teal|cyan|lime|fuchsia)-\d{2,3})(?:\/\d+)?(?![\w/-])/g
+const PALETTE = /(?<![\w/-])(?:[a-z-]+:)*(?:text|bg|border|ring|divide|outline|placeholder|fill|stroke)-(?:white|black|\[#[\da-fA-F]{3,8}\]|(?:zinc|gray|slate|neutral|stone|red|amber|emerald|blue|violet|green|yellow|orange|sky|indigo|rose|pink|purple|teal|cyan|lime|fuchsia)-\d{2,3})(?:\/\d+)?(?![\w/-])/g
 
 describe('colour tokens', () => {
   for (const file of files) {

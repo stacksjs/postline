@@ -146,8 +146,7 @@ effect(() => {
     </div>
   </dialog>
 
-  <aside class="hidden lg:flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[68px] px-5 h-screen min-w-0 bg-[#f3f3f1]/48 backdrop-blur-3xl backdrop-saturate-150 duration-150 ease-out transition-[width,padding]" aria-label="Postline" :aria-hidden="collapsed()" data-postline-sidebar data-window-drag-region>
-    <div class="absolute inset-0 bg-[linear-gradient(112deg,rgba(255,255,255,0.20)_0%,rgba(255,255,255,0.04)_45%,rgba(226,226,222,0.16)_100%)] pointer-events-none"></div>
+  <aside class="hidden lg:flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[68px] px-5 h-screen min-w-0 backdrop-blur-3xl backdrop-saturate-150 duration-150 ease-out transition-[width,padding]" aria-label="Postline" :aria-hidden="collapsed()" data-postline-sidebar data-window-drag-region>
     <div class="flex absolute right-5 top-3.5 z-20 items-center min-h-7" data-shell-controls-row>
       {{-- Craft's native titlebar uses this same button to toggle the sidebar. --}}
       <button class="inline-flex items-center justify-center h-8 w-8 text-muted hover:text-ink bg-glass hover:bg-raised border border-line rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus shadow-sm duration-150 transition-all" type="button" :aria-label="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'" :aria-expanded="!collapsed()" data-sidebar-collapse data-no-window-drag @click="emit('toggle-sidebar')">

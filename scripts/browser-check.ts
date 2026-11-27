@@ -1123,18 +1123,32 @@ async function checkEngagementCountLabels(cdp: Cdp): Promise<void> {
             countsByProvider: [{ provider: 'instagram', measured: 1, likes: 1, replies: 0, views: 12 }],
           },
         },
+        series: [{ label: 'Monday', value: 0 }, { label: 'Tuesday', value: 1 }],
         channelMix: [{ provider: 'instagram', published: 1, share: 100 }],
       } }))
     }
   ` })
   try {
+    await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] })
     await auditPage(`${site}/analytics`, { cdp })
     await waitUntil('Analytics shows measured zero and omits unavailable reposts', () => evaluate<boolean>(cdp, `
       document.querySelector('[data-analytics-engagement]')?.textContent === '1'
         && document.querySelector('[data-analytics-engagement-trend]')?.textContent === '1 like or reaction · 0 replies'
         && document.querySelector('[data-analytics-network-engagement] li')?.textContent.includes('1 like · 0 replies · 12 views')`), 10_000)
+    await waitUntil('Analytics paints the chart with dark theme tokens', () => evaluate<boolean>(cdp, `(() => {
+      const chart = document.querySelector('[data-analytics-chart]')
+      const background = chart?.querySelector('[data-chart-background]')
+      const tick = chart?.querySelector('[data-chart-y-axis] text')
+      if (!document.documentElement.classList.contains('dark') || !background || !tick) return false
+      const root = getComputedStyle(document.documentElement)
+      const color = (value) => value.startsWith('#') ? value.slice(1).match(/../g).map(part => parseInt(part, 16)).join(',') : value.match(/\\d+/g).join(',')
+      return color(getComputedStyle(background).fill) === color(root.getPropertyValue('--panel-2').trim())
+        && color(getComputedStyle(tick).fill) === color(root.getPropertyValue('--muted').trim())
+        && Boolean(chart.querySelector('[data-chart-line]').getAttribute('d'))
+    })()`), 5_000)
   }
   finally {
+    await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] })
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
   }
 }

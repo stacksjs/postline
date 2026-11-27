@@ -12,9 +12,9 @@
   <form class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]" novalidate @submit="join($event)">
     <label class="sr-only" for="waitlist-email">Email address</label>
     <input class="sr-only" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" x-model="website">
-    <input id="waitlist-email" class="px-4 h-11 text-[15px] text-ink placeholder:text-muted bg-panel border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-zinc-400/40" type="email" autocomplete="email" inputmode="email" placeholder="you@company.com" required x-model="email">
+    <input id="waitlist-email" class="px-4 h-11 text-[15px] text-ink placeholder:text-muted bg-panel border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus-ring" type="email" autocomplete="email" inputmode="email" placeholder="you@company.com" required x-model="email">
     <button class="inline-flex items-center justify-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl disabled:opacity-50 hover:opacity-90 transition-opacity" type="submit" :disabled="sending()" :text="sending() ? 'Adding…' : 'Notify me'">Notify me</button>
-    <p class="sm:col-span-2 m-0 min-h-5 text-[13px]" role="status" :class="tone() === 'error' ? 'text-red-600' : 'text-muted'" :text="message()"></p>
+    <p class="sm:col-span-2 m-0 min-h-5 text-[13px]" role="status" :class="tone() === 'error' ? 'text-danger' : 'text-muted'" :text="message()"></p>
     <p class="sm:col-span-2 m-0 text-[12px] text-muted">One email when it opens, nothing else. <a class="underline underline-offset-4 hover:text-ink" href="/privacy" data-stx-link>Privacy</a></p>
   </form>
 

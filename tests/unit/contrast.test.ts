@@ -29,6 +29,7 @@ const TEXT: Array<[string, string]> = [
   ...['ink', 'body', 'muted'].flatMap(fg => SURFACES.map(bg => [fg, bg] as [string, string])),
   ...['success', 'warning', 'danger', 'info', 'note'].flatMap(tone => [[tone, `${tone}-soft`], [tone, 'panel']] as Array<[string, string]>),
   ['on-accent', 'accent'],
+  ['body', 'info-soft'],
 ]
 const NON_TEXT: Array<[string, string]> = ['field-line', 'focus-ring'].flatMap(fg => ['bg', 'panel', 'panel-2'].map(bg => [fg, bg] as [string, string]))
 
