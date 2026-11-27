@@ -68,8 +68,19 @@ jobs:
           }
 
           start
-          login=$(curl --fail --silent --show-error "$origin/login")
-          grep -Fq 'Create the workspace account' <<< "$login"
+          setup=$(curl --fail --silent --show-error "$origin/setup")
+          grep -Fq 'data-testid="setup-page"' <<< "$setup"
+          curl --fail --silent --show-error "$origin/api/postline/setup/availability" \
+            | jq -e '.ok and .data.available == true' >/dev/null
+          csrf_cookie=$(curl --fail --silent --show-error --dump-header - --output /dev/null "$origin/api/csrf" \
+            | awk 'tolower($1) == "set-cookie:" && $2 ~ /^X-CSRF-Token=/ { sub(/;.*/, "", $2); print $2 }')
+          test -n "$csrf_cookie"
+          curl --fail --silent --show-error "$origin/api/register" \
+            --cookie "$csrf_cookie" --header "X-CSRF-Token: ${csrf_cookie#*=}" \
+            --data-urlencode 'name=Container Test' \
+            --data-urlencode 'email=container-check@example.test' \
+            --data-urlencode "password=$(openssl rand -hex 24)" \
+            | jq -e '.ok and .data.token_type == "Bearer"' >/dev/null
           before=$(print_key_digest)
           docker exec "$name" bun -e '
             import { Database } from "bun:sqlite"
@@ -82,6 +93,8 @@ jobs:
           docker rm "$name" >/dev/null
 
           start
+          curl --fail --silent --show-error "$origin/api/postline/setup/availability" \
+            | jq -e '.ok and .data.available == false' >/dev/null
           test "$before" = "$(print_key_digest)"
           docker exec "$name" bun -e '
             import { Database } from "bun:sqlite"
