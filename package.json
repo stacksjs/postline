@@ -24,6 +24,7 @@
   "scripts": {
     "build:reset": "rm -rf node_modules && bun install && ./buddy generate:types && ./buddy lint:fix",
     "buddy": "./buddy",
+    "postline": "bun scripts/postline.ts",
     "stacks": "./buddy",
     "setup": "./bootstrap",
     "fresh": "./buddy fresh",

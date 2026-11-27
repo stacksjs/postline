@@ -1,5 +1,8 @@
+import { Auth } from '@stacksjs/auth/authentication'
+import { authCookieName } from '@stacksjs/auth/cookie'
+import { HttpError } from '@stacksjs/error-handling'
 import { log } from '@stacksjs/logging'
-import { Middleware } from '@stacksjs/router'
+import { Middleware, parseBearerToken } from '@stacksjs/router'
 import FrameworkAuth from '@stacksjs/defaults/app/Middleware/Auth.ts'
 import { allowsNativeAppWithoutLogin } from '../Support/Auth/native'
 
@@ -8,8 +11,9 @@ import { allowsNativeAppWithoutLogin } from '../Support/Auth/native'
  *
  * The Mac app runs Postline for the one person at the keyboard and has no
  * sign-in, so its agent process skips authentication. That check looks at how
- * the process was started, never at the request. Every request on a server
- * goes through the framework's middleware unchanged.
+ * the process was started. Requests presenting a bearer, and every server
+ * request, use the framework's authentication. Workspace routes require a
+ * full session because automation tokens have their own narrower route.
  *
  * This file used to carry a copy of the framework's logic, and the copy
  * drifted: it once read only the bearer header and the `session_id` cookie,
@@ -25,10 +29,17 @@ export default new Middleware({
   priority: 1,
 
   async handle(request) {
-    if (allowsNativeAppWithoutLogin()) {
+    const bearer = parseBearerToken(request.headers.get('authorization'))
+    if (!bearer && allowsNativeAppWithoutLogin()) {
       log.debug('[middleware:auth] Desktop agent process: no sign-in')
       return
     }
-    return await FrameworkAuth.handle(request)
+    await FrameworkAuth.handle(request)
+
+    // The framework resolves the token from either source into the request
+    // context. Legacy session IDs use the framework's session stack instead.
+    const tokenCredential = bearer || request.cookie?.(authCookieName())
+    if (tokenCredential && !(await Auth.currentAccessToken())?.abilities.includes('*'))
+      throw new HttpError(403, 'A workspace session is required.')
   },
 })

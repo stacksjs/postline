@@ -1,7 +1,7 @@
 /**
  * The routes that answer without a session, written down.
  *
- * A route is public here when it carries no `auth` middleware. The list is
+ * A route is public here when it carries neither session nor automation auth. The list is
  * compared exactly, in both directions: a route that becomes public fails the
  * suite, and so does one that stops being served. That is the point. Routes
  * can arrive from a framework upgrade or a config switch as easily as from
@@ -79,7 +79,9 @@ const key = (route: { method: string, path: string }): string => `${route.method
 describe('public routes', () => {
   test('are exactly the ones written down here', async () => {
     const routes = await registeredRoutes()
-    const open = routes.filter(route => !route.middleware?.includes('auth')).map(key).sort()
+    const automation = routes.filter(route => route.middleware?.includes('postline-automation')).map(key).sort()
+    expect(automation).toEqual(['POST /api/postline/v1/posts'])
+    const open = routes.filter(route => !route.middleware?.some(name => name === 'auth' || name === 'postline-automation')).map(key).sort()
 
     expect(open).toEqual([...APP_PUBLIC, ...FRAMEWORK_PUBLIC].sort())
   })

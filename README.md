@@ -183,6 +183,10 @@ export the same `PORT_API` for the web and API services.
 ```
 <!-- /readme-serve -->
 
+## Automation
+
+Create drafts and schedule posts from scripts using the [Postline CLI and scoped API](docs/automation.md).
+
 ## CI
 
 CI runs on [ReviewOS](https://reviewos.org) from `.reviewos/workflows`. On

@@ -302,6 +302,26 @@ export interface SaveQueueInput {
   variants?: VariantMap | null
 }
 
+interface QueueReceipt {
+  postId: number
+  status: 'draft' | 'scheduled'
+  scheduledAt: string | null
+}
+
+interface PostSubmission {
+  requestKey: string
+  fingerprint: string
+}
+
+function findSubmission(submission: PostSubmission, tx = database): QueueReceipt | null {
+  const previous = tx.selectFrom('post_submissions').select(['fingerprint', 'receipt'])
+    .where('request_key', '=', submission.requestKey).executeTakeFirst()
+  if (!previous) return null
+  if (previous.fingerprint !== submission.fingerprint)
+    throw new UserFacingError('This Idempotency-Key already belongs to a different post submission.', 'submission_key_conflict')
+  return JSON.parse(previous.receipt) as QueueReceipt
+}
+
 /**
  * Edit input. The images and `variants` are tri-state: undefined keeps what
  * is stored, null (or an empty list) clears it, a value replaces it.
@@ -376,7 +396,10 @@ export class QueueService {
    * and, when one was chosen, account — and the real result rows replace them
    * at publish time.
    */
-  async save(input: SaveQueueInput): Promise<{ postId: number, status: 'draft' | 'scheduled', scheduledAt: string | null }> {
+  async save(input: SaveQueueInput, submission?: PostSubmission): Promise<QueueReceipt> {
+    const previous = submission && findSubmission(submission)
+    if (previous) return previous
+
     const body = input.text.trim()
     if (!body)
       throw new Error('Post text is required.')
@@ -409,29 +432,48 @@ export class QueueService {
     if (savedOptions) stored.options = savedOptions
     if (images?.length) stored.media = await storeImages(postUuid, images)
 
-    await database.insertInto('posts').values({
-      uuid: postUuid,
-      title: input.title?.trim() || body.slice(0, 80),
-      body,
-      status,
-      [await contentColumn()]: Object.keys(stored).length ? JSON.stringify(stored) : null,
-      scheduled_at: scheduledAt,
-      timezone: await workspace.timezone(),
-      source: 'composer',
-      account_id: accountId,
-      created_at: createdAt,
-      updated_at: createdAt,
-    }).execute()
+    const column = await contentColumn()
+    const timezone = await workspace.timezone()
+    try {
+      return await database.transaction((tx: typeof database) => {
+        const existing = submission && findSubmission(submission, tx)
+        if (existing) return existing
 
-    const post = await database
-      .selectFrom('posts')
-      .select(['id'])
-      .where('uuid', '=', postUuid)
-      .executeTakeFirstOrThrow()
+        tx.insertInto('posts').values({
+          uuid: postUuid,
+          title: input.title?.trim() || body.slice(0, 80),
+          body,
+          status,
+          [column]: Object.keys(stored).length ? JSON.stringify(stored) : null,
+          scheduled_at: scheduledAt,
+          timezone,
+          source: submission ? 'api' : 'composer',
+          account_id: accountId,
+          created_at: createdAt,
+          updated_at: createdAt,
+        }).execute()
 
-    this.writePlaceholders(Number(post.id), targets, status, scheduledAt, createdAt)
-
-    return { postId: Number(post.id), status, scheduledAt }
+        const post = tx.selectFrom('posts').select(['id']).where('uuid', '=', postUuid).executeTakeFirstOrThrow()
+        const receipt: QueueReceipt = { postId: Number(post.id), status, scheduledAt }
+        this.writePlaceholders(receipt.postId, targets, status, scheduledAt, createdAt, tx)
+        if (submission) {
+          tx.insertInto('post_submissions').values({
+            request_key: submission.requestKey,
+            fingerprint: submission.fingerprint,
+            receipt: JSON.stringify(receipt),
+            created_at: createdAt,
+            updated_at: createdAt,
+          }).execute()
+        }
+        return receipt
+      })
+    }
+    catch (error) {
+      // A competing process can finish the same submission first.
+      const existing = submission && findSubmission(submission)
+      if (existing) return existing
+      throw error
+    }
   }
 
   /**

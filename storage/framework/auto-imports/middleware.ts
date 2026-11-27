@@ -6,6 +6,7 @@
 // would make every compilation that touches a name resolve every module.
 export const middleware = {
   'Auth': '../../../app/Middleware/Auth.ts',
+  'PostlineAutomation': '../../../app/Middleware/PostlineAutomation.ts',
   'Abilities': '@stacksjs/defaults/app/Middleware/Abilities.ts',
   'Api': '@stacksjs/defaults/app/Middleware/Api.ts',
   'Can': '@stacksjs/defaults/app/Middleware/Can.ts',

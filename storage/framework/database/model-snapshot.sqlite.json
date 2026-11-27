@@ -3534,10 +3534,74 @@
             "type": "unique"
           }
         ]
+      },
+      {
+        "table": "post_submissions",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "request_key",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "fingerprint",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "receipt",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 512
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "UTC_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "post_submissions_request_key_unique",
+            "columns": [
+              "request_key"
+            ],
+            "type": "unique"
+          }
+        ]
       }
     ]
   },
-  "hash": "8c77794f35fb2fa9f2f35af53fa8680e5714de98d02581d7f106c0e86fd43c85",
+  "hash": "1c94bdcd0e3581f7f753dc2d9036b289d076ad1e45199c2afb610d127bb81687",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-27T10:55:57.268Z"
+  "updatedAt": "2026-11-27T12:14:12.331Z"
 }

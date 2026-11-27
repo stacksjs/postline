@@ -86,6 +86,8 @@ route.match(['GET', 'HEAD'], '/r/{code}', 'Actions/Postline/TrackedLinkRedirectA
 route.get('/postline/health', 'Actions/Postline/HealthAction').rateLimit(120, 'minute')
 route.get('/postline/setup/availability', 'Actions/Postline/SetupAvailabilityAction').rateLimit(60, 'minute')
 
+route.post('/postline/v1/posts', 'Actions/Postline/ApiPostCreateAction').middleware('postline-automation').rateLimit(30, 'minute')
+
 route.group({ prefix: '/postline/bluesky' }, () => {
   route.get('/status', 'Actions/Postline/BlueskyStatusAction').middleware('auth')
   route.post('/connect', 'Actions/Postline/BlueskyConnectAction').middleware('auth').rateLimit(10, 'minute')

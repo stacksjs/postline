@@ -14,6 +14,7 @@ export const actions = {
   'Actions/Postline/AlertListAction': '../../../app/Actions/Postline/AlertListAction.ts',
   'Actions/Postline/AlertReadAction': '../../../app/Actions/Postline/AlertReadAction.ts',
   'Actions/Postline/AnalyticsAction': '../../../app/Actions/Postline/AnalyticsAction.ts',
+  'Actions/Postline/ApiPostCreateAction': '../../../app/Actions/Postline/ApiPostCreateAction.ts',
   'Actions/Postline/BlogDeleteAction': '../../../app/Actions/Postline/BlogDeleteAction.ts',
   'Actions/Postline/BlogListAction': '../../../app/Actions/Postline/BlogListAction.ts',
   'Actions/Postline/BlogMediaAction': '../../../app/Actions/Postline/BlogMediaAction.ts',

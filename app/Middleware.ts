@@ -11,6 +11,7 @@ export default {
   'maintenance': 'Maintenance',
   'cors': 'Cors',
   'auth': 'Auth',
+  'postline-automation': 'PostlineAutomation',
   'guest': 'Guest',
   'api': 'Api',
   'team': 'Team',

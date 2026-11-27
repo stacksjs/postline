@@ -1502,6 +1502,15 @@ declare module '@stacksjs/database' {
       starts_at: string | null
       ends_at: string | null
     }
+    post_submissions: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      request_key: string
+      fingerprint: string
+      receipt: string
+    }
     post_targets: {
       // columns
       id: number
