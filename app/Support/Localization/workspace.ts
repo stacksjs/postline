@@ -22,3 +22,5 @@ export const unreadText = workspaceI18n.tm('workspace.unread')
 
 export const workspaceQueueText = workspaceI18n.tm('workspace.queue') as typeof en.workspace.queue
 export const workspaceQueuePanelsText = workspaceI18n.tm('workspace.queuePanels') as typeof en.workspace.queuePanels
+
+export const workspaceActivityText = workspaceI18n.tm('workspace.activity') as typeof en.workspace.activity

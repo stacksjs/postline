@@ -1,22 +1,39 @@
 @extends('layouts/app')
 
-@section('title', 'Postline - Activity')
+<script server cache>
+import { workspaceActivityText, workspaceLocale, workspaceQueueText } from '../../app/Support/Localization/workspace'
+
+export const activityLocale = workspaceLocale
+export const activityText = workspaceActivityText
+export const activityClient = {
+  locale: workspaceLocale,
+  messages: {
+    ...workspaceActivityText,
+    retryAt: workspaceQueueText.retryAt,
+    schedulerNever: workspaceQueueText.schedulerNever,
+    schedulerStopped: workspaceQueueText.schedulerStopped,
+    schedulerStoppedSince: workspaceQueueText.schedulerStoppedSince,
+  },
+}
+</script>
+
+@section('title')Postline - {{ activityText.region }}@endsection
 
 @section('content')
   @meta('description', 'What Postline sent, what failed, and when each job last ran.')
-  <section class="grid gap-5" data-postline-page="activity" data-testid="activity-page">
+  <section class="grid gap-5" data-postline-page="activity" data-testid="activity-page" lang="{{ activityLocale }}">
     <WorkspacePageHeader titleKey="workspace.navigation.activity" descriptionKey="workspace.pages.activity.description">
-      <SegmentedControl label="Send status" size="sm" :value="filter()" :options="[{ value: '', label: 'All' }, { value: 'published', label: 'Sent' }, { value: 'failed', label: 'Failed' }]" @change="setFilter" />
+      <SegmentedControl label="{{ activityText.sendStatus }}" size="sm" :value="filter()" :options="statuses" @change="setFilter" />
     </WorkspacePageHeader>
 
     <p class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !schedulerWarning() }" :text="schedulerWarning()" role="status" data-scheduler-warning></p>
 
     {{-- Unread alerts: what will not sort itself out. Read ones are dropped
         from the page; the sends below remain the full record. --}}
-    <section class="hidden overflow-hidden bg-panel border border-warning-line rounded-2xl shadow-sm" :class="{ 'hidden': attention().length === 0 }" aria-label="Needs your attention" data-activity-attention>
+    <section class="hidden overflow-hidden bg-panel border border-warning-line rounded-2xl shadow-sm" :class="{ 'hidden': attention().length === 0 }" aria-label="{{ activityText.attention }}" data-activity-attention>
       <div class="flex items-center justify-between px-4 py-3 bg-warning-soft border-b border-warning-line">
-        <strong class="font-semibold text-sm text-warning">Needs your attention</strong>
-        <button class="text-warning text-xs underline disabled:opacity-50" type="button" :disabled="marking()" @click="markAllRead()">Mark all as read</button>
+        <strong class="font-semibold text-sm text-warning">{{ activityText.attention }}</strong>
+        <button class="text-warning text-xs underline disabled:opacity-50" type="button" :disabled="marking()" @click="markAllRead()">{{ activityText.markRead }}</button>
       </div>
       <div>
         <article class="grid gap-0.5 px-4 py-3 border-b border-line last:border-b-0" x-for="alert in attention()" :data-command-context="alert.title" data-activity-alert>
@@ -31,16 +48,16 @@
     </section>
 
     <div class="grid gap-5 items-start lg:grid-cols-[minmax(0,1fr)_320px]">
-      <section aria-label="Sends">
+      <section aria-label="{{ activityText.sends }}">
         <Card padding="none" className="shadow-sm">
           <div class="flex items-center justify-between px-4 py-3 border-b border-line">
-            <strong class="font-semibold text-ink text-sm">Sends</strong>
+            <strong class="font-semibold text-ink text-sm">{{ activityText.sends }}</strong>
             <span class="text-muted text-xs" :text="countText()"></span>
           </div>
-          <WorkspaceListSkeleton :show="!loaded()" label="Loading activity" />
-          <ErrorState :show="loadError() && loaded()" title="Could not load activity" :message="loadError()" @retry="refresh()" />
-          <EmptyState :show="showEmpty()" variant="bare" :title="filter() === 'failed' ? 'Nothing has failed' : 'Nothing has been sent yet'" description="Your publishing activity will appear here.">
-            <StxLink class="text-info text-ui underline" to="/composer" :show="filter() !== 'failed'">Write a post</StxLink>
+          <WorkspaceListSkeleton :show="!loaded()" label="{{ activityText.loadingActivity }}" />
+          <ErrorState :show="loadError() && loaded()" title="{{ activityText.loadFailure }}" :message="loadError()" @retry="refresh()" />
+          <EmptyState :show="showEmpty()" variant="bare" :title="filter() === 'failed' ? copy.emptyFailed : copy.emptySends" description="{{ activityText.emptyDescription }}">
+            <StxLink class="text-info text-ui underline" to="/composer" :show="filter() !== 'failed'">{{ activityText.writePost }}</StxLink>
           </EmptyState>
           <div>
             <article class="grid gap-1 px-4 py-3 border-b border-line last:border-b-0" x-for="row in rows()" data-activity-row>
@@ -52,24 +69,24 @@
               <p class="m-0 text-body text-ui truncate" :text="row.excerpt"></p>
               <p class="m-0 text-danger text-xs" x-show="row.reason" :text="row.reason"></p>
               <div class="flex gap-3 items-center" x-show="row.url || row.failed">
-                <a class="text-muted text-xs underline hover:text-ink" x-show="row.url" :href="row.url" target="_blank" rel="noopener noreferrer">View on the network</a>
-                <a class="text-muted text-xs underline hover:text-ink" x-show="row.failed" href="/queue" data-stx-link>Open the queue to retry</a>
+                <a class="text-muted text-xs underline hover:text-ink" x-show="row.url" :href="row.url" target="_blank" rel="noopener noreferrer">{{ activityText.viewOnNetwork }}</a>
+                <a class="text-muted text-xs underline hover:text-ink" x-show="row.failed" href="/queue" data-stx-link>{{ activityText.retryInQueue }}</a>
               </div>
             </article>
           </div>
           <div class="flex justify-center p-3" x-show="nextCursor()">
-            <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" :disabled="loadingMore()" @click="loadMore()" :text="loadingMore() ? 'Loading…' : 'Load older activity'">Load older activity</button>
+            <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" :disabled="loadingMore()" @click="loadMore()" :text="loadingMore() ? copy.loading : copy.loadOlder">{{ activityText.loadOlder }}</button>
           </div>
         </Card>
       </section>
 
-      <section aria-label="Background jobs">
+      <section aria-label="{{ activityText.jobs }}">
         <Card padding="none" className="shadow-sm">
           <div class="px-4 py-3 border-b border-line">
-            <strong class="font-semibold text-ink text-sm">Background jobs</strong>
+            <strong class="font-semibold text-ink text-sm">{{ activityText.jobs }}</strong>
             <p class="m-0 mt-0.5 text-muted text-xs" :text="schedulerText()"></p>
           </div>
-          <p class="m-0 p-4 text-muted text-ui" x-show="showNoJobs()">No job has run yet.</p>
+          <p class="m-0 p-4 text-muted text-ui" x-show="showNoJobs()">{{ activityText.noJobs }}</p>
           <div>
             <div class="grid gap-0.5 px-4 py-2.5 border-b border-line last:border-b-0" x-for="job in jobRows()" data-activity-job>
               <div class="flex gap-2 items-center justify-between">
@@ -86,6 +103,14 @@
   </section>
 
   <script client>
+    import { createI18n } from '@stacksjs/i18n/client'
+
+    const { locale: language, messages: copy } = {{ activityClient }}
+    const words = createI18n({ locale: language, messages: { [language]: copy } })
+    const dateLocale = language === 'en' ? undefined : language
+    const secondsFormat = new Intl.NumberFormat(language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+    const statuses = [{ value: '', label: copy.all }, { value: 'published', label: copy.sent }, { value: 'failed', label: copy.failed }]
+
     interface ActivityEvent {
       id: number
       kind: 'published' | 'failed'
@@ -141,14 +166,13 @@
       blog: 'Blog',
     }
 
-    /** What each job does, in the owner's words and not its class name. */
     const JOBS: Record<string, string> = {
-      PublishScheduledPosts: 'Publish scheduled posts',
-      SyncEngagementMetrics: 'Update likes and replies',
-      ScanKeywordMonitors: 'Look for mentions',
-      SyncDirectMessages: 'Fetch direct messages',
-      AutoDeletePosts: 'Delete old posts',
-      KeepTokensAlive: 'Renew network sign-ins',
+      PublishScheduledPosts: copy.publishScheduledPosts,
+      SyncEngagementMetrics: copy.syncEngagementMetrics,
+      ScanKeywordMonitors: copy.scanKeywordMonitors,
+      SyncDirectMessages: copy.syncDirectMessages,
+      AutoDeletePosts: copy.autoDeletePosts,
+      KeepTokensAlive: copy.keepTokensAlive,
     }
 
     const parse = (value: string | null): Date | null => {
@@ -162,28 +186,28 @@
       const date = parse(value)
       if (!date) return ''
       const seconds = Math.round((Date.now() - date.getTime()) / 1000)
-      if (seconds < 60) return 'just now'
-      if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`
-      if (seconds < 86_400) return `${Math.floor(seconds / 3600)} h ago`
-      if (seconds < 7 * 86_400) return `${Math.floor(seconds / 86_400)} d ago`
-      return date.toLocaleDateString([], { dateStyle: 'medium' })
+      if (seconds < 60) return copy.justNow
+      if (seconds < 3600) return words.t('minutesAgo', { count: Math.floor(seconds / 60) })
+      if (seconds < 86_400) return words.t('hoursAgo', { count: Math.floor(seconds / 3600) })
+      if (seconds < 7 * 86_400) return words.t('daysAgo', { count: Math.floor(seconds / 86_400) })
+      return date.toLocaleDateString(dateLocale, { dateStyle: 'medium' })
     }
 
-    const full = (value: string | null): string => parse(value)?.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) || ''
+    const full = (value: string | null): string => parse(value)?.toLocaleString(dateLocale, { dateStyle: 'medium', timeStyle: 'short' }) || ''
 
     const rows = derived(() => events().map((event) => {
       const failed = event.kind === 'failed'
       const network = NETWORKS[event.provider] || event.provider
       const retry = parse(event.nextAttemptAt)
-      const again = retry ? ` Trying again at ${retry.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.` : ''
+      const again = retry ? words.t('retryAt', { time: retry.toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' }) }) : ''
       return {
         id: event.id,
         failed,
-        outcome: failed ? 'Failed' : 'Sent',
+        outcome: failed ? copy.failed : copy.sent,
         where: event.handle ? `${network} · ${event.handle}` : network,
         when: ago(event.at),
         whenFull: full(event.at),
-        excerpt: event.excerpt || 'A post with no text',
+        excerpt: event.excerpt || copy.noText,
         reason: failed ? `${event.reason || ''}${again}` : '',
         url: event.url || '',
       }
@@ -191,12 +215,13 @@
 
     const jobRows = derived(() => jobs().map((job) => {
       const failed = job.lastStatus === 'failed'
-      const took = job.lastDurationMs === null ? '' : job.lastDurationMs < 1000 ? `, took ${job.lastDurationMs} ms` : `, took ${(job.lastDurationMs / 1000).toFixed(1)} s`
+      const time = ago(job.lastStartedAt) || copy.never
+      const duration = job.lastDurationMs === null ? '' : job.lastDurationMs < 1000 ? `${job.lastDurationMs} ms` : `${secondsFormat.format(job.lastDurationMs / 1000)} s`
       return {
         label: JOBS[job.job] || job.job,
         failed,
-        status: failed ? 'Failed' : job.lastStatus === 'running' ? 'Running' : 'OK',
-        detail: `Last ran ${ago(job.lastStartedAt) || 'never'}${took}`,
+        status: failed ? copy.failed : job.lastStatus === 'running' ? copy.running : copy.ok,
+        detail: duration ? words.t('lastRanWithDuration', { time, duration }) : words.t('lastRan', { time }),
         error: failed ? job.lastError || '' : '',
       }
     }))
@@ -206,7 +231,7 @@
       title: alert.title,
       body: alert.body || '',
       link: alert.link || '',
-      action: alert.link === '/accounts' ? 'Open Channels' : 'Open the queue',
+      action: alert.link === '/accounts' ? copy.openChannels : alert.link === '/listening' ? copy.openListening : copy.openQueue,
       when: ago(alert.at),
     })))
 
@@ -236,15 +261,16 @@
 
     const showEmpty = derived(() => loaded() && !loadError() && events().length === 0)
     const showNoJobs = derived(() => loaded() && jobs().length === 0)
-    const countText = derived(() => !loaded() ? 'Loading…' : `${events().length}${nextCursor() ? '+' : ''} shown`)
+    const countText = derived(() => !loaded() ? copy.loading : words.t('shown', { count: `${events().length}${nextCursor() ? '+' : ''}` }))
 
     const schedulerWarning = derived(() => {
       const status = scheduler()
       if (status.state === 'ok') return ''
-      if (status.state === 'never') return 'Scheduled posts are not going out: the scheduler has not run yet. Start it with ./buddy schedule:run.'
-      return `Scheduled posts are not going out: the scheduler has not run since ${full(status.lastRunAt) || 'it was stopped'}.`
+      if (status.state === 'never') return copy.schedulerNever
+      const time = full(status.lastRunAt)
+      return time ? words.t('schedulerStoppedSince', { time }) : copy.schedulerStopped
     })
-    const schedulerText = derived(() => scheduler().state === 'ok' ? 'The scheduler is running.' : 'The scheduler is not running.')
+    const schedulerText = derived(() => scheduler().state === 'ok' ? copy.schedulerRunning : copy.schedulerNotRunning)
 
     const url = (before = 0): string => {
       const query = new URLSearchParams()
@@ -262,7 +288,7 @@
         const response = await fetch(url())
         const payload = await response.json()
         if (request !== activityRequest) return
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the activity.')
+        if (!response.ok || !payload.ok) throw new Error(payload.error || copy.loadFailure)
         events.set(payload.data.events || [])
         nextCursor.set(payload.data.nextCursor || 0)
         jobs.set(payload.data.jobs || [])
@@ -288,7 +314,7 @@
         const response = await fetch(url(nextCursor()))
         const payload = await response.json()
         if (request !== activityRequest) return
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load older activity.')
+        if (!response.ok || !payload.ok) throw new Error(payload.error || copy.olderFailure)
         events.set([...events(), ...(payload.data.events || [])])
         nextCursor.set(payload.data.nextCursor || 0)
       }

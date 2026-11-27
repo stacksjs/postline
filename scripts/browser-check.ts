@@ -2678,13 +2678,42 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
     await pressKey(cdp, 'Escape', 27)
 
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 1, mobile: true })
+    const mobile = await auditPage(`${site}/queue`, { cdp })
+    for (const error of mobile.errors) fail('queue', 'Spanish mobile', error)
+    for (const request of mobile.failed) fail('queue', 'Spanish mobile', request)
+    const more = "document.querySelector('[data-postline-mobile-nav] button')"
     await waitUntil('Spanish mobile navigation', () => evaluate<boolean>(cdp, `
-      document.querySelector('[data-postline-mobile-nav] button')?.innerText === 'Más'
+      ${more}?.innerText === 'Más' && ${more}.getAttribute('aria-expanded') === 'false'
         && document.documentElement.scrollWidth === window.innerWidth
     `), 5_000)
-    await evaluate(cdp, "document.querySelector('[data-postline-mobile-nav] button').click()")
+    await evaluate(cdp, `${more}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
     await waitUntil('Spanish mobile menu', () => evaluate<boolean>(cdp, `
       document.querySelector('#workspace-more[open] h2')?.textContent === 'Más vistas'
+    `), 5_000)
+
+    await cdp.send('Emulation.clearDeviceMetricsOverride')
+    const activity = await auditPage(`${site}/activity`, { cdp })
+    for (const error of activity.errors) fail('activity', 'Spanish', error)
+    for (const request of activity.failed) fail('activity', 'Spanish', request)
+    await waitUntil('Spanish Activity heading and Blog send', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-testid="activity-page"][lang="es"] h1')?.textContent === 'Actividad'
+        && document.title === 'Postline - Actividad'
+        && document.querySelector('[aria-label="Envíos"] [data-activity-row]')?.innerText.includes('Enviado')
+        && document.querySelector('[aria-label="Envíos"] [data-activity-row]')?.innerText.includes('Blog')
+    `), 5_000)
+    await waitUntil('Spanish Activity scheduler status', () => evaluate<boolean>(cdp, `
+      document.querySelector('[aria-label="Tareas en segundo plano"]')?.innerText.includes('Aún no se ha ejecutado ninguna tarea.')
+        && document.querySelector('[data-scheduler-warning]')?.innerText.includes('Inícialo con ./buddy schedule:run.')
+    `), 5_000)
+    await evaluate(cdp, `
+      [...document.querySelectorAll('[role="group"][aria-label="Estado del envío"] button')].find(button =>
+        button.innerText.trim() === 'Fallido').focus()
+    `)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Spanish Activity failed-sends keyboard filter', () => evaluate<boolean>(cdp, `
+      document.activeElement?.getAttribute('aria-pressed') === 'true'
+        && document.querySelector('[aria-label="Envíos"]')?.innerText.includes('No hay envíos fallidos')
     `), 5_000)
   }
   finally {
@@ -2838,7 +2867,7 @@ else {
   // eslint-disable-next-line no-console
   console.log(marketingScreenshots
     ? `Product screenshots written to ${productImages}.`
-    : spanishWorkspace ? 'Spanish workspace navigation and command palette passed.'
+    : spanishWorkspace ? 'Spanish workspace navigation, Queue, and Activity passed.'
     : `Every view opened clean in ${MODES.map(mode => mode.name).join(', ')}. Screenshots in ${out}.`)
 }
 process.exit(exitCode)
