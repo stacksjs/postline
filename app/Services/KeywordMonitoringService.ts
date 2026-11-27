@@ -5,6 +5,7 @@ import { stripHtml } from '../Support/Social/text'
 import { findIdentityRow } from './Social/identities'
 import { ensureAccount, now, uuid } from './Social/support'
 import { describeNetworkError } from '../Support/Social/network-errors'
+import { TWITTER_READ_PRICE, withTwitterReadBudget } from './Social/TwitterReadBudget'
 
 const database = db as any
 
@@ -22,6 +23,12 @@ interface MentionCandidate {
   authorName?: string | null
   body: string
   postedAt: string
+}
+
+interface TwitterSearchCursor {
+  sinceId?: string
+  untilId?: string
+  newestId?: string
 }
 
 export interface KeywordMonitorInput {
@@ -166,7 +173,11 @@ async function searchBlueskyOnce(query: string, keywords: string[], mode: MatchM
   })
 }
 
-async function searchTwitter(keywords: string[], mode: MatchMode): Promise<MentionCandidate[]> {
+async function searchTwitter(
+  keywords: string[],
+  mode: MatchMode,
+  cursor: TwitterSearchCursor,
+): Promise<{ candidates: MentionCandidate[], cursor: TwitterSearchCursor }> {
   const identity = await findIdentityRow<any>('twitter', undefined, isUsableIdentity)
   if (!isUsableIdentity(identity)) throw new Error('Connect X on Accounts to search recent posts.')
 
@@ -175,16 +186,29 @@ async function searchTwitter(keywords: string[], mode: MatchMode): Promise<Menti
     : mode === 'all'
       ? keywords.map(keyword => `"${keyword}"`).join(' ')
       : `(${keywords.map(keyword => `"${keyword}"`).join(' OR ')})`
-  const url = new URL('https://api.twitter.com/2/tweets/search/recent')
+  const url = new URL('https://api.x.com/2/tweets/search/recent')
+  const resultLimit = 50
   url.searchParams.set('query', `${terms} -is:retweet`)
-  url.searchParams.set('max_results', '50')
+  url.searchParams.set('max_results', String(resultLimit))
+  url.searchParams.set('sort_order', 'recency')
+  if (cursor.sinceId) url.searchParams.set('since_id', cursor.sinceId)
+  if (cursor.untilId) url.searchParams.set('until_id', cursor.untilId)
   url.searchParams.set('tweet.fields', 'created_at,author_id')
   url.searchParams.set('expansions', 'author_id')
   url.searchParams.set('user.fields', 'name,username')
-  const payload = await fetchJson(url, { headers: { authorization: `Bearer ${identity.access_token}` } })
+  const maximumMicros = resultLimit * (TWITTER_READ_PRICE.post + TWITTER_READ_PRICE.user)
+  const payload = await withTwitterReadBudget(maximumMicros, async () => {
+    const value = await fetchJson(url, { headers: { authorization: `Bearer ${identity.access_token}` } })
+    return {
+      value,
+      estimatedMicros: Array.isArray(value.data)
+        ? value.data.length * TWITTER_READ_PRICE.post + (value.includes?.users?.length ?? 0) * TWITTER_READ_PRICE.user
+        : value.meta?.result_count === 0 ? 0 : maximumMicros,
+    }
+  })
   const users = new Map((payload.includes?.users || []).map((user: any) => [String(user.id), user]))
 
-  return (payload.data || []).flatMap((post: any) => {
+  const candidates: MentionCandidate[] = (payload.data || []).flatMap((post: any) => {
     const body = String(post.text || '')
     const user: any = users.get(String(post.author_id))
     const handle = String(user?.username || 'i')
@@ -199,6 +223,14 @@ async function searchTwitter(keywords: string[], mode: MatchMode): Promise<Menti
       postedAt: post.created_at || new Date().toISOString(),
     }]
   })
+  // Both bounds are exclusive. Read the older remainder on the next scan,
+  // then advance the high-water mark only after the entire window is stored.
+  const newestId = cursor.newestId || payload.meta?.newest_id || cursor.sinceId
+  const oldestId: string | undefined = payload.meta?.oldest_id
+  const nextCursor = payload.meta?.next_token && oldestId && oldestId !== cursor.untilId
+    ? { sinceId: cursor.sinceId, newestId, untilId: oldestId }
+    : { sinceId: newestId }
+  return { candidates, cursor: nextCursor }
 }
 
 async function searchMastodon(keywords: string[], mode: MatchMode): Promise<MentionCandidate[]> {
@@ -284,7 +316,10 @@ export class KeywordMonitoringService {
     if (id) {
       const existing = await database.selectFrom('keyword_monitors').selectAll().where('id', '=', id).executeTakeFirst()
       if (!existing) throw new Error('Listening rule not found.')
-      await database.updateTable('keyword_monitors').set(values).where('id', '=', id).execute()
+      const resetCursor = existing.keywords !== values.keywords || existing.match_mode !== values.match_mode
+      await database.updateTable('keyword_monitors')
+        .set({ ...values, ...(resetCursor ? { twitter_search_cursor: null } : {}) })
+        .where('id', '=', id).execute()
       return monitorRow(await database.selectFrom('keyword_monitors').selectAll().where('id', '=', id).executeTakeFirstOrThrow())
     }
 
@@ -328,15 +363,19 @@ export class KeywordMonitoringService {
       const providers = normalizeListeningProviders(monitor.providers)
       const mode = LISTENING_MATCH_MODES.includes(monitor.match_mode) ? monitor.match_mode as MatchMode : 'any'
       const candidates: MentionCandidate[] = []
+      let twitterCursor: TwitterSearchCursor | undefined
 
       for (const provider of providers) {
         try {
-          const results = provider === 'bluesky'
-            ? await searchBluesky(keywords, mode)
-            : provider === 'twitter'
-              ? await searchTwitter(keywords, mode)
-              : await searchMastodon(keywords, mode)
-          candidates.push(...results)
+          if (provider === 'twitter') {
+            const result = await searchTwitter(keywords, mode, JSON.parse(monitor.twitter_search_cursor || '{}'))
+            twitterCursor = result.cursor
+            candidates.push(...result.candidates)
+          }
+          else {
+            const results = provider === 'bluesky' ? await searchBluesky(keywords, mode) : await searchMastodon(keywords, mode)
+            candidates.push(...results)
+          }
         }
         catch (error) {
           errors.push({ monitorId: Number(monitor.id), provider, message: describeNetworkError(provider, error, 'search') })
@@ -365,6 +404,17 @@ export class KeywordMonitoringService {
         }).execute()
         created++
         fresh.push(candidate)
+      }
+
+      if (twitterCursor) {
+        const previous = monitor.twitter_search_cursor
+        await database.updateTable('keyword_monitors')
+          .set({ twitter_search_cursor: JSON.stringify(twitterCursor) })
+          .where('id', '=', monitor.id)
+          .where('keywords', '=', monitor.keywords)
+          .where('match_mode', '=', monitor.match_mode)
+          .where('twitter_search_cursor', previous == null ? 'is' : '=', previous ?? null)
+          .execute()
       }
 
       // One alert per scan that found something, not one per mention: a busy

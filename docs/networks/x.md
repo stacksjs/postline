@@ -12,14 +12,21 @@ API use per post.
    Secret** into Postline under **Settings > Channels > Your network apps > X**,
    save, and connect.
 
-Postline asks for `tweet.read`, `tweet.write`, `users.read` and
-`offline.access` (so the sign-in can renew itself).
+Postline asks for `tweet.read`, `tweet.write`, `media.write` for image uploads,
+`users.read` and `offline.access` (so the sign-in can renew itself). Reconnect
+older X accounts to grant the image upload scope.
 
 - **Cost:** X bills per call against credits you buy in advance. As checked in
   October 2026 a post costs about $0.015 and a post containing a link about
   $0.20. Crossposting an article is a link post every time. X changes these
   prices often; check the developer portal before relying on them. Postline
   adds nothing on top.
+- **Daily read budget:** `TWITTER_DAILY_READ_BUDGET_USD` defaults to $2 per
+  workspace and resets at midnight UTC. Postline reserves the maximum cost
+  before profile lookups, Listening searches, and cleanup reads. Check the
+  estimate in Settings > Channels > Your network apps > X and actual charges
+  in the X Developer Console. The cap covers reads from this workspace. X
+  publishes [current per-resource prices](https://docs.x.com/x-api/getting-started/pricing).
 - **Deleting:** X allows 50 deletions per 15 minutes; cleanup paces itself to
   that, so a large cleanup takes hours.
 - **No inbox:** X direct messages are not supported.

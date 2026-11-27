@@ -776,6 +776,14 @@
             "isUnique": true,
             "isNullable": true,
             "hasDefault": false
+          },
+          {
+            "name": "twitter_search_cursor",
+            "type": "json",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
           }
         ],
         "indexes": [
@@ -2771,10 +2779,50 @@
             "type": "unique"
           }
         ]
+      },
+      {
+        "table": "twitter_read_usage",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "day",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 10
+          },
+          {
+            "name": "estimated_micros",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": 0
+          }
+        ],
+        "indexes": [
+          {
+            "name": "twitter_read_usage_day_unique",
+            "columns": [
+              "day"
+            ],
+            "type": "unique"
+          }
+        ]
       }
     ]
   },
-  "hash": "264b200042f97350d53f9e32146d2f88cf6bf492f8c76fd4e9461096c08e4e69",
+  "hash": "c32fecc6893d468096829547f283918cd69dcae941706303f7a9ff9c03eb5cf3",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-27T01:45:49.073Z"
+  "updatedAt": "2026-11-27T03:38:02.118Z"
 }

@@ -63,7 +63,7 @@
           <p class="m-0 mt-1 text-muted text-xs">X, LinkedIn, Instagram and Threads connect through an app you register on each network. Postline has no keys of its own: yours stay in this workspace.</p>
         </header>
         <div class="divide-line divide-y">
-          <details class="group" x-for="app in appRows()" data-network-app>
+          <details class="group" x-for="app in appRows()" :data-network-app="app.provider">
             <summary class="flex gap-3 items-center justify-between px-4 py-3 list-none hover:bg-panel-2 cursor-pointer">
               <span class="font-medium text-ink text-ui" :text="app.label"></span>
               <span class="flex gap-2 items-center">
@@ -75,6 +75,7 @@
               <ol class="grid gap-1 m-0 pl-5 text-body text-xs">
                 <li x-for="step in app.steps" :text="step"></li>
               </ol>
+              <p class="m-0 text-body text-xs" x-show="app.readUsage" :text="app.readUsage" data-x-read-usage></p>
               <div class="grid gap-1">
                 <span class="font-medium text-muted text-xs">Redirect address to give the network</span>
                 <div class="flex gap-2 items-center">
@@ -245,6 +246,7 @@
         ],
       },
     }
+    const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 3 })
     const appRows = derived(() => networkApps().map((app) => {
       const guide = APP_GUIDES[app.provider] || { label: app.provider, steps: [] }
       const draft = appDrafts()[app.provider] || {}
@@ -253,6 +255,9 @@
         label: guide.label,
         steps: guide.steps,
         configured: app.configured,
+        readUsage: app.readUsage
+          ? `Estimated X API reads today: ${usd.format(app.readUsage.estimatedUsd)} of ${usd.format(app.readUsage.limitUsd)}. Resets at midnight UTC.`
+          : '',
         status: app.configured ? (app.source === 'environment' ? 'Set in .env' : 'Set up') : 'Not set up',
         redirectUrl: app.redirectUrl,
         clientId: draft.clientId ?? app.clientId,

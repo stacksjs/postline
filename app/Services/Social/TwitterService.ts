@@ -13,6 +13,7 @@ import { explainNetworkError } from '../../Support/Social/network-errors'
 import { networkApps } from '../NetworkAppService'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { classifyFailure } from '../../Support/Social/retry'
+import { TWITTER_READ_PRICE, withTwitterReadBudget } from './TwitterReadBudget'
 
 const database = db as any
 
@@ -64,7 +65,7 @@ export class TwitterService {
       clientSecret: app.clientSecret,
       redirectUrl: app.redirectUrl,
       accessToken: String(env.TWITTER_ACCESS_TOKEN || '').trim(),
-      scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
+      scopes: ['tweet.read', 'tweet.write', 'media.write', 'users.read', 'offline.access'],
     }
   }
 
@@ -153,7 +154,7 @@ export class TwitterService {
       codeVerifier,
     })
 
-    const profile = await this.driver.getProfile(token.accessToken)
+    const profile = await this.readProfile(token.accessToken)
     const identity = await this.saveSession({
       accessToken: token.accessToken,
       refreshToken: token.refreshToken,
@@ -176,7 +177,7 @@ export class TwitterService {
       throw new Error('Connect X in Channels first.')
     }
 
-    const profile = await this.driver.getProfile(cfg.accessToken)
+    const profile = await this.readProfile(cfg.accessToken)
     const identity = await this.saveSession({
       accessToken: cfg.accessToken,
       userId: profile.id,
@@ -184,6 +185,13 @@ export class TwitterService {
       name: profile.name,
     }, { revive: options.revive ?? true })
     return this.publicIdentity(identity)
+  }
+
+  private async readProfile(accessToken: string) {
+    return await withTwitterReadBudget(TWITTER_READ_PRICE.user, async () => ({
+      value: await this.driver.getProfile(accessToken),
+      estimatedMicros: TWITTER_READ_PRICE.user,
+    }))
   }
 
   /**
@@ -304,7 +312,10 @@ export class TwitterService {
       provider: 'twitter',
       identityId: Number(identity.id),
       handle: identity.handle,
-      listPage: cursor => this.driver.listAuthoredPosts(credentials, { cursor }),
+      listPage: cursor => withTwitterReadBudget(100 * TWITTER_READ_PRICE.post, async () => {
+        const value = await this.driver.listAuthoredPosts(credentials, { cursor, limit: 100 })
+        return { value, estimatedMicros: value.posts.length * TWITTER_READ_PRICE.post }
+      }),
       deletePost: ref => this.driver.deletePost(credentials, ref),
     }
   }

@@ -11,6 +11,7 @@ import { db } from '@stacksjs/database'
 import { UserFacingError } from '../Support/Http/user-error'
 import { openToken, sealToken } from '../Support/Social/token-vault'
 import { now } from './Social/support'
+import { twitterReadUsage } from './Social/TwitterReadBudget'
 
 const database = db as any
 
@@ -40,6 +41,7 @@ export interface NetworkAppSummary {
   redirectUrl: string
   organizationPages: boolean
   engagementMetrics: boolean
+  readUsage?: Awaited<ReturnType<typeof twitterReadUsage>>
 }
 
 /** This install's public origin, from APP_URL (the Mac app sets it to its own address). */
@@ -92,6 +94,7 @@ export class NetworkAppService {
         redirectUrl: credentials.redirectUrl,
         organizationPages: credentials.organizationPages,
         engagementMetrics: credentials.engagementMetrics,
+        ...(provider === 'twitter' ? { readUsage: await twitterReadUsage() } : {}),
       }
     }))
   }

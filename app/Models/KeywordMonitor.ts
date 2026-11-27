@@ -65,5 +65,11 @@ export default defineModel({
       validation: { rule: schema.string().max(2000).optional() },
       factory: () => null,
     },
+    twitterSearchCursor: {
+      required: false,
+      fillable: false,
+      validation: { rule: schema.json().optional() },
+      factory: () => null,
+    },
   },
 } as const)

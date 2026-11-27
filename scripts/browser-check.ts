@@ -806,6 +806,13 @@ async function checkChannels(cdp: Cdp): Promise<void> {
     if (requests.length !== 1 || requests[0] !== '/api/postline/bootstrap')
       fail('accounts', 'channels', `expected one bootstrap request, saw ${requests.join(', ')}`)
 
+    const twitterApp = `document.querySelector('[data-network-app=twitter]')`
+    await evaluate(cdp, `${twitterApp}.querySelector('summary').click()`)
+    await waitUntil('Channels shows the current X API read estimate', () => evaluate<boolean>(cdp, `
+      ${twitterApp}.querySelector('[data-x-read-usage]')?.getClientRects().length > 0
+        && ${twitterApp}.querySelector('[data-x-read-usage]').textContent.includes('Resets at midnight UTC.')`), 5_000)
+    await evaluate(cdp, `${twitterApp}.querySelector('summary').click()`)
+
     await evaluate(cdp, `${card}.querySelector('[aria-label="Publish to @radio.example by default"]').click()`)
     await waitUntil('The new default channel account', () => evaluate<boolean>(cdp, `
       [...${card}.querySelectorAll('li')].find(row => row.innerText.includes('@radio.example'))?.innerText.includes('Default')
