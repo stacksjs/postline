@@ -2,8 +2,13 @@
 
 ## The Mac app
 
-Download the new release and replace the app in Applications. On its first
-launch it copies the database aside as
+Open **Settings > General > Software updates** and choose **Check for
+updates**. Before installing a verified update, Postline saves a database
+snapshot in the workspace’s `update-backups/` directory and keeps the three
+most recent snapshots. If the snapshot fails, the installed app stays in place.
+
+You can also download the new release and replace the app in Applications.
+On the first launch after either kind of update, Postline copies the database aside as
 `postline.before-<first new migration>.sqlite` in the data folder, then
 applies the new migrations. If a migration fails, the app does not start, the
 message names the copy, and the database is left as it was before the

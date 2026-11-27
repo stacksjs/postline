@@ -1,5 +1,6 @@
 import type { WebviewAgentModule } from '@stacksjs/desktop-build'
 import type { Schedule } from './schedule'
+import process from 'node:process'
 import { finishWorkspacePreparation } from './Prepare'
 
 let schedule: Schedule | undefined
@@ -50,6 +51,20 @@ export default {
     const { pathname } = new URL(request.url)
     if (pathname === '/' || pathname === '/login')
       return Response.redirect(new URL('/composer', request.url).toString(), 302)
+  },
+
+  async beforeInstall() {
+    try {
+      const database = process.env.DB_DATABASE_PATH
+      if (!database) throw new Error('The workspace database path is missing.')
+      const { backupBeforeDesktopUpdate } = await import('./update-backup')
+      const backup = backupBeforeDesktopUpdate(database)
+      console.log(`[postline] saved pre-update workspace database to ${backup}`)
+    }
+    catch (error) {
+      console.error('[postline] pre-update workspace backup failed', error)
+      throw new Error('Postline could not back up its workspace database. Check that the workspace is available and has free space, then try again.', { cause: error })
+    }
   },
 
   stop() {

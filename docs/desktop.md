@@ -15,6 +15,7 @@ What is theirs lives in `~/Library/Application Support/Postline`:
 | `storage/app/postline-media/` | Images attached to queued posts |
 | `content/blog/` | Long-form posts published to the blog channel |
 | `postline.before-<migration>.sqlite` | A copy made before an upgrade migrates the database |
+| `update-backups/` | The three most recent snapshots taken before an in-app update |
 
 The log is `~/Library/Logs/Postline.log`.
 
