@@ -81,6 +81,7 @@ export const actions = {
   'Actions/Postline/RegisterFirstUserAction': '../../../app/Actions/Postline/RegisterFirstUserAction.ts',
   'Actions/Postline/RetentionGetAction': '../../../app/Actions/Postline/RetentionGetAction.ts',
   'Actions/Postline/RetentionSaveAction': '../../../app/Actions/Postline/RetentionSaveAction.ts',
+  'Actions/Postline/SetupAvailabilityAction': '../../../app/Actions/Postline/SetupAvailabilityAction.ts',
   'Actions/Postline/SignInSecurityAction': '../../../app/Actions/Postline/SignInSecurityAction.ts',
   'Actions/Postline/SystemStatusAction': '../../../app/Actions/Postline/SystemStatusAction.ts',
   'Actions/Postline/ThreadsAuthAction': '../../../app/Actions/Postline/ThreadsAuthAction.ts',

@@ -61,8 +61,9 @@ APP_URL=localhost ./buddy dev --browser --with-localhost
 ```
 <!-- /readme-start -->
 
-Open the address it prints and create the workspace account (**First run?
-Create the workspace account**); see [docs/first-run.md](docs/first-run.md).
+Open `/setup` at the address it prints. Create the owner account, name the
+workspace, and choose where to publish your first post. See the
+[first-run guide](docs/first-run.md).
 For sample data on a fresh development workspace, run the seeder before
 creating an account. It adds `dev@postline.test` and a few posts. It prints
 the generated password, or you can set `SEED_USER_PASSWORD` yourself.

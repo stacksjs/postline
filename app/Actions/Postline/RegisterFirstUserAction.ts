@@ -4,7 +4,9 @@ import { Auth, authCookieForBrowserSession, displayNameMessage, displayNameProbl
 import { db } from '@stacksjs/database'
 import { response } from '@stacksjs/router'
 import { makeHash } from '@stacksjs/security'
+import { isDesktopAgent } from '../../Support/Auth/native'
 import { actionFailure } from '../../Support/Http/action-error'
+import { workspaceHasOwner } from '../../Support/Http/workspace-owner'
 import { isMarketingSite } from '../../Support/Marketing/site'
 
 const database = db as any
@@ -24,19 +26,14 @@ export default new Action({
   method: 'POST',
 
   async handle(request: RequestInstance) {
-    if (isMarketingSite()) {
+    if (isMarketingSite() || isDesktopAgent()) {
       return response.json({
         ok: false,
         error: 'Registration is available on your own Postline install.',
       }, { status: 403 })
     }
 
-    const existing = await database
-      .selectFrom('users')
-      .select(['id'])
-      .executeTakeFirst()
-
-    if (existing) return workspaceOwned()
+    if (await workspaceHasOwner()) return workspaceOwned()
 
     const email = normalizeAuthEmail(String(request.get('email') || ''))
     const password = String(request.get('password') || '')

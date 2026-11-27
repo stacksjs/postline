@@ -80,6 +80,7 @@ route.get('/postline/blog/media', 'Actions/Postline/BlogMediaAction').rateLimit(
 // For a load balancer or an uptime monitor: fails when the scheduler has
 // stopped, which the framework's own health check cannot see.
 route.get('/postline/health', 'Actions/Postline/HealthAction').rateLimit(120, 'minute')
+route.get('/postline/setup/availability', 'Actions/Postline/SetupAvailabilityAction').rateLimit(60, 'minute')
 
 route.group({ prefix: '/postline/bluesky' }, () => {
   route.get('/status', 'Actions/Postline/BlueskyStatusAction').middleware('auth')

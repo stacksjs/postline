@@ -3,24 +3,25 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 /**
- * The workspace is private. Every page behind the sign-in, and the sign-in
- * page, says noindex, which also keeps it out of the sitemap: the stx build
+ * The workspace is private. Every workspace page, including sign-in and
+ * setup, says noindex, which also keeps it out of the sitemap: the stx build
  * leaves noindex pages out. The marketing pages say nothing of the sort.
  */
 const root = resolve(import.meta.dir, '../..')
 const read = (path: string): string => readFileSync(join(root, path), 'utf8')
+const entryViews = ['login.stx', 'setup.stx']
 
 describe('what search engines may index', () => {
-  test('the app and Settings layouts, and the sign-in page, are noindex', () => {
+  test('the workspace layouts and entry pages are noindex', () => {
     expect(read('resources/layouts/app.stx')).toContain('<meta name="robots" content="noindex, nofollow">')
     expect(read('resources/layouts/settings.stx')).toContain('<meta name="robots" content="noindex, nofollow">')
-    expect(read('resources/views/login.stx')).toContain("@meta('robots', 'noindex, nofollow')")
+    for (const view of entryViews)
+      expect(read(`resources/views/${view}`)).toContain("@meta('robots', 'noindex, nofollow')")
   })
 
   test('every app view uses a noindex layout', () => {
-    // The public pages: the home page, sign-in (noindex by its own meta), and the plain pages the footer links to.
-    const publicViews = ['index.stx', 'login.stx', 'privacy.stx', 'your-data.stx', 'trademarks.stx', 'changelog.stx', 'roadmap.stx', 'download.stx', 'blog.stx', '404.stx']
-    const views = readdirSync(join(root, 'resources/views')).filter(name => name.endsWith('.stx') && !publicViews.includes(name))
+    const publicViews = ['index.stx', 'privacy.stx', 'your-data.stx', 'trademarks.stx', 'changelog.stx', 'roadmap.stx', 'download.stx', 'blog.stx', '404.stx']
+    const views = readdirSync(join(root, 'resources/views')).filter(name => name.endsWith('.stx') && !publicViews.includes(name) && !entryViews.includes(name))
     for (const view of views)
       expect(read(`resources/views/${view}`)).toMatch(/@extends\('layouts\/(app|settings)'\)/)
   })

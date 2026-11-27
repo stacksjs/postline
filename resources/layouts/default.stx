@@ -6,6 +6,4 @@
 
 @yield('footer')
 
-{{-- Signing in with a passkey (#95); the sign-in page is this layout's only page. --}}
-
 @stack('scripts')

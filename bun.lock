@@ -12,7 +12,7 @@
         "stacks": "^0.75.695",
         "ts-backups": "https://github.com/stacksjs/ts-backups/releases/download/v0.1.6/ts-backups-0.1.6.tgz",
         "ts-images": "^0.2.35",
-        "ts-medium-editor": "^0.2.0",
+        "ts-medium-editor": "0.2.1",
       },
       "devDependencies": {
         "@iconify-json/hugeicons": "^1.2.36",
@@ -496,7 +496,7 @@
 
     "ts-jpeg": ["ts-jpeg@0.3.6", "", {}, "sha512-BJB8NzbRx/vWH97iA17D065J/LaaJfdgoSvspV+EcpPHTN/aXvWhUf9LNhSclu0kd4SSoBecD9qIiFAnjwXT0g=="],
 
-    "ts-medium-editor": ["ts-medium-editor@0.2.0", "", {}, "sha512-XR4Orpxm1v9OfP6dCMImYpPaqdJUdoRl3laUUiPB9dR9WJHSFbWZmHCBdPG3uiQiaQljeSssKQTZTUcfQnsj3g=="],
+    "ts-medium-editor": ["ts-medium-editor@0.2.1", "", { "hasInstallScript": true }, "sha512-03Z5VGYaAZGxkdsCs+Pi8CAqj8RYLyVnma37ej/q5IQ5AaTHoC+3giUCeChLQl0W81UBPxDvUmssGeb5majqLw=="],
 
     "ts-pantry": ["ts-pantry@0.11.231", "", { "dependencies": { "@stacksjs/bumpx": "^0.2.29", "@stacksjs/env": "^0.75.311" }, "bin": { "ts-pantry": "./dist/bin/cli.js", "pantry-desktop": "./dist/bin/desktop.js" } }, "sha512-nN2FsMW6svdfCYYVsFUhUTOj2xBm+oCvqyEJSZ2trx183pi9+z3bFaZQOVqvL5VSYz6y/VraQjMkJvY1WCWhUA=="],
 

@@ -21,8 +21,10 @@ describe('the sign-in page', () => {
   })
 
   it('asks for a new password while the workspace account is created', () => {
-    expect(page).toContain(':autocomplete="registering() ? \'new-password\' : \'current-password\'"')
-    expect(page).toMatch(/name="password_confirmation"[^>]*autocomplete="new-password"/)
+    const setupPage = read('resources/views/setup.stx')
+    expect(page).toContain('autocomplete="current-password"')
+    expect(setupPage).toMatch(/name="password"[^>]*autocomplete="new-password"/)
+    expect(setupPage).toMatch(/name="password_confirmation"[^>]*autocomplete="new-password"/)
   })
 
   it('announces errors and uses no inline styles', () => {

@@ -1101,6 +1101,97 @@ async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkFirstRun(cdp: Cdp): Promise<void> {
+  const setup = `document.querySelector('[data-testid="setup-page"]')`
+  const input = (name: string): string => `${setup}.querySelector(` + JSON.stringify(`input[name=${name}]`) + ')'
+  const type = async (selector: string, value: string): Promise<void> => {
+    await evaluate(cdp, `${selector}.focus(); ${selector}.select()`)
+    await cdp.send('Input.insertText', { text: value })
+  }
+  const click = (selector: string): Promise<void> => evaluate(cdp, `${selector}.click()`)
+  const heading = (title: string): Promise<void> => waitUntil(title, () => evaluate<boolean>(cdp, `${setup}?.querySelector('h1').textContent === ${JSON.stringify(title)}`), 20_000)
+
+  await auditPage(`${site}/login`, { cdp })
+  const setupLink = `document.querySelector('a[href="/setup"]')`
+  await waitUntil('Setup is available from sign-in', () => evaluate<boolean>(cdp, `Boolean(${setupLink}?.getClientRects().length)`), 10_000)
+  await click(setupLink)
+  await heading('Create the owner account')
+  await type(input('name'), 'Browser Check')
+  await type(input('email'), 'check@postline.test')
+  await type(input('password'), 'browser-check-password')
+  await type(input('password_confirmation'), 'wrong-confirmation')
+  await click(`${setup}.querySelector('button[type=submit]')`)
+  await waitUntil('Registration confirms the password before creating an account', () => evaluate<boolean>(cdp, `${setup}.querySelector('[role=alert]').textContent === 'Passwords do not match.'`), 5_000)
+  await type(input('password_confirmation'), 'browser-check-password')
+  await click(`${setup}.querySelector('button[type=submit]')`)
+  await heading('Name your workspace')
+  await type(input('workspaceName'), 'Browser Workspace')
+  await type(input('timezone'), 'America/New_York')
+  await click(`${setup}.querySelector('button[type=submit]')`)
+  await heading('Choose a publishing channel')
+  const profileSaved = await evaluate<boolean>(cdp, `(async () => {
+    const { data } = await (await fetch('/api/postline/settings/workspace')).json()
+    return data.workspaceName === 'Browser Workspace' && data.timezone === 'America/New_York'
+  })()`)
+  if (!profileSaved) throw new Error('Setup did not save the workspace name and time zone.')
+
+  await click(`${setup}.querySelector('a[href="/accounts?setup=1"]')`)
+  const resume = `document.querySelector('a[href="/setup?step=channels"]')`
+  await waitUntil('Channels links back to setup', () => evaluate<boolean>(cdp, `location.pathname === '/accounts' && ${resume}?.textContent.includes('Continue setup')`), 15_000)
+  await click(resume)
+  await heading('Choose a publishing channel')
+  await waitUntil('The built-in Blog is the first available channel', () => evaluate<boolean>(cdp, `${setup}.querySelector('[data-setup-channel]')?.value === 'blog'`), 5_000)
+  const composerLink = `${setup}.querySelector('a[href="/composer?setup=1&target=blog"]')`
+  await click(composerLink)
+  await waitUntil('Composer preselects the chosen setup channel', () => evaluate<boolean>(cdp, `location.pathname === '/composer'
+    && !!document.querySelector('[data-setup-composer]')
+    && document.querySelector('[data-provider-toggle=blog]')?.getAttribute('aria-pressed') === 'true'`), 15_000)
+  const title = 'Postline first-run browser check'
+  await type("document.querySelector('[data-compose-title]')", title)
+  const richEditor = "document.querySelector('[data-richtext-host] [contenteditable=true]')"
+  const body = 'My first post is ready to publish.'
+  try {
+    await waitUntil('The Blog editor is ready', () => evaluate<boolean>(cdp, `Boolean(${richEditor}?.getClientRects().length)`), 10_000)
+    await evaluate(cdp, `(() => {
+      const editor = ${richEditor}
+      editor.focus()
+      const range = new Range()
+      range.selectNodeContents(editor)
+      const selection = getSelection()
+      selection.removeAllRanges()
+      selection.addRange(range)
+    })()`)
+    await cdp.send('Input.insertText', { text: body })
+    await waitUntil('The Blog body is ready to publish', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-bluesky-text]')?.value.includes(${JSON.stringify(body)})
+        && !document.querySelector('[data-bluesky-publish]')?.disabled`), 5_000)
+    await click("document.querySelector('[data-bluesky-publish]')")
+    await heading('Your first post is ready')
+  }
+  catch (error) {
+    const state = await evaluate(cdp, `(async () => ({
+      page: location.pathname + location.search,
+      heading: document.querySelector('h1')?.textContent,
+      message: document.querySelector('[role=alert]')?.textContent,
+      toast: document.querySelector('#postline-toast-host')?.textContent,
+      title: document.querySelector('[data-compose-title]')?.value,
+      body: document.querySelector('[data-bluesky-text]')?.value,
+      rich: ${richEditor}?.innerHTML,
+      active: document.activeElement?.outerHTML.slice(0, 250),
+      disabled: document.querySelector('[data-bluesky-publish]')?.disabled,
+      items: (await (await fetch('/api/postline/queue')).json()).data?.items,
+    }))()`)
+    throw new Error(`${String(error)}. Browser state: ${JSON.stringify(state)}`)
+  }
+  await click(`${setup}.querySelector('a[href="/queue"]')`)
+  await waitUntil('The Queue opens after setup', () => evaluate<boolean>(cdp, `location.pathname === '/queue' && !!document.getElementById('queue-tab-published')`), 15_000)
+  await click("document.getElementById('queue-tab-published')")
+  await waitUntil('The first Blog post is published in the queue', () => evaluate<boolean>(cdp, `
+    [...document.querySelectorAll('#queue-results article')].some(row =>
+      row.innerText.includes(${JSON.stringify(body)}) && row.querySelector('[data-target-chip][data-state="sent"]')?.textContent.includes('Blog'))`), 5_000)
+  await click("document.getElementById('queue-tab-scheduled')")
+}
+
 let exitCode = 0
 try {
   await waitUntil('The API', async () => (await fetch(`http://localhost:${API_PORT}/api/postline/health`)).status < 500)
@@ -1109,26 +1200,8 @@ try {
 
   const { cdp, close } = await launch({ viewport: { width: 1280, height: 800 } })
   try {
-    // The workspace account, created and signed in through the real pages:
-    // the CSRF cookie and the session cookie land in this browser context.
-    await auditPage(`${site}/login`, { cdp })
-    const signedIn = await evaluate<string>(cdp, `(async () => {
-      const credentials = ['check@postline.test', 'other@postline.test'].map(email => {
-        const fields = new FormData()
-        fields.set('name', 'Browser Check')
-        fields.set('email', email)
-        fields.set('password', 'browser-check-password')
-        return fields
-      })
-      const registrations = await Promise.all(credentials.map(body => fetch('/api/register', { method: 'POST', body })))
-      if (registrations.filter(result => result.ok).length !== 1 || !registrations.some(result => result.status === 403))
-        return 'expected exactly one workspace owner: ' + registrations.map(result => result.status).join(', ')
-      const body = credentials[registrations.findIndex(result => result.ok)]
-      const login = await fetch('/api/login', { method: 'POST', body })
-      const payload = await login.json()
-      if (!payload.token && !payload.access_token) return 'login failed: ' + JSON.stringify(payload)
-      document.cookie = 'postline-signed-in=1; path=/'
-      await fetch('/api/csrf')
+    await checkFirstRun(cdp)
+    const fixturesReady = await evaluate<string>(cdp, `(async () => {
       const draft = await fetch('/api/postline/queue', { method: 'POST', body: new URLSearchParams({ text: 'A draft for the keyboard smoke test', providers: 'bluesky' }) })
       if (!draft.ok) return 'could not create the queue fixture: ' + await draft.text()
       const current = new Date()
@@ -1139,7 +1212,7 @@ try {
       }
       return 'ok'
     })()`)
-    if (signedIn !== 'ok') throw new Error(signedIn)
+    if (fixturesReady !== 'ok') throw new Error(fixturesReady)
 
     for (const mode of MODES) {
       await cdp.send('Emulation.setDeviceMetricsOverride', { width: mode.width, height: mode.height, deviceScaleFactor: 1, mobile: mode.mobile })

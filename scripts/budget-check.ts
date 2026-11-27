@@ -20,7 +20,7 @@ const KB = 1024
 export const BUDGETS = { script: 150 * KB, css: 30 * KB, fonts: 60 * KB }
 
 /** The workspace pages, which carry the app's scripts. */
-const APP_PAGES = ['composer', 'queue', 'timeline', 'analytics', 'campaigns', 'listening', 'inbox', 'accounts', 'activity', 'writing', 'settings', 'login']
+const APP_PAGES = ['composer', 'queue', 'timeline', 'analytics', 'campaigns', 'listening', 'inbox', 'accounts', 'activity', 'writing', 'settings', 'login', 'setup']
 
 const gz = (text: string | Uint8Array): number => gzipSync(typeof text === 'string' ? Buffer.from(text) : text).length
 function local(path: string): string | null {

@@ -23,23 +23,13 @@ const allowsFirstRun = !isMarketingSite()
       </header>
 
       <form class="grid gap-3" @submit.prevent="onSubmit">
-        {{-- Object-form :class: the static hidden class is the pre-hydration
-            state, and classList.remove takes it off when the row shows. --}}
-        <label class="hidden gap-1.5" :class="{ 'hidden': !registering(), 'grid': registering() }">
-          <span class="font-semibold text-muted text-xs">Name</span>
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="name" autocomplete="name" placeholder="Your name" x-model="accountName" :required="registering()">
-        </label>
         <label class="grid gap-1.5" x-show="!challenge()">
           <span class="font-semibold text-muted text-xs">Email</span>
           <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="email" type="email" autocomplete="username" placeholder="you@example.com" x-model="email" :required="!challenge()" autofocus>
         </label>
         <label class="grid gap-1.5" x-show="!challenge()">
           <span class="font-semibold text-muted text-xs">Password</span>
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password" type="password" :autocomplete="registering() ? 'new-password' : 'current-password'" autocomplete="current-password" placeholder="••••••••" :required="!challenge()" :minlength="registering() ? 8 : 1" x-model="password">
-        </label>
-        <label class="hidden gap-1.5" :class="{ 'hidden': !registering(), 'grid': registering() }">
-          <span class="font-semibold text-muted text-xs">Confirm password</span>
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password_confirmation" type="password" autocomplete="new-password" placeholder="••••••••" minlength="8" x-model="confirmPassword" :required="registering()">
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password" type="password" autocomplete="current-password" placeholder="••••••••" :required="!challenge()" x-model="password">
         </label>
         {{-- The second step when two-factor sign-in is on (#95). --}}
         <label class="gap-1.5" :class="challenge() ? 'grid' : 'hidden'">
@@ -57,9 +47,9 @@ const allowsFirstRun = !isMarketingSite()
       </button>
       <button class="text-muted text-xs underline hover:text-body transition-colors" type="button" :class="challenge() ? '' : 'hidden'" @click="cancelChallenge">Use a different account</button>
       @if(allowsFirstRun)
-        <button class="text-muted text-xs underline hover:text-body transition-colors" type="button" x-show="!challenge()" @click="toggleMode" :text="toggleLabel()">First run? Create the workspace account</button>
+        <a :if="setupAvailable() && !challenge()" class="justify-self-center text-info text-sm underline" href="/setup" data-stx-link>Set up a new workspace</a>
       @endif
-      <p class="text-center text-muted text-xs" :class="registering() ? 'hidden' : ''">
+      <p class="text-center text-muted text-xs">
         Lost the password? Reset it on the machine Postline runs on:
         <code class="block mt-1 text-body whitespace-nowrap">./buddy user:add you@example.com --update</code>
         <a class="inline-block mt-1.5 underline hover:text-body" href="https://github.com/stacksjs/postline/blob/main/docs/first-run.md#if-you-lose-the-password" target="_blank" rel="noopener noreferrer">Lost the authenticator too?</a>
@@ -70,14 +60,13 @@ const allowsFirstRun = !isMarketingSite()
   <script client>
     import { passkeys } from '../functions/passkeys'
 
-    const registering = state(false)
+    const setupAvailable = state(false)
+    const returnToSetup = useRoute().query.return === 'setup'
     const errorMessage = state('')
     const busy = state(false)
 
-    const accountName = state('')
     const email = state('')
     const password = state('')
-    const confirmPassword = state('')
     /** The password step's challenge while an authenticator code is due. */
     const challenge = state('')
     const code = state('')
@@ -89,23 +78,20 @@ const allowsFirstRun = !isMarketingSite()
     })
 
     const webAuthn = passkeys.supported()
-    const passkeysOffered = derived(() => webAuthn && !registering() && !challenge())
+    const passkeysOffered = derived(() => webAuthn && !challenge())
 
-    const heading = derived(() => registering() ? 'Set up Postline' : 'Sign in to Postline')
-    const subtitle = derived(() => registering()
-      ? 'One account owns this workspace.'
-      : challenge()
-        ? 'One more step: a code from your authenticator app.'
-        : 'Compose once, publish everywhere.')
-    const submitLabel = derived(() => registering() ? 'Create account' : challenge() ? 'Verify' : 'Sign in')
-    const toggleLabel = derived(() => registering()
-      ? 'Already set up? Sign in instead'
-      : 'First run? Create the workspace account')
+    const heading = derived(() => challenge() ? 'Verify your sign-in' : 'Sign in to Postline')
+    const subtitle = derived(() => challenge() ? 'Enter a code from your authenticator app.' : 'Compose once, publish everywhere.')
+    const submitLabel = derived(() => challenge() ? 'Verify' : 'Sign in')
 
-    const toggleMode = () => {
-      registering.set(!registering())
-      errorMessage.set('')
-    }
+    onMount(async () => {
+      if (!{{ allowsFirstRun }}) return
+      try {
+        const response = await fetch('/api/postline/setup/availability')
+        if (response.ok) setupAvailable.set(Boolean((await response.json()).data?.available))
+      }
+      catch {}
+    })
 
     /**
      * Enter the app.
@@ -125,17 +111,13 @@ const allowsFirstRun = !isMarketingSite()
      * that somehow outlives its session is cleared by the first 401 the app
      * shell sees.
      *
-     * A hard navigation rather than stx `navigate()`: the app shell reads auth
-     * state at boot, so a fresh document is what makes the new session take
-     * effect everywhere. navigate() is the wrong call here, not merely the
-     * discouraged one — an SPA transition keeps the shell that booted without a
-     * session. The hard load IS the mechanism.
+     * The app shell reads auth state at boot. Load a fresh document so the
+     * new session takes effect everywhere.
      */
     const enterApp = (expiresIn?: number | string | null): void => {
       const maxAge = Number(expiresIn) > 0 ? Number(expiresIn) : 60 * 60 * 24 * 30
       useCookie('postline-signed-in', { maxAge }).set('1')
-      // stx-strict-ignore-next-line location.assign
-      location.assign('/composer')
+      navigate(returnToSetup ? '/setup' : '/composer', { reload: true, replace: true })
     }
 
     const cancelChallenge = () => {
@@ -218,34 +200,15 @@ const allowsFirstRun = !isMarketingSite()
         return
       }
 
-      // There is no recovery email: the password is reset from the machine
-      // Postline runs on (`./buddy user:add <email> --update`, see the README).
-      // A first-run typo should still not create an account its owner then
-      // has to recover.
-      if (registering() && password() !== confirmPassword()) {
-        errorMessage.set('Passwords do not match.')
-        return
-      }
-
       busy.set(true)
 
       const body = new FormData()
       body.set('email', email().trim())
       body.set('password', password())
-      if (registering()) body.set('name', accountName().trim())
 
       try {
-        const response = await fetch(registering() ? '/api/register' : '/api/login', { method: 'POST', body })
+        const response = await fetch('/api/login', { method: 'POST', body })
         const payload = await response.json().catch(() => ({}))
-
-        if (registering()) {
-          if (!response.ok || payload.ok === false)
-            throw new Error(payload.error || 'Could not create the account.')
-          const token = payload.data?.access_token
-          if (token) enterApp(payload.data?.expires_in)
-          else registering.set(false)
-          return
-        }
 
         if (response.ok && payload.requires_two_factor && payload.challenge_token) {
           challenge.set(payload.challenge_token)

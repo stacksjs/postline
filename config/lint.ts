@@ -11,7 +11,7 @@ export default {
   stx: {
     baselines: {
       // Direct DOM access in the composer, Settings and Channels purge controls.
-      'dom-guard': 21,
+      'dom-guard': 20,
       // Pre-hydration display:none on a few panels.
       'inline-style-attr': 3,
       'style-block': 1,

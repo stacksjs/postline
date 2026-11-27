@@ -92,10 +92,10 @@ async function healthy(): Promise<boolean> {
 
 await withServices('dev', [command('start')], async (signal) => {
   await waitUntil('first-run page', signal, async () => {
-    const login = await page('/login')
-    if (!login?.ok) return false
-    if (!(await login.text()).includes('Create the workspace account'))
-      throw new Error('The fresh workspace did not show first-run registration.')
+    const [setupPage, availability] = await Promise.all([page('/setup'), page('/api/postline/setup/availability')])
+    if (!setupPage?.ok || !availability?.ok) return false
+    if (!(await setupPage.text()).includes('Set up your workspace') || !(await availability.json()).data?.available)
+      throw new Error('The fresh workspace did not offer first-run setup.')
     return true
   })
   await waitUntil('development scheduler', signal, healthy)

@@ -23,6 +23,10 @@
     </header>
     <div class="grid">
       <section class="grid content-start grid-rows-[auto_auto_auto] self-start bg-panel border border-line rounded-2xl shadow-sm" aria-label="Post composer" :class="dragDepth() > 0 ? 'ring-2 ring-accent' : ''" @dragenter="enterImageDrop" @dragleave="leaveImageDrop" @dragover="overImageDrop" @drop="dropImages" @paste="pasteImages" data-composer-image-drop>
+        <div :if="setupActive" class="flex flex-wrap gap-2 items-center justify-between px-3 py-2 text-info text-xs bg-info-soft border-b border-line" data-setup-composer>
+          <span class="font-semibold">Write and publish or schedule your first post.</span>
+          <a class="underline" href="/setup?step=channels" data-stx-link>Choose a different channel</a>
+        </div>
         <div class="hidden flex-wrap gap-3 items-center justify-between px-3 py-2 text-xs bg-info-soft border-b border-info-line" :class="{ 'hidden': !editHeading(), 'flex': !!editHeading() }" data-edit-banner>
           <span class="font-semibold text-info">Editing a queued post</span>
           <a class="inline-flex items-center px-2.5 min-h-6 font-semibold text-info bg-panel hover:bg-info-line border border-info-line rounded-lg transition-colors" href="/composer" data-stx-link>Cancel</a>
@@ -239,6 +243,9 @@
     // as having none, so it says so and offers to try again.
     const providersFailed = state(false)
     const composerHandlers = { toggleProvider: null, retryProviders: null, scheduleChanged: null, setFormat: null, publish: null, variantChanged: null }
+    const setupTarget = useRoute().query.target
+    const setupActive = useRoute().query.setup === '1'
+    const finishSetup = () => { if (setupActive) navigate('/setup?step=complete') }
     const composerFormat = state<ComposerFormat>('single')
     const editingQueued = state(Boolean(useRoute().query.edit))
     const canPublish = state(false)
@@ -1342,6 +1349,7 @@
             'success',
             { title: payload.data.status === 'scheduled' ? 'Scheduled' : 'Draft saved' },
           )
+          if (payload.data.status === 'scheduled') finishSetup()
         }
         catch (error) {
           setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Queue' })
@@ -1474,6 +1482,7 @@
               { title: 'Published', url: lastUrl },
             )
           }
+          if (successCount > 0) finishSetup()
         }
         catch (error) {
           dismissPostlineToast('publish')
@@ -1590,6 +1599,11 @@
 
       const start = async () => {
         await refreshConnection()
+        if (setupActive && !editParam) {
+          selectedClear()
+          if (connectedProviders().some(target => target.key === setupTarget)) selectedAdd(setupTarget)
+          updatePublishability()
+        }
         if (editParam) await loadEditPost(editParam)
         else {
           await zoneReady

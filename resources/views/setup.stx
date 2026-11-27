@@ -1,0 +1,235 @@
+@extends('layouts/default')
+
+@section('title', 'Postline - Workspace setup')
+
+<script server>
+import { isMarketingSite } from '../../app/Support/Marketing/site'
+const availableHere = !isMarketingSite()
+</script>
+
+@section('content')
+  @meta('description', 'Set up a Postline workspace and write your first post.')
+  @meta('robots', 'noindex, nofollow')
+  <main class="grid place-items-center px-4 py-8 min-h-screen bg-bg" data-testid="setup-page">
+    <section class="grid gap-5 p-6 max-w-md w-full bg-panel border border-line rounded-2xl shadow-sm" aria-labelledby="setup-title" :aria-busy="stage() === 'loading' || busy()">
+      <header class="grid gap-2">
+        <span class="h-9 w-9 brand-mark" aria-hidden="true"></span>
+        <h1 class="m-0 font-semibold text-ink text-xl" id="setup-title" :text="heading()">Set up your workspace</h1>
+        <p class="m-0 text-muted text-ui" :text="description()"></p>
+      </header>
+
+      <ol class="flex flex-wrap gap-2 m-0 p-0 list-none text-xs" aria-label="Workspace setup progress" :if="currentStep() >= 0">
+        <li x-for="item in steps" :key="item.id" class="px-2 py-1 rounded-full" :aria-current="item.id === stage() ? 'step' : null" :class="item.id === stage() ? 'font-semibold bg-accent text-on-accent' : 'text-muted bg-panel-2'" :text="item.label"></li>
+      </ol>
+
+      <p class="m-0 text-danger text-xs" role="alert" :class="{ 'sr-only': !errorMessage() }" :text="errorMessage()"></p>
+      <button :if="stage() === 'unavailable'" class="justify-self-start px-3 h-9 font-semibold text-ink text-sm bg-panel-2 border border-line rounded-lg" type="button" @click="loadSetup">Try again</button>
+      <a :if="stage() === 'sign-in'" class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl" href="/login?return=setup" data-stx-link>Sign in to continue</a>
+      <a :if="stage() === 'marketing'" class="text-info text-sm underline" href="/download" data-stx-link>Get Postline</a>
+
+      <form :if="stage() === 'account'" class="grid gap-3" @submit.prevent="createOwner">
+        <label class="grid gap-1.5 font-semibold text-muted text-xs">
+          Name
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="name" autocomplete="name" minlength="2" maxlength="255" required x-model="accountName" ref="ownerNameInput">
+        </label>
+        <label class="grid gap-1.5 font-semibold text-muted text-xs">
+          Email
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="email" type="email" autocomplete="username" maxlength="254" required x-model="email">
+        </label>
+        <label class="grid gap-1.5 font-semibold text-muted text-xs">
+          Password
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="255" required x-model="password">
+        </label>
+        <label class="grid gap-1.5 font-semibold text-muted text-xs">
+          Confirm password
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password_confirmation" type="password" autocomplete="new-password" minlength="8" maxlength="255" required x-model="confirmation">
+        </label>
+        <button class="px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="submit" :disabled="busy()">Create workspace account</button>
+      </form>
+
+      <form :if="stage() === 'workspace'" class="grid gap-3" @submit.prevent="saveProfile">
+        <label class="grid gap-1.5 font-semibold text-muted text-xs">
+          Workspace name
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="workspaceName" minlength="2" maxlength="120" required x-model="workspaceName" ref="workspaceNameInput">
+        </label>
+        <label class="grid gap-1.5 font-semibold text-muted text-xs">
+          Time zone
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="timezone" type="text" list="setup-timezones" autocomplete="off" required x-model="timezone">
+        </label>
+        <datalist id="setup-timezones"><option x-for="zone in zones" :key="zone" :value="zone"></option></datalist>
+        <button class="px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="submit" :disabled="busy()">Continue</button>
+      </form>
+
+      <div :if="stage() === 'channels'" class="grid gap-4">
+        <label class="grid gap-1.5 font-semibold text-muted text-xs" :if="channels().length">
+          Where to publish
+          <select class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="selectedChannel" data-setup-channel>
+            <option x-for="channel in channels()" :key="channel.key" :value="channel.key" :text="channel.label"></option>
+          </select>
+        </label>
+        <a class="justify-self-start text-info text-sm underline" href="/accounts?setup=1" data-stx-link @click="continueThroughChannels">Connect a network</a>
+        <a :if="composerLink()" class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl" :href="composerLink()" data-stx-link @click="continueThroughChannels">Write your first post</a>
+        <a class="text-muted text-xs underline" href="/setup?step=workspace" data-stx-link>Back to workspace details</a>
+      </div>
+
+      <div :if="stage() === 'complete'" class="grid gap-2">
+        <a class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl" href="/queue" data-stx-link>Open the queue</a>
+        <a class="justify-self-center text-info text-sm underline" href="/composer" data-stx-link>Write another post</a>
+      </div>
+    </section>
+  </main>
+
+  <script client>
+    import type { ProviderStatus } from '../functions/social-client'
+    import { systemTimeZone } from '../../app/Support/time'
+    import { providerLabel } from '../functions/networks'
+    import { targetLabel } from '../functions/social-client'
+
+    type Stage = 'loading' | 'marketing' | 'unavailable' | 'sign-in' | 'account' | 'workspace' | 'channels' | 'complete'
+
+    const steps = [
+      { id: 'account', label: 'Account' },
+      { id: 'workspace', label: 'Workspace' },
+      { id: 'channels', label: 'First post' },
+    ]
+    const stage = state<Stage>('loading')
+    const currentStep = derived(() => steps.findIndex(item => item.id === stage()))
+    const heading = derived(() => ({
+      loading: 'Set up your workspace', marketing: 'Set up Postline on your own install', unavailable: 'Set up your workspace',
+      'sign-in': 'Continue workspace setup', account: 'Create the owner account', workspace: 'Name your workspace',
+      channels: 'Choose a publishing channel', complete: 'Your first post is ready',
+    })[stage()])
+    const description = derived(() => ({
+      loading: 'Checking this installation…', marketing: 'Workspace setup is available on your own Postline install.', unavailable: '',
+      'sign-in': 'This workspace already has an owner account.', account: 'This account manages your workspace.',
+      workspace: 'Postline uses this time zone for the queue and analytics.',
+      channels: 'Connect a social network or use the built-in Blog. You can add more channels later.',
+      complete: 'Open the queue to see the status of your post.',
+    })[stage()])
+    const errorMessage = state('')
+    const busy = state(false)
+    const accountName = state('')
+    const email = state('')
+    const password = state('')
+    const confirmation = state('')
+    const workspaceName = state('')
+    const timezone = state(systemTimeZone())
+    const zones = ['UTC', ...Intl.supportedValuesOf('timeZone')]
+    const channels = state<Array<{ key: string, label: string }>>([])
+    const selectedChannel = state('')
+    const setupInProgress = useSessionStorage('postline.setup.in-progress', false)
+    const ownerNameInput = useRef('ownerNameInput')
+    const workspaceNameInput = useRef('workspaceNameInput')
+    const query = useRoute().query
+    const composerLink = derived(() => selectedChannel() ? '/composer?setup=1&target=' + encodeURIComponent(selectedChannel()) : '')
+
+    function showStage(next: Stage) {
+      stage.set(next)
+      if (next === 'account') void nextTick(() => ownerNameInput.current?.focus())
+      if (next === 'workspace') void nextTick(() => workspaceNameInput.current?.focus())
+    }
+
+    async function readJson(response: Response, fallback: string) {
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !payload?.ok) throw new Error(payload?.error || fallback)
+      return payload.data
+    }
+
+    function loadChannels(providers: ProviderStatus[]) {
+      const ready = providers.flatMap((provider) => {
+        const accounts = (provider.accounts || []).filter(account => account.canPublish)
+        if (accounts.length) return accounts.map(account => ({ key: provider.provider + ':' + account.id, label: targetLabel(provider.provider, account.handle) }))
+        return provider.canPublish ? [{ key: provider.provider, label: providerLabel(provider.provider) }] : []
+      })
+      channels.set(ready)
+      selectedChannel.set(ready.find(channel => channel.key !== 'blog')?.key || ready[0]?.key || '')
+    }
+
+    async function loadSetup() {
+      if (!{{ availableHere }}) {
+        showStage('marketing')
+        return
+      }
+      errorMessage.set('')
+      showStage('loading')
+      try {
+        const availability = await readJson(await fetch('/api/postline/setup/availability'), 'Could not check workspace setup.')
+        if (availability.available) {
+          showStage('account')
+          return
+        }
+        const response = await fetch('/api/postline/bootstrap')
+        if (response.status === 401) {
+          showStage('sign-in')
+          return
+        }
+        const data = await readJson(response, 'Could not load your workspace.')
+        workspaceName.set(data.workspace.workspaceName)
+        timezone.set(data.workspace.timezone)
+        loadChannels(data.providers)
+        if (query.step === 'complete') {
+          const queue = await readJson(await fetch('/api/postline/queue'), 'Could not check your first post.')
+          if (queue.items.some(item => item.status === 'published' || item.status === 'scheduled')) {
+            setupInProgress.set(false)
+            showStage('complete')
+            return
+          }
+        }
+        showStage(query.step === 'channels' || query.step === 'complete' ? 'channels' : 'workspace')
+      }
+      catch (error) {
+        errorMessage.set(error instanceof Error ? error.message : String(error))
+        showStage('unavailable')
+      }
+    }
+
+    async function createOwner() {
+      if (busy()) return
+      errorMessage.set('')
+      if (password() !== confirmation()) {
+        errorMessage.set('Passwords do not match.')
+        return
+      }
+      busy.set(true)
+      try {
+        const body = new URLSearchParams({ name: accountName().trim(), email: email().trim(), password: password() })
+        const response = await fetch('/api/register', { method: 'POST', body })
+        if (response.status === 403) {
+          showStage('sign-in')
+          return
+        }
+        const result = await readJson(response, 'Could not create the workspace account.')
+        const maxAge = Number(result.expires_in) || 60 * 60 * 24 * 30
+        useCookie('postline-signed-in', { maxAge }).set('1')
+        setupInProgress.set(true)
+        navigate('/setup?step=workspace', { reload: true, replace: true })
+      }
+      catch (error) {
+        errorMessage.set(error instanceof Error ? error.message : String(error))
+      }
+      finally { busy.set(false) }
+    }
+
+    async function saveProfile() {
+      if (busy()) return
+      busy.set(true)
+      errorMessage.set('')
+      try {
+        const body = new URLSearchParams({ workspaceName: workspaceName().trim(), timezone: timezone().trim() })
+        await readJson(await fetch('/api/postline/settings/workspace', { method: 'POST', body }), 'Could not save workspace details.')
+        // Reload the bootstrap so the updated name and time zone reach the workspace shell.
+        navigate('/setup?step=channels', { reload: true })
+      }
+      catch (error) {
+        errorMessage.set(error instanceof Error ? error.message : String(error))
+      }
+      finally { busy.set(false) }
+    }
+
+    function continueThroughChannels() {
+      setupInProgress.set(true)
+    }
+
+    onMount(() => { void loadSetup() })
+  </script>
+@endsection

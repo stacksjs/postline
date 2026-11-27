@@ -11,9 +11,9 @@
         <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">Connect your channels</h1>
         <p class="mb-0 mt-1.5 text-muted text-ui">Bring every place you publish into one calm, reliable workspace.</p>
       </div>
-      <a class="inline-flex gap-2 items-center justify-center px-4 h-9 w-fit font-semibold text-ink text-sm bg-panel hover:bg-raised border border-line rounded-xl shadow-sm transition-colors" href="/composer" data-stx-link>
+      <a class="inline-flex gap-2 items-center justify-center px-4 h-9 w-fit font-semibold text-ink text-sm bg-panel hover:bg-raised border border-line rounded-xl shadow-sm transition-colors" :href="returnToSetup() ? '/setup?step=channels' : '/composer'" data-stx-link>
         <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>
-        Open Composer
+        <span :text="returnToSetup() ? 'Continue setup' : 'Open Composer'">Open Composer</span>
       </a>
     </header>
 
@@ -203,6 +203,10 @@
     const networkApps = derived(() => bootstrap.data()?.networkApps ?? [])
     const oauthFeedback = state('')
     const oauthFailed = state(false)
+
+    const setupInProgress = useSessionStorage('postline.setup.in-progress', false)
+    const setupRequested = useRoute().query.setup === '1'
+    const returnToSetup = derived(() => setupRequested || setupInProgress())
 
     onMount(() => void bootstrap.load())
 

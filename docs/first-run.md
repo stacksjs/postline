@@ -6,9 +6,9 @@ A Postline install has a single owner.
 
 - **In the Mac app** there is no sign-in at all: the app only answers its own
   window.
-- **On a server** the first person to open `/login` and choose **First run?
-  Create the workspace account** becomes the owner. Registration closes as
-  soon as that account exists, so create it before you share the address.
+- **On a server** open `/setup` to create the owner account before you share
+  the address. Registration closes as soon as that account exists. Setup then
+  asks for the workspace name, time zone, and first publishing channel.
 
 Signing in afterwards takes the password, or a passkey added under
 **Settings > Account**. Two-factor sign-in with an authenticator app, and its
@@ -35,8 +35,8 @@ off, and you can set it up again under **Settings > Account**.
 
 ## Your first post
 
-1. Connect a network under **Settings > Channels**. Bluesky and Mastodon take
-   a minute; see [Connecting networks](./networks/index.md).
+1. Connect a network in setup or under **Settings > Channels**. You can also
+   start with the built-in Blog. See [Connecting networks](./networks/index.md).
 2. Write in the composer, pick the accounts, and **Publish**, or schedule it
    for later. Each network shows how many characters it allows.
 3. The Queue lists scheduled posts and what happened to each. Failures name
