@@ -2,6 +2,7 @@
   <meta name="color-scheme" content="light dark">
   {{-- The workspace is private: keep every signed-in page and the sign-in page out of search engines, and out of the sitemap, which skips noindex pages. --}}
   <meta name="robots" content="noindex, nofollow">
+  <meta name="stx-css-group" content="postline-workspace">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <CsrfScripts />
   <SessionScripts />
