@@ -91,6 +91,7 @@ const config: PickierOptions = {
     // `buddy upgrade`, and `types/` is rewritten by `buddy generate:types`.
     // 0.75.599 ships unused imports in both, which failed `buddy lint` here.
     // The desktop build's output: generated entries and built views.
+    '**/app/Desktop/bundle.generated.js',
     '**/storage/framework/desktop/**',
     '**/storage/framework/server/**',
     '**/storage/framework/types/**',
