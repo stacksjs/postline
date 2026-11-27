@@ -78,15 +78,24 @@
               <span :text="row.connected ? row.label : `Connect ${row.label}`"></span>
             </button>
           </div>
-          {{-- Per-network overrides. Rows are built by the script, one per
-              selected target. Hidden in thread mode: the server publishes a
-              thread's shared segments, so an override there would be a lie. --}}
-          <div class="hidden mb-3" data-variant-section>
-            <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg transition-colors" type="button" data-variant-toggle aria-expanded="false">
+          <div class="hidden mb-3" :class="{ 'hidden': !variantsAvailable() }" data-variant-section>
+            <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg transition-colors" type="button" data-variant-toggle :aria-expanded="variantsOpen()" @click="toggleVariantPanel">
               <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
-              <span data-variant-toggle-label>Customize per network</span>
+              <span :text="variantToggleLabel()">Customize per network</span>
             </button>
-            <div class="hidden gap-2 mt-2" data-variant-panel></div>
+            <div :if="variantsOpen() && variantsAvailable()" class="grid gap-2 mt-2" data-variant-panel>
+              <div class="grid gap-2 p-3 bg-panel-2 border border-line rounded-xl" x-for="row in variantRows()" :key="row.provider" :data-variant-row="row.provider">
+                <div class="flex gap-2 items-center justify-between">
+                  <span class="font-semibold text-ink text-xs" :text="row.name"></span>
+                  <button class="inline-flex items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel hover:bg-raised border border-line rounded-lg transition-colors" type="button" :data-variant-action="row.custom ? 'reset' : 'fork'" :data-variant-provider="row.provider" :text="row.custom ? 'Use shared text' : 'Customize'" @click="toggleVariant(row.provider)"></button>
+                </div>
+                <template :if="row.custom">
+                  <ComposerVariantField :provider="row.provider" :label="row.name + ' post body'" :value="row.text" :autoFocus="newVariant() === row.provider" @edit="editVariant(row.provider, $event)" />
+                </template>
+                <p class="m-0 text-xs" :class="row.over ? 'text-danger' : 'text-muted'" :text="row.description"></p>
+                <p :if="row.stale" class="m-0 text-warning text-xs" :data-variant-stale="row.provider">The shared text changed after you customised this.</p>
+              </div>
+            </div>
           </div>
           <label class="hidden gap-2 items-center mb-2.5" :class="{ 'hidden': !showImageUrl(), 'flex': showImageUrl() }" data-compose-image-row>
             <span class="h-4 w-4 text-muted i-hugeicons-image-01" aria-hidden="true"></span>
@@ -229,7 +238,7 @@
     // The accounts could not be read (offline, a server error): not the same
     // as having none, so it says so and offers to try again.
     const providersFailed = state(false)
-    const composerHandlers = { toggleProvider: null, retryProviders: null, scheduleChanged: null, setFormat: null, publish: null }
+    const composerHandlers = { toggleProvider: null, retryProviders: null, scheduleChanged: null, setFormat: null, publish: null, variantChanged: null }
     const composerFormat = state<ComposerFormat>('single')
     const editingQueued = state(Boolean(useRoute().query.edit))
     const canPublish = state(false)
@@ -312,6 +321,69 @@
     }
 
     const selectedNetworkIds = state<string[]>([])
+    const sharedCopy = state('')
+    const variants = state<Record<string, { text: string, shared: string }>>({})
+    const variantsOpen = state(false)
+    const newVariant = state('')
+    const variantsAvailable = derived(() => selectedNetworkIds().length > 0 && composerFormat() === 'single')
+    const variantsPayload = derived(() => variantsAvailable()
+      ? Object.fromEntries(Object.entries(variants()).filter(([, entry]) => entry.text.trim()).map(([provider, entry]) => [provider, entry.text]))
+      : {})
+    const variantToggleLabel = derived(() => {
+      if (variantsOpen()) return 'Hide per-network text'
+      const count = Object.keys(variantsPayload()).length
+      return count ? `Customize per network (${count})` : 'Customize per network'
+    })
+    const variantRows = derived(() => {
+      const selected = providerRows().filter(target => target.selected)
+      return selected.filter((target, index) => selected.findIndex(other => other.provider === target.provider) === index)
+        .map(({ provider, characterLimit: limit }) => {
+          const entry = variants()[provider]
+          const text = entry?.text ?? sharedCopy()
+          const length = countText(provider, text)
+          const count = limit ? `${length} / ${limit}` : String(length)
+          const name = providerLabel(provider)
+          const over = Boolean(limit) && length > limit
+          const description = entry
+            ? `${count} characters`
+            : `Uses the shared text${limit ? ` · ${count}` : ''}${over ? ` · Too long for ${name}` : ''}`
+          return { provider, name, text, description, over, custom: Boolean(entry), stale: Boolean(entry && entry.shared !== sharedCopy()) }
+        })
+    })
+
+    effect(() => {
+      if (!variantsAvailable()) {
+        variantsOpen.set(false)
+        newVariant.set('')
+      }
+    })
+
+    function toggleVariantPanel() {
+      newVariant.set('')
+      variantsOpen.set(!variantsOpen())
+    }
+
+    function toggleVariant(provider: string) {
+      const entries = { ...variants() }
+      if (entries[provider]) {
+        delete entries[provider]
+        newVariant.set('')
+      }
+      else {
+        entries[provider] = { text: sharedCopy(), shared: sharedCopy() }
+        newVariant.set(provider)
+      }
+      variants.set(entries)
+      composerHandlers.variantChanged?.()
+    }
+
+    function editVariant(provider: string, { value }: { value: string }) {
+      const entry = variants()[provider]
+      if (!entry) return
+      variants.set({ ...variants(), [provider]: { ...entry, text: value } })
+      composerHandlers.variantChanged?.()
+    }
+
     const acceptedImageTypes = POST_IMAGE_FORMATS.join(',')
     const attachInput = useRef('attachInput')
     const dragDepth = state(0)
@@ -476,10 +548,6 @@
       const connection = root.querySelector('[data-bluesky-connection]')
       const connectionDot = root.querySelector('[data-bluesky-connection-dot]')
       const connectionLabel = root.querySelector('[data-bluesky-connection-label]')
-      const variantSection = root.querySelector('[data-variant-section]')
-      const variantToggle = root.querySelector('[data-variant-toggle]')
-      const variantToggleLabel = root.querySelector('[data-variant-toggle-label]')
-      const variantPanel = root.querySelector('[data-variant-panel]')
 
       /** The images attached in this session, with their alt text; saved ones are not included. */
       const attachedFiles = () => attachedImages().filter(image => image.file).map(image => ({ file: image.file, alt: image.alt.trim() }))
@@ -671,6 +739,7 @@
           return {
             key: target.key,
             provider: target.provider,
+            characterLimit: target.characterLimit,
             icon: target.multi ? providerIcon(target.provider) : '',
             label,
             connected,
@@ -704,182 +773,7 @@
 
       
       
-      // Per-network overrides: provider -> { text, shared }. `shared` is the
-      // body captured when the override was created, so a later edit to the
-      // shared text can be reported as having left this copy behind.
-      const variants = new Map()
-      let variantsOpen = false
-
-      const sharedBody = () => activeTextarea()?.value || ''
-
-      /**
-       * Overrides only apply to a single-post composer: `publishThread` strips
-       * them server-side. Rendering and payload building share this one test so
-       * a state that cannot show an override can never send one either.
-       */
-      const variantsAvailable = () => selectedConnected().length > 0 && composerFormat() === 'single'
-
-      /** Overrides worth sending: blank ones inherit, so they are dropped. */
-      const variantsPayload = () => {
-        const payload = {}
-        if (!variantsAvailable()) return payload
-        // Overrides are per network: two Bluesky accounts share the Bluesky one.
-        variants.forEach((entry, provider) => {
-          if (entry.text.trim()) payload[provider] = entry.text
-        })
-        return payload
-      }
-
-      /** The body a provider will actually receive — mirrors resolveVariantBody. */
-      const bodyFor = (provider) => {
-        const entry = variantsAvailable() ? variants.get(provider) : undefined
-        return entry && entry.text.trim() ? entry.text : sharedBody()
-      }
-
-      const isVariantStale = entry => entry.shared !== sharedBody()
-
-      const variantRow = (status) => {
-        const provider = status.provider
-        const label = providerLabel(provider)
-        const entry = variants.get(provider)
-        const limit = status.characterLimit || 0
-
-        const row = document.createElement('div')
-        row.className = 'grid gap-2 p-3 bg-panel-2 border border-line rounded-xl'
-        row.dataset.variantRow = provider
-
-        const head = document.createElement('div')
-        head.className = 'flex gap-2 items-center justify-between'
-
-        const name = document.createElement('span')
-        name.className = 'font-semibold text-ink text-xs'
-        name.textContent = label
-
-        const action = document.createElement('button')
-        action.type = 'button'
-        action.className = 'inline-flex items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel hover:bg-raised border border-line rounded-lg transition-colors'
-        action.dataset.variantAction = entry ? 'reset' : 'fork'
-        action.dataset.variantProvider = provider
-        action.textContent = entry ? 'Use shared text' : 'Customize'
-
-        head.append(name, action)
-        row.append(head)
-
-        if (!entry) {
-          const inherit = document.createElement('p')
-          inherit.className = 'text-muted text-xs'
-          const length = lengthFor(provider, sharedBody())
-          inherit.textContent = limit && length > limit
-            ? `Uses the shared text - ${length} / ${limit}, too long for ${label}`
-            : `Uses the shared text${limit ? ` - ${length} / ${limit}` : ''}`
-          inherit.dataset.variantInherit = provider
-          row.append(inherit)
-          return row
-        }
-
-        const area = document.createElement('textarea')
-        area.className = 'p-2 min-h-20 w-full leading-relaxed text-ink text-sm bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid resize-none'
-        area.value = entry.text
-        area.setAttribute('aria-label', `${label} post body`)
-        area.dataset.variantInput = provider
-        row.append(area)
-
-        const meta = document.createElement('p')
-        meta.className = 'text-muted text-xs'
-        meta.dataset.variantMeta = provider
-        row.append(meta)
-
-        // Always present, shown or hidden by updateVariantMeta. Creating it up
-        // front means staleness can be re-evaluated on every keystroke without
-        // rebuilding the row and stealing focus.
-        const stale = document.createElement('p')
-        stale.className = 'hidden text-warning text-xs'
-        stale.dataset.variantStale = provider
-        stale.textContent = 'The shared text changed after you customised this.'
-        row.append(stale)
-
-        return row
-      }
-
-      /**
-       * Refresh per-row counts and the staleness notice in place, so typing in
-       * either the shared body or an override never rebuilds the panel.
-       */
-      const updateVariantMeta = () => {
-        selectedNetworks().forEach((status) => {
-          const provider = status.provider
-          const limit = status.characterLimit || 0
-          const entry = variants.get(provider)
-          const inherit = variantPanel?.querySelector(`[data-variant-inherit="${provider}"]`)
-          if (inherit) {
-            const length = lengthFor(provider, sharedBody())
-            const over = Boolean(limit) && length > limit
-            inherit.textContent = over
-              ? `Uses the shared text - ${length} / ${limit}, too long for ${providerLabel(provider)}`
-              : `Uses the shared text${limit ? ` - ${length} / ${limit}` : ''}`
-            inherit.classList.toggle('text-danger', over)
-            inherit.classList.toggle('text-muted', !over)
-          }
-          const meta = variantPanel?.querySelector(`[data-variant-meta="${provider}"]`)
-          if (meta && entry) {
-            const length = lengthFor(provider, entry.text)
-            const over = Boolean(limit) && length > limit
-            meta.textContent = limit ? `${length} / ${limit} characters` : `${length} characters`
-            meta.classList.toggle('text-danger', over)
-            meta.classList.toggle('text-muted', !over)
-          }
-          const stale = variantPanel?.querySelector(`[data-variant-stale="${provider}"]`)
-          if (stale) stale.classList.toggle('hidden', !entry || !isVariantStale(entry))
-        })
-      }
-
-      const updateVariantToggleLabel = () => {
-        if (!variantToggleLabel) return
-        const active = Object.keys(variantsPayload()).length
-        variantToggleLabel.textContent = variantsOpen
-          ? 'Hide per-network text'
-          : active
-            ? `Customize per network (${active})`
-            : 'Customize per network'
-      }
-
-      /**
-       * Replace one row after a fork/reset instead of the whole panel, so the
-       * other rows keep their caret, selection and undo history.
-       */
-      const refreshVariantRow = (provider) => {
-        const existing = variantPanel?.querySelector(`[data-variant-row="${provider}"]`)
-        const status = selectedNetworks().find(item => item.provider === provider)
-        if (!existing || !status) {
-          renderVariantPanel()
-          return
-        }
-        const replacement = variantRow(status)
-        existing.replaceWith(replacement)
-        replacement.querySelector('[data-variant-input]')?.focus()
-        updateVariantToggleLabel()
-        updateVariantMeta()
-      }
-
-      const renderVariantPanel = () => {
-        if (!variantSection || !variantPanel) return
-        const networks = selectedNetworks()
-        const available = variantsAvailable()
-        variantSection.classList.toggle('hidden', !available)
-        if (!available) variantsOpen = false
-
-        updateVariantToggleLabel()
-        variantToggle?.setAttribute('aria-expanded', variantsOpen ? 'true' : 'false')
-        variantPanel.classList.toggle('hidden', !variantsOpen)
-        variantPanel.classList.toggle('grid', variantsOpen)
-        if (!variantsOpen) {
-          variantPanel.replaceChildren()
-          return
-        }
-
-        variantPanel.replaceChildren(...networks.map(variantRow))
-        updateVariantMeta()
-      }
+      const bodyFor = provider => variantsPayload()[provider] || sharedCopy()
 
       const renderConnectionSummary = () => {
         const connected = connectedProviders()
@@ -901,7 +795,6 @@
 
       const updatePublishability = () => {
         canPublish.set(selectedConnected().length > 0 && (!editParam || editingId !== null))
-        renderVariantPanel()
         updateCount()
       }
 
@@ -988,7 +881,7 @@
           action: postAction(),
           scheduledIso: scheduledIso(),
           posts: posts.map(post => ({ text: textareaFor(post)?.value || '' })),
-          variants: Array.from(variants.entries())
+          variants: Object.entries(variants())
             .map(([provider, entry]) => ({ provider, text: entry.text, shared: entry.shared })),
         })
       }
@@ -1009,10 +902,7 @@
         savedActiveIndex = draft.mode === 'thread' ? Math.max(0, Math.min(draft.activeIndex, draft.posts.length - 1)) : 0
         postCounter = draft.posts.length
         activePost = allPosts()[savedActiveIndex] || root.querySelector('[data-composer-post]')
-        variants.clear()
-        draft.variants.forEach((entry) => {
-          variants.set(entry.provider, { text: entry.text, shared: entry.shared })
-        })
+        variants.set(Object.fromEntries(draft.variants.map(entry => [entry.provider, { text: entry.text, shared: entry.shared }])))
       }
 
       
@@ -1032,6 +922,7 @@
       const updateCount = () => {
         const textarea = activeTextarea()
         if (!textarea || !count) return
+        sharedCopy.set(textarea.value)
         const length = lengthFor(tightestProvider(), textarea.value)
         const limit = effectiveLimit()
         const over = overLimitProviders()
@@ -1050,7 +941,6 @@
         count.classList.toggle('text-warning', over.length === 0 && length > limit - 40)
         count.classList.toggle('text-muted', over.length === 0 && length <= limit - 40)
 
-        updateVariantMeta()
       }
 
       const renderLinkPreview = (post, preview) => {
@@ -1156,11 +1046,6 @@
         postsRoot?.append(post)
         renamePosts()
         selectPost(post, { skipSave: true })
-        // Availability depends on the post count, so it has to be recomputed
-        // here: a second post makes this a thread, where overrides never apply.
-        renderVariantPanel()
-        // No toast: the new editor appears and takes focus, so saying so is
-        // narrating what the user can already see.
         if (options.focus !== false) textareaFor(post)?.focus()
         if (options.save !== false) saveDraft()
         return post
@@ -1179,7 +1064,6 @@
         post.remove()
         renamePosts()
         selectPost(next || root.querySelector('[data-composer-post]'), { skipSave: true })
-        renderVariantPanel()
         saveDraft()
         // An empty post goes without a word. One with writing in it can come
         // back: the node is kept, so Undo puts back exactly what was there.
@@ -1195,7 +1079,6 @@
               parent.insertBefore(post, before?.isConnected ? before : null)
               renamePosts()
               selectPost(post, { skipSave: true })
-              renderVariantPanel()
               saveDraft()
             },
           },
@@ -1267,11 +1150,8 @@
 
         // Overrides. `shared` is seeded from the stored body so a restored
         // override only reads as stale once this edit actually changes the text.
-        variants.clear()
-        Object.entries(item.variants || {}).forEach(([provider, text]) => {
-          if (typeof text === 'string' && text.trim())
-            variants.set(provider, { text, shared: item.text || '' })
-        })
+        variants.set(Object.fromEntries(Object.entries(item.variants || {}).flatMap(([provider, text]) =>
+          typeof text === 'string' && text.trim() ? [[provider, { text, shared: item.text || '' }]] : [])))
 
         // Targets: select exactly the post's accounts (intersected with what is
         // still connected). `targets` holds specs; older payloads only had
@@ -1452,8 +1332,7 @@
           resetPostOptions()
           renderLinkPreview(activePost, null)
           // Same reason as the publish path: the overrides went with that post.
-          variants.clear()
-          renderVariantPanel()
+          variants.set({})
           updateCount()
           saveDraft()
           setStatus(
@@ -1573,8 +1452,7 @@
           // Overrides belong to the post that just went out. Leaving them set
           // would send the previous post's per-network copy with the next one,
           // while the shared body reads as empty — before saveDraft persists it.
-          variants.clear()
-          renderVariantPanel()
+          variants.set({})
           updateCount()
           saveDraft()
           clearAttachment()
@@ -1677,45 +1555,11 @@
           refreshButton.removeAttribute('disabled')
         }
       })
-            variantToggle?.addEventListener('click', () => {
-        variantsOpen = !variantsOpen
-        renderVariantPanel()
-      })
-      variantPanel?.addEventListener('click', (event) => {
-        const target = event.target
-        if (!(target instanceof HTMLElement)) return
-        const button = target.closest('[data-variant-action]')
-        if (!button) return
-        const provider = button.dataset.variantProvider
-        if (!provider) return
-        if (button.dataset.variantAction === 'fork') {
-          // Seed the override from the shared body so the user edits down from
-          // what they already wrote rather than starting on an empty box.
-          variants.set(provider, { text: sharedBody(), shared: sharedBody() })
-        }
-        else {
-          variants.delete(provider)
-        }
-        // Swap just this row: rebuilding the panel would drop every other row's
-        // caret and undo history, and leave focus on <body>.
-        refreshVariantRow(provider)
+      composerHandlers.variantChanged = () => {
+        markEdited()
         updateCount()
-        saveDraft()
-      })
-      variantPanel?.addEventListener('input', (event) => {
-        const target = event.target
-        if (!(target instanceof HTMLElement)) return
-        const provider = target.dataset.variantInput
-        if (!provider) return
-        const entry = variants.get(provider)
-        if (!entry) return
-        entry.text = target.value
-        // An override changing can flip that provider's over-limit state, which
-        // the footer counter and chip dots also report on.
-        updateCount()
-        updateVariantToggleLabel()
         queueDraftSave()
-      })
+      }
       searchButton?.addEventListener('click', () => {
         const text = activeTextarea()?.value.trim()
         setStatus(text ? `Searching local drafts for: ${text.slice(0, 80)}` : 'Write a phrase first, then search local drafts.', text ? 'success' : 'error')

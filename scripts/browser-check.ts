@@ -463,6 +463,27 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
       editor.focus()
     })()`)
     await waitUntil('The shared grapheme counter', () => evaluate<boolean>(cdp, "document.querySelector('[data-bluesky-count]').textContent.includes('1 / 300')"), 5_000)
+    const variantToggle = "document.querySelector('[data-variant-toggle]')"
+    const variant = "document.querySelector('[data-variant-input=bluesky]')"
+    await evaluate(cdp, `${variantToggle}.click()`)
+    const customize = "document.querySelector('[data-variant-action=fork][data-variant-provider=bluesky]')"
+    await waitUntil('Bluesky can customize the shared text', () => evaluate<boolean>(cdp, `Boolean(${customize})`), 5_000)
+    await evaluate(cdp, `${customize}.click()`)
+    await waitUntil('The Bluesky override copies shared text and takes focus', () => evaluate<boolean>(cdp, `
+      ${variant}?.value === ${JSON.stringify(text)} && document.activeElement === ${variant}`), 5_000)
+    await evaluate(cdp, `${variant}.value = 'a'.repeat(301)
+      ${variant}.dispatchEvent(new Event('input', { bubbles: true }))
+      ${variant}.setSelectionRange(2, 2)`)
+    await cdp.send('Input.insertText', { text: 'Z' })
+    await waitUntil('Typing preserves the override caret and updates the network limit', () => evaluate<boolean>(cdp, `
+      ${variant}.selectionStart === 3 && ${variant}.value.startsWith('aaZ')
+        && ${target}.getAttribute('data-over') === 'true'
+        && document.querySelector('[data-bluesky-count]').textContent.includes('too long for Bluesky')`), 5_000)
+    await evaluate(cdp, "document.querySelector('[data-variant-action=reset][data-variant-provider=bluesky]').click()")
+    await waitUntil('Resetting the override restores the shared copy and count', () => evaluate<boolean>(cdp, `
+      !${variant} && ${target}.getAttribute('data-over') !== 'true'
+        && document.querySelector('[data-bluesky-count]').textContent.includes('1 / 300')`), 5_000)
+    await evaluate(cdp, `${variantToggle}.click()`)
     const instagram = "document.querySelector('[data-provider-toggle=\"instagram:102\"]')"
     await evaluate(cdp, `(() => {
       ${instagram}.click()

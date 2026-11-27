@@ -1,0 +1,30 @@
+<script client>
+const label = useReactiveProp('label', '')
+const provider = useReactiveProp('provider', '')
+const initialValue = useReactiveProp('value', '')
+const autoFocus = useReactiveProp('autoFocus', false)
+const body = state(initialValue())
+const field = useRef('field')
+const emit = defineEmits(['edit'])
+
+watch(initialValue, (value) => {
+  if (body() !== value) body.set(value)
+})
+
+function updateBody(event: Event) {
+  emit('edit', { value: (event.target as HTMLTextAreaElement).value })
+}
+
+onMount(() => {
+  if (autoFocus()) field.current?.focus()
+})
+</script>
+
+<textarea
+  class="p-2 min-h-20 w-full leading-relaxed text-ink text-sm bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid resize-none"
+  ref="field"
+  :aria-label="label()"
+  :data-variant-input="provider()"
+  x-model="body"
+  @input="updateBody"
+></textarea>
