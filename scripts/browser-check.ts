@@ -3170,6 +3170,42 @@ async function checkSpanishSettings(cdp: Cdp): Promise<void> {
     return !${securitySetup}?.getClientRects().length && result.data?.twoFactor === false
   })()`), 5_000)
 
+  await evaluate(cdp, `${tab('data')}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  const data = `${settings}.querySelector('[data-settings-pane=data]')`
+  const phrase = `${data}.querySelector('[data-delete-phrase] input')`
+  const deleteButton = `[...${data}.querySelectorAll('button')].find(button => button.textContent.trim() === 'Borrar todos los datos')`
+  await waitUntil('Spanish Data shows the export and locks deletion behind the confirmation phrase', () => evaluate<boolean>(cdp, `
+    ${data}.querySelector('a[download]')?.textContent.trim() === 'Exportar…'
+      && ${data}.innerText.includes('Elegir un archivo…')
+      && (${deleteButton})?.disabled === true
+  `), 5_000)
+  await evaluate(cdp, `(async () => {
+    const archive = await fetch(${data}.querySelector('a[download]').href)
+    if (!archive.ok) throw new Error('Could not export the browser fixture')
+    const transfer = new DataTransfer()
+    transfer.items.add(new File([await archive.blob()], 'postline-fixture.json', { type: 'application/json' }))
+    const input = ${data}.querySelector('input[type=file]')
+    input.files = transfer.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  const archiveMessage = `${data}.querySelector('[data-workspace-data-message]')`
+  await waitUntil('The real archive reimport displays a result', () => evaluate<boolean>(cdp, `Boolean(${archiveMessage}?.textContent.trim())`), 10_000)
+  const importSummary = await evaluate<string>(cdp, `${archiveMessage}.textContent.trim()`)
+  if (!importSummary.includes('Se importaron 0 publicaciones') || !/Se conserv(?:ó|aron) [1-9][0-9]* elementos? existentes?/.test(importSummary))
+    throw new Error(`Expected the Spanish archive summary for existing records. Received: ${importSummary}`)
+  await evaluate(cdp, `${phrase}.focus()`)
+  await cdp.send('Input.insertText', { text: 'DELETE EVERYTHING' })
+  await waitUntil('The confirmation phrase makes the Spanish delete button available', () => evaluate<boolean>(cdp, `(${deleteButton})?.disabled === false`), 5_000)
+  await evaluate(cdp, `(${deleteButton}).focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The Spanish deletion dialog initially focuses Cancel', () => evaluate<boolean>(cdp, `
+    document.activeElement?.textContent === 'Cancelar'
+      && document.activeElement.closest('[role=alertdialog]')?.textContent.includes('Esta acción es irreversible.')
+  `), 5_000)
+  await pressKey(cdp, 'Escape', 27)
+  await waitUntil('Cancel returns to the workspace data controls', () => evaluate<boolean>(cdp, `!document.querySelector('[role=alertdialog]')`), 5_000)
+
   await evaluate(cdp, `${tab('notifications')}.focus()`)
   await pressKey(cdp, 'Enter', 13)
   const activity = `${settings}.querySelector('[data-setting=activity-alerts] button')`

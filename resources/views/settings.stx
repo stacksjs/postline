@@ -44,7 +44,7 @@ export const settingsAppearanceOptions = [
           <SettingsSidebarItem id="composer" label="{{ settingsText.composer }}" icon="i-hugeicons-pencil-edit-02" tone="orange" />
           <SettingsSidebarItem id="ai" label="{{ settingsText.ai }}" icon="i-hugeicons-sparkles" tone="purple" keywords="anthropic openai ollama claude api key campaign planner" />
           <SettingsSidebarItem id="deletion" label="{{ settingsText.cleanup }}" icon="i-hugeicons-delete-02" tone="red" keywords="retention delete cleanup" />
-          <SettingsSidebarItem id="data" label="{{ settingsText.data }}" icon="i-hugeicons-hard-drive" tone="grey" keywords="export import backup move delete everything archive" />
+          <SettingsSidebarItem id="data" label="{{ settingsText.data }}" icon="i-hugeicons-hard-drive" tone="grey" keywords="{{ settingsText.dataKeywords }}" />
         </SettingsSidebarGroup>
         <div x-show="!ownWindow()">
           <SettingsSidebarGroup>
@@ -226,25 +226,25 @@ export const settingsAppearanceOptions = [
         install, or delete everything here. Sign-ins and keys never travel.
       --}}
       <SettingsPane id="data" title="{{ settingsText.data }}">
-        <SettingsGroup footer="One JSON file with your posts and their results, threads, campaigns, blog posts, Listening rules, settings and the images on queued posts. Network sign-ins, app keys and the AI key stay here; connect them again on the other install.">
-          <SettingsRow label="Export this workspace" setting="export" keywords="download backup archive">
-            <a class="inline-flex items-center px-3 h-7 text-ink text-ui bg-panel border border-line rounded-md" href="/api/postline/settings/export" download data-no-router>Export…</a>
+        <SettingsGroup footer="{{ settingsText.archiveHelp }}">
+          <SettingsRow label="{{ settingsText.exportWorkspace }}" setting="export" keywords="{{ settingsText.exportKeywords }}">
+            <a class="inline-flex items-center px-3 h-7 text-ink text-ui bg-panel border border-line rounded-md" href="/api/postline/settings/export" download data-no-router>{{ settingsText.exportArchive }}</a>
           </SettingsRow>
-          <SettingsRow label="Import an export" description="From another Postline install, up to 64 MB. Anything already here is left as it is." setting="import" keywords="restore move">
+          <SettingsRow label="{{ settingsText.importArchive }}" description="{{ settingsText.importHelp }}" setting="import" keywords="{{ settingsText.importKeywords }}">
             <label class="inline-flex items-center px-3 h-7 text-ui bg-panel border border-line rounded-md cursor-pointer">
-              <span :text="dataBusy() ? 'Working…' : 'Choose a file…'">Choose a file…</span>
+              <span :text="dataBusy() ? copy.archiveBusy : copy.chooseArchive">{{ settingsText.chooseArchive }}</span>
               <input class="sr-only" type="file" accept=".json,application/json" @change="importWorkspace($event)">
             </label>
           </SettingsRow>
         </SettingsGroup>
-        <SettingsGroup title="Delete everything" footer="Deletes every post, result, campaign, blog post, Listening rule, inbox copy, connected account, network app and image in this workspace, on this install. Your posts on the networks themselves are not touched. Export first if you may want any of it.">
-          <SettingsRow label="Type DELETE EVERYTHING" setting="delete-everything" keywords="wipe reset erase">
+        <SettingsGroup title="{{ settingsText.deleteDataHeading }}" footer="{{ settingsText.deleteDataHelp }}">
+          <SettingsRow label="{{ settingsText.deleteDataPhrase }}" setting="delete-everything" keywords="{{ settingsText.deleteDataKeywords }}">
             <TextInput variant="mac" v-model:value="deletePhrase" placeholder="DELETE EVERYTHING" autocomplete="off" data-delete-phrase />
           </SettingsRow>
         </SettingsGroup>
         <div class="flex gap-2 items-center justify-end mt-3">
-          <p class="m-0 mr-auto text-xs" :data-tone="dataTone()" x-show="dataMessage()" :text="dataMessage()" role="status" aria-live="polite"></p>
-          <Button appearance="mac" variant="danger" :disabled="dataBusy() || deletePhrase() !== 'DELETE EVERYTHING'" @click="deleteEverything">Delete Everything</Button>
+          <p class="m-0 mr-auto text-xs" :data-tone="dataTone()" x-show="dataMessage()" :text="dataMessage()" role="status" aria-live="polite" data-workspace-data-message></p>
+          <Button appearance="mac" variant="danger" :disabled="dataBusy() || deletePhrase() !== 'DELETE EVERYTHING'" @click="deleteEverything">{{ settingsText.deleteDataAction }}</Button>
         </div>
       </SettingsPane>
 
@@ -355,6 +355,7 @@ export const settingsAppearanceOptions = [
 
 
   <script client>
+    import type { ImportReport } from '../../app/Services/WorkspaceArchiveService'
     import type { ComposerFormat } from '../functions/composer-draft'
     import type { DesktopAlertsBridge } from '../functions/desktop-alerts'
     import { COMPOSER_AUTOSAVE_KEY, COMPOSER_DEFAULT_FORMAT_KEY } from '../functions/composer-draft'
@@ -862,30 +863,42 @@ export const settingsAppearanceOptions = [
       }
     }
 
+    const archiveList = new Intl.ListFormat(language, { type: 'conjunction' })
+    const archiveCount = (count: number, forms: { one: string, other: string }): string =>
+      forms[plural.select(count) === 'one' ? 'one' : 'other'].replace('{count}', () => numbers.format(count))
+
     const importWorkspace = (event: Event): Promise<void> => dataAction(async () => {
       const file = (event.target as HTMLInputElement | null)?.files?.[0]
       if (!file) return ''
       const body = new FormData()
       body.set('archive', await file.text())
-      const payload = await requestJson('/api/postline/settings/import', { method: 'POST', body }, 'The import failed.')
-      const r = payload.data.report
-      const presets = r.composerPresets ? `, ${r.composerPresets} saved Composer items` : ''
-      const links = r.trackedLinks ? `, ${r.trackedLinks} tracked links` : ''
-      const feeds = r.draftFeeds ? `, ${r.draftFeeds} draft feeds` : ''
-      const slots = r.postingSlots ? `, ${r.postingSlots} posting slots` : ''
-      const repeats = r.recurringPosts ? `, ${r.recurringPosts} recurring posts` : ''
-      return `Imported ${r.posts} posts, ${r.campaigns} campaigns, ${r.blogPosts} blog posts, ${r.monitors} Listening rules${presets}${links}${feeds}${slots}${repeats} and ${r.media} images${r.skipped ? `; ${r.skipped} already here were left alone` : ''}.`
+      const payload = await requestJson('/api/postline/settings/import', { method: 'POST', body }, copy.importFailed)
+      const report = payload.data.report as ImportReport
+      const items = [
+        archiveCount(report.posts, copy.importPosts),
+        archiveCount(report.campaigns, copy.importCampaigns),
+        archiveCount(report.blogPosts, copy.importBlogPosts),
+        archiveCount(report.monitors, copy.importMonitors),
+      ]
+      if (report.composerPresets) items.push(archiveCount(report.composerPresets, copy.importPresets))
+      if (report.trackedLinks) items.push(archiveCount(report.trackedLinks, copy.importLinks))
+      if (report.draftFeeds) items.push(archiveCount(report.draftFeeds, copy.importFeeds))
+      if (report.postingSlots) items.push(archiveCount(report.postingSlots, copy.importSlots))
+      if (report.recurringPosts) items.push(archiveCount(report.recurringPosts, copy.importRepeats))
+      items.push(archiveCount(report.media, copy.importImages))
+      const summary = copy.importResults.replace('{items}', () => archiveList.format(items))
+      return report.skipped ? `${summary} ${archiveCount(report.skipped, copy.importSkipped)}` : summary
     })
 
     const deleteEverything = async (): Promise<void> => {
       const confirmation = deletePhrase()
-      if (!await stxConfirm('This cannot be undone.', { title: 'Delete everything in this workspace?', type: 'error', confirmText: 'Delete everything' })) return
+      if (!await stxConfirm(copy.deleteDataWarning, { title: copy.deleteDataQuestion, type: 'error', confirmText: copy.deleteDataConfirm, cancelText: copy.cancelDataDeletion })) return
       await dataAction(async () => {
         const body = new FormData()
         body.set('confirmation', confirmation)
-        await requestJson('/api/postline/settings/delete-everything', { method: 'POST', body }, 'Nothing was deleted.')
+        await requestJson('/api/postline/settings/delete-everything', { method: 'POST', body }, copy.deleteDataFailed)
         deletePhrase.set('')
-        return 'Everything in this workspace was deleted.'
+        return copy.deleteDataCompleted
       })
     }
 

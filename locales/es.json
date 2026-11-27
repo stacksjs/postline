@@ -1149,7 +1149,21 @@
         "signOutEverywhereHelp": "Cierra todas las sesiones y revoca todos los tokens, incluido el de este dispositivo. Úsalo si pierdes un dispositivo o crees que se ha filtrado un token.",
         "signOutEverywhereLabel": "Cerrar sesión en todos los dispositivos",
         "signOutEverywhere": "Cerrar todas las sesiones",
-        "everywhereKeywords": "sesiones dispositivos revocar tokens"
+        "everywhereKeywords": "sesiones dispositivos revocar tokens",
+        "dataKeywords": "exportar importar copia de seguridad trasladar borrar todo archivo",
+        "archiveHelp": "Un archivo JSON con tus publicaciones y sus resultados, hilos, campañas, entradas del blog, reglas de escucha, ajustes e imágenes de la cola. Vuelve a conectar las redes y configura las claves de aplicación y de IA en la otra instalación.",
+        "exportWorkspace": "Exportar este espacio de trabajo",
+        "exportArchive": "Exportar…",
+        "exportKeywords": "descargar copia de seguridad archivo",
+        "importArchive": "Importar un archivo exportado",
+        "importHelp": "Archivos de otra instalación de Postline, de hasta 64 MB. La importación aplica los ajustes exportados y añade los elementos que faltan.",
+        "importKeywords": "restaurar trasladar",
+        "chooseArchive": "Elegir un archivo…",
+        "deleteDataHeading": "Borrar todos los datos",
+        "deleteDataHelp": "Elimina las publicaciones, resultados, campañas, entradas del blog, reglas de escucha, mensajes, cuentas conectadas, aplicaciones de red e imágenes de esta instalación. Solo se eliminan los datos locales. Exporta una copia si puedes necesitar esos datos.",
+        "deleteDataPhrase": "Escribe DELETE EVERYTHING",
+        "deleteDataKeywords": "borrar restablecer eliminar",
+        "deleteDataAction": "Borrar todos los datos"
       },
       "client": {
         "checking": "Comprobando",
@@ -1230,7 +1244,61 @@
         "twoFactorOff": "La autenticación de dos factores está desactivada.",
         "codesGenerated": "Se generaron nuevos códigos de recuperación. Los anteriores dejaron de funcionar.",
         "codesCopied": "Códigos copiados.",
-        "codesCopyFailed": "No se pudieron copiar los códigos. Selecciónalos para copiarlos manualmente."
+        "codesCopyFailed": "No se pudieron copiar los códigos. Selecciónalos para copiarlos manualmente.",
+        "archiveBusy": "Procesando…",
+        "chooseArchive": "Elegir un archivo…",
+        "importFailed": "No se pudo completar la importación.",
+        "importResults": "Se importaron {items}.",
+        "importSkipped": {
+          "one": "Se conservó {count} elemento existente.",
+          "other": "Se conservaron {count} elementos existentes."
+        },
+        "importPosts": {
+          "one": "{count} publicación",
+          "other": "{count} publicaciones"
+        },
+        "importCampaigns": {
+          "one": "{count} campaña",
+          "other": "{count} campañas"
+        },
+        "importBlogPosts": {
+          "one": "{count} entrada del blog",
+          "other": "{count} entradas del blog"
+        },
+        "importMonitors": {
+          "one": "{count} regla de escucha",
+          "other": "{count} reglas de escucha"
+        },
+        "importPresets": {
+          "one": "{count} elemento guardado del editor",
+          "other": "{count} elementos guardados del editor"
+        },
+        "importLinks": {
+          "one": "{count} enlace con seguimiento",
+          "other": "{count} enlaces con seguimiento"
+        },
+        "importFeeds": {
+          "one": "{count} fuente para borradores",
+          "other": "{count} fuentes para borradores"
+        },
+        "importSlots": {
+          "one": "{count} turno de publicación",
+          "other": "{count} turnos de publicación"
+        },
+        "importRepeats": {
+          "one": "{count} publicación recurrente",
+          "other": "{count} publicaciones recurrentes"
+        },
+        "importImages": {
+          "one": "{count} imagen",
+          "other": "{count} imágenes"
+        },
+        "deleteDataWarning": "Esta acción es irreversible.",
+        "deleteDataQuestion": "¿Borrar todos los datos de este espacio de trabajo?",
+        "deleteDataConfirm": "Borrar todos los datos",
+        "deleteDataFailed": "No se eliminó nada.",
+        "deleteDataCompleted": "Se borraron todos los datos de este espacio de trabajo.",
+        "cancelDataDeletion": "Cancelar"
       }
     },
     "queuePanels": {

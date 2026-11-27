@@ -1149,7 +1149,21 @@
         "signOutEverywhereHelp": "Ends every session and revokes every token, on every browser and device, this one included. Use it if a device is lost or a token may have leaked.",
         "signOutEverywhereLabel": "Sign out everywhere",
         "signOutEverywhere": "Sign Out Everywhere",
-        "everywhereKeywords": "sessions devices revoke tokens"
+        "everywhereKeywords": "sessions devices revoke tokens",
+        "dataKeywords": "export import backup move delete everything archive",
+        "archiveHelp": "One JSON file with your posts and their results, threads, campaigns, blog posts, Listening rules, settings and the images on queued posts. Network sign-ins, app keys and the AI key stay here; connect them again on the other install.",
+        "exportWorkspace": "Export this workspace",
+        "exportArchive": "Export…",
+        "exportKeywords": "download backup archive",
+        "importArchive": "Import an export",
+        "importHelp": "Up to 64 MB from another Postline install. Applies the exported workspace settings and adds missing records.",
+        "importKeywords": "restore move",
+        "chooseArchive": "Choose a file…",
+        "deleteDataHeading": "Delete everything",
+        "deleteDataHelp": "Deletes every post, result, campaign, blog post, Listening rule, inbox copy, connected account, network app and image in this workspace, on this install. Your posts on the networks themselves are not touched. Export first if you may want any of it.",
+        "deleteDataPhrase": "Type DELETE EVERYTHING",
+        "deleteDataKeywords": "wipe reset erase",
+        "deleteDataAction": "Delete Everything"
       },
       "client": {
         "checking": "Checking",
@@ -1230,7 +1244,61 @@
         "twoFactorOff": "Two-factor sign-in is off.",
         "codesGenerated": "New recovery codes made. The old ones no longer work.",
         "codesCopied": "Copied.",
-        "codesCopyFailed": "Copy did not work here; select the codes instead."
+        "codesCopyFailed": "Copy did not work here; select the codes instead.",
+        "archiveBusy": "Working…",
+        "chooseArchive": "Choose a file…",
+        "importFailed": "The import failed.",
+        "importResults": "Imported {items}.",
+        "importSkipped": {
+          "one": "{count} existing item was kept.",
+          "other": "{count} existing items were kept."
+        },
+        "importPosts": {
+          "one": "{count} post",
+          "other": "{count} posts"
+        },
+        "importCampaigns": {
+          "one": "{count} campaign",
+          "other": "{count} campaigns"
+        },
+        "importBlogPosts": {
+          "one": "{count} blog post",
+          "other": "{count} blog posts"
+        },
+        "importMonitors": {
+          "one": "{count} Listening rule",
+          "other": "{count} Listening rules"
+        },
+        "importPresets": {
+          "one": "{count} saved Composer item",
+          "other": "{count} saved Composer items"
+        },
+        "importLinks": {
+          "one": "{count} tracked link",
+          "other": "{count} tracked links"
+        },
+        "importFeeds": {
+          "one": "{count} draft feed",
+          "other": "{count} draft feeds"
+        },
+        "importSlots": {
+          "one": "{count} posting slot",
+          "other": "{count} posting slots"
+        },
+        "importRepeats": {
+          "one": "{count} recurring post",
+          "other": "{count} recurring posts"
+        },
+        "importImages": {
+          "one": "{count} image",
+          "other": "{count} images"
+        },
+        "deleteDataWarning": "This cannot be undone.",
+        "deleteDataQuestion": "Delete everything in this workspace?",
+        "deleteDataConfirm": "Delete everything",
+        "deleteDataFailed": "Nothing was deleted.",
+        "deleteDataCompleted": "Everything in this workspace was deleted.",
+        "cancelDataDeletion": "Cancel"
       }
     },
     "queuePanels": {
