@@ -34,10 +34,12 @@ jobs:
           set -euo pipefail
           name="postline-container-check-$$"
           volume="$name-data"
+          session=$(mktemp)
           cleanup() {
             docker stop --time 10 "$name" >/dev/null 2>&1 || true
             docker rm "$name" >/dev/null 2>&1 || true
             docker volume rm "$volume" >/dev/null 2>&1 || true
+            rm -f "$session"
           }
           trap cleanup EXIT
           set -E
@@ -77,10 +79,14 @@ jobs:
           test -n "$csrf_cookie"
           curl --fail --silent --show-error "$origin/api/register" \
             --cookie "$csrf_cookie" --header "X-CSRF-Token: ${csrf_cookie#*=}" \
+            --cookie-jar "$session" \
             --data-urlencode 'name=Container Test' \
             --data-urlencode 'email=container-check@example.test' \
             --data-urlencode "password=$(openssl rand -hex 24)" \
             | jq -e '.ok and .data.token_type == "Bearer"' >/dev/null
+          channels=$(curl --fail --silent --show-error --cookie "$session" "$origin/accounts")
+          grep -Fq 'data-testid="accounts-page"' <<< "$channels"
+          grep -Fq 'Valid OAuth Redirect URI' <<< "$channels"
           before=$(print_key_digest)
           docker exec "$name" bun -e '
             import { Database } from "bun:sqlite"

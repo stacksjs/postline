@@ -4,6 +4,7 @@
 !config/**
 !database/migrations/**
 !database/types.d.ts
+!docs/networks/*.md
 !public/**
 !resources/**
 !routes/**
