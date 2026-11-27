@@ -49,6 +49,6 @@ Last checked 24 November 2026.
 ## Not on the site until they are true
 
 - Engagement for X, LinkedIn, Instagram, Threads and Mastodon.
-- X and Instagram direct messages.
+- Instagram direct messages and X direct messages through a browser session.
 - Revoking a token at the network on disconnect.
 - Team seats.
