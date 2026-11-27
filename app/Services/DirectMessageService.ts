@@ -18,12 +18,15 @@
 
 import type { DmConversationCandidate, DmMessageCandidate, DmProvider } from '../Support/Social/direct-messages'
 import { db } from '@stacksjs/database'
+import { raw } from '@stacksjs/query-builder'
 import { DM_PROVIDERS, DM_UNAVAILABLE, isDmProvider } from '../Support/Social/direct-messages'
 import { isUsableIdentity } from '../Support/Social/accounts'
 import { getDmTransport, listDmTransports } from './Social/DirectMessages'
 import { listIdentityRows } from './Social/identities'
 import { now, uuid } from './Social/support'
 import { describeNetworkError } from '../Support/Social/network-errors'
+import { UserFacingError } from '../Support/Http/user-error'
+import { replyToTwitterDm, syncTwitterDmPage, TWITTER_DM_CHARACTER_LIMIT, twitterDmOptions } from './Social/TwitterDmInbox'
 
 const database = db as any
 
@@ -46,6 +49,10 @@ export interface DmSyncResult {
   conversations: number
   messages: number
   errors: Array<{ provider: DmProvider, message: string }>
+}
+
+function dmCharacterLimit(provider: DmProvider): number {
+  return provider === 'twitter' ? TWITTER_DM_CHARACTER_LIMIT : getDmTransport(provider).characterLimit
 }
 
 function sqliteTimestamp(value: unknown): string {
@@ -124,25 +131,35 @@ export class DirectMessageService {
       .filter((identity: any) => identity.auth_status === 'connected' && identity.access_token)
       .map((identity: any) => String(identity.provider)))
 
-    const accounts = await Promise.all(DM_PROVIDERS.map(async provider => (await listIdentityRows<any>(provider))
+    const transports = listDmTransports()
+    const accounts = await Promise.all(transports.map(async ({ provider }) => (await listIdentityRows<any>(provider))
       .filter(identity => isUsableIdentity(identity))
       .map(identity => ({ id: Number(identity.id), provider, handle: String(identity.handle) }))))
+    const twitter = await twitterDmOptions()
+    const unavailable = Object.entries(DM_UNAVAILABLE)
+      .filter(([provider]) => connected.has(provider))
+      .map(([provider, reason]) => ({ provider, reason }))
+    if (connected.has('twitter') && !twitter.accounts.length) {
+      unavailable.push({
+        provider: 'twitter',
+        reason: twitter.enabled ? 'Reconnect your X account in Channels to authorize Inbox messages.' : 'Enable X API messages in Channels to sync direct messages.',
+      })
+    }
 
     return {
-      supported: DM_PROVIDERS.map(provider => ({
+      supported: transports.map(({ provider, characterLimit }) => ({
         provider,
         connected: connected.has(provider),
         handle: identities.find((identity: any) => identity.provider === provider)?.handle || null,
-        characterLimit: getDmTransport(provider).characterLimit,
+        characterLimit,
       })),
       // Every connected account the inbox reads, for the account filter (#136).
-      accounts: accounts.flat(),
+      accounts: [...accounts.flat(), ...twitter.accounts.map(account => ({ ...account, provider: 'twitter' as const }))],
       // Only networks this workspace has connected: the panel explains why a
       // network you use for publishing has no inbox here, and is no place to
       // list networks you never connected (or Postline no longer offers).
-      unavailable: Object.entries(DM_UNAVAILABLE)
-        .filter(([provider]) => connected.has(provider))
-        .map(([provider, reason]) => ({ provider, reason })),
+      unavailable,
+      twitter,
     }
   }
 
@@ -157,6 +174,7 @@ export class DirectMessageService {
   private scopedInbox(query: any, options: ConversationFilter) {
     // Conversations from old connectors stay stored without appearing in Inbox.
     query = query.where('provider', 'in', [...DM_PROVIDERS])
+      .whereRaw(raw`(provider <> 'twitter' OR social_identity_id IS NOT NULL)`)
       .where('status', '=', options.status === 'archived' ? 'archived' : 'open')
     if (isDmProvider(options.provider)) query = query.where('provider', '=', options.provider)
     if (options.identityId) query = query.where('social_identity_id', '=', options.identityId)
@@ -194,11 +212,13 @@ export class DirectMessageService {
     // The newest messages, shown oldest first. Ordering ascending and then
     // limiting returned the first hundred ever exchanged, so a long
     // conversation opened on its beginning and never showed the latest reply.
-    const newest = await database
+    let messageQuery = database
       .selectFrom('dm_messages')
       .selectAll()
       .where('dm_conversation_id', '=', conversation.id)
       .orderBy('sent_at', 'desc')
+    if (conversation.provider === 'twitter') messageQuery = messageQuery.orderBy('remote_id', 'desc')
+    const newest = await messageQuery
       .orderBy('id', 'desc')
       .limit(MESSAGE_LIMIT + 1)
       .offset(pageOffset(options.offset))
@@ -214,25 +234,23 @@ export class DirectMessageService {
       conversation: conversationRow({ ...conversation, unread_count: options.markRead === false ? conversation.unread_count : 0 }),
       messages: messages.map(messageRow),
       olderOffset,
-      characterLimit: getDmTransport(String(conversation.provider) as DmProvider).characterLimit,
+      characterLimit: dmCharacterLimit(String(conversation.provider) as DmProvider),
     }
   }
 
   /**
-   * Pull conversations and their messages from every connected network.
+   * Pull conversations and their messages from Bluesky and Mastodon.
    *
    * One network's failure is recorded and stepped over rather than thrown: a
-   * dead X token should not stop Bluesky DMs from arriving, which is exactly
+   * dead Mastodon token should not stop Bluesky DMs from arriving, which is exactly
    * the failure mode that makes a multi-network inbox worth having.
    */
   async sync(options: { provider?: string, conversationId?: number } = {}): Promise<DmSyncResult> {
     if (options.conversationId) return await this.syncConversation(options.conversationId)
 
-    const transports = isDmProvider(options.provider)
-      ? [getDmTransport(options.provider)]
-      : listDmTransports()
-
     const result: DmSyncResult = { synced: 0, conversations: 0, messages: 0, errors: [] }
+    if (options.provider === 'twitter') return result
+    const transports = listDmTransports().filter(transport => !isDmProvider(options.provider) || options.provider === transport.provider)
 
     // Every connected account on each network has an inbox of its own (#136).
     // A network with none connected still gets one pass, as its default
@@ -250,7 +268,7 @@ export class DirectMessageService {
         result.synced += 1
 
         for (const candidate of candidates) {
-          const { id: conversationId, changed } = await this.upsertConversation(transport.provider, candidate, identityId)
+          const { id: conversationId, changed } = this.upsertConversation(transport.provider, candidate, identityId)
           result.conversations += 1
           // The preview is saved before fetching the history. A previous
           // failure may therefore leave an unchanged preview with missing
@@ -259,7 +277,7 @@ export class DirectMessageService {
 
           try {
             const messages = await transport.listMessages(candidate.remoteId, MESSAGE_LIMIT, identityId)
-            result.messages += await this.storeMessages(conversationId, transport.provider, messages)
+            result.messages += this.storeMessages(conversationId, transport.provider, messages)
           }
           catch (error) {
             // The conversation row is already saved, so the thread still shows
@@ -279,16 +297,30 @@ export class DirectMessageService {
     return result
   }
 
+  async syncTwitter(identityId: number, older: boolean): Promise<DmSyncResult> {
+    if (!Number.isSafeInteger(identityId) || identityId <= 0) throw new UserFacingError('Choose an X account in Inbox.')
+    return await syncTwitterDmPage(identityId, older, (tx, batches) => {
+      let messages = 0
+      for (const batch of batches) {
+        const { id } = this.upsertConversation('twitter', batch.conversation, identityId, tx)
+        messages += this.storeMessages(id, 'twitter', batch.messages, tx)
+        this.refreshPreview(id, 'twitter', tx)
+      }
+      return { synced: 1, conversations: batches.length, messages, errors: [] }
+    })
+  }
+
   /** Refresh a single thread — what the open conversation polls. */
   private async syncConversation(conversationId: number): Promise<DmSyncResult> {
     const conversation = await this.requireConversation(conversationId)
     const provider = String(conversation.provider) as DmProvider
     const result: DmSyncResult = { synced: 1, conversations: 1, messages: 0, errors: [] }
+    if (provider === 'twitter') return result
 
     try {
       const messages = await getDmTransport(provider).listMessages(String(conversation.remote_id), MESSAGE_LIMIT, conversationIdentity(conversation))
-      result.messages = await this.storeMessages(conversationId, provider, messages)
-      await this.refreshPreview(conversationId)
+      result.messages = this.storeMessages(conversationId, provider, messages)
+      this.refreshPreview(conversationId, provider)
     }
     catch (error) {
       result.errors.push({ provider, message: describeNetworkError(provider, error, 'read') })
@@ -311,15 +343,21 @@ export class DirectMessageService {
 
     const conversation = await this.requireConversation(conversationId)
     const provider = String(conversation.provider) as DmProvider
-    const transport = getDmTransport(provider)
+    const limit = dmCharacterLimit(provider)
 
-    if (text.length > transport.characterLimit)
-      throw new Error(`${provider.charAt(0).toUpperCase()}${provider.slice(1)} messages must be ${transport.characterLimit} characters or fewer.`)
+    if (text.length > limit)
+      throw new Error(`${provider === 'twitter' ? 'X' : provider.charAt(0).toUpperCase() + provider.slice(1)} messages must be ${limit} characters or fewer.`)
 
     // Replies go out from the account the conversation belongs to.
-    const sent = await transport.sendMessage(String(conversation.remote_id), text, conversationIdentity(conversation))
-    await this.storeMessages(conversationId, provider, [{ ...sent, direction: 'outgoing' }], 'sent')
-    await this.refreshPreview(conversationId)
+    const identityId = conversationIdentity(conversation)
+    if (provider === 'twitter' && !identityId) throw new UserFacingError('This conversation is not linked to a connected X account.')
+    const sent = provider === 'twitter'
+      ? await replyToTwitterDm(identityId!, String(conversation.remote_id), text)
+      : await getDmTransport(provider).sendMessage(String(conversation.remote_id), text, identityId)
+    database.transaction((tx: typeof database) => {
+      this.storeMessages(conversationId, provider, [{ ...sent, direction: 'outgoing' }], tx)
+      this.refreshPreview(conversationId, provider, tx)
+    })
 
     const messages = await database
       .selectFrom('dm_messages')
@@ -347,7 +385,7 @@ export class DirectMessageService {
       : await database.selectFrom('dm_conversations').selectAll().where('status', '=', 'open').execute()
 
     for (const conversation of targets) {
-      if (!isDmProvider(conversation.provider)) continue
+      if (!isDmProvider(conversation.provider) || conversation.provider === 'twitter') continue
       const transport = getDmTransport(conversation.provider)
       if (!transport.markRead) continue
       try {
@@ -375,6 +413,7 @@ export class DirectMessageService {
       .selectFrom('dm_conversations')
       .selectAll()
       .where('id', '=', Number(conversationId) || 0)
+      .whereRaw(raw`(provider <> 'twitter' OR social_identity_id IS NOT NULL)`)
       .executeTakeFirst()
 
     if (!conversation) throw new Error('That conversation is not in your inbox.')
@@ -389,28 +428,29 @@ export class DirectMessageService {
    * lowered: X reports none at all, and letting a zero from one network stomp
    * a count Postline is tracking locally would silently mark threads read.
    */
-  private async upsertConversation(provider: DmProvider, candidate: DmConversationCandidate, identityId: number | null = null): Promise<{ id: number, changed: boolean }> {
+  private upsertConversation(provider: DmProvider, candidate: DmConversationCandidate, identityId: number | null = null, store = database): { id: number, changed: boolean } {
     // Keyed on (provider, account, remote id): two of the owner's accounts in
     // one conversation are two inbox rows, each answering as its own account.
     // A row stored before conversations had an account is adopted by the
     // first account that sees it.
-    const sameRemote = await database
+    const sameRemote = store
       .selectFrom('dm_conversations')
       .selectAll()
       .where('provider', '=', provider)
       .where('remote_id', '=', candidate.remoteId)
-      .execute()
+      .get()
     const existing = sameRemote.find((row: any) => (row.social_identity_id ? Number(row.social_identity_id) : null) === identityId)
       ?? (identityId ? sameRemote.find((row: any) => !row.social_identity_id) : undefined)
 
     const primary = candidate.participants[0]
+    const keepProfile = provider === 'twitter' && primary && existing?.participant_remote_id === primary.remoteId && primary.handle === primary.remoteId
 
     const values: Record<string, unknown> = {
       provider,
       remote_id: candidate.remoteId,
-      participant_handle: participantLabel(candidate.participants.map(person => person.handle)),
-      participant_name: primary?.name || null,
-      participant_avatar: primary?.avatar || null,
+      participant_handle: keepProfile ? existing.participant_handle : participantLabel(candidate.participants.map(person => person.handle)),
+      participant_name: keepProfile ? existing.participant_name : primary?.name || null,
+      participant_avatar: keepProfile ? existing.participant_avatar : primary?.avatar || null,
       participant_remote_id: primary?.remoteId || null,
       last_message_at: candidate.lastMessageAt ? sqliteTimestamp(candidate.lastMessageAt) : existing?.last_message_at || null,
       last_message_preview: (candidate.lastMessageText || existing?.last_message_preview || '').slice(0, 500) || null,
@@ -426,24 +466,18 @@ export class DirectMessageService {
       // stored, or does not say (then the messages are fetched to find out).
       const changed = !candidate.lastMessageAt || String(values.last_message_at) !== String(existing.last_message_at)
         || Number(candidate.unreadCount || 0) > Number(existing.unread_count || 0)
-      await database.updateTable('dm_conversations').set(values).where('id', '=', existing.id).execute()
+      store.updateTable('dm_conversations').set(values).where('id', '=', existing.id).execute()
       return { id: Number(existing.id), changed }
     }
 
     const conversationUuid = uuid()
-    await database.insertInto('dm_conversations').values({
+    const created = store.insertInto('dm_conversations').values({
       ...values,
       uuid: conversationUuid,
       unread_count: candidate.unreadCount || 0,
       status: 'open',
       created_at: now(),
-    }).execute()
-
-    const created = await database
-      .selectFrom('dm_conversations')
-      .select(['id'])
-      .where('uuid', '=', conversationUuid)
-      .executeTakeFirstOrThrow()
+    }).returning('id').first()
 
     return { id: Number(created.id), changed: true }
   }
@@ -463,26 +497,26 @@ export class DirectMessageService {
    * count — this is the only place unread is raised for networks (X) that do
    * not report it.
    */
-  private async storeMessages(conversationId: number, provider: DmProvider, candidates: DmMessageCandidate[], status: 'received' | 'sent' = 'received'): Promise<number> {
+  private storeMessages(conversationId: number, provider: DmProvider, candidates: DmMessageCandidate[], store = database): number {
     let created = 0
     let freshIncoming = 0
 
     // One query for which of these are stored already, not one per message (#108).
     const remoteIds = candidates.map(candidate => candidate.remoteId)
     const stored = remoteIds.length
-      ? new Set((await database
+      ? new Set((store
           .selectFrom('dm_messages')
           .select(['remote_id'])
           .where('dm_conversation_id', '=', conversationId)
           .where('remote_id', 'in', remoteIds)
-          .execute()).map((row: { remote_id: string }) => String(row.remote_id)))
+          .get()).map((row: { remote_id: string }) => String(row.remote_id)))
       : new Set<string>()
 
     for (const candidate of candidates) {
       if (stored.has(candidate.remoteId)) continue
       stored.add(candidate.remoteId)
 
-      await database.insertInto('dm_messages').values({
+      store.insertInto('dm_messages').values({
         uuid: uuid(),
         dm_conversation_id: conversationId,
         provider,
@@ -491,7 +525,7 @@ export class DirectMessageService {
         author_handle: candidate.authorHandle,
         author_name: candidate.authorName || null,
         body: candidate.body.slice(0, 10000),
-        status: candidate.direction === 'outgoing' ? 'sent' : status,
+        status: candidate.direction === 'outgoing' ? 'sent' : 'received',
         failure_reason: null,
         sent_at: sqliteTimestamp(candidate.sentAt),
         created_at: now(),
@@ -503,13 +537,13 @@ export class DirectMessageService {
     }
 
     if (freshIncoming) {
-      const conversation = await database
+      const conversation = store
         .selectFrom('dm_conversations')
         .select(['unread_count'])
         .where('id', '=', conversationId)
-        .executeTakeFirst()
+        .first()
 
-      await database.updateTable('dm_conversations').set({
+      store.updateTable('dm_conversations').set({
         unread_count: Number(conversation?.unread_count || 0) + freshIncoming,
         updated_at: now(),
       }).where('id', '=', conversationId).execute()
@@ -519,18 +553,18 @@ export class DirectMessageService {
   }
 
   /** Re-derive the conversation preview from its newest stored message. */
-  private async refreshPreview(conversationId: number): Promise<void> {
-    const latest = await database
+  private refreshPreview(conversationId: number, provider: DmProvider, store = database): void {
+    let query = store
       .selectFrom('dm_messages')
       .selectAll()
       .where('dm_conversation_id', '=', conversationId)
       .orderBy('sent_at', 'desc')
-      .orderBy('id', 'desc')
-      .executeTakeFirst()
+    if (provider === 'twitter') query = query.orderBy('remote_id', 'desc')
+    const latest = query.orderBy('id', 'desc').first()
 
     if (!latest) return
 
-    await database.updateTable('dm_conversations').set({
+    store.updateTable('dm_conversations').set({
       last_message_at: latest.sent_at,
       last_message_preview: String(latest.body || '').slice(0, 500),
       last_message_outgoing: latest.direction === 'outgoing' ? 1 : 0,

@@ -39,7 +39,7 @@ Last checked 24 November 2026.
 |---|---|
 | Direct messages from Bluesky (app password with message access) and Mastodon | `app/Support/Social/direct-messages.ts` (`DM_PROVIDERS`), `app/Services/Social/DirectMessages/*.ts` |
 | Instagram messages not supported (Meta app review) | `direct-messages.ts` (`DM_UNAVAILABLE.instagram`) |
-| X messages not supported yet | `direct-messages.ts` (`DM_UNAVAILABLE.twitter`) |
+| Direct messages from X through an opted-in developer app, with a daily read cap | `app/Services/Social/TwitterDmInbox.ts`, `docs/networks/x.md` |
 | Keyword listening on Bluesky, X, Mastodon, every five minutes, up to 20 keywords | `app/Jobs/ScanKeywordMonitors.ts:13`, `KeywordMonitoringService.ts:48` |
 | Engagement synced for Bluesky posts only | `app/Jobs/SyncEngagementMetrics.ts:17` |
 | Thirty days of activity, channel mix, posting windows | `app/Actions/Postline/AnalyticsAction.ts` |

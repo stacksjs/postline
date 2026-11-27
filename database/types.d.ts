@@ -664,25 +664,6 @@ declare module '@stacksjs/database' {
       starts_at: string | null
       ends_at: string | null
     }
-    discover_entries: {
-      // columns
-      id: number
-      form: string
-      source_key: string
-      title: string | null
-      body: string
-      url: string | null
-      status: string
-      published_at: string
-      score: number
-      read_count: number
-      conversion_count: number
-      publication_id: number | null
-      post_id: number | null
-      created_at: string
-      updated_at: string | null
-      uuid: string | null
-    }
     dm_conversations: {
       // columns
       id: number
@@ -1231,6 +1212,7 @@ declare module '@stacksjs/database' {
       redirect_url: string
       organization_pages: number
       engagement_metrics: number
+      direct_messages: number
     }
     notification_deliveries: {
       // columns
@@ -1444,21 +1426,6 @@ declare module '@stacksjs/database' {
       auction_id: number
       customer_id: number
     }
-    post_comments: {
-      // columns
-      id: number
-      source_key: string
-      parent_id: number | null
-      author_name: string
-      author_email: string
-      body: string
-      status: string
-      publication_id: number | null
-      publication_subscriber_id: number | null
-      created_at: string
-      updated_at: string | null
-      uuid: string | null
-    }
     post_purchase_offer_responses: {
       // columns
       id: number
@@ -1637,97 +1604,6 @@ declare module '@stacksjs/database' {
       nutritional_info: string
       category_id: number
       manufacturer_id: number
-    }
-    publication_recommendations: {
-      // columns
-      id: number
-      target_slug: string
-      target_name: string
-      note: string | null
-      target_publication_id: number | null
-      publication_id: number | null
-      created_at: string
-      updated_at: string | null
-      uuid: string | null
-    }
-    publication_sends: {
-      // columns
-      id: number
-      source_key: string
-      subject: string
-      body: string
-      url: string | null
-      audience: string
-      status: string
-      recipient_count: number
-      delivered_count: number
-      failed_count: number
-      last_error: string | null
-      sent_at: string | null
-      publication_id: number | null
-      post_id: number | null
-      created_at: string
-      updated_at: string | null
-      uuid: string | null
-      skipped_count: number
-    }
-    publication_subscribers: {
-      // columns
-      id: number
-      email: string
-      name: string | null
-      status: string
-      plan: string
-      stripe_customer_id: string | null
-      stripe_subscription_id: string | null
-      current_period_end: string | null
-      cancels_at: string | null
-      confirmation_token: string | null
-      unsubscribe_token: string
-      confirmed_at: string | null
-      source: string
-      source_entry_id: number | null
-      publication_id: number | null
-      publication_tier_id: number | null
-      created_at: string
-      updated_at: string | null
-      uuid: string | null
-    }
-    publication_tiers: {
-      // columns
-      id: number
-      name: string
-      description: string | null
-      amount_cents: number
-      currency: string
-      interval: string
-      stripe_product_id: string | null
-      stripe_price_id: string | null
-      active: number | null
-      sort_order: number
-      publication_id: number | null
-      created_at: string
-      updated_at: string | null
-      uuid: string | null
-    }
-    publications: {
-      // columns
-      id: number
-      name: string
-      slug: string
-      tagline: string | null
-      description: string | null
-      domain: string | null
-      avatar_url: string | null
-      author_name: string | null
-      listed: number | null
-      subscriber_count: number
-      entry_count: number
-      last_published_at: string | null
-      account_id: number | null
-      created_at: string
-      updated_at: string | null
-      uuid: string | null
     }
     purge_runs: {
       // columns
@@ -2012,6 +1888,8 @@ declare module '@stacksjs/database' {
       auth_status: "connected" | "expired" | "revoked" | "missing"
       access_token: string
       refresh_token: string
+      twitter_dm_consent: number
+      twitter_dm_state: string
       instagram_page_id: string
       insights_access_token: string
       token_expires_at: string

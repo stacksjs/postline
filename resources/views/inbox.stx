@@ -3,14 +3,14 @@
 @section('title', 'Postline - Inbox')
 
 @section('content')
-  @meta('description', 'Read direct messages and keep up with public replies and mentions from Bluesky and Mastodon.')
+  @meta('description', 'Read direct messages from Bluesky, Mastodon and X, and keep up with public replies and mentions.')
   <section class="grid gap-4" data-postline-page="inbox" data-testid="inbox-page">
     <WorkspacePageHeader titleKey="workspace.navigation.inbox">
       <template #description><span :show="inboxSection() === 'messages' && !loading()" :text="inboxOverview()"></span>
         <span :show="inboxSection() === 'public'">Public replies and mentions from Bluesky and Mastodon</span></template>
       <div class="flex flex-wrap gap-2 items-center" :show="inboxSection() === 'messages'">
         <button class="inline-flex gap-2 items-center justify-center px-3 h-9 font-semibold text-ink text-xs bg-panel hover:bg-raised border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="unreadCount() === 0" @click="markAllRead">Mark all read</button>
-        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="syncing() || connectedCount() === 0" @click="runSync">
+        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" :show="providerFilter() !== 'twitter'" :disabled="syncing() || connectedCount() === 0" @click="runSync">
           <span class="h-4 w-4 i-hugeicons-refresh" :class="syncing() ? 'animate-spin' : ''" aria-hidden="true"></span>
           <span :text="syncing() ? 'Syncing…' : 'Sync now'">Sync now</span>
         </button>
@@ -26,6 +26,17 @@
 
     <div :show="inboxSection() === 'messages'" class="grid gap-4 lg:grid-cols-[minmax(13rem,18rem)_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]">
       <aside class="grid content-start gap-4" aria-label="Conversations">
+        <section class="grid gap-2 p-4 bg-panel border border-line rounded-2xl" :show="xInbox().accounts.length && providerFilter() !== 'bluesky' && providerFilter() !== 'mastodon'" aria-labelledby="x-inbox-title">
+          <h2 id="x-inbox-title" class="m-0 font-semibold text-ink text-sm">X API messages</h2>
+          <p class="m-0 text-body text-xs" :text="xReadCost()" data-x-inbox-cost></p>
+          <div class="grid gap-1" role="group" :aria-label="'X messages for @' + account.handle" x-for="account in xInbox().accounts">
+            <p class="m-0 font-medium text-body text-xs" :text="'@' + account.handle"></p>
+            <div class="flex flex-wrap gap-1.5">
+              <Button variant="secondary" size="xs" :disabled="Boolean(xSyncing())" @click="runXSync(account.id)">Sync X messages</Button>
+              <Button variant="quiet" size="xs" :show="account.older" :disabled="Boolean(xSyncing())" @click="runXSync(account.id, true)">Load older from X</Button>
+            </div>
+          </div>
+        </section>
         <Card padding="none" className="shadow-sm">
           <header class="grid gap-2.5 px-4 py-3 border-b border-line">
             <div class="flex gap-2 items-center justify-between">
@@ -45,9 +56,9 @@
 
           <WorkspaceListSkeleton :show="loading()" label="Loading conversations" />
           <ErrorState :show="conversationError() && !loading()" title="Could not load conversations" :message="conversationError()" @retry="loadConversations()" />
-          <EmptyState :show="showEmptyList()" variant="bare" :title="connectedCount() ? 'No conversations yet' : 'Connect a network to read messages'" :description="connectedCount() ? 'Sync to pull your latest messages into Postline.' : 'The inbox supports Bluesky and Mastodon.'">
-            <StxLink class="text-info text-ui underline" to="/accounts" :show="!connectedCount()">Open Channels</StxLink>
-            <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="connectedCount()" :disabled="syncing()" @click="runSync">Sync now</button>
+          <EmptyState :show="showEmptyList()" variant="bare" :title="connectedCount() || xInbox().accounts.length ? 'No conversations yet' : 'Connect a network to read messages'" :description="connectedCount() || xInbox().accounts.length ? 'Sync to pull your latest messages into Postline.' : 'The inbox supports Bluesky, Mastodon and the X API.'">
+            <StxLink class="text-info text-ui underline" to="/accounts" :show="!connectedCount() && !xInbox().accounts.length">Open Channels</StxLink>
+            <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="connectedCount() && providerFilter() !== 'twitter'" :disabled="syncing()" @click="runSync">Sync now</button>
           </EmptyState>
 
           <div class="overflow-y-auto max-h-80 lg:max-h-[32rem] divide-line divide-y" x-show="!loading() && conversations().length">
@@ -99,7 +110,7 @@
               </div>
             </div>
             <div class="flex gap-2 items-center">
-              <button class="px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :disabled="refreshing()" @click="refreshThread" :text="refreshing() ? 'Refreshing…' : 'Refresh'">Refresh</button>
+              <button class="px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :show="activeProvider() !== 'twitter'" :disabled="refreshing()" @click="refreshThread" :text="refreshing() ? 'Refreshing…' : 'Refresh'">Refresh</button>
               <button class="px-3 h-8 font-semibold text-xs border rounded-lg transition-colors" type="button" @click="toggleArchive" :class="statusFilter() === 'archived' ? 'text-ink bg-panel-2 border-line hover:bg-raised' : 'text-danger border-danger-line hover:bg-danger-soft'" :text="statusFilter() === 'archived' ? 'Restore' : 'Archive'">Archive</button>
             </div>
           </header>
@@ -108,7 +119,7 @@
             <WorkspaceListSkeleton :show="threadLoading()" label="Loading messages" />
             <ErrorState :show="threadError() && !threadLoading()" title="Could not load messages" :message="threadError()" @retry="loadThread()" />
             <EmptyState :show="!threadLoading() && !threadError() && !messages().length" variant="bare" title="No messages synced yet" description="Sync to pull this conversation’s history.">
-              <button class="text-info text-ui underline disabled:opacity-50" type="button" :disabled="syncing()" @click="runSync">Sync now</button>
+              <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="activeProvider() !== 'twitter'" :disabled="syncing()" @click="runSync">Sync now</button>
             </EmptyState>
             <button class="justify-self-center px-3 py-1 text-muted text-xs hover:text-ink rounded-lg" type="button" x-show="olderOffset() !== null" :disabled="loadingOlder()" @click="loadOlderMessages" :text="loadingOlder() ? 'Loading…' : 'Show older messages'">Show older messages</button>
             <article class="flex" x-for="message in messages()" :class="message.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
@@ -129,9 +140,9 @@
             <textarea class="px-3 py-2.5 min-h-20 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus resize-y" placeholder="Write a reply…" aria-label="Reply" x-model="draftBody" :maxlength="String(characterLimit())" @keydown="maybeSend($event)"></textarea>
             <div class="flex flex-wrap gap-2 items-center justify-between">
               <span class="text-muted text-xs" :text="`${remaining()} characters left · ⌘↵ to send`"></span>
-              <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="sending() || !draftBody().trim()">
+              <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="sending() || !canReply() || !draftBody().trim()">
                 <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
-                <span :text="sending() ? 'Sending…' : 'Send'">Send</span>
+                <span :text="sending() ? 'Sending…' : replyLabel()">Send</span>
               </button>
             </div>
           </form>
@@ -149,6 +160,7 @@
     interface InboxConversation {
       id: number
       provider: string
+      identityId?: number | null
       participantHandle: string
       participantName?: string | null
       lastMessageAt?: string | null
@@ -172,7 +184,7 @@
 
     // The networks the inbox reads. Why the others are missing comes from the
     // server and is shown above the list.
-    const providerOptions = ['bluesky', 'mastodon']
+    const providerOptions = ['bluesky', 'mastodon', 'twitter']
 
     const conversations = state([])
     const messages = state([])
@@ -191,6 +203,14 @@
     const providerFilter = state('')
     const accountFilter = state('')
     const accounts = state([])
+    const xInbox = state({ accounts: [], readUsage: null, maxReadUsd: 0, replyUsd: 0 })
+    const xSyncing = state(0)
+    const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 3 })
+    const xReadCost = derived(() => {
+      const usage = xInbox().readUsage
+      if (!usage) return ''
+      return `Up to ${usd.format(xInbox().maxReadUsd)} per page. Estimated X API reads today ${usd.format(usage.estimatedUsd)} of ${usd.format(usage.limitUsd)}. Resets at midnight UTC.`
+    })
     const accountOptions = derived(() => accounts()
       .filter(account => !providerFilter() || account.provider === providerFilter())
       .map(account => ({ id: String(account.id), label: `@${String(account.handle).replace(/^@/, '')}` })))
@@ -229,6 +249,8 @@
     const showEmptyList = derived(() => !loading() && !conversationError() && conversations().length === 0)
     const activeConversation = derived(() => conversations().find(item => item.id === activeId()) || null)
     const activeProvider = derived(() => activeConversation()?.provider || 'bluesky')
+    const canReply = derived(() => activeProvider() !== 'twitter' || xInbox().accounts.some(account => account.id === activeConversation()?.identityId))
+    const replyLabel = derived(() => activeProvider() === 'twitter' && xInbox().replyUsd ? `Send (${usd.format(xInbox().replyUsd)})` : 'Send')
     const activeTitle = derived(() => activeConversation()?.participantName || activeConversation()?.participantHandle || 'Conversation')
     const activeSubtitle = derived(() => {
       const conversation = activeConversation()
@@ -265,6 +287,7 @@
         supported.set(payload.data?.providers?.supported || [])
         accounts.set(payload.data?.providers?.accounts || [])
         unavailable.set(payload.data?.providers?.unavailable || [])
+        if (payload.data?.providers?.twitter) xInbox.set(payload.data.providers.twitter)
         // A thread that has been archived or filtered away should not stay open.
         if (activeId() && !conversations().some(item => item.id === activeId())) closeConversation()
       }
@@ -425,6 +448,24 @@
       }
     }
 
+    const runXSync = async (identityId: number, older = false) => {
+      if (xSyncing()) return
+      xSyncing.set(identityId)
+      try {
+        const payload = await postJson('/api/postline/inbox/sync', { twitter_identity_id: identityId, older })
+        const count = payload.data?.messages || 0
+        showNotification({ title: 'X messages synced', message: `${count} new message${count === 1 ? '' : 's'}.`, tone: 'success', id: 'x-inbox-sync' })
+        if (activeId() && activeProvider() === 'twitter') await loadThread({ markRead: false, quiet: true })
+      }
+      catch (error) {
+        showNotification({ title: 'Could not sync X messages', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'x-inbox-sync' })
+      }
+      finally {
+        await loadConversations({ quiet: true })
+        xSyncing.set(0)
+      }
+    }
+
     const refreshThread = async () => {
       if (!activeId()) return
       refreshing.set(true)
@@ -444,18 +485,22 @@
     const sendReply = async (event: SubmitEvent) => {
       event.preventDefault()
       const body = draftBody().trim()
-      if (!body || !activeId()) return
+      const conversationId = activeId()
+      const isX = activeProvider() === 'twitter'
+      if (!body || !conversationId || !canReply() || sending()) return
       sending.set(true)
       try {
-        const payload = await postJson('/api/postline/inbox/reply', { conversation_id: activeId(), body })
-        if (payload.data?.message) messages.set([...messages(), payload.data.message])
-        draftBody.set('')
-        drafts.delete(activeId())
-        scrollToNewest()
+        const payload = await postJson('/api/postline/inbox/reply', { conversation_id: conversationId, body })
+        drafts.delete(conversationId)
+        if (activeId() === conversationId) {
+          if (payload.data?.message) messages.set([...messages(), payload.data.message])
+          draftBody.set('')
+          scrollToNewest()
+        }
         await loadConversations({ quiet: true })
       }
       catch (error) {
-        showNotification({ title: 'Message not sent', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-reply' })
+        showNotification({ title: isX ? 'Could not confirm X reply' : 'Message not sent', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-reply' })
       }
       finally {
         sending.set(false)

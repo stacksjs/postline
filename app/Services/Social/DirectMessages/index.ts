@@ -10,12 +10,12 @@ import type { DmProvider, DmTransport } from '../../../Support/Social/direct-mes
 import { BlueskyDmTransport } from './bluesky'
 import { MastodonDmTransport } from './mastodon'
 
-const transports: Record<DmProvider, DmTransport> = {
+const transports: Record<DmTransport['provider'], DmTransport> = {
   bluesky: new BlueskyDmTransport(),
   mastodon: new MastodonDmTransport(),
 }
 
-export function getDmTransport(provider: DmProvider): DmTransport {
+export function getDmTransport(provider: Exclude<DmProvider, 'twitter'>): DmTransport {
   const transport = transports[provider]
   if (!transport) throw new Error(`Postline cannot read DMs on "${provider}" yet.`)
 

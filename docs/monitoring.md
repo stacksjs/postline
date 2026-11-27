@@ -2,7 +2,7 @@
 
 ## Inbox
 
-Open **Inbox** to check direct messages from connected Bluesky and Mastodon accounts. Filter by network or account, choose a conversation, and use the reply box. **Sync now** pulls recent conversations. The scheduler checks periodically while Postline is running.
+Open **Inbox** to check direct messages from connected Bluesky, Mastodon and X accounts. Filter by network or account, choose a conversation, and use the reply box. **Sync now** pulls recent Bluesky and Mastodon conversations, and the scheduler checks those networks while Postline is running. Choose **Sync X messages** for a paid refresh after enabling the [X API Inbox](./networks/x.md#direct-messages-through-the-api).
 
 Choose **Replies and mentions** to see public activity for connected Bluesky and Mastodon accounts. **Sync public activity** checks for new items immediately. Mark items as read in Postline, or open the original post to reply on the network. Sync checks a recent window of notifications per account. Postline keeps collected items for up to 90 days.
 

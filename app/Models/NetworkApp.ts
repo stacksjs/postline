@@ -69,5 +69,13 @@ export default defineModel({
       validation: { rule: schema.boolean() },
       factory: () => false,
     },
+    /** X only. Request Inbox scopes and enable user-initiated paid calls. */
+    directMessages: {
+      required: false,
+      fillable: true,
+      default: false,
+      validation: { rule: schema.boolean() },
+      factory: () => false,
+    },
   },
 } as const)

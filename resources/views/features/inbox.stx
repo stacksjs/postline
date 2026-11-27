@@ -1,7 +1,7 @@
 @extends('layouts/marketing')
 
 @section('title', 'Inbox: Answer everyone from one inbox - Postline')
-@section('description', 'Read and reply to direct messages from Bluesky and Mastodon without switching apps.')
+@section('description', 'Read and reply to direct messages from Bluesky, Mastodon and the opt-in X API.')
 @section('ogImageAlt', 'Postline feature: Inbox. Answer everyone from one inbox.')
 
 <script server>
@@ -20,7 +20,7 @@ useHead(marketingHead('/features/inbox', '/images/og/feature-inbox.png'))
       </nav>
       <span class="grid place-items-center h-12 w-12 text-ink text-xl bg-panel border border-line rounded-2xl" aria-hidden="true"><span class="i-hugeicons-message-01"></span></span>
       <h1 class="m-0 leading-[1.04] text-4xl text-ink sm:text-6xl">Answer everyone from one inbox</h1>
-      <p class="m-0 max-w-[60ch] leading-relaxed text-[17px] text-body sm:text-lg">See direct messages from Bluesky and Mastodon together. Open a conversation, reply, or archive it from the same inbox.</p>
+      <p class="m-0 max-w-[60ch] leading-relaxed text-[17px] text-body sm:text-lg">See direct messages from Bluesky, Mastodon and the opt-in X API together. Open a conversation, reply, or archive it from the same inbox.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/download" data-stx-link>Get started<span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span></a>
         <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline"><span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>Read the source</a>

@@ -1083,6 +1083,52 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkTwitterDmControls(cdp: Cdp): Promise<void> {
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const fetchInbox = window.fetch.bind(window)
+    window.xInboxRequests = []
+    window.fetch = (input, options) => {
+      const path = new URL(input instanceof Request ? input.url : input, location.href).pathname
+      if (path === '/api/postline/inbox') return Promise.resolve(Response.json({ ok: true, data: {
+        conversations: [], unreadCount: 0, providers: {
+          supported: [], unavailable: [], accounts: [{ id: 47, provider: 'twitter', handle: 'x_fixture' }],
+          twitter: {
+            accounts: [{ id: 47, handle: 'x_fixture', older: window.xInboxRequests.length === 1 }],
+            readUsage: { estimatedUsd: window.xInboxRequests.length * 0.02, limitUsd: 2 }, maxReadUsd: 0.5, replyUsd: 0.015,
+          },
+        },
+      } }))
+      if (path === '/api/postline/inbox/sync') {
+        const body = JSON.parse(options.body)
+        window.xInboxRequests.push(body)
+        return Promise.resolve(Response.json({ ok: true, data: { messages: 1 } }))
+      }
+      return fetchInbox(input, options)
+    }
+  ` })
+  const group = `document.querySelector('[aria-label="X messages for @x_fixture"]')`
+  const sync = `Array.from(${group}?.querySelectorAll('button') || []).find(button => button.textContent.trim() === 'Sync X messages')`
+  const older = `Array.from(${group}?.querySelectorAll('button') || []).find(button => button.textContent.trim() === 'Load older from X')`
+  try {
+    await auditPage(`${site}/inbox`, { cdp })
+    await waitUntil('Inbox shows the X refresh and projected cost without a paid request', () => evaluate<boolean>(cdp, `
+      Boolean(${sync}?.getClientRects().length) && !${older}?.getClientRects().length
+      && document.querySelector('[data-x-inbox-cost]')?.textContent.includes('$0.50')
+      && window.xInboxRequests.length === 0`), 5_000)
+    await evaluate(cdp, `${sync}.click()`)
+    await waitUntil('Inbox offers the next X history page after syncing', () => evaluate<boolean>(cdp, `
+      Boolean(${older}?.getClientRects().length) && !${older}.disabled
+      && document.querySelector('[data-x-inbox-cost]')?.textContent.includes('$0.02')`), 5_000)
+    await evaluate(cdp, `${older}.click()`)
+    await waitUntil('X history uses one paid request and updates the cost', () => evaluate<boolean>(cdp, `
+      !${older}?.getClientRects().length && document.querySelector('[data-x-inbox-cost]')?.textContent.includes('$0.04')
+      && JSON.stringify(window.xInboxRequests) === '[{"twitter_identity_id":47,"older":false},{"twitter_identity_id":47,"older":true}]'`), 5_000)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+  }
+}
+
 async function checkPublicInbox(cdp: Cdp): Promise<void> {
   const fixture = new Database(database)
   try {
@@ -2473,6 +2519,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkWorkspaceBootstrap(cdp)
   await checkChannels(cdp)
   await checkPublicInbox(cdp)
+  await checkTwitterDmControls(cdp)
   await checkXBrowserSession(cdp)
   await checkInstagramPagePicker(cdp)
   await checkNetworkComponents(cdp)

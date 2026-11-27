@@ -26,19 +26,39 @@ older X accounts to grant the image upload scope.
 - **Daily read budget:** `TWITTER_DAILY_READ_BUDGET_USD` defaults to $2 per
   workspace and resets at midnight UTC. Postline reserves the maximum cost
   before profile lookups, Listening searches, cleanup reads, and engagement
-  refreshes. Check the estimate in Settings > Channels > Your network apps > X
+  refreshes and direct-message pages. Check the estimate in Settings > Channels > Your network apps > X
   and actual charges
   in the X Developer Console. The cap covers reads from this workspace. X
   publishes [current per-resource prices](https://docs.x.com/x-api/getting-started/pricing).
 - **Deleting:** X allows 50 deletions per 15 minutes; cleanup paces itself to
   that, so a large cleanup takes hours.
-- **No inbox:** X direct messages are not supported.
 - **Engagement:** Allow paid engagement reads in the X network app settings
   or set `TWITTER_ENGAGEMENT_METRICS=true`. Select **Refresh engagement** in
   Analytics to update counts for up to 100 recent posts per connected X
   account. X's public metrics use the existing `tweet.read` scope.
 - **Limits:** 280 characters, up to four images. Write a thread in the
   composer's Thread mode to go longer.
+
+### Direct messages through the API
+
+Enable paid X API direct messages in **Settings > Channels > Your network apps > X**,
+save, then reconnect each account you want to use in Inbox. The consent screen
+adds `dm.read` and `dm.write`. Self-hosted installs can set
+`TWITTER_DIRECT_MESSAGES=true`. A `TWITTER_ACCESS_TOKEN` must be an X user token
+with both scopes.
+
+Choose **Sync X messages** for the account in Inbox. Each click requests one
+page of up to 25 message events and their senders, with a maximum estimated
+read cost of $0.50 at the published rates. **Load older from X** requests the
+next history page. X's lookup endpoint serves up to 30 days of events. Postline
+keeps imported messages locally, so reopening or polling Inbox does not make
+paid requests. The daily read cap applies to both buttons, and incomplete
+syncs resume from their saved cursor. The Inbox shows the estimate before a
+read and lists the per-reply charge on the send button. Current charges are
+listed in [X API pricing](https://docs.x.com/x-api/getting-started/pricing).
+
+Inbox sends text replies to existing conversations. Media-only messages show
+an attachment notice. Open X to view the media.
 
 ## Browser session on the Mac
 

@@ -5,20 +5,19 @@ import { stripHtml } from '../../app/Support/Social/text'
 
 describe('dm provider registry', () => {
   test('only the networks Postline can read messages on are listed', () => {
-    expect([...DM_PROVIDERS]).toEqual(['bluesky', 'mastodon'])
+    expect([...DM_PROVIDERS]).toEqual(['bluesky', 'mastodon', 'twitter'])
     expect(isDmProvider('bluesky')).toBe(true)
-    // Instagram needs Meta's app review and X its paid message API (#129).
+    // Instagram needs Meta's app review (#129).
     expect(isDmProvider('instagram')).toBe(false)
-    expect(isDmProvider('twitter')).toBe(false)
+    expect(isDmProvider('twitter')).toBe(true)
     expect(DM_UNAVAILABLE.instagram).toContain('app review')
-    expect(DM_UNAVAILABLE.twitter).toContain('not supported yet')
     expect(isDmProvider('threads')).toBe(false)
     expect(isDmProvider(undefined)).toBe(false)
   })
 
   test('names no network Postline no longer offers', () => {
     // Facebook and TikTok were dropped; the inbox listed them anyway (#173).
-    expect(Object.keys(DM_UNAVAILABLE).sort()).toEqual(['instagram', 'linkedin', 'threads', 'twitter'])
+    expect(Object.keys(DM_UNAVAILABLE).sort()).toEqual(['instagram', 'linkedin', 'threads'])
   })
 
   test('every unsupported network explains itself', () => {

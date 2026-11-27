@@ -27,6 +27,7 @@ export interface NetworkAppCredentials {
   /** LinkedIn: connect the owner's company Pages as well (`LINKEDIN_PAGES=true` from the environment). */
   organizationPages: boolean
   engagementMetrics: boolean
+  directMessages: boolean
   /** Where the id and secret came from. */
   source: 'settings' | 'environment' | 'none'
 }
@@ -41,6 +42,7 @@ export interface NetworkAppSummary {
   redirectUrl: string
   organizationPages: boolean
   engagementMetrics: boolean
+  directMessages: boolean
   readUsage?: Awaited<ReturnType<typeof twitterReadUsage>>
 }
 
@@ -68,6 +70,7 @@ export class NetworkAppService {
         redirectUrl: String(row.redirect_url || '').trim() || env('REDIRECT_URL') || defaultRedirectUrl(network),
         organizationPages: network === 'linkedin' && Boolean(Number(row.organization_pages ?? 0)),
         engagementMetrics: Boolean(Number(row.engagement_metrics ?? 0)),
+        directMessages: network === 'twitter' && Boolean(Number(row.direct_messages ?? 0)),
         source: 'settings',
       }
     }
@@ -78,6 +81,7 @@ export class NetworkAppService {
       redirectUrl: env('REDIRECT_URL') || defaultRedirectUrl(network),
       organizationPages: network === 'linkedin' && env('PAGES').toLowerCase() === 'true',
       engagementMetrics: env('ENGAGEMENT_METRICS').toLowerCase() === 'true',
+      directMessages: network === 'twitter' && env('DIRECT_MESSAGES').toLowerCase() === 'true',
       source: clientId ? 'environment' : 'none',
     }
   }
@@ -94,6 +98,7 @@ export class NetworkAppService {
         redirectUrl: credentials.redirectUrl,
         organizationPages: credentials.organizationPages,
         engagementMetrics: credentials.engagementMetrics,
+        directMessages: credentials.directMessages,
         ...(provider === 'twitter' ? { readUsage: await twitterReadUsage() } : {}),
       }
     }))
@@ -103,7 +108,7 @@ export class NetworkAppService {
    * Store a network's app. A blank secret keeps the stored one, so the id can
    * be corrected without pasting the secret again.
    */
-  async save(network: AppNetwork, input: { clientId: string, clientSecret?: string, redirectUrl?: string, organizationPages?: boolean, engagementMetrics?: boolean }): Promise<NetworkAppSummary> {
+  async save(network: AppNetwork, input: { clientId: string, clientSecret?: string, redirectUrl?: string, organizationPages?: boolean, engagementMetrics?: boolean, directMessages?: boolean }): Promise<NetworkAppSummary> {
     if (!APP_NETWORKS.includes(network)) throw new UserFacingError('That network does not use an app of its own.')
     const clientId = input.clientId.trim()
     if (!clientId || clientId.length > 255 || /\s/.test(clientId)) throw new UserFacingError('Paste the client id from the network\'s developer console. It has no spaces.')
@@ -122,6 +127,7 @@ export class NetworkAppService {
       // Left as it is when not given, so a form without the switch keeps it.
       ...(input.organizationPages === undefined ? {} : { organization_pages: network === 'linkedin' && input.organizationPages }),
       ...(input.engagementMetrics === undefined ? {} : { engagement_metrics: input.engagementMetrics }),
+      ...(network === 'twitter' && input.directMessages !== undefined ? { direct_messages: input.directMessages } : {}),
       updated_at: now(),
     }
     if (existing)

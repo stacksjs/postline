@@ -4,7 +4,7 @@ import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
-import { TwitterDriver } from './Drivers/TwitterDriver'
+import { TwitterApiError, TwitterDriver } from './Drivers/TwitterDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
 import { refreshOnce } from '../../Support/Social/token-refresh'
 import { exceedsLimit } from '../../Support/Social/count-text'
@@ -30,6 +30,7 @@ type SocialIdentityRow = {
   token_expires_at?: string | null
   account_id?: number | null
   social_driver_id?: number | null
+  twitter_dm_consent?: boolean | number | null
 }
 
 type SocialDriverRow = {
@@ -46,6 +47,12 @@ interface TwitterConfig {
   redirectUrl: string
   accessToken: string
   scopes: string[]
+  directMessages: boolean
+}
+
+function hasDirectMessageScopes(scope: string): boolean {
+  const granted = new Set(scope.split(/\s+/))
+  return granted.has('dm.read') && granted.has('dm.write')
 }
 
 export class TwitterService {
@@ -63,7 +70,8 @@ export class TwitterService {
       clientSecret: app.clientSecret,
       redirectUrl: app.redirectUrl,
       accessToken: String(env.TWITTER_ACCESS_TOKEN || '').trim(),
-      scopes: ['tweet.read', 'tweet.write', 'media.write', 'users.read', 'offline.access'],
+      scopes: ['tweet.read', 'tweet.write', 'media.write', 'users.read', 'offline.access', ...(app.directMessages ? ['dm.read', 'dm.write'] : [])],
+      directMessages: app.directMessages,
     }
   }
 
@@ -115,21 +123,22 @@ export class TwitterService {
    * second account means switching accounts on x.com first; the callback then
    * adds it alongside the first rather than replacing it.
    */
-  async prepareAuthorization(): Promise<{ url: string, codeVerifier: string }> {
+  async prepareAuthorization(): Promise<{ url: string, codeVerifier: string, requestedScopes: string[] }> {
     const cfg = (await this.config())
     if (!cfg.clientId) throw new UserFacingError('Add your X app under Settings, Channels first: its client id and secret.')
     if (!cfg.redirectUrl) throw new UserFacingError('Postline could not work out its address for the X redirect. Set it under Settings, Channels.')
 
-    return await this.driver.createAuthorization({
+    const authorization = await this.driver.createAuthorization({
       clientId: cfg.clientId,
       redirectUrl: cfg.redirectUrl,
       scopes: cfg.scopes,
       state: '',
     })
+    return { ...authorization, requestedScopes: cfg.scopes }
   }
 
   /** Handle the OAuth redirect: exchange the code and store the tokens. */
-  async exchangeAuthorizationCode(code: string, { codeVerifier, testOnly }: NetworkOAuthExchangeOptions = {}) {
+  async exchangeAuthorizationCode(code: string, { codeVerifier, testOnly, requestedScopes }: NetworkOAuthExchangeOptions = {}) {
     const cfg = (await this.config())
     if (!code) throw new Error('X/Twitter did not return an authorization code.')
     if (!codeVerifier) throw new UserFacingError('Start a new X connection from Channels to continue.')
@@ -151,6 +160,7 @@ export class TwitterService {
       userId: profile.id,
       username: profile.username,
       name: profile.name,
+      directMessages: hasDirectMessageScopes(token.scope ?? requestedScopes?.join(' ') ?? ''),
     })
     return this.publicIdentity(identity)
   }
@@ -172,6 +182,7 @@ export class TwitterService {
       userId: profile.id,
       username: profile.username,
       name: profile.name,
+      directMessages: cfg.directMessages,
     }, { revive: options.revive ?? true })
     return this.publicIdentity(identity)
   }
@@ -331,6 +342,28 @@ export class TwitterService {
     })
   }
 
+  /** Paid Inbox work always uses the explicitly selected, authorized account. */
+  async withDirectMessages<T>(identityId: number, action: (account: { handle: string, did: string, accessToken: string }, driver: TwitterDriver) => Promise<T>): Promise<T> {
+    if (!(await networkApps.credentials('twitter')).directMessages)
+      throw new UserFacingError('Enable X API messages in Channels first.')
+
+    const identity = await findIdentityRow<SocialIdentityRow>('twitter', identityId)
+    if (!isUsableIdentity(identity) || !identity?.twitter_dm_consent)
+      throw new UserFacingError('Reconnect this X account in Channels to allow Inbox messages.')
+
+    const current = await this.refreshIfExpiring(identity)
+    if (!current?.twitter_dm_consent || !current.access_token || !current.external_id)
+      throw new UserFacingError('Reconnect this X account in Channels to allow Inbox messages.')
+
+    try {
+      return await action({ handle: current.handle, did: current.external_id, accessToken: current.access_token }, this.driver)
+    }
+    catch (error) {
+      if (error instanceof TwitterApiError && error.isAuthError) await markIdentityExpired(current)
+      throw error
+    }
+  }
+
   /**
    * The account to act as. A named account must be usable as-is; without a
    * name this is the default account, falling back to the `.env` token.
@@ -387,6 +420,7 @@ export class TwitterService {
           refresh_token: nextRefresh,
           token_expires_at: nextExpiry,
           auth_status: 'connected',
+          ...(refreshed.scope === undefined ? {} : { twitter_dm_consent: hasDirectMessageScopes(refreshed.scope) }),
           updated_at: now(),
         })
       },
@@ -413,7 +447,7 @@ export class TwitterService {
    * reconnecting an account refreshes its row, a different account is added.
    */
   private async saveSession(
-    input: { accessToken: string, refreshToken?: string, expiresIn?: number, userId: string, username: string, name?: string },
+    input: { accessToken: string, refreshToken?: string, expiresIn?: number, userId: string, username: string, name?: string, directMessages: boolean },
     options: { revive?: boolean } = {},
   ): Promise<SocialIdentityRow> {
     const accountId = await ensureAccount()
@@ -427,6 +461,7 @@ export class TwitterService {
       auth_status: 'connected',
       access_token: input.accessToken,
       refresh_token: input.refreshToken ?? null,
+      twitter_dm_consent: input.directMessages,
       token_expires_at: expiresAt(input.expiresIn),
       account_id: accountId,
       social_driver_id: driver.id,

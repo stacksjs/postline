@@ -6,15 +6,18 @@ import { directMessages } from '../../Services/DirectMessageService'
 
 export default new Action({
   name: 'Postline Inbox Sync',
-  description: 'Pull new direct messages from every connected network.',
+  description: 'Refresh direct messages, with explicit X account selection for paid reads.',
   method: 'POST',
 
   async handle(request: RequestInstance) {
     try {
-      const data = await directMessages.sync({
-        provider: String(request.get('provider') || ''),
-        conversationId: Number(request.get('conversation_id') || 0),
-      })
+      const twitterIdentity = request.get('twitter_identity_id')
+      const data = twitterIdentity == null
+        ? await directMessages.sync({
+            provider: String(request.get('provider') || ''),
+            conversationId: Number(request.get('conversation_id') || 0),
+          })
+        : await directMessages.syncTwitter(Number(twitterIdentity), request.get('older') === true)
 
       return response.json({ ok: true, data })
     }

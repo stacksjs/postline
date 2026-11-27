@@ -19,7 +19,7 @@ it post as you never leave it.
 | **Per-network variants** | Give one network its own wording without forking the draft |
 | **Queue** | Drafts, scheduled posts and failures in one list or on a calendar, in your own timezone |
 | **Campaigns** | Lay a launch out across weeks, have an assistant draft the sequence, then move it into the queue in one step |
-| **Inbox** | Direct messages from Bluesky and Mastodon (an app password with message access) in one list. X messages are not supported yet |
+| **Inbox** | Direct messages from Bluesky, Mastodon and the opt-in X API in one list. Bluesky needs an app password with message access. X API calls use your credits |
 | **Listening** | Keyword rules across Bluesky, X and Mastodon, checked every five minutes |
 | **Analytics** | Publishing activity for every network, with likes, reposts and replies for Bluesky and Mastodon posts |
 | **Cleanup** | Delete posts older than a set number of days, or clear an account, with a preview first |

@@ -6,17 +6,15 @@
  * A DM is a two-way thread against a single network, so the useful unit is a
  * conversation, not a post, and there is nothing to crosspost.
  *
- * Every network that can do this at all is behind a different shape: Bluesky
- * has first-class convos, X has a flat event stream you group yourself, and
- * Mastodon fakes threads out of direct-visibility statuses. `DmTransport` is
- * the seam that hides all three, so `DirectMessageService` only ever deals in
- * conversations and messages.
+ * `DmTransport` wraps the conversation APIs for Bluesky and Mastodon. X uses
+ * an account-wide event stream, with one page per paid refresh. Both paths
+ * produce the same local conversation and message records.
  */
 
 import type { SocialProvider } from './types'
 
 /** Networks Postline can currently read and answer DMs on. */
-export const DM_PROVIDERS = ['bluesky', 'mastodon'] as const
+export const DM_PROVIDERS = ['bluesky', 'mastodon', 'twitter'] as const
 
 export type DmProvider = typeof DM_PROVIDERS[number]
 
@@ -33,10 +31,6 @@ export const DM_UNAVAILABLE: Partial<Record<SocialProvider, string>> = {
   // in development mode sees only people with a role on it. A self-hosted
   // app made for one person cannot reasonably get there (#129).
   instagram: 'Instagram messages need Meta\'s app review (Advanced Access), which an app you made for yourself does not have.',
-  // X charges for its message endpoints, and Postline does not ask for the
-  // message permissions. Messages will come with signing in to X inside
-  // Postline (#121).
-  twitter: 'X messages are not supported yet; they will come with signing in to X inside Postline.',
   linkedin: 'LinkedIn messaging is limited to partner-approved apps.',
 }
 
@@ -88,7 +82,7 @@ export interface DmMessageCandidate {
  * how to keep a session alive should be the one doing it.
  */
 export interface DmTransport {
-  provider: DmProvider
+  provider: Exclude<DmProvider, 'twitter'>
   /** Longest body the network accepts in a single message. */
   characterLimit: number
   /**

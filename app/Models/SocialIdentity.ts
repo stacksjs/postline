@@ -90,6 +90,20 @@ export default defineModel({
       validation: { rule: schema.string().max(4000).optional() },
       factory: () => null,
     },
+    twitterDmConsent: {
+      required: false,
+      hidden: true,
+      default: false,
+      validation: { rule: schema.boolean() },
+      factory: () => false,
+    },
+    /** Private pagination checkpoints for the account's X message event stream. */
+    twitterDmState: {
+      required: false,
+      hidden: true,
+      validation: { rule: schema.string().optional() },
+      factory: () => null,
+    },
     /** Facebook Page selected for this connected Instagram account. */
     instagramPageId: {
       required: false,

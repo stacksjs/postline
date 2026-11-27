@@ -1967,6 +1967,23 @@
             "isNullable": true,
             "hasDefault": false,
             "maxLength": 255
+          },
+          {
+            "name": "twitter_dm_consent",
+            "type": "boolean",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": true,
+            "defaultValue": false
+          },
+          {
+            "name": "twitter_dm_state",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
           }
         ],
         "indexes": [
@@ -2793,6 +2810,15 @@
           },
           {
             "name": "engagement_metrics",
+            "type": "boolean",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": true,
+            "defaultValue": false
+          },
+          {
+            "name": "direct_messages",
             "type": "boolean",
             "isPrimaryKey": false,
             "isUnique": false,
@@ -3721,7 +3747,7 @@
       }
     ]
   },
-  "hash": "150fbd3b8864987a5cdad4d2c8a6ee9a611e9165aa226364be7262e14307a541",
+  "hash": "241a6dad4472c4496871f159f53c5a2eb504609884354776e7e95ddb4f9ad557",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-27T12:27:12.276Z"
+  "updatedAt": "2026-11-27T14:17:33.253Z"
 }

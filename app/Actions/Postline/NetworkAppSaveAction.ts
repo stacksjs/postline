@@ -25,6 +25,7 @@ export default new Action({
         redirectUrl: String(request.get('redirect_url') || ''),
         organizationPages: flag('organization_pages'),
         engagementMetrics: flag('engagement_metrics'),
+        directMessages: flag('direct_messages'),
       })
       return response.json({ ok: true, data })
     }

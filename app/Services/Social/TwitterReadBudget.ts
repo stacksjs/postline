@@ -5,7 +5,7 @@ const MICROS_PER_DOLLAR = 1_000_000
 const DEFAULT_DAILY_LIMIT = 2 * MICROS_PER_DOLLAR
 
 // https://docs.x.com/x-api/getting-started/pricing
-export const TWITTER_READ_PRICE = { post: 5_000, user: 10_000 } as const
+export const TWITTER_READ_PRICE = { post: 5_000, user: 10_000, directMessage: 10_000 } as const
 
 function dailyLimit(): number {
   const value = Bun.env.TWITTER_DAILY_READ_BUDGET_USD?.trim()

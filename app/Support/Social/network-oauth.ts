@@ -10,6 +10,7 @@ const FLOW_TTL_MS = 15 * 60_000
 export interface NetworkOAuthExchangeOptions {
   codeVerifier?: string
   testOnly?: boolean
+  requestedScopes?: string[]
 }
 
 function networkResult(provider: AppNetwork, status: 'connected' | 'tested' | 'error', message?: string): Response {
@@ -37,20 +38,20 @@ export async function workspaceOwner(request: RequestInstance): Promise<number |
 export async function redirectToNetworkConsent(
   request: RequestInstance,
   provider: AppNetwork,
-  prepare: () => Promise<{ url: string, codeVerifier?: string }>,
+  prepare: () => Promise<{ url: string, codeVerifier?: string, requestedScopes?: string[] }>,
 ): Promise<Response> {
   const owner = await workspaceOwner(request)
   if (owner === undefined) return response.unauthorized('Unauthorized')
 
   try {
-    const { url, codeVerifier } = await prepare()
+    const { url, codeVerifier, requestedScopes } = await prepare()
     const testOnly = request.get('test') === '1'
     const authorization = new URL(url)
     const flow = await issueOAuthFlow({
       purpose: `postline-connect:${provider}`,
       userId: owner,
       ttlMs: FLOW_TTL_MS,
-      data: { ...(testOnly && { testOnly }), ...(codeVerifier && { codeVerifier }) },
+      data: { ...(testOnly && { testOnly }), ...(codeVerifier && { codeVerifier }), ...(requestedScopes && { requestedScopes }) },
       cookie: { path: `/api/postline/${provider}/callback` },
     })
     // The driver prepares its authorization parameters, including PKCE. The
@@ -88,7 +89,8 @@ export async function finishNetworkConsent(
       const code = String(request.get('code') || '')
       const codeVerifier = typeof flow.data?.codeVerifier === 'string' ? flow.data.codeVerifier : undefined
       const testOnly = flow.data?.testOnly === true
-      const exchanged = await exchange(code, { codeVerifier, testOnly }, owner)
+      const requestedScopes = Array.isArray(flow.data?.requestedScopes) ? flow.data.requestedScopes.filter((scope): scope is string => typeof scope === 'string') : undefined
+      const exchanged = await exchange(code, { codeVerifier, testOnly, ...(requestedScopes && { requestedScopes }) }, owner)
       result = exchanged instanceof Response ? exchanged : networkResult(provider, testOnly ? 'tested' : 'connected')
     }
   }
