@@ -1321,6 +1321,87 @@
         "label": "New date, {day}",
         "timeZone": "Time zone"
       }
+    },
+    "login": {
+      "labels": {
+        "documentTitle": "Postline - Sign in",
+        "description": "Sign in to your Postline workspace.",
+        "heading": "Sign in to Postline",
+        "tagline": "Compose once, publish everywhere.",
+        "email": "Email",
+        "password": "Password",
+        "authenticatorCode": "Authenticator code",
+        "authenticatorHelp": "The 6-digit code from your authenticator app, or one of your recovery codes.",
+        "submit": "Sign in",
+        "passkey": "Sign in with a passkey",
+        "otherAccount": "Use a different account",
+        "setup": "Set up a new workspace",
+        "passwordHelp": "Lost the password? Reset it on the machine Postline runs on:",
+        "authenticatorLost": "Lost the authenticator too?"
+      },
+      "client": {
+        "heading": "Sign in to Postline",
+        "tagline": "Compose once, publish everywhere.",
+        "submit": "Sign in",
+        "verifyHeading": "Verify your sign-in",
+        "verifyHelp": "Enter a code from your authenticator app.",
+        "shareHelp": "Sign in to add the shared link to a post.",
+        "verify": "Verify",
+        "invalidCode": "That code is not right.",
+        "restartCode": "That code is not right. Sign in again.",
+        "retryCode": "That code is not right. Try again.",
+        "invalidLogin": "Incorrect email or password."
+      }
+    },
+    "setup": {
+      "labels": {
+        "documentTitle": "Postline - Workspace setup",
+        "description": "Set up a Postline workspace and write your first post.",
+        "heading": "Set up your workspace",
+        "progress": "Workspace setup progress",
+        "retry": "Try again",
+        "signIn": "Sign in to continue",
+        "download": "Get Postline",
+        "name": "Name",
+        "email": "Email",
+        "password": "Password",
+        "confirmPassword": "Confirm password",
+        "createAccount": "Create workspace account",
+        "workspaceName": "Workspace name",
+        "timezone": "Time zone",
+        "proceed": "Continue",
+        "target": "Where to publish",
+        "connect": "Connect a network",
+        "compose": "Write your first post",
+        "back": "Back to workspace details",
+        "openQueue": "Open the queue",
+        "composeAnother": "Write another post"
+      },
+      "client": {
+        "accountStep": "Account",
+        "workspaceStep": "Workspace",
+        "firstPostStep": "First post",
+        "setupHeading": "Set up your workspace",
+        "marketingHeading": "Set up Postline on your own install",
+        "signInHeading": "Continue workspace setup",
+        "accountHeading": "Create the owner account",
+        "workspaceHeading": "Name your workspace",
+        "channelsHeading": "Choose a publishing channel",
+        "completeHeading": "Your first post is ready",
+        "loadingHelp": "Checking this installation…",
+        "marketingHelp": "Workspace setup is available on your own Postline install.",
+        "signInHelp": "This workspace already has an owner account.",
+        "accountHelp": "This account manages your workspace.",
+        "workspaceHelp": "Postline uses this time zone for the queue and analytics.",
+        "channelsHelp": "Connect a social network or use the built-in Blog. You can add more channels later.",
+        "completeHelp": "Open the queue to see the status of your post.",
+        "loadSetupFailed": "Could not check workspace setup.",
+        "loadWorkspaceFailed": "Could not load your workspace.",
+        "loadPostFailed": "Could not check your first post.",
+        "passwordMismatch": "Passwords do not match.",
+        "createOwnerFailed": "Could not create the workspace account.",
+        "saveProfileFailed": "Could not save workspace details."
+      }
     }
   }
 }

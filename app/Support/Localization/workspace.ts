@@ -37,3 +37,5 @@ export const workspaceInstagramPagePickerText = workspaceI18n.tm('workspace.inst
 export const workspaceXBrowserSessionText = workspaceI18n.tm('workspace.xBrowserSession') as typeof en.workspace.xBrowserSession
 export const workspaceCampaignText = workspaceI18n.tm('workspace.campaigns') as typeof en.workspace.campaigns
 export const workspaceSettingsText = workspaceI18n.tm('workspace.settings') as typeof en.workspace.settings
+export const workspaceLoginText = workspaceI18n.tm('workspace.login') as typeof en.workspace.login
+export const workspaceSetupText = workspaceI18n.tm('workspace.setup') as typeof en.workspace.setup

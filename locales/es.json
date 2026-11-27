@@ -1321,6 +1321,87 @@
         "label": "Nueva fecha, {day}",
         "timeZone": "Zona horaria"
       }
+    },
+    "login": {
+      "labels": {
+        "documentTitle": "Postline - Iniciar sesión",
+        "description": "Inicia sesión en tu espacio de trabajo de Postline.",
+        "heading": "Inicia sesión en Postline",
+        "tagline": "Escribe una vez y publica en todas partes.",
+        "email": "Correo electrónico",
+        "password": "Contraseña",
+        "authenticatorCode": "Código de autenticación",
+        "authenticatorHelp": "Usa el código de 6 dígitos de tu aplicación de autenticación o uno de tus códigos de recuperación.",
+        "submit": "Iniciar sesión",
+        "passkey": "Iniciar sesión con una llave de acceso",
+        "otherAccount": "Usar otra cuenta",
+        "setup": "Configurar un espacio de trabajo nuevo",
+        "passwordHelp": "¿Olvidaste la contraseña? Restablécela en el equipo donde se ejecuta Postline:",
+        "authenticatorLost": "¿También perdiste el autenticador?"
+      },
+      "client": {
+        "heading": "Inicia sesión en Postline",
+        "tagline": "Escribe una vez y publica en todas partes.",
+        "submit": "Iniciar sesión",
+        "verifyHeading": "Verifica tu inicio de sesión",
+        "verifyHelp": "Introduce un código de tu aplicación de autenticación.",
+        "shareHelp": "Inicia sesión para añadir el enlace compartido a una publicación.",
+        "verify": "Verificar",
+        "invalidCode": "El código no es correcto.",
+        "restartCode": "El código no es correcto. Vuelve a iniciar sesión.",
+        "retryCode": "El código no es correcto. Inténtalo de nuevo.",
+        "invalidLogin": "El correo electrónico o la contraseña son incorrectos."
+      }
+    },
+    "setup": {
+      "labels": {
+        "documentTitle": "Postline - Configuración del espacio de trabajo",
+        "description": "Configura un espacio de trabajo de Postline y escribe tu primera publicación.",
+        "heading": "Configura tu espacio de trabajo",
+        "progress": "Progreso de la configuración del espacio de trabajo",
+        "retry": "Volver a intentar",
+        "signIn": "Iniciar sesión para continuar",
+        "download": "Obtener Postline",
+        "name": "Nombre",
+        "email": "Correo electrónico",
+        "password": "Contraseña",
+        "confirmPassword": "Confirmar contraseña",
+        "createAccount": "Crear la cuenta del espacio de trabajo",
+        "workspaceName": "Nombre del espacio de trabajo",
+        "timezone": "Zona horaria",
+        "proceed": "Continuar",
+        "target": "Dónde publicar",
+        "connect": "Conectar una red",
+        "compose": "Escribir tu primera publicación",
+        "back": "Volver a los datos del espacio de trabajo",
+        "openQueue": "Abrir la cola",
+        "composeAnother": "Escribir otra publicación"
+      },
+      "client": {
+        "accountStep": "Cuenta",
+        "workspaceStep": "Espacio de trabajo",
+        "firstPostStep": "Primera publicación",
+        "setupHeading": "Configura tu espacio de trabajo",
+        "marketingHeading": "Configura Postline en tu propia instalación",
+        "signInHeading": "Continúa con la configuración",
+        "accountHeading": "Crea la cuenta del propietario",
+        "workspaceHeading": "Ponle un nombre a tu espacio de trabajo",
+        "channelsHeading": "Elige un canal para publicar",
+        "completeHeading": "Tu primera publicación está lista",
+        "loadingHelp": "Comprobando esta instalación…",
+        "marketingHelp": "Puedes configurar un espacio de trabajo en tu propia instalación de Postline.",
+        "signInHelp": "Este espacio de trabajo ya tiene una cuenta de propietario.",
+        "accountHelp": "Esta cuenta administra tu espacio de trabajo.",
+        "workspaceHelp": "Postline usa esta zona horaria para la cola y las estadísticas.",
+        "channelsHelp": "Conecta una red social o usa el blog integrado. Puedes añadir más canales después.",
+        "completeHelp": "Abre la cola para ver el estado de tu publicación.",
+        "loadSetupFailed": "No se pudo comprobar la configuración del espacio de trabajo.",
+        "loadWorkspaceFailed": "No se pudo cargar tu espacio de trabajo.",
+        "loadPostFailed": "No se pudo comprobar tu primera publicación.",
+        "passwordMismatch": "Las contraseñas no coinciden.",
+        "createOwnerFailed": "No se pudo crear la cuenta del espacio de trabajo.",
+        "saveProfileFailed": "No se pudieron guardar los datos del espacio de trabajo."
+      }
     }
   }
 }

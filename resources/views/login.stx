@@ -1,58 +1,63 @@
 @extends('layouts/default')
 
-@section('title', 'Postline - Sign in')
-
 <script server>
 import { isMarketingSite } from '../../app/Support/Marketing/site'
+import { workspaceLocale, workspaceLoginText } from '../../app/Support/Localization/workspace'
+
+export const loginLocale = workspaceLocale
+export const loginText = workspaceLoginText.labels
+export const loginMessages = workspaceLoginText.client
 
 const allowsFirstRun = !isMarketingSite()
 </script>
 
+@section('title'){{ loginText.documentTitle }}@endsection
+
 @section('content')
-  @meta('description', 'Sign in to your Postline workspace.')
+  @meta('description', loginText.description)
   @meta('robots', 'noindex, nofollow')
   {{-- The theme is stamped before paint by `app.colorMode` in config/ui.ts,
       as on every layout. --}}
-  <main class="grid place-items-center px-4 min-h-screen bg-bg" data-testid="login-page">
+  <main class="grid place-items-center px-4 min-h-screen bg-bg" data-testid="login-page" lang="{{ loginLocale }}">
     <section class="grid gap-5 p-6 max-w-sm w-full bg-panel border border-line rounded-2xl shadow-sm">
       <header class="grid gap-2 justify-items-center text-center">
         {{-- The same mark as the favicon and the sidebar (`.brand-mark`). --}}
         <span class="h-11 w-11 brand-mark" aria-hidden="true"></span>
-        <h1 class="m-0 font-semibold text-ink text-xl" :text="heading()">Sign in to Postline</h1>
-        <p class="m-0 text-muted text-ui" :text="subtitle()">Compose once, publish everywhere.</p>
+        <h1 class="m-0 font-semibold text-ink text-xl" :text="heading()">{{ loginText.heading }}</h1>
+        <p class="m-0 text-muted text-ui" :text="subtitle()">{{ loginText.tagline }}</p>
       </header>
 
       <form class="grid gap-3" @submit.prevent="onSubmit">
         <label class="grid gap-1.5" x-show="!challenge()">
-          <span class="font-semibold text-muted text-xs">Email</span>
+          <span class="font-semibold text-muted text-xs">{{ loginText.email }}</span>
           <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="email" type="email" autocomplete="username" placeholder="you@example.com" x-model="email" :required="!challenge()" autofocus>
         </label>
         <label class="grid gap-1.5" x-show="!challenge()">
-          <span class="font-semibold text-muted text-xs">Password</span>
+          <span class="font-semibold text-muted text-xs">{{ loginText.password }}</span>
           <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password" type="password" autocomplete="current-password" placeholder="••••••••" :required="!challenge()" x-model="password">
         </label>
         {{-- The second step when two-factor sign-in is on (#95). --}}
         <label class="gap-1.5" :class="challenge() ? 'grid' : 'hidden'">
-          <span class="font-semibold text-muted text-xs">Authenticator code</span>
+          <span class="font-semibold text-muted text-xs">{{ loginText.authenticatorCode }}</span>
           <input class="px-3 h-10 text-ink text-sm tracking-widest bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="code" autocomplete="one-time-code" inputmode="text" placeholder="123456" maxlength="64" x-model="code" :required="!!challenge()" ref="codeInput" data-two-factor-code>
-          <span class="text-muted text-xs">The 6-digit code from your authenticator app, or one of your recovery codes.</span>
+          <span class="text-muted text-xs">{{ loginText.authenticatorHelp }}</span>
         </label>
         <p class="m-0 text-danger text-xs" :class="{ 'sr-only': !errorMessage() }" :text="errorMessage()" role="alert"></p>
-        <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="busy()" :text="submitLabel()">Sign in</button>
+        <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="busy()" :text="submitLabel()">{{ loginText.submit }}</button>
       </form>
 
       <button class="hidden gap-2 items-center justify-center px-4 h-10 font-semibold text-ink text-sm bg-panel hover:bg-hover border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :class="{ 'hidden': !passkeysOffered(), 'inline-flex': passkeysOffered() }" :disabled="busy()" @click="signInWithPasskey" data-passkey-sign-in>
         <span class="h-4 w-4 i-hugeicons-key-01" aria-hidden="true"></span>
-        Sign in with a passkey
+        {{ loginText.passkey }}
       </button>
-      <button class="text-muted text-xs underline hover:text-body transition-colors" type="button" :class="challenge() ? '' : 'hidden'" @click="cancelChallenge">Use a different account</button>
+      <button class="text-muted text-xs underline hover:text-body transition-colors" type="button" :class="challenge() ? '' : 'hidden'" @click="cancelChallenge">{{ loginText.otherAccount }}</button>
       @if(allowsFirstRun)
-        <a :if="setupAvailable() && !challenge()" class="justify-self-center text-info text-sm underline" href="/setup" data-stx-link>Set up a new workspace</a>
+        <a :if="setupAvailable() && !challenge()" class="justify-self-center text-info text-sm underline" href="/setup" data-stx-link>{{ loginText.setup }}</a>
       @endif
       <p class="text-center text-muted text-xs">
-        Lost the password? Reset it on the machine Postline runs on:
+        {{ loginText.passwordHelp }}
         <code class="block mt-1 text-body whitespace-nowrap">./buddy user:add you@example.com --update</code>
-        <a class="inline-block mt-1.5 underline hover:text-body" href="https://github.com/stacksjs/postline/blob/main/docs/first-run.md#if-you-lose-the-password" target="_blank" rel="noopener noreferrer">Lost the authenticator too?</a>
+        <a class="inline-block mt-1.5 underline hover:text-body" href="https://github.com/stacksjs/postline/blob/main/docs/first-run.md#if-you-lose-the-password" target="_blank" rel="noopener noreferrer">{{ loginText.authenticatorLost }}</a>
       </p>
     </section>
   </main>
@@ -61,6 +66,7 @@ const allowsFirstRun = !isMarketingSite()
     import { shareComposerPath, sharedPage } from '../functions/composer-share'
     import { passkeys } from '../functions/passkeys'
 
+    const copy = {{ loginMessages }}
     const setupAvailable = state(false)
     const route = useRoute()
     const returnToSetup = route.query.return === 'setup'
@@ -83,12 +89,12 @@ const allowsFirstRun = !isMarketingSite()
     const webAuthn = passkeys.supported()
     const passkeysOffered = derived(() => webAuthn && !challenge())
 
-    const heading = derived(() => challenge() ? 'Verify your sign-in' : 'Sign in to Postline')
+    const heading = derived(() => challenge() ? copy.verifyHeading : copy.heading)
     const subtitle = derived(() => {
-      if (challenge()) return 'Enter a code from your authenticator app.'
-      return pendingShare ? 'Sign in to add the shared link to a post.' : 'Compose once, publish everywhere.'
+      if (challenge()) return copy.verifyHelp
+      return pendingShare ? copy.shareHelp : copy.tagline
     })
-    const submitLabel = derived(() => challenge() ? 'Verify' : 'Sign in')
+    const submitLabel = derived(() => challenge() ? copy.verify : copy.submit)
 
     onMount(async () => {
       if (!{{ allowsFirstRun }}) return
@@ -147,16 +153,16 @@ const allowsFirstRun = !isMarketingSite()
         return
       }
       if (response.status !== 401)
-        throw new Error(payload.error || payload.message || 'That code is not right.')
+        throw new Error(payload.error || payload.message || copy.invalidCode)
       // A challenge is single-use, so a wrong code spends it. Ask for a fresh
       // one with the password still in hand, so a typo costs a retry rather
       // than the password. If that fails too, back to the password step.
       if (!await requestChallenge()) {
         cancelChallenge()
-        throw new Error('That code is not right. Sign in again.')
+        throw new Error(copy.restartCode)
       }
       code.set('')
-      throw new Error('That code is not right. Try again.')
+      throw new Error(copy.retryCode)
     }
 
     /** The password step on its own; true when it answered with a challenge. */
@@ -223,7 +229,7 @@ const allowsFirstRun = !isMarketingSite()
 
         const token = payload.access_token || payload.token
         if (!response.ok || !token)
-          throw new Error(payload.error || payload.message || 'Incorrect email or password.')
+          throw new Error(response.status === 401 ? copy.invalidLogin : payload.error || payload.message || copy.invalidLogin)
         enterApp(payload.expires_in)
       }
       catch (error) {

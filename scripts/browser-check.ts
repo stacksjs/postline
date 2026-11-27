@@ -2484,6 +2484,18 @@ async function watchPageSecurity(cdp: Cdp): Promise<void> {
 }
 
 async function checkFirstRun(cdp: Cdp): Promise<void> {
+  const copy = spanishWorkspace
+    ? {
+        login: 'Inicia sesión en Postline', setup: 'Configurar un espacio de trabajo nuevo',
+        account: 'Crea la cuenta del propietario', mismatch: 'Las contraseñas no coinciden.',
+        workspace: 'Ponle un nombre a tu espacio de trabajo', channels: 'Elige un canal para publicar',
+        complete: 'Tu primera publicación está lista',
+      }
+    : {
+        login: 'Sign in to Postline', setup: 'Set up a new workspace',
+        account: 'Create the owner account', mismatch: 'Passwords do not match.',
+        workspace: 'Name your workspace', channels: 'Choose a publishing channel', complete: 'Your first post is ready',
+      }
   const setup = `document.querySelector('[data-testid="setup-page"]')`
   const input = (name: string): string => `${setup}.querySelector(` + JSON.stringify(`input[name=${name}]`) + ')'
   const type = async (selector: string, value: string): Promise<void> => {
@@ -2495,24 +2507,38 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
   const heading = (title: string): Promise<void> => waitUntil(title, () => evaluate<boolean>(cdp, `${setup}?.querySelector('h1').textContent === ${JSON.stringify(title)}`), 20_000)
 
   await auditPage(`${site}/login`, { cdp })
+  const login = `document.querySelector('[data-testid="login-page"]')`
   const setupLink = `document.querySelector('a[href="/setup"]')`
-  await waitUntil('Setup is available from sign-in', () => evaluate<boolean>(cdp, `Boolean(${setupLink}?.getClientRects().length)`), 10_000)
+  await waitUntil('Sign-in offers setup in the workspace language', () => evaluate<boolean>(cdp, `
+    ${login}?.lang === ${JSON.stringify(spanishWorkspace ? 'es' : 'en')}
+      && ${login}.querySelector('h1')?.textContent === ${JSON.stringify(copy.login)}
+      && Boolean(${setupLink}?.getClientRects().length)
+      && ${setupLink}.textContent.trim() === ${JSON.stringify(copy.setup)}
+  `), 10_000)
+  if (spanishWorkspace) {
+    await type(`${login}.querySelector('input[name=email]')`, 'check@postline.test')
+    await type(`${login}.querySelector('input[name=password]')`, 'browser-check-password')
+    await click(`${login}.querySelector('button[type=submit]')`)
+    await waitUntil('Rejected credentials show the Spanish sign-in error', () => evaluate<boolean>(cdp, `
+      ${login}.querySelector('[role=alert]')?.textContent === 'El correo electrónico o la contraseña son incorrectos.'
+    `), 5_000)
+  }
   await click(setupLink)
-  await heading('Create the owner account')
+  await heading(copy.account)
   const workspaceName = marketingScreenshots ? 'Northstar Studio' : 'Browser Workspace'
   await type(input('name'), marketingScreenshots ? 'Alex Rivera' : 'Browser Check')
   await type(input('email'), marketingScreenshots ? 'alex@northstar.example' : 'check@postline.test')
   await type(input('password'), 'browser-check-password')
   await type(input('password_confirmation'), 'wrong-confirmation')
   await click(`${setup}.querySelector('button[type=submit]')`)
-  await waitUntil('Registration confirms the password before creating an account', () => evaluate<boolean>(cdp, `${setup}.querySelector('[role=alert]').textContent === 'Passwords do not match.'`), 5_000)
+  await waitUntil('Registration confirms the password before creating an account', () => evaluate<boolean>(cdp, `${setup}.querySelector('[role=alert]').textContent === ${JSON.stringify(copy.mismatch)}`), 5_000)
   await type(input('password_confirmation'), 'browser-check-password')
   await click(`${setup}.querySelector('button[type=submit]')`)
-  await heading('Name your workspace')
+  await heading(copy.workspace)
   await type(input('workspaceName'), workspaceName)
   await type(input('timezone'), 'America/New_York')
   await click(`${setup}.querySelector('button[type=submit]')`)
-  await heading('Choose a publishing channel')
+  await heading(copy.channels)
   const profileSaved = await evaluate<boolean>(cdp, `(async () => {
     const { data } = await (await fetch('/api/postline/settings/workspace')).json()
     return data.workspaceName === ${JSON.stringify(workspaceName)} && data.timezone === 'America/New_York'
@@ -2524,7 +2550,7 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
   const resumeLabel = spanishWorkspace ? 'Continuar la configuración' : 'Continue setup'
   await waitUntil('Channels links back to setup', () => evaluate<boolean>(cdp, `location.pathname === '/accounts' && ${resume}?.textContent.trim() === ${JSON.stringify(resumeLabel)}`), 15_000)
   await click(resume)
-  await heading('Choose a publishing channel')
+  await heading(copy.channels)
   await waitUntil('The built-in Blog is the first available channel', () => evaluate<boolean>(cdp, `${setup}.querySelector('[data-setup-channel]')?.value === 'blog'`), 5_000)
   const composerLink = `${setup}.querySelector('a[href="/composer?setup=1&target=blog"]')`
   await click(composerLink)
@@ -2551,7 +2577,7 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
       document.querySelector('[data-bluesky-text]')?.value.includes(${JSON.stringify(body)})
         && !document.querySelector('[data-bluesky-publish]')?.disabled`), 5_000)
     await click("document.querySelector('[data-bluesky-publish]')")
-    await heading('Your first post is ready')
+    await heading(copy.complete)
     if (!await evaluate<boolean>(cdp, `Number(new URLSearchParams(location.search).get('post')) > 0`))
       throw new Error('Setup did not persist the post ID returned by publishing.')
   }
