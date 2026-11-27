@@ -20,7 +20,7 @@ export { providerLabel, providerInitial, providerColor, providerIcon } from '../
 export { showNotification } from '../../../resources/functions/notification'
 export { passkeys } from '../../../resources/functions/passkeys'
 export { requestJson, fetchWorkspaceBootstrap, refreshWorkspaceBootstrap, disconnectSocialAccount, escapeHtml, relativeTime, workspaceBootstrapQuery, announceWorkspaceChange, bindWorkspaceChanges } from '../../../resources/functions/postline-client'
-export { fetchWorkspace, fetchLinkPreview, fetchProviders, publishCrosspost, formatHandle, targetLabel } from '../../../resources/functions/social-client'
+export { fetchWorkspace, fetchProviders, publishCrosspost, formatHandle, targetLabel } from '../../../resources/functions/social-client'
 export type { AccountStatus, ProviderStatus, CrosspostResultItem, CrosspostInput } from '../../../resources/functions/social-client'
 export { postStatusVariant } from '../../../resources/functions/status-badge'
 export { workspaceCommands, runWorkspaceCommand } from '../../../resources/functions/workspace-commands'

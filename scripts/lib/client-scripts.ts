@@ -10,14 +10,14 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-/** Every script a layout, view or component references, by file name. */
+/** Every asset named by a template, including URLs used by dynamic imports. */
 export function referencedClientScripts(root: string): string[] {
   const referenced = new Set<string>()
   for (const folder of ['resources/layouts', 'resources/views', 'resources/components']) {
     const glob = new Bun.Glob('**/*.stx')
     for (const file of glob.scanSync({ cwd: join(root, folder), absolute: true })) {
-      for (const match of readFileSync(file, 'utf8').matchAll(/src="\/assets\/scripts\/([\w.-]+\.ts)"/g))
-        referenced.add(match[1]!)
+      for (const match of readFileSync(file, 'utf8').matchAll(/(['"])\/assets\/scripts\/([\w.-]+\.ts)\1/g))
+        referenced.add(match[2]!)
     }
   }
   return [...referenced].sort()

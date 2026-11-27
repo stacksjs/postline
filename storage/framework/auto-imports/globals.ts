@@ -56,7 +56,6 @@ declare global {
   const announceWorkspaceChange: typeof autoImports.announceWorkspaceChange
   const bindWorkspaceChanges: typeof autoImports.bindWorkspaceChanges
   const fetchWorkspace: typeof autoImports.fetchWorkspace
-  const fetchLinkPreview: typeof autoImports.fetchLinkPreview
   const fetchProviders: typeof autoImports.fetchProviders
   const publishCrosspost: typeof autoImports.publishCrosspost
   const formatHandle: typeof autoImports.formatHandle

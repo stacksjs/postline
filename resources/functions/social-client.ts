@@ -1,5 +1,5 @@
 import { providerLabel } from './networks'
-import { fetchWorkspaceBootstrap, requestJson } from './postline-client'
+import { fetchWorkspaceBootstrap } from './postline-client'
 
 /** One connected account on a network. Several per network are allowed. */
 export interface AccountStatus {
@@ -99,19 +99,6 @@ export function targetLabel(provider: string, handle?: string | null): string {
 /** The workspace profile (its name and time zone), which most views read. */
 export async function fetchWorkspace() {
   return (await fetchWorkspaceBootstrap()).workspace
-}
-
-/** A link's preview card, asked for once however often the composer redraws it. */
-export async function fetchLinkPreview(url: string): Promise<Record<string, unknown>> {
-  const endpoint = `/api/postline/bluesky/link-preview?url=${encodeURIComponent(url)}`
-  const preview = window.stx.cachedQuery<Record<string, unknown> | null>(endpoint, {
-    scope: false,
-    staleTime: 30_000,
-    load: async ({ signal }) => (await requestJson(endpoint, { signal }, 'Could not render link preview.')).data,
-  })
-  const data = await preview.load()
-  if (!data) throw new Error(preview.error() || 'Could not render link preview.')
-  return data
 }
 
 export async function fetchProviders(): Promise<ProviderStatus[]> {

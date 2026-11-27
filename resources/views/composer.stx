@@ -148,7 +148,7 @@
           <label class="inline-flex gap-1.5 items-center text-muted text-xs" x-show="showLanguage()">
             <span>Language</span>
             <select class="px-2 h-8 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="postLanguage" data-post-language>
-              <option x-for="option in languageOptions" :value="option.value" :text="option.label"></option>
+              <option x-for="option in languageOptions()" :value="option.value" :selected="option.value === postLanguage()" :text="option.label"></option>
             </select>
           </label>
           <label class="inline-flex gap-1.5 items-center text-muted text-xs" x-show="showMastodonOptions()">
@@ -247,17 +247,15 @@
     import { appendComposerImages, composerFileError, composerImageFiles, composerImageTypes, composerMediaWarnings } from '../functions/composer-media'
     import { composerActionText, composerQueueTimestamp, composerScheduleIso } from '../functions/composer-schedule'
     import { composerPreviewCards, previewImageUrl } from '../functions/composer-preview'
-    import { blogArticle } from '../../app/Support/Social/blog-article'
     import { composerKeyForSpec, composerSelection, composerTargetRows, composerTargets, uniqueComposerNetworks } from '../functions/composer-targets'
     import type { ComposerVariants } from '../functions/composer-variants'
     import { composerVariantRows, composerVariantsPayload } from '../functions/composer-variants'
-    import { requestJson } from '../functions/postline-client'
     import type { ComposerPreviewImage } from '../functions/composer-preview'
     import type { ComposerSegment } from '../functions/composer-thread'
     import { composerLinkPreview, firstComposerLink } from '../functions/composer-thread'
     import { providerLabel } from '../functions/networks'
     import type { ProviderStatus } from '../functions/social-client'
-    import { fetchLinkPreview, fetchProviders, fetchWorkspace, publishCrosspost, targetLabel } from '../functions/social-client'
+    import { fetchProviders, fetchWorkspace, publishCrosspost, targetLabel } from '../functions/social-client'
 
     const providersFailed = state(false)
     const query = useRoute().query
@@ -544,19 +542,7 @@
     const showMastodonOptions = derived(() => selectedNetworkIds().includes('mastodon'))
     const showLanguage = derived(() => selectedNetworkIds().some(id => id === 'bluesky' || id === 'mastodon'))
     const showPostOptions = derived(() => showLanguage() || showMastodonOptions())
-    /** Common languages, named in the reader's own language, the browser's first. */
-    const languageOptions = (() => {
-      const codes = ['en', 'es', 'de', 'fr', 'pt', 'pt-BR', 'it', 'nl', 'sv', 'pl', 'tr', 'ru', 'uk', 'ar', 'hi', 'ja', 'ko', 'zh']
-      const own = String(navigator.language || '').split('-')[0]
-      const ordered = own && codes.includes(own) ? [own, ...codes.filter(code => code !== own)] : codes
-      let names = null
-      try {
-        names = new Intl.DisplayNames([navigator.language || 'en'], { type: 'language' })
-      }
-      catch {}
-      return [{ value: '', label: 'Not set' }, ...ordered.map(code => ({ value: code, label: names?.of(code) || code }))]
-    })()
-
+    const languageOptions = state<Array<{ value: string, label: string }>>([])
     const attachedFiles = () => composerImageFiles(attachedImages())
     const appendImages = (form: FormData) => appendComposerImages(form, attachedImages())
 
@@ -623,6 +609,14 @@
     const connectedProviders = derived(() => publishTargets().filter(target => target.canPublish))
     const selectedConnected = derived(() => connectedProviders().filter(target => selectedHas(target.key)))
     const selectedNetworks = derived(() => uniqueComposerNetworks(selectedConnected()))
+
+    effect(() => {
+      if (!showLanguage() || languageOptions().length) return
+      const path = '/assets/scripts/composer-languages.ts'
+      void import(path)
+        .then(module => languageOptions.set(module.composerLanguages(navigator.language)))
+        .catch(() => setStatus('Could not load post languages.', 'error'))
+    })
 
     // The tightest limit among selected targets. Used for the counter's
     // denominator only — it is never enforced on the textarea, because
@@ -780,13 +774,18 @@
       return { text, tone: over.length ? 'danger' : length > limit - 40 ? 'warning' : 'muted' }
     })
 
+    function loadPreviews() {
+      const path = '/assets/scripts/composer-previews.ts'
+      return import(path) as Promise<typeof import('../assets/scripts/composer-previews')>
+    }
+
     const updateLinkPreview = async (id = activeSegmentId()) => {
       const post = segments().find(item => item.id === id)
       if (!post) return
       const source = firstComposerLink(post.text)
       if (!source || post.preview?.source === source) return
 
-      const data = await fetchLinkPreview(source).catch(() => undefined)
+      const data = await loadPreviews().then(module => module.fetchLinkPreview(source)).catch(() => undefined)
       const preview = composerLinkPreview(source, data)
       segments.update(posts => posts.map(item => item.id === id && firstComposerLink(item.text) === source
         ? { ...item, preview }
@@ -959,41 +958,34 @@
       return files.length || !url ? files : [{ id: 'image-url', src: url, alt: '' }]
     })
     const blogPreviewHtml = state<ReadonlyMap<string, string>>(new Map())
-    const blogPreviewBodies = derived(() => {
-      if (!selectedNetworkIds().includes('blog')) return []
-      return [...new Set(previewSegments().map((post, index) => blogArticle(
-        (variantsPayload().blog || post.text).trim(), index === 0 ? composedTitle() : undefined,
-      ).body).filter(Boolean))]
-    })
     const previewCards = derived(() => composerPreviewCards({
       networks: selectedNetworks(), segments: previewSegments(), variants: variantsPayload(), images: previewImages(),
       title: composedTitle() || '', spoiler: mastodonSpoiler(), blogHtml: blogPreviewHtml(),
     }))
 
     let blogPreviewRequest: AbortController | undefined
-    const renderBlogPreview = useDebounce(async (bodies: string[]) => {
-      if (!bodies.length) {
+    const renderBlogPreview = useDebounce(async (texts: string[], title?: string) => {
+      if (!texts.some(text => text.trim())) {
         blogPreviewHtml.set(new Map())
         return
       }
       const controller = new AbortController()
       blogPreviewRequest = controller
       try {
-        const payload = await requestJson('/api/postline/blog/preview', {
-          method: 'POST', body: JSON.stringify({ bodies }), signal: controller.signal,
-        })
-        if (!controller.signal.aborted)
-          blogPreviewHtml.set(new Map(bodies.map((body, index) => [body, payload.data.html[index]])))
+        const preview = await (await loadPreviews()).fetchBlogPreview(texts, title, controller.signal)
+        if (!controller.signal.aborted) blogPreviewHtml.set(preview)
       }
       catch {
-        // The plain text stays visible if the formatted preview is unavailable.
+        // Keep the plain text when the formatted preview is unavailable.
       }
     }, 250)
 
     effect(() => {
-      const bodies = blogPreviewBodies()
       blogPreviewRequest?.abort()
-      renderBlogPreview(bodies)
+      const texts = selectedNetworkIds().includes('blog')
+        ? previewSegments().map(post => variantsPayload().blog || post.text)
+        : []
+      renderBlogPreview(texts, composedTitle())
     })
     onDestroy(() => {
       toast.dismiss('browser-share')

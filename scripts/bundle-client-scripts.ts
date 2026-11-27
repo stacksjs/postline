@@ -47,9 +47,9 @@ let pages = 0
 const glob = new Bun.Glob('**/*.html')
 for (const file of glob.scanSync({ cwd: dist, absolute: true })) {
   const html = readFileSync(file, 'utf8')
-  const next = html.replace(/(src=")(\/assets\/scripts\/[\w.-]+\.ts)(")/g, (match, open: string, path: string, close: string) => {
+  const next = html.replace(/(['"])(\/assets\/scripts\/[\w.-]+\.ts)\1/g, (match, quote: string, path: string) => {
     const target = renamed.get(path)
-    return target ? `${open}${target}${close}` : match
+    return target ? `${quote}${target}${quote}` : match
   })
   if (next !== html) {
     writeFileSync(file, next)
@@ -60,7 +60,7 @@ for (const file of glob.scanSync({ cwd: dist, absolute: true })) {
 // A page still naming a .ts file would load nothing; say so rather than ship it.
 const left: string[] = []
 for (const file of glob.scanSync({ cwd: dist, absolute: true })) {
-  if (/src="\/assets\/scripts\/[\w.-]+\.ts"/.test(readFileSync(file, 'utf8'))) left.push(file.slice(dist.length + 1))
+  if (/(['"])\/assets\/scripts\/[\w.-]+\.ts\1/.test(readFileSync(file, 'utf8'))) left.push(file.slice(dist.length + 1))
 }
 
 // Shared helpers under scripts/lib/ are inside the bundles; their copies go too.

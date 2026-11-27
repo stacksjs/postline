@@ -474,7 +474,7 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
         return Response.json({ ...payload, data: { ...payload.data, providers, unread: { inbox: inboxUnread, listening: 106 } } })
       })
       if (path === '/api/postline/publish') return request.formData().then(async body => {
-        window.composerPublish = { text: body.get('text'), providers: body.get('providers') }
+        window.composerPublish = { text: body.get('text'), providers: body.get('providers'), language: body.get('language') }
         await publishGate
         return Response.json({ ok: true, data: { postId: 1, results: [{ provider: 'bluesky', ok: true, url: ${JSON.stringify(publishedUrl)} }] } })
       })
@@ -540,6 +540,12 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
       editor.focus()
     })()`)
     await waitUntil('The shared grapheme counter', () => evaluate<boolean>(cdp, "document.querySelector('[data-bluesky-count]').textContent.includes('1 / 300')"), 5_000)
+    const language = "document.querySelector('[data-post-language]')"
+    await waitUntil('The selected network loads its language choices', () => evaluate<boolean>(cdp, `
+      Boolean(${language}?.querySelector('option[value="de"]')?.textContent)`), 5_000)
+    await evaluate(cdp, `
+      ${language}.value = 'de'
+      ${language}.dispatchEvent(new Event('change', { bubbles: true }))`)
     const variantToggle = "document.querySelector('[data-variant-toggle]')"
     const variant = "document.querySelector('[data-variant-input=bluesky]')"
     await evaluate(cdp, `${variantToggle}.click()`)
@@ -595,7 +601,8 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
       ${editor}.focus()`)
     await pressKey(cdp, 'Enter', 13, 4)
     await waitUntil('The imported publish function', () => evaluate<boolean>(cdp, `
-      window.composerPublish?.text === ${JSON.stringify(text)} && window.composerPublish.providers === 'bluesky:101'`), 5_000)
+      window.composerPublish?.text === ${JSON.stringify(text)} && window.composerPublish.providers === 'bluesky:101'
+        && window.composerPublish.language === 'de'`), 5_000)
     await waitUntil('The publish progress notice', () => evaluate<boolean>(cdp, `
       document.querySelector('[data-stx-toast-key=publish]:not([data-stx-toast-exiting]) [data-stx-toast-loading]') !== null`), 5_000)
     await evaluate(cdp, 'window.finishPublish()')

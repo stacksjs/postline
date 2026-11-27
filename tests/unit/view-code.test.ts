@@ -23,6 +23,14 @@ describe('code loads only where it is used', () => {
     expect(readdirSync(join(root, 'resources/assets/styles'))).toEqual(['marketing.css'])
   })
 
+  it('bundles optional Composer features for on-demand loading', () => {
+    const scripts = referencedClientScripts(root)
+    for (const filename of ['composer-previews.ts', 'composer-languages.ts']) {
+      expect(scripts).toContain(filename)
+      expect(layout).not.toContain(filename)
+    }
+  })
+
   it('bundles the editor imported by URL, though no page names it', () => {
     const referenced = referencedClientScripts(root)
     expect(referenced).not.toContain('richtext-editor.ts')
