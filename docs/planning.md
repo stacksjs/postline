@@ -14,6 +14,12 @@ When the scheduler resumes, posts due within the last 30 minutes can still go ou
 
 The Queue shows failures by account. Transient failures may retry automatically. For a partially sent post, **Retry failed networks** leaves the successful results intact. If a thread stops partway through, **Resume thread** continues from the failed segment.
 
+## Turn a feed into drafts
+
+Open **Queue > Draft feeds** and add a public RSS, Atom, or JSON feed. Postline checks the feed when you add it and every 30 minutes while the scheduler is running. Select **Create drafts for items already in the feed** to bring in existing entries. Each new entry creates one draft with its title and public link. Open **Queue > Drafts** and choose channels when you are ready to edit, schedule, or publish it.
+
+Use **Check now** for an immediate refresh. Pausing or removing a feed keeps the drafts it created. Deleting a draft leaves the feed entry marked as seen, so the next check does not recreate it.
+
 ## Build a campaign
 
 Open **Campaigns** and create a brief with an objective, audience, tone, and date range. Add planned posts by hand or ask the planner to draft a sequence. Review the copy, channels, and timing. Send the posts you want to publish to the Queue. A draft on the campaign board needs to be queued before the scheduler can publish it.

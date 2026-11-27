@@ -1434,6 +1434,24 @@ async function checkQueueCalendar(cdp: Cdp): Promise<void> {
   })()`), 5_000)
 }
 
+async function checkDraftFeeds(cdp: Cdp): Promise<void> {
+  await auditPage(`${site}/queue`, { cdp })
+  const panel = "document.querySelector('[data-draft-feeds]')"
+  const form = `${panel}.querySelector('[data-draft-feed-form]')`
+  await evaluate(cdp, `${panel}.querySelector('summary').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Draft feeds open from the keyboard', () => evaluate<boolean>(cdp, `
+    ${panel}?.open && [...${panel}.querySelectorAll('p')].some(p => p.innerText === 'No draft feeds yet.')`), 5_000)
+  await evaluate(cdp, `
+    ${form}.elements.name.value = 'Private fixture'
+    ${form}.elements.url.value = 'http://localhost/feed.xml'
+    ${form}.requestSubmit()
+  `)
+  await waitUntil('A private feed is refused without creating a subscription', () => evaluate<boolean>(cdp, `
+    ${panel}.querySelector('[role=alert]')?.innerText.includes('public HTTP or HTTPS feed')
+      && !${panel}.querySelector('[data-draft-feed]')`), 5_000)
+}
+
 async function checkTrackedLinks(cdp: Cdp): Promise<void> {
   await auditPage(`${site}/analytics`, { cdp })
   const form = "document.querySelector('[data-tracked-link-form]')"
@@ -2071,6 +2089,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkPhoneNavigation(cdp)
   await checkQueueRescheduling(cdp)
   await checkQueueCalendar(cdp)
+  await checkDraftFeeds(cdp)
   await checkCampaignScheduling(cdp)
   await checkCampaignLocalDates(cdp)
   await checkAnalytics(cdp)

@@ -30,6 +30,11 @@ export default function () {
     .everyFiveMinutes()
     .withoutOverlapping(5)
 
+  schedule
+    .job('ImportDraftFeeds')
+    .everyThirtyMinutes()
+    .withoutOverlapping(30)
+
   // Mirror new direct messages into the inbox
   schedule
     .job('SyncDirectMessages')

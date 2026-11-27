@@ -40,6 +40,7 @@ describe('postline api — auth', () => {
     ['/api/postline/providers'],
     ['/api/postline/analytics'],
     ['/api/postline/analytics/links'],
+    ['/api/postline/draft-feeds'],
     ['/api/postline/queue'],
     ['/api/postline/setup/post-status?id=1'],
     ['/api/postline/queue/image?id=1&index=0'],
@@ -104,6 +105,15 @@ describe('tracked links', () => {
 })
 
 describe('postline api — reads', () => {
+  test('draft feed settings need a session and reject a private source before polling', async () => {
+    const endpoint = '/api/postline/draft-feeds'
+    const data = { name: 'Workspace service', url: 'http://localhost/feed.xml', includeExisting: true }
+    ;(await featureTest().post(endpoint, data)).assertStatus(401)
+    const client = featureTest().actingAs(await actingUser())
+    ;(await client.post(endpoint, data)).assertStatus(422)
+    ;(await client.get(endpoint)).assertStatus(200)
+  })
+
   test('Blog previews use the publishing renderer behind authentication', async () => {
     const body = { bodies: ['An **emphasized** note.', '# A second segment'] }
     ;(await featureTest().post('/api/postline/blog/preview', body)).assertStatus(401)

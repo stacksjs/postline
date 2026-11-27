@@ -33,6 +33,7 @@ export declare function jobs(): Promise<{
   publishScheduledPosts: Runnable
   syncEngagementMetrics: Runnable
   scanKeywordMonitors: Runnable
+  importDraftFeeds: Runnable
   syncDirectMessages: Runnable
   autoDeletePosts: Runnable
   keepTokensAlive: Runnable

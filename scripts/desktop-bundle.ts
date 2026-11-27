@@ -202,10 +202,11 @@ ${configFiles.map(([name, file]) => `  ${JSON.stringify(name)}: () => import(${s
 export const clientScripts = ${JSON.stringify(scripts)}
 
 export async function jobs() {
-  const [publishScheduledPosts, syncEngagementMetrics, scanKeywordMonitors, syncDirectMessages, autoDeletePosts, keepTokensAlive, pruneLocalData] = await Promise.all([
+  const [publishScheduledPosts, syncEngagementMetrics, scanKeywordMonitors, importDraftFeeds, syncDirectMessages, autoDeletePosts, keepTokensAlive, pruneLocalData] = await Promise.all([
     import('../Jobs/PublishScheduledPosts.ts'),
     import('../Jobs/SyncEngagementMetrics.ts'),
     import('../Jobs/ScanKeywordMonitors.ts'),
+    import('../Jobs/ImportDraftFeeds.ts'),
     import('../Jobs/SyncDirectMessages.ts'),
     import('../Jobs/AutoDeletePosts.ts'),
     import('../Jobs/KeepTokensAlive.ts'),
@@ -216,6 +217,7 @@ export async function jobs() {
     publishScheduledPosts: publishScheduledPosts.default,
     syncEngagementMetrics: syncEngagementMetrics.default,
     scanKeywordMonitors: scanKeywordMonitors.default,
+    importDraftFeeds: importDraftFeeds.default,
     syncDirectMessages: syncDirectMessages.default,
     autoDeletePosts: autoDeletePosts.default,
     keepTokensAlive: keepTokensAlive.default,
@@ -260,6 +262,7 @@ export declare function jobs(): Promise<{
   publishScheduledPosts: Runnable
   syncEngagementMetrics: Runnable
   scanKeywordMonitors: Runnable
+  importDraftFeeds: Runnable
   syncDirectMessages: Runnable
   autoDeletePosts: Runnable
   keepTokensAlive: Runnable

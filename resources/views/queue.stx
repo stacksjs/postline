@@ -18,6 +18,8 @@
       </div>
     </WorkspacePageHeader>
 
+    <DraftFeedsPanel @drafts-created="refresh()" />
+
     <form class="flex flex-wrap gap-2 items-center" role="search" aria-label="Posts" @submit.prevent="searchPosts">
       <label class="sr-only" for="queue-search">Search posts</label>
       <input class="px-3 h-9 w-full sm:max-w-xs text-ink text-ui bg-panel border border-field-line rounded-lg" id="queue-search" type="search" placeholder="Search all posts" maxlength="200" x-model="searchText">
@@ -98,9 +100,10 @@
               <span x-show="row.partial && !row.resumeLabel">
                 <Button variant="secondary" size="xs" :loading="busyId() === row.id" @click="retryItem(row.id)">Retry failed networks</Button>
               </span>
-              <span x-show="row.actionable && !row.partial && !row.resumeLabel">
+              <span x-show="row.actionable && row.targets.length && !row.partial && !row.resumeLabel">
                 <Button variant="ghost" size="xs" :loading="busyId() === row.id" :label="row.status === 'failed' ? 'Try again now' : 'Publish now'" @click="publishItem(row.id)" />
               </span>
+              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-info text-xs" x-show="row.actionable && !row.targets.length" :href="row.editUrl" data-stx-link>Choose channels</a>
             </div>
             <details class="relative" x-show="row.actionable || (row.liveUrl && (row.partial || row.resumeLabel))" @keydown="closeActionsOnEscape($event)">
               <summary class="grid place-items-center h-7 w-8 list-none text-muted bg-panel hover:bg-hover border border-line rounded-lg cursor-pointer" aria-label="More post actions" title="More post actions">

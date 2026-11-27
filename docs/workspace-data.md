@@ -4,7 +4,7 @@
 
 Open **Settings > Data > Export this workspace** to download a JSON archive. On the destination install, use **Import an export**. Imports accept archives up to 64 MB and leave existing records in place. The archive includes saved Composer text and each X Listening watch’s selected source. Reconnect accounts and re-enter credentials on the destination. To resume browser-session imports on another Mac, confirm your X sign-in there. [Connect a network](./networks/index.md).
 
-Treat an export as private. It contains workspace content, including short-link destinations, codes, and redirect totals. Shared short URLs keep working after a restore when you keep the same public origin. For disaster recovery on a server, use the database, media, and application-key backup. [Back up and restore a server](./recovery.md).
+Treat an export as private. It contains workspace content, including short-link destinations, codes, redirect totals, and draft feed subscriptions. A restored feed remembers items that the workspace already processed. Shared short URLs keep working after a restore when you keep the same public origin. For disaster recovery on a server, use the database, media, and application-key backup. [Back up and restore a server](./recovery.md).
 
 ## Locate data and back it up
 

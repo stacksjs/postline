@@ -30,6 +30,7 @@ export function startSchedule(jobs: {
   publishScheduledPosts: Runnable
   syncEngagementMetrics: Runnable
   scanKeywordMonitors: Runnable
+  importDraftFeeds: Runnable
   syncDirectMessages: Runnable
   autoDeletePosts: Runnable
   keepTokensAlive: Runnable
@@ -49,6 +50,7 @@ export function startSchedule(jobs: {
     { job: jobs.scanKeywordMonitors, everyMs: 5 * MINUTE },
     { job: jobs.syncDirectMessages, everyMs: 5 * MINUTE },
     { job: jobs.syncEngagementMetrics, everyMs: 30 * MINUTE },
+    { job: jobs.importDraftFeeds, everyMs: 30 * MINUTE },
     { job: jobs.autoDeletePosts, everyMs: 24 * 60 * MINUTE },
     { job: jobs.keepTokensAlive, everyMs: 24 * 60 * MINUTE },
     { job: jobs.pruneLocalData, everyMs: 24 * 60 * MINUTE },
