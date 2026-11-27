@@ -1,6 +1,7 @@
 import type { RunWebviewAppOptions } from '@stacksjs/desktop-build'
 import { Database } from 'bun:sqlite'
 import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
+import { release } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { desktopAppPaths, runWebviewApp as launch } from '@stacksjs/desktop-build'
@@ -262,6 +263,34 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   check('the database carries its migration ledger', ledger > 0, String(ledger))
   check('the Mac agent runs the webhook job without queuing events when disabled', webhookScheduler?.last_status === 'ok' && webhookOutbox.count === 0)
   check('the blog file is in the data directory', existsSync(join(dataDir, 'content/blog')) && readdirSync(join(dataDir, 'content/blog')).includes('desktop-check.md'))
+
+  const pendingErasure = await call('POST', browserSessionPath, challenge)
+  check('the erasure fixture starts with an X sign-in hold', JSON.parse(pendingErasure.text).data?.needsCheck === true)
+  const system = await call('GET', '/api/postline/system')
+  const localProfile: string | null = JSON.parse(system.text).data?.localTwitterProfile
+  const canHaveNativeProfile = process.platform === 'darwin' && Number(release().split('.')[0]) >= 23
+  if (canHaveNativeProfile) {
+    check('the erasure scope identifies this Mac’s named profile', localProfile === initialProfile.profile)
+    const blocked = await call('POST', '/api/postline/settings/delete-everything', { confirmation: 'DELETE EVERYTHING' })
+    const stillSaved = await call('GET', browserSessionPath)
+    const stillQueued = await call('GET', '/api/postline/queue')
+    check('the agent keeps the workspace and handle until the native profile is erased', blocked.status === 409
+      && JSON.parse(stillSaved.text).data?.handle === 'postline_test'
+      && JSON.parse(stillQueued.text).data?.items?.some((item: { status: string }) => item.status === 'draft') === true)
+  }
+  else {
+    check('the erasure scope stays within the workspace on this platform', localProfile === null)
+  }
+  const erased = await call('POST', '/api/postline/settings/delete-everything', {
+    confirmation: 'DELETE EVERYTHING',
+    ...(localProfile && { removedTwitterProfile: localProfile }),
+  })
+  const afterErasure = await call('GET', browserSessionPath)
+  const remainingSession = JSON.parse(afterErasure.text).data
+  check('workspace erasure clears X sign-in state and keeps the owner profile identity', erased.status === 200
+    && typeof JSON.parse(erased.text).data?.deleted?.posts === 'number'
+    && remainingSession?.profile === initialProfile.profile
+    && remainingSession?.handle === null && remainingSession?.needsCheck === false)
 
   if (failures.length > 0) {
     console.error(`\n${failures.length} check(s) failed.`)

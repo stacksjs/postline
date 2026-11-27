@@ -1295,12 +1295,17 @@
           "one": "{count} image",
           "other": "{count} images"
         },
-        "deleteDataWarning": "This cannot be undone.",
+        "deleteDataWarning": "This cannot be undone. To clear the local X browser session, run Delete Everything in Postline on that Mac.",
         "deleteDataQuestion": "Delete everything in this workspace?",
         "deleteDataConfirm": "Delete everything",
-        "deleteDataFailed": "Nothing was deleted.",
-        "deleteDataCompleted": "Everything in this workspace was deleted.",
-        "cancelDataDeletion": "Cancel"
+        "deleteDataFailed": "Could not finish deleting the workspace. Retry Delete Everything.",
+        "deleteDataCompleted": "Workspace data on this install was deleted.",
+        "cancelDataDeletion": "Cancel",
+        "checkLocalDataFailed": "Could not check which data is on this install.",
+        "openMacForErasure": "Open Postline on this Mac to delete its X browser profile.",
+        "updateMacForErasure": "Update Postline on this Mac to delete its X browser profile.",
+        "profileErasureBusy": "Close any other window using this X profile, then try again.",
+        "deleteDataAndProfileCompleted": "Workspace data and the X browser profile on this Mac were deleted."
       }
     },
     "queuePanels": {

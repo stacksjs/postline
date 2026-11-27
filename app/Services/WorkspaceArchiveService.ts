@@ -399,7 +399,15 @@ export class WorkspaceArchiveService {
       await wipe(table)
 
     const accountId = await ensureAccount()
-    await database.updateTable('accounts').set({ ai_provider: null, ai_api_key: null, ai_model: null, auto_delete_enabled: false, updated_at: now() }).where('id', '=', accountId).execute()
+    await database.updateTable('accounts').set({
+      ai_provider: null,
+      ai_api_key: null,
+      ai_model: null,
+      auto_delete_enabled: false,
+      twitter_browser_handle: null,
+      twitter_browser_needs_check: false,
+      updated_at: now(),
+    }).where('id', '=', accountId).execute()
     await rm(MEDIA_DIR, { recursive: true, force: true })
     return { deleted }
   }

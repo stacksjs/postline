@@ -37,6 +37,24 @@ export async function openXBrowser(browser: XBrowserWindow, profile: string, url
   })
 }
 
+export async function removeXBrowserProfile(host: unknown, profile: string): Promise<'removed' | 'unsupported' | 'busy'> {
+  const browser = (host as { window?: {
+    removeDataStore?: (name: string) => Promise<void>
+    _call?: (action: 'destroy', input: undefined, name: string) => Promise<void>
+  } } | null)?.window
+  if (typeof browser?.removeDataStore !== 'function' || typeof browser._call !== 'function')
+    return 'unsupported'
+  try {
+    await browser._call('destroy', undefined, profile)
+    await browser.removeDataStore(profile)
+    return 'removed'
+  }
+  catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'BUSY') return 'busy'
+    throw error
+  }
+}
+
 /** Read the account and the requested data from the open X page. */
 export function inspectXPage(page: Document, href: string, read: XBrowserRead = 'sign-in'): XBrowserStatus {
   const url = new URL(href)

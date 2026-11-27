@@ -25,7 +25,7 @@ export type { AccountStatus, ProviderStatus } from '../../../resources/functions
 export { postStatusVariant } from '../../../resources/functions/status-badge'
 export { workspaceCommands, runWorkspaceCommand } from '../../../resources/functions/workspace-commands'
 export type { WorkspaceCommand } from '../../../resources/functions/workspace-commands'
-export { openXBrowser, readXBrowserSession, xBrowserWindow, inspectXPage } from '../../../resources/functions/x-browser-session'
+export { openXBrowser, removeXBrowserProfile, readXBrowserSession, xBrowserWindow, inspectXPage } from '../../../resources/functions/x-browser-session'
 export type { XBrowserWindow } from '../../../resources/functions/x-browser-session'
 export { fetchWebAnalytics, fetchSalesAnalytics, fetchCampaignAnalytics, fetchEventAnalytics, recordAnalyticsEvent, useAnalytics } from '@stacksjs/defaults/functions/analytics.ts'
 export type { AnalyticsOverview, TrafficDataPoint, PageData, ReferrerData, DeviceData, BrowserData, CountryData, AnalyticsRange, AnalyticsScope, WebAnalyticsResponse, SalesAnalyticsResponse, CampaignAnalyticsResponse, EventAnalyticsResponse, RecordAnalyticsEventInput } from '@stacksjs/defaults/functions/analytics.ts'

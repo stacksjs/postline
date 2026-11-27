@@ -3,6 +3,7 @@ import { config } from '@stacksjs/config'
 import { response } from '@stacksjs/router'
 import { alertDeliverySettings, mailIsSetUp } from '../../Services/AlertService'
 import { workspace } from '../../Services/WorkspaceService'
+import { localTwitterProfileForErasure } from '../../Services/Social/TwitterBrowserSession'
 import { actionFailure } from '../../Support/Http/action-error'
 import { readHeartbeats, schedulerState } from '../../Support/heartbeat'
 
@@ -20,7 +21,10 @@ export default new Action({
       const mail = { configured: mailIsSetUp(driver), driver, from: String(config.email?.from?.address || '') }
       // Paused by the owner (#195) is its own state: the scheduler runs, and holds.
       const paused = (await workspace.profile()).publishingPaused
-      return response.json({ ok: true, data: { scheduler: schedulerState(jobs), jobs, mail, alerts: alertDeliverySettings(), paused } })
+      const localTwitterProfile = await localTwitterProfileForErasure()
+      return response.json({ ok: true, data: { scheduler: schedulerState(jobs), jobs, mail, alerts: alertDeliverySettings(), paused, localTwitterProfile } }, {
+        headers: { 'Cache-Control': 'private, no-store' },
+      })
     }
     catch (error) {
       return actionFailure(error, 500)

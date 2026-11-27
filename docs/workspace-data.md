@@ -29,4 +29,6 @@ For age-based cleanup, use **Settings > Automatic Cleanup**. Select the cutoff i
 
 **Settings > Data > Delete everything** clears the current workspace's stored posts, saved Composer text, plans, messages, rules, accounts, and images. Posts on social networks remain there. Export anything you want to keep before confirming.
 
+On macOS 14 and later, **Delete everything** in the Mac app also erases that Mac’s Postline X browser profile. Use the Mac app on the device that holds the profile. If Postline reports that the profile is busy, close the other windows using it and try again.
+
 On a Mac, quit Postline from the menu bar and move **Postline.app** out of Applications. Keep the data folder and Keychain entry for a later installation. To clear all local data, use `app.keychain-id` to identify the `org.postline.workspace` entry in Keychain Access before removing it, the data folder, and `~/Library/Logs/Postline.log`. On a server, stop the web, API, and scheduler services before removing the installation. Retain the database, media, and application key if you plan to reinstall, and revoke network or AI credentials you no longer need through their providers.

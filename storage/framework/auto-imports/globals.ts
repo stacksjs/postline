@@ -63,6 +63,7 @@ declare global {
   const workspaceCommands: typeof autoImports.workspaceCommands
   const runWorkspaceCommand: typeof autoImports.runWorkspaceCommand
   const openXBrowser: typeof autoImports.openXBrowser
+  const removeXBrowserProfile: typeof autoImports.removeXBrowserProfile
   const readXBrowserSession: typeof autoImports.readXBrowserSession
   const xBrowserWindow: typeof autoImports.xBrowserWindow
   const inspectXPage: typeof autoImports.inspectXPage

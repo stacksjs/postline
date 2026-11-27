@@ -1241,6 +1241,86 @@ async function checkComposerVideo(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkWorkspaceErasure(cdp: Cdp): Promise<void> {
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const send = window.fetch.bind(window)
+    const profile = 'postline-x-12345678-1234-5678-9012-123456789012'
+    window.erasureSteps = []
+    window.allowProfileErasure = false
+    window.allowWorkspaceErasure = false
+    window.craft = { app: { nativePlatformControls: false }, capabilities: { nativePlatformControls: false }, window: {
+      async _call(action, input, name) {
+        if (action !== 'destroy' || name !== profile) throw new Error('Wrong profile window')
+        window.erasureSteps.push('destroy')
+      },
+      async removeDataStore(name) {
+        if (name !== profile) throw new Error('Wrong data store')
+        window.erasureSteps.push('remove')
+        if (!window.allowProfileErasure) throw Object.assign(new Error('WebKit still holds this profile.'), { code: 'BUSY' })
+      },
+    } }
+    window.fetch = async (input, options) => {
+      const url = new URL(input instanceof Request ? input.url : input, location.href)
+      if (url.pathname === '/api/postline/system') {
+        const result = await send(input, options).then(response => response.json())
+        result.data.localTwitterProfile = profile
+        return Response.json(result)
+      }
+      if (url.pathname === '/api/postline/settings/delete-everything') {
+        window.erasureSteps.push('workspace')
+        if (options.body.get('removedTwitterProfile') !== profile || options.body.get('confirmation') !== 'DELETE EVERYTHING')
+          return Response.json({ ok: false, error: 'Incorrect erasure receipt' }, { status: 409 })
+        if (!window.allowWorkspaceErasure)
+          return Response.json({ ok: false, error: 'The workspace reset can be retried.' }, { status: 503 })
+        return Response.json({ ok: true, data: { deleted: {} } })
+      }
+      return send(input, options)
+    }
+  ` })
+  const phrase = "document.querySelector('[data-delete-phrase] input')"
+  const button = "[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Delete Everything')"
+  const confirm = "[...document.querySelectorAll('[role=alertdialog] button')].find(button => button.textContent.trim() === 'Delete everything')"
+  const perform = async (): Promise<void> => {
+    await waitUntil('The previous workspace erasure dialog is gone', () => evaluate<boolean>(cdp, "!document.querySelector('[role=alertdialog]')"), 5_000)
+    await evaluate(cdp, `${button}.click()`)
+    await waitUntil('Workspace erasure confirmation', () => evaluate<boolean>(cdp, `Boolean(${confirm}?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, `${confirm}.click()`)
+  }
+  const typeConfirmation = async (): Promise<void> => {
+    await auditPage(`${site}/settings`, { cdp })
+    await evaluate(cdp, "document.querySelector('[data-settings-item=data]').click()")
+    await waitUntil('The workspace erasure input is visible', () => evaluate<boolean>(cdp, `Boolean(${phrase}?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, `${phrase}.focus()`)
+    await cdp.send('Input.insertText', { text: 'DELETE EVERYTHING' })
+    await waitUntil('Typed workspace erasure phrase', () => evaluate<boolean>(cdp, `!${button}.disabled`), 5_000)
+  }
+  try {
+    await typeConfirmation()
+    await perform()
+    await waitUntil('Profile erasure errors are shown without clearing the workspace', () => evaluate<boolean>(cdp, `
+      document.body.innerText.includes('Close any other window using this X profile, then try again.')
+        && window.erasureSteps.join(',') === 'destroy,remove'`), 5_000)
+    await evaluate(cdp, 'window.allowProfileErasure = true')
+    await perform()
+    await waitUntil('An unsuccessful workspace reset reports a retry after profile removal', () => evaluate<boolean>(cdp, `
+      document.body.innerText.includes('The workspace reset can be retried.')
+        && window.erasureSteps.join(',') === 'destroy,remove,destroy,remove,workspace'`), 5_000)
+    await evaluate(cdp, 'window.allowWorkspaceErasure = true')
+    await perform()
+    await waitUntil('Workspace erasure waits for successful profile removal', () => evaluate<boolean>(cdp, `
+      document.body.innerText.includes('Workspace data and the X browser profile on this Mac were deleted.')
+        && window.erasureSteps.join(',') === 'destroy,remove,destroy,remove,workspace,destroy,remove,workspace'`), 5_000)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+  }
+  await typeConfirmation()
+  await perform()
+  await waitUntil('The web workspace reports only the data it erased', () => evaluate<boolean>(cdp, `
+    document.body.innerText.includes('Workspace data on this install was deleted.')
+      && !document.body.innerText.includes('Workspace data and the X browser profile on this Mac were deleted.')`), 5_000)
+}
+
 async function checkXBrowserSession(cdp: Cdp): Promise<void> {
   const endpoint = '/api/postline/twitter/browser-session'
   await auditPage(`${site}/accounts`, { cdp })
@@ -3511,6 +3591,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkComposerNetworkOptions(cdp)
   await checkComposerVideo(cdp)
   await checkFirstComments(cdp)
+  await checkWorkspaceErasure(cdp)
 }
 
 interface FixtureServer {

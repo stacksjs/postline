@@ -361,6 +361,7 @@ export const settingsAppearanceOptions = [
     import { COMPOSER_AUTOSAVE_KEY, COMPOSER_DEFAULT_FORMAT_KEY } from '../functions/composer-draft'
     import { passkeys } from '../functions/passkeys'
     import { fetchProviders } from '../functions/social-client'
+    import { removeXBrowserProfile } from '../functions/x-browser-session'
 
     /**
      * The stored theme preference.
@@ -846,6 +847,7 @@ export const settingsAppearanceOptions = [
     const dataMessage = state('')
     const dataTone = state('neutral')
     const deletePhrase = state('')
+    const desktop = useNativeDesktop()
 
     const dataAction = async (work: () => Promise<string>): Promise<void> => {
       dataBusy.set(true)
@@ -892,13 +894,25 @@ export const settingsAppearanceOptions = [
 
     const deleteEverything = async (): Promise<void> => {
       const confirmation = deletePhrase()
+      if (dataBusy() || confirmation !== 'DELETE EVERYTHING') return
       if (!await stxConfirm(copy.deleteDataWarning, { title: copy.deleteDataQuestion, type: 'error', confirmText: copy.deleteDataConfirm, cancelText: copy.cancelDataDeletion })) return
+      if (dataBusy()) return
       await dataAction(async () => {
+        const { data } = await requestJson('/api/postline/system', { cache: 'no-store' }, copy.checkLocalDataFailed)
+        const profile: string | null = data.localTwitterProfile
         const body = new FormData()
         body.set('confirmation', confirmation)
+        if (profile) {
+          const host = desktop()
+          if (!host) throw new Error(copy.openMacForErasure)
+          const result = await removeXBrowserProfile(host, profile)
+          if (result === 'unsupported') throw new Error(copy.updateMacForErasure)
+          if (result === 'busy') throw new Error(copy.profileErasureBusy)
+          body.set('removedTwitterProfile', profile)
+        }
         await requestJson('/api/postline/settings/delete-everything', { method: 'POST', body }, copy.deleteDataFailed)
         deletePhrase.set('')
-        return copy.deleteDataCompleted
+        return profile ? copy.deleteDataAndProfileCompleted : copy.deleteDataCompleted
       })
     }
 
@@ -912,7 +926,6 @@ export const settingsAppearanceOptions = [
       return current.from ? copy.mailerFrom.replace('{driver}', () => current.driver).replace('{sender}', () => current.from) : copy.mailer.replace('{driver}', () => current.driver)
     })
     const delivery = state<{ email: boolean, webhook: boolean } | null>(null)
-    const desktop = useNativeDesktop()
     const notifications = () => (desktop() as DesktopAlertsBridge | null)?.notifications
     const notificationControls = derived(() => Boolean(notifications()?.getPermissionStatus && notifications()?.requestPermission))
     const nativeNotificationPermission = state('')

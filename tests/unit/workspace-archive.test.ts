@@ -12,6 +12,7 @@ import { keywordMonitoring } from '../../app/Services/KeywordMonitoringService'
 import { recurringPosts } from '../../app/Services/RecurringPostService'
 import { postQueue } from '../../app/Services/Social/QueueService'
 import { ensureAccount } from '../../app/Services/Social/support'
+import { rememberTwitterBrowserHandle, twitterBrowserSession } from '../../app/Services/Social/TwitterBrowserSession'
 import { trackedLinks } from '../../app/Services/TrackedLinkService'
 import { DELETE_EVERYTHING_PHRASE, workspaceArchive } from '../../app/Services/WorkspaceArchiveService'
 import { wallTimeInZone } from '../../app/Support/time'
@@ -69,8 +70,13 @@ describe('workspace archive', () => {
     expect(archive.media[`${tag}.png`]).toBe(png)
     expect(JSON.stringify(archive)).not.toContain('access_token')
 
+    await rememberTwitterBrowserHandle('archive_fixture')
+    const browserSession = await twitterBrowserSession()
     await expect(workspaceArchive.deleteEverything('delete everything')).rejects.toThrow(DELETE_EVERYTHING_PHRASE)
+    expect(await twitterBrowserSession()).toEqual(browserSession)
     await workspaceArchive.deleteEverything(DELETE_EVERYTHING_PHRASE)
+    expect(await ensureAccount()).toBe(accountId)
+    expect(await twitterBrowserSession()).toEqual({ profile: browserSession.profile, handle: null, needsCheck: false })
     expect(await composerPresets.list()).toEqual([])
     expect(await trackedLinks.export(accountId)).toEqual([])
     expect(await draftFeeds.list()).toEqual([])

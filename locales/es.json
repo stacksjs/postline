@@ -1295,12 +1295,17 @@
           "one": "{count} imagen",
           "other": "{count} imágenes"
         },
-        "deleteDataWarning": "Esta acción es irreversible.",
+        "deleteDataWarning": "Esta acción es irreversible. Para borrar la sesión de X del navegador local, usa Borrar todos los datos en Postline en ese Mac.",
         "deleteDataQuestion": "¿Borrar todos los datos de este espacio de trabajo?",
         "deleteDataConfirm": "Borrar todos los datos",
-        "deleteDataFailed": "No se eliminó nada.",
-        "deleteDataCompleted": "Se borraron todos los datos de este espacio de trabajo.",
-        "cancelDataDeletion": "Cancelar"
+        "deleteDataFailed": "No se pudo terminar de borrar el espacio de trabajo. Vuelve a intentar Borrar todos los datos.",
+        "deleteDataCompleted": "Se borraron los datos del espacio de trabajo de esta instalación.",
+        "cancelDataDeletion": "Cancelar",
+        "checkLocalDataFailed": "No se pudieron comprobar los datos de esta instalación.",
+        "openMacForErasure": "Abre Postline en este Mac para borrar su perfil de X.",
+        "updateMacForErasure": "Actualiza Postline en este Mac para borrar su perfil de X.",
+        "profileErasureBusy": "Cierra las demás ventanas que estén usando este perfil de X y vuelve a intentarlo.",
+        "deleteDataAndProfileCompleted": "Se borraron los datos del espacio de trabajo y el perfil de X de este Mac."
       }
     },
     "queuePanels": {

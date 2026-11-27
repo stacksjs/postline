@@ -1,5 +1,8 @@
 import type { EngagementCounts } from '../../Support/Social/engagement-analytics'
+import { release } from 'node:os'
+import process from 'node:process'
 import { db } from '@stacksjs/database'
+import { isDesktopAgent } from '../../Support/Auth/native'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { workspaceXBrowserSessionText } from '../../Support/Localization/workspace'
 import { engagementCounts } from '../../Support/Social/engagement-analytics'
@@ -21,6 +24,13 @@ export async function twitterBrowserSession(): Promise<TwitterBrowserSessionSnap
     handle: account.twitter_browser_handle ?? null,
     needsCheck: Boolean(account.twitter_browser_needs_check),
   }
+}
+
+export async function localTwitterProfileForErasure(): Promise<string | null> {
+  // Named WKWebsiteDataStore profiles were introduced with macOS 14 (Darwin 23).
+  const canHaveLocalProfile = isDesktopAgent() && process.platform === 'darwin'
+    && Number(release().split('.')[0]) >= 23
+  return canHaveLocalProfile ? (await twitterBrowserSession()).profile : null
 }
 
 export async function rememberTwitterBrowserHandle(handle: unknown): Promise<void> {
