@@ -1,3 +1,4 @@
+import type { NetworkOAuthExchangeOptions } from '../../Support/Social/network-oauth'
 import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
@@ -147,7 +148,7 @@ export class InstagramService {
     return { url }
   }
 
-  async exchangeAuthorizationCode(code: string) {
+  async exchangeAuthorizationCode(code: string, { testOnly }: NetworkOAuthExchangeOptions = {}) {
     const cfg = (await this.config())
     if (!code) throw new Error('Facebook did not return an authorization code.')
 
@@ -170,6 +171,7 @@ export class InstagramService {
     }
 
     const account = await this.driver.resolveAccount(userToken)
+    if (testOnly) return
     const identity = await this.saveSession({
       accessToken: account.pageAccessToken,
       insightsAccessToken: cfg.engagementMetrics ? userToken : undefined,

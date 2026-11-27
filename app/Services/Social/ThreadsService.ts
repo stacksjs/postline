@@ -1,3 +1,4 @@
+import type { NetworkOAuthExchangeOptions } from '../../Support/Social/network-oauth'
 import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
@@ -136,7 +137,7 @@ export class ThreadsService {
     return { url }
   }
 
-  async exchangeAuthorizationCode(code: string) {
+  async exchangeAuthorizationCode(code: string, { testOnly }: NetworkOAuthExchangeOptions = {}) {
     const cfg = (await this.config())
     if (!code) throw new Error('Threads did not return an authorization code.')
 
@@ -159,12 +160,14 @@ export class ThreadsService {
       expiresIn = longLived.expiresIn
     }
     catch (error) {
+      if (testOnly) throw new UserFacingError('Threads did not issue a lasting token. Check the developer app and try again.')
       // The account still connects, on a token that lasts about an hour. Say
       // so: silently, the first sign of it was a failed post.
       log.warn(`[postline] threads: could not get a long-lived token, the connection will lapse within hours: ${error instanceof Error ? error.message : String(error)}`)
     }
 
     const account = await this.driver.resolveAccount(accessToken)
+    if (testOnly) return
     const identity = await this.saveSession({
       accessToken: account.accessToken,
       threadsUserId: account.threadsUserId,

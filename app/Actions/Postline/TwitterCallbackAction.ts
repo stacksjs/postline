@@ -9,6 +9,6 @@ export default new Action({
   method: 'GET',
 
   async handle(request: RequestInstance) {
-    return finishNetworkConsent(request, 'twitter', (code, verifier) => twitter.exchangeAuthorizationCode(code, verifier))
+    return finishNetworkConsent(request, 'twitter', (code, options) => twitter.exchangeAuthorizationCode(code, options))
   },
 })

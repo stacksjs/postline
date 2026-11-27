@@ -215,8 +215,12 @@ describe('optional engagement drivers', () => {
     let postId: number | undefined
     try {
       await networkApps.save('instagram', { clientId: 'test-client', clientSecret: 'test-secret', engagementMetrics: true })
+      await instagram.exchangeAuthorizationCode('test-code', { testOnly: true })
+      expect(profile).toHaveBeenCalledWith('long-user-token')
+      expect(await database.selectFrom('social_identities').select('id')
+        .where('provider', '=', 'instagram').where('external_id', '=', '801').executeTakeFirst()).toBeUndefined()
       const identity = await instagram.exchangeAuthorizationCode('test-code')
-      if (!identity.id) throw new Error('Instagram did not return its connected account.')
+      if (!identity?.id) throw new Error('Instagram did not return its connected account.')
       id = identity.id
       const draft = await postQueue.save({ text: 'A post for the Insights test', providers: [`instagram:${id}`] })
       postId = draft.postId

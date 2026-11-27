@@ -111,6 +111,7 @@ const networkSetupGuides = await loadNetworkSetupGuides()
                 <div class="flex flex-wrap gap-2 items-center sm:col-span-2">
                   <p class="m-0 mr-auto text-muted text-xs" :text="app.note"></p>
                   <button class="px-3 h-8 font-medium text-danger text-xs bg-panel hover:bg-danger-soft border border-line rounded-lg disabled:opacity-50" type="button" x-show="app.removable" :disabled="appBusy() === app.provider" @click="clearApp(app.provider)">Remove</button>
+                  <Button variant="secondary" size="xs" :disabled="!app.testReady || appBusy() === app.provider" @click="navigate('/api/postline/' + app.provider + '/auth?test=1', { reload: true })">Test connection</Button>
                   <button class="px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="submit" :disabled="appBusy() === app.provider">Save</button>
                 </div>
               </form>
@@ -219,6 +220,12 @@ const networkSetupGuides = await loadNetworkSetupGuides()
     const appRows = derived(() => networkApps().map((app) => {
       const guide = guides[app.provider]
       const draft = appDrafts()[app.provider] || {}
+      const clientId = draft.clientId ?? app.clientId
+      const clientSecret = draft.clientSecret ?? ''
+      const organizationPages = draft.organizationPages ?? Boolean(app.organizationPages)
+      const engagementMetrics = draft.engagementMetrics ?? Boolean(app.engagementMetrics)
+      const hasChanges = clientId.trim() !== app.clientId || Boolean(clientSecret.trim())
+        || organizationPages !== Boolean(app.organizationPages) || engagementMetrics !== Boolean(app.engagementMetrics)
       return {
         provider: app.provider,
         label: guide?.label ?? app.provider,
@@ -230,12 +237,13 @@ const networkSetupGuides = await loadNetworkSetupGuides()
           : '',
         status: app.configured ? (app.source === 'environment' ? 'Set in .env' : 'Set up') : 'Not set up',
         redirectUrl: app.redirectUrl,
-        clientId: draft.clientId ?? app.clientId,
-        clientSecret: draft.clientSecret ?? '',
-        organizationPages: draft.organizationPages ?? Boolean(app.organizationPages),
-        engagementMetrics: draft.engagementMetrics ?? Boolean(app.engagementMetrics),
+        clientId,
+        clientSecret,
+        organizationPages,
+        engagementMetrics,
         secretPlaceholder: app.hasSecret ? 'Stored. Leave blank to keep it.' : 'Paste the client secret',
         removable: app.source === 'settings',
+        testReady: app.configured && !hasChanges,
         note: app.source === 'environment' ? 'Read from .env. Saving here takes over from it.' : app.configured ? 'Saved. Connect the account in its card above.' : '',
       }
     }))
@@ -291,7 +299,7 @@ const networkSetupGuides = await loadNetworkSetupGuides()
       const route = useRoute()
       for (const provider of ['linkedin', 'twitter', 'instagram', 'threads']) {
         const result = route.query[provider]
-        if (result !== 'connected' && result !== 'error') continue
+        if (!['connected', 'tested', 'error'].includes(result)) continue
         const params = new URLSearchParams(route.fullPath.split('?')[1] || '')
         const message = params.get('message')
         params.delete(provider)
@@ -299,7 +307,10 @@ const networkSetupGuides = await loadNetworkSetupGuides()
         const query = params.toString()
         window.history.replaceState({}, '', `${route.path}${query ? `?${query}` : ''}`)
         oauthFailed.set(result === 'error')
-        oauthFeedback.set(result === 'connected' ? `${providerLabel(provider)} connected.` : message || `Could not connect ${providerLabel(provider)}.`)
+        const name = providerLabel(provider)
+        if (result === 'connected') oauthFeedback.set(`${name} connected.`)
+        else if (result === 'tested') oauthFeedback.set(`${name} sign-in passed. Connect the account when you’re ready to publish.`)
+        else oauthFeedback.set(message || `Could not connect ${name}.`)
         if (result === 'connected') {
           // The redirected page reads the fresh account as it mounts.
           // Notify any existing workspace windows as well.

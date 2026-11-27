@@ -842,6 +842,9 @@ async function checkChannels(cdp: Cdp): Promise<void> {
       if (!response.ok) return response
       const payload = await response.json()
       payload.data.accounts = accounts
+      payload.data.networkApps = payload.data.networkApps.map(app => app.provider === 'linkedin'
+        ? { ...app, configured: true, source: 'settings', clientId: 'test-app', hasSecret: true }
+        : app)
       payload.data.providers = payload.data.providers.map(provider => provider.provider === 'bluesky'
         ? { ...provider, ...status, handle: accounts.find(account => account.isDefault)?.handle, accounts }
         : provider)
@@ -849,7 +852,9 @@ async function checkChannels(cdp: Cdp): Promise<void> {
     }
   ` })
   try {
-    await auditPage(`${site}/accounts`, { cdp })
+    await auditPage(`${site}/accounts?linkedin=tested`, { cdp })
+    await waitUntil('Channels reports a completed sign-in test', () => evaluate<boolean>(cdp, `
+      [...document.querySelectorAll('[role=status]')].some(node => node.textContent.includes('LinkedIn sign-in passed.'))`), 5_000)
     await waitUntil('Channels loading without a disconnected flash', () => evaluate<boolean>(cdp, `
       document.querySelector('[data-channels-loading]')?.getClientRects().length > 0
       && !document.querySelector('[data-channel]')`), 5_000)
@@ -875,6 +880,12 @@ async function checkChannels(cdp: Cdp): Promise<void> {
     await waitUntil('Channels shows the LinkedIn setup guide', () => evaluate<boolean>(cdp, `
       ${linkedInApp}.querySelector('ol').innerText.includes('Sign In with LinkedIn using OpenID Connect')
         && ${linkedInApp}.querySelector('[aria-label="Full LinkedIn setup guide"]')?.href.endsWith('/docs/networks/linkedin.md')`), 5_000)
+    const testConnection = `[...${linkedInApp}.querySelectorAll('button')].find(button => button.textContent.trim() === 'Test connection')`
+    await waitUntil('The saved network app can be tested', () => evaluate<boolean>(cdp, `
+      ${testConnection}?.getClientRects().length > 0 && !(${testConnection}).disabled`), 5_000)
+    await evaluate(cdp, `${linkedInApp}.querySelector('[data-app-client-id]').focus()`)
+    await cdp.send('Input.insertText', { text: '-unsaved' })
+    await waitUntil('The app must be saved before testing changes', () => evaluate<boolean>(cdp, `(${testConnection}).disabled`), 5_000)
     await evaluate(cdp, `${linkedInApp}.querySelector('summary').click()`)
 
     await evaluate(cdp, `${card}.querySelector('summary').click()`)

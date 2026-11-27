@@ -7,8 +7,13 @@ import { publicMessage } from '../Http/action-error'
 
 const FLOW_TTL_MS = 15 * 60_000
 
-function networkResult(provider: AppNetwork, message?: string): Response {
-  const query = new URLSearchParams({ [provider]: message ? 'error' : 'connected' })
+export interface NetworkOAuthExchangeOptions {
+  codeVerifier?: string
+  testOnly?: boolean
+}
+
+function networkResult(provider: AppNetwork, status: 'connected' | 'tested' | 'error', message?: string): Response {
+  const query = new URLSearchParams({ [provider]: status })
   if (message) query.set('message', message)
   return redirect(`/accounts?${query}`)
 }
@@ -39,12 +44,13 @@ export async function redirectToNetworkConsent(
 
   try {
     const { url, codeVerifier } = await prepare()
+    const testOnly = request.get('test') === '1'
     const authorization = new URL(url)
     const flow = await issueOAuthFlow({
       purpose: `postline-connect:${provider}`,
       userId: owner,
       ttlMs: FLOW_TTL_MS,
-      data: codeVerifier ? { codeVerifier } : undefined,
+      data: { ...(testOnly && { testOnly }), ...(codeVerifier && { codeVerifier }) },
       cookie: { path: `/api/postline/${provider}/callback` },
     })
     // The driver prepares its authorization parameters, including PKCE. The
@@ -53,14 +59,14 @@ export async function redirectToNetworkConsent(
     return redirect(authorization.toString(), flow.cookie)
   }
   catch (error) {
-    return networkResult(provider, publicMessage(error))
+    return networkResult(provider, 'error', publicMessage(error))
   }
 }
 
 export async function finishNetworkConsent(
   request: RequestInstance,
   provider: AppNetwork,
-  exchange: (code: string, codeVerifier?: string) => Promise<unknown>,
+  exchange: (code: string, options: NetworkOAuthExchangeOptions) => Promise<unknown>,
 ): Promise<Response> {
   const owner = await workspaceOwner(request)
   if (owner === undefined) return response.unauthorized('Unauthorized')
@@ -73,20 +79,21 @@ export async function finishNetworkConsent(
       browserSecret: readOAuthFlowCookie(request.headers.get('cookie'), state),
     })
     if (!flow || flow.userId !== owner) {
-      result = networkResult(provider, 'This connection expired or was started in another browser. Start again from Channels.')
+      result = networkResult(provider, 'error', 'This connection expired or was started in another browser. Start again from Channels.')
     }
     else if (request.get('error')) {
-      result = networkResult(provider, 'The network did not authorize the connection. Try connecting again from Channels.')
+      result = networkResult(provider, 'error', 'The network did not authorize the connection. Try connecting again from Channels.')
     }
     else {
       const code = String(request.get('code') || '')
-      const verifier = typeof flow.data?.codeVerifier === 'string' ? flow.data.codeVerifier : undefined
-      await exchange(code, verifier)
-      result = networkResult(provider)
+      const codeVerifier = typeof flow.data?.codeVerifier === 'string' ? flow.data.codeVerifier : undefined
+      const testOnly = flow.data?.testOnly === true
+      await exchange(code, { codeVerifier, testOnly })
+      result = networkResult(provider, testOnly ? 'tested' : 'connected')
     }
   }
   catch (error) {
-    result = networkResult(provider, publicMessage(error))
+    result = networkResult(provider, 'error', publicMessage(error))
   }
   if (state) result.headers.append('Set-Cookie', await clearOAuthFlowCookie(state, { path: `/api/postline/${provider}/callback` }))
   return result

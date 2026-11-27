@@ -1,3 +1,4 @@
+import type { NetworkOAuthExchangeOptions } from '../../Support/Social/network-oauth'
 import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
@@ -146,7 +147,7 @@ export class LinkedInService {
   }
 
   /** Handle the OAuth redirect: exchange the code and store the token. */
-  async exchangeAuthorizationCode(code: string) {
+  async exchangeAuthorizationCode(code: string, { testOnly }: NetworkOAuthExchangeOptions = {}) {
     const cfg = (await this.config())
     if (!code) throw new Error('LinkedIn did not return an authorization code.')
 
@@ -158,6 +159,10 @@ export class LinkedInService {
     })
 
     const profile = await this.driver.getProfile(token.accessToken).catch(() => undefined)
+    if (testOnly) {
+      if (!profile?.sub) throw new UserFacingError('LinkedIn did not return the signed-in member. Check the OpenID Connect product and try again.')
+      return
+    }
     const authorUrn = profile?.sub ? `urn:li:person:${profile.sub}` : cfg.authorUrn
     if (!authorUrn) throw new Error('Could not resolve your LinkedIn member URN.')
 

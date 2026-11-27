@@ -9,6 +9,6 @@ export default new Action({
   method: 'GET',
 
   async handle(request: RequestInstance) {
-    return finishNetworkConsent(request, 'threads', code => threads.exchangeAuthorizationCode(code))
+    return finishNetworkConsent(request, 'threads', (code, options) => threads.exchangeAuthorizationCode(code, options))
   },
 })

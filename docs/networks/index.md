@@ -19,6 +19,11 @@ Channels**, next to the fields: `https://<your address>/api/postline/<network>/c
 where `<network>` is `twitter` for X. In the Mac app it is a local address the
 app shows you.
 
+After saving an OAuth developer app, choose **Test connection** and complete the
+network's sign-in. A passing test returns you to Channels. Choose **Connect**
+on the channel card to enable publishing. The X test includes a profile read
+that counts against the workspace's daily read budget.
+
 ## What each network can do in Postline
 
 | | Publish | Threads | Images | Delete | Inbox | Listening | Engagement numbers |

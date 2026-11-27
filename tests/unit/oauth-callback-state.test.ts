@@ -1,5 +1,6 @@
 import type { RequestInstance } from '@stacksjs/types'
 import type { AppNetwork } from '../../app/Services/NetworkAppService'
+import type { NetworkOAuthExchangeOptions } from '../../app/Support/Social/network-oauth'
 import { describe, expect, mock, test } from 'bun:test'
 import { db } from '@stacksjs/database'
 import { oauthFlowDigest } from '@stacksjs/socials'
@@ -14,8 +15,8 @@ function request(fields: Record<string, string> = {}, cookie = '', ownerId = 7):
   } as unknown as RequestInstance
 }
 
-async function start(provider: AppNetwork, codeVerifier?: string) {
-  const reply = await redirectToNetworkConsent(request(), provider, async () => ({
+async function start(provider: AppNetwork, codeVerifier?: string, testOnly = false) {
+  const reply = await redirectToNetworkConsent(request(testOnly ? { test: '1' } : {}), provider, async () => ({
     url: 'https://network.example/authorize?scope=publish',
     codeVerifier,
   }))
@@ -33,7 +34,7 @@ async function start(provider: AppNetwork, codeVerifier?: string) {
 describe('network OAuth flow state', () => {
   test.each(APP_NETWORKS)('%s completes only a pending browser-bound flow', async (provider) => {
     const { state, cookie } = await start(provider)
-    const exchange = mock<(code: string, verifier?: string) => Promise<void>>(async () => {})
+    const exchange = mock<(code: string, options: NetworkOAuthExchangeOptions) => Promise<void>>(async () => {})
     const fields = { code: 'test-code', state }
     const unbound = await finishNetworkConsent(request(fields), provider, exchange)
     expect(unbound.headers.get('Location')).toContain(`?${provider}=error`)
@@ -43,7 +44,7 @@ describe('network OAuth flow state', () => {
     expect(finished.headers.get('Location')).toBe(`/accounts?${provider}=connected`)
     expect(finished.headers.get('Set-Cookie')).toContain('Max-Age=0')
     expect(exchange).toHaveBeenCalledTimes(1)
-    expect(exchange).toHaveBeenCalledWith('test-code', undefined)
+    expect(exchange).toHaveBeenCalledWith('test-code', { codeVerifier: undefined, testOnly: false })
 
     const repeated = await finishNetworkConsent(request(fields, cookie), provider, exchange)
     expect(repeated.headers.get('Location')).toContain(`?${provider}=error`)
@@ -60,12 +61,15 @@ describe('network OAuth flow state', () => {
     expect(rows).toHaveLength(2)
     expect(rows.every(row => row.user_id === 7)).toBe(true)
 
-    const exchange = mock<(code: string, verifier?: string) => Promise<void>>(async () => {})
+    const exchange = mock<(code: string, options: NetworkOAuthExchangeOptions) => Promise<void>>(async () => {})
     const one = await finishNetworkConsent(request({ code: 'one', state: first.state }, first.cookie), 'twitter', exchange)
     const two = await finishNetworkConsent(request({ code: 'two', state: second.state }, second.cookie), 'twitter', exchange)
     expect(one.headers.get('Location')).toBe('/accounts?twitter=connected')
     expect(two.headers.get('Location')).toBe('/accounts?twitter=connected')
-    expect(exchange.mock.calls).toEqual([['one', 'first-verifier'], ['two', 'second-verifier']])
+    expect(exchange.mock.calls).toEqual([
+      ['one', { codeVerifier: 'first-verifier', testOnly: false }],
+      ['two', { codeVerifier: 'second-verifier', testOnly: false }],
+    ])
   })
 
   test('clears a cancelled flow and does not exchange a code', async () => {
@@ -86,5 +90,13 @@ describe('network OAuth flow state', () => {
     const otherOwner = await finishNetworkConsent(request(fields, cookie, 8), 'linkedin', exchange)
     expect(otherOwner.headers.get('Location')).toContain('?linkedin=error')
     expect(exchange).not.toHaveBeenCalled()
+  })
+
+  test('carries the requested connection test through the stored flow', async () => {
+    const { state, cookie } = await start('twitter', 'test-verifier', true)
+    const exchange = mock(async () => {})
+    const reply = await finishNetworkConsent(request({ state, code: 'test-code' }, cookie), 'twitter', exchange)
+    expect(reply.headers.get('Location')).toBe('/accounts?twitter=tested')
+    expect(exchange).toHaveBeenCalledWith('test-code', { codeVerifier: 'test-verifier', testOnly: true })
   })
 })

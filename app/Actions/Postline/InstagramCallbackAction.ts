@@ -9,6 +9,6 @@ export default new Action({
   method: 'GET',
 
   async handle(request: RequestInstance) {
-    return finishNetworkConsent(request, 'instagram', code => instagram.exchangeAuthorizationCode(code))
+    return finishNetworkConsent(request, 'instagram', (code, options) => instagram.exchangeAuthorizationCode(code, options))
   },
 })

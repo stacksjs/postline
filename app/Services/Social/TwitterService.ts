@@ -1,3 +1,4 @@
+import type { NetworkOAuthExchangeOptions } from '../../Support/Social/network-oauth'
 import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
@@ -127,7 +128,7 @@ export class TwitterService {
   }
 
   /** Handle the OAuth redirect: exchange the code and store the tokens. */
-  async exchangeAuthorizationCode(code: string, codeVerifier?: string) {
+  async exchangeAuthorizationCode(code: string, { codeVerifier, testOnly }: NetworkOAuthExchangeOptions = {}) {
     const cfg = (await this.config())
     if (!code) throw new Error('X/Twitter did not return an authorization code.')
     if (!codeVerifier) throw new UserFacingError('Start a new X connection from Channels to continue.')
@@ -141,6 +142,7 @@ export class TwitterService {
     })
 
     const profile = await this.readProfile(token.accessToken)
+    if (testOnly) return
     const identity = await this.saveSession({
       accessToken: token.accessToken,
       refreshToken: token.refreshToken,
