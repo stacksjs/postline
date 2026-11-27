@@ -3,7 +3,7 @@
  */
 import { describe, expect, test } from 'bun:test'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { db } from '@stacksjs/database'
 import { composerPresets } from '../../app/Services/ComposerPresetService'
 import { draftFeeds } from '../../app/Services/DraftFeedService'
@@ -18,15 +18,16 @@ import { trackedLinks } from '../../app/Services/TrackedLinkService'
 import { DELETE_EVERYTHING_PHRASE, workspaceArchive } from '../../app/Services/WorkspaceArchiveService'
 import { wallTimeInZone } from '../../app/Support/time'
 import { workspace } from '../../app/Services/WorkspaceService'
-import { MEDIA_DIR } from '../../app/Support/Social/uploads'
+import { MEDIA_DIR, mediaDirectory } from '../../app/Support/Social/uploads'
 
 const database = db as any
 const at = '2026-11-20 10:00:00'
 const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD1sAAAAASUVORK5CYII='
 
 describe('workspace archive', () => {
-  test('the media folder in tests is not the project\'s', () => {
-    expect(MEDIA_DIR).not.toContain(process.cwd())
+  test('archive tests use disposable media storage', () => {
+    expect(basename(dirname(MEDIA_DIR))).toStartWith(`postline-test-${process.pid}-`)
+    expect(MEDIA_DIR).not.toBe(mediaDirectory({}, process.cwd()))
   })
 
   test('export, delete everything, import: the same workspace comes back, links intact', async () => {
