@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { db } from '@stacksjs/database'
+import { acquireSocialOperationLease } from '../../app/Support/Database/operation-lease'
 import { toPublicAccount } from '../../app/Support/Social/accounts'
 import { isRefusedRefresh, needsRefresh, refreshOnce, tokenLifetime } from '../../app/Support/Social/token-refresh'
 
@@ -15,10 +14,6 @@ let nextId = 1000
 
 function identity(provider: string, expiresIn: number, extra: Record<string, unknown> = {}) {
   return { id: nextId++, provider, handle: 'me', access_token: 'old', refresh_token: 'r1', token_expires_at: at(expiresIn), ...extra }
-}
-
-function lockFile(): string {
-  return join(mkdtempSync(join(tmpdir(), 'postline-token-')), 'token.lock')
 }
 
 describe('when a token is renewed', () => {
@@ -44,7 +39,6 @@ describe('refreshing once', () => {
     let stored = row
     let calls = 0
     const steps = {
-      lockFile: lockFile(),
       reload: async () => stored,
       refresh: async (current: typeof row) => {
         calls++
@@ -65,7 +59,6 @@ describe('refreshing once', () => {
     const row = identity('threads', 60)
     let refreshes = 0
     const result = await refreshOnce(row, {
-      lockFile: lockFile(),
       reload: async () => undefined,
       refresh: async (current) => { refreshes++; return current },
       refused: async () => {},
@@ -78,7 +71,6 @@ describe('refreshing once', () => {
     const row = identity('twitter', 60)
     let calls = 0
     const result = await refreshOnce(row, {
-      lockFile: lockFile(),
       reload: async () => ({ ...row, access_token: 'theirs', refresh_token: 'r2', token_expires_at: at(2 * HOUR) }),
       refresh: async (current) => { calls++; return current },
       refused: async () => {},
@@ -89,24 +81,75 @@ describe('refreshing once', () => {
     expect(result?.refresh_token).toBe('r2')
   })
 
-  test('while another process holds the lock, no second refresh is sent', async () => {
+  test('uses the refreshed credential while another process still holds its lease', async () => {
     const row = identity('twitter', 60)
-    const path = lockFile()
-    writeFileSync(path, JSON.stringify({ pid: 1, at: Date.now() }))
+    const key = `token-refresh:${row.id}`
+    const owner = acquireSocialOperationLease(key, 60_000)!
+    let stored = row
     let calls = 0
-    let waits = 0
 
-    const result = await refreshOnce(row, {
-      lockFile: path,
-      // Stop waiting at once: the real wait is fifteen seconds.
-      wait: async () => { waits++; writeFileSync(path, JSON.stringify({ pid: 1, at: Date.now() })); if (waits > 2) throw new Error('stop') },
-      reload: async () => row,
-      refresh: async (current) => { calls++; return current },
-      refused: async () => {},
-    }).catch(() => row)
+    try {
+      const result = await refreshOnce(row, {
+        wait: async () => { stored = { ...row, access_token: 'theirs', refresh_token: 'r2', token_expires_at: at(2 * HOUR) } },
+        reload: async () => stored,
+        refresh: async (current) => { calls++; return current },
+        refused: async () => {},
+      })
+      expect(calls).toBe(0)
+      expect(result?.access_token).toBe('theirs')
+      expect(acquireSocialOperationLease(key, 60_000)).toBeNull()
+    }
+    finally {
+      owner.release()
+    }
+  })
 
-    expect(calls).toBe(0)
-    expect(result?.access_token).toBe('old')
+  test('does not refresh after its lease is lost during reload', async () => {
+    const row = identity('twitter', 60)
+    const key = `token-refresh:${row.id}`
+    let calls = 0
+
+    try {
+      const result = await refreshOnce(row, {
+        reload: async () => {
+          await (db as any).deleteFrom('social_operation_leases').where('lease_key', '=', key).execute()
+          expect(acquireSocialOperationLease(key, 60_000)).not.toBeNull()
+          return row
+        },
+        refresh: async (current) => { calls++; return current },
+        refused: async () => {},
+      })
+      expect(calls).toBe(0)
+      expect(result?.access_token).toBe('old')
+      expect(acquireSocialOperationLease(key, 60_000)).toBeNull()
+    }
+    finally {
+      await (db as any).deleteFrom('social_operation_leases').where('lease_key', '=', key).execute()
+    }
+  })
+
+  test('an old owner cannot mark the account refused after another lease takes over', async () => {
+    const row = identity('twitter', 60)
+    const key = `token-refresh:${row.id}`
+    let refused = false
+
+    try {
+      const result = await refreshOnce(row, {
+        reload: async () => row,
+        refresh: async () => {
+          await (db as any).deleteFrom('social_operation_leases').where('lease_key', '=', key).execute()
+          expect(acquireSocialOperationLease(key, 60_000)).not.toBeNull()
+          throw Object.assign(new Error('invalid_grant'), { status: 400 })
+        },
+        refused: async () => { refused = true },
+      })
+      expect(result?.access_token).toBe('old')
+      expect(refused).toBe(false)
+      expect(acquireSocialOperationLease(key, 60_000)).toBeNull()
+    }
+    finally {
+      await (db as any).deleteFrom('social_operation_leases').where('lease_key', '=', key).execute()
+    }
   })
 
   test('a refusal marks the account, a network failure does not', async () => {
@@ -114,8 +157,7 @@ describe('refreshing once', () => {
     const run = async (error: unknown) => {
       const row = identity('linkedin', DAY)
       const result = await refreshOnce(row, {
-        lockFile: lockFile(),
-        reload: async () => row,
+          reload: async () => row,
         refresh: async () => { throw error },
         refused: async (current) => { refused.push(current.id) },
       })

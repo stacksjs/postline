@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { acquireSocialOperationLease } from '../../app/Services/Social/operation-lease'
+import { acquireSocialOperationLease } from '../../app/Support/Database/operation-lease'
 
 describe('social operation leases', () => {
   test('only one owner can hold the same operation', () => {

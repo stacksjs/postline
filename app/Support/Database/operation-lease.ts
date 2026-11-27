@@ -1,6 +1,5 @@
 import { db, sqliteWriteOptions } from '@stacksjs/database'
 import { log } from '@stacksjs/logging'
-import { uuid } from './support'
 
 const database = db as any
 
@@ -15,7 +14,7 @@ function timestamp(ms: number): string {
 
 /** API and Scheduler take a lease in the same workspace database. */
 export function acquireSocialOperationLease(key: string, ttlMs: number, clock = Date.now): SocialOperationLease | null {
-  const token = uuid()
+  const token = crypto.randomUUID()
   const claimed = database.transaction((tx: typeof database) => {
     const at = clock()
     const now = timestamp(at)

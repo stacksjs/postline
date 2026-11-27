@@ -7,18 +7,16 @@
  * a token the network has just cancelled, which disconnects the account.
  *
  * Two guards stop that. Inside one process, callers for the same account
- * share one promise. Across processes, a lock file beside the database (the
- * one place both processes see) lets one refresh run; whoever waited then
- * reads the row again and finds it already fresh.
+ * share one promise. Across processes, a lease in the workspace database
+ * lets one renewal run. A caller that waited reloads the stored identity
+ * before deciding whether it needs a refresh.
  *
  * A refresh the network refuses marks the account as needing a reconnect, so
  * the owner sees it on Channels before a post fails. A refresh that fails for
  * any other reason (the network is down) is logged and tried again later.
  */
-import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from 'node:fs'
-import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
-import process from 'node:process'
 import { log } from '@stacksjs/logging'
+import { acquireSocialOperationLease } from '../Database/operation-lease'
 
 const MINUTE = 60
 const DAY = 24 * 60 * 60
@@ -79,36 +77,6 @@ export function isRefusedRefresh(error: unknown): boolean {
   return /invalid_grant|invalid_token|token (?:has )?(?:expired|been revoked)/i.test(message)
 }
 
-/** Beside the database and named after it, so two databases never share a lock. */
-function lockPath(identityId: number): string {
-  const database = String(process.env.DB_DATABASE_PATH || '').trim()
-  if (!database) return join(process.cwd(), 'storage/framework/runtime', `postline-token-${identityId}.lock`)
-  const file = isAbsolute(database) ? database : resolve(process.cwd(), database)
-  return join(dirname(file), `${basename(file)}.token-${identityId}.lock`)
-}
-
-function takeLock(path: string): (() => void) | null {
-  mkdirSync(dirname(path), { recursive: true })
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const handle = openSync(path, 'wx', 0o600)
-      writeSync(handle, JSON.stringify({ pid: process.pid, at: Date.now() }))
-      closeSync(handle)
-      return () => rmSync(path, { force: true })
-    }
-    catch {
-      let takenAt = 0
-      try {
-        takenAt = Number(JSON.parse(readFileSync(path, 'utf8')).at) || 0
-      }
-      catch {}
-      if (Date.now() - takenAt < LOCK_STALE_MS) return null
-      rmSync(path, { force: true })
-    }
-  }
-  return null
-}
-
 const inFlight = new Map<number, Promise<RefreshableIdentity | undefined>>()
 
 export interface RefreshSteps<T extends RefreshableIdentity> {
@@ -119,7 +87,6 @@ export interface RefreshSteps<T extends RefreshableIdentity> {
   /** Called when the network refuses: the account needs reconnecting. */
   refused: (current: T) => Promise<void>
   /** For tests. */
-  lockFile?: string
   wait?: (ms: number) => Promise<void>
 }
 
@@ -139,44 +106,50 @@ export async function refreshOnce<T extends RefreshableIdentity>(identity: T, st
 }
 
 async function run<T extends RefreshableIdentity>(identity: T, steps: RefreshSteps<T>): Promise<T | undefined> {
-  const path = steps.lockFile ?? lockPath(identity.id)
+  const key = `token-refresh:${identity.id}`
   const wait = steps.wait ?? ((ms: number) => new Promise<void>(done => setTimeout(done, ms)))
-
-  let release = takeLock(path)
+  let lease = acquireSocialOperationLease(key, LOCK_STALE_MS)
   const deadline = Date.now() + LOCK_WAIT_MS
-  while (!release && Date.now() < deadline) {
-    await wait(150)
-    release = takeLock(path)
-  }
-
-  try {
-    // Whoever held the lock may have refreshed already, and with a rotating
-    // refresh token ours is then cancelled: always work from the stored row.
+  while (!lease && Date.now() < deadline) {
     const current = await steps.reload()
     if (!current || !needsRefresh(current)) return current
-    // Another process still holds the lock. Do not send a second refresh
-    // beside it; use what is stored and let the next call try again.
-    if (!release) return current
+    await wait(150)
+    lease = acquireSocialOperationLease(key, LOCK_STALE_MS)
+  }
+
+  let heartbeat: ReturnType<typeof setInterval> | undefined
+  try {
+    // Re-read after taking the lease. Another process may have rotated the
+    // credential while this one was waiting.
+    const current = await steps.reload()
+    if (!current || !needsRefresh(current)) return current
+    if (!lease?.renew()) return current
+    const owner = lease
+    heartbeat = setInterval(() => owner.renew(), LOCK_STALE_MS / 3)
+    heartbeat.unref()
 
     try {
       const refreshed = await steps.refresh(current)
       if (refreshed) return refreshed
     }
     catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const statusCode = Number((error as { status?: unknown } | null)?.status)
+      const status = Number.isInteger(statusCode) && statusCode >= 400 && statusCode <= 599 ? ` (HTTP ${statusCode})` : ''
       const who = `${current.provider} account ${current.handle ?? current.id}`
       if (isRefusedRefresh(error)) {
-        log.error(`[postline] ${who} could not renew its token and needs reconnecting: ${message}`)
+        if (!owner.renew()) return await steps.reload()
+        log.error(`[postline] ${who} could not renew its token${status} and needs reconnecting.`)
         await steps.refused(current)
       }
       else {
-        log.warn(`[postline] ${who} could not renew its token, will try again: ${message}`)
+        log.warn(`[postline] ${who} could not renew its token${status}. Postline will try again.`)
       }
     }
     return await steps.reload()
   }
   finally {
-    release?.()
+    clearInterval(heartbeat)
+    lease?.release()
   }
 }
 
