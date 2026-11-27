@@ -93,6 +93,7 @@
     "@stacksjs/components": "0.2.960",
     "better-dx": "^0.2.22",
     "bun-plugin-stx": "0.2.960",
+    "craft-native": "0.0.548",
     "typescript": "^7.0.2"
   },
   "workspaces": [
