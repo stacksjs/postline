@@ -77,6 +77,10 @@ if (isMarketingSite())
 route.get('/postline/media', 'Actions/Postline/MediaServeAction').rateLimit(120, 'minute')
 route.get('/postline/blog/media', 'Actions/Postline/BlogMediaAction').rateLimit(120, 'minute')
 
+// Issued short links are public so anyone can follow a link in a post.
+// A lookup uses an opaque code. The request cannot supply the destination.
+route.match(['GET', 'HEAD'], '/r/{code}', 'Actions/Postline/TrackedLinkRedirectAction').rateLimit(240, 'minute')
+
 // For a load balancer or an uptime monitor: fails when the scheduler has
 // stopped, which the framework's own health check cannot see.
 route.get('/postline/health', 'Actions/Postline/HealthAction').rateLimit(120, 'minute')
@@ -147,6 +151,9 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/composer/presets/delete', 'Actions/Postline/ComposerPresetDeleteAction').middleware('auth').rateLimit(30, 'minute')
   route.get('/unread', 'Actions/Postline/UnreadCountsAction').middleware('auth')
   route.get('/analytics', 'Actions/Postline/AnalyticsAction').middleware('auth')
+  route.get('/analytics/links', 'Actions/Postline/TrackedLinkListAction').middleware('auth')
+  route.post('/analytics/links', 'Actions/Postline/TrackedLinkCreateAction').middleware('auth').rateLimit(30, 'minute')
+  route.post('/analytics/links/disable', 'Actions/Postline/TrackedLinkDisableAction').middleware('auth').rateLimit(30, 'minute')
   route.get('/blog', 'Actions/Postline/BlogListAction').middleware('auth')
   route.post('/blog/preview', 'Actions/Postline/BlogPreviewAction').middleware('auth').rateLimit(240, 'minute')
   route.post('/blog/update', 'Actions/Postline/BlogUpdateAction').middleware('auth').rateLimit(60, 'minute')

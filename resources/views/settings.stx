@@ -825,7 +825,8 @@
       const payload = await requestJson('/api/postline/settings/import', { method: 'POST', body }, 'The import failed.')
       const r = payload.data.report
       const presets = r.composerPresets ? `, ${r.composerPresets} saved Composer items` : ''
-      return `Imported ${r.posts} posts, ${r.campaigns} campaigns, ${r.blogPosts} blog posts, ${r.monitors} Listening rules${presets} and ${r.media} images${r.skipped ? `; ${r.skipped} already here were left alone` : ''}.`
+      const links = r.trackedLinks ? `, ${r.trackedLinks} tracked links` : ''
+      return `Imported ${r.posts} posts, ${r.campaigns} campaigns, ${r.blogPosts} blog posts, ${r.monitors} Listening rules${presets}${links} and ${r.media} images${r.skipped ? `; ${r.skipped} already here were left alone` : ''}.`
     })
 
     const deleteEverything = async (): Promise<void> => {

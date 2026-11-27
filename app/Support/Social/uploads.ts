@@ -145,7 +145,7 @@ export function isPublicBase(base: string): boolean {
   if (!raw) return false
   let host: string
   try {
-    host = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).hostname.toLowerCase().replace(/^\[|\]$/g, '')
+    host = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '')
   }
   catch {
     return false

@@ -18,6 +18,8 @@ Select **Thread** and add one segment for each post. Check the limits while edit
 
 Use the image button to attach images to a post or thread segment. Add a description in each image's **Alt text** field. Check the selected network's limits and image requirements before publishing. Bluesky displays an attached image in place of a link card when both are present. Instagram needs an image it can fetch over the internet. [Check Instagram setup](./networks/instagram.md).
 
+To track a link, open **Analytics > Tracked links**. Enter the full destination address and the UTM tags your destination's analytics expects. **Build tagged URL** gives you a link to copy into a post. On a server with a public HTTPS `APP_URL`, you can also name the link and choose **Create short link**. Postline reports all-time redirects for each short link, including repeat visits and automated previews. Disabling a short link stops it from working wherever it was shared.
+
 ## Draft, schedule, or publish
 
 - Choose **Draft** and save to put a post in **Queue > Drafts**. The composer also keeps an in-progress draft in the current browser or Mac app.

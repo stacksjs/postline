@@ -24,14 +24,16 @@ import { MAX_IMAGE_BYTES, MAX_POST_IMAGES } from '../Support/Social/media-rules'
 import { referencedMediaFiles } from '../Support/Social/stored-content'
 import { isSafeMediaFilename, MEDIA_DIR } from '../Support/Social/uploads'
 import type { ComposerPreset } from './ComposerPresetService'
+import type { TrackedLink } from './TrackedLinkService'
 import { composerPresets, readComposerPreset } from './ComposerPresetService'
 import { blog } from './Social/BlogService'
 import { ensureAccount, now } from './Social/support'
+import { readArchivedTrackedLink, trackedLinks } from './TrackedLinkService'
 
 const database = db as any
 
 export const ARCHIVE_FORMAT = 'postline-workspace'
-export const ARCHIVE_VERSION = 4
+export const ARCHIVE_VERSION = 5
 
 /** Typed to delete everything, so a stray click cannot. */
 export const DELETE_EVERYTHING_PHRASE = 'DELETE EVERYTHING'
@@ -68,6 +70,7 @@ export interface WorkspaceArchive {
   blogPosts: ArchivedBlogPost[]
   monitors: Array<Record<string, unknown>>
   composerPresets: ComposerPreset[]
+  trackedLinks: TrackedLink[]
   /** Images attached to queued posts, by file name, as base64. */
   media: Record<string, string>
 }
@@ -80,6 +83,7 @@ export interface ImportReport {
   blogPosts: number
   monitors: number
   composerPresets: number
+  trackedLinks: number
   media: number
   /** Rows already here (same uuid), left as they are. */
   skipped: number
@@ -153,6 +157,7 @@ export class WorkspaceArchiveService {
       blogPosts,
       monitors: monitors.map((row: any) => pick(row, MONITOR_COLUMNS)),
       composerPresets: await composerPresets.list(accountId),
+      trackedLinks: await trackedLinks.export(accountId),
       media,
     }
   }
@@ -170,6 +175,9 @@ export class WorkspaceArchiveService {
     if (version >= 4 && !Array.isArray(archive.composerPresets))
       throw new UserFacingError('That export is missing its saved Composer text.')
     const presets = version >= 4 ? archive.composerPresets.map(readComposerPreset) : []
+    if (version >= 5 && !Array.isArray(archive.trackedLinks))
+      throw new UserFacingError('That export is missing its tracked links.')
+    const links = version >= 5 ? archive.trackedLinks.map(readArchivedTrackedLink) : []
 
     const monitors = (archive.monitors || []).map((monitor) => {
       // Browser-session watches first appeared in version 3. Require the source
@@ -206,7 +214,7 @@ export class WorkspaceArchiveService {
         return { ...post, images }
       })
 
-    const report: ImportReport = { posts: 0, targets: 0, campaigns: 0, campaignPosts: 0, blogPosts: 0, monitors: 0, composerPresets: 0, media: 0, skipped: 0 }
+    const report: ImportReport = { posts: 0, targets: 0, campaigns: 0, campaignPosts: 0, blogPosts: 0, monitors: 0, composerPresets: 0, trackedLinks: 0, media: 0, skipped: 0 }
     const accountId = await ensureAccount()
     const exists = async (table: string, uuid: unknown) => Boolean(uuid) && Boolean(await database.selectFrom(table).select(['id']).where('uuid', '=', String(uuid)).executeTakeFirst())
     const idOf = async (table: string, uuid: unknown): Promise<number | null> => {
@@ -279,6 +287,11 @@ export class WorkspaceArchiveService {
       else report.skipped++
     }
 
+    for (const link of links) {
+      if (await trackedLinks.restore(accountId, link)) report.trackedLinks++
+      else report.skipped++
+    }
+
     await mkdir(MEDIA_DIR, { recursive: true })
     for (const [name, bytes] of media) {
       const path = join(MEDIA_DIR, name)
@@ -310,7 +323,7 @@ export class WorkspaceArchiveService {
     const blogPosts = await database.selectFrom('blog_posts').select(['id']).execute()
     for (const post of blogPosts) await blog.remove(Number(post.id)).catch(() => {})
 
-    for (const table of ['campaign_posts', 'launch_campaigns', 'post_targets', 'posts', 'keyword_mentions', 'keyword_monitors', 'composer_presets', 'dm_messages', 'dm_conversations', 'timeline_items', 'purge_runs', 'alerts', 'social_identities', 'network_apps', 'twitter_read_usage'])
+    for (const table of ['campaign_posts', 'launch_campaigns', 'post_targets', 'posts', 'keyword_mentions', 'keyword_monitors', 'composer_presets', 'tracked_links', 'dm_messages', 'dm_conversations', 'timeline_items', 'purge_runs', 'alerts', 'social_identities', 'network_apps', 'twitter_read_usage'])
       await wipe(table)
 
     const accountId = await ensureAccount()

@@ -1434,6 +1434,25 @@ async function checkQueueCalendar(cdp: Cdp): Promise<void> {
   })()`), 5_000)
 }
 
+async function checkTrackedLinks(cdp: Cdp): Promise<void> {
+  await auditPage(`${site}/analytics`, { cdp })
+  const form = "document.querySelector('[data-tracked-link-form]')"
+  const result = "document.querySelector('[data-tracked-link-result]')"
+  await waitUntil('Tracking can build a tagged URL on a local install', () => evaluate<boolean>(cdp, `
+    ${form}?.textContent.includes('Short links need a public HTTPS Postline server.')
+      && !${form}.querySelector('button[value=shorten]').getClientRects().length
+      && !${form}.querySelector('button[value=tag]').disabled`), 5_000)
+  await evaluate(cdp, `
+    ${form}.elements.destination.value = 'https://example.org/story?edition=1#more'
+    ${form}.elements.source.value = 'Mastodon'
+    ${form}.elements.campaign.value = 'Product news'
+    ${form}.querySelector('button[value=tag]').focus()
+  `)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The builder preserves the destination query and fragment', () => evaluate<boolean>(cdp, `
+    ${result}?.value === 'https://example.org/story?edition=1&utm_source=Mastodon&utm_campaign=Product+news#more'`), 5_000)
+}
+
 async function checkAnalytics(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
@@ -2055,6 +2074,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkCampaignScheduling(cdp)
   await checkCampaignLocalDates(cdp)
   await checkAnalytics(cdp)
+  await checkTrackedLinks(cdp)
   await checkListStates(cdp)
 }
 

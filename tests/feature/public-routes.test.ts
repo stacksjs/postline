@@ -32,6 +32,9 @@ const APP_PUBLIC = [
   // Instagram and Threads fetch a queued image from here, server to server.
   'GET /api/postline/media',
   'GET /api/postline/blog/media',
+  // A reader of a post can follow an opaque short link. Creation needs a session.
+  'GET /api/r/{code}',
+  'HEAD /api/r/{code}',
   // One boolean for the first-run and sign-in pages, with no account details.
   'GET /api/postline/setup/availability',
   // Health for a load balancer: database and scheduler state, nothing else.

@@ -7,6 +7,8 @@ import { join } from 'node:path'
 import { db } from '@stacksjs/database'
 import { composerPresets } from '../../app/Services/ComposerPresetService'
 import { keywordMonitoring } from '../../app/Services/KeywordMonitoringService'
+import { ensureAccount } from '../../app/Services/Social/support'
+import { trackedLinks } from '../../app/Services/TrackedLinkService'
 import { DELETE_EVERYTHING_PHRASE, workspaceArchive } from '../../app/Services/WorkspaceArchiveService'
 import { MEDIA_DIR } from '../../app/Support/Social/uploads'
 
@@ -37,9 +39,13 @@ describe('workspace archive', () => {
       name: `Browser watch ${tag}`, keywords: ['Postline'], providers: ['twitter'], twitterReadSource: 'browser',
     })
     const preset = await composerPresets.save(undefined, { kind: 'snippet', name: `Sign-off ${tag}`, body: 'Thanks for reading.' })
+    const link = { code: crypto.randomUUID().replaceAll('-', '').slice(0, 16), name: `Launch ${tag}`, destination: 'https://example.org/launch', visits: 17, disabled: true }
+    const accountId = await ensureAccount()
+    await trackedLinks.restore(accountId, link)
     const archive = await workspaceArchive.export()
-    expect(archive.version).toBe(4)
+    expect(archive.version).toBe(5)
     expect(archive.composerPresets).toContainEqual(preset)
+    expect(archive.trackedLinks).toContainEqual(link)
     const archivedWatch = archive.monitors.find(row => row.name === watch.name)
     expect(archivedWatch?.twitter_read_source).toBe('browser')
     expect(archive.posts.some(row => row.uuid === postUuid)).toBe(true)
@@ -49,6 +55,7 @@ describe('workspace archive', () => {
     await expect(workspaceArchive.deleteEverything('delete everything')).rejects.toThrow(DELETE_EVERYTHING_PHRASE)
     await workspaceArchive.deleteEverything(DELETE_EVERYTHING_PHRASE)
     expect(await composerPresets.list()).toEqual([])
+    expect(await trackedLinks.export(accountId)).toEqual([])
     expect(await database.selectFrom('posts').select(['id']).where('uuid', '=', postUuid).executeTakeFirst()).toBeUndefined()
     expect(existsSync(join(MEDIA_DIR, `${tag}.png`))).toBe(false)
 
@@ -58,7 +65,9 @@ describe('workspace archive', () => {
     expect(report.posts).toBeGreaterThanOrEqual(1)
     expect(report.media).toBeGreaterThanOrEqual(1)
     expect(report.composerPresets).toBe(1)
+    expect(report.trackedLinks).toBe(1)
     expect(await composerPresets.list()).toContainEqual(preset)
+    expect(await trackedLinks.export(accountId)).toContainEqual(link)
 
     const back = await database.selectFrom('posts').select(['id']).where('uuid', '=', postUuid).executeTakeFirstOrThrow()
     const target = await database.selectFrom('post_targets').selectAll().where('post_id', '=', back.id).executeTakeFirstOrThrow()
@@ -77,6 +86,7 @@ describe('workspace archive', () => {
     const again = await workspaceArchive.import(archive)
     expect(again.posts).toBe(0)
     expect(again.composerPresets).toBe(0)
+    expect(again.trackedLinks).toBe(0)
     expect(again.skipped).toBeGreaterThan(0)
   })
 

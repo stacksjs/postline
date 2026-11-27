@@ -2930,10 +2930,104 @@
             "type": "unique"
           }
         ]
+      },
+      {
+        "table": "tracked_links",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "code",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 100
+          },
+          {
+            "name": "destination",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "visits",
+            "type": "integer",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": 0
+          },
+          {
+            "name": "disabled",
+            "type": "boolean",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": false
+          },
+          {
+            "name": "account_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "accounts",
+              "column": "id"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "UTC_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "tracked_links_code_unique",
+            "columns": [
+              "code"
+            ],
+            "type": "unique"
+          }
+        ]
       }
     ]
   },
-  "hash": "b596bc79c709f51a6e6968886e751b3faa03324ef2a34a99ce84b6d1dd84267a",
+  "hash": "2aa8f5f8000412acd4d06854848cc5a572f0d9435ecf30e2e323dbe1d739e2c7",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-27T07:05:20.101Z"
+  "updatedAt": "2026-11-27T07:22:53.102Z"
 }

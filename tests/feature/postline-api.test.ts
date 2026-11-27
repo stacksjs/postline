@@ -14,7 +14,9 @@
  * sign-in is currently broken (#45), and these tests pass regardless, because
  * they exercise the API rather than the cookie the client cannot read.
  */
+import type { TrackedLink } from '../../app/Services/TrackedLinkService'
 import { describe, expect, test } from 'bun:test'
+import process from 'node:process'
 import { db } from '@stacksjs/database'
 import { featureTest } from '@stacksjs/testing'
 import { postQueue } from '../../app/Services/Social/QueueService'
@@ -37,6 +39,7 @@ describe('postline api — auth', () => {
     ['/api/postline/bootstrap'],
     ['/api/postline/providers'],
     ['/api/postline/analytics'],
+    ['/api/postline/analytics/links'],
     ['/api/postline/queue'],
     ['/api/postline/setup/post-status?id=1'],
     ['/api/postline/queue/image?id=1&index=0'],
@@ -51,6 +54,52 @@ describe('postline api — auth', () => {
     // 401, not 500. A missing table used to surface here as a server error,
     // which reads as "the app is broken" rather than "you are not signed in".
     expect(response.status).toBe(401)
+  })
+})
+
+describe('tracked links', () => {
+  test('the authenticated owner issues and disables a link, and only GET increments the total', async () => {
+    type LinkWithUrl = TrackedLink & { shortUrl: string }
+    const address = process.env.APP_URL
+    process.env.APP_URL = 'https://workspace.example.org'
+    const endpoint = '/api/postline/analytics/links'
+    const submitted = { name: 'Launch', destination: 'https://example.com/launch?from=post#read', campaign: 'Summer launch' }
+    let code: string | undefined
+    try {
+      ;(await featureTest().post(endpoint, submitted)).assertStatus(401)
+      const client = featureTest().actingAs(await actingUser())
+      const created = await client.post(endpoint, submitted)
+      created.assertStatus(201)
+      const { data } = await created.json<{ data: LinkWithUrl }>()
+      code = data.code
+      expect(data.shortUrl).toBe(`https://workspace.example.org/api/r/${code}`)
+      expect(data.destination).toBe('https://example.com/launch?from=post&utm_campaign=Summer+launch#read')
+      expect(data.visits).toBe(0)
+      const path = `/api/r/${code}`
+      const head = await featureTest().request('HEAD', path)
+      head.assertStatus(302)
+      expect(head.headers.get('location')).toBe(data.destination)
+      for (let index = 0; index < 2; index++) {
+        const visit = await featureTest().get(`${path}?utm_campaign=other`)
+        visit.assertStatus(302)
+        expect(visit.headers.get('location')).toBe(data.destination)
+        expect(visit.headers.get('cache-control')).toContain('no-store')
+        expect(visit.headers.get('referrer-policy')).toBe('no-referrer')
+      }
+      const list = await client.get(endpoint)
+      expect((await list.json<{ data: { links: LinkWithUrl[] } }>()).data.links).toContainEqual({ ...data, visits: 2 })
+      ;(await client.post(endpoint, { ...submitted, destination: data.shortUrl })).assertStatus(422)
+      ;(await client.post(`${endpoint}/disable`, { code })).assertStatus(200)
+      ;(await featureTest().get(path)).assertStatus(404)
+      ;(await featureTest().request('HEAD', path)).assertStatus(404)
+      const after = await client.get(endpoint)
+      expect((await after.json<{ data: { links: LinkWithUrl[] } }>()).data.links).toContainEqual({ ...data, disabled: true, visits: 2 })
+    }
+    finally {
+      if (address === undefined) delete process.env.APP_URL
+      else process.env.APP_URL = address
+      if (code) await db.deleteFrom('tracked_links').where('code', '=', code).execute()
+    }
   })
 })
 

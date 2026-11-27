@@ -98,6 +98,11 @@ for (const path of ['/api/csrf', '/api/postline/bootstrap', '/api/postline/provi
   check(`GET ${path}`, read.status === 200, `${read.status} ${read.text.slice(0, 160)}`)
 }
 
+const shortLinks = await call('GET', '/api/postline/analytics/links')
+check('the Mac agent reports short links unavailable without a public server', shortLinks.status === 200 && JSON.parse(shortLinks.text).data.enabled === false)
+const shortRedirect = await call('GET', '/api/r/1234567890abcdef')
+check('the Mac agent never serves a public redirect', shortRedirect.status === 404 && !shortRedirect.headers.has('location'))
+
 const unsigned = csrfToken
 csrfToken = ''
 const refused = await call('POST', '/api/postline/queue', { text: 'Sent without a CSRF token.', providers: 'blog' })
