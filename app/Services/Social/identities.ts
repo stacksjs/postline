@@ -24,7 +24,7 @@ import { now, uuid } from './support'
 
 const database = db as any
 
-const TOKEN_COLUMNS = ['access_token', 'refresh_token'] as const
+const TOKEN_COLUMNS = ['access_token', 'refresh_token', 'insights_access_token'] as const
 type TokenColumns = Record<typeof TOKEN_COLUMNS[number], string | null>
 // A reconnect encrypts fresh ciphertext even when the credential string is
 // unchanged. Keep that stored generation out of the public identity object.
@@ -39,6 +39,7 @@ function updateCurrentIdentity(identity: IdentityLike, values: Record<string, un
     .where('auth_status', '=', identity.auth_status)
     .where('access_token', tokens.access_token == null ? 'is' : '=', tokens.access_token)
     .where('refresh_token', tokens.refresh_token == null ? 'is' : '=', tokens.refresh_token)
+    .where('insights_access_token', tokens.insights_access_token == null ? 'is' : '=', tokens.insights_access_token)
 }
 
 /**
@@ -58,6 +59,7 @@ export async function openIdentityRow<T>(row: T | undefined): Promise<T | undefi
   tokenSnapshots.set(opened, {
     access_token: typeof opened.access_token === 'string' ? opened.access_token : null,
     refresh_token: typeof opened.refresh_token === 'string' ? opened.refresh_token : null,
+    insights_access_token: typeof opened.insights_access_token === 'string' ? opened.insights_access_token : null,
   })
   for (const column of TOKEN_COLUMNS) {
     if (typeof opened[column] !== 'string')
@@ -95,7 +97,7 @@ export function sealStoredTokens(): Promise<number> {
     const rows = await database
       .selectFrom('social_identities')
       .select(['id', ...TOKEN_COLUMNS])
-      .execute() as Array<{ id: number, access_token: string | null, refresh_token: string | null }>
+      .execute() as Array<{ id: number } & TokenColumns>
 
     let rewritten = 0
     for (const row of rows) {
@@ -109,6 +111,7 @@ export function sealStoredTokens(): Promise<number> {
         .where('id', '=', row.id)
         .where('access_token', row.access_token == null ? 'is' : '=', row.access_token)
         .where('refresh_token', row.refresh_token == null ? 'is' : '=', row.refresh_token)
+        .where('insights_access_token', row.insights_access_token == null ? 'is' : '=', row.insights_access_token)
         .returning('id')
         .executeTakeFirst()
       if (updated) rewritten++
@@ -251,10 +254,11 @@ export async function revokeIdentityRow(provider: string, identityId: number): P
     is_default: false,
     access_token: null,
     refresh_token: null,
+    insights_access_token: null,
     token_expires_at: null,
   }).where('id', '=', row.id).execute()
 
-  return { ...row, auth_status: 'revoked', access_token: null }
+  return { ...row, auth_status: 'revoked', access_token: null, refresh_token: null, insights_access_token: null }
 }
 
 /**

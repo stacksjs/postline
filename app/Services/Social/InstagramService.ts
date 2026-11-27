@@ -26,6 +26,7 @@ type SocialIdentityRow = {
   auth_status: 'connected' | 'expired' | 'revoked' | 'missing'
   access_token?: string | null
   refresh_token?: string | null
+  insights_access_token?: string | null
   token_expires_at?: string | null
   account_id?: number | null
   social_driver_id?: number | null
@@ -44,6 +45,8 @@ interface InstagramConfig {
   clientSecret: string
   redirectUrl: string
   accessToken: string
+  insightsAccessToken: string
+  engagementMetrics: boolean
   userId: string
   username: string
   scopes: string[]
@@ -71,6 +74,8 @@ export class InstagramService {
       clientSecret: app.clientSecret,
       redirectUrl: app.redirectUrl,
       accessToken: String(env.INSTAGRAM_ACCESS_TOKEN || '').trim(),
+      insightsAccessToken: String(env.INSTAGRAM_INSIGHTS_ACCESS_TOKEN || '').trim(),
+      engagementMetrics: app.engagementMetrics,
       userId: String(env.INSTAGRAM_USER_ID || '').trim(),
       username: String(env.INSTAGRAM_USERNAME || '').trim(),
       // The messaging permissions are not asked for: the
@@ -176,6 +181,7 @@ export class InstagramService {
     const account = await this.driver.resolveAccount(userToken)
     const identity = await this.saveSession({
       accessToken: account.pageAccessToken,
+      insightsAccessToken: cfg.engagementMetrics ? userToken : undefined,
       igUserId: account.igUserId,
       username: account.username,
     })
@@ -196,14 +202,21 @@ export class InstagramService {
     let igUserId = cfg.userId
     let username = cfg.username || undefined
     let pageAccessToken = cfg.accessToken
+    let insightsAccessToken = cfg.insightsAccessToken
     if (!igUserId) {
       const account = await this.driver.resolveAccount(cfg.accessToken)
       igUserId = account.igUserId
       username = account.username
       pageAccessToken = account.pageAccessToken
+      insightsAccessToken ||= cfg.accessToken
     }
 
-    const identity = await this.saveSession({ accessToken: pageAccessToken, igUserId, username }, { revive: options.revive ?? true })
+    const identity = await this.saveSession({
+      accessToken: pageAccessToken,
+      insightsAccessToken: cfg.engagementMetrics ? insightsAccessToken : undefined,
+      igUserId,
+      username,
+    }, { revive: options.revive ?? true })
     return this.publicIdentity(identity)
   }
 
@@ -308,11 +321,15 @@ export class InstagramService {
 
   async syncMetrics(limit = 100) {
     if (!(await networkApps.credentials('instagram')).engagementMetrics) return { synced: 0 }
-    return await syncConnectedMetrics<SocialIdentityRow>('instagram', this.driver, identity => ({
-      handle: identity.handle,
-      did: identity.external_id || undefined,
-      accessToken: identity.access_token || undefined,
-    }), limit)
+    return await syncConnectedMetrics<SocialIdentityRow>('instagram', this.driver, (identity) => {
+      if (!identity.insights_access_token)
+        throw new UserFacingError('Reconnect Instagram in Channels to grant access to engagement metrics.')
+      return {
+        handle: identity.handle,
+        did: identity.external_id || undefined,
+        accessToken: identity.insights_access_token,
+      }
+    }, limit)
   }
 
   /**
@@ -343,7 +360,7 @@ export class InstagramService {
    * id: reconnecting an account refreshes its row, a different one is added.
    */
   private async saveSession(
-    input: { accessToken: string, igUserId: string, username?: string },
+    input: { accessToken: string, insightsAccessToken?: string, igUserId: string, username?: string },
     options: { revive?: boolean } = {},
   ): Promise<SocialIdentityRow> {
     const accountId = await ensureAccount()
@@ -358,6 +375,7 @@ export class InstagramService {
       auth_status: 'connected',
       access_token: input.accessToken,
       refresh_token: null,
+      insights_access_token: input.insightsAccessToken || null,
       token_expires_at: null,
       account_id: accountId,
       social_driver_id: driver.id,

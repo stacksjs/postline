@@ -90,6 +90,14 @@ export default defineModel({
       validation: { rule: schema.string().max(4000).optional() },
       factory: () => null,
     },
+    /** Facebook User token for Instagram Insights. Publishing uses the Page token. */
+    insightsAccessToken: {
+      required: false,
+      hidden: true,
+      fillable: true,
+      validation: { rule: schema.string().max(4000).optional() },
+      factory: () => null,
+    },
     tokenExpiresAt: {
       required: false,
       hidden: true,

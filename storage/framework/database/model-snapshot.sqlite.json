@@ -1920,6 +1920,14 @@
             "isNullable": true,
             "hasDefault": true,
             "defaultValue": false
+          },
+          {
+            "name": "insights_access_token",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
           }
         ],
         "indexes": [
@@ -2766,7 +2774,7 @@
       }
     ]
   },
-  "hash": "f89edf2ee1dfbefba9c6439f5a15c4b3e18965d59a2ffa72ae2148865d00695c",
+  "hash": "264b200042f97350d53f9e32146d2f88cf6bf492f8c76fd4e9461096c08e4e69",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-27T01:22:07.097Z"
+  "updatedAt": "2026-11-27T01:45:49.073Z"
 }

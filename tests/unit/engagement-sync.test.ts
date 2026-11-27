@@ -6,6 +6,7 @@ import { describe, expect, spyOn, test } from 'bun:test'
 import { db } from '@stacksjs/database'
 import { networkApps } from '../../app/Services/NetworkAppService'
 import { bluesky } from '../../app/Services/Social/BlueskyService'
+import { InstagramDriver } from '../../app/Services/Social/Drivers/InstagramDriver'
 import { ThreadsDriver } from '../../app/Services/Social/Drivers/ThreadsDriver'
 import { syncEngagement } from '../../app/Services/Social/EngagementService'
 import { instagram } from '../../app/Services/Social/InstagramService'
@@ -131,6 +132,7 @@ describe('optional engagement drivers', () => {
     async function observedPost(provider: keyof typeof services, account: string, uri: string, previous: object | null = null, legacy = false): Promise<number> {
       const row = await upsertIdentityRow(provider, { externalId: account }, {
         handle: account, external_id: account, auth_status: 'connected', access_token: 'test-' + account,
+        ...(provider === 'instagram' ? { insights_access_token: 'insights-' + account } : {}),
       })
       const id = Number(row.id)
       identities.push(id)
@@ -182,7 +184,7 @@ describe('optional engagement drivers', () => {
         synced: 3,
         errors: [{ provider: 'threads', explanation: expect.stringContaining('read engagement metrics') }],
       })
-      expect(requests.map(({ authorization }) => authorization).sort()).toEqual(['400', '402', '600', '602', 'urn:li:organization:500'].map(account => 'Bearer test-' + account))
+      expect(requests.map(({ authorization }) => authorization).sort()).toEqual(['Bearer insights-400', 'Bearer insights-402', 'Bearer test-600', 'Bearer test-602', 'Bearer test-urn:li:organization:500'])
       expect(requests.some(({ url }) => url.searchParams.get('ids') === 'List(urn:li:share:501)')).toBe(true)
       expect(await savedCounts(ig!)).toMatchObject({ likes: 3, replies: 1 })
       expect(await savedCounts(ig!)).not.toHaveProperty('reposts')
@@ -200,6 +202,44 @@ describe('optional engagement drivers', () => {
       }
       if (identities.length) await database.deleteFrom('social_identities').where('id', 'in', identities).execute()
       for (const { provider } of sources) await networkApps.clear(provider)
+    }
+  })
+
+  test('Instagram OAuth keeps the Page token for publishing and the User token for Insights', async () => {
+    const exchange = spyOn(InstagramDriver.prototype, 'exchangeCode').mockResolvedValue({ accessToken: 'short-user-token' })
+    const longLived = spyOn(InstagramDriver.prototype, 'exchangeLongLivedUserToken').mockResolvedValue({ accessToken: 'long-user-token' })
+    const profile = spyOn(InstagramDriver.prototype, 'resolveAccount').mockResolvedValue({ igUserId: '801', pageAccessToken: 'page-publish-token' })
+    const publish = spyOn(InstagramDriver.prototype, 'publish').mockResolvedValue({ provider: 'instagram', uri: '802' })
+    const metrics = spyOn(InstagramDriver.prototype, 'metrics').mockResolvedValue([{ uri: '802', likes: 6 }])
+    let id: number | undefined
+    let postId: number | undefined
+    try {
+      await networkApps.save('instagram', { clientId: 'test-client', clientSecret: 'test-secret', engagementMetrics: true })
+      const state = new URL(await instagram.getAuthUrl()).searchParams.get('state')!
+      const identity = await instagram.handleCallback('test-code', state)
+      if (!identity.id) throw new Error('Instagram did not return its connected account.')
+      id = identity.id
+      const draft = await postQueue.save({ text: 'A post for the Insights test', providers: [`instagram:${id}`] })
+      postId = draft.postId
+      const result = await instagram.publishToPost({ id: postId, body: 'A post for the Insights test' }, { media: [{ url: 'https://example.test/image.jpg' }] }, id)
+      expect(result.ok).toBe(true)
+      expect(publish.mock.calls[0]?.[0].accessToken).toBe('page-publish-token')
+      expect(await instagram.syncMetrics()).toEqual({ synced: 1 })
+      expect(metrics.mock.calls[0]?.[0].accessToken).toBe('long-user-token')
+
+      const stored = await database.selectFrom('social_identities').select('insights_access_token').where('id', '=', id).executeTakeFirstOrThrow()
+      expect(stored.insights_access_token).toStartWith('enc:v1:')
+      await revokeIdentityRow('instagram', id)
+      expect((await database.selectFrom('social_identities').select('insights_access_token').where('id', '=', id).executeTakeFirstOrThrow()).insights_access_token).toBeNull()
+    }
+    finally {
+      for (const mocked of [exchange, longLived, profile, publish, metrics]) mocked.mockRestore()
+      if (postId) {
+        await database.deleteFrom('post_targets').where('post_id', '=', postId).execute()
+        await database.deleteFrom('posts').where('id', '=', postId).execute()
+      }
+      if (id) await database.deleteFrom('social_identities').where('id', '=', id).execute()
+      await networkApps.clear('instagram')
     }
   })
 

@@ -32,4 +32,7 @@ Postline asks for `instagram_basic`, `instagram_content_publish`,
 ## Engagement metrics
 
 Grant the app `instagram_manage_insights`, then enable **Read engagement metrics** in its Postline network app settings and reconnect. The connected Facebook account needs permission to analyze the linked Page.
-[Provider documentation](https://developers.facebook.com/docs/insights/overview/).
+Postline stores the Facebook User token for insights separately from the Page
+token it uses to publish. If you connect with a Page token in `.env`, provide
+the Facebook User token in `INSTAGRAM_INSIGHTS_ACCESS_TOKEN`. [Provider
+documentation](https://developers.facebook.com/documentation/instagram-platform/reference/instagram-media/insights).
