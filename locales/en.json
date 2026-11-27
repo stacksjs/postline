@@ -30,6 +30,10 @@
     },
     "commands": {
       "label": "Commands",
+      "title": "Command palette",
+      "shortcuts": "Shortcuts",
+      "shortcutsTitle": "Keyboard shortcuts",
+      "navigation": "Go to view",
       "open": "Open command palette",
       "tooltip": "Commands (Command+K or Ctrl+K)",
       "search": "Search commands",

@@ -45,7 +45,7 @@ function actionable(element: HTMLElement): boolean {
 export function workspaceCommands(dialog: HTMLDialogElement, navigationOnly = false): WorkspaceCommand[] {
   const document = dialog.ownerDocument
   const navigation = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[data-command-destination]'), target => ({
-    label: cleanLabel(target.dataset.commandDestination), context: 'Go to view', shortcut: target.dataset.commandShortcut, target,
+    label: cleanLabel(target.dataset.commandDestination), context: dialog.dataset.commandNavigation, shortcut: target.dataset.commandShortcut, target,
   }))
   // A palette opened above another modal can reach the controls in that
   // modal. The native dialog still prevents access to the page beneath it.

@@ -2,9 +2,16 @@
 import { workspaceCommandsText } from '../../app/Support/Localization/workspace'
 
 export const commandText = workspaceCommandsText
+export const commandModeText = {
+  title: commandText.title,
+  label: commandText.label,
+  shortcuts: commandText.shortcuts,
+  shortcutsTitle: commandText.shortcutsTitle,
+}
 </script>
 
 <script client>
+const modeText = {{ commandModeText }}
 const commandDialog = useRef<HTMLDialogElement>('commandDialog')
 const commandSearch = useRef<HTMLInputElement>('commandSearch')
 const commandResults = useRef('commandResults')
@@ -129,14 +136,15 @@ useEventListener('keydown', handleShortcut)
       class="overflow-hidden p-0 text-ink bg-panel border border-line rounded-2xl shadow-xl"
       aria-labelledby="workspace-commands-title"
       data-command-dialog
+      data-command-navigation="{{ commandText.navigation }}"
       @close="open.set(false)"
       @click="dismissCommands($event)"
     >
       <div class="grid gap-3 p-4">
         <header class="flex gap-3 items-center justify-between">
-          <h2 class="m-0 font-semibold text-base" id="workspace-commands-title" :text="sheet() ? 'Keyboard shortcuts' : 'Command palette'">Command palette</h2>
+          <h2 class="m-0 font-semibold text-base" id="workspace-commands-title" :text="sheet() ? modeText.shortcutsTitle : modeText.title">{{ commandText.title }}</h2>
           <div class="flex gap-2 items-center">
-            <button class="px-2 h-9 text-muted text-xs hover:bg-panel-2 rounded-lg" type="button" :text="sheet() ? 'Commands' : 'Shortcuts'" @click="sheet.set(!sheet())">Shortcuts</button>
+            <button class="px-2 h-9 text-muted text-xs hover:bg-panel-2 rounded-lg" type="button" :text="sheet() ? modeText.label : modeText.shortcuts" @click="sheet.set(!sheet())">{{ commandText.shortcuts }}</button>
             <button class="grid place-items-center h-9 w-9 text-muted bg-panel-2 hover:bg-raised rounded-xl" type="button" aria-label="{{ commandText.close }}" autofocus @click="closeCommands">
               <span class="h-5 w-5 i-hugeicons-cancel-01" aria-hidden="true"></span>
             </button>
