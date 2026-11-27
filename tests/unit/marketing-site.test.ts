@@ -42,9 +42,9 @@ describe('the marketing site is served only where asked for (#222)', () => {
     expect(readFileSync(join(root, 'config/email.ts'), 'utf8')).toContain('signup: isMarketingSite()')
   })
 
-  test('the Mac app builds no marketing page', () => {
+  test('the Mac app omits generated marketing pages by route', () => {
     const build = readFileSync(join(root, 'app/Desktop/build-views.ts'), 'utf8')
-    expect(build).toContain(`excludeDirs: ['features', 'use-cases']`)
-    expect(build).toContain('for (const path of marketingPaths())')
+    expect(build).toContain('new Set(marketingPaths())')
+    expect(build).toContain('if (marketing.has(page.route)) rmSync(page.outputPath)')
   })
 })

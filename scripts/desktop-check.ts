@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { appBundleFiles, appClientScripts, appConfigFiles, appMigrationFiles } from '@stacksjs/actions/build/macos-native'
-import { desktopLauncherCompileArgs, renderWebviewEntry } from '@stacksjs/desktop-build'
+import { collectViewFiles, desktopLauncherCompileArgs, renderWebviewEntry } from '@stacksjs/desktop-build'
 import desktop from '../config/desktop'
 
 const root = join(import.meta.dir, '..')
@@ -17,13 +17,16 @@ const { appName, appId, window, agent } = desktop.webview
 
 try {
   const agentEntry = join(root, agent.entry)
+  const views = join(scratch, 'views')
+  const buildViews = Bun.spawn([process.execPath, 'app/Desktop/build-views.ts'], {
+    cwd: root, env: { ...process.env, DESKTOP_VIEWS_OUT: views }, stdout: 'inherit', stderr: 'inherit',
+  })
+  if (await buildViews.exited !== 0) throw new Error('Could not build the bundled desktop views.')
   const [app, scripts, migrations] = await Promise.all([
     appBundleFiles(root, [agentEntry]),
     appClientScripts(root, join(scratch, 'client-scripts')),
     appMigrationFiles(root),
   ])
-  const composer = join(scratch, 'composer.html')
-  writeFileSync(composer, '<!doctype html><title>Postline compiled desktop check</title>')
   const entry = join(scratch, 'entry.ts')
   writeFileSync(entry, renderWebviewEntry({
     manifest: {
@@ -37,7 +40,7 @@ try {
     agentEntry,
     prepareEntry: join(root, agent.prepare),
     ...app,
-    viewFiles: { '/composer': composer, ...scripts },
+    viewFiles: { ...collectViewFiles(views), ...scripts },
     migrations,
     databaseFilename: agent.database.filename,
     configFiles: appConfigFiles(root),

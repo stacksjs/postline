@@ -6,8 +6,6 @@ import process from 'node:process'
 import { desktopAppPaths, runWebviewApp as launch } from '@stacksjs/desktop-build'
 import { WORKSPACE_KEY_ID_FILE, WORKSPACE_KEY_SERVICE } from '../../app/Desktop/keychain'
 
-const composerFixture = 'Postline compiled desktop check'
-
 export async function runWebviewApp(options: RunWebviewAppOptions): Promise<number> {
   const testHome = process.cwd()
   const paths = desktopAppPaths('Postline Desktop Check', { home: testHome, env: {} })
@@ -97,7 +95,24 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   }
 
   const page = await call('GET', '/composer')
-  check('a page is left to the built views', page.status === 200 && page.text.includes(composerFixture), `${page.status} ${page.type}`)
+  check('Composer comes from the built views', page.status === 200 && page.text.includes('data-testid="composer-page"'), `${page.status} ${page.type}`)
+  const settings = await call('GET', '/settings')
+  check('Settings comes from the built views', settings.status === 200 && settings.text.includes('data-testid="settings-page"'), `${settings.status} ${settings.type}`)
+  const hasCsrfBootstrap = (source: string): boolean => source.includes('/api/csrf') && source.includes('X-CSRF-Token')
+  async function bootstrapsCsrf(html: string): Promise<boolean> {
+    if (hasCsrfBootstrap(html)) return true
+    for (const [, path] of html.matchAll(/<script\b[^>]*\bsrc="(\/_stx\/[^" ]+)"/g)) {
+      const script = await call('GET', path!)
+      if (script.status === 200 && hasCsrfBootstrap(script.text)) return true
+    }
+    return false
+  }
+  check('Composer bootstraps CSRF protection', await bootstrapsCsrf(page.text))
+  check('Settings bootstraps CSRF protection', await bootstrapsCsrf(settings.text))
+  const analytics = await call('GET', '/analytics')
+  check('the desktop Analytics view survives its marketing namesake', analytics.status === 200 && analytics.text.includes('data-testid="analytics-page"'))
+  const marketing = await call('GET', '/features/analytics')
+  check('the desktop does not serve the marketing Analytics page', marketing.status !== 200)
 
   const front = await call('GET', '/')
   check('the landing page sends the window to the workspace', front.status === 302)
