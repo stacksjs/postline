@@ -31,3 +31,7 @@ export const workspaceAnalyticsLinksText = workspaceI18n.tm('workspace.analytics
 export const workspaceWritingText = workspaceI18n.tm('workspace.writing') as typeof en.workspace.writing
 export const workspaceInboxText = workspaceI18n.tm('workspace.inbox') as typeof en.workspace.inbox
 export const workspaceInboxPublicText = workspaceI18n.tm('workspace.inboxPublic') as typeof en.workspace.inboxPublic
+export const workspaceChannelsText = workspaceI18n.tm('workspace.channels') as typeof en.workspace.channels
+export const workspaceChannelCardText = workspaceI18n.tm('workspace.channelCard') as typeof en.workspace.channelCard
+export const workspaceInstagramPagePickerText = workspaceI18n.tm('workspace.instagramPagePicker') as typeof en.workspace.instagramPagePicker
+export const workspaceXBrowserSessionText = workspaceI18n.tm('workspace.xBrowserSession') as typeof en.workspace.xBrowserSession

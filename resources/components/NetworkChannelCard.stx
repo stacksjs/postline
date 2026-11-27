@@ -1,4 +1,17 @@
+<script server cache>
+import { workspaceChannelCardText, workspaceLocale } from '../../app/Support/Localization/workspace'
+
+export const channelCardText = workspaceChannelCardText
+export const channelCardClient = { locale: workspaceLocale, messages: workspaceChannelCardText }
+</script>
+
 <script client>
+import { createI18n } from '@stacksjs/i18n/client'
+const { locale: language, messages: copy } = {{ channelCardClient }}
+const words = createI18n({ locale: language, messages: { [language]: copy } })
+const numbers = new Intl.NumberFormat(language)
+const plural = new Intl.PluralRules(language)
+
 const provider = useReactiveProp('provider', '')
 const guide = useReactiveProp('guide', null, { parse: value => value })
 const bootstrap = workspaceBootstrapQuery()
@@ -14,37 +27,37 @@ const status = derived(() => bootstrap.data()?.providers.find(item => item.provi
 const accounts = derived(() => bootstrap.data()?.accounts.filter(account => account.provider === provider()) ?? [])
 const disconnectTitle = derived(() => {
   const account = accounts().find(item => item.id === disconnectId())
-  return account ? `Disconnect ${channelHandle(account.handle)}?` : 'Disconnect account?'
+  return account ? words.t('disconnectTitle', { handle: channelHandle(account.handle) }) : copy.disconnectAccount
 })
 const blog = derived(() => provider() === 'blog')
 const manual = derived(() => provider() === 'bluesky' || provider() === 'mastodon')
 const connected = derived(() => Boolean(status()?.canPublish))
 const pill = derived(() => {
-  if (connected()) return blog() ? 'Ready' : 'Connected'
-  if (blog()) return 'Disabled'
-  return status()?.handle ? 'Reconnect' : 'Setup'
+  if (connected()) return blog() ? copy.ready : copy.connected
+  if (blog()) return copy.disabled
+  return status()?.handle ? copy.reconnect : copy.setup
 })
 const summary = derived(() => {
-  if (blog()) return 'Built into Postline'
+  if (blog()) return copy.builtIn
   const total = accounts().length
-  if (total > 1) return `${total} accounts connected`
-  return status()?.handle ? channelHandle(status()!.handle!) : 'Not connected'
+  if (total > 1) return words.t('accountCount', { count: numbers.format(total) })
+  return status()?.handle ? channelHandle(status()!.handle!) : copy.notConnected
 })
 const detail = derived(() => {
-  if (blog()) return 'Publish long-form posts to your site without another account.'
+  if (blog()) return copy.blogDescription
   if (provider() === 'bluesky')
-    return connected() ? 'Ready to publish and sync your timeline.' : 'Add an app password to publish and sync your timeline.'
+    return connected() ? copy.blueskyConnected : copy.blueskyDescription
   if (provider() === 'mastodon')
-    return connected() ? 'Ready to publish from Postline.' : 'Connect any Mastodon instance with an access token.'
+    return connected() ? copy.publishReady : copy.mastodonDescription
   if (provider() === 'instagram')
-    return connected() ? 'Ready to publish images.' : 'Connect an Instagram professional account. Posts require an image.'
+    return connected() ? copy.instagramConnected : copy.instagramDescription
   if (provider() === 'twitter')
-    return connected() ? 'Ready to publish on X.' : 'Connect X to publish with the API. X charges per post.'
-  return connected() ? 'Ready to publish from Postline.' : `Connect ${name()} to publish from Postline.`
+    return connected() ? copy.xConnected : copy.xDescription
+  return connected() ? copy.publishReady : words.t('connectToPublish', { network: name() })
 })
 const connectLabel = derived(() => {
-  if (connected()) return manual() ? 'Add or reconnect account' : 'Connect another account'
-  return status()?.handle ? `Reconnect ${name()}` : `Connect ${name()}`
+  if (connected()) return manual() ? copy.addOrReconnect : copy.addAccount
+  return status()?.handle ? words.t('reconnectNetwork', { network: name() }) : words.t('connectNetwork', { network: name() })
 })
 
 function channelHandle(handle: string): string {
@@ -54,10 +67,10 @@ function channelHandle(handle: string): string {
 
 function expiryLabel(expiresAt: string | null): string {
   const hours = Math.round((Date.parse(expiresAt || '') - Date.now()) / 3_600_000)
-  if (!Number.isFinite(hours)) return 'Expires soon'
-  if (hours <= 0) return 'Expired'
-  if (hours < 48) return `Expires in ${hours} hour${hours === 1 ? '' : 's'}`
-  return `Expires in ${Math.round(hours / 24)} days`
+  if (!Number.isFinite(hours)) return copy.expiresSoon
+  if (hours <= 0) return copy.expired
+  if (hours < 48) return words.t(plural.select(hours) === 'one' ? 'hourLeft' : 'hoursLeft', { count: numbers.format(hours) })
+  return words.t('daysLeft', { count: numbers.format(Math.round(hours / 24)) })
 }
 
 function showMessage(text: string, error = false) {
@@ -72,14 +85,14 @@ async function connect(event?: SubmitEvent) {
   showMessage('')
   try {
     const body = form instanceof HTMLFormElement ? new FormData(form) : undefined
-    await requestJson(`/api/postline/${provider()}/connect`, { method: 'POST', body }, `Could not connect ${name()}.`)
+    await requestJson(`/api/postline/${provider()}/connect`, { method: 'POST', body }, words.t('connectFailed', { network: name() }))
     await bootstrap.load()
     if (form instanceof HTMLFormElement) {
       const token = form.elements.namedItem('access_token')
       if (token instanceof HTMLInputElement) token.value = ''
       else form.reset()
     }
-    showMessage(`${name()} connected.`)
+    showMessage(words.t('connectSuccess', { network: name() }))
   }
   catch (error) {
     showMessage(error instanceof Error ? error.message : String(error), true)
@@ -100,14 +113,14 @@ async function updateAccount(id: number, action: 'default' | 'disconnect') {
       await disconnectSocialAccount(id)
       disconnectDialog.current?.close()
       await bootstrap.load()
-      showMessage(`${channelHandle(account.handle)} disconnected.`)
+      showMessage(words.t('disconnected', { handle: channelHandle(account.handle) }))
     }
     else {
       const body = new FormData()
       body.set('id', String(id))
-      await requestJson('/api/postline/accounts/default', { method: 'POST', body }, 'Could not change the default account.')
+      await requestJson('/api/postline/accounts/default', { method: 'POST', body }, copy.defaultFailed)
       await bootstrap.load()
-      showMessage(`${channelHandle(account.handle)} is the default account.`)
+      showMessage(words.t('defaultSuccess', { handle: channelHandle(account.handle) }))
     }
   }
   catch (error) {
@@ -141,43 +154,43 @@ function confirmDisconnect(id: number) {
         <li class="grid gap-1.5 p-2 bg-panel-2 border border-line rounded-xl" x-for="account in accounts()" :key="account.id">
           <div class="flex flex-wrap gap-1.5 items-center justify-between">
             <span class="max-w-full min-w-0 text-ink text-xs truncate" :title="account.displayName || channelHandle(account.handle)" :text="channelHandle(account.handle)"></span>
-            <Badge size="sm" :variant="account.connected && !account.expiresSoon ? 'success' : 'warning'">{{ !account.connected ? 'Reconnect' : account.expiresSoon ? expiryLabel(account.expiresAt) : 'Connected' }}</Badge>
+            <Badge size="sm" :variant="account.connected && !account.expiresSoon ? 'success' : 'warning'">{{ !account.connected ? copy.reconnect : account.expiresSoon ? expiryLabel(account.expiresAt) : copy.connected }}</Badge>
           </div>
           <div class="flex flex-wrap gap-2 justify-end">
-            <span class="mr-auto text-muted text-xs" x-show="account.isDefault && accounts().length > 1">Default</span>
-            <button class="text-muted text-xs underline hover:text-ink disabled:opacity-50" type="button" :disabled="Boolean(busyAccount())" x-show="account.connected && !account.isDefault && accounts().length > 1" :aria-label="`Publish to ${channelHandle(account.handle)} by default`" @click="updateAccount(account.id, 'default')">Make default</button>
-            <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50" type="button" :disabled="Boolean(busyAccount())" :aria-label="`Disconnect ${channelHandle(account.handle)}`" @click="confirmDisconnect(account.id)">Disconnect</button>
+            <span class="mr-auto text-muted text-xs" x-show="account.isDefault && accounts().length > 1">{{ channelCardText.default }}</span>
+            <button class="text-muted text-xs underline hover:text-ink disabled:opacity-50" type="button" :disabled="Boolean(busyAccount())" x-show="account.connected && !account.isDefault && accounts().length > 1" :aria-label="words.t('defaultLabel', { handle: channelHandle(account.handle) })" @click="updateAccount(account.id, 'default')">{{ channelCardText.makeDefault }}</button>
+            <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50" type="button" :disabled="Boolean(busyAccount())" :aria-label="words.t('disconnectLabel', { handle: channelHandle(account.handle) })" @click="confirmDisconnect(account.id)">{{ channelCardText.disconnect }}</button>
           </div>
         </li>
       </ul>
     </div>
     <div class="grid gap-2">
-      <a class="inline-flex items-center justify-center h-9 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl" href="/writing" data-stx-link x-show="blog()">Open Blog</a>
+      <a class="inline-flex items-center justify-center h-9 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl" href="/writing" data-stx-link x-show="blog()">{{ channelCardText.openBlog }}</a>
       <div class="grid gap-2" x-show="!manual() && !blog()">
         <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="button" :disabled="!status()?.oauthConfigured || sending()" :text="connectLabel()" @click="navigate('/api/postline/' + provider() + '/auth', { reload: true })"></button>
-        <p class="m-0 text-muted text-xs" x-show="!status()?.oauthConfigured">Set up this app under Your network apps to sign in.</p>
-        <button class="text-muted text-xs underline hover:text-ink disabled:opacity-50" type="button" :disabled="sending()" x-show="status()?.configuredFromEnv" @click="connect()">Use configured token</button>
+        <p class="m-0 text-muted text-xs" x-show="!status()?.oauthConfigured">{{ channelCardText.setUpApp }}</p>
+        <button class="text-muted text-xs underline hover:text-ink disabled:opacity-50" type="button" :disabled="sending()" x-show="status()?.configuredFromEnv" @click="connect()">{{ channelCardText.configuredToken }}</button>
       </div>
       <details x-show="manual()">
-        <summary class="inline-flex items-center justify-center h-9 w-full font-semibold list-none text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl cursor-pointer" :text="'Manage ' + name()"></summary>
-        <ol class="grid gap-1 mb-0 mt-3 pl-5 text-body text-xs">
+        <summary class="inline-flex items-center justify-center h-9 w-full font-semibold list-none text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl cursor-pointer" :text="words.t('manage', { network: name() })"></summary>
+        <ol class="grid gap-1 mb-0 mt-3 pl-5 text-body text-xs" lang="en">
           <li x-for="step in guide()?.steps ?? []" :text="step"></li>
         </ol>
-        <a class="inline-block mt-2 text-info text-xs underline" :href="guide()?.url" :aria-label="'Full ' + name() + ' setup guide'" target="_blank" rel="noopener noreferrer" x-show="guide()">Full setup guide</a>
+        <a class="inline-block mt-2 text-info text-xs underline" :href="guide()?.url" :aria-label="words.t('guideLabel', { network: name() })" target="_blank" rel="noopener noreferrer" x-show="guide()">{{ channelCardText.guide }}</a>
         <form class="grid gap-2 pt-3" @submit.prevent="connect($event)">
-          <input class="px-3 h-9 text-ink text-xs bg-raised border border-field-line rounded-xl" :name="provider() === 'bluesky' ? 'identifier' : 'instance'" :placeholder="provider() === 'bluesky' ? 'name.bsky.social' : 'mastodon.social'" :autocomplete="provider() === 'bluesky' ? 'username' : 'url'" :aria-label="provider() === 'bluesky' ? 'Bluesky handle' : 'Mastodon instance'" :value="provider() === 'mastodon' ? status()?.instance : null" required>
-          <input class="px-3 h-9 text-ink text-xs bg-raised border border-field-line rounded-xl" type="password" :name="provider() === 'bluesky' ? 'password' : 'access_token'" :placeholder="provider() === 'bluesky' ? 'App password' : 'Access token'" :autocomplete="provider() === 'bluesky' ? 'current-password' : 'off'" :aria-label="provider() === 'bluesky' ? 'Bluesky app password' : 'Mastodon access token'" required>
-          <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="submit" :disabled="sending()" :text="sending() ? 'Connecting…' : connectLabel()"></button>
+          <input class="px-3 h-9 text-ink text-xs bg-raised border border-field-line rounded-xl" :name="provider() === 'bluesky' ? 'identifier' : 'instance'" :placeholder="provider() === 'bluesky' ? 'name.bsky.social' : 'mastodon.social'" :autocomplete="provider() === 'bluesky' ? 'username' : 'url'" :aria-label="provider() === 'bluesky' ? copy.blueskyHandle : copy.mastodonInstance" :value="provider() === 'mastodon' ? status()?.instance : null" required>
+          <input class="px-3 h-9 text-ink text-xs bg-raised border border-field-line rounded-xl" type="password" :name="provider() === 'bluesky' ? 'password' : 'access_token'" :placeholder="provider() === 'bluesky' ? copy.password : copy.token" :autocomplete="provider() === 'bluesky' ? 'current-password' : 'off'" :aria-label="provider() === 'bluesky' ? copy.blueskyPassword : copy.mastodonToken" required>
+          <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="submit" :disabled="sending()" :text="sending() ? copy.connecting : connectLabel()"></button>
         </form>
       </details>
       <p class="m-0 text-xs" role="status" x-show="message()" :class="failed() ? 'text-danger' : 'text-success'" :text="message()"></p>
     </div>
     <dialog ref="disconnectDialog" class="p-4 max-w-[22rem] text-ink bg-panel border border-line rounded-xl shadow-xl" :aria-labelledby="'disconnect-' + provider()" data-channel-confirmation>
       <h3 class="m-0 font-semibold" :id="'disconnect-' + provider()" :text="disconnectTitle()"></h3>
-      <p class="mt-2 text-body text-sm">Scheduled posts for this account will fail until it is connected again. Published posts are kept.</p>
+      <p class="mt-2 text-body text-sm">{{ channelCardText.disconnectWarning }}</p>
       <form method="dialog" class="flex gap-2 justify-end">
-        <button class="px-3 h-9 font-semibold text-ink text-xs bg-panel-2 rounded-lg" type="submit" autofocus>Cancel</button>
-        <button class="px-3 h-9 font-semibold text-on-accent text-xs bg-danger-solid rounded-lg disabled:opacity-50" type="button" :disabled="Boolean(busyAccount())" @click="updateAccount(disconnectId(), 'disconnect')">Disconnect</button>
+        <button class="px-3 h-9 font-semibold text-ink text-xs bg-panel-2 rounded-lg" type="submit" autofocus>{{ channelCardText.cancel }}</button>
+        <button class="px-3 h-9 font-semibold text-on-accent text-xs bg-danger-solid rounded-lg disabled:opacity-50" type="button" :disabled="Boolean(busyAccount())" @click="updateAccount(disconnectId(), 'disconnect')">{{ channelCardText.disconnect }}</button>
       </form>
     </dialog>
   </article>

@@ -1,7 +1,20 @@
+<script server cache>
+import { workspaceXBrowserSessionText, workspaceLocale } from '../../app/Support/Localization/workspace'
+
+export const xBrowserSessionText = workspaceXBrowserSessionText
+export const xBrowserSessionClient = { locale: workspaceLocale, messages: workspaceXBrowserSessionText }
+</script>
+
 <script client>
+import { createI18n } from '@stacksjs/i18n/client'
 import type { XBrowserWindow } from '../functions/x-browser-session'
 import { requestJson } from '../functions/postline-client'
 import { openXBrowser, readXBrowserSession, xBrowserWindow } from '../functions/x-browser-session'
+
+const { locale: language, messages: copy } = {{ xBrowserSessionClient }}
+const words = createI18n({ locale: language, messages: { [language]: copy } })
+const numbers = new Intl.NumberFormat(language)
+const plural = new Intl.PluralRules(language)
 
 const xSessionDesktop = useNativeDesktop()
 const xBrowser = state<XBrowserWindow | null>(null)
@@ -14,11 +27,11 @@ const xSessionEndpoint = '/api/postline/twitter/browser-session'
 
 async function loadSession() {
   try {
-    const { data } = await requestJson(xSessionEndpoint, { cache: 'no-store' }, 'Could not load the X browser session.')
+    const { data } = await requestJson(xSessionEndpoint, { cache: 'no-store' }, copy.loadFailed)
     xSession.set(data)
   }
   catch (error) {
-    xSessionFeedback.set(error instanceof Error ? error.message : 'Could not load the X browser session.')
+    xSessionFeedback.set(error instanceof Error ? error.message : copy.loadFailed)
   }
 }
 
@@ -36,10 +49,10 @@ async function openSession() {
   xSessionBusy.set(true)
   try {
     await openXBrowser(windowApi, current.profile)
-    xSessionFeedback.set('Return here and select Check sign-in after signing in or out on X.')
+    xSessionFeedback.set(copy.openHelp)
   }
   catch {
-    xSessionFeedback.set('Could not open X. Browser sessions require macOS 14 or later.')
+    xSessionFeedback.set(copy.openFailed)
   }
   finally {
     xSessionBusy.set(false)
@@ -49,8 +62,8 @@ async function openSession() {
 async function returnToX(browser: XBrowserWindow, profile: string, reason: 'needs-attention' | 'signed-out') {
   xSessionNeedsCheck.set(true)
   xSessionFeedback.set(reason === 'needs-attention'
-    ? 'X needs your attention. Complete the check in X, then select Check sign-in.'
-    : 'Sign in to X, then select Check sign-in before importing again.')
+    ? copy.attention
+    : copy.signInFirst)
   await openXBrowser(browser, profile).catch(() => {})
 }
 
@@ -66,18 +79,18 @@ async function checkSignIn() {
       return
     }
     if (status.state === 'unavailable') {
-      xSessionFeedback.set('Open X and wait for the page to finish loading before checking again.')
+      xSessionFeedback.set(copy.checkReady)
       return
     }
 
     const body = status.state === 'connected' ? { handle: status.handle } : { signed_out: true }
-    const { data } = await requestJson(xSessionEndpoint, { method: 'POST', body: JSON.stringify(body) }, 'Could not save the X sign-in.')
+    const { data } = await requestJson(xSessionEndpoint, { method: 'POST', body: JSON.stringify(body) }, copy.saveFailed)
     xSession.set({ ...current, handle: data.handle })
     xSessionNeedsCheck.set(false)
-    xSessionFeedback.set(data.handle ? `Signed in to X as @${data.handle}.` : 'Signed out of X. Open X to sign in.')
+    xSessionFeedback.set(data.handle ? words.t('signedIn', { handle: data.handle }) : copy.signedOut)
   }
   catch (error) {
-    xSessionFeedback.set(error instanceof Error ? error.message : 'Could not check the X sign-in.')
+    xSessionFeedback.set(error instanceof Error ? error.message : copy.checkFailed)
   }
   finally {
     xSessionBusy.set(false)
@@ -93,10 +106,10 @@ async function readConfirmedSession(browser: XBrowserWindow, profile: string, ha
   if (result.state === 'connected') {
     if (result.handle.toLowerCase() === handle.toLowerCase()) return result
     xSessionNeedsCheck.set(true)
-    xSessionFeedback.set('The X window is signed in to a different account. Select Check sign-in before importing.')
+    xSessionFeedback.set(copy.differentAccount)
     return
   }
-  xSessionFeedback.set('Open X and wait for the page to finish loading before importing.')
+  xSessionFeedback.set(copy.importReady)
 }
 
 async function captureMetrics() {
@@ -110,13 +123,13 @@ async function captureMetrics() {
     const { data } = await requestJson(`${xSessionEndpoint}/metrics`, {
       method: 'POST',
       body: JSON.stringify({ handle: result.handle, measurements: result.measurements }),
-    }, 'Could not save X engagement.')
+    }, copy.saveEngagementFailed)
     xSessionFeedback.set(data.synced
-      ? `Updated ${data.synced} published ${data.synced === 1 ? 'post' : 'posts'} in Analytics.`
-      : 'No visible counts matched your published X posts. Open your profile in the X window and try again.')
+      ? words.t(plural.select(data.synced) === 'one' ? 'metricsOne' : 'metricsMany', { count: numbers.format(data.synced) })
+      : copy.noMatches)
   }
   catch (error) {
-    xSessionFeedback.set(error instanceof Error ? error.message : 'Could not read X engagement.')
+    xSessionFeedback.set(error instanceof Error ? error.message : copy.readEngagementFailed)
   }
   finally {
     xSessionBusy.set(false)
@@ -132,23 +145,23 @@ async function captureListening() {
     const result = await readConfirmedSession(windowApi, current.profile, current.handle, 'listening')
     if (!result) return
     if (result.readIssue === 'layout') {
-      xSessionFeedback.set('Postline could not read this X page. Let Search or Mentions finish loading, then try again.')
+      xSessionFeedback.set(copy.layout)
       return
     }
     if (!result.posts) {
-      xSessionFeedback.set('Open Search or Mentions in the X window first.')
+      xSessionFeedback.set(copy.openMentions)
       return
     }
     const { data } = await requestJson(`${xSessionEndpoint}/listening`, {
       method: 'POST',
       body: JSON.stringify({ handle: result.handle, posts: result.posts }),
-    }, 'Could not import X posts.')
+    }, copy.importFailed)
     xSessionFeedback.set(data.watches
-      ? `Saved ${data.created} new X ${data.created === 1 ? 'mention' : 'mentions'} in Listening.`
-      : 'Create an active Listening watch with X browser session as its source.')
+      ? words.t(plural.select(data.created) === 'one' ? 'mentionsOne' : 'mentionsMany', { count: numbers.format(data.created) })
+      : copy.createWatch)
   }
   catch (error) {
-    xSessionFeedback.set(error instanceof Error ? error.message : 'Could not import X posts.')
+    xSessionFeedback.set(error instanceof Error ? error.message : copy.importFailed)
   }
   finally {
     xSessionBusy.set(false)
@@ -160,15 +173,15 @@ async function captureListening() {
   <section aria-labelledby="x-browser-session-title" :if="xBrowser()">
     <Card padding="sm" className="shadow-sm">
       <div class="grid gap-2">
-        <h2 class="m-0 font-semibold text-ink text-sm" id="x-browser-session-title">X browser session</h2>
-        <p class="m-0 text-body text-xs">Sign in to X in a separate window. WebKit keeps the sign-in on this Mac. X may restrict accounts that use scripted access.</p>
-        <p class="m-0 text-muted text-xs" :show="xSession()?.handle" :text="xSession()?.handle ? 'Last confirmed as @' + xSession().handle : ''"></p>
+        <h2 class="m-0 font-semibold text-ink text-sm" id="x-browser-session-title">{{ xBrowserSessionText.title }}</h2>
+        <p class="m-0 text-body text-xs">{{ xBrowserSessionText.description }}</p>
+        <p class="m-0 text-muted text-xs" :show="xSession()?.handle" :text="xSession()?.handle ? words.t('lastConfirmed', { handle: xSession().handle }) : ''"></p>
         <div class="flex flex-wrap gap-2 items-center">
-          <Button variant="secondary" size="xs" label="Open X" :disabled="!xSession() || xSessionBusy()" @click="openSession" />
-          <Button variant="secondary" size="xs" label="Check sign-in" :disabled="!xSession() || xSessionBusy()" @click="checkSignIn" />
-          <Button variant="secondary" size="xs" label="Read visible engagement" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="captureMetrics" />
-          <Button variant="secondary" size="xs" label="Import visible mentions" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="captureListening" />
-          <a class="text-info text-xs underline" href="https://help.x.com/en/rules-and-policies/x-automation" target="_blank" rel="noopener noreferrer">X automation rules</a>
+          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.open }}" :disabled="!xSession() || xSessionBusy()" @click="openSession" />
+          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.check }}" :disabled="!xSession() || xSessionBusy()" @click="checkSignIn" />
+          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.metrics }}" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="captureMetrics" />
+          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.mentions }}" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="captureListening" />
+          <a class="text-info text-xs underline" href="https://help.x.com/en/rules-and-policies/x-automation" target="_blank" rel="noopener noreferrer">{{ xBrowserSessionText.rules }}</a>
         </div>
         <p class="m-0 text-body text-xs" role="status" :show="xSessionFeedback()" :text="xSessionFeedback()"></p>
       </div>

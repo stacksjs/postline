@@ -1,28 +1,32 @@
 @extends('layouts/app')
 
-@section('title', 'Postline - Settings - Channels')
-
 <script server>
+import { workspaceChannelsText, workspaceLocale } from '../../app/Support/Localization/workspace'
 import { loadNetworkSetupGuides } from '../../app/Support/Social/network-setup-guides'
 
 const networkSetupGuides = await loadNetworkSetupGuides()
+export const channelsLocale = workspaceLocale
+export const channelsText = workspaceChannelsText
+export const channelsClient = { locale: workspaceLocale, messages: workspaceChannelsText }
 </script>
 
+@section('title'){{ channelsText.title }}@endsection
+
 @section('content')
-  @meta('description', 'Connect and manage publishing channels in Postline settings.')
-  <section class="grid gap-4" data-postline-page="accounts" data-testid="accounts-page">
+  @meta('description', channelsText.description)
+  <section class="grid gap-4" data-postline-page="accounts" data-testid="accounts-page" lang="{{ channelsLocale }}">
     <WorkspacePageHeader titleKey="workspace.pages.accounts.title">
-      <template #description><span class="block min-h-5" :text="channelsReady() ? channelProviders().length + (channelProviders().length === 1 ? ' publishing channel' : ' publishing channels') : ''"></span></template>
+      <template #description><span class="block min-h-5" :text="channelSummary()"></span></template>
       <a class="inline-flex gap-2 items-center justify-center px-4 h-9 w-fit font-semibold text-ink text-sm bg-panel hover:bg-raised border border-line rounded-xl shadow-sm transition-colors" :href="returnToSetup() ? '/setup?step=channels' : '/composer'" data-stx-link>
         <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>
-        <span :text="returnToSetup() ? 'Continue setup' : 'Open Composer'">Open Composer</span>
+        <span :text="returnToSetup() ? copy.setup : copy.composer">{{ channelsText.composer }}</span>
       </a>
-      <StxLink class="text-info text-ui underline" to="/listening">Watch brand mentions</StxLink>
+      <StxLink class="text-info text-ui underline" to="/listening">{{ channelsText.listen }}</StxLink>
     </WorkspacePageHeader>
 
-    <nav class="flex gap-1 p-1 w-fit bg-panel-3 border border-line rounded-xl" aria-label="Settings sections">
-      <a class="inline-flex items-center justify-center px-3 h-8 font-semibold text-muted text-xs hover:text-ink rounded-lg transition-colors" href="/settings" data-stx-link data-no-router>General</a>
-      <a class="inline-flex items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel border border-line rounded-lg shadow-sm" href="/accounts" data-stx-link aria-current="page">Channels</a>
+    <nav class="flex gap-1 p-1 w-fit bg-panel-3 border border-line rounded-xl" aria-label="{{ channelsText.sections }}">
+      <a class="inline-flex items-center justify-center px-3 h-8 font-semibold text-muted text-xs hover:text-ink rounded-lg transition-colors" href="/settings" data-stx-link data-no-router>{{ channelsText.general }}</a>
+      <a class="inline-flex items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel border border-line rounded-lg shadow-sm" href="/accounts" data-stx-link aria-current="page">{{ channelsText.channels }}</a>
     </nav>
 
     <InstagramPagePicker />
@@ -31,13 +35,13 @@ const networkSetupGuides = await loadNetworkSetupGuides()
       <Card padding="none" className="shadow-sm">
         <header class="flex gap-3 items-start justify-between px-4 py-3.5 border-b border-line">
           <div>
-            <h2 class="m-0 font-semibold text-ink text-sm" id="publishing-channels-title">Publishing channels</h2>
-            <p class="m-0 mt-1 text-muted text-xs">Postline stores channel credentials in your workspace.</p>
+            <h2 class="m-0 font-semibold text-ink text-sm" id="publishing-channels-title">{{ channelsText.publishing }}</h2>
+            <p class="m-0 mt-1 text-muted text-xs">{{ channelsText.credentialStorage }}</p>
           </div>
         </header>
         <p class="m-0 pt-3 px-4 text-sm" role="status" x-cloak x-show="oauthFeedback()" :class="oauthFailed() ? 'text-danger' : 'text-success'" :text="oauthFeedback()"></p>
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" x-show="!channelsReady() && !bootstrap.error()" data-channels-loading>
-          <span class="sr-only" role="status">Loading publishing channels</span>
+          <span class="sr-only" role="status">{{ channelsText.loading }}</span>
           @for(i = 0; i < 3; i++)
             <div class="grid gap-4 p-4 min-h-52 border border-line rounded-2xl" aria-hidden="true">
               <Skeleton variant="avatar" className="bg-panel-2" />
@@ -46,9 +50,9 @@ const networkSetupGuides = await loadNetworkSetupGuides()
             </div>
           @endfor
         </div>
-        <ErrorState :show="bootstrap.error() && !channelsReady()" title="Could not load publishing channels" :message="bootstrap.error()" @retry="bootstrap.refresh()" testID="channels-error" />
-        <EmptyState :show="channelsReady() && !channelProviders().length" variant="bare" title="No publishing channels available" description="Refresh to check which channels this workspace can use.">
-          <button class="text-info text-ui underline" type="button" @click="bootstrap.refresh()">Refresh channels</button>
+        <ErrorState :show="bootstrap.error() && !channelsReady()" title="{{ channelsText.loadFailed }}" :message="bootstrap.error()" @retry="bootstrap.refresh()" testID="channels-error" />
+        <EmptyState :show="channelsReady() && !channelProviders().length" variant="bare" title="{{ channelsText.empty }}" description="{{ channelsText.emptyDescription }}">
+          <button class="text-info text-ui underline" type="button" @click="bootstrap.refresh()">{{ channelsText.refresh }}</button>
         </EmptyState>
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" x-cloak x-show="channelsReady()" data-publishing-channels>
           <div class="min-w-0" x-for="provider in channelProviders()" :key="provider">
@@ -66,11 +70,11 @@ const networkSetupGuides = await loadNetworkSetupGuides()
       secret are entered here (the secret is stored sealed), so no file has to
       be edited, which the Mac app cannot do at all.
     --}}
-    <section aria-label="Your network apps" x-cloak x-show="channelsReady()" data-network-apps>
+    <section aria-label="{{ channelsText.apps }}" x-cloak x-show="channelsReady()" data-network-apps>
       <Card padding="none" className="shadow-sm">
         <header class="px-4 py-3.5 border-b border-line">
-          <h2 class="m-0 font-semibold text-ink text-sm">Your network apps</h2>
-          <p class="m-0 mt-1 text-muted text-xs">The X API, LinkedIn, Instagram and Threads use an app you register on each network. Postline has no keys of its own: yours stay in this workspace.</p>
+          <h2 class="m-0 font-semibold text-ink text-sm">{{ channelsText.apps }}</h2>
+          <p class="m-0 mt-1 text-muted text-xs">{{ channelsText.appsDescription }}</p>
         </header>
         <div class="divide-line divide-y">
           <details class="group" x-for="app in appRows()" :data-network-app="app.provider">
@@ -82,49 +86,49 @@ const networkSetupGuides = await loadNetworkSetupGuides()
               </span>
             </summary>
             <div class="grid gap-3 pb-4 px-4">
-              <ol class="grid gap-1 m-0 pl-5 text-body text-xs">
+              <ol class="grid gap-1 m-0 pl-5 text-body text-xs" lang="en">
                 <li x-for="step in app.steps" :text="step"></li>
               </ol>
-              <a class="w-fit text-info text-xs underline" :href="app.guideUrl" :aria-label="'Full ' + app.label + ' setup guide'" target="_blank" rel="noopener noreferrer" x-show="app.guideUrl">Full setup guide</a>
+              <a class="w-fit text-info text-xs underline" :href="app.guideUrl" :aria-label="words.t('networkGuide', { network: app.label })" target="_blank" rel="noopener noreferrer" x-show="app.guideUrl">{{ channelsText.fullGuide }}</a>
               <p class="m-0 text-body text-xs" x-show="app.readUsage" :text="app.readUsage" data-x-read-usage></p>
               <div class="grid gap-1">
-                <span class="font-medium text-muted text-xs">Redirect address to give the network</span>
+                <span class="font-medium text-muted text-xs">{{ channelsText.redirectAddress }}</span>
                 <div class="flex gap-2 items-center">
                   <code class="flex-1 px-2.5 py-1.5 min-w-0 text-ink text-xs truncate bg-panel-2 border border-line rounded-lg" :text="app.redirectUrl" :title="app.redirectUrl"></code>
-                  <button class="shrink-0 px-2.5 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" type="button" @click="copyRedirect(app.provider)">Copy</button>
+                  <button class="shrink-0 px-2.5 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" type="button" @click="copyRedirect(app.provider)">{{ channelsText.copy }}</button>
                 </div>
               </div>
               <form class="grid gap-2 sm:grid-cols-2" @submit.prevent="saveApp(app.provider)">
                 <label class="grid gap-1 text-muted text-xs">
-                  <span>Client id</span>
+                  <span>{{ channelsText.clientId }}</span>
                   <input class="px-3 h-9 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" autocomplete="off" spellcheck="false" :value="app.clientId" @input="setAppField(app.provider, 'clientId', $event)" data-app-client-id>
                 </label>
                 <label class="grid gap-1 text-muted text-xs">
-                  <span>Client secret</span>
+                  <span>{{ channelsText.clientSecret }}</span>
                   <input class="px-3 h-9 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="password" autocomplete="off" :placeholder="app.secretPlaceholder" :value="app.clientSecret" @input="setAppField(app.provider, 'clientSecret', $event)" data-app-client-secret>
                 </label>
                 {{-- LinkedIn company Pages (#130): opt-in, since the scopes need a product the app may not have. --}}
                 <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'linkedin' ? 'flex' : 'hidden'">
                   <input class="mt-0.5" type="checkbox" :checked="app.organizationPages" @change="setAppFlag(app.provider, 'organizationPages', $event)" data-app-organization-pages>
-                  <span>Also connect the company Pages I administer. Needs the Community Management API product on this app; without it LinkedIn refuses the sign-in.</span>
+                  <span>{{ channelsText.companyPages }}</span>
                 </label>
                 <label class="flex gap-2 items-start sm:col-span-2 text-body text-xs">
                   <input class="mt-0.5" type="checkbox" :checked="app.engagementMetrics" @change="setAppFlag(app.provider, 'engagementMetrics', $event)">
-                  <span :text="app.provider === 'twitter' ? 'Allow paid X engagement reads when you refresh from Analytics. Reads count toward the daily budget.' : 'Read engagement metrics. Enable the permission in your developer app, then reconnect the account.'"></span>
+                  <span :text="app.provider === 'twitter' ? copy.paidEngagement : copy.engagement"></span>
                 </label>
                 <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'twitter' ? 'flex' : 'hidden'">
                   <input class="mt-0.5" type="checkbox" :checked="app.directMessages" @change="setAppFlag(app.provider, 'directMessages', $event)" data-app-direct-messages>
-                  <span>Enable paid X API direct messages. Save this setting and reconnect each account to grant Inbox access.</span>
+                  <span>{{ channelsText.paidMessages }}</span>
                 </label>
                 <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'instagram' ? 'flex' : 'hidden'">
                   <input class="mt-0.5" type="checkbox" :checked="app.firstComments" @change="setAppFlag(app.provider, 'firstComments', $event)">
-                  <span>Publish first comments. Enable the comment permission in your Meta app, then reconnect Instagram.</span>
+                  <span>{{ channelsText.firstComments }}</span>
                 </label>
                 <div class="flex flex-wrap gap-2 items-center sm:col-span-2">
                   <p class="m-0 mr-auto text-muted text-xs" :text="app.note"></p>
-                  <button class="px-3 h-8 font-medium text-danger text-xs bg-panel hover:bg-danger-soft border border-line rounded-lg disabled:opacity-50" type="button" x-show="app.removable" :disabled="appBusy() === app.provider" @click="clearApp(app.provider)">Remove</button>
-                  <Button variant="secondary" size="xs" :disabled="!app.testReady || appBusy() === app.provider" @click="navigate('/api/postline/' + app.provider + '/auth?test=1', { reload: true })">Test connection</Button>
-                  <button class="px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="submit" :disabled="appBusy() === app.provider">Save</button>
+                  <button class="px-3 h-8 font-medium text-danger text-xs bg-panel hover:bg-danger-soft border border-line rounded-lg disabled:opacity-50" type="button" x-show="app.removable" :disabled="appBusy() === app.provider" @click="clearApp(app.provider)">{{ channelsText.remove }}</button>
+                  <Button variant="secondary" size="xs" :disabled="!app.testReady || appBusy() === app.provider" @click="navigate('/api/postline/' + app.provider + '/auth?test=1', { reload: true })">{{ channelsText.testConnection }}</Button>
+                  <button class="px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="submit" :disabled="appBusy() === app.provider">{{ channelsText.save }}</button>
                 </div>
               </form>
             </div>
@@ -136,34 +140,34 @@ const networkSetupGuides = await loadNetworkSetupGuides()
     <details class="overflow-hidden bg-panel border border-line rounded-2xl open:border-danger-line shadow-sm group" x-cloak x-show="channelsReady() || bootstrap.error()" data-purge-card>
       <summary class="flex gap-3 items-center justify-between p-4 list-none hover:bg-panel-2 transition-colors cursor-pointer">
         <div class="flex gap-3 items-center"><span class="grid place-items-center h-9 w-9 text-danger text-lg bg-danger-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-alert-02"></span></span><div>
-          <strong class="text-ink text-ui">Cleanup</strong>
-          <p class="mb-0 mt-1 text-muted text-xs">Preview or permanently remove posts from connected accounts.</p>
+          <strong class="text-ink text-ui">{{ channelsText.cleanup }}</strong>
+          <p class="mb-0 mt-1 text-muted text-xs">{{ channelsText.cleanupDescription }}</p>
         </div></div>
         <span class="h-4 w-4 text-muted transition-transform group-open:rotate-180 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
       </summary>
 
       <div class="grid gap-4 p-4 border-danger-line border-t">
-        <div class="flex gap-2 items-center p-3 text-danger text-xs bg-danger-soft border border-danger-line rounded-xl"><span class="shrink-0 h-4 w-4 i-hugeicons-alert-02" aria-hidden="true"></span><span>Deletion is permanent. Postline always shows a preview and requires an exact confirmation phrase first.</span></div>
+        <div class="flex gap-2 items-center p-3 text-danger text-xs bg-danger-soft border border-danger-line rounded-xl"><span class="shrink-0 h-4 w-4 i-hugeicons-alert-02" aria-hidden="true"></span><span>{{ channelsText.cleanupWarning }}</span></div>
         <fieldset class="grid gap-2 m-0 p-0 border-0">
-          <legend class="mb-1 p-0 font-semibold text-muted text-xs">What to delete</legend>
+          <legend class="mb-1 p-0 font-semibold text-muted text-xs">{{ channelsText.whatToDelete }}</legend>
           <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
             <input class="mt-0.5" type="radio" name="purge-scope" value="tracked" checked data-purge-scope>
             <span>
-              <span class="block font-semibold text-ink text-ui">Posts Postline published</span>
-              <span class="block mt-0.5 text-muted text-xs">Only posts sent from this workspace. Anything you posted elsewhere stays.</span>
+              <span class="block font-semibold text-ink text-ui">{{ channelsText.trackedPosts }}</span>
+              <span class="block mt-0.5 text-muted text-xs">{{ channelsText.trackedDescription }}</span>
             </span>
           </label>
           <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
             <input class="mt-0.5" type="radio" name="purge-scope" value="all" data-purge-scope>
             <span>
-              <span class="block font-semibold text-ink text-ui">Everything on the account</span>
-              <span class="block mt-0.5 text-muted text-xs">Every post the account ever made, including posts created outside Postline.</span>
+              <span class="block font-semibold text-ink text-ui">{{ channelsText.allPosts }}</span>
+              <span class="block mt-0.5 text-muted text-xs">{{ channelsText.allPostsDescription }}</span>
             </span>
           </label>
         </fieldset>
 
         <fieldset class="grid gap-2 m-0 p-0 border-0">
-          <legend class="mb-1 p-0 font-semibold text-muted text-xs">Accounts</legend>
+          <legend class="mb-1 p-0 font-semibold text-muted text-xs">{{ channelsText.accounts }}</legend>
           <div class="flex flex-wrap gap-3">
             <label class="inline-flex gap-2 items-center text-ui">
               <input type="checkbox" value="bluesky" checked data-purge-provider> Bluesky
@@ -178,12 +182,12 @@ const networkSetupGuides = await loadNetworkSetupGuides()
               <input type="checkbox" value="linkedin" checked data-purge-provider> LinkedIn
             </label>
           </div>
-          <p class="m-0 text-muted text-xs">LinkedIn can delete the posts Postline published; listing its full history needs a partner permission most apps don't hold. Instagram and Threads can't delete posts at all through their APIs — remove those in their own apps.</p>
+          <p class="m-0 text-muted text-xs">{{ channelsText.deletionLimits }}</p>
         </fieldset>
 
         <div class="flex flex-wrap gap-3 items-center">
-          <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-ink text-sm bg-panel hover:bg-panel-3 border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" data-purge-preview>Preview what would be deleted</button>
-          <span class="text-muted text-xs" data-purge-summary>No preview yet.</span>
+          <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-ink text-sm bg-panel hover:bg-panel-3 border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" data-purge-preview>{{ channelsText.preview }}</button>
+          <span class="text-muted text-xs" data-purge-summary>{{ channelsText.noPreview }}</span>
         </div>
 
         {{-- Rendered from the purgeRows() signal. Object-form :class, because
@@ -198,22 +202,33 @@ const networkSetupGuides = await loadNetworkSetupGuides()
 
         <div class="grid gap-2 p-3 bg-danger-soft border border-danger-line rounded-xl">
           <label class="grid gap-1.5">
-            <span class="font-semibold text-danger text-xs">Type <code class="px-1 py-0.5 text-xs bg-panel rounded" data-purge-phrase>the phrase the preview shows</code> to confirm</span>
-            <input class="px-3 h-10 text-ink text-sm bg-panel border border-danger-line outline-none rounded-xl focus:border-danger-solid focus:ring-2 focus:ring-danger-soft" type="text" autocomplete="off" placeholder="Run a preview first" aria-label="Deletion confirmation phrase" data-purge-confirmation>
+            <span class="font-semibold text-danger text-xs">{{ channelsText.type }} <code class="px-1 py-0.5 text-xs bg-panel rounded" data-purge-phrase>{{ channelsText.thePhrase }}</code> {{ channelsText.toConfirm }}</span>
+            <input class="px-3 h-10 text-ink text-sm bg-panel border border-danger-line outline-none rounded-xl focus:border-danger-solid focus:ring-2 focus:ring-danger-soft" type="text" autocomplete="off" placeholder="{{ channelsText.previewFirst }}" aria-label="{{ channelsText.confirmationPhrase }}" data-purge-confirmation>
           </label>
-          <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-solid text-sm bg-danger-solid hover:bg-danger-solid-hover rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" disabled data-purge-run>Delete permanently</button>
-          <button class="hidden items-center justify-center px-4 h-10 font-semibold text-danger text-sm bg-panel hover:bg-hover border border-danger-line rounded-xl transition-colors" type="button" data-purge-cancel>Stop deleting</button>
-          <p class="m-0 text-danger text-xs" data-purge-hint>Run a preview first, then type the phrase it shows to enable deletion.</p>
+          <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-solid text-sm bg-danger-solid hover:bg-danger-solid-hover rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" disabled data-purge-run>{{ channelsText.deletePermanently }}</button>
+          <button class="hidden items-center justify-center px-4 h-10 font-semibold text-danger text-sm bg-panel hover:bg-hover border border-danger-line rounded-xl transition-colors" type="button" data-purge-cancel>{{ channelsText.stopDeleting }}</button>
+          <p class="m-0 text-danger text-xs" data-purge-hint>{{ channelsText.previewHint }}</p>
         </div>
       </div>
     </details>
   </section>
 
   <script client>
+    import { createI18n } from '@stacksjs/i18n/client'
     import { showNotification } from '../functions/notification'
+
+    const { locale: language, messages: copy } = {{ channelsClient }}
+    const words = createI18n({ locale: language, messages: { [language]: copy } })
+    const numbers = new Intl.NumberFormat(language)
+    const plural = new Intl.PluralRules(language)
     const bootstrap = workspaceBootstrapQuery()
     const channelsReady = derived(() => Boolean(bootstrap.data()))
     const channelProviders = derived(() => bootstrap.data()?.providers.map(status => status.provider) ?? [])
+    const channelSummary = derived(() => {
+      if (!channelsReady()) return ''
+      const count = channelProviders().length
+      return words.t(plural.select(count) === 'one' ? 'channelCountOne' : 'channelCountMany', { count: numbers.format(count) })
+    })
     const networkApps = derived(() => bootstrap.data()?.networkApps ?? [])
     const oauthFeedback = state('')
     const oauthFailed = state(false)
@@ -228,7 +243,7 @@ const networkSetupGuides = await loadNetworkSetupGuides()
     const appDrafts = state({})
     const appBusy = state('')
     const guides = {{ networkSetupGuides }}
-    const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 3 })
+    const usd = new Intl.NumberFormat(language, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 3 })
     const appRows = derived(() => networkApps().map((app) => {
       const guide = guides[app.provider]
       const draft = appDrafts()[app.provider] || {}
@@ -249,9 +264,9 @@ const networkSetupGuides = await loadNetworkSetupGuides()
         guideUrl: guide?.url ?? '',
         configured: app.configured,
         readUsage: app.readUsage
-          ? `Estimated X API reads today: ${usd.format(app.readUsage.estimatedUsd)} of ${usd.format(app.readUsage.limitUsd)}. Resets at midnight UTC.`
+          ? words.t('readUsage', { used: usd.format(app.readUsage.estimatedUsd), limit: usd.format(app.readUsage.limitUsd) })
           : '',
-        status: app.configured ? (app.source === 'environment' ? 'Set in .env' : 'Set up') : 'Not set up',
+        status: app.configured ? (app.source === 'environment' ? copy.environment : copy.configured) : copy.unconfigured,
         redirectUrl: app.redirectUrl,
         clientId,
         clientSecret,
@@ -259,10 +274,10 @@ const networkSetupGuides = await loadNetworkSetupGuides()
         engagementMetrics,
         directMessages,
         firstComments,
-        secretPlaceholder: app.hasSecret ? 'Stored. Leave blank to keep it.' : 'Paste the client secret',
+        secretPlaceholder: app.hasSecret ? copy.keepSecret : copy.pasteSecret,
         removable: app.source === 'settings',
         testReady: app.configured && !hasChanges,
-        note: app.source === 'environment' ? 'Read from .env. Saving here takes over from it.' : app.configured ? 'Saved. Connect the account in its card above.' : '',
+        note: app.source === 'environment' ? copy.environmentNote : app.configured ? copy.configuredNote : '',
       }
     }))
     const setAppField = (provider, field, event) => {
@@ -288,10 +303,10 @@ const networkSetupGuides = await loadNetworkSetupGuides()
      */
     const purgeCapNote = (row) => {
       if (row.dailyLimit && row.truncated)
-        return ` now; ${row.provider} allows ${row.dailyLimit.limit} deletions a day, ${row.dailyLimit.remaining} left today, so run again tomorrow for the rest`
+        return words.t('dailyTruncated', { network: row.provider, limit: numbers.format(row.dailyLimit.limit), remaining: numbers.format(row.dailyLimit.remaining) })
       if (row.dailyLimit)
-        return ` (${row.provider} allows ${row.dailyLimit.limit} deletions a day; ${row.dailyLimit.remaining} left today)`
-      return row.truncated ? ' (capped at 2000 per run — run again for the rest)' : ''
+        return words.t('dailyLimit', { network: row.provider, limit: numbers.format(row.dailyLimit.limit), remaining: numbers.format(row.dailyLimit.remaining) })
+      return row.truncated ? copy.capped : ''
     }
 
     /** One purge-result row flattened to exactly what the template renders. */
@@ -302,8 +317,8 @@ const networkSetupGuides = await loadNetworkSetupGuides()
       detail: row.skippedReason
         ? row.skippedReason
         : !row.supported || !row.connected
-            ? 'Not available.'
-            : `${row.matched} post${row.matched === 1 ? '' : 's'} would be deleted${purgeCapNote(row)}.`,
+            ? copy.unavailable
+            : words.t(plural.select(row.matched) === 'one' ? 'wouldDeleteOne' : 'wouldDeleteMany', { count: numbers.format(row.matched), limit: purgeCapNote(row) }),
     })))
 
     ;(() => {
@@ -326,9 +341,9 @@ const networkSetupGuides = await loadNetworkSetupGuides()
         window.history.replaceState({}, '', `${route.path}${query ? `?${query}` : ''}`)
         oauthFailed.set(result === 'error')
         const name = providerLabel(provider)
-        if (result === 'connected') oauthFeedback.set(`${name} connected.`)
-        else if (result === 'tested') oauthFeedback.set(`${name} sign-in passed. Connect the account when you’re ready to publish.`)
-        else oauthFeedback.set(message || `Could not connect ${name}.`)
+        if (result === 'connected') oauthFeedback.set(words.t('connected', { network: name }))
+        else if (result === 'tested') oauthFeedback.set(words.t('connectionPassed', { network: name }))
+        else oauthFeedback.set(message || words.t('connectionFailed', { network: name }))
         if (result === 'connected') {
           // The redirected page reads the fresh account as it mounts.
           // Notify any existing workspace windows as well.
@@ -350,12 +365,12 @@ const networkSetupGuides = await loadNetworkSetupGuides()
           body.set('engagement_metrics', row.engagementMetrics ? '1' : '0')
           if (provider === 'twitter') body.set('direct_messages', row.directMessages ? '1' : '0')
           if (provider === 'instagram') body.set('first_comments', row.firstComments ? '1' : '0')
-          await requestJson('/api/postline/network-apps', { method: 'POST', body }, 'Could not save the app.')
+          await requestJson('/api/postline/network-apps', { method: 'POST', body }, copy.saveFailed)
           const drafts = { ...appDrafts() }
           delete drafts[provider]
           appDrafts.set(drafts)
           await bootstrap.load()
-          notify(`${row.label} app saved. Connect the account in its card.`, 'success', { title: row.label })
+          notify(words.t('appSaved', { network: row.label }), 'success', { title: row.label })
         }
         catch (error) {
           notify(error instanceof Error ? error.message : String(error), 'error', { title: row.label })
@@ -366,12 +381,12 @@ const networkSetupGuides = await loadNetworkSetupGuides()
       }
       appHandlers.clear = async (provider) => {
         const row = appRows().find(entry => entry.provider === provider)
-        if (!row || !await stxConfirm(`Connected ${row.label} accounts stop renewing until an app is set up again.`, { title: `Remove your ${row.label} app?`, type: 'error', confirmText: 'Remove app' })) return
+        if (!row || !await stxConfirm(words.t('removeWarning', { network: row.label }), { title: words.t('removeTitle', { network: row.label }), type: 'error', confirmText: copy.removeApp })) return
         appBusy.set(provider)
         try {
           const body = new FormData()
           body.set('provider', provider)
-          await requestJson('/api/postline/network-apps/clear', { method: 'POST', body }, 'Could not remove the app.')
+          await requestJson('/api/postline/network-apps/clear', { method: 'POST', body }, copy.removeFailed)
           await bootstrap.load()
         }
         catch (error) {
@@ -386,10 +401,10 @@ const networkSetupGuides = await loadNetworkSetupGuides()
         if (!row) return
         try {
           await navigator.clipboard.writeText(row.redirectUrl)
-          notify('Redirect address copied.', 'success', { title: row.label })
+          notify(copy.copied, 'success', { title: row.label })
         }
         catch {
-          notify(row.redirectUrl, 'info', { title: 'Copy this address' })
+          notify(row.redirectUrl, 'info', { title: copy.copyManually })
         }
       }
 
@@ -414,8 +429,8 @@ const networkSetupGuides = await loadNetworkSetupGuides()
       const setPreview = (phrase, token) => {
         previewPhrase = phrase || ''
         previewToken = token || ''
-        if (purgePhraseLabel) purgePhraseLabel.textContent = previewPhrase || 'the phrase the preview shows'
-        if (purgeConfirmation) purgeConfirmation.placeholder = previewPhrase || 'Run a preview first'
+        if (purgePhraseLabel) purgePhraseLabel.textContent = previewPhrase || copy.thePhrase
+        if (purgeConfirmation) purgeConfirmation.placeholder = previewPhrase || copy.previewFirst
       }
 
       const purgeScope = () => root.querySelector('[data-purge-scope]:checked')?.value || 'tracked'
@@ -432,14 +447,14 @@ const networkSetupGuides = await loadNetworkSetupGuides()
         if (purgeRun) purgeRun.disabled = !enabled
         if (purgeHint) {
           purgeHint.textContent = !purgeProviders().length
-            ? 'Pick at least one account.'
+            ? copy.selectAccount
             : !previewOk
-              ? 'Run a preview for this selection first.'
+              ? copy.previewSelection
               : nothingToDelete
-                ? 'The preview matched no posts, so there is nothing to delete.'
+                ? copy.noMatches
               : !phraseOk
-                ? `Type ${previewPhrase} exactly to enable deletion.`
-                : 'This permanently deletes the posts listed above.'
+                ? words.t('typeExact', { phrase: previewPhrase })
+                : copy.deletePreviewed
         }
       }
 
@@ -456,28 +471,28 @@ const networkSetupGuides = await loadNetworkSetupGuides()
       purgePreview?.addEventListener('click', async () => {
         const providers = purgeProviders()
         if (!providers.length) {
-          notify('Pick at least one account to preview.', 'error', { title: 'Danger zone' })
+          notify(copy.selectToPreview, 'error', { title: copy.dangerZone })
           return
         }
 
         purgePreview.setAttribute('disabled', 'disabled')
-        if (purgeSummary) purgeSummary.textContent = 'Counting…'
+        if (purgeSummary) purgeSummary.textContent = copy.counting
         try {
           const query = new URLSearchParams({ scope: purgeScope(), providers: providers.join(',') })
           const response = await fetch(`/api/postline/purge/preview?${query.toString()}`)
           const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Preview failed.')
+          if (!response.ok || !payload.ok) throw new Error(payload.error || copy.previewFailed)
 
           renderPurgeResults(payload.data)
           previewedSelection = purgeSelection()
           setPreview(payload.data.confirmation, payload.data.previewToken)
-          if (purgeSummary) purgeSummary.textContent = `${payload.data.matched} post${payload.data.matched === 1 ? '' : 's'} matched.`
+          if (purgeSummary) purgeSummary.textContent = words.t(plural.select(payload.data.matched) === 'one' ? 'matchesOne' : 'matchesMany', { count: numbers.format(payload.data.matched) })
         }
         catch (error) {
           previewedSelection = null
           setPreview('', '')
-          if (purgeSummary) purgeSummary.textContent = 'Preview failed.'
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Danger zone' })
+          if (purgeSummary) purgeSummary.textContent = copy.previewFailed
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: copy.dangerZone })
         }
         finally {
           purgePreview.removeAttribute('disabled')
@@ -489,8 +504,8 @@ const networkSetupGuides = await loadNetworkSetupGuides()
         const scope = purgeScope()
         // Last stop before an irreversible action, with the number it is about.
         const count = Number((previewPhrase.match(/\d+/) || ['0'])[0])
-        const where = scope === 'all' ? 'from the selected accounts' : 'that Postline published'
-        if (!await stxConfirm(`Delete ${count} post${count === 1 ? '' : 's'} ${where}. This cannot be undone.`, { title: 'Permanently delete posts?', type: 'error', confirmText: 'Delete posts' })) return
+        const where = scope === 'all' ? copy.fromSelected : copy.fromPostline
+        if (!await stxConfirm(words.t(plural.select(count) === 'one' ? 'confirmOne' : 'confirmMany', { count: numbers.format(count), where }), { title: copy.confirmTitle, type: 'error', confirmText: copy.deletePosts })) return
 
         purgeRun.disabled = true
         try {
@@ -502,7 +517,7 @@ const networkSetupGuides = await loadNetworkSetupGuides()
 
           const response = await fetch('/api/postline/purge', { method: 'POST', body })
           const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Deletion failed.')
+          if (!response.ok || !payload.ok) throw new Error(payload.error || copy.deletionFailed)
 
           // The deleting carries on in the background; follow it here.
           purgeRunId = payload.data.runId
@@ -513,7 +528,7 @@ const networkSetupGuides = await loadNetworkSetupGuides()
           await followPurge(purgeRunId)
         }
         catch (error) {
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: 'Deletion failed' })
+          notify(error instanceof Error ? error.message : String(error), 'error', { title: copy.deletionFailedTitle })
         }
         finally {
           showPurgeRunning(false)
@@ -534,17 +549,18 @@ const networkSetupGuides = await loadNetworkSetupGuides()
         for (;;) {
           const response = await fetch(`/api/postline/purge/status?run=${encodeURIComponent(runId)}`)
           const payload = await response.json()
-          if (!response.ok || !payload.ok) throw new Error(payload.error || 'Lost track of the deletion run.')
+          if (!response.ok || !payload.ok) throw new Error(payload.error || copy.lostRun)
           const run = payload.data
-          if (purgeSummary) purgeSummary.textContent = `${run.deleted} of ${run.limit} deleted${run.failed ? `, ${run.failed} failed` : ''}${run.status === 'running' ? '…' : '.'}`
+          if (purgeSummary) purgeSummary.textContent = `${words.t('deleteProgress', { deleted: numbers.format(run.deleted), limit: numbers.format(run.limit) })}${run.failed ? words.t('deleteProgressFailed', { failed: numbers.format(run.failed) }) : ''}${run.status === 'running' ? '…' : '.'}`
           if (run.status !== 'running') {
             if (run.result) renderPurgeResults(run.result)
-            if (run.status === 'failed') throw new Error(run.error || 'Deletion failed.')
-            const stopped = run.status === 'cancelled' ? ' Stopped before the end.' : ''
+            if (run.status === 'failed') throw new Error(run.error || copy.deletionFailed)
+            const stopped = run.status === 'cancelled' ? copy.stopped : ''
             notify(
-              `Deleted ${run.deleted} post${run.deleted === 1 ? '' : 's'}.${run.failed ? ` ${run.failed} failed.` : ''}${stopped}`,
+              words.t(plural.select(run.deleted) === 'one' ? 'deletedOne' : 'deletedMany', { count: numbers.format(run.deleted) })
+                + (run.failed ? words.t('deletedFailed', { count: numbers.format(run.failed) }) : '') + stopped,
               run.failed ? 'error' : 'success',
-              { title: 'Danger zone' },
+              { title: copy.dangerZone },
             )
             return
           }
@@ -559,7 +575,7 @@ const networkSetupGuides = await loadNetworkSetupGuides()
         body.set('run', purgeRunId)
         try {
           await fetch('/api/postline/purge/cancel', { method: 'POST', body })
-          if (purgeSummary) purgeSummary.textContent = 'Stopping after the post in hand…'
+          if (purgeSummary) purgeSummary.textContent = copy.stopping
         }
         catch {
           purgeCancel.disabled = false

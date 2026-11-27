@@ -2501,7 +2501,8 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
 
   await click(`${setup}.querySelector('a[href="/accounts?setup=1"]')`)
   const resume = `document.querySelector('a[href="/setup?step=channels"]')`
-  await waitUntil('Channels links back to setup', () => evaluate<boolean>(cdp, `location.pathname === '/accounts' && ${resume}?.textContent.includes('Continue setup')`), 15_000)
+  const resumeLabel = spanishWorkspace ? 'Continuar la configuración' : 'Continue setup'
+  await waitUntil('Channels links back to setup', () => evaluate<boolean>(cdp, `location.pathname === '/accounts' && ${resume}?.textContent.trim() === ${JSON.stringify(resumeLabel)}`), 15_000)
   await click(resume)
   await heading('Choose a publishing channel')
   await waitUntil('The built-in Blog is the first available channel', () => evaluate<boolean>(cdp, `${setup}.querySelector('[data-setup-channel]')?.value === 'blog'`), 5_000)
@@ -2858,6 +2859,7 @@ async function checkSpanishListening(cdp: Cdp): Promise<void> {
   await waitUntil('The Spanish watch opens in the editor from the keyboard', () => evaluate<boolean>(cdp, `
     ${listening}?.querySelector('aside h2')?.textContent === 'Editar regla de escucha'
       && ${listening}?.querySelector('input[placeholder="Menciones de la marca"]')?.value === 'Marca de prueba'
+      && [...${listening}.querySelectorAll('aside button')].some(button => button.innerText === 'Eliminar' && button.getClientRects().length)
   `), 5_000)
   const markRead = `[...${mentions}.querySelectorAll('button')].find(button => button.textContent.trim() === 'Marcar todo como leído')`
   await evaluate(cdp, `${markRead}.focus()`)
@@ -2926,6 +2928,40 @@ async function checkSpanishAnalytics(cdp: Cdp): Promise<void> {
     ${links}.querySelector('h2')?.textContent === 'Enlaces con seguimiento'
       && ${links}.querySelector('[data-tracked-link-result]')?.value === 'https://example.org/articulo?utm_source=boletin'
       && ${links}.querySelector('[role=status]')?.innerText === 'El enlace está listo para copiar.'
+  `), 5_000)
+}
+
+async function checkSpanishChannels(cdp: Cdp): Promise<void> {
+  const report = await auditPage(`${site}/accounts?twitter=tested`, { cdp })
+  for (const error of report.errors) fail('accounts', 'Spanish', error)
+  for (const request of report.failed) fail('accounts', 'Spanish', request)
+  await waitUntil('Spanish publishing channels, connection feedback, and Blog card', () => evaluate<boolean>(cdp, `
+    document.title === 'Postline - Configuración - Canales'
+      && document.querySelector('[data-testid="accounts-page"][lang="es"] h1')?.textContent === 'Conecta tus canales'
+      && document.querySelector('[data-testid="accounts-page"] header')?.innerText.includes('canales de publicación')
+      && document.querySelector('[data-channel="blog"]')?.innerText.includes('Incluido en Postline')
+      && document.querySelector('[data-testid="accounts-page"] [role=status]')?.innerText.includes('Se verificó el inicio de sesión en X.')
+  `), 5_000)
+
+  await evaluate(cdp, `document.querySelector('[data-network-app=twitter] summary').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Spanish X developer app form reveals its localized labels', () => evaluate<boolean>(cdp, `
+    document.querySelector('[data-network-app=twitter]')?.open
+      && document.querySelector('[data-network-app=twitter] [data-app-client-id]')?.closest('label')?.innerText === 'ID de cliente'
+      && document.querySelector('[data-network-app=twitter] [data-app-client-secret]')?.placeholder === 'Pega el secreto de cliente'
+      && document.querySelector('[data-network-app=twitter] [data-app-direct-messages]')?.closest('label')?.innerText.includes('mensajes directos de pago')
+      && document.querySelector('[data-network-app=twitter] ol')?.lang === 'en'
+  `), 5_000)
+
+  await evaluate(cdp, `document.querySelector('[data-purge-card] summary').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await evaluate(cdp, `document.querySelector('[data-purge-preview]').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Spanish cleanup preview uses the workspace result and keeps deletion locked', () => evaluate<boolean>(cdp, `
+    document.querySelector('[data-purge-summary]')?.innerText === 'Se encontraron 0 publicaciones.'
+      && document.querySelector('[data-purge-phrase]')?.innerText === 'DELETE 0 POSTS'
+      && document.querySelector('[data-purge-run]')?.disabled === true
+      && document.querySelector('[data-purge-hint]')?.innerText === 'La vista previa no encontró publicaciones para eliminar.'
   `), 5_000)
 }
 
@@ -3099,6 +3135,7 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
     await checkSpanishInbox(cdp)
     await checkSpanishListening(cdp)
     await checkSpanishAnalytics(cdp)
+    await checkSpanishChannels(cdp)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
@@ -3252,7 +3289,7 @@ else {
   // eslint-disable-next-line no-console
   console.log(marketingScreenshots
     ? `Product screenshots written to ${productImages}.`
-    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, Blog, Inbox, Listening, and Analytics passed.'
+    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, Blog, Inbox, Listening, Analytics, and Channels passed.'
     : `Every view opened clean in ${MODES.map(mode => mode.name).join(', ')}. Screenshots in ${out}.`)
 }
 process.exit(exitCode)
