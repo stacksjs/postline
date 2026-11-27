@@ -3033,6 +3033,56 @@ async function checkSpanishCampaigns(cdp: Cdp): Promise<void> {
   `), 5_000)
 }
 
+async function checkSpanishSettings(cdp: Cdp): Promise<void> {
+  const report = await auditPage(`${site}/settings`, { cdp })
+  for (const error of report.errors) fail('settings', 'Spanish', error)
+  for (const request of report.failed) fail('settings', 'Spanish', request)
+  const settings = `document.querySelector('[data-testid="settings-page"][lang="es"]')`
+  const general = `${settings}.querySelector('[data-settings-pane=general]')`
+  const workspaceName = `${general}.querySelector('[data-setting=workspace-name] input')`
+  const tab = (pane: string) => `${settings}.querySelector('[data-settings-item=${pane}]')`
+  await waitUntil('Spanish Settings opens General with the localized search and controls', () => evaluate<boolean>(cdp, `
+    document.title === 'Postline - Configuración'
+      && ${settings}.querySelector('[data-settings-search-input]')?.placeholder === 'Buscar en la configuración'
+      && ${settings}.querySelector('[data-settings-back]')?.innerText.trim() === 'Volver a Postline'
+      && ${general}?.innerText.includes('Zona horaria')
+      && Boolean(${workspaceName}?.value)
+  `), 5_000)
+
+  const save = `[...${general}.querySelectorAll('button')].find(button => button.textContent.trim() === 'Guardar')`
+  await evaluate(cdp, `${workspaceName}.focus(); ${workspaceName}.select()`)
+  await cdp.send('Input.insertText', { text: 'Taller de publicaciones' })
+  await waitUntil('The Spanish workspace preferences can be saved', () => evaluate<boolean>(cdp, `(${save})?.disabled === false`), 5_000)
+  await evaluate(cdp, `(${save}).focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Saving the workspace displays the Spanish status and persists the name', () => evaluate<boolean>(cdp, `(async () => {
+    const response = await fetch('/api/postline/settings/workspace').then(value => value.json())
+    return response.data?.workspaceName === 'Taller de publicaciones'
+      && ${general}.querySelector('[data-workspace-message]')?.innerText === 'Cambios guardados.'
+  })()`), 5_000)
+
+  await evaluate(cdp, `${tab('appearance')}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The appearance radio group has Spanish captions', () => evaluate<boolean>(cdp, `
+    ${settings}.querySelector('[data-settings-pane=appearance] [role=radiogroup]')?.innerText.includes('Automática')
+      && ${tab('appearance')}.getAttribute('aria-selected') === 'true'
+  `), 5_000)
+
+  await evaluate(cdp, `${tab('notifications')}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  const activity = `${settings}.querySelector('[data-setting=activity-alerts] button')`
+  await waitUntil('Notifications shows the Spanish instructions and live mail status', () => evaluate<boolean>(cdp, `
+    ${tab('notifications')}.getAttribute('aria-selected') === 'true'
+      && ${activity}?.innerText.trim() === 'Abrir Actividad'
+      && document.getElementById('settings-row-mail-status-description')?.innerText.includes('El correo queda en el registro')
+  `), 5_000)
+  await evaluate(cdp, `${activity}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Spanish Settings opens the Spanish Activity workspace', () => evaluate<boolean>(cdp, `
+    location.pathname === '/activity' && Boolean(document.querySelector('[data-postline-page=activity][lang=es]'))
+  `), 5_000)
+}
+
 async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
@@ -3205,6 +3255,7 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
     await checkSpanishAnalytics(cdp)
     await checkSpanishChannels(cdp)
     await checkSpanishCampaigns(cdp)
+    await checkSpanishSettings(cdp)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
@@ -3358,7 +3409,7 @@ else {
   // eslint-disable-next-line no-console
   console.log(marketingScreenshots
     ? `Product screenshots written to ${productImages}.`
-    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, Blog, Inbox, Listening, Analytics, Channels, and Campaigns passed.'
+    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, Blog, Inbox, Listening, Analytics, Channels, Campaigns, and Settings passed.'
     : `Every view opened clean in ${MODES.map(mode => mode.name).join(', ')}. Screenshots in ${out}.`)
 }
 process.exit(exitCode)

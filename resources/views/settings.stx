@@ -2,71 +2,80 @@
 
 <script server cache>
 import manifest from '../../package.json'
+import { workspaceLocale, workspaceSettingsText } from '../../app/Support/Localization/workspace'
 
 export const buildVersion = manifest.version
+export const settingsLocale = workspaceLocale
+export const settingsText = workspaceSettingsText.labels
+export const settingsCopy = { locale: workspaceLocale, messages: workspaceSettingsText.client }
+export const settingsAppearanceOptions = [
+  { value: 'light', label: settingsText.light },
+  { value: 'dark', label: settingsText.dark },
+  { value: 'auto', label: settingsText.automatic },
+]
 </script>
 
-@section('title', 'Postline - Settings')
+@section('title'){{ settingsText.documentTitle }}@endsection
 
 @section('content')
-  @meta('description', 'Configure Postline publishing defaults.')
+  @meta('description', settingsText.description)
   {{--
     The Settings window stx ships: the two columns System Settings has, with
     its sidebar, search, panes and Mac controls. In the desktop app the
     workspace opens this page in a window of its own (craft.window.open, from
     layouts/app.stx); in a browser it is the whole page, with a way back.
   --}}
-  <main id="workspace-content" tabindex="-1" data-postline-page="settings" data-testid="settings-page">
-    <SettingsWindow id="postline-settings" title="Settings" storageKey="postline" v-model:pane="pane">
+  <main id="workspace-content" tabindex="-1" data-postline-page="settings" data-testid="settings-page" lang="{{ settingsLocale }}">
+    <SettingsWindow id="postline-settings" title="{{ settingsText.title }}" searchPlaceholder="{{ settingsText.search }}" storageKey="postline" v-model:pane="pane">
       <template #account>
         <a class="inline-flex gap-1.5 items-center px-2 py-1 text-muted text-ui hover:text-ink" href="/composer" data-no-router x-show="!ownWindow()" data-settings-back>
           <span class="h-3.5 w-3.5 i-hugeicons-arrow-left-01" aria-hidden="true"></span>
-          Back to Postline
+          {{ settingsText.back }}
         </a>
       </template>
       <template #sidebar>
         <SettingsSidebarGroup>
-          <SettingsSidebarItem id="general" label="General" icon="i-hugeicons-settings-01" tone="grey" />
-          <SettingsSidebarItem id="appearance" label="Appearance" icon="i-hugeicons-sun-moon" tone="ink" />
+          <SettingsSidebarItem id="general" label="{{ settingsText.general }}" icon="i-hugeicons-settings-01" tone="grey" />
+          <SettingsSidebarItem id="appearance" label="{{ settingsText.appearance }}" icon="i-hugeicons-sun-moon" tone="ink" />
         </SettingsSidebarGroup>
         <SettingsSidebarGroup>
-          <SettingsSidebarItem id="channels" label="Channels" icon="i-hugeicons-share-08" tone="blue" keywords="accounts networks bluesky linkedin mastodon threads instagram" />
-          <SettingsSidebarItem id="notifications" label="Notifications" icon="i-hugeicons-notification-01" tone="red" keywords="alerts email smtp webhook macOS badge" />
-          <SettingsSidebarItem id="composer" label="Composer" icon="i-hugeicons-pencil-edit-02" tone="orange" />
-          <SettingsSidebarItem id="ai" label="AI" icon="i-hugeicons-sparkles" tone="purple" keywords="anthropic openai ollama claude api key campaign planner" />
-          <SettingsSidebarItem id="deletion" label="Automatic Cleanup" icon="i-hugeicons-delete-02" tone="red" keywords="retention delete cleanup" />
-          <SettingsSidebarItem id="data" label="Data" icon="i-hugeicons-hard-drive" tone="grey" keywords="export import backup move delete everything archive" />
+          <SettingsSidebarItem id="channels" label="{{ settingsText.channels }}" icon="i-hugeicons-share-08" tone="blue" keywords="{{ settingsText.channelKeywords }}" />
+          <SettingsSidebarItem id="notifications" label="{{ settingsText.notifications }}" icon="i-hugeicons-notification-01" tone="red" keywords="{{ settingsText.notificationKeywords }}" />
+          <SettingsSidebarItem id="composer" label="{{ settingsText.composer }}" icon="i-hugeicons-pencil-edit-02" tone="orange" />
+          <SettingsSidebarItem id="ai" label="{{ settingsText.ai }}" icon="i-hugeicons-sparkles" tone="purple" keywords="anthropic openai ollama claude api key campaign planner" />
+          <SettingsSidebarItem id="deletion" label="{{ settingsText.cleanup }}" icon="i-hugeicons-delete-02" tone="red" keywords="retention delete cleanup" />
+          <SettingsSidebarItem id="data" label="{{ settingsText.data }}" icon="i-hugeicons-hard-drive" tone="grey" keywords="export import backup move delete everything archive" />
         </SettingsSidebarGroup>
         <div x-show="!ownWindow()">
           <SettingsSidebarGroup>
-            <SettingsSidebarItem id="account" label="Account" icon="i-hugeicons-user" tone="indigo" keywords="sign out log out passkey two-factor 2fa authenticator recovery codes security" />
+            <SettingsSidebarItem id="account" label="{{ settingsText.account }}" icon="i-hugeicons-user" tone="indigo" keywords="sign out log out passkey two-factor 2fa authenticator recovery codes security" />
           </SettingsSidebarGroup>
         </div>
         <SettingsSidebarGroup>
-          <SettingsSidebarItem id="about" label="About" icon="i-hugeicons-information-circle" tone="grey" keywords="version software update log troubleshooting" />
+          <SettingsSidebarItem id="about" label="{{ settingsText.about }}" icon="i-hugeicons-information-circle" tone="grey" keywords="version software update log troubleshooting" />
         </SettingsSidebarGroup>
       </template>
 
-      <SettingsPane id="general" title="General" active>
+      <SettingsPane id="general" title="{{ settingsText.general }}" active>
         <SettingsGroup>
-          <SettingsRow label="Channels" setting="channels-summary" to="channels" :value="channelPill()" />
-          <SettingsRow label="Automatic deletion" setting="deletion-summary" to="deletion" :value="statusPill()" />
-          <SettingsRow label="Appearance" setting="appearance-summary" to="appearance" />
-          <SettingsRow label="Notifications" setting="notifications-summary" to="notifications" />
+          <SettingsRow label="{{ settingsText.channels }}" setting="channels-summary" to="channels" :value="channelPill()" />
+          <SettingsRow label="{{ settingsText.automaticDeletion }}" setting="deletion-summary" to="deletion" :value="statusPill()" />
+          <SettingsRow label="{{ settingsText.appearance }}" setting="appearance-summary" to="appearance" />
+          <SettingsRow label="{{ settingsText.notifications }}" setting="notifications-summary" to="notifications" />
         </SettingsGroup>
 
         {{--
           The workspace. Its time zone is the one every schedule, campaign
           and chart uses, so changing it here moves them together.
         --}}
-        <SettingsGroup title="Workspace" footer="Schedules, campaigns and the best-time chart all use this time zone.">
-          <SettingsRow label="Workspace" setting="workspace-name" keywords="rename workspace">
+        <SettingsGroup title="{{ settingsText.workspace }}" footer="{{ settingsText.workspaceHelp }}">
+          <SettingsRow label="{{ settingsText.workspace }}" setting="workspace-name" keywords="{{ settingsText.workspaceKeywords }}">
             <TextInput variant="mac" v-model:value="workspaceName" maxlength="120" data-workspace-name />
           </SettingsRow>
-          <SettingsRow label="Your name" setting="owner-name" keywords="owner profile">
+          <SettingsRow label="{{ settingsText.owner }}" setting="owner-name" keywords="{{ settingsText.ownerKeywords }}">
             <TextInput variant="mac" v-model:value="ownerName" maxlength="120" data-workspace-owner />
           </SettingsRow>
-          <SettingsRow label="Time zone" setting="timezone" keywords="timezone time zone clock schedule">
+          <SettingsRow label="{{ settingsText.timezone }}" setting="timezone" keywords="{{ settingsText.timezoneKeywords }}">
             <Select variant="mac" v-model:value="workspaceZone" placeholder="" :options="zoneOptions()" data-workspace-timezone />
           </SettingsRow>
         </SettingsGroup>
@@ -76,51 +85,51 @@ export const buildVersion = manifest.version
           at home), Postline can lend the image one for as long as the network
           takes to fetch it.
         --}}
-        <SettingsGroup title="Images" footer="For Instagram and Threads when Postline has no public address. The image is relayed through localtunnel.dev, the Stacks tunnel service, for the few seconds the network takes to fetch it, then the link is closed.">
-          <SettingsRow label="Share images through a temporary link" setting="share-media" keywords="instagram threads image tunnel public address">
+        <SettingsGroup title="{{ settingsText.images }}" footer="{{ settingsText.imagesHelp }}">
+          <SettingsRow label="{{ settingsText.shareImages }}" setting="share-media" keywords="{{ settingsText.imageKeywords }}">
             <Switch variant="mac" v-model:checked="shareMediaByTunnel" data-share-media />
           </SettingsRow>
         </SettingsGroup>
-        <SettingsGroup title="Publishing" footer="While paused, scheduled posts stay in the queue and nothing goes out on its own. Publishing by hand still works. A post that comes due more than its grace period before you resume is held as missed.">
-          <SettingsRow label="Pause scheduled publishing" setting="publishing-paused" keywords="pause hold stop scheduler queue resume">
+        <SettingsGroup title="{{ settingsText.publishing }}" footer="{{ settingsText.publishingHelp }}">
+          <SettingsRow label="{{ settingsText.pause }}" setting="publishing-paused" keywords="{{ settingsText.publishingKeywords }}">
             <Switch variant="mac" v-model:checked="publishingPaused" data-publishing-paused />
           </SettingsRow>
         </SettingsGroup>
         <div class="flex gap-2 items-center justify-end mt-3">
           <p class="m-0 mr-auto text-xs" :data-tone="workspaceTone()" x-show="workspaceMessage()" :text="workspaceMessage()" role="status" aria-live="polite" data-workspace-message></p>
-          <Button appearance="mac" variant="primary" :disabled="!canSaveWorkspace()" @click="saveWorkspace">Save</Button>
+          <Button appearance="mac" variant="primary" :disabled="!canSaveWorkspace()" @click="saveWorkspace">{{ settingsText.save }}</Button>
         </div>
       </SettingsPane>
 
-      <SettingsPane id="appearance" title="Appearance">
-        <SettingsGroup footer="Automatic follows the appearance your system is set to.">
-          <SettingsRow label="Appearance" layout="stacked" setting="appearance" keywords="theme light dark">
-            <AppearancePicker v-model:value="appearance" label="Appearance" @change="setAppearance" />
+      <SettingsPane id="appearance" title="{{ settingsText.appearance }}">
+        <SettingsGroup footer="{{ settingsText.appearanceHelp }}">
+          <SettingsRow label="{{ settingsText.appearance }}" layout="stacked" setting="appearance" keywords="{{ settingsText.appearanceKeywords }}">
+            <AppearancePicker v-model:value="appearance" label="{{ settingsText.appearance }}" :options="appearanceOptions" @change="setAppearance" />
           </SettingsRow>
         </SettingsGroup>
       </SettingsPane>
 
-      <SettingsPane id="channels" title="Channels">
-        <SettingsGroup footer="Credentials stay in your workspace.">
-          <SettingsRow label="Publishing channels" :description="channelSummary()" setting="channels" keywords="accounts networks connect">
-            <Button appearance="mac" @click="openWorkspacePage('/accounts')">Manage Channels…</Button>
+      <SettingsPane id="channels" title="{{ settingsText.channels }}">
+        <SettingsGroup footer="{{ settingsText.credentials }}">
+          <SettingsRow label="{{ settingsText.publishingChannels }}" :description="channelSummary()" setting="channels" keywords="{{ settingsText.manageKeywords }}">
+            <Button appearance="mac" @click="openWorkspacePage('/accounts')">{{ settingsText.manageChannels }}</Button>
           </SettingsRow>
         </SettingsGroup>
       </SettingsPane>
 
-      <SettingsPane id="notifications" title="Notifications">
-        <SettingsGroup footer="Postline records failed or missed posts, expired channel sign-ins, and Listening matches in Activity.">
-          <SettingsRow label="Workspace alerts" setting="activity-alerts">
-            <Button appearance="mac" @click="openWorkspacePage('/activity')">Open Activity</Button>
+      <SettingsPane id="notifications" title="{{ settingsText.notifications }}">
+        <SettingsGroup footer="{{ settingsText.alertsHelp }}">
+          <SettingsRow label="{{ settingsText.alerts }}" setting="activity-alerts">
+            <Button appearance="mac" @click="openWorkspacePage('/activity')">{{ settingsText.openActivity }}</Button>
           </SettingsRow>
-          <SettingsRow label="macOS notifications" :description="nativeNotificationDescription()" setting="macos-notifications" x-show="notificationControls()">
-            <Button appearance="mac" :disabled="requestingNotifications()" :show="nativeNotificationPermission() === 'notDetermined'" @click="allowNativeNotifications">Allow notifications…</Button>
+          <SettingsRow label="{{ settingsText.macNotifications }}" :description="nativeNotificationDescription()" setting="macos-notifications" x-show="notificationControls()">
+            <Button appearance="mac" :disabled="requestingNotifications()" :show="nativeNotificationPermission() === 'notDetermined'" @click="allowNativeNotifications">{{ settingsText.allowNotifications }}</Button>
           </SettingsRow>
         </SettingsGroup>
-        <SettingsGroup title="Delivery">
-          <SettingsRow label="Email delivery" :description="mailDescription()" setting="mail-status" keywords="mail smtp mailer email" />
-          <SettingsRow label="Email alerts" setting="email-alerts" :description="delivery() ? (delivery().email ? 'On' : 'Off') : ''" />
-          <SettingsRow label="Alert webhook" setting="alert-webhook" :description="delivery() ? (delivery().webhook ? 'Set up' : 'Not set up') : ''" />
+        <SettingsGroup title="{{ settingsText.delivery }}">
+          <SettingsRow label="{{ settingsText.emailDelivery }}" :description="mailDescription()" setting="mail-status" keywords="{{ settingsText.emailKeywords }}" />
+          <SettingsRow label="{{ settingsText.emailAlerts }}" setting="email-alerts" :description="delivery() ? (delivery().email ? copy.on : copy.off) : ''" />
+          <SettingsRow label="{{ settingsText.webhook }}" setting="alert-webhook" :description="delivery() ? (delivery().webhook ? copy.configured : copy.unconfigured) : ''" />
         </SettingsGroup>
       </SettingsPane>
 
@@ -129,7 +138,7 @@ export const buildVersion = manifest.version
         the environment, which is the only way the Mac app can have one. The
         key is sealed on the server and never sent back to this page.
       --}}
-      <SettingsPane id="ai" title="AI">
+      <SettingsPane id="ai" title="{{ settingsText.ai }}">
         <SettingsGroup footer="Campaign planning sends your brief and the channels it is for to this provider. Without one, plans come from Postline's built-in planner and are labelled that way.">
           <SettingsRow label="Provider" setting="ai-provider" keywords="anthropic openai ollama">
             <Select variant="mac" v-model:value="aiProvider" placeholder="" :options="aiProviderOptions" data-ai-provider />
@@ -153,7 +162,7 @@ export const buildVersion = manifest.version
         </div>
       </SettingsPane>
 
-      <SettingsPane id="composer" title="Composer">
+      <SettingsPane id="composer" title="{{ settingsText.composer }}">
         <SettingsGroup footer="The limit is the tightest one among the channels that can publish.">
           <SettingsRow label="Character limit" :description="charLimitSource()" setting="character-limit">
             <span :text="charLimitText()">—</span>
@@ -172,7 +181,7 @@ export const buildVersion = manifest.version
         by the AutoDeletePosts job through the same purge engine as the manual
         tool under Channels, so it has the same caps and audit trail.
       --}}
-      <SettingsPane id="deletion" title="Automatic Cleanup">
+      <SettingsPane id="deletion" title="{{ settingsText.cleanup }}">
         <SettingsGroup footer="Checked once a day. A post whose date can't be read is always kept.">
           <SettingsRow label="Delete my posts automatically" :description="statusPill()" setting="auto-delete" keywords="retention cleanup">
             <Switch variant="mac" v-model:checked="autoEnabled" data-retention-enabled />
@@ -216,7 +225,7 @@ export const buildVersion = manifest.version
         The workspace as one file (#209): export it, bring it into another
         install, or delete everything here. Sign-ins and keys never travel.
       --}}
-      <SettingsPane id="data" title="Data">
+      <SettingsPane id="data" title="{{ settingsText.data }}">
         <SettingsGroup footer="One JSON file with your posts and their results, threads, campaigns, blog posts, Listening rules, settings and the images on queued posts. Network sign-ins, app keys and the AI key stay here; connect them again on the other install.">
           <SettingsRow label="Export this workspace" setting="export" keywords="download backup archive">
             <a class="inline-flex items-center px-3 h-7 text-ink text-ui bg-panel border border-line rounded-md" href="/api/postline/settings/export" download data-no-router>Export…</a>
@@ -239,7 +248,7 @@ export const buildVersion = manifest.version
         </div>
       </SettingsPane>
 
-      <SettingsPane id="account" title="Account">
+      <SettingsPane id="account" title="{{ settingsText.account }}">
         {{--
           Ways in besides the password (#95). The password always keeps
           working, so neither a lost passkey nor a lost phone locks the owner
@@ -320,7 +329,7 @@ export const buildVersion = manifest.version
           </SettingsRow>
         </SettingsGroup>
       </SettingsPane>
-      <SettingsPane id="about" title="About">
+      <SettingsPane id="about" title="{{ settingsText.about }}">
         <SettingsPaneHeader icon="i-hugeicons-sent" tone="red" title="Postline" description="Draft once, then publish to every connected account." />
         <SettingsGroup>
           <SettingsRow label="Postline version" setting="desktop-version" keywords="version update" :description="desktopUpdate()?.currentVersion || '{{ buildVersion }}'">
@@ -371,6 +380,8 @@ export const buildVersion = manifest.version
       }
     }
 
+    const { locale: language, messages: copy } = {{ settingsCopy }}
+    const numbers = new Intl.NumberFormat(language)
     const themePref = state(readStoredTheme())
     const pane = state('general')
     const composerFormat = useLocalStorage<ComposerFormat>(COMPOSER_DEFAULT_FORMAT_KEY, 'single')
@@ -439,9 +450,10 @@ export const buildVersion = manifest.version
       catch {}
     }
     // The picker says 'auto' where this app's stored preference says 'system'.
+    const appearanceOptions = {{ settingsAppearanceOptions }}
     const appearance = state(readStoredTheme() === 'system' ? 'auto' : readStoredTheme())
-    const channelSummary = state('Checking…')
-    const channelPill = state('Checking')
+    const channelSummary = state(copy.checkingStatus)
+    const channelPill = state(copy.checking)
     const charLimitText = state('—')
     const charLimitSource = state('—')
 
@@ -808,9 +820,9 @@ export const buildVersion = manifest.version
         body.set('timezone', workspaceZone())
         body.set('shareMediaByTunnel', shareMediaByTunnel() ? '1' : '0')
         body.set('publishingPaused', publishingPaused() ? '1' : '0')
-        const payload = await requestJson('/api/postline/settings/workspace', { method: 'POST', body }, 'Could not save.')
+        const payload = await requestJson('/api/postline/settings/workspace', { method: 'POST', body }, copy.saveFailed)
         applyWorkspace(payload.data)
-        workspaceMessage.set('Saved.')
+        workspaceMessage.set(copy.saved)
         workspaceTone.set('success')
       }
       catch (error) {
@@ -877,8 +889,8 @@ export const buildVersion = manifest.version
     const mailDescription = derived(() => {
       const current = mail()
       if (!current) return ''
-      if (!current.configured) return 'Emails are written to the log, not sent: no mail service is set up on this machine. The self-hosting guide shows how to add one.'
-      return current.from ? `Sent through ${current.driver} as ${current.from}.` : `Sent through ${current.driver}.`
+      if (!current.configured) return copy.noMailer
+      return current.from ? copy.mailerFrom.replace('{driver}', () => current.driver).replace('{sender}', () => current.from) : copy.mailer.replace('{driver}', () => current.driver)
     })
     const delivery = state<{ email: boolean, webhook: boolean } | null>(null)
     const desktop = useNativeDesktop()
@@ -888,11 +900,11 @@ export const buildVersion = manifest.version
     const requestingNotifications = state(false)
     const nativeNotificationDescription = derived(() => {
       switch (nativeNotificationPermission()) {
-        case 'authorized': return 'On'
-        case 'provisional': return 'Delivered quietly. Choose banners and sounds in macOS System Settings.'
-        case 'denied': return 'Off. Allow Postline in macOS System Settings → Notifications.'
-        case 'notDetermined': return 'Allow Postline to notify you when a post or a channel needs attention.'
-        case 'unknown': return 'Check Postline’s permission in macOS System Settings → Notifications.'
+        case 'authorized': return copy.on
+        case 'provisional': return copy.quiet
+        case 'denied': return copy.denied
+        case 'notDetermined': return copy.needsPermission
+        case 'unknown': return copy.unknownPermission
         default: return ''
       }
     })
@@ -1030,7 +1042,7 @@ export const buildVersion = manifest.version
     const retentionTone = state('')
     const lastRunText = state('')
 
-    const statusPill = derived(() => savedEnabled() ? `On · ${savedDays()} days` : 'Off')
+    const statusPill = derived(() => savedEnabled() ? copy.retention.replace('{count}', numbers.format(savedDays())) : copy.off)
     const daysValid = derived(() => Number.isInteger(autoDays()) && autoDays() >= 1 && autoDays() <= 3650)
     // Consent is asked for whenever a change makes it delete more: switching
     // it on, a shorter age limit, another network, or the wider scope. The
@@ -1208,12 +1220,12 @@ export const buildVersion = manifest.version
 
         channelSummary.set(
           ready.length > 0
-            ? `${ready.length} of ${channels.length} ready: ${ready.map(entry => providerLabel(entry.provider)).join(', ')}.`
+            ? copy.readyChannels.replace('{ready}', numbers.format(ready.length)).replace('{total}', numbers.format(channels.length)).replace('{channels}', () => ready.map(entry => providerLabel(entry.provider)).join(', '))
             : pending.length > 0
-              ? `${pending.length} of ${channels.length} connected, none able to publish yet.`
-              : 'No channels connected yet.',
+              ? copy.pendingChannels.replace('{pending}', numbers.format(pending.length)).replace('{total}', numbers.format(channels.length))
+              : copy.noChannels,
         )
-        channelPill.set(ready.length > 0 ? `${ready.length}/${channels.length}` : 'Setup')
+        channelPill.set(ready.length > 0 ? `${ready.length}/${channels.length}` : copy.setup)
 
         // The binding limit is the tightest among the channels that can
         // actually publish: with Bluesky on, 300 constrains the post however
@@ -1231,8 +1243,8 @@ export const buildVersion = manifest.version
           charLimitSource.set('No channels connected')
         }
       }).catch(() => {
-        channelSummary.set('Could not load channel status.')
-        channelPill.set('Unknown')
+        channelSummary.set(copy.channelStatusFailed)
+        channelPill.set(copy.unknown)
       })
     })
   </script>
