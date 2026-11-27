@@ -106,7 +106,7 @@ depends on it, so start with one.
 |---|---|
 | [Bluesky](docs/networks/bluesky.md) | A handle and an app password. No developer account |
 | [Mastodon](docs/networks/mastodon.md) | Your instance URL and an access token |
-| [X](docs/networks/x.md) | An OAuth 2.0 app. X bills API use per post |
+| [X](docs/networks/x.md) | An OAuth 2.0 app for publishing. The Mac app can also read visible posts from your X browser session |
 | [LinkedIn](docs/networks/linkedin.md) | An app with Sign In with LinkedIn using OpenID Connect and Share on LinkedIn |
 | [Instagram](docs/networks/instagram.md) | A Meta app, a Business or Creator account and a Facebook Page |
 | [Threads](docs/networks/threads.md) | A Meta app with the Threads API |
