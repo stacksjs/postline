@@ -7,11 +7,7 @@
   <section class="grid gap-5" data-postline-page="activity" data-testid="activity-page">
     <WorkspacePageHeader title="Activity">
       <template #description>Every send to a network and when each background job last ran.</template>
-      <div class="grid grid-cols-3 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Show">
-        <button class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="filter() === ''" @click="setFilter('')">All</button>
-        <button class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="filter() === 'published'" @click="setFilter('published')">Sent</button>
-        <button class="inline-flex items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="filter() === 'failed'" @click="setFilter('failed')">Failed</button>
-      </div>
+      <SegmentedControl label="Send status" size="sm" :value="filter()" :options="[{ value: '', label: 'All' }, { value: 'published', label: 'Sent' }, { value: 'failed', label: 'Failed' }]" @change="setFilter" />
     </WorkspacePageHeader>
 
     <p class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !schedulerWarning() }" :text="schedulerWarning()" role="status" data-scheduler-warning></p>

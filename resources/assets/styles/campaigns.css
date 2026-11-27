@@ -370,9 +370,6 @@
 .campaign-queued-notice p > span { margin-top: 4px; color: var(--ink); }
 .campaign-queued-notice p > small { margin-top: 8px; opacity: .82; }
 
-.campaign-view-toggle { display: inline-flex; min-width: 78px; height: 32px; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 10px; font-weight: 700; transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease; }
-.campaign-view-toggle[data-active="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
-
 @media (max-width: 1180px) {
   .campaign-workspace { grid-template-columns: minmax(0, 1fr) 300px; }
   .campaign-list-row { grid-template-columns: 80px minmax(160px, 1fr) auto auto; }

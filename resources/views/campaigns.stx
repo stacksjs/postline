@@ -17,14 +17,7 @@
         <select id="campaign-picker" class="px-3 h-9 min-w-44 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus" x-show="campaignsList().length" @change="selectCampaign($event.target.value)">
           <option x-for="option in campaignsList()" :value="option.id" :selected="option.id === campaign()?.id">{{ option.name }}</option>
         </select>
-        <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Campaign view" x-show="campaign()">
-          <button class="campaign-view-toggle" type="button" :data-active="view() === 'calendar'" :aria-pressed="view() === 'calendar'" @click="view.set('calendar')">
-            <span class="h-3.5 w-3.5 i-hugeicons-calendar-03" aria-hidden="true"></span><span>Calendar</span>
-          </button>
-          <button class="campaign-view-toggle" type="button" :data-active="view() === 'list'" :aria-pressed="view() === 'list'" @click="view.set('list')">
-            <span class="h-3.5 w-3.5 i-hugeicons-menu-01" aria-hidden="true"></span><span>List</span>
-          </button>
-        </div>
+        <SegmentedControl label="Campaign view" size="sm" :show="campaign()" v-model:value="view" :options="[{ value: 'calendar', label: 'Calendar' }, { value: 'list', label: 'List' }]" />
         <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors" type="button" x-show="campaign()" @click="openCampaignForm()">
           <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
           <span>New campaign</span>

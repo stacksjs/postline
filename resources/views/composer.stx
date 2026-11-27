@@ -26,10 +26,7 @@
               <span :text="connectionLabel()">Checking accounts…</span>
             </a>
           </div>
-          <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Post format">
-            <button class="px-2.5 py-1.5 min-w-19 text-xs rounded-lg transition-colors" type="button" data-view-toggle data-composer-mode="single" :data-active="composerFormat() === 'single'" :aria-pressed="composerFormat() === 'single'" :disabled="editingQueued()" @click="chooseFormat('single')">Single</button>
-            <button class="px-2.5 py-1.5 min-w-19 text-xs rounded-lg transition-colors" type="button" data-view-toggle data-composer-mode="thread" :data-active="composerFormat() === 'thread'" :aria-pressed="composerFormat() === 'thread'" :disabled="editingQueued()" @click="chooseFormat('thread')">Thread</button>
-          </div>
+          <SegmentedControl label="Post format" size="sm" :value="composerFormat()" :disabled="editingQueued()" :options="[{ value: 'single', label: 'Single' }, { value: 'thread', label: 'Thread' }]" @change="chooseFormat" />
         </header>
 
         <div class="grid gap-1 p-4">

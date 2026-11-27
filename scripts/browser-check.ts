@@ -640,7 +640,7 @@ async function checkLocalComposerDraft(cdp: Cdp): Promise<void> {
 async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
   await auditPage(`${site}/composer`, { cdp })
   const blog = "document.querySelector('[data-provider-toggle=blog]')"
-  const format = "document.querySelector('[data-composer-mode=thread]')"
+  const format = "document.querySelector('[data-stx-segmented-control] button[aria-label=Thread]')"
   const editors = "document.querySelectorAll('[data-bluesky-text]')"
   const segments = ['Keyboard thread draft opening\n\nAn **emphasized** note.', 'Keyboard thread draft conclusion']
   await waitUntil('The Blog is available in the composer', () => evaluate<boolean>(cdp, `Boolean(${blog}?.getClientRects().length)`), 5_000)
@@ -669,7 +669,7 @@ async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
     document.querySelectorAll('[data-network-preview=blog] [data-preview-segment]').length === 2
       && document.querySelector('[data-network-preview=blog] [data-preview-copy] strong')?.textContent === 'emphasized'
       && document.querySelector('[data-network-preview=blog] [data-preview-segment]:nth-of-type(2)')?.textContent.includes('Post 2')`), 5_000)
-  await evaluate(cdp, "document.querySelector('[data-composer-mode=single]').focus()")
+  await evaluate(cdp, "document.querySelector('[data-stx-segmented-control] button[aria-label=Single]').focus()")
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Single format shows the opening without dropping the second segment', () => evaluate<boolean>(cdp, `
     ${editors}.length === 2
@@ -875,7 +875,7 @@ async function checkPhoneNavigation(cdp: Cdp): Promise<void> {
       && document.activeElement.matches('${more}')
       && document.activeElement.getAttribute('aria-expanded') === 'false'`), 5_000)
 
-  await evaluate(cdp, `Array.from(document.querySelectorAll('[data-view-toggle]')).find(button => button.innerText.includes('Agenda')).click()`)
+  await evaluate(cdp, `Array.from(document.querySelectorAll('[aria-label="Queue view"] button')).find(button => button.innerText.includes('Agenda')).click()`)
   await waitUntil('The agenda replaces the month grid', () => evaluate<boolean>(cdp, `
     document.querySelector('[aria-label="Monthly agenda"]').getClientRects().length > 0
       && !document.querySelector('[data-cal-cell]')?.getClientRects().length`), 5_000)
@@ -967,7 +967,7 @@ async function checkQueueRescheduling(cdp: Cdp): Promise<void> {
   })()`)
   await auditPage(`${site}/queue`, { cdp })
   await evaluate(cdp, `
-    [...document.querySelectorAll('[data-view-toggle]')].find(button => button.textContent.trim() === 'List').click()
+    [...document.querySelectorAll('[aria-label="Queue view"] button')].find(button => button.textContent.trim() === 'List').click()
     document.getElementById('queue-tab-scheduled').click()
   `)
   const select = `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Select posts')`
@@ -1223,6 +1223,13 @@ async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
       const posts = (await response.json()).data.selected.posts
       return posts.find(post => post.id === ${fixture.postId})?.scheduledAt.endsWith('13:00:00')
     })()`), 5_000)
+    const views = `document.querySelector('[data-stx-segmented-control][aria-label="Campaign view"]')`
+    await evaluate(cdp, `${views}.querySelector('[aria-label=List]').focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Campaign List is selected and shows the same post', () => evaluate<boolean>(cdp, `
+      ${views}.querySelector('[aria-label=List]').getAttribute('aria-pressed') === 'true'
+        && ${views}.querySelector('[aria-label=Calendar]').getAttribute('aria-pressed') === 'false'
+        && [...document.querySelectorAll('.campaign-list-row')].some(row => row.getClientRects().length && row.textContent.includes('Plan the scheduling fixture'))`), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: recommendation.identifier })

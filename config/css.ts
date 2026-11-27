@@ -409,8 +409,6 @@ const APP_UI: string = `
  * colour utility in its `class` attribute.
  */
 const QUEUE_STATUS: string = `
-[data-view-toggle] { color: var(--muted); }
-[data-view-toggle][data-active]:not([data-active="false"]) { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
 /* Queue tabs and per-network chips (#168). */
 [data-queue-tab] { color: var(--muted); }
 [data-queue-tab]:hover { color: var(--ink); background: var(--panel-2); }

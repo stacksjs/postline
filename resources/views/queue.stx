@@ -10,14 +10,7 @@
     <WorkspacePageHeader title="Scheduled posts">
       <template #description>What's drafted, scheduled, and recently published.</template>
       <div class="flex flex-wrap gap-2 items-center">
-        <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Queue view" x-show="!activeSearch()">
-          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'list'" :aria-pressed="view() === 'list'" @click="setView('list')">
-            <span class="h-3.5 w-3.5 i-hugeicons-menu-01" aria-hidden="true"></span><span>List</span>
-          </button>
-          <button class="inline-flex gap-1.5 items-center justify-center px-3 py-1.5 font-semibold text-xs rounded-lg transition-colors" type="button" data-view-toggle :data-active="view() === 'calendar'" :aria-pressed="view() === 'calendar'" @click="setView('calendar')">
-            <span class="h-3.5 w-3.5 i-hugeicons-calendar-03" aria-hidden="true"></span><span class="sm:hidden">Agenda</span><span class="hidden sm:inline">Calendar</span>
-          </button>
-        </div>
+        <SegmentedControl label="Queue view" size="sm" :show="!activeSearch()" :value="view()" :options="queueViews()" @change="setView" />
         <a href="/composer" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors">
           <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
           <span>New post</span>
@@ -135,10 +128,7 @@
             </button>
           </div>
           <strong class="text-ui" aria-live="polite" :text="calTitle()">Calendar</strong>
-          <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Calendar period">
-            <button class="px-3 py-1.5 font-semibold text-xs rounded-lg" type="button" data-view-toggle :data-active="calendarPeriod() === 'month'" :aria-pressed="calendarPeriod() === 'month'" @click="calendarPeriod.set('month')">Month</button>
-            <button class="px-3 py-1.5 font-semibold text-xs rounded-lg" type="button" data-view-toggle :data-active="calendarPeriod() === 'week'" :aria-pressed="calendarPeriod() === 'week'" @click="calendarPeriod.set('week')">Week</button>
-          </div>
+          <SegmentedControl label="Calendar period" size="sm" v-model:value="calendarPeriod" :options="[{ value: 'month', label: 'Month' }, { value: 'week', label: 'Week' }]" />
         </header>
         <WorkspaceListSkeleton :show="calendarBusy()" label="Loading calendar" />
         <ErrorState :show="calendarError() && !calendarBusy()" title="Could not load the calendar" :message="calendarError()" @retry="loadCalendar()" />
@@ -293,6 +283,11 @@
 
     const calAnchor = state(dayKey(new Date()))
     const calendarPeriod = useLocalStorage('postline.queue.calendar-period', 'month')
+    const fullCalendar = useMediaQuery('(min-width: 640px)')
+    const queueViews = derived(() => [
+      { value: 'list', label: 'List' },
+      { value: 'calendar', label: fullCalendar() ? 'Calendar' : 'Agenda' },
+    ])
     const calendarItems = state<QueueApiItem[]>([])
     const calendarBusy = state(false)
     const calendarError = state('')
