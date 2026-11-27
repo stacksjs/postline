@@ -204,5 +204,5 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Write the migrated database the check starts from
         run: bun scripts/desktop-bundle.ts
-      - name: Open every view
-        run: bun scripts/browser-check.ts
+      - name: Open every view under the production security policy
+        run: bun scripts/browser-check.ts --production

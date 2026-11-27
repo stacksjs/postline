@@ -2,7 +2,7 @@
  * Open every workspace view in a real browser and fail on what a person
  * would see break (#80).
  *
- *   bun scripts/browser-check.ts [--marketing-screenshots]
+ *   bun scripts/browser-check.ts [--production] [--marketing-screenshots]
  *
  * Starts the API and the site on ports of their own against a fresh, migrated
  * database in a temporary directory, creates the workspace account, signs in,
@@ -16,12 +16,14 @@
  * whose bindings all went dead, or an editor that never mounted.
  */
 import type { Cdp } from '@stacksjs/testing/browser'
+import { randomBytes } from 'node:crypto'
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
 import { auditPage, closeSharedBrowsers, launch } from '@stacksjs/testing/browser'
 
+const production = process.argv.includes('--production')
 const root = join(import.meta.dir, '..')
 const out = join(root, 'storage/framework/browser-check')
 const productImages = join(root, 'public/images/product')
@@ -47,7 +49,9 @@ copyFileSync(join(root, 'app/Desktop/database.template.sqlite'), database)
 
 const env = {
   ...process.env,
-  APP_ENV: 'local',
+  APP_ENV: production ? 'production' : 'local',
+  APP_URL: site,
+  APP_KEY: `base64:${randomBytes(32).toString('base64')}`,
   POSTLINE_SITE: '',
   DB_CONNECTION: 'sqlite',
   DB_DATABASE_PATH: database,
@@ -60,8 +64,8 @@ const env = {
 }
 
 const servers = [
-  Bun.spawn(['./buddy', 'dev:api'], { cwd: root, env, stdout: 'ignore', stderr: 'pipe' }),
-  Bun.spawn(['./buddy', 'dev:frontend'], { cwd: root, env, stdout: 'ignore', stderr: 'pipe' }),
+  Bun.spawn(production ? ['./buddy', 'serve:api', '--port', String(API_PORT)] : ['./buddy', 'dev:api'], { cwd: root, env, stdout: 'ignore', stderr: 'pipe' }),
+  Bun.spawn(['./buddy', production ? 'serve' : 'dev:frontend'], { cwd: root, env, stdout: 'ignore', stderr: 'pipe' }),
 ]
 
 async function waitUntil(what: string, ready: () => Promise<boolean>, timeoutMs = 300_000): Promise<void> {
@@ -1579,10 +1583,45 @@ async function checkCampaignLocalDates(cdp: Cdp): Promise<void> {
   }
 }
 
+async function watchPageSecurity(cdp: Cdp): Promise<void> {
+  const responses = await Promise.all([fetch(`${site}/login`), fetch(`${site}/login`)])
+  const nonces = await Promise.all(responses.map(async (response) => {
+    const policy = response.headers.get('content-security-policy') || ''
+    const nonce = /'nonce-([^']+)'/.exec(policy)?.[1]
+    if (!nonce || policy.includes('unsafe-eval') || !policy.includes("frame-ancestors 'self'") || !policy.includes("form-action 'self'"))
+      throw new Error('The page response needs an enforcing CSP with a script nonce and same-origin frame and form directives.')
+    if (response.headers.get('cross-origin-opener-policy') !== 'same-origin-allow-popups'
+      || !response.headers.get('permissions-policy') || response.headers.get('x-content-type-options') !== 'nosniff')
+      throw new Error('The page response is missing its opener, permissions, or content-type header.')
+    const html = await response.text()
+    if (!html.includes('data-stx-csp-script') || !html.includes(`nonce="${nonce}"`))
+      throw new Error('The sign-in page did not receive nonce-authorized STX bindings.')
+    return nonce
+  }))
+  if (nonces[0] === nonces[1]) throw new Error('The web server reused a CSP nonce.')
+
+  await cdp.send('Runtime.addBinding', { name: 'reportPostlineCspViolation' })
+  cdp.on('Runtime.bindingCalled', ({ name, payload }) => {
+    if (name === 'reportPostlineCspViolation') failures.push(`CSP violation: ${payload}`)
+  })
+  await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: `
+    document.addEventListener('securitypolicyviolation', event => {
+      reportPostlineCspViolation(location.pathname + ' ' + event.violatedDirective + ' ' + event.blockedURI)
+    })
+    const warn = console.warn
+    console.warn = (...args) => {
+      const lines = args.map(String)
+      if (lines.some(line => line.includes('[stx:csp]'))) reportPostlineCspViolation(location.pathname + ' ' + lines.join(' '))
+      warn.apply(console, args)
+    }
+  ` })
+}
+
 async function checkFirstRun(cdp: Cdp): Promise<void> {
   const setup = `document.querySelector('[data-testid="setup-page"]')`
   const input = (name: string): string => `${setup}.querySelector(` + JSON.stringify(`input[name=${name}]`) + ')'
   const type = async (selector: string, value: string): Promise<void> => {
+    await waitUntil('The setup input', () => evaluate<boolean>(cdp, `Boolean(${selector}?.getClientRects().length)`), 5_000)
     await evaluate(cdp, `${selector}.focus(); ${selector}.select()`)
     await cdp.send('Input.insertText', { text: value })
   }
@@ -1933,6 +1972,7 @@ try {
 
   const { cdp, close } = await launch({ viewport: { width: 1280, height: 800 } })
   try {
+    if (production) await watchPageSecurity(cdp)
     await checkFirstRun(cdp)
     if (marketingScreenshots) await captureMarketingScreenshots(cdp)
     else await checkWorkspace(cdp)

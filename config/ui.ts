@@ -28,6 +28,7 @@ import { url } from './domains'
 
 export default {
   site: { url },
+  csp: { enabled: true, precompile: true },
 
   // Project root. Pinned so directory keys are never double-prefixed.
   root: '.',

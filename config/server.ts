@@ -20,9 +20,8 @@ export default {
 
   // Headers on every rendered page: HSTS on a real https host, an opener
   // policy that still lets OAuth popups report back, and a permissions policy.
-  // The Content-Security-Policy only reports for now, so the browser console
-  // shows what enforcing it would break before it is switched on (#90).
+  // STX precompiles bindings so nonce-authorized scripts run without eval.
   security: {
-    csp: 'report-only',
+    csp: true,
   },
 } satisfies ServerConfig
