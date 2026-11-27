@@ -83,6 +83,7 @@ declare global {
   const RecurringPost: typeof import('../../../app/Models/RecurringPost')['default']
   const SocialDriver: typeof import('../../../app/Models/SocialDriver')['default']
   const SocialIdentity: typeof import('../../../app/Models/SocialIdentity')['default']
+  const SocialOperationLease: typeof import('../../../app/Models/SocialOperationLease')['default']
   const ThreadPublishClaim: typeof import('../../../app/Models/ThreadPublishClaim')['default']
   const TimelineItem: typeof import('../../../app/Models/TimelineItem')['default']
   const TrackedLink: typeof import('../../../app/Models/TrackedLink')['default']

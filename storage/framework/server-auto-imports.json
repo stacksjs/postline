@@ -147,6 +147,7 @@
     "SocialAccount": true,
     "SocialDriver": true,
     "SocialIdentity": true,
+    "SocialOperationLease": true,
     "SocialPost": true,
     "StorageItem": true,
     "StorageItemTask": true,

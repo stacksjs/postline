@@ -79,7 +79,7 @@ export function isRefusedRefresh(error: unknown): boolean {
   return /invalid_grant|invalid_token|token (?:has )?(?:expired|been revoked)/i.test(message)
 }
 
-/** Beside the database and named after it, so two databases never share a lock (see purge-lock.ts). */
+/** Beside the database and named after it, so two databases never share a lock. */
 function lockPath(identityId: number): string {
   const database = String(process.env.DB_DATABASE_PATH || '').trim()
   if (!database) return join(process.cwd(), 'storage/framework/runtime', `postline-token-${identityId}.lock`)

@@ -151,6 +151,16 @@ describe('a run in the background', () => {
     await settle(service, first.runId)
   }, 30_000)
 
+  test('an automatic cleanup cannot overlap a confirmed API cleanup', async () => {
+    const manual = fakeNetwork(3)
+    const scheduled = fakeNetwork(3)
+    const preview = await manual.service.preview({ providers: ['bluesky'], scope: 'all' })
+    const running = manual.service.start({ providers: ['bluesky'], scope: 'all', confirmation: preview.confirmation, previewToken: preview.previewToken })
+    await expect(scheduled.service.purgeOlderThan({ providers: ['bluesky'], scope: 'all', olderThanDays: 30 })).rejects.toThrow('already in progress')
+    expect(scheduled.deleted).toEqual([])
+    expect((await settle(manual.service, running.runId)).deleted).toBe(3)
+  })
+
   test('stopping it leaves the rest of the posts alone', async () => {
     const { service, deleted } = fakeNetwork(6)
     // The real pause between deletes, so there is time to stop after the first.

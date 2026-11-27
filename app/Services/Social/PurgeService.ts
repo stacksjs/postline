@@ -3,7 +3,8 @@ import { timingSafeEqual } from 'node:crypto'
 import process from 'node:process'
 import type { AuthoredPost, ProviderPurgeAdapter, SocialProvider } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
-import { acquirePurgeLock } from '../../Support/Social/purge-lock'
+import type { SocialOperationLease } from './operation-lease'
+import { acquireSocialOperationLease } from './operation-lease'
 import { bluesky } from './BlueskyService'
 import { linkedin } from './LinkedInService'
 import { mastodon } from './MastodonService'
@@ -129,6 +130,13 @@ export const DAILY_DELETE_LIMITS: Partial<Record<SocialProvider, number>> = {
 
 /** Hard ceiling on one run, so a runaway loop can't delete unboundedly. */
 const MAX_DELETIONS_PER_RUN = 2000
+const CLEANUP_LEASE_MS = 2 * 60 * 60 * 1000
+
+function claimCleanup(): SocialOperationLease {
+  const lease = acquireSocialOperationLease('cleanup', CLEANUP_LEASE_MS)
+  if (!lease) throw new UserFacingError('A deletion run is already in progress. Wait for it to finish, then try again.')
+  return lease
+}
 
 /** Pause between deletes — providers rate-limit destructive endpoints hard. */
 const DELETE_DELAY_MS = 250
@@ -232,6 +240,7 @@ interface RunContext {
   trigger: PurgeTrigger
   /** Deletions left in this run: a manual run stops at the count its preview showed. */
   budget: { left: number }
+  lease?: SocialOperationLease
   /** A background run's progress, updated after each deletion. */
   progress?: PurgeProgress
   /** True once the owner asked a background run to stop. */
@@ -318,9 +327,7 @@ export class PurgeService {
     const limit = this.confirmedLimit(input)
     // Taken here, before answering, so a second run is refused straight away
     // rather than discovered by polling.
-    const release = acquirePurgeLock()
-    if (!release)
-      throw new UserFacingError('A deletion run is already in progress. Wait for it to finish, then try again.')
+    const lease = claimCleanup()
 
     const progress: PurgeProgress = {
       runId: crypto.randomUUID(),
@@ -339,7 +346,7 @@ export class PurgeService {
       if (run.status !== 'running') this.runs.delete(id)
     }
 
-    void this.runUnlocked({ ...input, dryRun: false, limit }, progress, () => this.cancelRequested.has(progress.runId))
+    void this.runUnlocked({ ...input, dryRun: false, limit, lease }, progress, () => this.cancelRequested.has(progress.runId))
       .then((result) => {
         progress.result = result
         progress.status = this.cancelRequested.has(progress.runId) ? 'cancelled' : 'completed'
@@ -351,7 +358,7 @@ export class PurgeService {
       .finally(() => {
         progress.finishedAt = new Date().toISOString()
         this.cancelRequested.delete(progress.runId)
-        release()
+        lease.release()
       })
 
     return progress
@@ -411,18 +418,16 @@ export class PurgeService {
     if (input.dryRun)
       return await this.runUnlocked(input)
 
-    const release = acquirePurgeLock()
-    if (!release)
-      throw new Error('A deletion run is already in progress. Wait for it to finish, then try again.')
+    const lease = claimCleanup()
     try {
-      return await this.runUnlocked(input)
+      return await this.runUnlocked({ ...input, lease })
     }
     finally {
-      release()
+      lease.release()
     }
   }
 
-  private async runUnlocked(input: PurgeInput & { dryRun: boolean, trigger?: PurgeTrigger, limit?: number }, progress?: PurgeProgress, cancelled?: () => boolean): Promise<PurgeResult> {
+  private async runUnlocked(input: PurgeInput & { dryRun: boolean, trigger?: PurgeTrigger, limit?: number, lease?: SocialOperationLease }, progress?: PurgeProgress, cancelled?: () => boolean): Promise<PurgeResult> {
     const scope: PurgeScope = input.scope === 'all' ? 'all' : 'tracked'
     const providers = this.resolveProviders(input.providers)
     const cutoff = cutoffFor(input.olderThanDays)
@@ -433,6 +438,7 @@ export class PurgeService {
       olderThanDays: cutoff ? Math.floor(Number(input.olderThanDays)) : null,
       trigger: input.trigger || 'manual',
       budget: { left: input.limit ?? Number.POSITIVE_INFINITY },
+      lease: input.lease,
       progress,
       cancelled,
     }
@@ -577,6 +583,7 @@ export class PurgeService {
     }
 
     const deletedTargetIds: number[] = []
+    const deletedUris: string[] = []
     const affectedPostIds = new Set<number>()
 
     for (const [index, candidate] of candidates.entries()) {
@@ -586,10 +593,16 @@ export class PurgeService {
         result.truncated = true
         break
       }
+      if (!context.lease?.renew()) {
+        result.truncated = true
+        result.skippedReason = 'The cleanup claim expired. Review this run before starting a new cleanup.'
+        break
+      }
       context.budget.left -= 1
       try {
         await adapter.deletePost({ uri: candidate.uri, cid: candidate.cid })
         result.deleted += 1
+        deletedUris.push(candidate.uri)
         if (context.progress) context.progress.deleted += 1
         if (candidate.targetId) deletedTargetIds.push(candidate.targetId)
         if (candidate.postId) affectedPostIds.add(candidate.postId)
@@ -619,9 +632,9 @@ export class PurgeService {
       }
     }
 
-    result.localRemoved = await this.removeLocal(deletedTargetIds, affectedPostIds, adapter.identityId, candidates)
+    result.localRemoved = await this.removeLocal(deletedTargetIds, affectedPostIds, adapter.identityId, deletedUris)
 
-    const status = result.failed === 0 ? 'completed' : result.deleted > 0 ? 'partial' : 'failed'
+    const status = !result.failed && !result.skippedReason ? 'completed' : result.deleted > 0 ? 'partial' : 'failed'
     await this.recordRun(result, context, status)
     return result
   }
@@ -732,7 +745,7 @@ export class PurgeService {
     targetIds: number[],
     affectedPostIds: Set<number>,
     identityId: number,
-    candidates: PurgeCandidate[],
+    deletedUris: string[],
   ): Promise<number> {
     let removed = 0
 
@@ -761,8 +774,7 @@ export class PurgeService {
       removed += orphaned.length
     }
 
-    const uris = candidates.map(candidate => candidate.uri).filter(Boolean)
-    for (const batch of chunk(uris, 200)) {
+    for (const batch of chunk(deletedUris, 200)) {
       if (!batch.length) continue
       await database
         .deleteFrom('timeline_items')

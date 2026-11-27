@@ -1906,6 +1906,15 @@ declare module '@stacksjs/database' {
       account_id: number
       social_driver_id: number
     }
+    social_operation_leases: {
+      // columns
+      id: number
+      uuid: string
+      created_at: string
+      updated_at: string | null
+      lease_key: string
+      expires_at: string
+    }
     social_posts: {
       // columns
       id: number

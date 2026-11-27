@@ -3903,10 +3903,80 @@
             "type": "unique"
           }
         ]
+      },
+      {
+        "table": "social_operation_leases",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "lease_key",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "expires_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "UTC_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "social_operation_leases_key_unique",
+            "columns": [
+              "lease_key"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "social_operation_leases_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
       }
     ]
   },
-  "hash": "a53b4466ed75cd9576895ad60a8d2be6ed598efb62c6fe4fc6e926e5c2e8b7b3",
+  "hash": "5402be8e599114a19a6c8c86b611d63c9211b48075227320b36f9bd9331f3655",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-27T23:21:45.631Z"
+  "updatedAt": "2026-11-27T23:42:29.453Z"
 }
