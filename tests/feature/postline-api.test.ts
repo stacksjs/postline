@@ -54,6 +54,7 @@ describe('postline api — auth', () => {
     ['/api/postline/queue/image?id=1&index=0'],
     ['/api/postline/campaigns'],
     ['/api/postline/listening'],
+    ['/api/postline/inbox/mentions'],
     ['/api/postline/activity'],
     ['/api/postline/alerts'],
     ['/api/postline/system'],
@@ -63,6 +64,13 @@ describe('postline api — auth', () => {
     // 401, not 500. A missing table used to surface here as a server error,
     // which reads as "the app is broken" rather than "you are not signed in".
     expect(response.status).toBe(401)
+  })
+})
+
+describe('public inbox API', () => {
+  test.each(['sync', 'read'])('requires authentication for %s', async (action) => {
+    const request = await featureTest().post(`/api/postline/inbox/mentions/${action}`, { id: 1 })
+    request.assertStatus(401)
   })
 })
 

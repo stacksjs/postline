@@ -127,6 +127,8 @@ export interface SafeFetchOptions {
   /** Hard cap on the body, enforced while reading. */
   maxBytes: number
   headers?: Record<string, string>
+  /** Reject redirects when a request carries credentials for one origin. */
+  redirect?: 'error'
   /** Injected in tests. */
   fetcher?: typeof fetch
   resolve?: Resolver
@@ -210,6 +212,8 @@ async function follow(value: string, options: SafeFetchOptions, signal: AbortSig
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location')
       await response.body?.cancel().catch(() => {})
+      if (options.redirect === 'error')
+        throw new UnsafeUrlError('That address returned an unexpected redirect.')
       if (!location)
         throw new UnsafeUrlError('That address redirected nowhere.')
       if (hop >= MAX_REDIRECTS)

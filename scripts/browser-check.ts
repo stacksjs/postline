@@ -16,6 +16,7 @@
  * whose bindings all went dead, or an editor that never mounted.
  */
 import type { Cdp } from '@stacksjs/testing/browser'
+import { Database } from 'bun:sqlite'
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -1022,6 +1023,47 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
     await evaluate(cdp, `sessionStorage.removeItem('test-x-window-open'); localStorage.removeItem('test-x-session-handle')`)
   }
+}
+
+async function checkPublicInbox(cdp: Cdp): Promise<void> {
+  const fixture = new Database(database)
+  try {
+    const identity = fixture.query(`INSERT INTO social_identities (uuid, provider, handle, auth_status)
+      VALUES (?, 'bluesky', 'inbox-check.example', 'missing') RETURNING id`).get(crypto.randomUUID()) as { id: number }
+    fixture.query(`INSERT INTO inbox_mentions (uuid, social_identity_id, remote_id, kind, author, body, url, posted_at)
+      VALUES (?, ?, 'browser-check', 'reply', 'fixture-author.example', 'A public reply fixture', ?, CURRENT_TIMESTAMP)`)
+      .run(crypto.randomUUID(), identity.id, 'https://bsky.app/profile/fixture-author.example/post/abc')
+  }
+  finally {
+    fixture.close()
+  }
+
+  await auditPage(`${site}/inbox`, { cdp })
+  const sections = `document.querySelectorAll('[aria-label="Inbox sections"] button')`
+  const inbox = `document.querySelector('[data-testid="public-inbox"]')`
+  await evaluate(cdp, `${sections}[1].focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Inbox opens public replies with the keyboard and loads the saved post', () => evaluate<boolean>(cdp, `
+    ${sections}[1].getAttribute('aria-pressed') === 'true'
+      && ${sections}[0].getAttribute('aria-pressed') === 'false'
+      && !document.querySelector('[aria-label="Conversations"]').getClientRects().length
+      && Boolean(${inbox}?.getClientRects().length)
+      && ${inbox}?.querySelector('article p')?.textContent === 'A public reply fixture'
+      && ${inbox}?.querySelector('article a')?.href === 'https://bsky.app/profile/fixture-author.example/post/abc'
+      && Boolean(${inbox}?.querySelector('article time')?.textContent)`), 5000)
+  await evaluate(cdp, `${inbox}.querySelector('article button').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Inbox marks the reply as read in the database', () => evaluate<boolean>(cdp, `(async () => {
+    const payload = await fetch('/api/postline/inbox/mentions').then(response => response.json())
+    return !${inbox}?.querySelector('article button')?.getClientRects().length
+      && payload.data?.entries?.some(entry => entry.author === 'fixture-author.example' && entry.read)
+  })()`), 5000)
+  await evaluate(cdp, `${sections}[0].focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Inbox returns to direct messages', () => evaluate<boolean>(cdp, `
+    ${sections}[0].getAttribute('aria-pressed') === 'true'
+      && Boolean(document.querySelector('[aria-label="Conversations"]').getClientRects().length)
+      && !${inbox}?.getClientRects().length`), 5000)
 }
 
 async function checkInstagramPagePicker(cdp: Cdp): Promise<void> {
@@ -2286,6 +2328,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkWorkspaceCommands(cdp)
   await checkWorkspaceBootstrap(cdp)
   await checkChannels(cdp)
+  await checkPublicInbox(cdp)
   await checkXBrowserSession(cdp)
   await checkInstagramPagePicker(cdp)
   await checkNetworkComponents(cdp)

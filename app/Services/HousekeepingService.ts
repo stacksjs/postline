@@ -18,6 +18,7 @@ const database = db as any
 export const KEEP_DAYS = {
   /** Keyword matches from Listening: a search result, read the week it arrives. */
   keywordMentions: 90,
+  publicInbox: 90,
   /** The home-feed cache behind Timeline, refetched on every visit. */
   timelineItems: 30,
   /** The log of cleanup runs. The last 24 hours also count toward Threads' daily cap. */
@@ -34,6 +35,7 @@ export const VACUUM_JOB = 'VacuumDatabase'
 
 export interface PruneResult {
   keywordMentions: number
+  publicInbox: number
   timelineItems: number
   purgeRuns: number
   readAlerts: number
@@ -55,6 +57,7 @@ async function deleteOlder(table: string, column: string, days: number, extra?: 
 export class HousekeepingService {
   async prune(): Promise<PruneResult> {
     return {
+      publicInbox: await deleteOlder('inbox_mentions', 'posted_at', KEEP_DAYS.publicInbox),
       keywordMentions: await deleteOlder('keyword_mentions', 'created_at', KEEP_DAYS.keywordMentions),
       timelineItems: await deleteOlder('timeline_items', 'created_at', KEEP_DAYS.timelineItems),
       purgeRuns: await deleteOlder('purge_runs', 'created_at', KEEP_DAYS.purgeRuns),

@@ -3,11 +3,12 @@
 @section('title', 'Postline - Inbox')
 
 @section('content')
-  @meta('description', 'Read and answer direct messages from Bluesky and Mastodon in one place.')
+  @meta('description', 'Read direct messages and keep up with public replies and mentions from Bluesky and Mastodon.')
   <section class="grid gap-4" data-postline-page="inbox" data-testid="inbox-page">
     <WorkspacePageHeader title="Inbox">
-      <template #description><span :show="!loading()" :text="inboxOverview()"></span></template>
-      <div class="flex flex-wrap gap-2 items-center">
+      <template #description><span :show="inboxSection() === 'messages' && !loading()" :text="inboxOverview()"></span>
+        <span :show="inboxSection() === 'public'">Public replies and mentions from Bluesky and Mastodon</span></template>
+      <div class="flex flex-wrap gap-2 items-center" :show="inboxSection() === 'messages'">
         <button class="inline-flex gap-2 items-center justify-center px-3 h-9 font-semibold text-ink text-xs bg-panel hover:bg-raised border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="unreadCount() === 0" @click="markAllRead">Mark all read</button>
         <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="syncing() || connectedCount() === 0" @click="runSync">
           <span class="h-4 w-4 i-hugeicons-refresh" :class="syncing() ? 'animate-spin' : ''" aria-hidden="true"></span>
@@ -16,7 +17,14 @@
       </div>
     </WorkspacePageHeader>
 
-    <div class="grid gap-4 lg:grid-cols-[minmax(13rem,18rem)_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]">
+    <div class="flex flex-wrap gap-2" role="group" aria-label="Inbox sections">
+      <button class="px-3 py-2 font-semibold text-ui border border-line rounded-xl" type="button" :class="inboxSection() === 'messages' ? 'bg-accent text-on-accent' : 'bg-panel text-ink hover:bg-raised'" :aria-pressed="inboxSection() === 'messages'" @click="inboxSection.set('messages')">Direct messages</button>
+      <button class="px-3 py-2 font-semibold text-ui border border-line rounded-xl" type="button" :class="inboxSection() === 'public' ? 'bg-accent text-on-accent' : 'bg-panel text-ink hover:bg-raised'" :aria-pressed="inboxSection() === 'public'" @click="inboxSection.set('public')">Replies and mentions</button>
+    </div>
+
+    <div :if="inboxSection() === 'public'"><InboxPublicActivity /></div>
+
+    <div :show="inboxSection() === 'messages'" class="grid gap-4 lg:grid-cols-[minmax(13rem,18rem)_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]">
       <aside class="grid content-start gap-4" aria-label="Conversations">
         <Card padding="none" className="shadow-sm">
           <header class="grid gap-2.5 px-4 py-3 border-b border-line">
@@ -136,6 +144,8 @@
 
   <script client>
     import { showNotification } from '../functions/notification'
+
+    const inboxSection = state<'messages' | 'public'>('messages')
     interface InboxConversation {
       id: number
       provider: string

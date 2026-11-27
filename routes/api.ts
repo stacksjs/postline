@@ -201,6 +201,12 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/inbox/reply', 'Actions/Postline/InboxReplyAction').middleware('auth').rateLimit(60, 'hour')
   route.post('/inbox/read', 'Actions/Postline/InboxReadAction').middleware('auth').rateLimit(120, 'minute')
   route.post('/inbox/archive', 'Actions/Postline/InboxArchiveAction').middleware('auth').rateLimit(60, 'minute')
+
+  // Public replies and mentions have their own local mirror.
+  route.get('/inbox/mentions', 'Actions/Postline/PublicInboxListAction').middleware('auth')
+  route.post('/inbox/mentions/sync', 'Actions/Postline/PublicInboxSyncAction').middleware('auth').rateLimit(20, 'hour')
+  route.post('/inbox/mentions/read', 'Actions/Postline/PublicInboxReadAction').middleware('auth').rateLimit(120, 'minute')
+
   route.get('/listening', 'Actions/Postline/KeywordMonitorListAction').middleware('auth')
   route.post('/listening', 'Actions/Postline/KeywordMonitorSaveAction').middleware('auth').rateLimit(30, 'minute')
   route.post('/listening/delete', 'Actions/Postline/KeywordMonitorDeleteAction').middleware('auth').rateLimit(20, 'minute')

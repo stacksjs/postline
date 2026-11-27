@@ -11,7 +11,8 @@
 - **Limits:** whatever your instance allows, 500 characters on most; up to four
   images. Visibility and content warnings are set per post in the composer.
 - **Inbox:** direct conversations (posts with Mentioned people only visibility)
-  appear in Postline's inbox.
+  appear in Direct messages. Public replies and mentions use the token’s
+  `read:notifications` scope, which is included in `read`.
 - **Analytics:** Postline reads likes, boosts and replies through the account
   that published each post. Private posts require the token's read scope.
   [Mastodon status API](https://docs.joinmastodon.org/methods/statuses/#get).

@@ -122,6 +122,21 @@ describe('safeFetch', () => {
     expect(calls).toBe(4)
   })
 
+  test('stops at a redirect when sending account authorization', async () => {
+    let calls = 0
+    const fetcher = (async (url: URL, init?: RequestInit) => {
+      calls++
+      expect(url.pathname).toBe('/notifications')
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer fixture-token')
+      return new Response(null, { status: 302, headers: { location: 'https://another.example/notifications' } })
+    }) as unknown as typeof fetch
+
+    await expect(safeFetch('https://example.com/notifications', {
+      ...options, fetcher, redirect: 'error', headers: { Authorization: 'Bearer fixture-token' },
+    })).rejects.toBeInstanceOf(UnsafeUrlError)
+    expect(calls).toBe(1)
+  })
+
   test('follows a redirect to another public address', async () => {
     let calls = 0
     const fetcher = (async () => {

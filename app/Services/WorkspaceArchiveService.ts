@@ -378,7 +378,7 @@ export class WorkspaceArchiveService {
       }
     })
 
-    for (const table of ['campaign_posts', 'launch_campaigns', 'post_targets', 'posts', 'keyword_mentions', 'keyword_monitors', 'composer_presets', 'tracked_links', 'dm_messages', 'dm_conversations', 'timeline_items', 'purge_runs', 'alerts', 'social_identities', 'network_apps', 'twitter_read_usage'])
+    for (const table of ['campaign_posts', 'launch_campaigns', 'post_targets', 'posts', 'keyword_mentions', 'keyword_monitors', 'composer_presets', 'tracked_links', 'inbox_mentions', 'dm_messages', 'dm_conversations', 'timeline_items', 'purge_runs', 'alerts', 'social_identities', 'network_apps', 'twitter_read_usage'])
       await wipe(table)
 
     const accountId = await ensureAccount()

@@ -935,6 +935,21 @@ declare module '@stacksjs/database' {
       template_id: string
       customer_id: number
     }
+    inbox_mentions: {
+      // columns
+      id: number
+      uuid: string
+      created_at: string
+      updated_at: string | null
+      remote_id: string
+      kind: "reply" | "mention"
+      author: string
+      body: string
+      url: string
+      posted_at: string
+      read_at: string
+      social_identity_id: number
+    }
     job_heartbeats: {
       // columns
       id: number

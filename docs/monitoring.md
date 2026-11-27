@@ -4,6 +4,8 @@
 
 Open **Inbox** to check direct messages from connected Bluesky and Mastodon accounts. Filter by network or account, choose a conversation, and use the reply box. **Sync now** pulls recent conversations. The scheduler checks periodically while Postline is running.
 
+Choose **Replies and mentions** to see public activity for connected Bluesky and Mastodon accounts. **Sync public activity** checks for new items immediately. Mark items as read in Postline, or open the original post to reply on the network. Sync checks a recent window of notifications per account. Postline keeps collected items for up to 90 days.
+
 ## Listening
 
 Open **Listening** and create a rule with the terms and networks you want to watch. Bluesky, X, and Mastodon are available to rules. Use **Scan now** to check without waiting for the next scheduled scan. Apply the watch or network filter to narrow the matches. Use the original post link to read the conversation on its network.

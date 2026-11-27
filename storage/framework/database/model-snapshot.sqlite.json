@@ -3397,10 +3397,147 @@
             "type": "unique"
           }
         ]
+      },
+      {
+        "table": "inbox_mentions",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "remote_id",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 700
+          },
+          {
+            "name": "kind",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "reply",
+              "mention"
+            ]
+          },
+          {
+            "name": "author",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 255
+          },
+          {
+            "name": "body",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "url",
+            "type": "text",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "posted_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "read_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "social_identity_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "social_identities",
+              "column": "id"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "UTC_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "inbox_mentions_identity_remote_unique",
+            "columns": [
+              "social_identity_id",
+              "remote_id"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "inbox_mentions_posted_at_index",
+            "columns": [
+              "posted_at",
+              "id"
+            ],
+            "type": "index"
+          },
+          {
+            "name": "inbox_mentions_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
       }
     ]
   },
-  "hash": "0afb7618a0f105e56bcde226787d6a8d4b15252d1fd79511adae98d48cb6c061",
+  "hash": "8c77794f35fb2fa9f2f35af53fa8680e5714de98d02581d7f106c0e86fd43c85",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-27T10:31:40.375Z"
+  "updatedAt": "2026-11-27T10:55:57.268Z"
 }
