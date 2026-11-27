@@ -162,6 +162,7 @@
     "Team": true,
     "TeamInvitation": true,
     "TeamMember": true,
+    "ThreadPublishClaim": true,
     "TimelineItem": true,
     "TrackedLink": true,
     "Transaction": true,
