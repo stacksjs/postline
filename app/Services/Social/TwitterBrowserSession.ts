@@ -4,7 +4,7 @@ import process from 'node:process'
 import { db } from '@stacksjs/database'
 import { isDesktopAgent } from '../../Support/Auth/native'
 import { UserFacingError } from '../../Support/Http/user-error'
-import { workspaceXBrowserSessionText } from '../../Support/Localization/workspace'
+import { workspaceXBrowserErrors, workspaceXBrowserSessionText } from '../../Support/Localization/workspace'
 import { engagementCounts } from '../../Support/Social/engagement-analytics'
 import { alerts } from '../AlertService'
 import { saveTargetEngagement } from './save-target-engagement'
@@ -35,7 +35,7 @@ export async function localTwitterProfileForErasure(): Promise<string | null> {
 
 export async function rememberTwitterBrowserHandle(handle: unknown): Promise<void> {
   if (handle !== null && (typeof handle !== 'string' || !/^[A-Za-z0-9_]{1,15}$/.test(handle)))
-    throw new UserFacingError('Postline could not identify the signed-in X account.')
+    throw new UserFacingError(workspaceXBrowserErrors.invalidHandle)
 
   await db.updateTable('accounts').set({ twitter_browser_handle: handle, twitter_browser_needs_check: false, updated_at: now() })
     .where('id', '=', await ensureAccount()).execute()
@@ -61,14 +61,14 @@ export async function pauseTwitterBrowserReads(): Promise<void> {
 export async function requireTwitterBrowserHandle(handle: unknown): Promise<string> {
   const session = await twitterBrowserSession()
   if (session.needsCheck || !session.handle || typeof handle !== 'string' || handle.toLowerCase() !== session.handle.toLowerCase())
-    throw new UserFacingError('Check the X browser sign-in before reading its data.')
+    throw new UserFacingError(workspaceXBrowserErrors.checkSignIn)
   return session.handle
 }
 
 export async function saveTwitterBrowserMetrics(handle: unknown, reports: unknown): Promise<number> {
   const confirmedHandle = await requireTwitterBrowserHandle(handle)
   if (!Array.isArray(reports) || reports.length > 100)
-    throw new UserFacingError('Postline could not read the visible X post counts.')
+    throw new UserFacingError(workspaceXBrowserErrors.invalidMetrics)
 
   const measurements = new Map<string, EngagementCounts>()
   for (const report of reports) {

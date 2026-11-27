@@ -4,6 +4,7 @@ import { response } from '@stacksjs/router'
 import { pauseTwitterBrowserReads, rememberTwitterBrowserHandle, twitterBrowserSession } from '../../Services/Social/TwitterBrowserSession'
 import { isDesktopAgent } from '../../Support/Auth/native'
 import { actionFailure } from '../../Support/Http/action-error'
+import { workspaceXBrowserErrors } from '../../Support/Localization/workspace'
 
 export default new Action({
   name: 'Postline Save X Browser Session',
@@ -12,7 +13,7 @@ export default new Action({
 
   async handle(request: RequestInstance) {
     if (!isDesktopAgent())
-      return response.json({ ok: false, error: 'X browser sessions are available in the Postline Mac app.' }, { status: 404 })
+      return response.json({ ok: false, error: workspaceXBrowserErrors.desktopOnly }, { status: 404 })
     try {
       if (request.get('needs_check') === true) await pauseTwitterBrowserReads()
       else await rememberTwitterBrowserHandle(request.get('signed_out') === true ? null : request.get('handle'))

@@ -627,6 +627,13 @@
       "attentionTitle": "El inicio de sesión de X requiere atención",
       "attentionBody": "Abre el navegador de X en Canales, termina de iniciar sesión y selecciona Verificar sesión para reanudar las lecturas."
     },
+    "xBrowserErrors": {
+      "desktopOnly": "Las sesiones de X en el navegador están disponibles en la app de Postline para Mac.",
+      "invalidHandle": "Postline no pudo identificar la cuenta con la que iniciaste sesión en X.",
+      "checkSignIn": "Selecciona Verificar sesión antes de leer los datos de X.",
+      "invalidMetrics": "Postline no pudo leer las métricas visibles de las publicaciones de X.",
+      "invalidPosts": "Postline no pudo leer las publicaciones visibles de X."
+    },
     "analytics": {
       "title": "Estadísticas",
       "description": "Consulta las estadísticas de publicación de Postline.",

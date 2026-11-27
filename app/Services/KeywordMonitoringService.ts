@@ -1,5 +1,6 @@
 import { db } from '@stacksjs/database'
 import { UserFacingError } from '../Support/Http/user-error'
+import { workspaceXBrowserErrors } from '../Support/Localization/workspace'
 import { alerts } from './AlertService'
 import { isUsableIdentity } from '../Support/Social/accounts'
 import { stripHtml } from '../Support/Social/text'
@@ -366,7 +367,7 @@ export class KeywordMonitoringService {
 
   async importTwitterBrowserPosts(reports: unknown): Promise<{ watches: number, created: number }> {
     if (!Array.isArray(reports) || reports.length > 100)
-      throw new UserFacingError('Postline could not read the visible X posts.')
+      throw new UserFacingError(workspaceXBrowserErrors.invalidPosts)
 
     const candidates = new Map<string, MentionCandidate>()
     for (const report of reports) {

@@ -3080,6 +3080,15 @@ async function checkSpanishChannels(cdp: Cdp): Promise<void> {
       && document.querySelector('[data-testid="accounts-page"] [role=status]')?.innerText.includes('Se verificó el inicio de sesión en X.')
   `), 5_000)
 
+  const browserSessionError = await evaluate<{ status: number, message: string }>(cdp, `(async () => {
+    const response = await fetch('/api/postline/twitter/browser-session')
+    const result = await response.json()
+    return { status: response.status, message: result.error }
+  })()`)
+  if (browserSessionError.status !== 404
+    || browserSessionError.message !== 'Las sesiones de X en el navegador están disponibles en la app de Postline para Mac.')
+    throw new Error('The X browser session API did not return its Spanish desktop-only message.')
+
   await evaluate(cdp, `document.querySelector('[data-network-app=twitter] summary').focus()`)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Spanish X developer app form reveals its localized labels', () => evaluate<boolean>(cdp, `

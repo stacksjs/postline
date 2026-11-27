@@ -627,6 +627,13 @@
       "attentionTitle": "X browser sign-in needs attention",
       "attentionBody": "Open the X browser in Channels, finish signing in, and select Check sign-in to resume browser reads."
     },
+    "xBrowserErrors": {
+      "desktopOnly": "X browser sessions are available in the Postline Mac app.",
+      "invalidHandle": "Postline could not identify the signed-in X account.",
+      "checkSignIn": "Check the X browser sign-in before reading its data.",
+      "invalidMetrics": "Postline could not read the visible X post counts.",
+      "invalidPosts": "Postline could not read the visible X posts."
+    },
     "analytics": {
       "title": "Analytics",
       "description": "Review lightweight publishing analytics in Postline.",
