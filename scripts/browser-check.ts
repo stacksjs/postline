@@ -2,7 +2,7 @@
  * Open every workspace view in a real browser and fail on what a person
  * would see break (#80).
  *
- *   bun scripts/browser-check.ts [--production] [--marketing-screenshots]
+ *   bun scripts/browser-check.ts [--production] [--marketing-screenshots] [--workspace-spanish]
  *
  * Starts the API and the site on ports of their own against a fresh, migrated
  * database in a temporary directory, creates the workspace account, signs in,
@@ -34,6 +34,7 @@ const root = join(import.meta.dir, '..')
 const out = join(root, 'storage/framework/browser-check')
 const productImages = join(root, 'public/images/product')
 const marketingScreenshots = process.argv.includes('--marketing-screenshots')
+const spanishWorkspace = process.argv.includes('--workspace-spanish')
 const ports = [0, 0].map(() => Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response() }))
 const API_PORT = Number(process.env.BROWSER_CHECK_API_PORT) || ports[0]!.port
 const SITE_PORT = Number(process.env.BROWSER_CHECK_PORT) || ports[1]!.port
@@ -58,6 +59,7 @@ const env = {
   APP_URL: site,
   APP_KEY: `base64:${randomBytes(32).toString('base64')}`,
   POSTLINE_SITE: '',
+  POSTLINE_WORKSPACE_LOCALE: spanishWorkspace ? 'es' : 'en',
   DB_CONNECTION: 'sqlite',
   DB_DATABASE_PATH: database,
   PORT: String(SITE_PORT),
@@ -2376,6 +2378,55 @@ async function captureMarketingScreenshots(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const actualFetch = window.fetch.bind(window)
+    window.fetch = async (input, init) => {
+      const response = await actualFetch(input, init)
+      if (new URL(input instanceof Request ? input.url : input, location.href).pathname !== '/api/postline/bootstrap' || !response.ok)
+        return response
+      const payload = await response.json()
+      return Response.json({ ...payload, data: { ...payload.data, unread: { inbox: 1, listening: 2 } } })
+    }
+  ` })
+  try {
+    const report = await auditPage(`${site}/queue`, { cdp })
+    for (const error of report.errors) fail('queue', 'Spanish', error)
+    for (const request of report.failed) fail('queue', 'Spanish', request)
+    await waitUntil('Spanish navigation, headings, and unread labels', () => evaluate<boolean>(cdp, `
+      document.querySelector('h1[lang="es"]')?.textContent === 'Publicaciones programadas'
+        && document.querySelector('[data-testid=postline-nav] a[href="/queue"]')?.closest('[lang]')?.lang === 'es'
+        && document.querySelector('[data-testid=postline-nav] a[href="/inbox"]')?.textContent.includes('1 mensaje sin leer')
+        && document.querySelector('[data-testid=postline-nav] a[href="/listening"]')?.textContent.includes('2 menciones sin leer')
+        && document.querySelector('main[lang="en"] input#queue-search')?.placeholder === 'Search all posts'
+    `), 5_000)
+
+    await pressKey(cdp, 'k', 75, 2)
+    await waitUntil('Spanish command palette opens with the keyboard', () => evaluate<boolean>(cdp, `
+      document.querySelector('#workspace-commands[open] h2')?.textContent === 'Paleta de comandos'
+        && document.activeElement?.getAttribute('aria-label') === 'Buscar comandos'
+    `), 5_000)
+    await cdp.send('Input.insertText', { text: 'cola' })
+    await waitUntil('Spanish navigation result', () => evaluate<boolean>(cdp, `
+      document.querySelector('#workspace-commands [role=option][lang=es]')?.textContent.includes('Ir a la vista')
+    `), 5_000)
+    await pressKey(cdp, 'Escape', 27)
+
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 1, mobile: true })
+    await waitUntil('Spanish mobile navigation', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-postline-mobile-nav] button')?.innerText === 'Más'
+        && document.documentElement.scrollWidth === window.innerWidth
+    `), 5_000)
+    await evaluate(cdp, "document.querySelector('[data-postline-mobile-nav] button').click()")
+    await waitUntil('Spanish mobile menu', () => evaluate<boolean>(cdp, `
+      document.querySelector('#workspace-more[open] h2')?.textContent === 'Más vistas'
+    `), 5_000)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+  }
+}
+
 async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkSetupProviderRetry(cdp)
   const fixturesReady = await evaluate<string>(cdp, `(async () => {
@@ -2485,6 +2536,7 @@ ${migration.stderr.toString()}`)
     if (production) await watchPageSecurity(cdp)
     await checkFirstRun(cdp)
     if (marketingScreenshots) await captureMarketingScreenshots(cdp)
+    else if (spanishWorkspace) await checkSpanishWorkspace(cdp)
     else await checkWorkspace(cdp)
   }
   finally {
@@ -2517,6 +2569,7 @@ else {
   // eslint-disable-next-line no-console
   console.log(marketingScreenshots
     ? `Product screenshots written to ${productImages}.`
+    : spanishWorkspace ? 'Spanish workspace navigation and command palette passed.'
     : `Every view opened clean in ${MODES.map(mode => mode.name).join(', ')}. Screenshots in ${out}.`)
 }
 process.exit(exitCode)

@@ -1,6 +1,7 @@
 <script server cache>
-import { workspaceCommandsText } from '../../app/Support/Localization/workspace'
+import { workspaceCommandsText, workspaceLocale } from '../../app/Support/Localization/workspace'
 
+export const language = workspaceLocale
 export const commandText = workspaceCommandsText
 export const commandModeText = {
   title: commandText.title,
@@ -114,7 +115,7 @@ useEventListener('keydown', handleShortcut)
 </script>
 
 <template>
-  <div class="contents">
+  <div class="contents" lang="{{ language }}">
     <button
       class="inline-flex gap-2 items-center justify-center px-3 h-11 min-w-11 sm:h-9 font-medium text-muted text-ui hover:text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl"
       type="button"
@@ -175,6 +176,7 @@ useEventListener('keydown', handleShortcut)
               tabindex="-1"
               x-for="command in results()"
               :id="command.id"
+              :lang="command.target.closest('[lang]')?.getAttribute('lang') || 'en'"
               :aria-selected="command.index === selected()"
               :class="command.index === selected() ? 'bg-nav-active text-ink' : 'text-body'"
               @click="chooseCommand(command.index)"

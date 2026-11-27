@@ -1,0 +1,86 @@
+{
+  "workspace": {
+    "navigation": {
+      "composer": "Redacción",
+      "compose": "Redactar",
+      "queue": "Cola",
+      "timeline": "Cronología",
+      "analytics": "Estadísticas",
+      "campaigns": "Campañas",
+      "listening": "Escucha social",
+      "inbox": "Bandeja de entrada",
+      "writing": "Blog",
+      "activity": "Actividad",
+      "channels": "Canales",
+      "settings": "Configuración"
+    },
+    "shell": {
+      "skipToContent": "Saltar al contenido",
+      "primaryNavigation": "Navegación principal",
+      "more": "Más",
+      "moreViews": "Más vistas",
+      "closeMenu": "Cerrar menú",
+      "brandLink": "Redacción en Postline",
+      "openView": "Abrir {view} ({shortcut})",
+      "shortcut": "Atajo {shortcut}",
+      "settingsShortcut": "Atajo: coma",
+      "openSettings": "Abrir configuración (,)",
+      "expandSidebar": "Expandir barra lateral",
+      "collapseSidebar": "Contraer barra lateral",
+      "workspaceRegion": "Espacio de trabajo de Postline"
+    },
+    "unread": {
+      "inboxOne": "{count} mensaje sin leer",
+      "inboxOther": "{count} mensajes sin leer",
+      "listeningOne": "{count} mención sin leer",
+      "listeningOther": "{count} menciones sin leer"
+    },
+    "commands": {
+      "label": "Comandos",
+      "title": "Paleta de comandos",
+      "shortcuts": "Atajos",
+      "shortcutsTitle": "Atajos de teclado",
+      "navigation": "Ir a la vista",
+      "open": "Abrir paleta de comandos",
+      "tooltip": "Comandos (Comando+K o Ctrl+K)",
+      "search": "Buscar comandos",
+      "placeholder": "Buscar vistas y acciones",
+      "close": "Cerrar comandos",
+      "noMatches": "No hay comandos que coincidan",
+      "showKeyboardShortcuts": "Mostrar atajos de teclado",
+      "closeDialog": "Cerrar cuadro de diálogo"
+    },
+    "pages": {
+      "composer": {
+        "title": "Redactar una publicación",
+        "description": "Escribe una vez y publica en todas las cuentas conectadas."
+      },
+      "queue": {
+        "title": "Publicaciones programadas",
+        "description": "Borradores, publicaciones programadas y publicaciones recientes."
+      },
+      "timeline": {
+        "title": "Cronología de Bluesky",
+        "description": "Publicaciones de tu cuenta de Bluesky conectada."
+      },
+      "analytics": {
+        "title": "Estadísticas de publicación"
+      },
+      "listening": {
+        "title": "Escucha social"
+      },
+      "accounts": {
+        "title": "Conecta tus canales"
+      },
+      "writing": {
+        "title": "Publicaciones de formato largo"
+      },
+      "campaigns": {
+        "description": "Planifica publicaciones para las próximas semanas y añádelas a la cola."
+      },
+      "activity": {
+        "description": "Envíos a redes y última ejecución de cada tarea en segundo plano."
+      }
+    }
+  }
+}

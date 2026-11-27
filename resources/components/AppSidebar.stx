@@ -1,7 +1,9 @@
 <script server>
-import { workspaceShellText, workspaceText } from '../../app/Support/Localization/workspace'
+import { unreadText, workspaceLocale, workspaceShellText, workspaceText } from '../../app/Support/Localization/workspace'
 
 const shellText = workspaceShellText
+export const language = workspaceLocale
+export const sidebarText = { unread: unreadText, expand: shellText.expandSidebar, collapse: shellText.collapseSidebar }
 const settingsLabel = workspaceText('workspace.navigation.settings')
 const channelsLabel = workspaceText('workspace.navigation.channels')
 
@@ -52,6 +54,7 @@ const moreLinks = [
 </script>
 
 <script client>
+const copy = {{ sidebarText }}
 const collapsed = useReactiveProp('collapsed', false)
 const emit = defineEmits()
 const moreDialog = useRef('moreDialog')
@@ -71,8 +74,9 @@ function unreadFor(href: string): number {
 
 function unreadLabel(href: string): string {
   const count = unreadFor(href)
-  const kind = href === '/inbox' ? 'message' : 'mention'
-  return `${count} unread ${kind}${count === 1 ? '' : 's'}`
+  const kind = href === '/inbox' ? 'inbox' : 'listening'
+  const form = count === 1 ? 'One' : 'Other'
+  return copy.unread[kind + form].replace('{count}', String(count))
 }
 
 function unreadBadge(href: string): string {
@@ -103,7 +107,7 @@ effect(() => {
 </script>
 
 <template>
-  <div class="contents">
+  <div class="contents" lang="{{ language }}">
   <nav class="grid lg:hidden bottom-0 fixed inset-x-0 z-50 grid-cols-4 items-center px-2 bg-panel border-line border-t" aria-label="{{ shellText.primaryNavigation }}" data-postline-mobile-nav>
     @foreach (mobileLinks as link)
       <a
@@ -164,7 +168,7 @@ effect(() => {
   <aside id="workspace-sidebar" class="hidden lg:flex overflow-hidden relative sticky top-0 flex-col pb-5 pt-[68px] px-5 h-screen min-w-0 backdrop-blur-3xl backdrop-saturate-150" aria-label="Postline" :aria-hidden="collapsed()" data-postline-sidebar data-craft-drag>
     <div class="flex absolute right-5 top-3.5 z-20 items-center min-h-7" data-shell-controls-row>
       {{-- Craft's native titlebar uses this same button to toggle the sidebar. --}}
-      <button class="inline-flex items-center justify-center h-8 w-8 text-muted hover:text-ink bg-glass hover:bg-raised border border-line rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus shadow-sm duration-150 transition-colors" type="button" :aria-label="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'" aria-controls="workspace-sidebar" :aria-expanded="!collapsed()" data-sidebar-collapse data-craft-no-drag @click="emit('toggle-sidebar')">
+      <button class="inline-flex items-center justify-center h-8 w-8 text-muted hover:text-ink bg-glass hover:bg-raised border border-line rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus shadow-sm duration-150 transition-colors" type="button" :aria-label="collapsed() ? copy.expand : copy.collapse" aria-controls="workspace-sidebar" :aria-expanded="!collapsed()" data-sidebar-collapse data-craft-no-drag @click="emit('toggle-sidebar')">
         <span class="h-[18px] w-[18px] i-hugeicons-sidebar-left" aria-hidden="true"></span>
       </button>
     </div>

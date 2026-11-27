@@ -26,7 +26,14 @@
       "settingsShortcut": "Shortcut comma",
       "openSettings": "Open Settings (,)",
       "expandSidebar": "Expand sidebar",
+      "collapseSidebar": "Collapse sidebar",
       "workspaceRegion": "Postline workspace"
+    },
+    "unread": {
+      "inboxOne": "{count} unread message",
+      "inboxOther": "{count} unread messages",
+      "listeningOne": "{count} unread mention",
+      "listeningOther": "{count} unread mentions"
     },
     "commands": {
       "label": "Commands",
