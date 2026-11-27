@@ -1,8 +1,6 @@
 <script client>
 import type { ComposerPreset, ComposerPresetKind } from '../../app/Services/ComposerPresetService'
-import { requestJson } from '../functions/postline-client'
 
-const endpoint = '/api/postline/composer/presets'
 const disabled = useReactiveProp('disabled', false)
 const dialog = useRef<HTMLDialogElement>('library')
 const nameInput = useRef<HTMLInputElement>('nameInput')
@@ -20,26 +18,28 @@ const body = state('')
 const kind = state<ComposerPresetKind>('snippet')
 const labels = { snippet: 'Snippet', template: 'Template', hashtags: 'Hashtag set' }
 
-async function run(work: () => Promise<void>) {
+type SavedText = typeof import('../assets/scripts/composer-saved-text')
+async function run(work: (api: SavedText) => Promise<void>) {
   if (busy()) return
   message.set('')
   busy.set(true)
-  try { await work() }
+  try {
+    const path = '/assets/scripts/composer-saved-text.ts'
+    await work(await import(path))
+  }
   catch (error) { message.set(error instanceof Error ? error.message : String(error)) }
   finally { busy.set(false) }
-}
-
-async function load() {
-  const { data } = await requestJson(endpoint, { cache: 'no-store' }, 'Could not load saved text.')
-  items.set(data)
-  if (!selected()) selectedId.set(data[0]?.uuid || '')
 }
 
 function open() {
   if (disabled()) return
   mode.set('browse')
   dialog.current?.showModal()
-  void run(load)
+  void run(async (api) => {
+    const data = await api.loadSavedText()
+    items.set(data)
+    if (!selected()) selectedId.set(data[0]?.uuid || '')
+  })
 }
 
 function edit(item?: ComposerPreset) {
@@ -53,13 +53,10 @@ function edit(item?: ComposerPreset) {
 }
 
 function save() {
-  void run(async () => {
-    const { data } = await requestJson(endpoint, {
-      method: 'POST',
-      body: JSON.stringify({ ...(id() && { uuid: id() }), name: name(), kind: kind(), body: body() }),
-    }, 'Could not save the text.')
-    items.update(current => [...current.filter(item => item.uuid !== data.uuid), data].sort((a, b) => a.name.localeCompare(b.name)))
-    selectedId.set(data.uuid)
+  void run(async (api) => {
+    const saved = await api.storeSavedText({ uuid: id(), name: name(), kind: kind(), body: body() }, items())
+    items.set(saved.items)
+    selectedId.set(saved.uuid)
     mode.set('browse')
   })
 }
@@ -67,9 +64,8 @@ function save() {
 function remove() {
   const item = selected()
   if (!item) return
-  void run(async () => {
-    await requestJson(`${endpoint}/delete`, { method: 'POST', body: JSON.stringify({ uuid: item.uuid }) }, 'Could not delete the saved text.')
-    items.update(current => current.filter(preset => preset.uuid !== item.uuid))
+  void run(async (api) => {
+    items.set(await api.deleteSavedText(item.uuid, items()))
     selectedId.set(items()[0]?.uuid || '')
     mode.set('browse')
   })
