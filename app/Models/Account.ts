@@ -55,6 +55,13 @@ export default defineModel({
       validation: { rule: schema.boolean().optional() },
       factory: () => false,
     },
+    // The last confirmed handle from this workspace's isolated WebKit profile.
+    // The profile's credentials stay in WebKit.
+    twitterBrowserHandle: {
+      required: false,
+      hidden: true,
+      validation: { rule: schema.string().max(15).optional() },
+    },
     // The AI provider for campaign planning, chosen in Settings (#138). Empty
     // means the environment's AI_PROVIDER / ANTHROPIC_API_KEY / OPENAI_API_KEY
     // decide, as before; the Mac app has no environment, so it needs these.

@@ -123,6 +123,23 @@ if (state && flowCookie) {
     && cancel.headers.get('Set-Cookie')?.includes('Max-Age=0') === true)
 }
 
+const browserSessionPath = '/api/postline/twitter/browser-session'
+const session = await call('GET', browserSessionPath)
+const initialProfile = JSON.parse(session.text).data
+check('the native X browser session uses a workspace profile', session.status === 200
+  && initialProfile?.handle === null && /^postline-x-[0-9a-f-]{36}$/.test(initialProfile?.profile ?? ''))
+const invalidHandle = await call('POST', browserSessionPath, { handle: 'https://x.com/fixture' })
+check('the native session rejects an invalid X handle', invalidHandle.status === 422)
+const connectedBrowser = await call('POST', browserSessionPath, { handle: 'postline_test' })
+const savedBrowser = await call('GET', browserSessionPath)
+const savedProfile = JSON.parse(savedBrowser.text).data
+check('the native session remembers only its X handle and profile', connectedBrowser.status === 200
+  && savedBrowser.status === 200 && savedProfile?.handle === 'postline_test' && savedProfile?.profile === initialProfile?.profile
+  && Object.keys(savedProfile).sort().join(',') === 'handle,profile')
+const foreignMetrics = await call('POST', `${browserSessionPath}/metrics`, { handle: 'another_user' })
+check('the native session rejects engagement from a different handle', foreignMetrics.status === 422
+  && JSON.parse(foreignMetrics.text)?.error?.includes('Check the X browser sign-in') === true)
+
 const published = await call('POST', '/api/postline/publish', { text: 'Published by the desktop check.', title: 'Desktop check', providers: 'blog' })
 check('publishing to the blog', published.status === 200 && JSON.parse(published.text)?.data?.results?.[0]?.ok === true, `${published.status} ${published.text.slice(0, 200)}`)
 

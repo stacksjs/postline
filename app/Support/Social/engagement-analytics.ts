@@ -18,14 +18,19 @@ const metricFields = ['likes', 'reposts', 'replies', 'quotes', 'views', 'shares'
 type MetricField = typeof metricFields[number]
 export type EngagementCounts = Partial<Record<MetricField, number>>
 
+export function engagementCounts(value: unknown): EngagementCounts {
+  if (!value || typeof value !== 'object') return {}
+  const counts = value as Partial<Record<MetricField, unknown>>
+  return Object.fromEntries(metricFields.flatMap((field) => {
+    const count = counts[field]
+    return typeof count === 'number' && Number.isSafeInteger(count) && count >= 0 ? [[field, count]] : []
+  }))
+}
+
 export function readEngagementMetrics(value: string | null): EngagementCounts {
   if (!value) return {}
   try {
-    const counts = JSON.parse(value) as Partial<Record<MetricField, unknown>> | null
-    return Object.fromEntries(metricFields.flatMap((field) => {
-      const count = counts?.[field]
-      return typeof count === 'number' && Number.isSafeInteger(count) && count >= 0 ? [[field, count]] : []
-    }))
+    return engagementCounts(JSON.parse(value))
   }
   catch {
     // A damaged snapshot has no usable measurements.

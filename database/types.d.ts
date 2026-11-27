@@ -16,6 +16,7 @@ declare module '@stacksjs/database' {
       timezone: string
       share_media_by_tunnel: number
       publishing_paused: number
+      twitter_browser_handle: string
       ai_provider: "" | "anthropic" | "openai" | "ollama"
       ai_api_key: string
       ai_model: string
@@ -955,6 +956,7 @@ declare module '@stacksjs/database' {
       status: "active" | "paused"
       last_checked_at: string
       last_error: string
+      twitter_search_cursor: unknown
       account_id: number
     }
     labels: {
@@ -2112,6 +2114,14 @@ declare module '@stacksjs/database' {
       loyalty_points_earned: number
       loyalty_points_redeemed: number
       order_id: number
+    }
+    twitter_read_usage: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      day: string
+      estimated_micros: number
     }
     usage_events: {
       // columns

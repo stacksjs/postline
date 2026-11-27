@@ -168,6 +168,15 @@
             "isNullable": true,
             "hasDefault": true,
             "defaultValue": false
+          },
+          {
+            "name": "twitter_browser_handle",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 15
           }
         ],
         "indexes": [
@@ -2822,7 +2831,7 @@
       }
     ]
   },
-  "hash": "c32fecc6893d468096829547f283918cd69dcae941706303f7a9ff9c03eb5cf3",
+  "hash": "b043ef6ce5c371e1248cb1fabd513d43420481fe8a18ebd7ff8be58fb46e1e38",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-27T03:38:02.118Z"
+  "updatedAt": "2026-11-27T05:36:10.961Z"
 }

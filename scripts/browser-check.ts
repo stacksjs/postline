@@ -817,6 +817,93 @@ async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkXBrowserSession(cdp: Cdp): Promise<void> {
+  const endpoint = '/api/postline/twitter/browser-session'
+  await auditPage(`${site}/accounts`, { cdp })
+  const hostedStatus = await evaluate<number>(cdp, `fetch('${endpoint}').then(response => response.status)`)
+  if (hostedStatus !== 404) fail('accounts', 'X browser session', 'the hosted process exposed the desktop session')
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const send = window.fetch.bind(window)
+    const profile = 'postline-x-12345678-1234-5678-9012-123456789012'
+    window.xSessionWrites = 0
+    window.xSessionOpens = []
+    window.xSessionState = { state: 'connected', handle: 'postline_test', measurements: [{ id: '4321', counts: { likes: 2 } }] }
+    window.craft = { app: { nativePlatformControls: false }, capabilities: { nativePlatformControls: false }, window: {
+      async openExternal(options) {
+        window.xSessionOpens.push(options)
+        sessionStorage.setItem('test-x-window-open', 'true')
+        return { name: profile }
+      },
+      async _call(action, input, name) {
+        if (!sessionStorage.getItem('test-x-window-open')) throw new Error('Window not found')
+        if (action !== 'executeJavaScript' || name !== profile || !input.code.includes('AppTabBar_Profile_Link'))
+          throw new Error('Unexpected X window inspection')
+        return JSON.stringify(window.xSessionState)
+      },
+    } }
+    window.fetch = (input, options) => {
+      const url = new URL(input instanceof Request ? input.url : input, location.href)
+      if (url.pathname === '${endpoint}/metrics') {
+        const { handle, measurements } = JSON.parse(options.body)
+        if (options.method !== 'POST' || handle !== 'postline_test' || measurements[0]?.counts.likes !== 2)
+          return Promise.resolve(Response.json({ ok: false, error: 'Invalid session metrics request' }, { status: 422 }))
+        return Promise.resolve(Response.json({ ok: true, data: { synced: 1 } }))
+      }
+      if (url.pathname !== '${endpoint}') return send(input, options)
+      if (options?.method === 'POST') {
+        window.xSessionWrites++
+        const { handle, signed_out } = JSON.parse(options.body)
+        if (signed_out) localStorage.removeItem('test-x-session-handle')
+        else localStorage.setItem('test-x-session-handle', handle)
+      }
+      return Promise.resolve(Response.json({ ok: true, data: { profile, handle: localStorage.getItem('test-x-session-handle') } }))
+    }
+  ` })
+
+  const section = `document.querySelector('[aria-labelledby="x-browser-session-title"]')`
+  const open = `${section}?.querySelector('button')`
+  const check = `${section}?.querySelectorAll('button')[1]`
+  try {
+    await auditPage(`${site}/accounts`, { cdp })
+    await waitUntil('The isolated X browser controls are ready', () => evaluate<boolean>(cdp, `Boolean(${open}?.getClientRects().length && !${open}.disabled)`), 5_000)
+    await evaluate(cdp, `${check}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Checking sign-in requires an open X window', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('Open X and wait') && window.xSessionOpens.length === 0`), 5_000)
+    await evaluate(cdp, `${open}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The visible isolated X window is requested', () => evaluate<boolean>(cdp, `
+      window.xSessionOpens.length === 1 && window.xSessionOpens[0].url === 'https://x.com/home'
+        && window.xSessionOpens[0].name === window.xSessionOpens[0].dataStore && !window.xSessionOpens[0].headless`), 5_000)
+    await evaluate(cdp, `${check}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The checked X handle is saved', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('Last confirmed as @postline_test') && window.xSessionWrites === 1`), 5_000)
+    await evaluate(cdp, `${section}.querySelectorAll('button')[2].focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Reading visible engagement saves the X measurements', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('Updated 1 published post in Analytics.')`), 5_000)
+    await auditPage(`${site}/accounts`, { cdp })
+    await waitUntil('The confirmed handle survives a reload', () => evaluate<boolean>(cdp, `
+      ${section}?.textContent.includes('Last confirmed as @postline_test')`), 5_000)
+
+    await evaluate(cdp, `window.xSessionState = { state: 'needs-attention' }; ${check}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('An account challenge stops the X check', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('X needs your attention') && window.xSessionWrites === 0`), 5_000)
+
+    await evaluate(cdp, `window.xSessionState = { state: 'signed-out' }; ${check}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Signing out clears the confirmed handle', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('Signed out of X.')
+        && !${section}.querySelectorAll('button')[2].getClientRects().length && window.xSessionWrites === 1`), 5_000)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+    await evaluate(cdp, `sessionStorage.removeItem('test-x-window-open'); localStorage.removeItem('test-x-session-handle')`)
+  }
+}
+
 async function checkChannels(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const send = window.fetch.bind(window)
@@ -1823,6 +1910,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkWorkspaceCommands(cdp)
   await checkWorkspaceBootstrap(cdp)
   await checkChannels(cdp)
+  await checkXBrowserSession(cdp)
   await checkNetworkComponents(cdp)
   await checkLocalComposerDraft(cdp)
   await checkComposerThreadDraft(cdp)

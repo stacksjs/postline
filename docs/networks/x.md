@@ -32,3 +32,17 @@ older X accounts to grant the image upload scope.
 - **No inbox:** X direct messages are not supported.
 - **Limits:** 280 characters, up to four images. Write a thread in the
   composer's Thread mode to go longer.
+
+## Browser session on the Mac
+
+In a Postline build with isolated WebKit windows, open **Settings > Channels >
+X browser session** and choose **Open X**. Sign in directly on X, then return
+to Postline and choose **Check sign-in**. This requires macOS 14 or later.
+WebKit keeps the sign-in on this Mac, and Postline remembers the confirmed
+handle. To sign out, use X's menu in that window and check the session again.
+X [restricts scripted website use](https://help.x.com/en/rules-and-policies/x-automation).
+
+With your profile open in the X window, choose **Read visible engagement** in
+Postline. Exact counts shown on your own posts update matching published posts
+in Analytics. This reads the open page through WebKit and needs no developer
+app credentials.

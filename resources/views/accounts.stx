@@ -56,8 +56,10 @@ const networkSetupGuides = await loadNetworkSetupGuides()
       </Card>
     </section>
 
+    <XBrowserSession />
+
     {{--
-      Bring your own keys: X, LinkedIn, Instagram and Threads sign in through a
+      Bring your own keys: the X API, LinkedIn, Instagram and Threads sign in through a
       developer app the owner registers on each network. Its client id and
       secret are entered here (the secret is stored sealed), so no file has to
       be edited, which the Mac app cannot do at all.
@@ -66,7 +68,7 @@ const networkSetupGuides = await loadNetworkSetupGuides()
       <Card padding="none" className="shadow-sm">
         <header class="px-4 py-3.5 border-b border-line">
           <h2 class="m-0 font-semibold text-ink text-sm">Your network apps</h2>
-          <p class="m-0 mt-1 text-muted text-xs">X, LinkedIn, Instagram and Threads connect through an app you register on each network. Postline has no keys of its own: yours stay in this workspace.</p>
+          <p class="m-0 mt-1 text-muted text-xs">The X API, LinkedIn, Instagram and Threads use an app you register on each network. Postline has no keys of its own: yours stay in this workspace.</p>
         </header>
         <div class="divide-line divide-y">
           <details class="group" x-for="app in appRows()" :data-network-app="app.provider">
