@@ -260,6 +260,19 @@ export interface SaveQueueInput {
  */
 export type UpdateQueueInput = SaveQueueInput
 
+interface QueueThreadInput {
+  texts: readonly string[]
+  providers: readonly string[]
+  scheduledAt?: string | null
+  options?: PostOptions | null
+}
+
+interface SavedQueueThread {
+  postIds: number[]
+  status: 'draft' | 'scheduled'
+  scheduledAt: string | null
+}
+
 /** An image on a queued post. */
 export interface QueueImage {
   bytes?: Uint8Array
@@ -303,6 +316,7 @@ export interface QueueEditView {
   /** Per-provider overrides, so an edit round-trips them instead of dropping them. */
   variants: VariantMap | null
   options: PostOptions | null
+  thread: { postIds: number[], texts: string[] } | null
 }
 
 export class QueueService {
@@ -379,51 +393,89 @@ export class QueueService {
   }
 
   /**
-   * Schedule a thread (#255): one post per segment, sharing a thread key,
-   * each with the same targets and time. When it comes due the scheduler
-   * sends the segments once, in order, as replies (publishNow, below).
+   * Save a thread as one post per segment, sharing a time, targets and
+   * thread key. A draft can be opened again before it gets a publishing time.
    */
-  async saveThread(input: { texts: readonly string[], providers: readonly string[], scheduledAt: string, options?: SaveQueueInput['options'] }): Promise<{ postIds: number[], status: 'scheduled', scheduledAt: string }> {
+  async saveThread(input: QueueThreadInput): Promise<SavedQueueThread> {
+    return this.writeThread(input)
+  }
+
+  async updateThread(id: number, input: QueueThreadInput): Promise<SavedQueueThread> {
+    const post = await this.findActionable(id)
+    if (!post.thread_key) throw new UserFacingError('This post is not a thread.')
+    return this.writeThread(input, post)
+  }
+
+  private threadPosts(threadKey: string, tx = database) {
+    return tx.selectFrom('posts').selectAll().where('thread_key', '=', threadKey).where('status', '!=', 'archived')
+      .orderBy('id', 'asc').execute()
+  }
+
+  private async writeThread(input: QueueThreadInput, original?: any): Promise<SavedQueueThread> {
     const segments = input.texts.map(text => String(text).trim()).filter(Boolean)
     if (segments.length < 2) throw new UserFacingError('A thread needs at least two posts.')
     const targets = await this.validTargets(input.providers)
 
-    const scheduledAt = input.scheduledAt.trim()
-    if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(scheduledAt))
-      throw new Error('Scheduled time must be a UTC YYYY-MM-DD HH:MM:SS timestamp.')
-    if (!isRealTimestamp(scheduledAt))
-      throw new UserFacingError('That date or time does not exist. Check the day and the hour.')
-    if (scheduledAt <= now())
-      throw new UserFacingError('Pick a time in the future.')
-
-    const accountId = await ensureAccount()
-    const threadKey = uuid()
+    const scheduledAt = input.scheduledAt?.trim() || null
+    if (scheduledAt) {
+      if (scheduledAt.length !== 19 || !isRealTimestamp(scheduledAt))
+        throw new UserFacingError('That date or time does not exist. Check the day and the hour.')
+      if (scheduledAt <= now()) throw new UserFacingError('Pick a time in the future.')
+    }
+    const status = scheduledAt ? 'scheduled' : 'draft'
+    const accountId = original?.account_id ?? await ensureAccount()
+    const threadKey = original?.thread_key ?? uuid()
     const options = sanitizePostOptions(input.options)
     const column = await contentColumn()
-    const timezone = await workspace.timezone()
-    const postIds: number[] = []
-    for (const body of segments) {
-      const postUuid = uuid()
-      const createdAt = now()
-      await database.insertInto('posts').values({
-        uuid: postUuid,
-        title: body.slice(0, 80),
-        body,
-        status: 'scheduled',
-        [column]: options ? JSON.stringify({ options }) : null,
-        scheduled_at: scheduledAt,
-        timezone,
-        source: 'composer',
-        thread_key: threadKey,
-        account_id: accountId,
-        created_at: createdAt,
-        updated_at: createdAt,
-      }).execute()
-      const post = await database.selectFrom('posts').select(['id']).where('uuid', '=', postUuid).executeTakeFirstOrThrow()
-      postIds.push(Number(post.id))
-      this.writePlaceholders(Number(post.id), targets, 'scheduled', scheduledAt, createdAt)
-    }
-    return { postIds, status: 'scheduled', scheduledAt }
+    const timezone = original?.timezone ?? await workspace.timezone()
+    const { postIds, removed } = await database.transaction((tx: typeof database) => {
+      const existing: any[] = original ? this.threadPosts(threadKey, tx) : []
+      if (original) {
+        const current = existing.find(row => row.id === original.id)
+        if (!current || current.updated_at !== original.updated_at || current.scheduled_at !== original.scheduled_at
+          || existing.some(row => row.status !== 'draft' && row.status !== 'scheduled') || this.pendingThreadRemoval(threadKey, tx))
+          throw new UserFacingError('This thread changed. Reopen it from the queue before saving.', 'queue_post_changed')
+      }
+
+      const at = now()
+      const postIds = segments.map((body, index) => {
+        const row = existing[index]
+        const stored: StoredContent = parseStoredContent(row?.[column]) ?? {}
+        if (input.options !== undefined || !row) {
+          if (options) stored.options = options
+          else delete stored.options
+        }
+        const values = {
+          title: stored.title || body.slice(0, 80),
+          body,
+          status,
+          [column]: Object.keys(stored).length ? JSON.stringify(stored) : null,
+          scheduled_at: scheduledAt,
+          updated_at: at,
+        }
+        let id: number
+        if (row) {
+          id = Number(row.id)
+          tx.updateTable('posts').set(values).where('id', '=', id).execute()
+          tx.deleteFrom('post_targets').where('post_id', '=', id).execute()
+        }
+        else {
+          const postUuid = uuid()
+          tx.insertInto('posts').values({
+            ...values, uuid: postUuid, timezone, source: 'composer', thread_key: threadKey, account_id: accountId, created_at: at,
+          }).execute()
+          id = Number(tx.selectFrom('posts').select('id').where('uuid', '=', postUuid).executeTakeFirstOrThrow().id)
+        }
+        this.writePlaceholders(id, targets, status, scheduledAt, at, tx)
+        return id
+      })
+
+      const removed = existing.slice(segments.length)
+      for (const row of removed) this.deletePostRows(tx, Number(row.id))
+      return { postIds, removed }
+    })
+    for (const row of removed) await this.removeStoredMedia(row)
+    return { postIds, status, scheduledAt }
   }
 
   /** Recent posts with their per-provider targets, newest first. */
@@ -494,7 +546,8 @@ export class QueueService {
     const threadKeys = [...new Set(posts.map((post: any) => post.thread_key).filter(Boolean))]
     const threadInfo = new Map<string, { ids: number[], resumeFrom: number | null }>()
     if (threadKeys.length) {
-      const segments = await database.selectFrom('posts').select(['id', 'thread_key']).where('thread_key', 'in', threadKeys).orderBy('id', 'asc').execute()
+      const segments = await database.selectFrom('posts').select(['id', 'thread_key']).where('thread_key', 'in', threadKeys)
+        .where('status', '!=', 'archived').orderBy('id', 'asc').execute()
       const segmentTargets = segments.length
         ? await database.selectFrom('post_targets').select(['post_id', 'status']).where('post_id', 'in', segments.map((row: any) => row.id)).execute()
         : []
@@ -669,6 +722,10 @@ export class QueueService {
     const targets = targetsOf(rows)
 
     const media = stored?.media?.[0]
+    const segments: Array<{ id: number, body: string, status: string }> = post.thread_key ? await this.threadPosts(post.thread_key) : []
+    const thread = segments.length && segments.every(segment => segment.status === 'draft' || segment.status === 'scheduled')
+      ? { postIds: segments.map(segment => Number(segment.id)), texts: segments.map(segment => segment.body) }
+      : null
     return {
       id: Number(post.id),
       text: String(post.body || ''),
@@ -682,6 +739,7 @@ export class QueueService {
       images: (stored?.media || []).map(item => ({ kind: item.path ? 'file' as const : 'url' as const, url: item.url || null, altText: item.altText || null })),
       variants: sanitizeVariants(stored?.variants) || null,
       options: sanitizePostOptions(stored?.options) || null,
+      thread,
     }
   }
 

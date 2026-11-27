@@ -457,9 +457,10 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
       const editor = document.querySelector('[data-bluesky-text]')
       editor.value = ${JSON.stringify(text)}
       editor.dispatchEvent(new Event('input', { bubbles: true }))
+      editor.focus()
     })()`)
     await waitUntil('The shared grapheme counter', () => evaluate<boolean>(cdp, "document.querySelector('[data-bluesky-count]').textContent.includes('1 / 300')"), 5_000)
-    await evaluate(cdp, "document.querySelector('[data-bluesky-publish]').click()")
+    await pressKey(cdp, 'Enter', 13, 4)
     await waitUntil('The imported publish function', () => evaluate<boolean>(cdp, `
       window.composerPublish?.text === ${JSON.stringify(text)} && window.composerPublish.providers === 'bluesky:101'`), 5_000)
     await waitUntil('The publish progress notice', () => evaluate<boolean>(cdp, `
@@ -494,6 +495,62 @@ async function checkWorkspaceBootstrap(cdp: Cdp): Promise<void> {
     settingsWindow.close()
   })()`)
   await waitUntil('The bootstrap after a change in another window', () => evaluate<boolean>(cdp, `${reads}.length === ${requests.length + 1}`), 5_000)
+}
+
+async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
+  await auditPage(`${site}/composer`, { cdp })
+  const blog = "document.querySelector('[data-provider-toggle=blog]')"
+  const format = "document.querySelector('[data-composer-mode=thread]')"
+  const editors = "document.querySelectorAll('[data-bluesky-text]')"
+  const segments = ['Keyboard thread draft opening', 'Keyboard thread draft conclusion']
+  await waitUntil('The Blog is available in the composer', () => evaluate<boolean>(cdp, `Boolean(${blog}?.getClientRects().length)`), 5_000)
+  await evaluate(cdp, `(() => {
+    for (const chip of document.querySelectorAll('[data-provider-toggle][aria-pressed=true]'))
+      if (chip !== ${blog}) chip.click()
+    if (${blog}.getAttribute('aria-pressed') !== 'true') ${blog}.click()
+    ${format}.focus()
+  })()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Keyboard selection of Thread opens two editors', () => evaluate<boolean>(cdp, `
+    ${format}.getAttribute('aria-pressed') === 'true' && ${editors}.length === 2`), 5_000)
+  await evaluate(cdp, `(() => {
+    const segments = ${JSON.stringify(segments)}
+    ${editors}.forEach((editor, index) => {
+      editor.value = segments[index]
+      editor.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    ${editors}[1].focus()
+  })()`)
+  await evaluate(cdp, "document.querySelector('[data-composer-mode=single]').focus()")
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Single format shows the opening without dropping the second segment', () => evaluate<boolean>(cdp, `
+    [...${editors}].filter(editor => editor.closest('[data-composer-post]').getClientRects().length).length === 1
+      && ${editors}[1].value === ${JSON.stringify(segments[1])}`), 5_000)
+  await evaluate(cdp, `${format}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await evaluate(cdp, `${editors}[1].focus()`)
+  await pressKey(cdp, 's', 83, 4)
+  await waitUntil('Cmd+S saves the thread draft', () => evaluate<boolean>(cdp, `
+    document.querySelector('#postline-toast-host')?.textContent.includes('Draft saved to the queue.')
+      && [...${editors}].every(editor => editor.value === '')`), 5_000)
+  const drafts = await evaluate<Array<{ id: number, status: string, body: string }>>(cdp, `(async () => {
+    const { data } = await (await fetch('/api/postline/queue')).json()
+    return data.items.filter(item => ${JSON.stringify(segments)}.includes(item.body))
+  })()`)
+  const draft = drafts.find(item => item.body === segments[1])
+  if (!draft || drafts.length !== 2 || drafts.some(item => item.status !== 'draft'))
+    throw new Error('The queue did not store both keyboard-saved segments as a draft.')
+
+  try {
+    await auditPage(`${site}/composer?edit=${draft.id}`, { cdp })
+    await waitUntil('Reopening a queued thread restores every segment in order', () => evaluate<boolean>(cdp, `
+      ${format}.getAttribute('aria-pressed') === 'true'
+        && JSON.stringify([...${editors}].map(editor => editor.value)) === ${JSON.stringify(JSON.stringify(segments))}
+        && document.querySelector('[data-bluesky-publish-label]').textContent === 'Save draft'`), 5_000)
+  }
+  finally {
+    await evaluate(cdp, "localStorage.removeItem('postline:composer-draft:v1')")
+  }
 }
 
 async function checkChannels(cdp: Cdp): Promise<void> {
@@ -646,13 +703,20 @@ async function checkPhoneNavigation(cdp: Cdp): Promise<void> {
 
   await auditPage(`${site}/composer`, { cdp })
   const picker = '[data-postline-schedule-picker] [data-date-time-trigger]'
+  const actions = '[data-composer-actions]'
   await waitUntil('The composer scheduling picker', () => evaluate<boolean>(cdp, `
     document.querySelector('${picker}')?.getAttribute('aria-expanded') === 'false'`), 5_000)
   const timezone = await evaluate<string>(cdp, `(async () => {
     const response = await fetch('/api/postline/bootstrap')
     return (await response.json()).data.workspace.timezone
   })()`)
-  await evaluate(cdp, `document.querySelector('${picker}').click()`)
+  await evaluate(cdp, `document.querySelector('${actions} summary').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await pressKey(cdp, 'Tab', 9)
+  await pressKey(cdp, 'Tab', 9)
+  await waitUntil('Tab reaches Schedule in the open action menu', () => evaluate<boolean>(cdp, `
+    document.querySelector('${actions}').open && document.activeElement === document.querySelector('${picker}')`), 5_000)
+  await pressKey(cdp, 'Enter', 13)
   await waitUntil('The workspace calendar fits at 375 pixels', () => evaluate<boolean>(cdp, `
     (() => {
       const panel = document.querySelector('[data-date-time-panel]')
@@ -660,10 +724,33 @@ async function checkPhoneNavigation(cdp: Cdp): Promise<void> {
       return bounds?.width > 0 && bounds.left >= 0 && bounds.right <= innerWidth
         && panel.textContent.includes(${JSON.stringify(timezone)})
     })()`), 5_000)
-  await evaluate(cdp, `document.querySelector('[data-date-time-preset=hour]').click()`)
+  await evaluate(cdp, `document.querySelector('[data-date-time-preset=hour]').focus()`)
+  await pressKey(cdp, 'Enter', 13)
   await waitUntil('In an hour schedules the composer post', () => evaluate<boolean>(cdp, `
     !document.querySelector('[data-date-time-panel]')
-      && document.querySelector('[data-bluesky-publish-label]')?.textContent === 'Schedule'`), 5_000)
+      && !document.querySelector('${actions}').open
+      && document.querySelector('[data-bluesky-publish-label]')?.textContent?.startsWith('Schedule for ')`), 5_000)
+
+  const blog = "document.querySelector('[data-provider-toggle=blog]')"
+  const scheduledBody = 'Keyboard scheduling fixture'
+  await waitUntil('The phone composer has a publishing channel', () => evaluate<boolean>(cdp, `Boolean(${blog})`), 5_000)
+  await evaluate(cdp, `(() => {
+    for (const chip of document.querySelectorAll('[data-provider-toggle][aria-pressed=true]'))
+      if (chip !== ${blog}) chip.click()
+    if (${blog}.getAttribute('aria-pressed') !== 'true') ${blog}.click()
+    const editor = document.querySelector('[data-bluesky-text]')
+    editor.value = ${JSON.stringify(scheduledBody)}
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
+  })()`)
+  await pressKey(cdp, 'Enter', 13, 2)
+  await waitUntil('Ctrl+Enter saves the chosen publishing time', () => evaluate<boolean>(cdp, `
+    document.querySelector('#postline-toast-host')?.textContent.includes('Scheduled. Check the Queue page')`), 5_000)
+  const scheduledAt = await evaluate<string | null>(cdp, `(async () => {
+    const { data } = await (await fetch('/api/postline/queue')).json()
+    return data.items.find(item => item.status === 'scheduled' && item.body === ${JSON.stringify(scheduledBody)})?.scheduledAt || null
+  })()`)
+  const delay = scheduledAt ? Date.parse(scheduledAt.replace(' ', 'T') + 'Z') - Date.now() : 0
+  if (delay < 58 * 60_000 || delay > 60 * 60_000) throw new Error('Keyboard scheduling did not store the one-hour preset.')
 }
 
 async function checkQueueRescheduling(cdp: Cdp): Promise<void> {
@@ -940,6 +1027,7 @@ try {
     await checkWorkspaceBootstrap(cdp)
     await checkChannels(cdp)
     await checkNetworkComponents(cdp)
+    await checkComposerThreadDraft(cdp)
     await checkBrowserPasskey(cdp)
     await checkPhoneNavigation(cdp)
     await checkQueueRescheduling(cdp)

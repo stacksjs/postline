@@ -35,10 +35,9 @@
               <span data-bluesky-connection-label>Checking accounts…</span>
             </a>
           </div>
-          <div class="grid grid-cols-3 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Post mode">
-            <button class="px-2.5 py-1.5 min-w-19 text-ink text-xs bg-panel rounded-lg shadow-sm transition-colors" type="button" aria-pressed="true" data-composer-mode="single">Single</button>
-            <button class="px-2.5 py-1.5 min-w-19 text-muted text-xs rounded-lg transition-colors" type="button" aria-pressed="false" data-composer-mode="thread">Thread</button>
-            <button class="px-2.5 py-1.5 min-w-19 text-muted text-xs rounded-lg transition-colors" type="button" aria-pressed="false" data-composer-mode="draft">Draft</button>
+          <div class="grid grid-cols-2 p-0.5 bg-panel-3 border border-line rounded-xl" role="group" aria-label="Post format">
+            <button class="px-2.5 py-1.5 min-w-19 text-xs rounded-lg transition-colors" type="button" data-view-toggle data-composer-mode="single" :data-active="composerFormat() === 'single'" :aria-pressed="composerFormat() === 'single'" :disabled="editingQueued()" @click="chooseFormat('single')">Single</button>
+            <button class="px-2.5 py-1.5 min-w-19 text-xs rounded-lg transition-colors" type="button" data-view-toggle data-composer-mode="thread" :data-active="composerFormat() === 'thread'" :aria-pressed="composerFormat() === 'thread'" :disabled="editingQueued()" @click="chooseFormat('thread')">Thread</button>
           </div>
         </header>
 
@@ -94,7 +93,7 @@
             <input class="px-3 h-9 w-full text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="url" inputmode="url" placeholder="Image URL (required for Instagram)" aria-label="Image URL for Instagram" data-compose-image>
           </label>
           <input class="hidden mb-2 w-full font-semibold leading-snug text-2xl text-ink placeholder:text-muted bg-transparent border-0 outline-none rounded-md" data-focus-outline type="text" maxlength="200" placeholder="Post title" aria-label="Blog post title" data-compose-title>
-          <div class="grid overflow-y-auto content-start gap-4 pr-1 max-h-72" data-composer-posts>
+          <div class="grid overflow-y-auto content-start gap-4 pr-1 max-h-72" data-composer-posts :data-composer-format="composerFormat()">
             <article class="grid gap-2 pb-3 last:pb-0 border-b border-line last:border-b-0" data-composer-post data-active="true">
               <header class="flex gap-3 items-center justify-between">
                 <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-on-accent text-xs bg-accent rounded-lg" type="button" data-select-post>
@@ -167,17 +166,28 @@
             <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach images" title="Attach images (up to 4)" data-attach-button>
               <span class="h-4 w-4 i-hugeicons-image-01" aria-hidden="true"></span>
             </button>
-            <PostlineSchedulePicker :value="scheduledIso" :timeZone="scheduleZone" @change="selectSchedule" />
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Add post" title="Add post" data-add-post>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Add post" title="Add post" data-add-post :disabled="editingQueued() && composerFormat() === 'single'" x-show="!editingQueued() || composerFormat() === 'thread'">
               <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
             </button>
             <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Preview post" title="Preview post" data-preview-post>
               <span class="h-4 w-4 i-hugeicons-view" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex gap-2 items-center justify-center ml-auto px-4 sm:ml-0 h-9 font-semibold text-on-accent bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" data-bluesky-publish>
-              <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
-              <span data-bluesky-publish-label>Publish</span>
-            </button>
+            <div class="inline-flex ml-auto sm:ml-0 text-on-accent bg-accent rounded-xl">
+              <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold hover:bg-accent-hover rounded-l-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" ref="publishTrigger" data-bluesky-publish aria-keyshortcuts="Meta+Enter Control+Enter" :disabled="!canPublish() || submitting()" @click="runPostAction">
+                <span class="shrink-0 h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
+                <span data-bluesky-publish-label :text="postActionLabel()">Publish</span>
+              </button>
+              <details class="relative border-current border-l" ref="publishActions" data-composer-actions @keydown="closePublishActionsOnEscape">
+                <summary class="grid place-items-center h-9 w-9 list-none hover:bg-accent-hover rounded-r-xl cursor-pointer" aria-label="Publishing actions" ref="publishMenuTrigger">
+                  <span class="h-4 w-4 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
+                </summary>
+                <div class="grid absolute bottom-full right-0 z-30 gap-1 mb-1 p-1.5 min-w-40 text-ink text-ui bg-panel border border-line rounded-xl shadow-lg">
+                  <button class="px-3 py-2 text-left hover:bg-hover rounded-lg" type="button" x-show="!editingQueued()" @click="choosePostAction('publish')">Publish now</button>
+                  <PostlineSchedulePicker :value="scheduledIso" :timeZone="scheduleZone" label="Schedule" @change="selectSchedule" />
+                  <button class="px-3 py-2 text-left hover:bg-hover rounded-lg" type="button" aria-keyshortcuts="Meta+S Control+S" @click="choosePostAction('draft')">Save draft</button>
+                </div>
+              </details>
+            </div>
           </div>
         </footer>
       </section>
@@ -203,13 +213,72 @@
     // The accounts could not be read (offline, a server error): not the same
     // as having none, so it says so and offers to try again.
     const providersFailed = state(false)
-    const composerHandlers = { toggleProvider: null, retryProviders: null, scheduleChanged: null }
+    const composerHandlers = { toggleProvider: null, retryProviders: null, scheduleChanged: null, setFormat: null, publish: null }
+    const composerFormat = state<'single' | 'thread'>('single')
+    const editingQueued = state(Boolean(useRoute().query.edit))
+    const canPublish = state(false)
+    const submitting = state(false)
+    const postAction = state<'publish' | 'schedule' | 'draft'>('publish')
     const scheduledIso = state<string | null>(null)
     const scheduleZone = state(systemTimeZone())
+    const publishTrigger = useRef('publishTrigger')
+    const publishActions = useRef('publishActions')
+    const publishMenuTrigger = useRef('publishMenuTrigger')
+
+    const postActionLabel = derived(() => {
+      if (submitting()) return postAction() === 'publish' && !editingQueued() ? 'Publishing…' : 'Saving…'
+      const iso = scheduledIso()
+      if (postAction() === 'schedule' && iso) {
+        const when = new Date(iso).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: scheduleZone() })
+        return `Schedule for ${when}`
+      }
+      if (editingQueued() && postAction() !== 'draft') return 'Update post'
+      return postAction() === 'draft' ? 'Save draft' : 'Publish'
+    })
+    const chooseFormat = (format: 'single' | 'thread') => {
+      if (!editingQueued() && !submitting()) composerHandlers.setFormat?.(format)
+    }
+    const runPostAction = () => composerHandlers.publish?.()
+
+    function closePublishActions(restoreMenuFocus = false) {
+      if (publishActions.current) publishActions.current.open = false
+      if (restoreMenuFocus || publishTrigger.current?.disabled) publishMenuTrigger.current?.focus()
+      else publishTrigger.current?.focus()
+    }
+
+    function closePublishActionsOnEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape' || event.defaultPrevented || !publishActions.current?.open) return
+      event.preventDefault()
+      closePublishActions(true)
+    }
+
+    function choosePostAction(action: 'publish' | 'draft') {
+      scheduledIso.set(null)
+      postAction.set(action)
+      composerHandlers.scheduleChanged?.()
+      closePublishActions()
+    }
+
     const selectSchedule = ({ value }: { value: string | null }) => {
       scheduledIso.set(value)
+      postAction.set(value ? 'schedule' : editingQueued() ? 'draft' : 'publish')
       composerHandlers.scheduleChanged?.()
+      void nextTick(() => closePublishActions())
     }
+
+    useEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.repeat || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return
+      if (event.target instanceof Element && event.target.closest('[role=dialog], [role=alertdialog]')) return
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        runPostAction()
+      }
+      else if (event.key.toLowerCase() === 's' && !submitting()) {
+        event.preventDefault()
+        choosePostAction('draft')
+        runPostAction()
+      }
+    })
     const toggleProvider = key => composerHandlers.toggleProvider?.(key)
     const retryProviders = () => composerHandlers.retryProviders?.()
 
@@ -266,8 +335,6 @@
       const connection = root.querySelector('[data-bluesky-connection]')
       const connectionDot = root.querySelector('[data-bluesky-connection-dot]')
       const connectionLabel = root.querySelector('[data-bluesky-connection-label]')
-      const publishLabel = root.querySelector('[data-bluesky-publish-label]')
-      const buttons = Array.from(root.querySelectorAll('[data-bluesky-publish], [data-bluesky-publish-top]'))
       const variantSection = root.querySelector('[data-variant-section]')
       const variantToggle = root.querySelector('[data-variant-toggle]')
       const variantToggleLabel = root.querySelector('[data-variant-toggle-label]')
@@ -315,15 +382,11 @@
       const previewButton = root.querySelector('[data-preview-post]')
       const refreshButton = root.querySelector('[data-composer-refresh]')
       const searchButton = root.querySelector('[data-composer-search]')
-      const modeButtons = Array.from(root.querySelectorAll('[data-composer-mode]'))
       const urlPattern = /https?:\/\/[^\s<>"']+/i
       const draftKey = 'postline:composer-draft:v1'
       let activePost = root.querySelector('[data-composer-post]')
       let postCounter = root.querySelectorAll('[data-composer-post]').length
-      let activeMode = modeButtons.find(button => button.classList.contains('bg-panel'))?.dataset.composerMode || 'single'
       let savedActiveIndex = 0
-
-      let canPublish = false
 
       // Signals, not plain values: the provider chips render from these through
       // x-for, so every mutation repaints with no hand-written render pass.
@@ -520,7 +583,7 @@
        * them server-side. Rendering and payload building share this one test so
        * a state that cannot show an override can never send one either.
        */
-      const variantsAvailable = () => selectedConnected().length > 0 && allPosts().length === 1
+      const variantsAvailable = () => selectedConnected().length > 0 && composerFormat() === 'single'
 
       /** Overrides worth sending: blank ones inherit, so they are dropped. */
       const variantsPayload = () => {
@@ -703,18 +766,13 @@
       }
 
       const updatePublishability = () => {
-        canPublish = selectedConnected().length > 0
-        buttons.forEach((button) => {
-          if (canPublish) button.removeAttribute('disabled')
-          else button.setAttribute('disabled', 'disabled')
-        })
+        canPublish.set(selectedConnected().length > 0 && (!editParam || editingId !== null))
         // The image field is only meaningful for Instagram, which rejects
         // text-only posts.
         const needsImage = isNetworkSelected('instagram')
         composeImageRow?.classList.toggle('hidden', !needsImage)
         composeImageRow?.classList.toggle('flex', needsImage)
-        // Long-form title field appears whenever the blog is a target.
-        const wantsTitle = isNetworkSelected('blog')
+        const wantsTitle = composerFormat() === 'single' && isNetworkSelected('blog')
         composeTitle?.classList.toggle('hidden', !wantsTitle)
         composeTitle?.classList.toggle('block', wantsTitle)
         renderVariantPanel()
@@ -800,9 +858,15 @@
           const draft = JSON.parse(localStorage.getItem(draftKey) || 'null')
           if (!draft || !Array.isArray(draft.posts) || draft.posts.length === 0) return null
 
+          const restoredSchedule = draft.action === 'schedule' && typeof draft.scheduledIso === 'string'
+            && Number.isFinite(Date.parse(draft.scheduledIso)) ? draft.scheduledIso : null
           return {
             activeIndex: Number.isFinite(draft.activeIndex) ? draft.activeIndex : 0,
-            mode: ['single', 'thread', 'draft'].includes(draft.mode) ? draft.mode : 'single',
+            mode: draft.mode === 'thread' ? 'thread' : 'single',
+            action: restoredSchedule
+              ? 'schedule'
+              : draft.mode === 'draft' || draft.action === 'draft' || draft.action === 'schedule' ? 'draft' : 'publish',
+            scheduledIso: restoredSchedule,
             posts: draft.posts
               .slice(0, 24)
               // Corruption guard, not a content cap: 10000 mirrors the largest
@@ -837,7 +901,9 @@
           const posts = allPosts()
           localStorage.setItem(draftKey, JSON.stringify({
             activeIndex: Math.max(0, posts.indexOf(activePost)),
-            mode: activeMode,
+            mode: composerFormat(),
+            action: postAction(),
+            scheduledIso: scheduledIso(),
             posts: posts.map(post => ({ text: textareaFor(post)?.value || '' })),
             variants: Array.from(variants.entries())
               .map(([provider, entry]) => ({ provider, text: entry.text, shared: entry.shared })),
@@ -858,8 +924,10 @@
         if (!draft || !postsRoot) return
 
         postsRoot.replaceChildren(...draft.posts.map((post, index) => createPost(index + 1, post.text)))
-        activeMode = draft.mode
-        savedActiveIndex = Math.max(0, Math.min(draft.activeIndex, draft.posts.length - 1))
+        composerFormat.set(draft.mode)
+        postAction.set(draft.action)
+        scheduledIso.set(draft.scheduledIso)
+        savedActiveIndex = draft.mode === 'thread' ? Math.max(0, Math.min(draft.activeIndex, draft.posts.length - 1)) : 0
         postCounter = draft.posts.length
         activePost = allPosts()[savedActiveIndex] || root.querySelector('[data-composer-post]')
         variants.clear()
@@ -888,7 +956,7 @@
         const length = lengthFor(tightestProvider(), textarea.value)
         const limit = effectiveLimit()
         const over = overLimitProviders()
-        const posts = allPosts().length
+        const posts = composerFormat() === 'thread' ? allPosts().length : 1
 
         // Over-limit names the networks rather than the number, because with
         // mixed targets "over" is only true for some of them.
@@ -1017,6 +1085,7 @@
 
       const removePost = (post) => {
         if (!post || allPosts().length === 1) return
+        markEdited()
         const label = post.querySelector('[data-post-label]')?.textContent || 'Post'
         const hadText = Boolean(textareaFor(post)?.value.trim())
         const parent = post.parentElement
@@ -1050,14 +1119,6 @@
         })
       }
 
-      const updatePublishLabel = () => {
-        if (!publishLabel) return
-        if (editingId) publishLabel.textContent = scheduledIso() ? 'Update schedule' : 'Update post'
-        else if (scheduledIso()) publishLabel.textContent = 'Schedule'
-        else if (activeMode === 'draft') publishLabel.textContent = 'Save draft'
-        else publishLabel.textContent = 'Publish'
-      }
-
       const zoneReady = fetchWorkspace()
         .then((workspace) => {
           if (workspace?.timezone) scheduleZone.set(workspace.timezone)
@@ -1070,7 +1131,10 @@
       // (saveDraft refuses in edit mode), so leaving would drop them silently.
       let editDirty = false
       const markEdited = () => { if (editingId) editDirty = true }
-      composerHandlers.scheduleChanged = markEdited
+      composerHandlers.scheduleChanged = () => {
+        markEdited()
+        queueDraftSave()
+      }
       root.addEventListener('input', markEdited)
       root.addEventListener('change', markEdited)
       // A link or navigate() that would drop them is held, and the toast says
@@ -1104,11 +1168,20 @@
         editingId = item.id
         editBanner?.classList.remove('hidden')
         editBanner?.classList.add('flex')
-        if (composerHeading) composerHeading.textContent = `Editing post #${item.id}`
+        if (composerHeading) composerHeading.textContent = item.thread ? 'Editing thread' : `Editing post #${item.id}`
 
-        // Text (single-post edit — threads edit one segment).
-        const textarea = activeTextarea()
-        if (textarea) textarea.value = item.text || ''
+        if (item.thread && postsRoot) {
+          const posts = item.thread.texts.map((text, index) => createPost(index + 1, text))
+          postsRoot.replaceChildren(...posts)
+          postCounter = posts.length
+          composerFormat.set('thread')
+          renamePosts()
+          selectPost(posts[item.thread.postIds.indexOf(item.id)] || posts[0], { skipSave: true })
+        }
+        else {
+          const textarea = activeTextarea()
+          if (textarea) textarea.value = item.text || ''
+        }
         if (composeTitle) composeTitle.value = item.title || ''
 
         // Overrides. `shared` is seeded from the stored body so a restored
@@ -1132,6 +1205,7 @@
         // Schedule.
         const savedSchedule = item.scheduledAt ? new Date(`${item.scheduledAt.replace(' ', 'T')}Z`) : null
         scheduledIso.set(savedSchedule && Number.isFinite(savedSchedule.getTime()) ? savedSchedule.toISOString() : null)
+        postAction.set(scheduledIso() ? 'schedule' : item.status === 'draft' ? 'draft' : 'publish')
 
         // Link card.
         if (item.external?.uri) {
@@ -1152,7 +1226,6 @@
 
         updateCount()
         void updateLinkPreview(activePost)
-        updatePublishLabel()
       }
 
       const loadEditPost = async (id) => {
@@ -1168,8 +1241,18 @@
         }
       }
 
+      const composedThread = () => composerFormat() === 'thread'
+        ? allPosts().map(post => textareaFor(post)?.value.trim()).filter(Boolean)
+        : []
+
       const updateQueued = async () => {
-        const text = activeTextarea()?.value.trim()
+        const threadTexts = composedThread()
+        if (composerFormat() === 'thread' && threadTexts.length < 2) {
+          setStatus('Write at least two posts before updating the thread.', 'error')
+          activeTextarea()?.focus()
+          return
+        }
+        const text = threadTexts[0] || activeTextarea()?.value.trim()
         if (!text) {
           setStatus('Write something before updating.', 'error')
           activeTextarea()?.focus()
@@ -1184,6 +1267,7 @@
         const form = new FormData()
         form.set('id', String(editingId))
         form.set('text', text)
+        if (threadTexts.length) form.set('thread', JSON.stringify(threadTexts))
         form.set('providers', targetProviders.join(','))
         const editTitle = composedTitle()
         if (editTitle) form.set('title', editTitle)
@@ -1204,27 +1288,26 @@
         // "keep what is stored", so clearing every override has to be explicit.
         form.set('variants', JSON.stringify(variantsPayload()))
 
-        buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
         try {
           const response = await fetch('/api/postline/queue/update', { method: 'POST', body: form })
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not update the post.')
           editDirty = false
-          setStatus('Post updated.', 'success', { title: 'Updated' })
+          setStatus(threadTexts.length ? 'Thread updated.' : 'Post updated.', 'success', { title: 'Updated' })
           // Back to the queue to see the change. A router visit, not a full
           // load: a reload took the "Post updated" toast down with the page.
           navigate('/queue')
         }
         catch (error) {
           setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Update failed' })
-          buttons.forEach((button) => { if (canPublish) button.removeAttribute('disabled') })
         }
       }
 
       // Draft mode and schedule-time both save to the server-side queue
       // instead of publishing immediately.
       const saveToQueue = async (scheduleValue) => {
-        const text = activeTextarea()?.value.trim()
+        const threadTexts = composedThread()
+        const text = threadTexts[0] || activeTextarea()?.value.trim()
         if (!text) {
           setStatus('Write something before saving.', 'error')
           activeTextarea()?.focus()
@@ -1235,12 +1318,6 @@
           setStatus('Select a connected account before saving to the queue.', 'error', { title: 'Not connected' })
           return
         }
-        // A thread goes to the queue as its segments; the server stores them
-        // together and sends them in order when they come due (#255).
-        const threadTexts = activeMode === 'thread'
-          ? allPosts().map(post => textareaFor(post)?.value.trim()).filter(Boolean)
-          : []
-
         const form = new FormData()
         if (threadTexts.length > 1) form.set('thread', JSON.stringify(threadTexts))
         form.set('text', text)
@@ -1260,13 +1337,12 @@
         const queueVariants = variantsPayload()
         if (Object.keys(queueVariants).length) form.set('variants', JSON.stringify(queueVariants))
 
-        buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
         try {
           const response = await fetch('/api/postline/queue', { method: 'POST', body: form })
           const payload = await response.json()
           if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save to the queue.')
 
-          // A scheduled thread took every segment with it.
+          // Clear every segment committed to the queue.
           if (threadTexts.length > 1) {
             allPosts().forEach((post) => {
               const segment = textareaFor(post)
@@ -1277,6 +1353,7 @@
           const textarea = activeTextarea()
           if (textarea) textarea.value = ''
           scheduledIso.set(null)
+          if (scheduleValue) postAction.set('publish')
           if (composeTitle) composeTitle.value = ''
           clearAttachment()
           resetPostOptions()
@@ -1285,7 +1362,6 @@
           variants.clear()
           renderVariantPanel()
           updateCount()
-          updatePublishLabel()
           saveDraft()
           setStatus(
             payload.data.status === 'scheduled'
@@ -1298,32 +1374,15 @@
         catch (error) {
           setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Queue' })
         }
-        finally {
-          buttons.forEach((button) => {
-            if (canPublish) button.removeAttribute('disabled')
-          })
-        }
       }
 
       const setMode = (mode, options = {}) => {
-        const nextMode = ['single', 'thread', 'draft'].includes(mode) ? mode : 'single'
-        activeMode = nextMode
-        modeButtons.forEach((button) => {
-          const active = button.dataset.composerMode === nextMode
-          button.setAttribute('aria-pressed', String(active))
-          button.classList.toggle('bg-panel', active)
-          button.classList.toggle('text-ink', active)
-          button.classList.toggle('shadow-sm', active)
-          button.classList.toggle('text-muted', !active)
-        })
-        if (nextMode === 'thread' && allPosts().length === 1 && !options.skipThreadPost) {
+        composerFormat.set(mode)
+        if (mode === 'single') selectPost(allPosts()[0], { skipSave: true })
+        else if (allPosts().length === 1 && !options.skipThreadPost) {
           addPost({ focus: false, save: false })
         }
-        updatePublishLabel()
-        // No toast: the segmented control above already shows which mode is
-        // active, and it changed under the pointer that asked for it. Success
-        // toasts run for 8s, so trying the three modes in turn left all three
-        // stacked over the composer at once.
+        updatePublishability()
         if (!options.skipSave) saveDraft()
       }
 
@@ -1345,23 +1404,13 @@
       }
 
       const publish = async () => {
-        // Editing a queued post always updates it in place (never publishes).
-        if (editingId) {
-          await updateQueued()
-          return
-        }
-        if (activeMode === 'draft' || scheduledIso()) {
-          await saveToQueue(scheduledIso())
-          return
-        }
-
         const targetProviders = selectedConnected().map(target => target.key)
         if (targetProviders.length === 0) {
           setStatus('Select a connected account in Settings → Channels before publishing.', 'error', { title: 'Not connected' })
           return
         }
 
-        const targets = activeMode === 'thread'
+        const targets = composerFormat() === 'thread'
           ? allPosts().filter(post => textareaFor(post)?.value.trim())
           : [activePost].filter(Boolean)
 
@@ -1374,8 +1423,6 @@
         const providerNames = selectedConnected()
           .map(target => target.multi ? targetLabel(target.provider, target.account?.handle) : providerLabel(target.provider))
           .join(', ')
-        buttons.forEach(button => button.setAttribute('disabled', 'disabled'))
-        if (publishLabel) publishLabel.textContent = 'Publishing…'
         setStatus(
           targets.length > 1 ? `Publishing ${targets.length} posts to ${providerNames}…` : `Publishing to ${providerNames}…`,
           'info',
@@ -1422,7 +1469,7 @@
             collect(await publishOne(targets[0], targetProviders))
           }
 
-          if (activeMode === 'thread') {
+          if (targets.length > 1) {
             allPosts().forEach((post) => {
               const textarea = textareaFor(post)
               if (textarea) textarea.value = ''
@@ -1466,11 +1513,19 @@
           dismissPostlineToast('publish')
           setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Publish failed' })
         }
+      }
+
+      composerHandlers.setFormat = setMode
+      composerHandlers.publish = async () => {
+        if (!canPublish() || submitting()) return
+        submitting.set(true)
+        try {
+          if (editingId) await updateQueued()
+          else if (postAction() === 'publish') await publish()
+          else await saveToQueue(postAction() === 'schedule' ? scheduledIso() : null)
+        }
         finally {
-          updatePublishLabel()
-          buttons.forEach(button => {
-            if (canPublish) button.removeAttribute('disabled')
-          })
+          submitting.set(false)
         }
       }
 
@@ -1496,7 +1551,6 @@
         selectPost(post)
         updateCount()
       })
-      effect(updatePublishLabel)
       attachButton?.addEventListener('click', () => attachInput?.click())
       attachInput?.addEventListener('change', () => {
         const picked = [...(attachInput.files || [])]
@@ -1531,7 +1585,12 @@
         if (removed?.kept && editingId && editHadImage) editRemoveImage = true
         attachedImages.set(attachedImages().filter(image => image.id !== id))
       }
-      addPostButton?.addEventListener('click', addPost)
+      addPostButton?.addEventListener('click', () => {
+        if (submitting() || (editingQueued() && composerFormat() === 'single')) return
+        setMode('thread', { skipSave: true, skipThreadPost: true })
+        addPost()
+        markEdited()
+      })
       previewButton?.addEventListener('click', () => {
         const text = activeTextarea()?.value.trim()
         void updateLinkPreview()
@@ -1551,8 +1610,8 @@
         try {
           await refreshConnection()
           setStatus(
-            canPublish ? 'Accounts are ready to publish.' : 'Connect an account in Settings → Channels.',
-            canPublish ? 'success' : 'error',
+            canPublish() ? 'Accounts are ready to publish.' : 'Connect an account in Settings → Channels.',
+            canPublish() ? 'success' : 'error',
             { title: 'Channels' },
           )
         }
@@ -1603,8 +1662,6 @@
         const text = activeTextarea()?.value.trim()
         setStatus(text ? `Searching local drafts for: ${text.slice(0, 80)}` : 'Write a phrase first, then search local drafts.', text ? 'success' : 'error')
       })
-      modeButtons.forEach(button => button.addEventListener('click', () => setMode(button.dataset.composerMode || 'single')))
-      buttons.forEach(button => button.addEventListener('click', publish))
       // Editing a queued post — don't restore a local draft over it. The
       // reciprocal guard (never writing an edit back into the draft) lives in
       // saveDraft itself, so it holds for every caller.
@@ -1612,7 +1669,6 @@
         useEventListener('beforeunload', saveDraft, { target: window })
         restoreDraft()
       }
-      setMode(activeMode, { skipSave: true, skipThreadPost: true })
       renamePosts()
       selectPost(allPosts()[savedActiveIndex] || activePost, { skipSave: true })
       updateCount()
@@ -1623,7 +1679,10 @@
       const applyScheduleParam = () => {
         if (!scheduleParam || !/^\d{4}-\d{2}-\d{2}$/.test(scheduleParam)) return
         const instant = instantFromWallTime(`${scheduleParam} 09:00:00`, scheduleZone())
-        if (instant) scheduledIso.set(instant.toISOString())
+        if (instant) {
+          scheduledIso.set(instant.toISOString())
+          postAction.set('schedule')
+        }
         activeTextarea()?.focus()
       }
 

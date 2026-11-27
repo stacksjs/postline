@@ -1,4 +1,15 @@
 import type { CrosspostTargetResult, PublishContent } from './types'
+import { UserFacingError } from '../Http/user-error'
+
+export function readQueuedThread(value: unknown): string[] | null {
+  if (value === undefined || value === null || value === '') return null
+  try {
+    const texts = typeof value === 'string' ? JSON.parse(value) : value
+    if (Array.isArray(texts) && texts.every(text => typeof text === 'string')) return texts
+  }
+  catch {}
+  throw new UserFacingError('Could not read the thread.')
+}
 
 /**
  * The two rules that make a thread a thread, kept pure and out of

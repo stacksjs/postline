@@ -9,6 +9,8 @@ import { parseTargets, targetKey } from '../../Support/Social/targets'
 import { readImagesInput } from '../../Support/Social/image-input'
 import { readPostOptions } from '../../Support/Social/post-options'
 import { parseVariantsField } from '../../Support/Social/variants'
+import { readQueuedThread } from '../../Support/Social/threads'
+import { UserFacingError } from '../../Support/Http/user-error'
 
 export default new Action({
   name: 'Postline Queue Update',
@@ -70,6 +72,12 @@ export default new Action({
       return response.json({ ok: false, error: readOptions.error }, { status: 422 })
 
     try {
+      const texts = readQueuedThread(request.get('thread'))
+      if (texts) {
+        if (images !== undefined) throw new UserFacingError('Save the thread without changing its images.')
+        const data = await postQueue.updateThread(id, { texts, providers, scheduledAt, options: sendsOptions ? (readOptions.options ?? null) : undefined })
+        return response.json({ ok: true, data })
+      }
       const data = await postQueue.update(id, { text, providers, title, scheduledAt, external, images, variants, options: sendsOptions ? (readOptions.options ?? null) : undefined })
       return response.json({ ok: true, data })
     }

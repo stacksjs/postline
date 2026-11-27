@@ -235,6 +235,30 @@ describe('removing posts from the queue', () => {
   })
 })
 
+describe('queued thread drafts', () => {
+  test('saves, reopens and schedules the entire thread in order', async () => {
+    const client = featureTest().actingAs(await actingUser())
+    const texts = ['Thread opening', 'The middle', 'The end']
+    const created = await client.post('/api/postline/queue', { thread: texts, providers: 'bluesky' })
+    created.assertStatus(200)
+    const draft = (await created.json<{ data: { postIds: number[], status: string, scheduledAt: string } }>()).data
+    expect(draft).toMatchObject({ status: 'draft', scheduledAt: null })
+    expect(draft.postIds).toHaveLength(3)
+    const id = draft.postIds[1]!
+    const read = await client.get(`/api/postline/queue/item?id=${id}`)
+    read.assertStatus(200)
+    expect(await read.json()).toMatchObject({ data: { status: 'draft', thread: { postIds: draft.postIds, texts } } })
+
+    const scheduledAt = '2099-04-08 15:45:00'
+    const revised = ['Revised thread opening', 'Revised ending']
+    const scheduled = await client.post('/api/postline/queue/update', { id, thread: revised, providers: 'bluesky', scheduled_at: scheduledAt })
+    scheduled.assertStatus(200)
+    expect(await scheduled.json()).toMatchObject({ data: { postIds: draft.postIds.slice(0, 2), status: 'scheduled', scheduledAt } })
+    expect((await postQueue.get(id)).thread?.texts).toEqual(revised)
+    await expect(postQueue.get(draft.postIds[2]!)).rejects.toThrow('Post not found')
+  })
+})
+
 describe('postline api — the endpoints that had no table', () => {
   /**
    * The regression guard for the migration gap. Before the pending migrations
