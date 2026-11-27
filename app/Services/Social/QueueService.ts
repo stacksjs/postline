@@ -4,7 +4,8 @@ import type { PostOptions } from '../../Support/Social/post-options'
 import type { ScheduledSelection, ScheduleDestination } from '../../Support/Social/rescheduling'
 import type { RecurringSegment } from '../../Support/Social/recurring-posts'
 import type { StoredContent } from '../../Support/Social/stored-content'
-import { sanitizePostOptions } from '../../Support/Social/post-options'
+import { InvalidStoredPostOptionsError, sanitizePostOptions } from '../../Support/Social/post-options'
+import { threadPostOptions } from '../../Support/Social/threads'
 import { postFirstComments } from './PostFirstCommentService'
 import { isDue, MAX_ATTEMPTS, nextAttemptAt } from '../../Support/Social/retry'
 import { moveScheduledTime } from '../../Support/Social/rescheduling'
@@ -20,7 +21,7 @@ import { env } from '@stacksjs/env'
 import { raw } from '@stacksjs/query-builder'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { dedupeTargets, isAccountProvider, parseTargets, targetKey, targetProviders } from '../../Support/Social/targets'
-import { hydrateStoredContent, InvalidFirstCommentError, MissingMediaError, parseStoredContent } from '../../Support/Social/stored-content'
+import { hydrateStoredContent, MissingMediaError, parseStoredContent } from '../../Support/Social/stored-content'
 import { isSafeMediaFilename, MEDIA_DIR, storedImageResponse } from '../../Support/Social/uploads'
 import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/variants'
 import { crosspost, crosspostProviders } from './CrosspostService'
@@ -570,7 +571,7 @@ export class QueueService {
               stored.variants = input.texts ? undefined : resolveStoredVariants(input.variants, stored.variants) ?? undefined
             }
             const options = input.options === undefined ? stored.options : input.options
-            stored.options = sanitizePostOptions(options) ?? undefined
+            stored.options = threadPostOptions(index, sanitizePostOptions(options))
             const values = {
               title: stored.title || body.slice(0, 80),
               body,
@@ -665,7 +666,8 @@ export class QueueService {
         const row = existing[index]
         const stored: StoredContent = parseStoredContent(row?.[column]) ?? {}
         if (input.options !== undefined || !row) {
-          if (options) stored.options = options
+          const segmentOptions = threadPostOptions(index, options)
+          if (segmentOptions) stored.options = segmentOptions
           else delete stored.options
         }
         if (index === 0) {
@@ -1567,7 +1569,7 @@ export class QueueService {
         // Refused before anything was claimed or sent. Left as it was it
         // would be picked up and refused again every minute, so it is set
         // aside with the reason for the owner to fix.
-        if ((error instanceof MissingMediaError || error instanceof InvalidFirstCommentError) && !await this.setAside(Number(post.id), error.message, scheduledAt))
+        if ((error instanceof MissingMediaError || error instanceof InvalidStoredPostOptionsError) && !await this.setAside(Number(post.id), error.message, scheduledAt))
           continue
         // Swallowed so one post cannot stop the rest, but never silently.
         log.error(`[postline] scheduled post ${post.id} could not be published: ${error instanceof Error ? error.message : String(error)}`)

@@ -1,3 +1,4 @@
+import type { PostOptions } from './post-options'
 import type { CrosspostTargetResult, PublishContent } from './types'
 import { UserFacingError } from '../Http/user-error'
 
@@ -79,9 +80,22 @@ export function threadSegmentContent(
   if (index === 0)
     return content ? { ...content, variants: undefined } : undefined
 
-  // The language, visibility and content warning hold for the whole thread:
-  // a reply that dropped a content warning would show what the first hid.
-  if (!chain && !content?.options) return undefined
-  const options = content?.options
-  return { ...(chain ? { reply: chain } : {}), ...(options ? { options: { ...options, firstComments: undefined } } : {}) }
+  const options = threadPostOptions(index, content?.options)
+  if (!chain && !options) return undefined
+  return { ...(chain ? { reply: chain } : {}), ...(options ? { options } : {}) }
+}
+
+/** Only the lead post carries the poll, quote or first comment. */
+export function threadPostOptions(index: number, options?: PostOptions): PostOptions | undefined {
+  if (!options || index === 0) return options
+  const { language, mastodon, bluesky } = options
+  const visibility = mastodon?.visibility
+  const spoilerText = mastodon?.spoilerText
+  const selfLabels = bluesky?.selfLabels
+  if (!language && !visibility && !spoilerText && !selfLabels?.length) return undefined
+  return {
+    ...(language && { language }),
+    ...((visibility || spoilerText) && { mastodon: { ...(visibility && { visibility }), ...(spoilerText && { spoilerText }) } }),
+    ...(selfLabels?.length && { bluesky: { selfLabels } }),
+  }
 }

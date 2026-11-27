@@ -1033,6 +1033,59 @@ async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkComposerNetworkOptions(cdp: Cdp): Promise<void> {
+  const fixture = new Database(database)
+  try {
+    const identity = fixture.query(`INSERT INTO social_identities
+      (uuid, provider, handle, external_id, auth_status, access_token)
+      VALUES (?, ?, ?, ?, 'connected', ?)`)
+    identity.run(crypto.randomUUID(), 'mastodon', 'options-test', 'https://mastodon.social', 'fixture-token')
+    identity.run(crypto.randomUUID(), 'bluesky', 'options-test.example', 'did:plc:options-test', 'fixture-token')
+  }
+  finally {
+    fixture.close()
+  }
+
+  const text = 'Browser fixture with a poll and quote'
+  const choices = ['Sunrise', 'Sunset'].join('\n')
+  const quote = 'https://bsky.app/profile/example.test/post/3j2'
+  await evaluate(cdp, "localStorage.removeItem('postline:composer-draft:v1')")
+  await auditPage(`${site}/composer`, { cdp })
+  const field = (name: string) => `document.querySelector('form [name=${name}]')`
+  const target = (provider: string) => `document.querySelector('[data-provider-toggle^="${provider}:"]')`
+  await waitUntil('Composer shows both network accounts', () => evaluate<boolean>(cdp,
+    `Boolean(${target('mastodon')}?.getClientRects().length && ${target('bluesky')}?.getClientRects().length)`), 5_000)
+  await evaluate(cdp, `(() => {
+    for (const chip of [${target('mastodon')}, ${target('bluesky')}])
+      if (chip.getAttribute('aria-pressed') !== 'true') chip.click()
+    ${field('pollChoices')}.closest('details').open = true
+    ${field('blueskyQuote')}.closest('details').open = true
+    const editor = document.querySelector('[data-bluesky-text]')
+    editor.value = ${JSON.stringify(text)}
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
+    ${field('pollChoices')}.value = ${JSON.stringify(choices)}
+    ${field('pollMultiple')}.checked = true
+    ${field('blueskyQuote')}.value = ${JSON.stringify(quote)}
+    ${field('blueskyLabels')}.value = 'graphic-media'
+    editor.focus()
+  })()`)
+  await pressKey(cdp, 's', 83, 4)
+  await waitUntil('Composer saves the draft with its network options', () => evaluate<boolean>(cdp,
+    "document.querySelector('#stx-toast-container')?.textContent.includes('Draft saved to the queue.')"), 5_000)
+  const id = await evaluate<number>(cdp, `(async () => {
+    const { data } = await (await fetch('/api/postline/queue')).json()
+    return data.items.find(item => item.body === ${JSON.stringify(text)})?.id
+  })()`)
+  if (!id) throw new Error('Composer did not save the network options fixture to Queue.')
+
+  await auditPage(`${site}/composer?edit=${id}`, { cdp })
+  await waitUntil('Opening a queued draft restores its poll, labels and quote', () => evaluate<boolean>(cdp, `
+    ${field('pollChoices')}?.value === ${JSON.stringify(choices)}
+      && ${field('pollMultiple')}?.checked
+      && ${field('blueskyQuote')}?.value === ${JSON.stringify(quote)}
+      && ${field('blueskyLabels')}?.value === 'graphic-media'`), 5_000)
+}
+
 async function checkXBrowserSession(cdp: Cdp): Promise<void> {
   const endpoint = '/api/postline/twitter/browser-session'
   await auditPage(`${site}/accounts`, { cdp })
@@ -2615,6 +2668,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkAnalytics(cdp)
   await checkTrackedLinks(cdp)
   await checkListStates(cdp)
+  await checkComposerNetworkOptions(cdp)
   await checkFirstComments(cdp)
 }
 

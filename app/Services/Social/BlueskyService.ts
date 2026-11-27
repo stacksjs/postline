@@ -320,14 +320,21 @@ export class BlueskyService {
       // The same key on every attempt, so a retry after a publish that did
       // land reads it back instead of posting twice (#132).
       const rkey = blueskyRecordKey(Number(post.id), Number(identity.id))
-      const published = await this.withFreshSession(identity, freshIdentity =>
-        accountDriver.publish({
+      const bluesky = content?.options?.bluesky
+      const published = await this.withFreshSession(identity, async (freshIdentity) => {
+        const credentials = {
           handle: freshIdentity.handle,
           did: freshIdentity.external_id || undefined,
           accessToken: freshIdentity.access_token || undefined,
           refreshToken: freshIdentity.refresh_token || undefined,
-        }, publishInput, { rkey }),
-      )
+        }
+        const quote = bluesky?.quote ? await accountDriver.resolveQuote(credentials, bluesky.quote) : undefined
+        return accountDriver.publish(credentials, publishInput, {
+          rkey,
+          ...(quote && { quote }),
+          ...(bluesky?.selfLabels && { selfLabels: bluesky.selfLabels }),
+        })
+      })
 
       const publishedAt = now()
       await database.updateTable('post_targets').set({

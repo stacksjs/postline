@@ -7,7 +7,7 @@ import { crosspostProviders } from '../../Services/Social/CrosspostService'
 import { postQueue } from '../../Services/Social/QueueService'
 import { parseTargets, targetKey } from '../../Support/Social/targets'
 import { readImagesInput } from '../../Support/Social/image-input'
-import { readPostOptions } from '../../Support/Social/post-options'
+import { POST_OPTION_FIELDS, readPostOptions } from '../../Support/Social/post-options'
 import { parseVariantsField } from '../../Support/Social/variants'
 import { readQueuedThread } from '../../Support/Social/threads'
 import { UserFacingError } from '../../Support/Http/user-error'
@@ -66,8 +66,7 @@ export default new Action({
 
     // Sent by the composer on every edit; another client that leaves them
     // all out keeps what is stored.
-    const sendsOptions = ['language', 'mastodon_visibility', 'mastodon_spoiler', 'linkedin_first_comment', 'instagram_first_comment']
-      .some(key => request.get(key) !== undefined && request.get(key) !== null)
+    const sendsOptions = POST_OPTION_FIELDS.some(key => request.get(key) !== undefined && request.get(key) !== null)
     const readOptions = readPostOptions(key => request.get(key))
     if (!readOptions.ok)
       return response.json({ ok: false, error: readOptions.error }, { status: 422 })

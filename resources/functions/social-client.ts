@@ -1,3 +1,4 @@
+import type { POST_OPTION_FIELDS } from '../../app/Support/Social/post-options'
 import { providerLabel } from './networks'
 import { fetchWorkspaceBootstrap } from './postline-client'
 
@@ -54,13 +55,7 @@ export interface CrosspostResultItem {
   firstComment?: { status: 'pending' | 'sending' | 'sent' | 'failed' | 'uncertain', error?: string }
 }
 
-export interface PostOptionFields {
-  language?: string
-  mastodon_visibility?: string
-  mastodon_spoiler?: string
-  linkedin_first_comment?: string
-  instagram_first_comment?: string
-}
+export type PostOptionFields = Partial<Record<typeof POST_OPTION_FIELDS[number], string>>
 
 export function appendPostOptions(form: FormData, options?: PostOptionFields): void {
   for (const [key, value] of Object.entries(options ?? {})) form.set(key, value)
@@ -81,7 +76,6 @@ export interface CrosspostInput {
   imageFile?: File
   /** Several attached images, in order, each with its alt text. */
   imageFiles?: Array<{ file: File, alt?: string }>
-  /** The post's language, and Mastodon's visibility and content warning. */
   options?: PostOptionFields
   /** Multi-segment thread; reply-chained on providers that support it. */
   thread?: string[]

@@ -10,6 +10,11 @@
 
 - **Limits:** whatever your instance allows, 500 characters on most; up to four
   images. Visibility and content warnings are set per post in the composer.
+- **Polls and quotes:** choose **Mastodon poll or quote** in Composer. Poll
+  limits come from your instance. Quoting requires an instance that
+  supports quote posts and the `read:search` scope, which is included in
+  `read`. Use a poll, a quote, or images on a post. In threads, the poll or
+  quote goes on the first post.
 - **Inbox:** direct conversations (posts with Mentioned people only visibility)
   appear in Direct messages. Public replies and mentions use the token’s
   `read:notifications` scope, which is included in `read`. Choose **Reply**

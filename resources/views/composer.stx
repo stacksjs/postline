@@ -144,7 +144,7 @@
           own visibility and content warning. Shown only when a network that
           uses them is selected.
         --}}
-        <div class="flex hidden flex-wrap gap-2 items-center pb-3 px-3" :class="{ 'hidden': !showPostOptions() }" data-post-options>
+        <div class="flex hidden flex-wrap gap-2 items-center pb-3 px-3" :class="{ 'hidden': !showLanguage() }" data-post-options>
           <label class="inline-flex gap-1.5 items-center text-muted text-xs" x-show="showLanguage()">
             <span>Language</span>
             <select class="px-2 h-8 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="postLanguage" data-post-language>
@@ -161,6 +161,41 @@
             </select>
           </label>
           <input class="flex-1 px-2.5 h-8 min-w-48 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="500" placeholder="Content warning on Mastodon (optional)" aria-label="Content warning on Mastodon" x-show="showMastodonOptions()" x-model="mastodonSpoiler" data-mastodon-spoiler>
+          <form class="contents" ref="networkOptionsForm" @submit.prevent="markEdited">
+            <details class="w-full text-body text-xs" x-show="showMastodonOptions()">
+              <summary class="font-medium cursor-pointer">Mastodon poll or quote</summary>
+              <div class="grid gap-2 pt-2">
+                <label class="grid gap-1">
+                  <span>Poll choices, one per line</span>
+                  <textarea class="p-2 text-ink text-ui bg-panel border border-field-line rounded-lg" maxlength="5000" rows="3" name="pollChoices" data-mastodon-poll></textarea>
+                </label>
+                <div class="flex flex-wrap gap-2 items-end">
+                  <label class="grid gap-1"><span>Duration in minutes</span><input class="px-2 h-8 max-w-32 bg-panel border border-field-line rounded-lg" type="number" min="1" max="525600" name="pollMinutes" value="1440"></label>
+                  <label class="inline-flex gap-1.5 items-center"><input type="checkbox" name="pollMultiple"> Allow multiple choices</label>
+                  <label class="inline-flex gap-1.5 items-center"><input type="checkbox" name="pollHideTotals"> Hide totals until voting ends</label>
+                </div>
+                <label class="grid gap-1">
+                  <span>Quote a Mastodon post</span>
+                  <input class="px-2 h-8 text-ink text-ui bg-panel border border-field-line rounded-lg" type="url" maxlength="2048" name="mastodonQuote" data-mastodon-quote>
+                </label>
+                <p class="m-0 text-muted">Choose a poll, a quote, or images. In a thread, the poll or quote goes on the first post.</p>
+              </div>
+            </details>
+            <details class="w-full text-body text-xs" x-show="showBlueskyOptions()">
+              <summary class="font-medium cursor-pointer">Bluesky quote and labels</summary>
+              <div class="grid gap-2 pt-2">
+                <label class="grid gap-1">
+                  <span>Quote a Bluesky post</span>
+                  <input class="px-2 h-8 text-ink text-ui bg-panel border border-field-line rounded-lg" type="text" maxlength="2048" name="blueskyQuote" data-bluesky-quote>
+                </label>
+                <label class="grid gap-1">
+                  <span>Content labels, separated by commas</span>
+                  <input class="px-2 h-8 text-ink text-ui bg-panel border border-field-line rounded-lg" type="text" maxlength="1290" placeholder="nudity, graphic-media" name="blueskyLabels" data-bluesky-labels>
+                </label>
+                <p class="m-0 text-muted">In a thread, the quote goes on the first post and labels apply to every post.</p>
+              </div>
+            </details>
+          </form>
         </div>
 
         <details class="mb-3 mx-3 text-ui" x-show="showLinkedInComment() || showInstagramComment()" data-first-comments>
@@ -551,6 +586,7 @@
     const mastodonSpoiler = state('')
     const linkedinFirstComment = state('')
     const instagramFirstComment = state('')
+    const networkOptionsForm = useRef('networkOptionsForm')
     const postTitle = state('')
     const postImageUrl = state('')
     const editHeading = state('')
@@ -560,26 +596,39 @@
     const showLinkedInComment = derived(() => selectedNetworkIds().includes('linkedin'))
     const showInstagramComment = derived(() => selectedNetworkIds().includes('instagram')
       && (Boolean(instagramFirstComment()) || providers().some(provider => provider.provider === 'instagram' && provider.firstCommentsEnabled)))
-    const showLanguage = derived(() => selectedNetworkIds().some(id => id === 'bluesky' || id === 'mastodon'))
-    const showPostOptions = derived(() => showLanguage() || showMastodonOptions())
+    const showBlueskyOptions = derived(() => selectedNetworkIds().includes('bluesky'))
+    const showLanguage = derived(() => showBlueskyOptions() || showMastodonOptions())
     const languageOptions = state<Array<{ value: string, label: string }>>([])
     const attachedFiles = () => composerImageFiles(attachedImages())
     const appendImages = (form: FormData) => appendComposerImages(form, attachedImages())
 
-    /** The options that apply to the selected networks; the rest go as empty, which clears them. */
-    const postOptions = () => ({
-      language: showLanguage() ? postLanguage() : '',
-      mastodon_visibility: showMastodonOptions() ? mastodonVisibility() : '',
-      mastodon_spoiler: showMastodonOptions() ? mastodonSpoiler().trim() : '',
-      linkedin_first_comment: showLinkedInComment() ? linkedinFirstComment().trim() : '',
-      instagram_first_comment: showInstagramComment() ? instagramFirstComment().trim() : '',
-    })
-    /** After a post goes out: the content warning was for that post. The language is kept. */
-    const resetPostOptions = () => {
+    const loadNetworkOptions = () => {
+      const path = '/assets/scripts/composer-network-options.ts'
+      return import(path)
+    }
+
+    async function postOptions() {
+      const mastodon = showMastodonOptions()
+      const bluesky = showBlueskyOptions()
+      const advanced = mastodon || bluesky
+        ? (await loadNetworkOptions()).readNetworkOptions(networkOptionsForm.current, { mastodon, bluesky })
+        : {}
+      return {
+        language: showLanguage() ? postLanguage() : '',
+        mastodon_visibility: mastodon ? mastodonVisibility() : '',
+        mastodon_spoiler: mastodon ? mastodonSpoiler().trim() : '',
+        linkedin_first_comment: showLinkedInComment() ? linkedinFirstComment().trim() : '',
+        instagram_first_comment: showInstagramComment() ? instagramFirstComment().trim() : '',
+        ...advanced,
+      }
+    }
+
+    function resetPostOptions() {
       mastodonVisibility.set('public')
       mastodonSpoiler.set('')
       linkedinFirstComment.set('')
       instagramFirstComment.set('')
+      networkOptionsForm.current?.reset()
     }
     const composedTitle = () => postTitle().trim() || undefined
 
@@ -898,7 +947,9 @@
       event.returnValue = ''
     })
 
-    const enterEditMode = (item) => {
+    const enterEditMode = async (item) => {
+      if (item.options?.mastodon || item.options?.bluesky)
+        (await loadNetworkOptions()).restoreNetworkOptions(networkOptionsForm.current, item.options)
       editingId.set(item.id)
       editingDraft.set(item.status === 'draft')
       editHeading.set(item.thread ? 'Editing thread' : `Editing post #${item.id}`)
@@ -961,7 +1012,7 @@
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the post.')
         await zoneReady
-        enterEditMode(payload.data)
+        await enterEditMode(payload.data)
       }
       catch (error) {
         setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Edit' })
@@ -1041,7 +1092,7 @@
       form.set('external_description', external.description)
     }
 
-    function queueForm(posts: ComposerSegment[], targetProviders: string[], schedule: string | null, id: number | null, nextSlot: boolean) {
+    async function queueForm(posts: ComposerSegment[], targetProviders: string[], schedule: string | null, id: number | null, nextSlot: boolean) {
       const form = new FormData()
       if (id) form.set('id', String(id))
       form.set('text', posts[0].text.trim())
@@ -1055,7 +1106,7 @@
       const imageUrl = postImageUrl().trim()
       if (imageUrl) form.set('image_url', imageUrl)
       if (!appendImages(form) && id && editRemoveImage) form.set('remove_image', '1')
-      appendPostOptions(form, postOptions())
+      appendPostOptions(form, await postOptions())
       const overrides = variantsPayload()
       // Updating always sends this field so an owner can clear every override.
       if (id || Object.keys(overrides).length) form.set('variants', JSON.stringify(overrides))
@@ -1082,7 +1133,7 @@
       }
 
       try {
-        const form = queueForm(posts, targetProviders, scheduledIso(), editingId(), nextSlot)
+        const form = await queueForm(posts, targetProviders, scheduledIso(), editingId(), nextSlot)
         const response = await fetch('/api/postline/queue/update', { method: 'POST', body: form })
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not update the post.')
@@ -1112,7 +1163,7 @@
         return
       }
       try {
-        const form = queueForm(posts, targetProviders, scheduleValue, null, nextSlot)
+        const form = await queueForm(posts, targetProviders, scheduleValue, null, nextSlot)
         const response = await fetch('/api/postline/queue', { method: 'POST', body: form })
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save to the queue.')
@@ -1185,7 +1236,7 @@
           image: imageUrl ? { url: imageUrl } : undefined,
           imageFiles: attachedFiles(),
           variants: thread ? undefined : variantsPayload(),
-          options: postOptions(),
+          options: await postOptions(),
         })
         const results = data.results || []
         const succeeded = results.filter(result => result.ok)

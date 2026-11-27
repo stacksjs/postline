@@ -3,6 +3,7 @@ import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
+import { assertPublicHttpUrl } from '../../Support/Http/safe-fetch'
 import { isUsableIdentity, pickDefaultIdentity, toPublicAccount } from '../../Support/Social/accounts'
 import { MastodonDriver, mastodonIdempotencyKey, normalizeInstance } from './Drivers/MastodonDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
@@ -170,15 +171,22 @@ export class MastodonService {
       .executeTakeFirstOrThrow()
 
     try {
+      const credentials = this.credentialsFor(identity)
+      const mastodon = content?.options?.mastodon
+      const quote = mastodon?.quote
+      if (quote) await assertPublicHttpUrl(quote)
+      const quotedStatusId = quote ? await this.driver.resolvePostId(credentials, quote) : undefined
       const published = await this.driver.publish(
-        this.credentialsFor(identity),
+        credentials,
         { text: post.body, media: content?.media, reply: content?.reply },
         // A retry of the same text to the same account gets the status the
         // first attempt created, instead of creating a second.
         {
           idempotencyKey: mastodonIdempotencyKey(Number(post.id), Number(identity.id), post.body),
-          visibility: content?.options?.mastodon?.visibility,
-          spoilerText: content?.options?.mastodon?.spoilerText,
+          visibility: mastodon?.visibility,
+          spoilerText: mastodon?.spoilerText,
+          ...(mastodon?.poll && { poll: mastodon.poll }),
+          ...(quotedStatusId && { quotedStatusId }),
           language: content?.options?.language,
         },
       )

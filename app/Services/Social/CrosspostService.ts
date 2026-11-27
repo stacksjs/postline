@@ -5,7 +5,7 @@ import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../.
 import { db } from '@stacksjs/database'
 import { log } from '@stacksjs/logging'
 import { parseTarget, resolveTargets, targetKey } from '../../Support/Social/targets'
-import { advanceChain, threadSegmentContent } from '../../Support/Social/threads'
+import { advanceChain, threadPostOptions, threadSegmentContent } from '../../Support/Social/threads'
 import { resolveVariantBody } from '../../Support/Social/variants'
 import { blog } from './BlogService'
 import { bluesky } from './BlueskyService'
@@ -22,8 +22,8 @@ import { persistTempMedia, removeTempMedia } from '../../Support/Social/uploads'
 import type { MediaShare } from '../../Support/Social/media-share'
 import { openMediaShare } from '../../Support/Social/media-share'
 import { MEDIA_RULES } from '../../Support/Social/media-rules'
-import { sanitizePostOptions } from '../../Support/Social/post-options'
-import { hydrateStoredContent, InvalidFirstCommentError, MissingMediaError, parseStoredContent } from '../../Support/Social/stored-content'
+import { InvalidStoredPostOptionsError, requireStoredPostOptions } from '../../Support/Social/post-options'
+import { hydrateStoredContent, MissingMediaError, parseStoredContent } from '../../Support/Social/stored-content'
 import { ensureAccount, now, uuid } from './support'
 import { postFirstComments } from './PostFirstCommentService'
 
@@ -233,6 +233,7 @@ export class CrosspostService {
     const halted = new Map<string, number>()
 
     for (const [index, body] of segments.entries()) {
+      const segmentOptions = threadPostOptions(index, content?.options)
       const postUuid = uuid()
       const createdAt = now()
 
@@ -246,7 +247,7 @@ export class CrosspostService {
         thread_key: threadKey,
         // The thread's language and content warning, so resuming it later
         // sends the rest the same way (resumeThread).
-        ...(content?.options ? { content: JSON.stringify({ options: content.options }) } : {}),
+        ...(segmentOptions ? { content: JSON.stringify({ options: segmentOptions }) } : {}),
         account_id: accountId,
         created_at: createdAt,
         updated_at: createdAt,
@@ -310,7 +311,7 @@ export class CrosspostService {
     const targets = new Map<string, PublishTarget>()
     for (const row of rows) targets.set(keyOf(row), { provider: row.provider, identityId: row.social_identity_id ? Number(row.social_identity_id) : null })
 
-    const options = sanitizePostOptions(parseStoredContent(posts[0].content)?.options)
+    const savedOptions = parseStoredContent(posts[0].content)?.options
     let lead: Promise<PublishContent | undefined> | undefined
 
     const results: CrosspostTargetResult[] = []
@@ -345,11 +346,11 @@ export class CrosspostService {
         try {
           const content = index === 0
             ? await (lead ??= hydrateStoredContent(post.content))
-            : options ? { options } : undefined
+            : { options: requireStoredPostOptions(savedOptions) }
           result = await this.publishTarget(target, publishingPost, threadSegmentContent(index, content, chain))
         }
         catch (error) {
-          if (!(error instanceof MissingMediaError || error instanceof InvalidFirstCommentError)) throw error
+          if (!(error instanceof MissingMediaError || error instanceof InvalidStoredPostOptionsError)) throw error
           result = await this.recordThreadFailure(target, publishingPost.id, error.message)
         }
         results.push(result)
