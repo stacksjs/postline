@@ -77,6 +77,10 @@ session, and how the theme, the sidebar and drafts survive a quit. The
 Settings window tells the workspace what it cannot do itself over a
 `BroadcastChannel`: apply the theme picked there, and show the Channels page.
 
+Open **Notifications** to see whether email alerts and the alert webhook are
+configured. **Open Activity** takes you to the alerts in the workspace window.
+Open **About** for the installed version, updates, and the log in Finder.
+
 To start over as a new install, quit the app and move
 `~/Library/Application Support/Postline` aside.
 

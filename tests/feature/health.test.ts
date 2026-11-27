@@ -25,12 +25,15 @@ describe('health', () => {
 })
 
 describe('system status', () => {
-  test('says whether mail is set up', async () => {
+  test('reports mail and alert delivery settings without revealing the webhook', async () => {
     const { featureTest } = await import('@stacksjs/testing')
     const User = (await import('../../storage/framework/defaults/app/Models/User')).default
     const user = await User.first() ?? await User.create({ name: 'Mail Test', email: `mail-${Date.now()}@postline.test`, password: 'unused-acting-as' })
     const response = await featureTest().actingAs(user as unknown as { id: number }).get('/api/postline/system')
-    const body = await response.json() as { data: { mail: { configured: boolean, driver: string } } }
+    const body = await response.json() as { data: { mail: { configured: boolean, driver: string }, alerts: { email: boolean, webhook: boolean } } }
+    const email = body.data.mail.configured && String(process.env.POSTLINE_ALERT_EMAIL || '').trim().toLowerCase() !== 'off'
+    const webhook = Boolean(String(process.env.POSTLINE_ALERT_WEBHOOK_URL || '').trim())
+    expect(body.data.alerts).toEqual({ email, webhook })
     expect(typeof body.data.mail.configured).toBe('boolean')
     expect(body.data.mail.configured).toBe(!['log', 'capture'].includes(body.data.mail.driver))
   })

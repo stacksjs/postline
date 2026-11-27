@@ -1,5 +1,11 @@
 @extends('layouts/settings')
 
+<script server cache>
+import manifest from '../../package.json'
+
+export const buildVersion = manifest.version
+</script>
+
 @section('title', 'Postline - Settings')
 
 @section('content')
@@ -25,6 +31,7 @@
         </SettingsSidebarGroup>
         <SettingsSidebarGroup>
           <SettingsSidebarItem id="channels" label="Channels" icon="i-hugeicons-share-08" tone="blue" keywords="accounts networks bluesky linkedin mastodon threads instagram" />
+          <SettingsSidebarItem id="notifications" label="Notifications" icon="i-hugeicons-notification-01" tone="red" keywords="alerts email smtp webhook macOS badge" />
           <SettingsSidebarItem id="composer" label="Composer" icon="i-hugeicons-pencil-edit-02" tone="orange" />
           <SettingsSidebarItem id="ai" label="AI" icon="i-hugeicons-sparkles" tone="purple" keywords="anthropic openai ollama claude api key campaign planner" />
           <SettingsSidebarItem id="deletion" label="Automatic Cleanup" icon="i-hugeicons-delete-02" tone="red" keywords="retention delete cleanup" />
@@ -35,15 +42,17 @@
             <SettingsSidebarItem id="account" label="Account" icon="i-hugeicons-user" tone="indigo" keywords="sign out log out passkey two-factor 2fa authenticator recovery codes security" />
           </SettingsSidebarGroup>
         </div>
+        <SettingsSidebarGroup>
+          <SettingsSidebarItem id="about" label="About" icon="i-hugeicons-information-circle" tone="grey" keywords="version software update log troubleshooting" />
+        </SettingsSidebarGroup>
       </template>
 
       <SettingsPane id="general" title="General" active>
-        <SettingsPaneHeader icon="i-hugeicons-sent" tone="red" title="Postline" description="Draft once, then publish to every connected account." />
         <SettingsGroup>
           <SettingsRow label="Channels" setting="channels-summary" to="channels" :value="channelPill()" />
           <SettingsRow label="Automatic deletion" setting="deletion-summary" to="deletion" :value="statusPill()" />
           <SettingsRow label="Appearance" setting="appearance-summary" to="appearance" />
-          <SettingsRow label="Email" :description="mailDescription()" setting="mail-status" keywords="mail smtp mailer email" :value="mailPill()" />
+          <SettingsRow label="Notifications" setting="notifications-summary" to="notifications" />
         </SettingsGroup>
 
         {{--
@@ -81,25 +90,6 @@
           <p class="m-0 mr-auto text-xs" :data-tone="workspaceTone()" x-show="workspaceMessage()" :text="workspaceMessage()" role="status" aria-live="polite" data-workspace-message></p>
           <Button appearance="mac" variant="primary" :disabled="!canSaveWorkspace()" @click="saveWorkspace">Save</Button>
         </div>
-        <div class="mt-4" :class="desktopUpdate() ? '' : 'hidden'">
-          <SettingsGroup title="Software updates">
-            <SettingsRow label="Postline version" setting="desktop-version" keywords="version update" :description="desktopUpdate()?.currentVersion || ''">
-              <Button appearance="mac" :disabled="checkingDesktopUpdate()" @click="checkDesktopUpdate">Check for updates</Button>
-            </SettingsRow>
-            <SettingsRow label="Update available" setting="desktop-install" :description="desktopUpdate()?.version || ''" x-show="desktopUpdate()?.state === 'available' && desktopUpdate()?.selfUpdating">
-              <Button appearance="mac" :disabled="checkingDesktopUpdate()" @click="installDesktopUpdate">Install update</Button>
-            </SettingsRow>
-          </SettingsGroup>
-          <p class="mt-2 text-muted text-xs" :text="desktopUpdateMessage()" role="status" aria-live="polite"></p>
-        </div>
-        {{-- The Mac app's log, for a bug report (#202). Only the app has one. --}}
-        <div class="mt-4" :class="ownWindow() ? '' : 'hidden'">
-          <SettingsGroup title="Troubleshooting" footer="The log is private to your Mac account, holds no passwords or sign-in links, and is kept to a few megabytes.">
-            <SettingsRow label="Log" setting="reveal-log" keywords="log logs debug bug report finder">
-              <Button appearance="mac" @click="revealLog">Show in Finder</Button>
-            </SettingsRow>
-          </SettingsGroup>
-        </div>
       </SettingsPane>
 
       <SettingsPane id="appearance" title="Appearance">
@@ -113,8 +103,22 @@
       <SettingsPane id="channels" title="Channels">
         <SettingsGroup footer="Credentials stay in your workspace.">
           <SettingsRow label="Publishing channels" :description="channelSummary()" setting="channels" keywords="accounts networks connect">
-            <Button appearance="mac" @click="manageChannels">Manage Channels…</Button>
+            <Button appearance="mac" @click="openWorkspacePage('/accounts')">Manage Channels…</Button>
           </SettingsRow>
+        </SettingsGroup>
+      </SettingsPane>
+
+      <SettingsPane id="notifications" title="Notifications">
+        <SettingsGroup footer="Postline records failed or missed posts, expired channel sign-ins, and Listening matches in Activity.">
+          <SettingsRow label="Workspace alerts" setting="activity-alerts">
+            <Button appearance="mac" @click="openWorkspacePage('/activity')">Open Activity</Button>
+          </SettingsRow>
+          <SettingsRow label="macOS notifications" description="Manage Postline’s notification permission in macOS System Settings." setting="macos-notifications" x-show="ownWindow()" />
+        </SettingsGroup>
+        <SettingsGroup title="Delivery">
+          <SettingsRow label="Email delivery" :description="mailDescription()" setting="mail-status" keywords="mail smtp mailer email" />
+          <SettingsRow label="Email alerts" setting="email-alerts" :description="delivery() ? (delivery().email ? 'On' : 'Off') : ''" />
+          <SettingsRow label="Alert webhook" setting="alert-webhook" :description="delivery() ? (delivery().webhook ? 'Set up' : 'Not set up') : ''" />
         </SettingsGroup>
       </SettingsPane>
 
@@ -314,6 +318,27 @@
           </SettingsRow>
         </SettingsGroup>
       </SettingsPane>
+      <SettingsPane id="about" title="About">
+        <SettingsPaneHeader icon="i-hugeicons-sent" tone="red" title="Postline" description="Draft once, then publish to every connected account." />
+        <SettingsGroup>
+          <SettingsRow label="Postline version" setting="desktop-version" keywords="version update" :description="desktopUpdate()?.currentVersion || '{{ buildVersion }}'">
+            <Button appearance="mac" x-show="ownWindow()" :disabled="checkingDesktopUpdate()" @click="checkDesktopUpdate">Check for updates</Button>
+          </SettingsRow>
+          <SettingsRow label="Update available" setting="desktop-install" :description="desktopUpdate()?.version || ''" x-show="desktopUpdate()?.state === 'available' && desktopUpdate()?.selfUpdating">
+            <Button appearance="mac" :disabled="checkingDesktopUpdate()" @click="installDesktopUpdate">Install update</Button>
+          </SettingsRow>
+        </SettingsGroup>
+        <p class="mt-2 text-muted text-xs" x-show="desktopUpdateMessage()" :text="desktopUpdateMessage()" role="status" aria-live="polite"></p>
+        {{-- The Mac app's log, for a bug report (#202). Only the app has one. --}}
+        <div class="mt-4" :class="ownWindow() ? '' : 'hidden'">
+          <SettingsGroup title="Troubleshooting" footer="The log is private to your Mac account, holds no passwords or sign-in links, and is kept to a few megabytes.">
+            <SettingsRow label="Log" setting="reveal-log" keywords="log logs debug bug report finder">
+              <Button appearance="mac" @click="revealLog">Show in Finder</Button>
+            </SettingsRow>
+          </SettingsGroup>
+        </div>
+      </SettingsPane>
+
     </SettingsWindow>
   </main>
 
@@ -400,8 +425,8 @@
      * What this window tells the workspace window.
      *
      * Two windows of one app share an origin and nothing else: a theme picked
-     * here has to be applied there, and "Manage Channels" opens a workspace
-     * page, which belongs in the workspace window.
+     * here has to be applied there, and links to workspace pages belong in
+     * the workspace window.
      */
     const workspace = typeof BroadcastChannel === 'function' ? new BroadcastChannel('postline:settings') : null
     const tellWorkspace = (message: { type: 'theme', pref: string } | { type: 'navigate', path: string }): void => {
@@ -462,13 +487,12 @@
       setTheme(mode === 'light' || mode === 'dark' ? mode : 'system')
     }
 
-    // A full page, so the framework's own navigation and not a pane.
-    const manageChannels = (): void => {
+    const openWorkspacePage = (path: '/accounts' | '/activity'): void => {
       if (ownWindow()) {
-        tellWorkspace({ type: 'navigate', path: '/accounts' })
+        tellWorkspace({ type: 'navigate', path })
         return
       }
-      navigate('/accounts')
+      navigate(path)
     }
 
     // Signal-backed cookie: setting it to '' emits max-age=0, and it adds
@@ -847,18 +871,21 @@
     // Whether email actually leaves this machine (#213). Without a mailer it
     // is written to the log, which is fine until someone expects it to arrive.
     const mail = state<{ configured: boolean, driver: string, from: string } | null>(null)
-    const mailPill = derived(() => !mail() ? '' : mail()!.configured ? 'Set up' : 'Not set up')
     const mailDescription = derived(() => {
       const current = mail()
       if (!current) return ''
       if (!current.configured) return 'Emails are written to the log, not sent: no mail service is set up on this machine. The self-hosting guide shows how to add one.'
       return current.from ? `Sent through ${current.driver} as ${current.from}.` : `Sent through ${current.driver}.`
     })
-    const loadMail = async (): Promise<void> => {
+    const delivery = state<{ email: boolean, webhook: boolean } | null>(null)
+    const loadDelivery = async (): Promise<void> => {
       try {
         const response = await fetch('/api/postline/system')
         const payload = await response.json()
-        if (response.ok && payload.ok) mail.set(payload.data?.mail || null)
+        if (response.ok && payload.ok) {
+          mail.set(payload.data?.mail || null)
+          delivery.set(payload.data?.alerts || null)
+        }
       }
       catch {}
     }
@@ -1093,7 +1120,7 @@
       void loadWorkspace()
       void loadRetention()
       void loadAi()
-      void loadMail()
+      void loadDelivery()
       if (ownWindow()) void requestDesktopUpdate()
       onDestroy(() => workspace?.close())
       onDestroy(bindWorkspaceChanges())

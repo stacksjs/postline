@@ -43,10 +43,22 @@ export interface AlertView {
 type Send = (url: string, payload: Record<string, unknown>) => Promise<void>
 type Mailer = (alert: AlertInput) => Promise<void>
 
+function alertWebhookUrl(): string {
+  return String(process.env.POSTLINE_ALERT_WEBHOOK_URL || '').trim()
+}
+
 /** Whether mail actually leaves: the `log` and `capture` mailers only pretend to send. */
 export function mailIsSetUp(driver: unknown = config.email?.default): boolean {
   const name = String(driver || 'log')
   return name !== 'log' && name !== 'capture'
+}
+
+export function alertDeliverySettings(): { email: boolean, webhook: boolean } {
+  return { email: alertEmailEnabled(), webhook: Boolean(alertWebhookUrl()) }
+}
+
+function alertEmailEnabled(): boolean {
+  return mailIsSetUp() && String(process.env.POSTLINE_ALERT_EMAIL || '').trim().toLowerCase() !== 'off'
 }
 
 /** The app's address with a scheme, for the link in an alert email. */
@@ -61,7 +73,7 @@ function appUrl(): string {
  * stops it where mail is set up for other reasons.
  */
 const emailOwner: Mailer = async (alert) => {
-  if (!mailIsSetUp() || String(process.env.POSTLINE_ALERT_EMAIL || '').trim().toLowerCase() === 'off') return
+  if (!alertEmailEnabled()) return
   const owner = await database.selectFrom('users').select(['email']).orderBy('id', 'asc').executeTakeFirst()
   if (!owner?.email) return
   const appName = String(config.app?.name || 'Postline')
@@ -98,7 +110,7 @@ const postJson: Send = async (url, payload) => {
 export class AlertService {
   constructor(
     private readonly send: Send = postJson,
-    private readonly webhookUrl: () => string = () => String(process.env.POSTLINE_ALERT_WEBHOOK_URL || '').trim(),
+    private readonly webhookUrl: () => string = alertWebhookUrl,
     private readonly email: Mailer = emailOwner,
   ) {}
 

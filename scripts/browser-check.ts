@@ -412,6 +412,32 @@ async function checkQueueKeyboard(cdp: Cdp): Promise<void> {
       && document.querySelector('#stx-toast-container')?.textContent.includes('Post restored to the queue.')`), 5_000)
 }
 
+async function checkNotificationSettings(cdp: Cdp): Promise<void> {
+  await auditPage(`${site}/settings`, { cdp })
+  const item = "document.querySelector('[data-settings-item=notifications]')"
+  await waitUntil('The Notifications pane', () => evaluate<boolean>(cdp, `Boolean(${item}?.getClientRects().length)`), 5_000)
+  await evaluate(cdp, `${item}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  const alerts = await evaluate<{ email: boolean, webhook: boolean }>(cdp, `(async () => {
+    const response = await fetch('/api/postline/system')
+    const payload = await response.json()
+    return payload.data.alerts
+  })()`)
+  await waitUntil('Notification delivery settings reflect the server configuration', () => evaluate<boolean>(cdp, `
+    (() => {
+      const email = document.getElementById('settings-row-email-alerts-description')
+      const webhook = document.getElementById('settings-row-alert-webhook-description')
+      return Boolean(email?.getClientRects().length && email.innerText === ${JSON.stringify(alerts.email ? 'On' : 'Off')}
+        && webhook?.getClientRects().length && webhook.innerText === ${JSON.stringify(alerts.webhook ? 'Set up' : 'Not set up')})
+    })()
+  `), 5_000)
+  await evaluate(cdp, "document.querySelector('[data-setting=activity-alerts] button').focus()")
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Notification Settings opens Activity', () => evaluate<boolean>(cdp, `
+    location.pathname === '/activity' && Boolean(document.querySelector('[data-postline-page=activity]'))
+  `), 5_000)
+}
+
 async function checkDesktopUpdateControls(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     window.craft = { window: {}, capabilities: { nativePlatformControls: false } }
@@ -432,7 +458,16 @@ async function checkDesktopUpdateControls(cdp: Cdp): Promise<void> {
   try {
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
     await auditPage(`${site}/settings`, { cdp })
-    await waitUntil('Settings displays the installed desktop version', () => evaluate<boolean>(cdp, `document.querySelector('[data-setting="desktop-version"]')?.innerText.includes('0.3.0')`), 5_000)
+    const about = "document.querySelector('[data-settings-item=about]')"
+    await waitUntil('The About pane', () => evaluate<boolean>(cdp, `Boolean(${about}?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, `${about}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Settings displays the installed desktop version', () => evaluate<boolean>(cdp, `
+      (() => {
+        const version = document.querySelector('[data-setting="desktop-version"]')
+        return Boolean(version?.getClientRects().length && version.innerText.includes('0.3.0'))
+      })()
+    `), 5_000)
     await evaluate(cdp, `document.querySelector('[data-setting="desktop-version"] button')?.click()`)
     await waitUntil('Settings displays the available desktop update', () => evaluate<boolean>(cdp, `document.querySelector('[data-setting="desktop-install"]')?.innerText.includes('0.4.0')`), 5_000)
     await evaluate(cdp, `document.querySelector('[data-setting="desktop-install"] button')?.click()`)
@@ -2762,6 +2797,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
     }
   }
   await checkDesktopUpdateControls(cdp)
+  await checkNotificationSettings(cdp)
   await checkWorkspaceShell(cdp)
   await checkWorkspaceCommands(cdp)
   await checkWorkspaceBootstrap(cdp)
