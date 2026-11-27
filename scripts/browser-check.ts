@@ -1571,14 +1571,25 @@ async function checkBrowserPasskey(cdp: Cdp): Promise<void> {
     await waitUntil('The Account pane', () => evaluate<boolean>(cdp, `Boolean(document.querySelector('[data-settings-item=account]')?.getClientRects().length)`), 5_000)
     await evaluate(cdp, "document.querySelector('[data-settings-item=account]').click()")
     await waitUntil('The Add Passkey button', () => evaluate<boolean>(cdp, `Boolean(${addPasskey}?.getClientRects().length) && !${addPasskey}.disabled`), 5_000)
-    await evaluate(cdp, `${addPasskey}.click()`)
+    await evaluate(cdp, `${addPasskey}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
     await waitUntil('The new passkey in Settings', () => evaluate<boolean>(cdp, "Boolean(document.querySelector('[data-passkey-row]')?.getClientRects().length)"), 10_000)
     await evaluate(cdp, "document.querySelector('[data-setting=sign-out] button').click()")
-    await waitUntil('The passkey sign-in button after signing out', () => evaluate<boolean>(cdp, `
-      location.pathname === '/login' && Boolean(document.querySelector('[data-passkey-sign-in]')?.getClientRects().length)`), 15_000)
-    await evaluate(cdp, "document.querySelector('[data-passkey-sign-in]').click()")
-    await waitUntil('Passkey sign-in returns to the workspace', () => evaluate<boolean>(cdp, `
-      location.pathname === '/composer' && !!document.querySelector('[data-postline-page=composer]')`), 15_000)
+    const signIn = "document.querySelector('[data-passkey-sign-in]')"
+    await waitUntil('The ready passkey sign-in button after signing out', () => evaluate<boolean>(cdp, `
+      location.pathname === '/login' && Boolean(${signIn}?.getClientRects().length)
+        && ${signIn}.classList.contains('inline-flex') && !${signIn}.disabled`), 15_000)
+    await evaluate(cdp, `${signIn}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    try {
+      await waitUntil('Passkey sign-in returns to the workspace', () => evaluate<boolean>(cdp, `
+        location.pathname === '/composer' && !!document.querySelector('[data-postline-page=composer]')`), 15_000)
+    }
+    catch (error) {
+      const message = await evaluate<string>(cdp, "document.querySelector('[role=alert]')?.textContent?.trim() || ''")
+      if (message) throw new Error(`Passkey sign-in reported ${message}`)
+      throw error
+    }
   }
   finally {
     await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId })

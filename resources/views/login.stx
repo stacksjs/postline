@@ -41,7 +41,7 @@ const allowsFirstRun = !isMarketingSite()
         <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="busy()" :text="submitLabel()">Sign in</button>
       </form>
 
-      <button class="gap-2 items-center justify-center px-4 h-10 font-semibold text-ink text-sm bg-panel hover:bg-hover border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :class="passkeysOffered() ? 'inline-flex' : 'hidden'" :disabled="busy()" @click="signInWithPasskey" data-passkey-sign-in>
+      <button class="hidden gap-2 items-center justify-center px-4 h-10 font-semibold text-ink text-sm bg-panel hover:bg-hover border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :class="{ 'hidden': !passkeysOffered(), 'inline-flex': passkeysOffered() }" :disabled="busy()" @click="signInWithPasskey" data-passkey-sign-in>
         <span class="h-4 w-4 i-hugeicons-key-01" aria-hidden="true"></span>
         Sign in with a passkey
       </button>
