@@ -1,18 +1,26 @@
 @extends('layouts/app')
 
-@section('title', 'Postline - Queue')
+<script server cache>
+import { workspaceLocale, workspaceQueueText } from '../../app/Support/Localization/workspace'
+
+export const queueLocale = workspaceLocale
+export const queueText = workspaceQueueText
+export const queueClient = { locale: workspaceLocale, messages: workspaceQueueText }
+</script>
+
+@section('title')Postline - {{ queueText.tablist }}@endsection
 
 @section('content')
   @meta('description', 'Review scheduled and drafted social posts in Postline.')
-  <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
+  <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page" lang="{{ queueLocale }}">
     <p class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !schedulerWarning() }" :text="schedulerWarning()" role="status" data-scheduler-warning></p>
     <a class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !attentionText() }" href="/activity" data-stx-link :text="attentionText()" data-attention-link></a>
     <WorkspacePageHeader titleKey="workspace.pages.queue.title" descriptionKey="workspace.pages.queue.description">
       <div class="flex flex-wrap gap-2 items-center">
-        <SegmentedControl label="Queue view" size="sm" :show="!activeSearch()" :value="view()" :options="queueViews()" @change="setView" />
+        <SegmentedControl label="{{ queueText.view }}" size="sm" :show="!activeSearch()" :value="view()" :options="queueViews()" @change="setView" />
         <a href="/composer" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors">
           <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
-          <span>New post</span>
+          <span>{{ queueText.newPost }}</span>
         </a>
       </div>
     </WorkspacePageHeader>
@@ -21,61 +29,61 @@
     <DraftFeedsPanel @drafts-created="refresh()" />
     <RecurringPostsPanel :source="repeatSelection()" :timeZone="zone()" @closed="repeatSelection.set(null)" />
 
-    <form class="flex flex-wrap gap-2 items-center" role="search" aria-label="Posts" @submit.prevent="searchPosts">
-      <label class="sr-only" for="queue-search">Search posts</label>
-      <input class="px-3 h-9 w-full sm:max-w-xs text-ink text-ui bg-panel border border-field-line rounded-lg" id="queue-search" type="search" placeholder="Search all posts" maxlength="200" x-model="searchText">
-      <button class="px-3 h-9 font-semibold text-on-accent text-ui bg-accent hover:bg-accent-hover rounded-lg" type="submit">Search</button>
-      <button class="px-3 h-9 font-medium text-muted text-ui hover:text-ink rounded-lg" type="button" x-show="activeSearch()" @click="clearSearch">Clear search</button>
+    <form class="flex flex-wrap gap-2 items-center" role="search" aria-label="{{ queueText.posts }}" @submit.prevent="searchPosts">
+      <label class="sr-only" for="queue-search">{{ queueText.searchField }}</label>
+      <input class="px-3 h-9 w-full sm:max-w-xs text-ink text-ui bg-panel border border-field-line rounded-lg" id="queue-search" type="search" placeholder="{{ queueText.searchPlaceholder }}" maxlength="200" x-model="searchText">
+      <button class="px-3 h-9 font-semibold text-on-accent text-ui bg-accent hover:bg-accent-hover rounded-lg" type="submit">{{ queueText.search }}</button>
+      <button class="px-3 h-9 font-medium text-muted text-ui hover:text-ink rounded-lg" type="button" x-show="activeSearch()" @click="clearSearch">{{ queueText.clearSearch }}</button>
     </form>
 
     {{-- x-cloak on both views: neither paints before the stored choice is
         read, so a queue left on Calendar no longer flashes the list first. --}}
     <section class="bg-panel border border-line rounded-2xl shadow-sm" x-cloak x-show="activeSearch() || view() === 'list'">
       <header class="flex flex-wrap gap-3 items-center justify-between p-2.5 border-b border-line">
-        <div class="flex flex-wrap gap-1" role="tablist" aria-label="Queue" x-show="!activeSearch()">
+        <div class="flex flex-wrap gap-1" role="tablist" aria-label="{{ queueText.tablist }}" x-show="!activeSearch()">
           <button class="inline-flex gap-1.5 items-center px-3 h-8 font-semibold text-xs rounded-lg transition-colors" type="button" role="tab" x-for="entry in tabs()" :id="'queue-tab-' + entry.id" aria-controls="queue-results" :aria-selected="tab() === entry.id" :tabindex="tab() === entry.id ? 0 : -1" :data-active="tab() === entry.id" :data-tone="entry.tone" data-queue-tab @click="setTab(entry.id)" @keydown="moveTab($event, entry.id)">
             <span :text="entry.label"></span>
             <span class="px-1.5 min-w-8 tabular-nums text-center text-xs rounded-full" data-queue-tab-count :text="entry.count"></span>
           </button>
         </div>
-        <h2 class="m-0 px-1 font-semibold text-ui" x-show="activeSearch()">Search results</h2>
+        <h2 class="m-0 px-1 font-semibold text-ui" x-show="activeSearch()">{{ queueText.searchResults }}</h2>
         <div class="flex gap-2 items-center">
-          <span class="pr-1 min-w-24 text-muted text-xs" aria-live="polite" :text="metaText()">Loading…</span>
+          <span class="pr-1 min-w-24 text-muted text-xs" aria-live="polite" :text="metaText()">{{ queueText.loading }}</span>
           <button class="px-2.5 h-8 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg disabled:opacity-50" type="button" :class="{ 'invisible': !hasSelectableRows() && !selectionOpen() }" :aria-pressed="selectionOpen()" :disabled="queueChanging() || (!hasSelectableRows() && !selectionOpen())" @click="toggleSelection">
-            Select posts
+            {{ queueText.selectPosts }}
           </button>
         </div>
       </header>
       <div class="flex flex-wrap gap-2 items-end p-3 border-b border-line" x-show="selectionOpen()">
-        <span class="self-center font-semibold text-muted text-xs" role="status" :text="selectedPosts().length + ' selected'"></span>
+        <span class="self-center font-semibold text-muted text-xs" role="status" :text="queueWords.t('selectedCount', { count: selectedPosts().length })"></span>
         <button class="px-3 h-9 font-semibold text-on-accent text-ui bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="button" x-show="hasScheduledRows()" :disabled="!canReschedule() || queueChanging()" @click="rescheduleSelection({ days: 7 })">
-          Move one week later
+          {{ queueText.moveWeek }}
         </button>
         <form class="flex flex-wrap gap-2 items-end" x-show="hasScheduledRows()" @submit.prevent="rescheduleSelection({ date: rescheduleDate() })">
           <PostlineDatePicker :value="rescheduleDate" :timeZone="zone" @change="selectRescheduleDate" />
           <button class="px-3 h-9 font-semibold text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg disabled:opacity-50" type="submit" :disabled="!canReschedule() || !rescheduleDate() || queueChanging()">
-            Move to date
+            {{ queueText.moveDate }}
           </button>
         </form>
         <button class="px-3 h-9 font-semibold text-danger text-ui bg-panel hover:bg-danger-soft border border-danger-line rounded-lg disabled:opacity-50" type="button" :disabled="!selectedPosts().length || queueChanging()" @click="deleteSelected">
-          Delete selected
+          {{ queueText.deleteSelected }}
         </button>
         <button class="px-3 h-9 font-semibold text-muted text-ui hover:text-ink rounded-lg disabled:opacity-50" type="button" :disabled="!selectedPosts().length || queueChanging()" @click="clearSelection">
-          Clear selection
+          {{ queueText.clearSelection }}
         </button>
       </div>
-      <div class="grid gap-2.5 p-3" id="queue-results" :role="activeSearch() ? 'region' : 'tabpanel'" :aria-label="activeSearch() ? 'Matching posts' : null" :aria-labelledby="activeSearch() ? null : 'queue-tab-' + tab()">
-        <WorkspaceListSkeleton :show="!loaded() && !loadError()" label="Loading posts" />
-        <ErrorState :show="loadError()" title="Could not load posts" :message="loadError()" :busy="readingQueue()" @retry="refresh()" />
+      <div class="grid gap-2.5 p-3" id="queue-results" :role="activeSearch() ? 'region' : 'tabpanel'" :aria-label="activeSearch() ? queueCopy.matchingPosts : null" :aria-labelledby="activeSearch() ? null : 'queue-tab-' + tab()">
+        <WorkspaceListSkeleton :show="!loaded() && !loadError()" label="{{ queueText.loadingPosts }}" />
+        <ErrorState retryLabel="{{ queueText.retry }}" busyLabel="{{ queueText.retrying }}" :show="loadError()" title="{{ queueText.couldNotLoadPosts }}" :message="loadError()" :busy="readingQueue()" @retry="refresh()" />
         <EmptyState :show="showEmpty()" variant="bare" :title="emptyQueue().title" :description="emptyQueue().description">
-          <StxLink class="text-info text-ui underline" to="/composer" :show="!activeSearch() && tab() !== 'attention'">Write a post</StxLink>
-          <button class="text-info text-ui underline" type="button" :show="activeSearch()" @click="clearSearch">Clear search</button>
+          <StxLink class="text-info text-ui underline" to="/composer" :show="!activeSearch() && tab() !== 'attention'">{{ queueText.writePost }}</StxLink>
+          <button class="text-info text-ui underline" type="button" :show="activeSearch()" @click="clearSearch">{{ queueText.clearSearch }}</button>
         </EmptyState>
         <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl group" x-for="row in visible()" :data-command-context="row.body">
           <header class="flex gap-3 items-start justify-between">
             <div class="grid gap-1.5 min-w-0">
               <div class="flex gap-2 items-center">
-                <input class="shrink-0 h-4 w-4 accent-accent disabled:opacity-50 cursor-pointer" type="checkbox" x-show="selectionOpen() && row.actionable" :checked="isSelected(row.id)" :disabled="queueChanging() || (selectedPosts().length >= MAX_QUEUE_SELECTION && !isSelected(row.id))" :aria-label="'Select ' + (row.title || row.body).slice(0, 80) + ', ' + row.when" @change="selectPost(row)">
+                <input class="shrink-0 h-4 w-4 accent-accent disabled:opacity-50 cursor-pointer" type="checkbox" x-show="selectionOpen() && row.actionable" :checked="isSelected(row.id)" :disabled="queueChanging() || (selectedPosts().length >= MAX_QUEUE_SELECTION && !isSelected(row.id))" :aria-label="queueWords.t('selectPost', { post: (row.title || row.body).slice(0, 80), when: row.when })" @change="selectPost(row)">
                 <span class="font-semibold text-xs">{{ row.when }}</span>
               </div>
               {{-- One chip per network: sent, failed (the reason on hover and
@@ -88,40 +96,40 @@
                 <span class="text-muted text-xs" x-show="row.meta" :text="row.meta"></span>
               </div>
             </div>
-            <Badge size="sm" className="whitespace-nowrap" :variant="postStatusVariant(row.statusLabel)">{{ row.statusLabel }}</Badge>
+            <Badge size="sm" className="whitespace-nowrap" :variant="postStatusVariant(row.statusLabel)">{{ row.statusName }}</Badge>
           </header>
           <p class="m-0 leading-normal text-body text-ui">{{ row.body }}</p>
           <p class="m-0 text-danger text-xs" x-show="row.failure" :text="row.failure"></p>
           <div class="flex flex-wrap gap-2 items-center justify-between text-xs" x-for="comment in row.comments" :key="comment.targetId" :class="comment.needsAttention ? 'text-danger' : 'text-muted'">
             <span :text="comment.message"></span>
-            <a class="text-info underline" x-show="comment.url" :href="comment.url" target="_blank" rel="noopener noreferrer">Check comments on post</a>
+            <a class="text-info underline" x-show="comment.url" :href="comment.url" target="_blank" rel="noopener noreferrer">{{ queueText.checkComments }}</a>
             <span x-show="comment.canRetry">
-              <Button variant="secondary" size="xs" :disabled="Boolean(commentBusy())" :loading="commentBusy() === comment.targetId" @click="retryFirstComment(comment.targetId)">Retry first comment</Button>
+              <Button variant="secondary" size="xs" :disabled="Boolean(commentBusy())" :loading="commentBusy() === comment.targetId" @click="retryFirstComment(comment.targetId)">{{ queueText.retryComment }}</Button>
             </span>
           </div>
           <footer class="flex flex-wrap gap-1.5 items-center justify-end" x-show="row.liveUrl || row.actionable || row.partial || row.resumeLabel || row.canRepeat">
             <div class="group-focus-within:opacity-100 group-hover:opacity-100 transition-opacity" :class="row.attention ? '' : 'pointer-fine:opacity-0'">
-              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl && !row.actionable && !row.partial && !row.resumeLabel" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View post</a>
+              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl && !row.actionable && !row.partial && !row.resumeLabel" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">{{ queueText.viewPost }}</a>
               <span x-show="row.resumeLabel">
                 <Button variant="secondary" size="xs" :loading="busyId() === row.id" :label="row.resumeLabel" @click="resumeItem(row.id)" />
               </span>
               <span x-show="row.partial && !row.resumeLabel">
-                <Button variant="secondary" size="xs" :loading="busyId() === row.id" @click="retryItem(row.id)">Retry failed networks</Button>
+                <Button variant="secondary" size="xs" :loading="busyId() === row.id" @click="retryItem(row.id)">{{ queueText.retryNetworks }}</Button>
               </span>
               <span x-show="row.actionable && row.targets.length && !row.partial && !row.resumeLabel">
-                <Button variant="ghost" size="xs" :loading="busyId() === row.id" :label="row.status === 'failed' ? 'Try again now' : 'Publish now'" @click="publishItem(row.id)" />
+                <Button variant="ghost" size="xs" :loading="busyId() === row.id" :label="row.status === 'failed' ? queueCopy.tryAgain : queueCopy.publishNow" @click="publishItem(row.id)" />
               </span>
-              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-info text-xs" x-show="row.actionable && !row.targets.length" :href="row.editUrl" data-stx-link>Choose channels</a>
+              <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-info text-xs" x-show="row.actionable && !row.targets.length" :href="row.editUrl" data-stx-link>{{ queueText.chooseChannels }}</a>
             </div>
             <details class="relative" x-show="row.actionable || row.canRepeat || (row.liveUrl && (row.partial || row.resumeLabel))" @keydown="closeActionsOnEscape($event)">
-              <summary class="grid place-items-center h-7 w-8 list-none text-muted bg-panel hover:bg-hover border border-line rounded-lg cursor-pointer" aria-label="More post actions" title="More post actions">
+              <summary class="grid place-items-center h-7 w-8 list-none text-muted bg-panel hover:bg-hover border border-line rounded-lg cursor-pointer" aria-label="{{ queueText.moreActions }}" title="{{ queueText.moreActions }}">
                 <span class="h-4 w-4 i-hugeicons-more-horizontal" aria-hidden="true"></span>
               </summary>
               <div class="grid absolute right-0 top-full z-10 gap-0.5 mt-1 p-1 min-w-28 text-ui bg-panel border border-line rounded-lg shadow-sm">
-                <a class="block px-2 py-1 text-ink hover:bg-hover rounded-md" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View post</a>
-                <a class="block px-2 py-1 text-ink hover:bg-hover rounded-md" x-show="row.actionable" :href="row.editUrl" data-stx-link>Edit</a>
-                <button class="px-2 py-1 text-left hover:bg-hover rounded-md" type="button" x-show="row.canRepeat" @click="chooseRepeat(row, $event)">Repeat…</button>
-                <button class="px-2 py-1 text-danger text-left hover:bg-danger-soft rounded-md disabled:opacity-50" type="button" x-show="row.actionable" :disabled="queueChanging() || busyId() === row.id" @click="deleteItem(row.id)">Delete</button>
+                <a class="block px-2 py-1 text-ink hover:bg-hover rounded-md" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">{{ queueText.viewPost }}</a>
+                <a class="block px-2 py-1 text-ink hover:bg-hover rounded-md" x-show="row.actionable" :href="row.editUrl" data-stx-link>{{ queueText.edit }}</a>
+                <button class="px-2 py-1 text-left hover:bg-hover rounded-md" type="button" x-show="row.canRepeat" @click="chooseRepeat(row, $event)">{{ queueText.repeat }}</button>
+                <button class="px-2 py-1 text-danger text-left hover:bg-danger-soft rounded-md disabled:opacity-50" type="button" x-show="row.actionable" :disabled="queueChanging() || busyId() === row.id" @click="deleteItem(row.id)">{{ queueText.deleteAction }}</button>
               </div>
             </details>
           </footer>
@@ -129,32 +137,32 @@
       </div>
       {{-- The list is paged; this fetches the page of older posts. --}}
       <div class="flex justify-center p-3" x-show="(activeSearch() || tab() === 'published') && nextCursor()">
-        <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" :disabled="loadingMore()" @click="loadMore" :text="loadingMore() ? 'Loading…' : (activeSearch() ? 'Load more results' : 'Load older posts')">Load older posts</button>
+        <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" :disabled="loadingMore()" @click="loadMore" :text="loadingMore() ? queueCopy.loading : (activeSearch() ? queueCopy.moreResults : queueCopy.olderPosts)">{{ queueText.olderPosts }}</button>
       </div>
     </section>
 
-    <section aria-label="Queue calendar" x-cloak x-show="!activeSearch() && view() === 'calendar'">
+    <section aria-label="{{ queueText.calendarRegion }}" x-cloak x-show="!activeSearch() && view() === 'calendar'">
       <Card padding="none" className="shadow-sm">
         <header class="flex flex-wrap gap-3 items-center justify-between p-3.5 border-b border-line">
           <div class="flex gap-2 items-center">
-            <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" :aria-label="'Previous ' + calendarPeriod()" @click="shiftCalendar(-1)">
+            <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" :aria-label="calendarPeriod() === 'week' ? queueCopy.previousWeek : queueCopy.previousMonth" @click="shiftCalendar(-1)">
               <span class="h-4 w-4 i-hugeicons-arrow-left-02" aria-hidden="true"></span>
             </button>
-            <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" @click="goToday">Today</button>
-            <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" :aria-label="'Next ' + calendarPeriod()" @click="shiftCalendar(1)">
+            <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" @click="goToday">{{ queueText.today }}</button>
+            <button class="inline-flex items-center justify-center h-8 w-8 text-muted bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" :aria-label="calendarPeriod() === 'week' ? queueCopy.nextWeek : queueCopy.nextMonth" @click="shiftCalendar(1)">
               <span class="h-4 w-4 i-hugeicons-arrow-right-02" aria-hidden="true"></span>
             </button>
           </div>
-          <strong class="text-ui" aria-live="polite" :text="calTitle()">Calendar</strong>
-          <SegmentedControl label="Calendar period" size="sm" v-model:value="calendarPeriod" :options="[{ value: 'month', label: 'Month' }, { value: 'week', label: 'Week' }]" />
+          <strong class="text-ui" aria-live="polite" :text="calTitle()">{{ queueText.calendar }}</strong>
+          <SegmentedControl label="{{ queueText.calendarPeriod }}" size="sm" v-model:value="calendarPeriod" :options="[{ value: 'month', label: queueCopy.month }, { value: 'week', label: queueCopy.week }]" />
         </header>
-        <WorkspaceListSkeleton :show="calendarBusy()" label="Loading calendar" />
-        <ErrorState :show="calendarError() && !calendarBusy()" title="Could not load the calendar" :message="calendarError()" @retry="loadCalendar()" />
-        <div class="sm:hidden divide-line divide-y" :aria-label="calendarPeriod() === 'week' ? 'Weekly agenda' : 'Monthly agenda'" role="list">
+        <WorkspaceListSkeleton :show="calendarBusy()" label="{{ queueText.loadingCalendar }}" />
+        <ErrorState retryLabel="{{ queueText.retry }}" busyLabel="{{ queueText.retrying }}" :show="calendarError() && !calendarBusy()" title="{{ queueText.couldNotLoadCalendar }}" :message="calendarError()" @retry="loadCalendar()" />
+        <div class="sm:hidden divide-line divide-y" :aria-label="calendarPeriod() === 'week' ? queueCopy.weeklyAgenda : queueCopy.monthlyAgenda" role="list">
           <article class="grid gap-2 px-3 py-2" role="listitem" x-for="day in calDays()" :key="day.key">
             <header class="flex gap-3 items-center justify-between">
               <time class="font-semibold text-ui" :datetime="day.key" :aria-current="day.isToday ? 'date' : null" :text="day.label"></time>
-              <a class="grid place-items-center shrink-0 h-11 w-11 text-ink bg-panel-2 hover:bg-raised rounded-xl" :href="day.scheduleUrl" :aria-label="'Schedule a post on ' + day.label" data-stx-link>
+              <a class="grid place-items-center shrink-0 h-11 w-11 text-ink bg-panel-2 hover:bg-raised rounded-xl" :href="day.scheduleUrl" :aria-label="queueWords.t('scheduleOn', { day: day.label })" data-stx-link>
                 <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
               </a>
             </header>
@@ -172,16 +180,16 @@
         <div class="hidden sm:block overflow-x-auto">
           <div class="min-w-[560px]">
             <div class="grid grid-cols-7 font-semibold text-muted text-xs border-b border-line">
-              <div class="p-2 text-center">Sun</div><div class="p-2 text-center">Mon</div><div class="p-2 text-center">Tue</div><div class="p-2 text-center">Wed</div><div class="p-2 text-center">Thu</div><div class="p-2 text-center">Fri</div><div class="p-2 text-center">Sat</div>
+              <div class="p-2 text-center">{{ queueText.sun }}</div><div class="p-2 text-center">{{ queueText.mon }}</div><div class="p-2 text-center">{{ queueText.tue }}</div><div class="p-2 text-center">{{ queueText.wed }}</div><div class="p-2 text-center">{{ queueText.thu }}</div><div class="p-2 text-center">{{ queueText.fri }}</div><div class="p-2 text-center">{{ queueText.sat }}</div>
             </div>
             <div class="grid grid-cols-7">
               <div class="grid content-start gap-1 p-1.5 min-h-24 border-b border-line border-r data-[drop-target=true]:ring-2 data-[drop-target=true]:ring-focus data-[drop-target=true]:ring-inset" data-cal-cell :data-blank="cell.blank" :data-today="cell.isToday" :data-calendar-date="cell.blank ? null : cell.key" :data-drop-target="!cell.blank && dropDay() === cell.key" x-for="cell in calCells()" :key="cell.key" @dragover="allowCalendarDrop($event, cell)" @drop="dropOnCalendar($event, cell)">
-                <a class="font-semibold text-xs hover:text-ink transition-colors" data-cal-day x-show="!cell.blank" :href="cell.scheduleUrl" data-stx-link title="Schedule a post on this day">{{ cell.day }}</a>
+                <a class="font-semibold text-xs hover:text-ink transition-colors" data-cal-day x-show="!cell.blank" :href="cell.scheduleUrl" data-stx-link title="{{ queueText.scheduleThisDay }}">{{ cell.day }}</a>
                 <a class="flex gap-1 items-center px-1 py-0.5 text-body text-xs bg-panel-2 hover:bg-panel-2 rounded transition-colors" x-for="chip in cell.chips" :key="chip.id" :href="chip.href" :draggable="chip.schedule ? 'true' : 'false'" @dragstart="startCalendarDrag($event, chip.schedule)" @dragend="endCalendarDrag" data-stx-link>
                   <span class="shrink-0 h-1.5 w-1.5 rounded-full" data-cal-dot :data-status="chip.status" aria-hidden="true"></span>
                   <span class="truncate">{{ chip.time }} {{ chip.label }}</span>
                 </a>
-                <button class="px-1 text-left text-muted text-xs hover:text-ink" type="button" x-show="cell.more" :text="'+' + cell.more + ' more'" :aria-label="'Show all posts on ' + cell.label" @click="showCalendarWeek(cell.key)"></button>
+                <button class="px-1 text-left text-muted text-xs hover:text-ink" type="button" x-show="cell.more" :text="queueWords.t('moreOnDay', { count: cell.more })" :aria-label="queueWords.t('showAllOn', { day: cell.label })" @click="showCalendarWeek(cell.key)"></button>
               </div>
             </div>
           </div>
@@ -195,11 +203,16 @@
     import type { QueueRemovalReceipt } from '../../app/Services/Social/QueueService'
     import type { ScheduledSelection, ScheduleDestination } from '../../app/Support/Social/rescheduling'
     import { MAX_QUEUE_SELECTION } from '../../app/Support/Social/rescheduling'
+    import { createI18n } from '@stacksjs/i18n/client'
     import { systemTimeZone } from '../../app/Support/time'
     import { requestJson } from '../functions/postline-client'
     import { showNotification } from '../functions/notification'
     import { fetchWorkspace, targetLabel } from '../functions/social-client'
     import { postStatusVariant } from '../functions/status-badge'
+
+    const { locale: language, messages: queueCopy } = {{ queueClient }}
+    const queueWords = createI18n({ locale: language, messages: { [language]: queueCopy } })
+    const dateLocale = language === 'en' ? undefined : language
 
     /**
      * Wire shapes for `/api/postline/queue/*`, declared where they are used.
@@ -263,6 +276,7 @@
       /** "Resume thread from 3", for a thread that stopped part way; '' otherwise. */
       resumeLabel: string
       statusLabel: string
+      statusName: string
       scheduledAt?: string | null
       publishedAt?: string | null
       title?: string | null
@@ -320,8 +334,8 @@
     const calendarPeriod = useLocalStorage('postline.queue.calendar-period', 'month')
     const fullCalendar = useMediaQuery('(min-width: 640px)')
     const queueViews = derived(() => [
-      { value: 'list', label: 'List' },
-      { value: 'calendar', label: fullCalendar() ? 'Calendar' : 'Agenda' },
+      { value: 'list', label: queueCopy.list },
+      { value: 'calendar', label: fullCalendar() ? queueCopy.calendar : queueCopy.agenda },
     ])
     const calendarItems = state<QueueApiItem[]>([])
     const calendarBusy = state(false)
@@ -345,7 +359,7 @@
     const formatTime = (value: string | null | undefined): string => {
       const date = parseUtc(value)
       if (!date) return value || ''
-      return date.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: zone() })
+      return date.toLocaleString(dateLocale, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: zone() })
     }
 
 
@@ -381,14 +395,14 @@
       if (!target.nextAttemptAt) return ''
       const at = new Date(target.nextAttemptAt)
       if (Number.isNaN(at.getTime())) return ''
-      return ` Trying again at ${at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`
+      return queueWords.t('retryAt', { time: at.toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' }) })
     }
 
     const failureText = (item: QueueApiItem): string => {
       const failed = item.providers.filter(target => target.status === 'failed' || target.failureReason)
       if (failed.length === 0) return ''
-      const lines = failed.map(target => `${channelLabels([target])[0] || target.provider}: ${target.failureReason || 'failed'}${retryNote(target)}`)
-      return item.partial ? `Sent to the others. ${lines.join(' ')}` : lines.join(' ')
+      const lines = failed.map(target => `${channelLabels([target])[0] || target.provider}: ${target.failureReason || queueCopy.failed}${retryNote(target)}`)
+      return item.partial ? queueWords.t('sentToOthers', { errors: lines.join(' ') }) : lines.join(' ')
     }
 
     /** Held back because it was due while Postline was not running. Nothing was sent. */
@@ -398,15 +412,14 @@
 
     /** Flatten an API item into exactly what a row renders. */
     const toRow = (item: QueueApiItem): QueueRow => {
-      const when = item.status === 'scheduled'
-        ? `Scheduled · ${formatTime(item.scheduledAt)}`
-        : item.status === 'published'
-          ? `Published · ${formatTime(item.publishedAt || item.createdAt)}`
-          : item.status === 'draft'
-            ? `Draft · saved ${formatTime(item.createdAt)}`
-            : `${item.status[0].toUpperCase()}${item.status.slice(1)} · ${formatTime(item.createdAt)}`
-      const extras = [item.hasImage ? 'image' : '', item.hasVideo ? 'video' : '', item.hasLink ? 'link card' : ''].filter(Boolean).join(' · ')
-      const thread = item.thread ? `thread · post ${item.thread.position} of ${item.thread.length}` : ''
+      const at = item.status === 'scheduled' ? item.scheduledAt
+        : item.status === 'published' ? item.publishedAt || item.createdAt
+          : item.createdAt
+      const time = formatTime(at)
+      const status = queueCopy.statuses[item.status] || item.status
+      const when = item.status === 'draft' ? queueWords.t('draftWhen', { time }) : `${status} · ${time}`
+      const extras = [item.hasImage ? queueCopy.image : '', item.hasVideo ? queueCopy.video : '', item.hasLink ? queueCopy.linkCard : ''].filter(Boolean).join(' · ')
+      const thread = item.thread ? queueWords.t('threadPosition', item.thread) : ''
       const labels = channelLabels(item.providers)
       const targets = item.providers.map((target, index) => {
         const failed = target.status === 'failed' || Boolean(target.failureReason)
@@ -415,7 +428,7 @@
         return {
           label,
           state: failed ? 'failed' as const : sent ? 'sent' as const : 'waiting' as const,
-          title: failed ? `${label}: ${target.failureReason || 'failed'}${retryNote(target)}` : sent ? `Sent to ${label}` : `Not sent to ${label} yet`,
+          title: failed ? `${label}: ${target.failureReason || queueCopy.failed}${retryNote(target)}` : sent ? queueWords.t('sentTo', { network: label }) : queueWords.t('waitingFor', { network: label }),
         }
       })
       const comments = item.providers.flatMap(({ firstComment, remoteUrl }, index) => {
@@ -423,10 +436,11 @@
         const { targetId, status, error } = firstComment
         const canRetry = status === 'failed'
         const needsAttention = canRetry || status === 'uncertain'
-        const detail = error || (status === 'sent' ? 'sent' : 'waiting to send')
+        const detail = error || (status === 'sent' ? queueCopy.sent : queueCopy.waitingToSend)
         const url = status === 'uncertain' ? liveUrlFor(remoteUrl) : ''
-        return [{ targetId, message: `${targets[index].label} first comment · ${detail}`, needsAttention, canRetry, url }]
+        return [{ targetId, message: queueWords.t('firstComment', { network: targets[index].label, detail }), needsAttention, canRetry, url }]
       })
+      const statusLabel = item.partial ? 'partly sent' : isMissed(item) ? 'missed' : item.status
       return {
         id: item.id,
         status: item.status,
@@ -443,10 +457,11 @@
         canRepeat: targets.length > 0 && (ACTIONABLE.has(item.status) || item.status === 'published'),
         hasImages: Boolean(item.hasImage || item.hasVideo || item.thread),
         partial: Boolean(item.partial),
-        resumeLabel: item.thread?.resumeFrom ? `Resume thread from ${item.thread.resumeFrom}` : '',
+        resumeLabel: item.thread?.resumeFrom ? queueWords.t('resumeFrom', { position: item.thread.resumeFrom }) : '',
         // A post that reached only some networks is not simply "published".
         // It borrows the amber of an unfinished publish.
-        statusLabel: item.partial ? 'partly sent' : isMissed(item) ? 'missed' : item.status,
+        statusLabel,
+        statusName: language === 'en' ? statusLabel : queueCopy.statuses[statusLabel] || statusLabel,
         scheduledAt: item.scheduledAt,
         publishedAt: item.publishedAt,
         title: item.title,
@@ -493,28 +508,29 @@
     const tabs = derived(() => {
       const count = (which: string) => rows().filter(row => inTab(row, which)).length
       return [
-        { id: 'scheduled', label: 'Scheduled', count: count('scheduled'), tone: '' },
-        { id: 'drafts', label: 'Drafts', count: count('drafts'), tone: '' },
-        { id: 'published', label: 'Published', count: count('published'), tone: '' },
-        { id: 'attention', label: 'Needs attention', count: count('attention'), tone: count('attention') ? 'danger' : '' },
+        { id: 'scheduled', label: queueCopy.scheduledTab, count: count('scheduled'), tone: '' },
+        { id: 'drafts', label: queueCopy.draftsTab, count: count('drafts'), tone: '' },
+        { id: 'published', label: queueCopy.publishedTab, count: count('published'), tone: '' },
+        { id: 'attention', label: queueCopy.attentionTab, count: count('attention'), tone: count('attention') ? 'danger' : '' },
       ]
     })
     const visible = derived(() => activeSearch() ? rows() : rows().filter(row => inTab(row, tab())))
     const showEmpty = derived(() => loaded() && !loadError() && visible().length === 0)
     const emptyQueue = derived(() => activeSearch()
-      ? { title: 'No posts match your search', description: 'Search for another word or clear the search to see the queue.' }
+      ? { title: queueCopy.noMatches, description: queueCopy.noMatchesDescription }
       : ({
-          scheduled: { title: 'No scheduled posts', description: 'Choose a time in Composer to schedule a post.' },
-          drafts: { title: 'No drafts', description: 'Save a draft from Composer to finish it later.' },
-          published: { title: 'Nothing published yet', description: 'Posts appear here once they go out.' },
-          attention: { title: 'Nothing needs attention', description: 'Posts with a failed destination or first comment appear here.' },
+          scheduled: { title: queueCopy.noScheduled, description: queueCopy.noScheduledDescription },
+          drafts: { title: queueCopy.noDrafts, description: queueCopy.noDraftsDescription },
+          published: { title: queueCopy.noPublished, description: queueCopy.noPublishedDescription },
+          attention: { title: queueCopy.noAttention, description: queueCopy.noAttentionDescription },
         })[tab()])
 
     const metaText = derived(() => {
-      if (!loaded()) return 'Loading…'
-      if (loadError()) return 'Could not load'
-      const n = visible().length
-      return `${n} ${activeSearch() ? 'matching ' : ''}post${n === 1 ? '' : 's'}${activeSearch() && nextCursor() ? ' shown' : ''}`
+      if (!loaded()) return queueCopy.loading
+      if (loadError()) return queueCopy.couldNotLoad
+      const count = visible().length
+      const name = activeSearch() ? (nextCursor() ? 'shownCount' : 'matchingCount') : 'postCount'
+      return queueWords.tc(name, count, { count })
     })
 
     const utcDate = (day: string): Date => new Date(`${day}T00:00:00Z`)
@@ -532,12 +548,12 @@
       const month = anchor.getUTCMonth()
       return { start: new Date(Date.UTC(year, month, 1)), days: new Date(Date.UTC(year, month + 1, 0)).getUTCDate() }
     })
-    const agendaDateFormat = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
-    const weekDateFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+    const agendaDateFormat = new Intl.DateTimeFormat(dateLocale, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+    const weekDateFormat = new Intl.DateTimeFormat(dateLocale, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
     const calTitle = derived(() => {
       const { start, days } = calRange()
       if (calendarPeriod() === 'week') return weekDateFormat.formatRange(start, calendarDay(start, days - 1))
-      return start.toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' })
+      return start.toLocaleDateString(dateLocale, { month: 'long', year: 'numeric', timeZone: 'UTC' })
     })
 
     const calDays = derived(() => {
@@ -569,8 +585,8 @@
             id: row.id,
             status: row.status,
             href: row.actionable ? row.editUrl : row.liveUrl || row.editUrl,
-            time: date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: zone() }),
-            label: (row.title || row.body || '').trim().slice(0, 160) || 'Post',
+            time: date.toLocaleTimeString(dateLocale, { hour: 'numeric', minute: '2-digit', timeZone: zone() }),
+            label: (row.title || row.body || '').trim().slice(0, 160) || queueCopy.post,
             schedule: row.status === 'scheduled' && row.scheduledAt ? { id: row.id, scheduledAt: row.scheduledAt } : null,
           })),
         }
@@ -624,7 +640,7 @@
       try {
         let before: number | null
         do {
-          const { data } = await requestJson(`/api/postline/queue?${query}`, { signal, cache: 'no-store' }, 'Could not load calendar.')
+          const { data } = await requestJson(`/api/postline/queue?${query}`, { signal, cache: 'no-store' }, queueCopy.calendarRequestError)
           posts.push(...data.items)
           before = data.nextCursor
           if (before) query.set('before', String(before))
@@ -704,7 +720,7 @@
       if (activeSearch()) query.set('q', activeSearch())
       const response = await fetch(`/api/postline/queue?${query}`)
       const payload = await response.json()
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load posts.')
+      if (!response.ok || !payload.ok) throw new Error(payload.error || queueCopy.queueRequestError)
       return payload.data
     }
 
@@ -767,20 +783,21 @@
     const schedulerStatus = state({ state: 'ok', lastRunAt: null })
     const publishingPaused = state(false)
     const schedulerWarning = derived(() => {
-      if (publishingPaused()) return 'Scheduled publishing is paused: nothing goes out on its own until you resume it in Settings or from the menu bar.'
+      if (publishingPaused()) return queueCopy.paused
       const status = schedulerStatus()
       if (status.state === 'ok') return ''
-      if (status.state === 'never') return 'Scheduled posts are not going out: the scheduler has not run yet. Start it with ./buddy schedule:run.'
+      if (status.state === 'never') return queueCopy.schedulerNever
       const at = new Date(String(status.lastRunAt))
-      const when = Number.isNaN(at.getTime()) ? '' : ` since ${at.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`
-      return `Scheduled posts are not going out: the scheduler has not run${when}.`
+      if (Number.isNaN(at.getTime())) return queueCopy.schedulerStopped
+      const time = at.toLocaleString(dateLocale, { dateStyle: 'medium', timeStyle: 'short' })
+      return queueWords.t('schedulerStoppedSince', { time })
     })
     /** How many alerts are unread: a failed post, a missed one, a refused sign-in. */
     const unreadAlerts = state(0)
     const attentionText = derived(() => {
       const count = unreadAlerts()
       if (!count) return ''
-      return `${count} thing${count === 1 ? ' needs' : 's need'} your attention. See what happened.`
+      return queueWords.tc('alertCount', count, { count })
     })
     const refreshAlerts = async () => {
       try {
@@ -831,7 +848,7 @@
       form.set(field, String(id))
       const response = await fetch(path, { method: 'POST', body: form })
       const payload = await response.json()
-      if (!response.ok || !payload.ok) throw new Error(payload.error || 'Request failed.')
+      if (!response.ok || !payload.ok) throw new Error(payload.error || queueCopy.requestFailed)
       return payload.data
     }
 
@@ -873,13 +890,13 @@
         clearSelection()
         rescheduleDate.set('')
         showNotification({
-          title: 'Schedule updated',
-          message: `Moved ${data.count} post${data.count === 1 ? '' : 's'}.`,
+          title: queueCopy.scheduleUpdated,
+          message: queueWords.tc('movedCount', data.count, { count: data.count }),
           tone: 'success',
         })
       }
       catch (error) {
-        showNotification({ title: 'Could not move posts', message: error instanceof Error ? error.message : String(error), tone: 'error' })
+        showNotification({ title: queueCopy.couldNotMove, message: error instanceof Error ? error.message : String(error), tone: 'error' })
       }
       finally {
         await refresh()
@@ -912,8 +929,8 @@
     const publishItem = (id: number): void => void runAction(
       id,
       '/api/postline/queue/publish-now',
-      { title: 'Published', message: 'Post published.' },
-      'Publish failed',
+      { title: queueCopy.published, message: queueCopy.postPublished },
+      queueCopy.publishFailed,
     )
 
     async function retryFirstComment(id: number): Promise<void> {
@@ -922,14 +939,14 @@
       try {
         const result = await post('/api/postline/queue/first-comment/retry', id, 'target_id') as { status: string, error?: string }
         if (result.status === 'sent') {
-          showNotification({ title: 'First comment sent', message: 'The comment was added to the published post.', tone: 'success' })
+          showNotification({ title: queueCopy.commentSent, message: queueCopy.commentAdded, tone: 'success' })
         }
         else {
-          showNotification({ title: 'First comment needs attention', message: result.error, tone: 'error' })
+          showNotification({ title: queueCopy.commentNeedsAttention, message: result.error, tone: 'error' })
         }
       }
       catch (error) {
-        showNotification({ title: 'Could not retry first comment', message: error instanceof Error ? error.message : String(error), tone: 'error' })
+        showNotification({ title: queueCopy.couldNotRetryComment, message: error instanceof Error ? error.message : String(error), tone: 'error' })
       }
       finally {
         await refresh()
@@ -940,8 +957,8 @@
     const retryItem = (id: number): void => void runAction(
       id,
       '/api/postline/queue/publish-now',
-      { title: 'Retried', message: 'The failed networks were sent again.' },
-      'Retry failed',
+      { title: queueCopy.retried, message: queueCopy.retriedNetworks },
+      queueCopy.retryFailed,
     )
 
     // A thread that stopped part way carries on from that segment, as replies
@@ -950,31 +967,31 @@
     const resumeItem = (id: number): void => void runAction(
       id,
       '/api/postline/queue/publish-now',
-      { title: 'Thread resumed', message: 'The rest of the thread was sent from where it stopped.' },
-      'Resume failed',
+      { title: queueCopy.threadResumed, message: queueCopy.threadSent },
+      queueCopy.resumeFailed,
     )
 
     function showRemoval(receipt: QueueRemovalReceipt) {
       const durationMs = Date.parse(receipt.expiresAt) - Date.now()
       if (!(durationMs > 0)) return
       showNotification({
-        title: 'Removed',
-        message: receipt.count === 1 ? 'Post removed from the queue.' : `${receipt.count} posts removed from the queue.`,
+        title: queueCopy.removed,
+        message: queueWords.tc('removedCount', receipt.count, { count: receipt.count }),
         tone: 'success',
         id: `queue-removal-${receipt.token}`,
         durationMs,
         dedupeMs: 0,
-        action: { label: 'Undo', run: () => void undoRemoval(receipt.token) },
+        action: { label: queueCopy.undo, run: () => void undoRemoval(receipt.token) },
       })
     }
 
     async function undoRemoval(token: string) {
       try {
         const { data } = await requestJson('/api/postline/queue/undo-delete', { method: 'POST', body: JSON.stringify({ token }) })
-        showNotification({ title: 'Restored', message: data.count === 1 ? 'Post restored to the queue.' : `${data.count} posts restored to the queue.`, tone: 'success' })
+        showNotification({ title: queueCopy.restored, message: queueWords.tc('restoredCount', data.count, { count: data.count }), tone: 'success' })
       }
       catch (error) {
-        showNotification({ title: 'Could not undo the removal', message: error instanceof Error ? error.message : String(error), tone: 'error' })
+        showNotification({ title: queueCopy.undoFailed, message: error instanceof Error ? error.message : String(error), tone: 'error' })
       }
       await refresh()
       if (view() === 'calendar' && !activeSearch()) await loadCalendar()
@@ -989,7 +1006,7 @@
         showRemoval(data)
       }
       catch (error) {
-        showNotification({ title: 'Could not remove the posts', message: error instanceof Error ? error.message : String(error), tone: 'error' })
+        showNotification({ title: queueCopy.deleteFailed, message: error instanceof Error ? error.message : String(error), tone: 'error' })
       }
       finally {
         await refresh()
@@ -1001,13 +1018,13 @@
       const ids = selectedPosts().map(post => post.id)
       if (!ids.length || queueChanging()) return
       if (ids.length === 1) return deleteItem(ids[0]!)
-      if (!await stxConfirm('You can undo this for one minute.', { title: `Delete ${ids.length} posts?`, type: 'error', confirmText: 'Delete posts' })) return
+      if (!await stxConfirm(queueCopy.undoHint, { title: queueWords.t('confirmDeleteMultiple', { count: ids.length }), type: 'error', confirmText: queueCopy.deletePosts, cancelText: queueCopy.cancel })) return
       await deletePosts(ids)
     }
 
     async function deleteItem(id: number) {
       if (queueChanging()) return
-      if (!await stxConfirm('You can undo this for one minute.', { title: 'Delete this post?', type: 'error', confirmText: 'Delete post' })) return
+      if (!await stxConfirm(queueCopy.undoHint, { title: queueCopy.confirmDeleteOne, type: 'error', confirmText: queueCopy.deletePost, cancelText: queueCopy.cancel })) return
       await deletePosts([id])
     }
 

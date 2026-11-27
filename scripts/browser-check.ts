@@ -2622,7 +2622,37 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
         && document.querySelector('[data-testid=postline-nav] a[href="/queue"]')?.closest('[lang]')?.lang === 'es'
         && document.querySelector('[data-testid=postline-nav] a[href="/inbox"]')?.textContent.includes('1 mensaje sin leer')
         && document.querySelector('[data-testid=postline-nav] a[href="/listening"]')?.textContent.includes('2 menciones sin leer')
-        && document.querySelector('main[lang="en"] input#queue-search')?.placeholder === 'Search all posts'
+        && document.querySelector('[data-testid="queue-page"][lang="es"] input#queue-search')?.placeholder === 'Buscar en todas las publicaciones'
+        && document.querySelector('[data-queue-tab][aria-selected="true"] span')?.textContent === 'Programadas'
+    `), 5_000)
+
+    await waitUntil('Spanish Queue panels', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-posting-slots] summary')?.textContent === 'Horarios de publicación'
+        && document.querySelector('[data-draft-feeds] summary')?.textContent === 'Fuentes de borradores'
+        && document.querySelector('[data-recurring-posts] summary')?.textContent === 'Publicaciones recurrentes'
+    `), 5_000)
+    await evaluate(cdp, "document.querySelector('[data-draft-feeds] summary').click()")
+    await waitUntil('Spanish draft-feed form and empty state', () => evaluate<boolean>(cdp, `
+      Boolean(document.querySelector('[data-draft-feed-form] button')?.textContent === 'Añadir fuente'
+        && [...document.querySelectorAll('[data-draft-feeds] p')].some(node =>
+          node.textContent === 'Aún no hay fuentes de borradores.' && node.getClientRects().length))
+    `), 5_000)
+    await evaluate(cdp, "document.querySelector('[data-draft-feeds] summary').click()")
+
+    await evaluate(cdp, "document.querySelector('[data-queue-tab][aria-selected=true]').focus()")
+    await pressKey(cdp, 'ArrowRight', 39)
+    await waitUntil('Spanish Queue tabs work with the keyboard', () => evaluate<boolean>(cdp, `
+      document.activeElement?.getAttribute('aria-selected') === 'true'
+        && document.activeElement?.querySelector('span')?.textContent === 'Borradores'
+    `), 5_000)
+
+    const calendar = "document.querySelector('[role=group][aria-label=\"Vista de la cola\"] button:nth-of-type(2)')"
+    await evaluate(cdp, `${calendar}?.click()`)
+    await waitUntil('Spanish calendar controls and abbreviations', () => evaluate<boolean>(cdp, `
+      Boolean(document.querySelector('[aria-label="Calendario de la cola"]')?.getClientRects().length
+        && document.querySelector('[aria-label="Mes anterior"]')
+        && document.querySelector('[aria-label="Mes siguiente"]')
+        && document.querySelector('[aria-label="Calendario de la cola"]').textContent.includes('lun.'))
     `), 5_000)
 
     await pressKey(cdp, 'k', 75, 2)

@@ -1,6 +1,17 @@
+<script server cache>
+import { workspaceLocale, workspaceQueuePanelsText } from '../../app/Support/Localization/workspace'
+
+export const panelText = workspaceQueuePanelsText.feeds
+export const panelClient = { locale: workspaceLocale, messages: panelText }
+</script>
+
 <script client>
+import { createI18n } from '@stacksjs/i18n/client'
 import type { DraftFeed } from '../../app/Services/DraftFeedService'
 import { requestJson } from '../functions/postline-client'
+
+const { locale, messages: copy } = {{ panelClient }}
+const words = createI18n({ locale, messages: { [locale]: copy } })
 
 const endpoint = '/api/postline/draft-feeds'
 const emit = defineEmits(['drafts-created'])
@@ -22,7 +33,7 @@ async function run(work: () => Promise<void>) {
 
 function load() {
   return run(async () => {
-    const { data } = await requestJson(endpoint, { cache: 'no-store' }, 'Could not load draft feeds.')
+    const { data } = await requestJson(endpoint, { cache: 'no-store' }, copy.loadFailed)
     feeds.set(data)
     loaded.set(true)
   })
@@ -38,9 +49,9 @@ function checked(feed: DraftFeed, created: number) {
   update(feed)
   if (created) {
     emit('drafts-created')
-    status.set(`Added ${created} ${created === 1 ? 'draft' : 'drafts'} to Queue.`)
+    status.set(words.tc('added', created, { count: created }))
   }
-  else if (!feed.lastError) status.set('No new drafts.')
+  else if (!feed.lastError) status.set(copy.noNew)
 }
 
 function toggle(event: Event) {
@@ -54,7 +65,7 @@ function subscribe(event: SubmitEvent) {
     const { data } = await requestJson(endpoint, {
       method: 'POST',
       body: JSON.stringify({ name: fields.get('name'), url: fields.get('url'), includeExisting: fields.has('include-existing') }),
-    }, 'Could not add the feed.')
+    }, copy.addFailed)
     form.reset()
     checked(data.feed, data.created)
   })
@@ -62,7 +73,7 @@ function subscribe(event: SubmitEvent) {
 
 function check(feed: DraftFeed) {
   return run(async () => {
-    const { data } = await requestJson(`${endpoint}/check`, { method: 'POST', body: JSON.stringify({ uuid: feed.uuid }) }, 'Could not check the feed.')
+    const { data } = await requestJson(`${endpoint}/check`, { method: 'POST', body: JSON.stringify({ uuid: feed.uuid }) }, copy.checkFailed)
     checked(data.feed, data.created)
   })
 }
@@ -71,43 +82,43 @@ function changeState(feed: DraftFeed) {
   return run(async () => {
     const { data } = await requestJson(`${endpoint}/state`, {
       method: 'POST', body: JSON.stringify({ uuid: feed.uuid, active: !feed.active }),
-    }, 'Could not change this feed.')
+    }, copy.changeFailed)
     update(data)
   })
 }
 
 async function remove(feed: DraftFeed) {
-  if (!await stxConfirm('Existing drafts will stay in Queue.', { title: `Remove ${feed.name}?`, type: 'warning', confirmText: 'Remove feed' })) return
+  if (!await stxConfirm(copy.keepDrafts, { title: words.t('confirmRemove', { name: feed.name }), type: 'warning', confirmText: copy.removeFeed, cancelText: copy.cancel })) return
   await run(async () => {
-    await requestJson(`${endpoint}/remove`, { method: 'POST', body: JSON.stringify({ uuid: feed.uuid }) }, 'Could not remove the feed.')
+    await requestJson(`${endpoint}/remove`, { method: 'POST', body: JSON.stringify({ uuid: feed.uuid }) }, copy.removeFailed)
     feeds.update(items => items.filter(item => item.uuid !== feed.uuid))
   })
 }
 
 function lastChecked(feed: DraftFeed): string {
-  if (!feed.active) return 'Paused'
-  if (!feed.lastCheckedAt) return 'Waiting for first check'
-  return `Last checked ${new Date(feed.lastCheckedAt.replace(' ', 'T') + 'Z').toLocaleString()}`
+  if (!feed.active) return copy.paused
+  if (!feed.lastCheckedAt) return copy.waiting
+  return words.t('lastChecked', { time: new Date(feed.lastCheckedAt.replace(' ', 'T') + 'Z').toLocaleString(locale === 'en' ? undefined : locale) })
 }
 </script>
 
 <details class="min-w-0 bg-panel border border-line rounded-xl" @toggle="toggle" data-draft-feeds>
-  <summary class="px-3 py-2 font-semibold text-ink text-ui cursor-pointer">Draft feeds</summary>
+  <summary class="px-3 py-2 font-semibold text-ink text-ui cursor-pointer">{{ panelText.title }}</summary>
   <div class="grid gap-3 p-3 border-line border-t">
-    <p class="m-0 text-muted text-ui">Postline checks public RSS, Atom, and JSON feeds every 30 minutes and saves new items as drafts.</p>
+    <p class="m-0 text-muted text-ui">{{ panelText.description }}</p>
     <form class="grid gap-2 text-ui" @submit.prevent="subscribe" data-draft-feed-form>
       <div class="grid gap-2 sm:grid-cols-2">
-        <label class="grid gap-1">Name <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="name" maxlength="120" required></label>
-        <label class="grid gap-1">Feed URL <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" type="url" name="url" maxlength="2048" required></label>
+        <label class="grid gap-1">{{ panelText.name }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="name" maxlength="120" required></label>
+        <label class="grid gap-1">{{ panelText.url }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" type="url" name="url" maxlength="2048" required></label>
       </div>
-      <label class="flex gap-2 items-center"><input type="checkbox" name="include-existing"> Create drafts for items already in the feed</label>
-      <button class="px-3 h-9 w-fit font-semibold text-on-accent bg-accent rounded-lg disabled:opacity-50" type="submit" :disabled="busy()">Add feed</button>
+      <label class="flex gap-2 items-center"><input type="checkbox" name="include-existing"> {{ panelText.existing }}</label>
+      <button class="px-3 h-9 w-fit font-semibold text-on-accent bg-accent rounded-lg disabled:opacity-50" type="submit" :disabled="busy()">{{ panelText.add }}</button>
     </form>
 
-    <p class="m-0 text-muted text-ui" role="status" x-show="busy() || status()" :text="busy() ? 'Checking…' : status()"></p>
+    <p class="m-0 text-muted text-ui" role="status" x-show="busy() || status()" :text="busy() ? copy.checking : status()"></p>
     <p class="m-0 text-danger text-ui" role="alert" x-show="error()" :text="error()"></p>
-    <button class="w-fit text-info text-ui" type="button" x-show="error() && !loaded()" @click="load">Try again</button>
-    <p class="m-0 text-muted text-ui" x-show="loaded() && !feeds().length">No draft feeds yet.</p>
+    <button class="w-fit text-info text-ui" type="button" x-show="error() && !loaded()" @click="load">{{ panelText.retry }}</button>
+    <p class="m-0 text-muted text-ui" x-show="loaded() && !feeds().length">{{ panelText.empty }}</p>
 
     <ul class="grid gap-2 m-0 p-0 list-none text-ui">
       <li class="grid gap-1 p-3 min-w-0 bg-panel-2 rounded-lg" x-for="feed in feeds()" :key="feed.uuid" data-draft-feed>
@@ -116,9 +127,9 @@ function lastChecked(feed: DraftFeed): string {
         <span class="text-muted text-xs" :text="lastChecked(feed)"></span>
         <span class="text-danger text-xs" x-show="feed.lastError" :text="feed.lastError"></span>
         <div class="flex flex-wrap gap-3">
-          <button class="text-info disabled:opacity-50" type="button" :disabled="busy() || !feed.active" @click="check(feed)">Check now</button>
-          <button class="text-info disabled:opacity-50" type="button" :disabled="busy()" @click="changeState(feed)" :text="feed.active ? 'Pause' : 'Resume'"></button>
-          <button class="text-danger disabled:opacity-50" type="button" :disabled="busy()" @click="remove(feed)">Remove</button>
+          <button class="text-info disabled:opacity-50" type="button" :disabled="busy() || !feed.active" @click="check(feed)">{{ panelText.check }}</button>
+          <button class="text-info disabled:opacity-50" type="button" :disabled="busy()" @click="changeState(feed)" :text="feed.active ? copy.pause : copy.resume"></button>
+          <button class="text-danger disabled:opacity-50" type="button" :disabled="busy()" @click="remove(feed)">{{ panelText.remove }}</button>
         </div>
       </li>
     </ul>

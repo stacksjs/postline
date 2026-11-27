@@ -1,3 +1,10 @@
+<script server cache>
+import { workspaceLocale, workspaceQueuePanelsText } from '../../app/Support/Localization/workspace'
+
+export const panelText = workspaceQueuePanelsText.repeats
+export const panelClient = { locale: workspaceLocale, messages: panelText }
+</script>
+
 <script client>
 import type { RecurringPost } from '../../app/Services/RecurringPostService'
 import { wallTimeInZone } from '../../app/Support/time'
@@ -9,6 +16,8 @@ interface RepeatSource {
   title?: string | null
   hasImages: boolean
 }
+
+const { locale, messages: copy } = {{ panelClient }}
 
 const endpoint = '/api/postline/recurring-posts'
 const source = useReactiveProp<RepeatSource | null>('source', null, { parse: value => value })
@@ -79,9 +88,9 @@ function submit(event: SubmitEvent) {
         action, id: original?.id, uuid: rule?.uuid, interval: fields.get('interval'),
         startAt: fields.get('startAt'), withoutImages: fields.has('without-images'),
       }),
-    }, 'Could not save the repeat.')
+    }, copy.saveFailed)
     rules.update(items => [...items.filter(item => item.uuid !== data.uuid), data])
-    status.set('Repeat saved.')
+    status.set(copy.saved)
     close()
     if (panel.current) panel.current.open = true
     try { await refreshList() }
@@ -90,17 +99,17 @@ function submit(event: SubmitEvent) {
 }
 
 async function refreshList() {
-  const { data } = await requestJson(endpoint, { cache: 'no-store' }, 'Could not load recurring posts.')
+  const { data } = await requestJson(endpoint, { cache: 'no-store' }, copy.loadFailed)
   rules.set(data.rules)
   loaded.set(true)
 }
 
 async function change(rule: RecurringPost, action: 'pause' | 'resume' | 'remove') {
-  if (action === 'remove' && !await stxConfirm('Posts already in the Queue will stay there.', { title: 'Remove this repeat?', type: 'warning', confirmText: 'Remove repeat' })) return
+  if (action === 'remove' && !await stxConfirm(copy.keepPosts, { title: copy.confirmRemove, type: 'warning', confirmText: copy.removeRepeat, cancelText: copy.cancel })) return
   await run(async () => {
-    const { data } = await requestJson(endpoint, { method: 'POST', body: JSON.stringify({ action, uuid: rule.uuid }) }, 'Could not change this repeat.')
+    const { data } = await requestJson(endpoint, { method: 'POST', body: JSON.stringify({ action, uuid: rule.uuid }) }, copy.changeFailed)
     rules.update(items => data ? items.map(item => item.uuid === rule.uuid ? data : item) : items.filter(item => item.uuid !== rule.uuid))
-    status.set(action === 'pause' ? 'Repeat paused.' : action === 'resume' ? 'Repeat resumed.' : 'Repeat removed.')
+    status.set(action === 'pause' ? copy.repeatPaused : action === 'resume' ? copy.repeatResumed : copy.repeatRemoved)
   })
 }
 
@@ -109,33 +118,33 @@ function destinations(rule: RecurringPost): string {
 }
 
 function nextTime(rule: RecurringPost): string {
-  if (!rule.active) return 'Paused'
+  if (!rule.active) return copy.paused
   const date = new Date(rule.nextAt.replace(' ', 'T') + 'Z')
-  return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: rule.timezone }) + ' · ' + rule.timezone
+  return date.toLocaleString(locale === 'en' ? undefined : locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: rule.timezone }) + ' · ' + rule.timezone
 }
 </script>
 
 <template>
   <div>
     <details class="min-w-0 bg-panel border border-line rounded-xl" ref="recurringPanel" @toggle="showPanel" data-recurring-posts>
-      <summary class="px-3 py-2 font-semibold text-ink text-ui cursor-pointer">Recurring posts</summary>
+      <summary class="px-3 py-2 font-semibold text-ink text-ui cursor-pointer">{{ panelText.title }}</summary>
       <div class="grid gap-3 p-3 border-line border-t">
-        <p class="m-0 text-muted text-ui">Choose Repeat in a post’s actions to schedule it again.</p>
-        <p class="m-0 text-muted text-ui" role="status" x-show="busy() || status()" :text="busy() ? 'Working…' : status()"></p>
+        <p class="m-0 text-muted text-ui">{{ panelText.description }}</p>
+        <p class="m-0 text-muted text-ui" role="status" x-show="busy() || status()" :text="busy() ? copy.working : status()"></p>
         <p class="m-0 text-danger text-ui" role="alert" x-show="error()" :text="error()"></p>
-        <button class="w-fit text-info text-ui" type="button" x-show="error() && !loaded()" @click="load">Try again</button>
-        <p class="m-0 text-muted text-ui" x-show="loaded() && !rules().length">No recurring posts yet.</p>
+        <button class="w-fit text-info text-ui" type="button" x-show="error() && !loaded()" @click="load">{{ panelText.retry }}</button>
+        <p class="m-0 text-muted text-ui" x-show="loaded() && !rules().length">{{ panelText.empty }}</p>
         <ul class="grid gap-2 m-0 p-0 list-none text-ui">
           <li class="grid gap-1 p-3 min-w-0 bg-panel-2 rounded-lg" x-for="rule in rules()" :key="rule.uuid" data-recurring-rule>
             <strong class="break-words" :text="rule.title"></strong>
-            <span class="capitalize text-muted text-xs" :text="rule.interval"></span>
+            <span class="capitalize text-muted text-xs" :text="copy[rule.interval]"></span>
             <span class="break-words text-muted text-xs" :text="destinations(rule)"></span>
             <span class="text-muted text-xs" :text="nextTime(rule)"></span>
             <span class="text-danger text-xs" x-show="rule.lastError" :text="rule.lastError"></span>
             <div class="flex flex-wrap gap-3">
-              <button class="text-info disabled:opacity-50" type="button" :disabled="busy()" @click="open(rule)">Edit schedule</button>
-              <button class="text-info disabled:opacity-50" type="button" :disabled="busy()" @click="change(rule, rule.active ? 'pause' : 'resume')" :text="rule.active ? 'Pause' : 'Resume'"></button>
-              <button class="text-danger disabled:opacity-50" type="button" :disabled="busy()" @click="change(rule, 'remove')">Remove</button>
+              <button class="text-info disabled:opacity-50" type="button" :disabled="busy()" @click="open(rule)">{{ panelText.edit }}</button>
+              <button class="text-info disabled:opacity-50" type="button" :disabled="busy()" @click="change(rule, rule.active ? 'pause' : 'resume')" :text="rule.active ? copy.pause : copy.resume"></button>
+              <button class="text-danger disabled:opacity-50" type="button" :disabled="busy()" @click="change(rule, 'remove')">{{ panelText.remove }}</button>
             </div>
           </li>
         </ul>
@@ -144,26 +153,26 @@ function nextTime(rule: RecurringPost): string {
 
     <dialog class="p-4 max-w-[min(92vw,28rem)] w-full text-ink bg-panel backdrop:bg-black/35 border border-line rounded-2xl shadow-xl" ref="recurringDialog" aria-labelledby="recurring-dialog-title" @close="closed" data-recurring-dialog>
       <form class="grid gap-3 text-ui" ref="recurringForm" @submit.prevent="submit">
-        <h2 class="m-0 font-semibold text-base" id="recurring-dialog-title" :text="editing() ? 'Edit repeat schedule' : 'Repeat post'"></h2>
+        <h2 class="m-0 font-semibold text-base" id="recurring-dialog-title" :text="editing() ? copy.editTitle : copy.newTitle"></h2>
         <p class="m-0 break-words text-body" :text="editing()?.title || source()?.title || ''"></p>
-        <label class="grid gap-1">Repeat
+        <label class="grid gap-1">{{ panelText.repeat }}
           <select class="px-2 h-9 bg-panel-2 border border-line rounded-lg" name="interval" :value="editing()?.interval || 'weekly'" required>
-            <option value="daily">Every day</option>
-            <option value="weekly" selected>Every week</option>
-            <option value="monthly">Every month</option>
+            <option value="daily">{{ panelText.everyDay }}</option>
+            <option value="weekly" selected>{{ panelText.everyWeek }}</option>
+            <option value="monthly">{{ panelText.everyMonth }}</option>
           </select>
         </label>
-        <label class="grid gap-1" for="recurring-start">Next publishing time
+        <label class="grid gap-1" for="recurring-start">{{ panelText.nextTime }}
           <input class="px-2 h-9 min-w-0 w-full bg-panel-2 border border-line rounded-lg" name="startAt" id="recurring-start" type="datetime-local" :value="startValue()" aria-describedby="recurring-zone" required>
         </label>
         <p class="m-0 text-muted text-xs" id="recurring-zone" :text="editing()?.timezone || timeZone()"></p>
         <label class="flex gap-2 items-center" x-show="!editing() && source()?.hasImages">
-          <input type="checkbox" name="without-images"> Repeat without the original attachments
+          <input type="checkbox" name="without-images"> {{ panelText.withoutAttachments }}
         </label>
         <p class="m-0 text-danger text-xs" role="alert" x-show="formError()" :text="formError()"></p>
         <div class="flex gap-2 justify-end">
-          <button class="px-3 h-9 border border-line rounded-lg" type="button" @click="close">Cancel</button>
-          <button class="px-3 h-9 font-semibold text-on-accent bg-accent rounded-lg disabled:opacity-50" type="submit" :disabled="busy()">Save repeat</button>
+          <button class="px-3 h-9 border border-line rounded-lg" type="button" @click="close">{{ panelText.cancel }}</button>
+          <button class="px-3 h-9 font-semibold text-on-accent bg-accent rounded-lg disabled:opacity-50" type="submit" :disabled="busy()">{{ panelText.save }}</button>
         </div>
       </form>
     </dialog>

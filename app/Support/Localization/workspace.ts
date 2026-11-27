@@ -19,3 +19,6 @@ export const workspaceText = workspaceI18n.t.bind(workspaceI18n)
 export const workspaceShellText = workspaceI18n.tm('workspace.shell')
 export const workspaceCommandsText = workspaceI18n.tm('workspace.commands')
 export const unreadText = workspaceI18n.tm('workspace.unread')
+
+export const workspaceQueueText = workspaceI18n.tm('workspace.queue') as typeof en.workspace.queue
+export const workspaceQueuePanelsText = workspaceI18n.tm('workspace.queuePanels') as typeof en.workspace.queuePanels

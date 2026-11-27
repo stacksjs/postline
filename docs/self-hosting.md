@@ -109,9 +109,10 @@ postline.example.com {
 
 ## Workspace language
 
-Set `POSTLINE_WORKSPACE_LOCALE=es` for Spanish navigation, page headings, and
-the command palette. English is the default. Set the same value when building
-and serving the frontend.
+Set `POSTLINE_WORKSPACE_LOCALE=es` for Spanish navigation, page headings, the
+command palette, and the Queue. The Queue includes search, the calendar,
+posting slots, draft feeds, and recurring posts. English is the default. Set
+the same value when building and serving the frontend.
 
 ## What else to set
 

@@ -1,5 +1,17 @@
+<script server cache>
+import { workspaceLocale, workspaceQueuePanelsText } from '../../app/Support/Localization/workspace'
+
+export const panelLocale = workspaceLocale
+export const panelText = workspaceQueuePanelsText.picker
+export const panelClient = { locale: workspaceLocale, messages: panelText }
+</script>
+
 <script client>
+import { createI18n } from '@stacksjs/i18n/client'
 import { wallTimeInZone } from '../../app/Support/time'
+
+const { locale, messages: copy } = {{ panelClient }}
+const words = createI18n({ locale, messages: { [locale]: copy } })
 
 const emit = defineEmits(['change'])
 const value = useReactiveProp<string | null>('value', null, { parse: value => value })
@@ -16,7 +28,7 @@ function calendarDate(key: string | null): Date | null {
 
 const dayValue = derived(() => calendarDate(value()))
 const dayMinimum = derived(() => calendarDate(wallTimeInZone(today(), timeZone()).slice(0, 10)))
-const dayLabel = derived(() => dayValue()?.toLocaleDateString(undefined, { dateStyle: 'medium' }) || 'Choose a date')
+const dayLabel = derived(() => dayValue()?.toLocaleDateString(locale === 'en' ? undefined : locale, { dateStyle: 'medium' }) || copy.choose)
 
 function onDayToggle(event: Event) {
   const open = (event.currentTarget as HTMLDetailsElement).open
@@ -45,9 +57,9 @@ function selectDay(date: Date) {
 </script>
 
 <details class="min-w-0" :open="dateOpen()" @toggle="onDayToggle" @keydown="escapeDay" data-schedule-day-details>
-  <summary class="px-3 py-2 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg cursor-pointer" :aria-label="'New date, ' + dayLabel()" ref="dateTrigger">{{ dayLabel() }}</summary>
+  <summary class="px-3 py-2 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg cursor-pointer" :aria-label="words.t('label', { day: dayLabel() })" ref="dateTrigger">{{ dayLabel() }}</summary>
   <div :if="dateOpen()" class="pt-2">
-    <p class="m-0 pb-2 text-muted text-xs">Time zone <span :text="timeZone()"></span></p>
-    <Calendar :value="dayValue" :minDate="dayMinimum" @change="selectDay" />
+    <p class="m-0 pb-2 text-muted text-xs">{{ panelText.timeZone }} <span :text="timeZone()"></span></p>
+    <Calendar locale="{{ panelLocale }}" :value="dayValue" :minDate="dayMinimum" @change="selectDay" />
   </div>
 </details>

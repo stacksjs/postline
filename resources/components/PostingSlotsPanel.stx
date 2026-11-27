@@ -1,11 +1,23 @@
+<script server cache>
+import { workspaceLocale, workspaceQueuePanelsText } from '../../app/Support/Localization/workspace'
+
+export const panelText = workspaceQueuePanelsText.slots
+export const panelClient = { locale: workspaceLocale, messages: panelText }
+</script>
+
 <script client>
+import { createI18n } from '@stacksjs/i18n/client'
 import type { PostingSlot } from '../../app/Support/Social/posting-slots'
 import { slotTime } from '../../app/Support/Social/posting-slots'
 import { providerLabel } from '../functions/networks'
 import { requestJson } from '../functions/postline-client'
 
+const { locale, messages: copy } = {{ panelClient }}
+const words = createI18n({ locale, messages: { [locale]: copy } })
+
 const endpoint = '/api/postline/posting-slots'
-const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const weekday = new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' })
+const days = Array.from({ length: 7 }, (_, index) => weekday.format(new Date(Date.UTC(2020, 0, 5 + index))))
 const providers = state<string[]>([])
 const slots = state<PostingSlot[]>([])
 const timezone = state('')
@@ -25,7 +37,7 @@ async function run(work: () => Promise<void>) {
 
 function load() {
   return run(async () => {
-    const { data } = await requestJson(endpoint, { cache: 'no-store' }, 'Could not load posting slots.')
+    const { data } = await requestJson(endpoint, { cache: 'no-store' }, copy.loadFailed)
     providers.set(data.providers)
     timezone.set(data.timezone)
     slots.set(data.slots)
@@ -38,9 +50,9 @@ function toggle(event: Event) {
 
 function change(slot: PostingSlot, remove = false) {
   return run(async () => {
-    const { data } = await requestJson(endpoint, { method: 'POST', body: JSON.stringify({ ...slot, remove }) }, 'Could not save the posting slot.')
+    const { data } = await requestJson(endpoint, { method: 'POST', body: JSON.stringify({ ...slot, remove }) }, copy.saveFailed)
     slots.set(data)
-    status.set(remove ? 'Posting slot removed.' : 'Posting slot saved.')
+    status.set(remove ? copy.removed : copy.saved)
   })
 }
 
@@ -56,34 +68,34 @@ function label(slot: PostingSlot) {
 </script>
 
 <details class="min-w-0 bg-panel border border-line rounded-xl" @toggle="toggle" data-posting-slots>
-  <summary class="px-3 py-2 font-semibold text-ink text-ui cursor-pointer">Posting slots</summary>
+  <summary class="px-3 py-2 font-semibold text-ink text-ui cursor-pointer">{{ panelText.title }}</summary>
   <div class="grid gap-3 p-3 border-line border-t">
-    <p class="m-0 text-muted text-ui">Choose weekly times for each network. In Composer, Add to queue fills the next available slot.</p>
-    <p class="m-0 text-muted text-xs" x-show="timezone()" :text="'Workspace time zone · ' + timezone()"></p>
+    <p class="m-0 text-muted text-ui">{{ panelText.description }}</p>
+    <p class="m-0 text-muted text-xs" x-show="timezone()" :text="words.t('timeZone', { zone: timezone() })"></p>
     <form class="flex flex-wrap gap-3 items-end text-ui" x-show="providers().length" @submit.prevent="add" data-posting-slot-form>
-      <label class="grid gap-1">Network
+      <label class="grid gap-1">{{ panelText.network }}
         <select name="provider" class="px-2 h-9 bg-panel-2 border border-line rounded-lg" required>
           <option x-for="provider in providers()" :key="provider" :value="provider" :text="providerLabel(provider)"></option>
         </select>
       </label>
-      <label class="grid gap-1">Day
+      <label class="grid gap-1">{{ panelText.day }}
         <select name="weekday" class="px-2 h-9 bg-panel-2 border border-line rounded-lg" required>
           <option x-for="(day, index) in days" :key="day" :value="index" :text="day"></option>
         </select>
       </label>
-      <label class="grid gap-1">Time
+      <label class="grid gap-1">{{ panelText.time }}
         <input type="time" name="time" class="px-2 h-9 bg-panel-2 border border-line rounded-lg" required>
       </label>
-      <button class="px-3 h-9 font-semibold text-on-accent bg-accent rounded-lg disabled:opacity-50" type="submit" :disabled="busy()">Add slot</button>
+      <button class="px-3 h-9 font-semibold text-on-accent bg-accent rounded-lg disabled:opacity-50" type="submit" :disabled="busy()">{{ panelText.add }}</button>
     </form>
-    <p class="m-0 text-muted text-ui" role="status" x-show="busy() || status()" :text="busy() ? 'Working…' : status()"></p>
+    <p class="m-0 text-muted text-ui" role="status" x-show="busy() || status()" :text="busy() ? copy.working : status()"></p>
     <p class="m-0 text-danger text-ui" role="alert" x-show="error()" :text="error()"></p>
-    <button class="w-fit text-info text-ui" type="button" x-show="error() && !providers().length" @click="load">Try again</button>
-    <p class="m-0 text-muted text-ui" x-show="providers().length && !slots().length">No posting slots yet.</p>
+    <button class="w-fit text-info text-ui" type="button" x-show="error() && !providers().length" @click="load">{{ panelText.retry }}</button>
+    <p class="m-0 text-muted text-ui" x-show="providers().length && !slots().length">{{ panelText.empty }}</p>
     <ul class="grid gap-2 m-0 p-0 list-none text-ui">
       <li class="flex flex-wrap gap-3 items-center justify-between p-2 bg-panel-2 rounded-lg" x-for="slot in slots()" :key="label(slot)">
         <span :text="label(slot)"></span>
-        <button class="text-danger disabled:opacity-50" type="button" :aria-label="'Remove ' + label(slot)" :disabled="busy()" @click="change(slot, true)">Remove</button>
+        <button class="text-danger disabled:opacity-50" type="button" :aria-label="words.t('removeSlot', { slot: label(slot) })" :disabled="busy()" @click="change(slot, true)">{{ panelText.remove }}</button>
       </li>
     </ul>
   </div>
