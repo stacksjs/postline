@@ -1,53 +1,61 @@
 @extends('layouts/app')
 
-@section('title', 'Postline - Analytics')
+<script server cache>
+import { workspaceAnalyticsText, workspaceLocale } from '../../app/Support/Localization/workspace'
+
+export const analyticsLocale = workspaceLocale
+export const analyticsText = workspaceAnalyticsText
+export const analyticsClient = { locale: workspaceLocale, messages: workspaceAnalyticsText }
+</script>
+
+@section('title')Postline - {{ analyticsText.title }}@endsection
 
 @section('content')
-  @meta('description', 'Review lightweight publishing analytics in Postline.')
-  <section class="grid gap-5" data-postline-page="analytics" data-testid="analytics-page">
+  @meta('description', analyticsText.description)
+  <section class="grid gap-5" data-postline-page="analytics" data-testid="analytics-page" lang="{{ analyticsLocale }}">
     <WorkspacePageHeader titleKey="workspace.pages.analytics.title">
       <label class="grid gap-1 text-muted text-xs">
-        <span>Date range</span>
+        <span>{{ analyticsText.dateRange }}</span>
         <select class="px-2.5 h-9 text-ink text-ui bg-panel border border-field-line rounded-xl" @change="changeRange(Number($event.target.value))">
-          <option value="7" :selected="days() === 7">Last 7 days</option>
-          <option value="30" selected :selected="days() === 30">Last 30 days</option>
-          <option value="90" :selected="days() === 90">Last 90 days</option>
+          <option value="7" :selected="days() === 7">{{ analyticsText.last7Days }}</option>
+          <option value="30" selected :selected="days() === 30">{{ analyticsText.last30Days }}</option>
+          <option value="90" :selected="days() === 90">{{ analyticsText.last90Days }}</option>
         </select>
       </label>
     </WorkspacePageHeader>
 
-    <WorkspaceListSkeleton :show="loading()" label="Loading analytics" />
-    <ErrorState :show="!loading() && error()" title="Could not load analytics" :message="error()" @retry="loadAnalytics(page())" />
-    <EmptyState :show="!loading() && !error() && total() === 0" :title="'No publishing activity in the last ' + days() + ' days'" description="Publish a post to start seeing activity here.">
-      <StxLink class="text-info text-ui underline" to="/composer">Write a post</StxLink>
+    <WorkspaceListSkeleton :show="loading()" label="{{ analyticsText.loading }}" />
+    <ErrorState :show="!loading() && error()" title="{{ analyticsText.loadFailed }}" :message="error()" @retry="loadAnalytics(page())" />
+    <EmptyState :show="!loading() && !error() && total() === 0" :title="words.t('empty', { days: days() })" description="{{ analyticsText.emptyDescription }}">
+      <StxLink class="text-info text-ui underline" to="/composer">{{ analyticsText.write }}</StxLink>
     </EmptyState>
 
     <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4" x-cloak :show="showResults()">
       <Card padding="sm" className="shadow-sm">
         <div class="grid gap-2">
-          <span class="text-muted text-xs">Posts published</span>
-          <strong class="text-2xl" :text="total()" data-analytics-total></strong>
+          <span class="text-muted text-xs">{{ analyticsText.postsPublished }}</span>
+          <strong class="text-2xl" :text="numbers.format(total())" data-analytics-total></strong>
         </div>
       </Card>
       <Card padding="sm" className="shadow-sm">
         <div class="grid gap-2">
-          <span class="text-muted text-xs">Engagement</span>
-          <strong class="text-2xl" :text="interactions() ?? 'Not available'" data-analytics-engagement></strong>
+          <span class="text-muted text-xs">{{ analyticsText.engagement }}</span>
+          <strong class="text-2xl" :text="interactions() ?? copy.unavailable" data-analytics-engagement></strong>
           <span class="text-muted text-xs" :text="engagementDescription()" data-analytics-engagement-trend></span>
         </div>
       </Card>
       <Card padding="sm" className="shadow-sm">
         <div class="grid gap-2">
-          <span class="text-muted text-xs">Best network</span>
-          <strong class="text-2xl" :text="bestNetwork()?.label ?? 'No recommendation'"></strong>
-          <span class="text-muted text-xs" :text="bestNetwork()?.sample ?? 'Needs a clear leader and ' + data()?.stats.minSample + ' measured posts on each of two channels'"></span>
+          <span class="text-muted text-xs">{{ analyticsText.bestNetwork }}</span>
+          <strong class="text-2xl" :text="bestNetwork()?.label ?? copy.noRecommendation"></strong>
+          <span class="text-muted text-xs" :text="bestNetwork()?.sample ?? words.t('needsNetworks', { count: data()?.stats.minSample })"></span>
         </div>
       </Card>
       <Card padding="sm" className="shadow-sm">
         <div class="grid gap-2">
-          <span class="text-muted text-xs">Best window</span>
-          <strong class="text-2xl" :text="bestWindow()?.label ?? 'No recommendation'"></strong>
-          <span class="text-muted text-xs" :text="bestWindow()?.sample ?? 'Needs a clear leader and ' + data()?.stats.minSample + ' measured posts in each of two hours'"></span>
+          <span class="text-muted text-xs">{{ analyticsText.bestWindow }}</span>
+          <strong class="text-2xl" :text="bestWindow()?.label ?? copy.noRecommendation"></strong>
+          <span class="text-muted text-xs" :text="bestWindow()?.sample ?? words.t('needsHours', { count: data()?.stats.minSample })"></span>
         </div>
       </Card>
     </div>
@@ -56,18 +64,18 @@
       <section class="min-w-0" aria-labelledby="analytics-chart-title">
         <Card padding="none" className="shadow-sm">
           <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
-            <h2 class="m-0 font-semibold text-ui" id="analytics-chart-title">Publishing activity</h2>
-            <span class="text-muted text-xs">Dates in UTC</span>
+            <h2 class="m-0 font-semibold text-ui" id="analytics-chart-title">{{ analyticsText.activity }}</h2>
+            <span class="text-muted text-xs">{{ analyticsText.utcDates }}</span>
           </header>
-          <p class="m-0 p-3.5 text-muted text-ui" :show="!enoughDays()">Publish on at least two days to see a trend.</p>
+          <p class="m-0 p-3.5 text-muted text-ui" :show="!enoughDays()">{{ analyticsText.trendEmpty }}</p>
           <div class="relative mx-3.5 my-3.5 h-56 sm:h-64" :show="enoughDays()">
-            <canvas class="block h-full w-full" ref="chartCanvas" data-analytics-chart role="img" aria-label="Posts published each day. A data table follows."></canvas>
+            <canvas class="block h-full w-full" ref="chartCanvas" data-analytics-chart role="img" aria-label="{{ analyticsText.chartName }}"></canvas>
           </div>
           <details class="p-3.5 text-ui border-line border-t">
-            <summary class="font-medium text-info cursor-pointer">Daily publishing totals</summary>
+            <summary class="font-medium text-info cursor-pointer">{{ analyticsText.dailyTotals }}</summary>
             <table class="mt-2 w-full text-left">
-              <thead><tr><th scope="col">Date (UTC)</th><th scope="col">Posts published</th></tr></thead>
-              <tbody><tr x-for="day in series()" :key="day.label"><td :text="day.label"></td><td :text="day.value"></td></tr></tbody>
+              <thead><tr><th scope="col">{{ analyticsText.dateUtc }}</th><th scope="col">{{ analyticsText.postsPublished }}</th></tr></thead>
+              <tbody><tr x-for="day in series()" :key="day.label"><td :text="day.label"></td><td :text="numbers.format(day.value)"></td></tr></tbody>
             </table>
           </details>
         </Card>
@@ -77,7 +85,7 @@
         <section aria-labelledby="network-engagement-title">
           <Card padding="none" className="shadow-sm">
             <header class="p-3.5 border-b border-line">
-              <h2 class="m-0 font-semibold text-ui" id="network-engagement-title">Engagement by network</h2>
+              <h2 class="m-0 font-semibold text-ui" id="network-engagement-title">{{ analyticsText.byNetwork }}</h2>
             </header>
             <ul class="grid gap-2 m-0 p-3.5 list-none text-muted text-xs" data-analytics-network-engagement>
               <li x-for="network in networks()" :key="network.provider">
@@ -86,8 +94,8 @@
               </li>
             </ul>
             <div class="grid gap-2 justify-items-start pb-3.5 px-3.5" :show="data()?.xMetricsEnabled">
-              <Button variant="secondary" size="xs" :aria-disabled="refreshingMetrics()" @click="refreshMetrics" aria-describedby="analytics-refresh-cost">Refresh engagement</Button>
-              <p class="m-0 text-muted text-xs" id="analytics-refresh-cost">Includes paid X API reads for up to 100 recent posts per connected X account, within your daily read budget.</p>
+              <Button variant="secondary" size="xs" :aria-disabled="refreshingMetrics()" @click="refreshMetrics" aria-describedby="analytics-refresh-cost">{{ analyticsText.refresh }}</Button>
+              <p class="m-0 text-muted text-xs" id="analytics-refresh-cost">{{ analyticsText.refreshCost }}</p>
             </div>
             <p class="m-0 pb-3.5 px-3.5 text-body text-xs" role="status" :show="metricsFeedback()" :text="metricsFeedback()"></p>
           </Card>
@@ -95,12 +103,12 @@
         <section aria-labelledby="channel-mix-title">
           <Card padding="none" className="shadow-sm">
             <header class="p-3.5 border-b border-line">
-              <h2 class="m-0 font-semibold text-ui" id="channel-mix-title">Publishing by network</h2>
+              <h2 class="m-0 font-semibold text-ui" id="channel-mix-title">{{ analyticsText.channelMix }}</h2>
             </header>
             <div class="grid gap-2 p-3.5">
               <div class="flex gap-2 justify-between text-ui" x-for="network in networks()" :key="network.provider">
                 <span :text="network.label"></span>
-                <span class="text-muted" :text="network.published + ' · ' + network.share + '%'"></span>
+                <span class="text-muted" :text="numbers.format(network.published) + ' · ' + percentages.format(network.share / 100)"></span>
               </div>
             </div>
           </Card>
@@ -108,10 +116,10 @@
         <section aria-labelledby="publishing-windows-title">
           <Card padding="none" className="shadow-sm">
             <header class="p-3.5 border-b border-line">
-              <h2 class="m-0 font-semibold text-ui" id="publishing-windows-title">Most-used posting windows</h2>
+              <h2 class="m-0 font-semibold text-ui" id="publishing-windows-title">{{ analyticsText.commonWindows }}</h2>
             </header>
             <ul class="grid gap-2 m-0 p-3.5 text-muted text-ui">
-              <li x-for="period in windows()" :key="period.hour" :text="formatWindow(period.hour) + ' · ' + period.count + (period.count === 1 ? ' post' : ' posts')"></li>
+              <li x-for="period in windows()" :key="period.hour" :text="formatWindow(period.hour, locale) + ' · ' + words.tc('postsCount', period.count, { count: numbers.format(period.count) })"></li>
             </ul>
           </Card>
         </section>
@@ -121,31 +129,31 @@
     <section class="min-w-0" aria-labelledby="published-posts-title" x-cloak x-show="showResults() && posts().length">
       <Card padding="none" className="shadow-sm">
         <header class="p-3.5 border-b border-line">
-          <h2 class="m-0 font-semibold text-ui" id="published-posts-title" tabindex="-1" ref="postsHeading">Published posts</h2>
+          <h2 class="m-0 font-semibold text-ui" id="published-posts-title" tabindex="-1" ref="postsHeading">{{ analyticsText.publishedPosts }}</h2>
         </header>
         <div class="overflow-x-auto">
           <table class="w-full text-left text-ui">
             <thead class="text-muted bg-panel-2">
-              <tr><th class="p-3" scope="col">Post</th><th class="p-3" scope="col">Published (UTC)</th><th class="p-3" scope="col">Reported metrics</th></tr>
+              <tr><th class="p-3" scope="col">{{ analyticsText.post }}</th><th class="p-3" scope="col">{{ analyticsText.publishedUtc }}</th><th class="p-3" scope="col">{{ analyticsText.reportedMetrics }}</th></tr>
             </thead>
             <tbody class="divide-line divide-y">
               <tr x-for="post in posts()" :key="post.id">
                 <th class="p-3 font-medium wrap-anywhere" scope="row" :text="post.title"></th>
-                <td class="p-3 text-muted whitespace-nowrap" :text="formatPostDate(post.publishedAt)"></td>
+                <td class="p-3 text-muted whitespace-nowrap" :text="formatPostDate(post.publishedAt, locale, copy.dateUnavailable)"></td>
                 <td class="p-3">
                   <ul class="grid gap-1 m-0 p-0 list-none">
                     <li x-for="target in post.targets" :key="target.id"><strong :text="providerLabel(target.provider) + (target.handle ? ' · ' + target.handle : '')"></strong> <span class="text-muted" :text="metricsText(target)"></span></li>
                   </ul>
-                  <span class="text-muted" :show="!post.targets.length">No reported metrics</span>
+                  <span class="text-muted" :show="!post.targets.length">{{ analyticsText.noMetrics }}</span>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-        <nav class="flex gap-3 items-center justify-between px-3 py-2.5 border-line border-t" aria-label="Published posts pages" :show="pageCount() > 1">
-          <button class="px-2.5 h-9 text-ui bg-panel-2 border border-line rounded-lg disabled:opacity-50" type="button" :disabled="page() <= 1" @click="loadAnalytics(page() - 1, { focusPosts: true })">Previous</button>
-          <span class="text-muted text-xs" :text="'Page ' + page() + ' of ' + pageCount()"></span>
-          <button class="px-2.5 h-9 text-ui bg-panel-2 border border-line rounded-lg disabled:opacity-50" type="button" :disabled="page() >= pageCount()" @click="loadAnalytics(page() + 1, { focusPosts: true })">Next</button>
+        <nav class="flex gap-3 items-center justify-between px-3 py-2.5 border-line border-t" aria-label="{{ analyticsText.postsPages }}" :show="pageCount() > 1">
+          <button class="px-2.5 h-9 text-ui bg-panel-2 border border-line rounded-lg disabled:opacity-50" type="button" :disabled="page() <= 1" @click="loadAnalytics(page() - 1, { focusPosts: true })">{{ analyticsText.previous }}</button>
+          <span class="text-muted text-xs" :text="words.t('page', { page: numbers.format(page()), total: numbers.format(pageCount()) })"></span>
+          <button class="px-2.5 h-9 text-ui bg-panel-2 border border-line rounded-lg disabled:opacity-50" type="button" :disabled="page() >= pageCount()" @click="loadAnalytics(page() + 1, { focusPosts: true })">{{ analyticsText.next }}</button>
         </nav>
       </Card>
     </section>
@@ -153,10 +161,20 @@
   </section>
 
   <script client>
+    import type { EngagementCounts } from '../../app/Support/Social/engagement-analytics'
     import type { AnalyticsPayload } from '../assets/scripts/lib/analytics'
-    import { drawPublishingChart, engagementLabels, formatPostDate, formatSample, formatWindow } from '../assets/scripts/lib/analytics'
+    import { createI18n } from '@stacksjs/i18n/client'
+    import { drawPublishingChart, formatPostDate, formatWindow } from '../assets/scripts/lib/analytics'
     import { providerLabel } from '../functions/networks'
     import { requestJson } from '../functions/postline-client'
+
+    const { locale: language, messages: copy } = {{ analyticsClient }}
+    const words = createI18n({ locale: language, messages: { [language]: copy } })
+    const locale = language === 'en' ? undefined : language
+    const numbers = new Intl.NumberFormat(locale)
+    const percentages = new Intl.NumberFormat(locale, { style: 'percent' })
+    const averages = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 })
+    const metricNames = ['likes', 'reposts', 'replies', 'quotes', 'views', 'shares', 'reach', 'saves'] as const
 
     const chartCanvas = useRef('chartCanvas')
     const postsHeading = useRef('postsHeading')
@@ -171,19 +189,23 @@
     let chart: ReturnType<typeof drawPublishingChart> | undefined
 
     const total = derived(() => data()?.totalPosts ?? 0)
-    const series = derived(() => data()?.series ?? [])
+    const series = derived(() => (data()?.series ?? []).map(day => locale && day.date
+      ? { ...day, label: formatPostDate(day.date, locale, day.label) }
+      : day))
     const enoughDays = derived(() => series().filter(point => point.value > 0).length >= 2)
     const showResults = derived(() => !loading() && !error() && total() > 0)
     const posts = derived(() => data()?.posts ?? [])
     const windows = derived(() => data()?.windows ?? [])
     const pageCount = derived(() => data()?.pageCount ?? 0)
+    const sampleLabel = ({ average, count }: { average: number, count: number }) =>
+      words.t('sample', { average: averages.format(average), count: numbers.format(count) })
     const bestNetwork = derived(() => {
       const best = data()?.stats.bestChannel
-      return best ? { label: providerLabel(best.provider), sample: formatSample(best) } : null
+      return best ? { label: providerLabel(best.provider), sample: sampleLabel(best) } : null
     })
     const bestWindow = derived(() => {
       const best = data()?.stats.bestHour
-      return best ? { label: formatWindow(best.hour), sample: formatSample(best) } : null
+      return best ? { label: formatWindow(best.hour, locale), sample: sampleLabel(best) } : null
     })
     const reported = derived(() => data()?.stats.engagement?.countsByProvider ?? [])
     const totals = derived(() => {
@@ -195,13 +217,21 @@
       }
     })
     const interactions = derived(() => Object.values(totals()).some(value => value !== undefined)
-      ? Object.values(totals()).reduce<number>((sum, value) => sum + (value ?? 0), 0).toLocaleString()
+      ? numbers.format(Object.values(totals()).reduce<number>((sum, value) => sum + (value ?? 0), 0))
       : null)
-    const engagementDescription = derived(() => engagementLabels(totals(), 'like or reaction', 'likes and reactions')
-      || 'Waiting for a supported network to report likes, reposts or replies')
+    const engagementDescription = derived(() => engagementLabels(totals(), 'likesAndReactions') || copy.awaitingMetrics)
 
-    function metricsText(target: { provider: string, counts?: Parameters<typeof engagementLabels>[0] }) {
-      return engagementLabels(target.counts ?? {}, target.provider === 'linkedin' ? 'reaction' : 'like') || 'No reported metrics'
+    function engagementLabels(counts: EngagementCounts, likes: 'likes' | 'reactions' | 'likesAndReactions') {
+      return metricNames.flatMap((metric) => {
+        const count = counts[metric]
+        if (count === undefined) return []
+        const key = metric === 'likes' ? likes : metric
+        return [words.tc(`metrics.${key}`, count, { amount: numbers.format(count) })]
+      }).join(' · ')
+    }
+
+    function metricsText(target: { provider: string, counts?: EngagementCounts }) {
+      return engagementLabels(target.counts ?? {}, target.provider === 'linkedin' ? 'reactions' : 'likes') || copy.noMetrics
     }
 
     const networks = derived(() => (data()?.channelMix ?? []).map(network => ({
@@ -218,18 +248,18 @@
     async function refreshMetrics() {
       if (refreshingMetrics()) return
       refreshingMetrics.set(true)
-      metricsFeedback.set('Refreshing engagement…')
+      metricsFeedback.set(copy.refreshing)
       try {
         const { data: { synced, errors } } = await requestJson('/api/postline/metrics/sync', {
           method: 'POST',
           body: JSON.stringify({ include_x: true }),
-        }, 'Could not refresh engagement.')
+        }, copy.refreshFailed)
         if (synced) await loadAnalytics(page(), { background: true })
-        const status = synced ? 'Engagement refreshed.' : 'No new metrics were reported.'
+        const status = synced ? copy.refreshed : copy.noNewMetrics
         metricsFeedback.set([status, ...errors.map((error: { explanation: string }) => error.explanation)].join(' '))
       }
       catch (problem) {
-        metricsFeedback.set(problem instanceof Error ? problem.message : 'Could not refresh engagement.')
+        metricsFeedback.set(problem instanceof Error ? problem.message : copy.refreshFailed)
       }
       finally {
         refreshingMetrics.set(false)
@@ -244,9 +274,9 @@
       if (!background) loading.set(true)
       error.set('')
       try {
-        const payload = await requestJson(`/api/postline/analytics?days=${days()}&page=${nextPage}`, { signal: controller.signal, cache: 'no-store' }, 'Could not load analytics.')
+        const payload = await requestJson(`/api/postline/analytics?days=${days()}&page=${nextPage}`, { signal: controller.signal, cache: 'no-store' }, copy.loadError)
         if (!payload.data?.stats || !Array.isArray(payload.data.series) || !Array.isArray(payload.data.posts))
-          throw new Error('Analytics data was incomplete.')
+          throw new Error(copy.incomplete)
         if (controller.signal.aborted) return
         chart?.destroy()
         chart = undefined
@@ -256,12 +286,12 @@
         await nextTick()
         if (controller.signal.aborted) return
         if (enoughDays() && chartCanvas.current)
-          chart = drawPublishingChart(chartCanvas.current, series())
+          chart = drawPublishingChart(chartCanvas.current, series(), copy.postsPublished)
         if (focusPosts) postsHeading.current?.focus()
       }
       catch (problem) {
         if (controller.signal.aborted) return
-        error.set(problem instanceof Error ? problem.message : 'Could not load analytics.')
+        error.set(problem instanceof Error ? problem.message : copy.loadError)
         loading.set(false)
       }
     }

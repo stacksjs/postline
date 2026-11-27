@@ -70,12 +70,14 @@ export default new Action({
         const date = parseUtc(post.published_at)
         if (date) byDay.set(dayKey(date), (byDay.get(dayKey(date)) || 0) + 1)
       }
-      const series: Array<{ label: string, value: number }> = []
+      const series: Array<{ date: string, label: string, value: number }> = []
       for (let offset = days - 1; offset >= 0; offset--) {
         const date = new Date(now - offset * DAY_MS)
+        const key = dayKey(date)
         series.push({
+          date: key,
           label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }),
-          value: byDay.get(dayKey(date)) || 0,
+          value: byDay.get(key) || 0,
         })
       }
 

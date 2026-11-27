@@ -1,7 +1,19 @@
+<script server cache>
+import { workspaceAnalyticsLinksText, workspaceLocale } from '../../app/Support/Localization/workspace'
+
+export const analyticsLinksText = workspaceAnalyticsLinksText
+export const analyticsLinksClient = { locale: workspaceLocale, messages: workspaceAnalyticsLinksText }
+</script>
+
 <script client>
 import type { TrackedLink } from '../../app/Services/TrackedLinkService'
+import { createI18n } from '@stacksjs/i18n/client'
 import { addUtmParameters } from '../../app/Support/Social/utm'
 import { requestJson } from '../functions/postline-client'
+
+const { locale: language, messages: copyText } = {{ analyticsLinksClient }}
+const words = createI18n({ locale: language, messages: { [language]: copyText } })
+const numbers = new Intl.NumberFormat(language === 'en' ? undefined : language)
 
 type LinkRow = TrackedLink & { shortUrl: string | null }
 const endpoint = '/api/postline/analytics/links'
@@ -26,7 +38,7 @@ async function run(work: () => Promise<void>) {
 
 function load() {
   return run(async () => {
-    const { data } = await requestJson(endpoint, { cache: 'no-store' }, 'Could not load short links.')
+    const { data } = await requestJson(endpoint, { cache: 'no-store' }, copyText.loadFailed)
     links.set(data.links)
     enabled.set(data.enabled)
     loaded.set(true)
@@ -40,12 +52,12 @@ function build(event: SubmitEvent) {
   void run(async () => {
     const tagged = addUtmParameters(fields.destination, fields)
     if (shorten) {
-      const { data } = await requestJson(endpoint, { method: 'POST', body: JSON.stringify(fields) }, 'Could not create a short link.')
+      const { data } = await requestJson(endpoint, { method: 'POST', body: JSON.stringify(fields) }, copyText.createFailed)
       links.update(rows => [data, ...rows])
       result.set(data.shortUrl)
     }
     else result.set(tagged)
-    status.set('Link ready to copy.')
+    status.set(copyText.ready)
   })
 }
 
@@ -53,22 +65,22 @@ async function copy(url: string) {
   if (!url) return
   try {
     await navigator.clipboard.writeText(url)
-    status.set('Link copied.')
+    status.set(copyText.copied)
   }
   catch {
     result.set(url)
-    status.set('Select and copy the link.')
+    status.set(copyText.selectCopy)
     void nextTick(() => { resultField.current?.focus(); resultField.current?.select() })
   }
 }
 
 async function disable(link: LinkRow) {
-  if (!await stxConfirm('This short link will stop working in posts that already use it.', { title: `Disable ${link.name}?`, type: 'warning', confirmText: 'Disable link' })) return
+  if (!await stxConfirm(copyText.disableWarning, { title: words.t('confirmDisable', { name: link.name }), type: 'warning', confirmText: copyText.disableLink, cancelText: copyText.cancel })) return
   await run(async () => {
-    await requestJson(`${endpoint}/disable`, { method: 'POST', body: JSON.stringify({ code: link.code }) }, 'Could not disable the short link.')
+    await requestJson(`${endpoint}/disable`, { method: 'POST', body: JSON.stringify({ code: link.code }) }, copyText.disableFailed)
     links.update(rows => rows.map(row => row.code === link.code ? { ...row, disabled: true } : row))
     if (result() === link.shortUrl) result.set('')
-    status.set('Short link disabled.')
+    status.set(copyText.disableComplete)
   })
 }
 
@@ -77,54 +89,54 @@ onMount(load)
 
 <section class="grid gap-4 p-4 min-w-0 bg-panel border border-line rounded-2xl" aria-labelledby="tracked-links-title" data-tracked-links>
   <div>
-    <h2 class="m-0 font-semibold text-base text-ink" id="tracked-links-title">Tracked links</h2>
-    <p class="m-0 mt-1 text-muted text-ui">Add tags for your destination’s analytics or create a short link that counts redirects here.</p>
+    <h2 class="m-0 font-semibold text-base text-ink" id="tracked-links-title">{{ analyticsLinksText.title }}</h2>
+    <p class="m-0 mt-1 text-muted text-ui">{{ analyticsLinksText.description }}</p>
   </div>
 
   <form class="grid gap-3 text-ui" @submit.prevent="build" data-tracked-link-form>
-    <label class="grid gap-1">Destination URL <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" type="url" name="destination" placeholder="https://example.com/article" maxlength="4096" required></label>
+    <label class="grid gap-1">{{ analyticsLinksText.destination }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" type="url" name="destination" placeholder="https://example.com/article" maxlength="4096" required></label>
     <div class="grid gap-3 sm:grid-cols-3">
-      <label class="grid gap-1">Source <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="source" maxlength="120" placeholder="bluesky"></label>
-      <label class="grid gap-1">Medium <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="medium" maxlength="120" placeholder="social"></label>
-      <label class="grid gap-1">Campaign <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="campaign" maxlength="120"></label>
+      <label class="grid gap-1">{{ analyticsLinksText.source }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="source" maxlength="120" placeholder="bluesky"></label>
+      <label class="grid gap-1">{{ analyticsLinksText.medium }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="medium" maxlength="120" placeholder="social"></label>
+      <label class="grid gap-1">{{ analyticsLinksText.campaign }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="campaign" maxlength="120"></label>
     </div>
     <details>
-      <summary class="w-fit text-info cursor-pointer">More UTM fields</summary>
+      <summary class="w-fit text-info cursor-pointer">{{ analyticsLinksText.moreUtm }}</summary>
       <div class="grid gap-3 sm:grid-cols-2 mt-2">
-        <label class="grid gap-1">Content <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="content" maxlength="120"></label>
-        <label class="grid gap-1">Term <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="term" maxlength="120"></label>
+        <label class="grid gap-1">{{ analyticsLinksText.content }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="content" maxlength="120"></label>
+        <label class="grid gap-1">{{ analyticsLinksText.term }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="term" maxlength="120"></label>
       </div>
     </details>
-    <label class="grid gap-1" x-show="enabled()">Short link name <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="name" maxlength="100"></label>
+    <label class="grid gap-1" x-show="enabled()">{{ analyticsLinksText.shortName }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="name" maxlength="100"></label>
     <div class="flex flex-wrap gap-2">
-      <button class="px-3 h-8 font-medium text-ink bg-panel-2 border border-line rounded-lg disabled:opacity-50" type="submit" value="tag" :disabled="busy()">Build tagged URL</button>
-      <button class="px-3 h-8 font-semibold text-on-accent bg-accent rounded-lg disabled:opacity-50" type="submit" value="shorten" x-show="enabled()" :disabled="busy()">Create short link</button>
+      <button class="px-3 h-8 font-medium text-ink bg-panel-2 border border-line rounded-lg disabled:opacity-50" type="submit" value="tag" :disabled="busy()">{{ analyticsLinksText.tagged }}</button>
+      <button class="px-3 h-8 font-semibold text-on-accent bg-accent rounded-lg disabled:opacity-50" type="submit" value="shorten" x-show="enabled()" :disabled="busy()">{{ analyticsLinksText.shorten }}</button>
     </div>
-    <p class="m-0 text-muted text-xs" x-show="loaded() && !enabled()">Short links need a public HTTPS Postline server.</p>
+    <p class="m-0 text-muted text-xs" x-show="loaded() && !enabled()">{{ analyticsLinksText.requiresPublic }}</p>
   </form>
 
   <div class="flex gap-2 items-end" x-show="result()">
-    <label class="grid flex-1 gap-1 min-w-0 text-ui">Link to share <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" :value="result()" readonly ref="trackedLinkResult" data-tracked-link-result></label>
-    <button class="px-2 h-9 text-info text-ui" type="button" @click="copy(result())">Copy</button>
+    <label class="grid flex-1 gap-1 min-w-0 text-ui">{{ analyticsLinksText.linkToShare }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" :value="result()" readonly ref="trackedLinkResult" data-tracked-link-result></label>
+    <button class="px-2 h-9 text-info text-ui" type="button" @click="copy(result())">{{ analyticsLinksText.copy }}</button>
   </div>
   <p class="m-0 text-success text-ui" role="status" x-show="status()" :text="status()"></p>
   <p class="m-0 text-danger text-ui" role="alert" x-show="error()" :text="error()"></p>
 
   <div class="grid gap-2 pt-3 border-line border-t">
     <div class="flex gap-3 items-center justify-between">
-      <h3 class="m-0 font-semibold text-ui">Short links and all-time redirects</h3>
-      <button class="text-info text-ui disabled:opacity-50" type="button" :disabled="busy()" @click="load()">Refresh</button>
+      <h3 class="m-0 font-semibold text-ui">{{ analyticsLinksText.report }}</h3>
+      <button class="text-info text-ui disabled:opacity-50" type="button" :disabled="busy()" @click="load()">{{ analyticsLinksText.refresh }}</button>
     </div>
-    <p class="m-0 text-muted text-xs">Totals include repeat visits and automated previews.</p>
-    <p class="m-0 text-muted text-ui" x-show="loaded() && !links().length">No short links yet.</p>
+    <p class="m-0 text-muted text-xs">{{ analyticsLinksText.countIncludes }}</p>
+    <p class="m-0 text-muted text-ui" x-show="loaded() && !links().length">{{ analyticsLinksText.empty }}</p>
     <ul class="grid gap-2 m-0 p-0 list-none text-ui">
       <li class="grid gap-1 p-3 min-w-0 bg-panel-2 rounded-lg" x-for="link in links()" :key="link.code">
-        <div class="flex gap-2 items-center justify-between"><strong :text="link.name"></strong><span class="text-muted whitespace-nowrap" :text="link.visits + (link.visits === 1 ? ' redirect' : ' redirects')"></span></div>
+        <div class="flex gap-2 items-center justify-between"><strong :text="link.name"></strong><span class="text-muted whitespace-nowrap" :text="words.tc('redirects', link.visits, { count: numbers.format(link.visits) })"></span></div>
         <span class="break-words text-muted" :text="link.destination"></span>
         <div class="flex gap-3 items-center">
-          <span class="text-muted" x-show="link.disabled">Disabled</span>
-          <button class="text-info" type="button" x-show="!link.disabled && link.shortUrl" @click="copy(link.shortUrl)">Copy short link</button>
-          <button class="text-danger" type="button" x-show="!link.disabled" :disabled="busy()" @click="disable(link)">Disable</button>
+          <span class="text-muted" x-show="link.disabled">{{ analyticsLinksText.disabled }}</span>
+          <button class="text-info" type="button" x-show="!link.disabled && link.shortUrl" @click="copy(link.shortUrl)">{{ analyticsLinksText.copyShort }}</button>
+          <button class="text-danger" type="button" x-show="!link.disabled" :disabled="busy()" @click="disable(link)">{{ analyticsLinksText.disable }}</button>
         </div>
       </li>
     </ul>

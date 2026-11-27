@@ -2869,6 +2869,66 @@ async function checkSpanishListening(cdp: Cdp): Promise<void> {
   })()`), 5_000)
 }
 
+async function checkSpanishAnalytics(cdp: Cdp): Promise<void> {
+  const report = await auditPage(`${site}/analytics`, { cdp })
+  for (const error of report.errors) fail('analytics', 'Spanish', error)
+  for (const request of report.failed) fail('analytics', 'Spanish', request)
+  const analytics = "document.querySelector('[data-testid=analytics-page][lang=es]')"
+  const range = `${analytics}?.querySelector('select')`
+  const dates = `${analytics}?.querySelector('details tbody')`
+  await waitUntil('Spanish Analytics displays the Blog post, date options, and data table', () => evaluate<boolean>(cdp, `
+    document.title === 'Postline - Estadísticas'
+      && ${analytics}?.querySelector('h1')?.textContent === 'Estadísticas de publicación'
+      && ${range}?.selectedOptions[0]?.textContent === 'Últimos 30 días'
+      && ${analytics}?.querySelector('[data-analytics-total]')?.textContent === '1'
+      && ${analytics}?.querySelector('[data-analytics-engagement]')?.textContent === 'No disponible'
+      && ${dates}?.querySelector('tr:last-child td')?.textContent === new Intl.DateTimeFormat('es', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date())
+  `), 5_000)
+  const fixture = new Database(database)
+  try {
+    fixture.query(`INSERT INTO post_targets (uuid, post_id, provider, status, created_at, metrics)
+      SELECT ?, id, 'bluesky', 'published', published_at, '{"likes":1,"replies":2}' FROM posts WHERE status='published'`)
+      .run(crypto.randomUUID())
+  }
+  finally {
+    fixture.close()
+  }
+  await evaluate(cdp, `
+    const select = ${range}
+    select.value = '7'
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+  `)
+  try {
+    await waitUntil('Spanish Analytics narrows the range and shows measured interactions', () => evaluate<boolean>(cdp, `
+      ${range}?.selectedOptions[0]?.textContent === 'Últimos 7 días'
+        && ${dates}?.querySelectorAll('tr').length === 7
+        && ${analytics}?.querySelector('[data-analytics-engagement]')?.textContent === '3'
+        && ${analytics}?.querySelector('[data-analytics-engagement-trend]')?.textContent === '1 Me gusta o reacción · 2 respuestas'
+    `), 5_000)
+  }
+  catch (error) {
+    const state = await evaluate<unknown>(cdp, `({
+      range: ${range}?.value, rows: ${dates}?.querySelectorAll('tr').length,
+      count: ${analytics}?.querySelector('[data-analytics-engagement]')?.textContent,
+      metrics: ${analytics}?.querySelector('[data-analytics-engagement-trend]')?.textContent,
+    })`)
+    throw new Error(`${String(error)} (${JSON.stringify(state)})`)
+  }
+
+  const links = `${analytics}.querySelector('[data-tracked-links]')`
+  await evaluate(cdp, `${links}.querySelector('input[name=destination]').focus()`)
+  await cdp.send('Input.insertText', { text: 'https://example.org/articulo' })
+  await evaluate(cdp, `${links}.querySelector('input[name=source]').focus()`)
+  await cdp.send('Input.insertText', { text: 'boletin' })
+  await evaluate(cdp, `${links}.querySelector('button[value=tag]').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Spanish tracked links builds the tagged URL', () => evaluate<boolean>(cdp, `
+    ${links}.querySelector('h2')?.textContent === 'Enlaces con seguimiento'
+      && ${links}.querySelector('[data-tracked-link-result]')?.value === 'https://example.org/articulo?utm_source=boletin'
+      && ${links}.querySelector('[role=status]')?.innerText === 'El enlace está listo para copiar.'
+  `), 5_000)
+}
+
 async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
@@ -3038,6 +3098,7 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
     `), 5_000)
     await checkSpanishInbox(cdp)
     await checkSpanishListening(cdp)
+    await checkSpanishAnalytics(cdp)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
@@ -3191,7 +3252,7 @@ else {
   // eslint-disable-next-line no-console
   console.log(marketingScreenshots
     ? `Product screenshots written to ${productImages}.`
-    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, Blog, Inbox, and Listening passed.'
+    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, Blog, Inbox, Listening, and Analytics passed.'
     : `Every view opened clean in ${MODES.map(mode => mode.name).join(', ')}. Screenshots in ${out}.`)
 }
 process.exit(exitCode)
