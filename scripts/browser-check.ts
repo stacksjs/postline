@@ -180,10 +180,28 @@ async function checkWorkspaceCommands(cdp: Cdp): Promise<void> {
 
   await openPalette(2)
   await typeQuery('settings')
-  await waitUntil('The Settings destination', () => evaluate<boolean>(cdp, `${option}?.textContent.includes('Settings')`), 5_000)
+  await waitUntil('The Settings destination', () => evaluate<boolean>(cdp, `${option}?.textContent.includes('Settings') && ${option}.textContent.includes('Go to view')`), 5_000)
   await pressKey(cdp, 'Enter', 13)
-  // Settings has its own layout. Wait for the new document to hydrate in dev.
-  await waitUntil('The Settings command trigger to hydrate', () => evaluate<boolean>(cdp, `location.pathname === '/settings' && ${trigger}?.getAttribute('aria-expanded') === 'false'`), 15_000)
+  // Settings has its own document, including a new copy of the palette.
+  try {
+    await waitUntil('The Settings document and command palette', () => evaluate<boolean>(cdp, `
+      location.pathname === '/settings'
+        && new URL(performance.getEntriesByType('navigation')[0].name).pathname === '/settings'
+        && !document.querySelector('[data-postline-shell]')
+        && document.querySelectorAll('#workspace-commands').length === 1
+        && ${trigger}?.getAttribute('aria-expanded') === 'false'
+    `), 15_000)
+  }
+  catch (error) {
+    const state = await evaluate<unknown>(cdp, `({
+      path: location.pathname, title: document.title,
+      loadedDocument: new URL(performance.getEntriesByType('navigation')[0].name).pathname,
+      shell: Boolean(document.querySelector('[data-postline-shell]')),
+      settings: Boolean(document.querySelector('[data-postline-page=settings]')),
+      expanded: ${trigger}?.getAttribute('aria-expanded'),
+    })`)
+    throw new Error(`${String(error)} (${JSON.stringify(state)})`)
+  }
   await evaluate(cdp, `${trigger}.focus()`)
   await pressKey(cdp, 'Enter', 13)
   await typeQuery('appearance')
@@ -452,7 +470,9 @@ async function checkNotificationSettings(cdp: Cdp): Promise<void> {
   await evaluate(cdp, "document.querySelector('[data-setting=activity-alerts] button').focus()")
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Notification Settings opens Activity', () => evaluate<boolean>(cdp, `
-    location.pathname === '/activity' && Boolean(document.querySelector('[data-postline-page=activity]'))
+    location.pathname === '/activity'
+      && new URL(performance.getEntriesByType('navigation')[0].name).pathname === '/activity'
+      && Boolean(document.querySelector('[data-postline-shell] [data-postline-page=activity]'))
   `), 5_000)
 }
 
@@ -1730,6 +1750,19 @@ async function checkPhoneNavigation(cdp: Cdp): Promise<void> {
     document.querySelector('[aria-labelledby=analytics-chart-title] p')?.textContent.includes('Publish on at least two days')
       && document.querySelector('[aria-labelledby=analytics-chart-title] p').getClientRects().length > 0
       && document.documentElement.scrollWidth - innerWidth <= 1`), 5_000)
+
+  await evaluate(cdp, `document.querySelector('${more}').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  const settings = "document.querySelector('#workspace-more[open] a[href=\"/settings\"]')"
+  await waitUntil('Settings is available in the phone navigation', () => evaluate<boolean>(cdp, `Boolean(${settings}?.getClientRects().length)`), 5_000)
+  await evaluate(cdp, `${settings}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The phone Settings link loads the Settings document', () => evaluate<boolean>(cdp, `
+    location.pathname === '/settings'
+      && new URL(performance.getEntriesByType('navigation')[0].name).pathname === '/settings'
+      && Boolean(document.querySelector('[data-postline-page=settings]'))
+      && !document.querySelector('[data-postline-shell]')
+  `), 10_000)
 
   await auditPage(`${site}/composer`, { cdp })
   const picker = '[data-postline-schedule-picker] [data-date-time-trigger]'

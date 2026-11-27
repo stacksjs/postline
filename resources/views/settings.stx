@@ -19,7 +19,7 @@ export const buildVersion = manifest.version
   <main id="workspace-content" tabindex="-1" data-postline-page="settings" data-testid="settings-page">
     <SettingsWindow id="postline-settings" title="Settings" storageKey="postline" v-model:pane="pane">
       <template #account>
-        <a class="inline-flex gap-1.5 items-center px-2 py-1 text-muted text-ui hover:text-ink" href="/composer" x-show="!ownWindow()" data-settings-back>
+        <a class="inline-flex gap-1.5 items-center px-2 py-1 text-muted text-ui hover:text-ink" href="/composer" data-no-router x-show="!ownWindow()" data-settings-back>
           <span class="h-3.5 w-3.5 i-hugeicons-arrow-left-01" aria-hidden="true"></span>
           Back to Postline
         </a>
@@ -495,7 +495,7 @@ export const buildVersion = manifest.version
         tellWorkspace({ type: 'navigate', path })
         return
       }
-      navigate(path)
+      navigate(path, { reload: true })
     }
 
     // Signal-backed cookie: setting it to '' emits max-age=0, and it adds

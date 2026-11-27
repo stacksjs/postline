@@ -69,7 +69,7 @@ function openSettings() {
   const origin = shell.current?.ownerDocument.location.origin
   const windowApi = bridge()?.window
   if (!origin || !windowApi?.open) {
-    navigate('/settings')
+    navigate('/settings', { reload: true })
     return
   }
   void windowApi.open({
@@ -83,7 +83,7 @@ function openSettings() {
     titlebarHidden: true,
     chromeControls: false,
     persistentStorage: true,
-  }).catch(() => navigate('/settings'))
+  }).catch(() => navigate('/settings', { reload: true }))
 }
 
 function handleLink(event: MouseEvent) {

@@ -149,6 +149,9 @@ effect(() => {
             data-stx-exact-active-class="text-ink bg-nav-active"
             aria-current="{{ link.active ? 'page' : 'false' }}"
             @click="closeMore"
+            @if(link.href === '/settings')
+              data-no-router
+            @endif
             @if(link.href === '/accounts')
               data-command-destination="{{ channelsLabel }}"
             @endif
@@ -216,6 +219,7 @@ effect(() => {
     <a
       href="/settings"
       data-stx-link
+      data-no-router
       data-stx-active-class="text-ink bg-nav-active"
       data-stx-exact-active-class="text-ink bg-nav-active"
       data-craft-no-drag

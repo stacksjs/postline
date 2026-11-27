@@ -14,7 +14,7 @@ export default {
       'dom-guard': 14,
       'style-block': 1,
       // Marketing links that are plain anchors.
-      'plain-internal-anchor': 4,
+      'plain-internal-anchor': 3,
       // One polling sleep in Channels.
       'unmanaged-timer': 1,
     },
