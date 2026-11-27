@@ -448,7 +448,7 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
       if (path === '/api/postline/bluesky/timeline') return Promise.resolve(Response.json({ ok: true, data: {
         connected: true,
         items: [
-          { uri: 'post-1', authorHandle: 'alice.example', authorName: 'Alice Example', postedAt, body: 'First post' },
+          { uri: 'post-1', authorHandle: 'alice.example', authorName: 'Alice Example', postedAt, body: 'First post <draft> https://example.com/read?value=one&track=two' },
           { uri: 'post-2', authorHandle: 'morgan.example', authorName: 'Morgan Example', postedAt, body: 'Second post', authorAvatar: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' },
         ],
       } }))
@@ -477,8 +477,16 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
 
     await auditPage(`${site}/timeline`, { cdp })
     await waitUntil('Timeline initials and image from their own rows', () => evaluate<boolean>(cdp, `
-      document.querySelector('.postline-feed-post__avatar[aria-label="Alice Example"]')?.textContent.trim() === 'AE'
-      && document.querySelector('.postline-feed-post__avatar[aria-label="Morgan Example"] img')?.naturalWidth === 1`), 5_000)
+      document.querySelector('[data-timeline-avatar][aria-label="Alice Example"]')?.textContent.trim() === 'AE'
+      && document.querySelector('[data-timeline-avatar][aria-label="Morgan Example"] img')?.naturalWidth === 1`), 5_000)
+
+    await waitUntil('Timeline preserves plain post text and renders the link as a labelled anchor', () => evaluate<boolean>(cdp, `(() => {
+      const copy = document.querySelector('[data-timeline-copy]')
+      const link = copy?.querySelector('a')
+      return copy?.textContent === 'First post <draft> https://example.com/read?value=one&track=two'
+        && !copy.querySelector('draft') && link?.href === 'https://example.com/read?value=one&track=two'
+        && link.rel.includes('noopener') && getComputedStyle(link).color !== getComputedStyle(copy).color
+    })()`), 5_000)
 
     await auditPage(`${site}/composer`, { cdp })
     const target = `document.querySelector('[data-provider-toggle="bluesky:101"]')`

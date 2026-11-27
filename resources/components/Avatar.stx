@@ -9,5 +9,5 @@
   })
 </script>
 
-<img x-if="source()" :src="source()" alt="" loading="lazy" referrerpolicy="no-referrer">
+<img class="object-cover h-full w-full" x-if="source()" :src="source()" alt="" loading="lazy" referrerpolicy="no-referrer">
 <span x-else aria-hidden="true" :text="initials()"></span>

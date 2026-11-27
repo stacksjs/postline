@@ -2,10 +2,6 @@
 
 @section('title', 'Postline - Timeline')
 
-@section('styles')
-  <link rel="stylesheet" href="/assets/styles/timeline.css">
-@endsection
-
 @section('content')
   @meta('description', 'Read your Bluesky home timeline in Postline.')
   <section class="grid gap-4" data-postline-page="timeline" data-testid="timeline-page">
@@ -21,15 +17,15 @@
     </WorkspacePageHeader>
 
     <section aria-label="Bluesky timeline">
-      <Card padding="none" className="shadow-sm postline-feed">
-        <div class="postline-feed__header">
+      <Card padding="none" className="shadow-sm">
+        <div class="flex gap-3 items-center justify-between px-4 py-3.5 border-b border-line">
           <div>
             <strong class="font-semibold text-ink text-sm">Following</strong>
             <p class="m-0 mt-0.5 text-muted text-xs" :text="metaText()">Loading feed…</p>
           </div>
           <span class="px-2.5 py-1 font-semibold text-info text-xs bg-info-soft border border-info-line rounded-full">Bluesky</span>
         </div>
-        <div class="postline-feed__list">
+        <div class="grid">
           <WorkspaceListSkeleton :show="busy()" label="Loading timeline" />
           <ErrorState :show="feedError()" title="Could not load the timeline" :message="feedError()" @retry="refresh()" />
           <EmptyState :show="showEmpty() && !busy()" variant="bare" title="No posts in your feed yet" description="Refresh to check for new posts on Bluesky.">
@@ -39,41 +35,36 @@
             <StxLink class="text-info text-ui underline" to="/accounts">Open Channels</StxLink>
           </EmptyState>
 
-          <article class="postline-feed-post" x-for="item in items()">
-            <div class="postline-feed-post__layout">
-              {{-- @bind:style, not :style — the latter routes to bindStyle, which
-                  expects an object; this is a raw custom-property declaration. --}}
-              <a class="postline-feed-post__avatar" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer" @bind:style="item.gradient" :aria-label="item.name">
+          <article class="grid px-4 py-3.5 hover:bg-hover border-b border-line last:border-b-0 transition-colors" x-for="item in items()">
+            <div class="grid gap-3 grid-cols-[2.75rem_minmax(0,1fr)] items-start">
+              <a class="grid overflow-hidden place-items-center h-11 w-11 font-semibold text-info text-ui bg-info-soft border border-line rounded-full" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer" data-timeline-avatar :aria-label="item.name">
                 <Avatar :src="item.avatar" :name="item.name" :handle="item.handle" />
               </a>
-              <div class="postline-feed-post__main">
-                <div class="postline-feed-post__meta">
-                  <div class="postline-feed-post__identity">
-                    <div class="postline-feed-post__name-row">
-                      <a class="postline-feed-post__name" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer">{{ item.name }}</a>
-                      <a class="postline-feed-post__handle" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer">@{{ item.handle }}</a>
-                      <span class="postline-feed-post__dot">·</span>
-                      <time class="postline-feed-post__time" :datetime="item.postedAt">{{ item.relativeTime }}</time>
+              <div class="grid gap-2 min-w-0">
+                <div class="flex gap-2 items-start justify-between">
+                  <div class="grid gap-0.5 min-w-0">
+                    <div class="flex flex-wrap gap-x-1.5 gap-y-0.5 items-baseline min-w-0">
+                      <a class="break-words font-semibold text-ink text-sm hover:underline" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer">{{ item.name }}</a>
+                      <a class="break-all text-muted text-ui hover:underline" :href="profileUrl(item.handle)" target="_blank" rel="noopener noreferrer">@{{ item.handle }}</a>
+                      <span class="text-muted text-ui">·</span>
+                      <time class="text-muted text-ui" :datetime="item.postedAt">{{ item.relativeTime }}</time>
                     </div>
-                    <span class="postline-feed-post__provider">Bluesky</span>
+                    <span class="font-semibold text-info text-xs tracking-wider uppercase">Bluesky</span>
                   </div>
-                  <a class="postline-feed-post__open" :href="item.url" target="_blank" rel="noopener noreferrer" aria-label="Open post on Bluesky" title="Open on Bluesky">
+                  <a class="inline-flex items-center justify-center shrink-0 h-8 w-8 text-muted hover:text-ink hover:bg-panel-2 rounded-lg transition-colors" :href="item.url" target="_blank" rel="noopener noreferrer" aria-label="Open post on Bluesky" title="Open on Bluesky">
                     <span class="h-4 w-4 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span>
                   </a>
                 </div>
-                {{-- x-html, not interpolation: the body carries anchor markup for
-                    any URLs it contains. linkifyBody HTML-escapes the text
-                    BEFORE inserting anchors, so nothing user-authored is trusted. --}}
-                <p class="postline-feed-post__body" x-html="item.bodyHtml"></p>
-                <div class="postline-feed-post__actions">
-                  <a class="postline-feed-post__stat" :href="item.url" target="_blank" rel="noopener noreferrer">
-                    <span class="h-4 w-4 i-hugeicons-comment-02" aria-hidden="true"></span><span>{{ item.replies }}</span>
+                <p class="m-0 break-words text-base text-body whitespace-pre-wrap" data-timeline-copy><template x-for="part in item.body"><a class="break-all text-info underline-offset-2 hover:underline" x-if="part.href" :href="part.href" target="_blank" rel="noopener noreferrer" :text="part.text"></a><span x-else :text="part.text"></span></template></p>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 items-center">
+                  <a class="inline-flex gap-1.5 items-center px-1.5 py-1 font-semibold text-muted text-xs hover:text-info hover:bg-info-soft rounded-lg transition-colors" :href="item.url" target="_blank" rel="noopener noreferrer">
+                    <span class="h-4 w-4 i-hugeicons-comment-02" aria-hidden="true"></span><span>{{ item.replies }}</span><span class="sr-only"> replies</span>
                   </a>
-                  <span class="postline-feed-post__stat">
-                    <span class="h-4 w-4 i-hugeicons-repeat" aria-hidden="true"></span><span>{{ item.reposts }}</span>
+                  <span class="inline-flex gap-1.5 items-center px-1.5 py-1 font-semibold text-muted text-xs rounded-lg">
+                    <span class="h-4 w-4 i-hugeicons-repeat" aria-hidden="true"></span><span>{{ item.reposts }}</span><span class="sr-only"> reposts</span>
                   </span>
-                  <span class="postline-feed-post__stat">
-                    <span class="h-4 w-4 i-hugeicons-favourite" aria-hidden="true"></span><span>{{ item.likes }}</span>
+                  <span class="inline-flex gap-1.5 items-center px-1.5 py-1 font-semibold text-muted text-xs rounded-lg">
+                    <span class="h-4 w-4 i-hugeicons-favourite" aria-hidden="true"></span><span>{{ item.likes }}</span><span class="sr-only"> likes</span>
                   </span>
                 </div>
               </div>
@@ -115,10 +106,9 @@
       name: string
       url: string
       avatar: string
-      gradient: string
       postedAt: string
       relativeTime: string
-      bodyHtml: string
+      body: Array<{ text: string, href?: string }>
       replies: string
       reposts: string
       likes: string
@@ -142,14 +132,6 @@
       return String(n)
     }
 
-    const avatarGradient = (handle: string): string => {
-      let hash = 0
-      for (let i = 0; i < handle.length; i++) hash = handle.charCodeAt(i) + ((hash << 5) - hash)
-      const hues = [215, 168, 280, 32, 340, 128, 48, 12]
-      const hue = hues[Math.abs(hash) % hues.length]
-      return `--postline-avatar-a:hsl(${hue} 72% 58%);--postline-avatar-b:hsl(${hue} 68% 42%)`
-    }
-
     const profileUrl = (handle: string): string => `https://bsky.app/profile/${encodeURIComponent(handle)}`
 
     const postUrl = (item: TimelineApiItem): string => {
@@ -160,10 +142,8 @@
         : profileUrl(item.authorHandle)
     }
 
-    const linkifyBody = (text: string): string => escapeHtml(text).replace(
-      /(https?:\/\/[^\s<]+)/g,
-      '<a class="postline-feed-post__link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
-    )
+    const bodyParts = (text: string): TimelineRow['body'] => text.split(/(https?:\/\/[^\s<]+)/g)
+      .flatMap((part, index) => part ? [{ text: part, ...(index % 2 ? { href: part } : {}) }] : [])
 
     /**
      * Flatten an API item into exactly what the template renders. Doing the
@@ -178,10 +158,9 @@
         name,
         url: postUrl(item),
         avatar: item.authorAvatar || '',
-        gradient: avatarGradient(handle),
         postedAt: item.postedAt || '',
         relativeTime: relativeTime(item.postedAt, { compact: true }),
-        bodyHtml: linkifyBody(item.body || ''),
+        body: bodyParts(item.body || ''),
         replies: formatCount(item.replyCount),
         reposts: formatCount(item.repostCount),
         likes: formatCount(item.likeCount),

@@ -22,11 +22,8 @@ describe('code loads only where it is used', () => {
   it('declares each view stylesheet in its own view, not in the layout', () => {
     expect(layout).not.toContain('timeline.css')
     expect(layout).not.toContain('campaigns.css')
-    for (const view of ['timeline', 'campaigns']) {
-      const source = read(`resources/views/${view}.stx`)
-      const styles = source.slice(source.indexOf('@section(\'styles\')'), source.indexOf('@endsection'))
-      expect(styles).toContain(`/assets/styles/${view}.css`)
-    }
+    expect(read('resources/views/campaigns.stx')).toContain('/assets/styles/campaigns.css')
+    expect(read('resources/views/timeline.stx')).not.toContain('timeline.css')
   })
 
   it('bundles the editor imported by URL, though no page names it', () => {

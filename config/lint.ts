@@ -12,8 +12,6 @@ export default {
     baselines: {
       // Direct DOM access in the composer, Settings and Channels purge controls.
       'dom-guard': 18,
-      // Pre-hydration display:none on a few panels.
-      'inline-style-attr': 1,
       'style-block': 1,
       // Marketing links that are plain anchors.
       'plain-internal-anchor': 4,
