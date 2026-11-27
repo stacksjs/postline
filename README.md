@@ -167,6 +167,11 @@ The Mac app runs the workspace and API locally and stores data in
 guide](docs/install-mac.md) for downloads and the [desktop development
 guide](docs/desktop.md) for building from source.
 
+## iPhone app
+
+Build the iPhone app from source with Xcode and connect it to a running Postline
+workspace. See the [iPhone build guide](docs/install-iphone.md).
+
 ## Running it on a server
 
 [docs/self-hosting.md](docs/self-hosting.md) covers the address, HTTPS (needed
