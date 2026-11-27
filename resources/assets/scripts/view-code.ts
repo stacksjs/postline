@@ -1,5 +1,5 @@
 /** Load the long-form editor when Composer first shows its Blog title field. */
-const editorUrl = '/assets/scripts/richtext-editor.ts'
+const editorUrl = new URL('/assets/scripts/richtext-editor.ts', import.meta.url)
 let loaded: Promise<typeof import('./richtext-editor')> | undefined
 let composer: HTMLElement | null = null
 let observer: MutationObserver | undefined
@@ -17,7 +17,7 @@ function watchComposer(): void {
     if (root !== composer || title.classList.contains('hidden')) return
     observer?.disconnect()
     observer = undefined
-    const pending = loaded ??= import(/* @vite-ignore */ editorUrl)
+    const pending = loaded ??= import(editorUrl.href)
     void pending.then(({ setupRichText }) => {
       if (root === composer && root.isConnected) setupRichText(root)
     }).catch((error) => {

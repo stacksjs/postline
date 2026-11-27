@@ -99,10 +99,8 @@ jobs:
       - name: Test suite
         run: bun run test
 
-  # The Mac app's agent, compiled and run from an empty directory the way the
-  # app runs it. The release workflow has always done this before imaging the
-  # app; doing it here too means a change that breaks the agent fails on the
-  # commit that made it, not on the next tag.
+  # Exercise the compiled agent from an empty directory and package the Mac
+  # app, including the native build's own view and client-module pipeline.
   desktop:
     reviewos:
       secrets: []
@@ -124,6 +122,10 @@ jobs:
           CHECK_DIR="$(mktemp -d)"
           bun build --compile scripts/desktop-check.ts --outfile "$CHECK_DIR/postline-check"
           (cd "$CHECK_DIR" && ./postline-check)
+      - name: Build and verify the Mac app bundle
+        run: |
+          DESKTOP_SIGNING_IDENTITY=- ./buddy build:desktop
+          codesign --verify --deep --strict storage/framework/desktop/webview/darwin-arm64/Postline.app
 
   # The site as a static host serves it (#179): every page built, every client
   # script bundled to JavaScript, and no TypeScript left for a browser to fetch.
