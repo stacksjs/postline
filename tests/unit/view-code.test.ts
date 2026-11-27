@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { lazyClientScripts, referencedClientScripts } from '../../scripts/lib/client-scripts'
 
@@ -19,11 +19,8 @@ describe('code loads only where it is used', () => {
     expect(scripts.filter(name => /richtext|analytics/.test(name!))).toEqual([])
   })
 
-  it('declares each view stylesheet in its own view, not in the layout', () => {
-    expect(layout).not.toContain('timeline.css')
-    expect(layout).not.toContain('campaigns.css')
-    expect(read('resources/views/campaigns.stx')).toContain('/assets/styles/campaigns.css')
-    expect(read('resources/views/timeline.stx')).not.toContain('timeline.css')
+  it('uses generated CSS for workspace views', () => {
+    expect(readdirSync(join(root, 'resources/assets/styles'))).toEqual(['marketing.css'])
   })
 
   it('bundles the editor imported by URL, though no page names it', () => {

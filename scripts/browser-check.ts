@@ -1211,9 +1211,31 @@ async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
     }
   ` })
   try {
-    await auditPage(`${site}/campaigns`, { cdp })
     const post = `[...document.querySelectorAll('article[role=button]')].find(item => item.textContent.includes('Plan the scheduling fixture') && item.getClientRects().length > 0)`
-    await waitUntil('The planned campaign post', () => evaluate<boolean>(cdp, `Boolean(${post})`), 5_000)
+    for (const mode of [MODES[1], MODES[2], MODES[0]]) {
+      await cdp.send('Emulation.setDeviceMetricsOverride', { width: mode.width, height: mode.height, deviceScaleFactor: 1, mobile: mode.mobile })
+      await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: mode.scheme }] })
+      const report = await auditPage(`${site}/campaigns`, { cdp })
+      for (const error of report.errors) fail('campaigns', mode.name, `console: ${error}`)
+      await waitUntil('The planned campaign post', () => evaluate<boolean>(cdp, `Boolean(${post})`), 5_000)
+      const layout = await evaluate<{ overflow: number, stacked: boolean, accentMatches: boolean }>(cdp, `(() => {
+        const board = document.querySelector('[aria-label="Campaign plan"]').getBoundingClientRect()
+        const panel = document.querySelector('[aria-label="Campaign tools"]').getBoundingClientRect()
+        const create = [...document.querySelectorAll('[data-postline-page=campaigns] button')].find(button => button.textContent.trim() === 'New campaign')
+        const accent = document.createElement('span').style
+        accent.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--accent')
+        return {
+          overflow: document.documentElement.scrollWidth - window.innerWidth,
+          stacked: panel.bottom <= board.top,
+          accentMatches: getComputedStyle(create).backgroundColor === accent.backgroundColor,
+        }
+      })()`)
+      if (layout.overflow > 1 || layout.stacked !== mode.mobile)
+        fail('campaigns', mode.name, 'the populated workspace does not fit its layout')
+      if (!layout.accentMatches) fail('campaigns', mode.name, 'the primary button does not use the workspace accent')
+      const shot = await cdp.send<{ data: string }>('Page.captureScreenshot', { format: 'png' })
+      writeFileSync(join(out, `campaigns-planned-${mode.name}.png`), Buffer.from(shot.data, 'base64'))
+    }
     await evaluate(cdp, `${post}.focus()`)
     await pressKey(cdp, 'Enter', 13)
     const picker = `document.querySelector('[data-postline-schedule-picker] [data-date-time-trigger]')`
@@ -1240,7 +1262,7 @@ async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
     await waitUntil('Campaign List is selected and shows the same post', () => evaluate<boolean>(cdp, `
       ${views}.querySelector('[aria-label=List]').getAttribute('aria-pressed') === 'true'
         && ${views}.querySelector('[aria-label=Calendar]').getAttribute('aria-pressed') === 'false'
-        && [...document.querySelectorAll('.campaign-list-row')].some(row => row.getClientRects().length && row.textContent.includes('Plan the scheduling fixture'))`), 5_000)
+        && [...document.querySelectorAll('[data-campaign-list-row]')].some(row => row.getClientRects().length && row.textContent.includes('Plan the scheduling fixture'))`), 5_000)
     await evaluate(cdp, `${post}.focus()`)
     await pressKey(cdp, 'Enter', 13)
     const remove = `[...document.querySelectorAll('button')].find(button => button.getClientRects().length && button.textContent.trim() === 'Delete')`
