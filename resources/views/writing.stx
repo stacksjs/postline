@@ -119,7 +119,7 @@
   </section>
 
   <script client>
-    import { showPostlineToast } from '../functions/postline-toast'
+    import { showNotification } from '../functions/notification'
     const items = state([])
     const loading = state(true)
     const loaded = state(false)
@@ -241,7 +241,7 @@
     })))
 
     const toast = (message: string, tone: 'success' | 'error' = 'success'): void => {
-      showPostlineToast({ message, tone, title: tone === 'error' ? 'Blog' : 'Done' })
+      showNotification({ message, tone, title: tone === 'error' ? 'Blog' : 'Done' })
     }
 
     const send = async (path: string, fields: Record<string, string>) => {

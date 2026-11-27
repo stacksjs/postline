@@ -189,16 +189,16 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
     ${shell}.dataset.sidebarCollapsed === 'false' && ${width} === 286
       && getComputedStyle(${expand}).visibility === 'hidden'`), 5_000)
 
-  const offlineNotice = "document.querySelector('[data-toast-id=postline-offline]')"
+  const offlineNotice = "document.querySelector('[data-stx-toast-key=postline-offline]')"
   await evaluate(cdp, "window.dispatchEvent(new Event('offline')); window.dispatchEvent(new Event('offline'))")
   await waitUntil('The offline notice is displayed once', () => evaluate<boolean>(cdp, `
-    ${offlineNotice}?.classList.contains('is-visible')
-      && document.querySelectorAll('[data-toast-id=postline-offline]').length === 1
+    ${offlineNotice}?.getAttribute('role') === 'status'
+      && document.querySelectorAll('[data-stx-toast-key=postline-offline]').length === 1
       && ${offlineNotice}.textContent.includes('Scheduled posts still go out on time.')`), 5_000)
   await evaluate(cdp, "window.dispatchEvent(new Event('online'))")
   await waitUntil('The online notice replaces the offline notice', () => evaluate<boolean>(cdp, `
     !${offlineNotice}
-      && document.querySelector('#postline-toast-host .is-visible')?.textContent.includes('Back online')`), 5_000)
+      && document.querySelector('#stx-toast-container [data-stx-toast]:not([data-stx-toast-exiting])')?.textContent.includes('Back online')`), 5_000)
 
   await evaluate(cdp, `(() => {
     const calls = window.postlineShellCalls = {
@@ -359,11 +359,11 @@ async function checkQueueKeyboard(cdp: Cdp): Promise<void> {
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('The confirmed draft deletion', () => evaluate<boolean>(cdp, `
     !document.querySelector('#queue-results[aria-label="Matching posts"] article')
-      && document.querySelector('#postline-toast-host')?.textContent.includes('Post removed from the queue.')`), 5_000)
-  await evaluate(cdp, `document.querySelector('#postline-toast-host button[data-toast-action]').click()`)
+      && document.querySelector('#stx-toast-container')?.textContent.includes('Post removed from the queue.')`), 5_000)
+  await evaluate(cdp, `document.querySelector('#stx-toast-container button[data-stx-toast-action]').click()`)
   await waitUntil('Undo restores the draft to the search results', () => evaluate<boolean>(cdp, `
     document.querySelector('#queue-results[aria-label="Matching posts"] article')?.textContent.includes('A draft for the keyboard smoke test')
-      && document.querySelector('#postline-toast-host')?.textContent.includes('Post restored to the queue.')`), 5_000)
+      && document.querySelector('#stx-toast-container')?.textContent.includes('Post restored to the queue.')`), 5_000)
 }
 
 async function checkDesktopUpdateControls(cdp: Cdp): Promise<void> {
@@ -406,6 +406,7 @@ async function checkDesktopUpdateControls(cdp: Cdp): Promise<void> {
 }
 
 async function checkNetworkComponents(cdp: Cdp): Promise<void> {
+  const publishedUrl = 'https://bsky.app/profile/alice.example/post/first'
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
     const postedAt = new Date().toISOString()
@@ -433,7 +434,7 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
       if (path === '/api/postline/publish') return request.formData().then(async body => {
         window.composerPublish = { text: body.get('text'), providers: body.get('providers') }
         await publishGate
-        return Response.json({ ok: true, data: { postId: 1, results: [{ provider: 'bluesky', ok: true }] } })
+        return Response.json({ ok: true, data: { postId: 1, results: [{ provider: 'bluesky', ok: true, url: ${JSON.stringify(publishedUrl)} }] } })
       })
       if (path === '/api/postline/inbox') return Promise.resolve(Response.json({ ok: true, data: { conversations } }))
       if (path === '/api/postline/inbox/read') inboxUnread = 2
@@ -530,11 +531,24 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
     await waitUntil('The imported publish function', () => evaluate<boolean>(cdp, `
       window.composerPublish?.text === ${JSON.stringify(text)} && window.composerPublish.providers === 'bluesky:101'`), 5_000)
     await waitUntil('The publish progress notice', () => evaluate<boolean>(cdp, `
-      document.querySelector('[data-toast-id=publish].is-visible .postline-toast__spinner') !== null`), 5_000)
+      document.querySelector('[data-stx-toast-key=publish]:not([data-stx-toast-exiting]) [data-stx-toast-loading]') !== null`), 5_000)
     await evaluate(cdp, 'window.finishPublish()')
     await waitUntil('The publish success notice replaces progress', () => evaluate<boolean>(cdp, `
-      !document.querySelector('[data-toast-id=publish]')
-        && document.querySelector('#postline-toast-host .postline-toast--success.is-visible')?.textContent.includes('Your post is live on Bluesky.')`), 5_000)
+      !document.querySelector('[data-stx-toast-key=publish]:not([data-stx-toast-exiting])')
+        && document.querySelector('#stx-toast-container [data-stx-toast][role=status]:not([data-stx-toast-exiting])')?.textContent.includes('Your post is live on Bluesky.')`), 5_000)
+    const action = "[...document.querySelectorAll('#stx-toast-container [data-stx-toast]:not([data-stx-toast-exiting]) button[data-stx-toast-action]')].find(button => button.textContent === 'Copy link')"
+    const link = await evaluate<string>(cdp, `document.querySelector('#stx-toast-container a[data-stx-toast-action][target=_blank]')?.href`)
+    if (link !== publishedUrl) fail('composer', 'publish', 'the confirmation link did not open the published post')
+    const { targetInfo } = await cdp.send<{ targetInfo: { browserContextId?: string } }>('Target.getTargetInfo')
+    await cdp.send('Browser.grantPermissions', {
+      origin: site, browserContextId: targetInfo.browserContextId, permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'],
+    })
+    await cdp.send('Page.bringToFront')
+    await evaluate(cdp, `${action}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The confirmation’s Copy link action writes the post URL', () => evaluate<boolean>(cdp, `(async () =>
+      (await navigator.clipboard.readText()) === ${JSON.stringify(publishedUrl)}
+        && document.querySelector('#stx-toast-container').textContent.includes('Link copied to clipboard.'))()`), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
@@ -644,7 +658,7 @@ async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
     ${editors}.length === 2 && ${editors}[1].value === ${JSON.stringify(segments[1])}
       && ${editors}[1].getClientRects().length > 0`), 5_000)
   await evaluate(cdp, `document.querySelector('[aria-label="Remove post 2"]').click()`)
-  const undoSegment = "document.querySelector('[data-toast-id=composer-post-removed] [data-toast-action]')"
+  const undoSegment = "document.querySelector('[data-stx-toast-key=composer-post-removed]:not([data-stx-toast-exiting]) [data-stx-toast-action]')"
   await waitUntil('Removing a thread segment offers Undo', () => evaluate<boolean>(cdp, `
     ${editors}.length === 1 && ${undoSegment}?.textContent === 'Undo'`), 5_000)
   await evaluate(cdp, `${undoSegment}.click()`)
@@ -683,7 +697,7 @@ async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
   await evaluate(cdp, `${editors}[1].focus()`)
   await pressKey(cdp, 's', 83, 4)
   await waitUntil('Cmd+S saves the thread draft', () => evaluate<boolean>(cdp, `
-    document.querySelector('#postline-toast-host')?.textContent.includes('Draft saved to the queue.')
+    document.querySelector('#stx-toast-container')?.textContent.includes('Draft saved to the queue.')
       && [...${editors}].every(editor => editor.value === '')`), 5_000)
   const drafts = await evaluate<Array<{ id: number, status: string, body: string }>>(cdp, `(async () => {
     const { data } = await (await fetch('/api/postline/queue')).json()
@@ -902,7 +916,7 @@ async function checkPhoneNavigation(cdp: Cdp): Promise<void> {
   })()`)
   await pressKey(cdp, 'Enter', 13, 2)
   await waitUntil('Ctrl+Enter saves the chosen publishing time', () => evaluate<boolean>(cdp, `
-    document.querySelector('#postline-toast-host')?.textContent.includes('Scheduled. Check the Queue page')`), 5_000)
+    document.querySelector('#stx-toast-container')?.textContent.includes('Scheduled. Check the Queue page')`), 5_000)
   const scheduledAt = await evaluate<string | null>(cdp, `(async () => {
     const { data } = await (await fetch('/api/postline/queue')).json()
     return data.items.find(item => item.status === 'scheduled' && item.body === ${JSON.stringify(scheduledBody)})?.scheduledAt || null
@@ -944,7 +958,7 @@ async function checkQueueRescheduling(cdp: Cdp): Promise<void> {
       && [...document.querySelectorAll('[role=status]')].some(status => status.textContent === '5 selected')`), 5_000)
   await evaluate(cdp, `${move}.click()`)
   await waitUntil('The bulk rescheduling success notice', () => evaluate<boolean>(cdp, `
-    document.querySelector('#postline-toast-host')?.textContent.includes('Moved 5 posts.')`), 5_000)
+    document.querySelector('#stx-toast-container')?.textContent.includes('Moved 5 posts.')`), 5_000)
   const moved = await evaluate<Array<{ id: number, scheduledAt: string }>>(cdp, `(async () => {
     const response = await fetch('/api/postline/queue?limit=500')
     return (await response.json()).data.items
@@ -964,14 +978,14 @@ async function checkQueueRescheduling(cdp: Cdp): Promise<void> {
     ${confirm}?.closest('[role=alertdialog]')?.textContent.includes('Delete 5 posts?')`), 5_000)
   await evaluate(cdp, `${confirm}.click()`)
   await waitUntil('The five posts are removed together', () => evaluate<boolean>(cdp, `
-    ${checkboxes}.length === 0 && document.querySelector('#postline-toast-host')?.textContent.includes('5 posts removed from the queue.')`), 5_000)
+    ${checkboxes}.length === 0 && document.querySelector('#stx-toast-container')?.textContent.includes('5 posts removed from the queue.')`), 5_000)
   await auditPage(`${site}/queue`, { cdp })
-  const undo = `document.querySelector('#postline-toast-host button[data-toast-action]')`
+  const undo = `document.querySelector('#stx-toast-container button[data-stx-toast-action]')`
   await waitUntil('Undo is available again after reload', () => evaluate<boolean>(cdp, `
     ${undo}?.textContent === 'Undo' && ${checkboxes}.length === 0`), 10_000)
   await evaluate(cdp, `${undo}.click()`)
   await waitUntil('Undo restores the whole batch', () => evaluate<boolean>(cdp, `
-    ${checkboxes}.length === 5 && document.querySelector('#postline-toast-host')?.textContent.includes('5 posts restored to the queue.')`), 5_000)
+    ${checkboxes}.length === 5 && document.querySelector('#stx-toast-container')?.textContent.includes('5 posts restored to the queue.')`), 5_000)
 
   const day = await evaluate<{ key: string, label: string, zone: string }>(cdp, `(async () => {
     const zone = (await (await fetch('/api/postline/bootstrap')).json()).data.workspace.timezone
@@ -997,7 +1011,7 @@ async function checkQueueRescheduling(cdp: Cdp): Promise<void> {
   await waitUntil('The selected calendar date is ready to submit', () => evaluate<boolean>(cdp, `
     !document.querySelector('${dayPicker}').open && !${moveToDate}.disabled`), 5_000)
   await evaluate(cdp, `${moveToDate}.click()`)
-  await waitUntil('The date move completes', () => evaluate<boolean>(cdp, `document.querySelector('#postline-toast-host')?.textContent.includes('Moved 1 post.')`), 5_000)
+  await waitUntil('The date move completes', () => evaluate<boolean>(cdp, `document.querySelector('#stx-toast-container')?.textContent.includes('Moved 1 post.')`), 5_000)
   const preservesClock = await evaluate<boolean>(cdp, `(async () => {
     const items = (await (await fetch('/api/postline/queue?limit=500')).json()).data.items
     const post = items.find(item => item.id === ${fixtures[0]!.id})
@@ -1227,7 +1241,7 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
       page: location.pathname + location.search,
       heading: document.querySelector('h1')?.textContent,
       message: document.querySelector('[role=alert]')?.textContent,
-      toast: document.querySelector('#postline-toast-host')?.textContent,
+      toast: document.querySelector('#stx-toast-container')?.textContent,
       title: document.querySelector('[data-compose-title]')?.value,
       body: document.querySelector('[data-bluesky-text]')?.value,
       rich: ${richEditor}?.innerHTML,

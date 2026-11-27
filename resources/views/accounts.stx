@@ -200,7 +200,7 @@
   </section>
 
   <script client>
-    import { showPostlineToast } from '../functions/postline-toast'
+    import { showNotification } from '../functions/notification'
     const bootstrap = workspaceBootstrapQuery()
     const channelsReady = derived(() => Boolean(bootstrap.data()))
     const channelProviders = derived(() => bootstrap.data()?.providers.map(status => status.provider) ?? [])
@@ -321,7 +321,7 @@
       if (!root) return
 
       const notify = (message, tone = 'neutral', options = {}) => {
-        showPostlineToast({ message, tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info', title: options.title })
+        showNotification({ message, tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info', title: options.title })
       }
 
       const route = useRoute()

@@ -218,7 +218,7 @@
   </section>
 
   <script client>
-    import { dismissPostlineToast, showPostlineToast } from '../functions/postline-toast'
+    import { showNotification } from '../functions/notification'
     import { countText } from '../../app/Support/Social/count-text'
     import { instantFromWallTime, systemTimeZone } from '../../app/Support/time'
     import type { ComposerAction, ComposerDraft, ComposerFormat } from '../functions/composer-draft'
@@ -561,7 +561,7 @@
     let editRemoveImage = false
 
     const setStatus = (message, tone = 'neutral', options = {}) => {
-      showPostlineToast({
+      showNotification({
         title: options.title,
         message,
         tone: tone === 'success' ? 'success' : tone === 'error' ? 'error' : 'info',
@@ -570,6 +570,7 @@
         action: options.action,
         dedupeMs: options.dedupeMs,
         durationMs: options.durationMs,
+        loading: options.loading,
       })
     }
 
@@ -1062,7 +1063,7 @@
       setStatus(
         targets.length > 1 ? `Publishing ${targets.length} posts to ${providerNames}…` : `Publishing to ${providerNames}…`,
         'info',
-        { title: 'Publishing', id: 'publish' },
+        { title: 'Publishing', id: 'publish', loading: true },
       )
 
       try {
@@ -1115,7 +1116,7 @@
         clearAttachment()
         resetPostOptions()
         postTitle.set('')
-        dismissPostlineToast('publish')
+        toast.dismiss('publish')
         if (failures.length && successCount === 0) {
           setStatus(`Publish failed. ${failures.join('; ')}`, 'error', { title: 'Publish failed' })
         }
@@ -1134,7 +1135,7 @@
         if (successCount > 0) finishSetup(publishedPostId)
       }
       catch (error) {
-        dismissPostlineToast('publish')
+        toast.dismiss('publish')
         setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Publish failed' })
       }
     }

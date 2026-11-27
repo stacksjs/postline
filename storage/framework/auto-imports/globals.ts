@@ -13,11 +13,29 @@ declare global {
   const readComposerDraft: typeof autoImports.readComposerDraft
   const writeComposerDraft: typeof autoImports.writeComposerDraft
   const COMPOSER_DRAFT_KEY: typeof autoImports.COMPOSER_DRAFT_KEY
+  const composerFileError: typeof autoImports.composerFileError
+  const composerMediaWarnings: typeof autoImports.composerMediaWarnings
+  const composerImageFiles: typeof autoImports.composerImageFiles
+  const appendComposerImages: typeof autoImports.appendComposerImages
+  const composerImageTypes: typeof autoImports.composerImageTypes
+  const composerScheduleIso: typeof autoImports.composerScheduleIso
+  const composerQueueTimestamp: typeof autoImports.composerQueueTimestamp
+  const composerActionText: typeof autoImports.composerActionText
+  const composerTargets: typeof autoImports.composerTargets
+  const uniqueComposerNetworks: typeof autoImports.uniqueComposerNetworks
+  const composerSelection: typeof autoImports.composerSelection
+  const composerKeyForSpec: typeof autoImports.composerKeyForSpec
+  const composerTargetRows: typeof autoImports.composerTargetRows
+  const firstComposerLink: typeof autoImports.firstComposerLink
+  const composerLinkPreview: typeof autoImports.composerLinkPreview
+  const composerVariantsPayload: typeof autoImports.composerVariantsPayload
+  const composerVariantRows: typeof autoImports.composerVariantRows
   const bindDesktopAlerts: typeof autoImports.bindDesktopAlerts
   const providerLabel: typeof autoImports.providerLabel
   const providerInitial: typeof autoImports.providerInitial
   const providerColor: typeof autoImports.providerColor
   const providerIcon: typeof autoImports.providerIcon
+  const showNotification: typeof autoImports.showNotification
   const passkeys: typeof autoImports.passkeys
   const requestJson: typeof autoImports.requestJson
   const fetchWorkspaceBootstrap: typeof autoImports.fetchWorkspaceBootstrap
@@ -28,8 +46,6 @@ declare global {
   const workspaceBootstrapQuery: typeof autoImports.workspaceBootstrapQuery
   const announceWorkspaceChange: typeof autoImports.announceWorkspaceChange
   const bindWorkspaceChanges: typeof autoImports.bindWorkspaceChanges
-  const dismissPostlineToast: typeof autoImports.dismissPostlineToast
-  const showPostlineToast: typeof autoImports.showPostlineToast
   const fetchWorkspace: typeof autoImports.fetchWorkspace
   const fetchLinkPreview: typeof autoImports.fetchLinkPreview
   const fetchProviders: typeof autoImports.fetchProviders

@@ -29,6 +29,6 @@ describe('motion', () => {
       .filter(match => Number(match[1]) > 180 || Number(match[1]) < 120)
       .map(match => `${file}: ${match[0]}`))
     expect(slow).toEqual([])
-    expect(read('resources/assets/styles/toast.css')).not.toMatch(/\b(2\d\d|[3-9]\d\d)ms\b/)
+    expect(css).toContain('#stx-toast-container [data-stx-toast] { animation-duration: var(--duration-slow) !important; }')
   })
 })

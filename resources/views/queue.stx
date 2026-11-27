@@ -192,7 +192,7 @@
     import { MAX_QUEUE_SELECTION } from '../../app/Support/Social/rescheduling'
     import { systemTimeZone } from '../../app/Support/time'
     import { requestJson } from '../functions/postline-client'
-    import { showPostlineToast } from '../functions/postline-toast'
+    import { showNotification } from '../functions/notification'
     import { fetchWorkspace, targetLabel } from '../functions/social-client'
 
     /**
@@ -827,14 +827,14 @@
         const { data } = await requestJson('/api/postline/queue/reschedule', { method: 'POST', body: JSON.stringify({ posts, ...destination }) })
         clearSelection()
         rescheduleDate.set('')
-        showPostlineToast({
+        showNotification({
           title: 'Schedule updated',
           message: `Moved ${data.count} post${data.count === 1 ? '' : 's'}.`,
           tone: 'success',
         })
       }
       catch (error) {
-        showPostlineToast({ title: 'Could not move posts', message: error instanceof Error ? error.message : String(error), tone: 'error' })
+        showNotification({ title: 'Could not move posts', message: error instanceof Error ? error.message : String(error), tone: 'error' })
       }
       finally {
         await refresh()
@@ -849,10 +849,10 @@
       busyId.set(id)
       try {
         await post(path, id)
-        showPostlineToast({ title: success.title, message: success.message, tone: 'success' })
+        showNotification({ title: success.title, message: success.message, tone: 'success' })
       }
       catch (error) {
-        showPostlineToast({
+        showNotification({
           title: failure,
           message: error instanceof Error ? error.message : String(error),
           tone: 'error',
@@ -891,7 +891,7 @@
     function showRemoval(receipt: QueueRemovalReceipt) {
       const durationMs = Date.parse(receipt.expiresAt) - Date.now()
       if (!(durationMs > 0)) return
-      showPostlineToast({
+      showNotification({
         title: 'Removed',
         message: receipt.count === 1 ? 'Post removed from the queue.' : `${receipt.count} posts removed from the queue.`,
         tone: 'success',
@@ -905,10 +905,10 @@
     async function undoRemoval(token: string) {
       try {
         const { data } = await requestJson('/api/postline/queue/undo-delete', { method: 'POST', body: JSON.stringify({ token }) })
-        showPostlineToast({ title: 'Restored', message: data.count === 1 ? 'Post restored to the queue.' : `${data.count} posts restored to the queue.`, tone: 'success' })
+        showNotification({ title: 'Restored', message: data.count === 1 ? 'Post restored to the queue.' : `${data.count} posts restored to the queue.`, tone: 'success' })
       }
       catch (error) {
-        showPostlineToast({ title: 'Could not undo the removal', message: error instanceof Error ? error.message : String(error), tone: 'error' })
+        showNotification({ title: 'Could not undo the removal', message: error instanceof Error ? error.message : String(error), tone: 'error' })
       }
       await refresh()
       if (view() === 'calendar' && !activeSearch()) await loadCalendar()
@@ -923,7 +923,7 @@
         showRemoval(data)
       }
       catch (error) {
-        showPostlineToast({ title: 'Could not remove the posts', message: error instanceof Error ? error.message : String(error), tone: 'error' })
+        showNotification({ title: 'Could not remove the posts', message: error instanceof Error ? error.message : String(error), tone: 'error' })
       }
       finally {
         await refresh()

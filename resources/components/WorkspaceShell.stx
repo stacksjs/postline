@@ -1,7 +1,7 @@
 <script client>
 import type { CraftBridgeAPI } from 'craft-native'
 import { bindDesktopAlerts } from '../functions/desktop-alerts'
-import { dismissPostlineToast, showPostlineToast } from '../functions/postline-toast'
+import { showNotification } from '../functions/notification'
 
 type WorkspaceBridge = CraftBridgeAPI & {
   window: CraftBridgeAPI['window'] & {
@@ -23,7 +23,7 @@ let unbindDesktopAlerts: (() => void) | undefined
 const offlineToastId = 'postline-offline'
 
 function showOfflineNotice() {
-  showPostlineToast({
+  showNotification({
     id: offlineToastId,
     tone: 'info',
     durationMs: 0,
@@ -34,8 +34,8 @@ function showOfflineNotice() {
 
 useEventListener('offline', showOfflineNotice)
 useEventListener('online', () => {
-  dismissPostlineToast(offlineToastId)
-  showPostlineToast({ tone: 'success', durationMs: 3000, title: 'Back online', message: 'Postline is connected again.' })
+  toast.dismiss(offlineToastId)
+  showNotification({ tone: 'success', durationMs: 3000, title: 'Back online', message: 'Postline is connected again.' })
 })
 
 function toggleSidebar() {

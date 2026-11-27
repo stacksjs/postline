@@ -14,7 +14,6 @@
     } catch {}
   </script>
   <FontFaces />
-  <link rel="stylesheet" href="/assets/styles/toast.css">
   {{-- A view's own stylesheet, declared in the head so the router loads it
       before it swaps the view in: no unstyled first entry, and no other view
       downloads it. --}}
@@ -25,7 +24,7 @@
     <WorkspaceShell>
       @yield('content')
     </WorkspaceShell>
-    <div id="postline-toast-host" class="flex bottom-6 fixed right-6 z-[100] sm:right-6 flex-col-reverse gap-2.5 max-w-[22rem] w-[calc(100%-2rem)] pointer-events-none" aria-live="polite" aria-relevant="additions"></div>
+    <StxToast position="bottom-center" />
     {{-- The editor and the analytics chart load with the view that uses them. --}}
     <script type="module" src="/assets/scripts/view-code.ts"></script>
     @stack('scripts')

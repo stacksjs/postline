@@ -277,6 +277,9 @@ const MOTION: string = `
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--duration-slow); animation-timing-function: var(--ease-out); }
+@media (prefers-reduced-motion: no-preference) {
+  #stx-toast-container [data-stx-toast] { animation-duration: var(--duration-slow) !important; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -371,8 +374,10 @@ html:not(.has-native-sidebar) ${collapsedWorkspaceShell}:not([data-shell-native=
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  [data-postline-shell] + #postline-toast-host {
-    bottom: calc(1rem + 3.75rem + env(safe-area-inset-bottom, 0px));
+  [data-postline-shell] + #stx-toast-container {
+    box-sizing: border-box;
+    margin-bottom: var(--postline-bottom-nav-height);
+    padding-inline: 0.75rem;
   }
 
 }
