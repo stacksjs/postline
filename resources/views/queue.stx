@@ -1,11 +1,14 @@
 @extends('layouts/app')
 
 <script server cache>
-import { workspaceLocale, workspaceQueueText } from '../../app/Support/Localization/workspace'
+import { workspaceLocale, workspaceQueueText, workspaceText } from '../../app/Support/Localization/workspace'
 
 export const queueLocale = workspaceLocale
 export const queueText = workspaceQueueText
-export const queueClient = { locale: workspaceLocale, messages: workspaceQueueText }
+export const queueDescription = workspaceText('workspace.pages.queue.description')
+export const queueActivity = workspaceText('workspace.navigation.activity')
+export const queueAlertSize = workspaceText('workspace.queue.alertCount', { count: 999999 })
+export const queueClient = { locale: workspaceLocale, messages: workspaceQueueText, activity: queueActivity }
 </script>
 
 @section('title')Postline - {{ queueText.tablist }}@endsection
@@ -13,9 +16,7 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
 @section('content')
   @meta('description', 'Review scheduled and drafted social posts in Postline.')
   <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page" lang="{{ queueLocale }}">
-    <p class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !schedulerWarning() }" :text="schedulerWarning()" role="status" data-scheduler-warning></p>
-    <a class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !attentionText() }" href="/activity" data-stx-link :text="attentionText()" data-attention-link></a>
-    <WorkspacePageHeader titleKey="workspace.pages.queue.title" descriptionKey="workspace.pages.queue.description">
+    <WorkspacePageHeader titleKey="workspace.pages.queue.title">
       <div class="flex flex-wrap gap-2 items-center">
         <SegmentedControl label="{{ queueText.view }}" size="sm" :show="!activeSearch()" :value="view()" :options="queueViews()" @change="setView" />
         <a href="/composer" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors">
@@ -24,6 +25,21 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
         </a>
       </div>
     </WorkspacePageHeader>
+
+    {{-- Keep notice rows the same height when their requests settle. The
+         sizing text wraps with the same width and language as the notices. --}}
+    <div class="grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,16rem)]">
+      <div class="grid px-3 py-2 text-ui border rounded-xl" :class="schedulerWarning() ? 'text-warning bg-warning-soft border-warning-line' : 'text-muted bg-panel border-line'">
+        <span class="invisible col-start-1 row-start-1" aria-hidden="true">{{ queueText.paused }}</span>
+        <span class="invisible col-start-1 row-start-1" aria-hidden="true">{{ queueText.schedulerNever }}</span>
+        <span class="col-start-1 row-start-1" :class="{ 'invisible': schedulerWarning() }">{{ queueDescription }}</span>
+        <p class="hidden col-start-1 row-start-1 m-0" :class="{ 'hidden': !schedulerWarning() }" :text="schedulerWarning()" role="status" data-scheduler-warning></p>
+      </div>
+      <a class="grid px-3 py-2 text-ui hover:underline border rounded-xl" :class="attentionText() ? 'text-warning bg-warning-soft border-warning-line' : 'text-muted bg-panel border-line'" href="/activity" data-stx-link data-attention-link>
+        <span class="invisible col-start-1 row-start-1" aria-hidden="true">{{ queueAlertSize }}</span>
+        <span class="col-start-1 row-start-1" :text="attentionText() || activityLabel">{{ queueActivity }}</span>
+      </a>
+    </div>
 
     <PostingSlotsPanel />
     <DraftFeedsPanel @drafts-created="refresh()" />
@@ -210,7 +226,7 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
     import { fetchWorkspace, targetLabel } from '../functions/social-client'
     import { postStatusVariant } from '../functions/status-badge'
 
-    const { locale: language, messages: queueCopy } = {{ queueClient }}
+    const { locale: language, messages: queueCopy, activity: activityLabel } = {{ queueClient }}
     const queueWords = createI18n({ locale: language, messages: { [language]: queueCopy } })
     const dateLocale = language === 'en' ? undefined : language
 

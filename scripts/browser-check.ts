@@ -1768,19 +1768,36 @@ async function checkQueueRescheduling(cdp: Cdp): Promise<void> {
     const read = window.fetch.bind(window)
     window.fetch = async (input, options) => {
       const request = new Request(input, options)
-      if (request.method === 'GET' && new URL(request.url).pathname === '/api/postline/queue') await gate
-      return read(input, options)
+      const pathname = new URL(request.url).pathname
+      if (request.method !== 'GET' || !['/api/postline/queue', '/api/postline/system', '/api/postline/alerts'].includes(pathname))
+        return read(input, options)
+      await gate
+      const response = await read(input, options)
+      if (!response.ok || pathname === '/api/postline/queue') return response
+      const payload = await response.json()
+      const notice = pathname === '/api/postline/system'
+        ? { scheduler: { state: 'never', lastRunAt: null }, paused: false }
+        : { unread: 2 }
+      return Response.json({ ...payload, data: { ...payload.data, ...notice } })
     }
   ` })
   try {
     await auditPage(`${site}/queue`, { cdp })
     await waitUntil('The Queue lists a loading state', () => evaluate<boolean>(cdp, `
       Boolean(document.querySelector('#queue-results [data-workspace-list-skeleton]')?.getClientRects().length)`), 5_000)
+    const queueTop = "document.getElementById('queue-results').getBoundingClientRect().top"
+    const before = await evaluate<number>(cdp, `document.fonts.ready.then(() => ${queueTop})`)
     await evaluate(cdp, 'window.releaseQueue()')
     await waitUntil('The scheduled Blog post has a quiet Publish now button', () => evaluate<boolean>(cdp, `
       ${publishBlog}?.textContent.trim() === 'Publish now' && !(${publishBlog}).disabled`), 5_000)
+    await waitUntil('The scheduler warning and unread alerts appear', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-scheduler-warning]')?.innerText.includes('the scheduler has not run yet')
+        && document.querySelector('[data-attention-link]')?.innerText.includes('2 things need your attention')
+    `), 5_000)
     const queueShift = await evaluate<number>(cdp, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(window.queueShift))))')
-    if (queueShift > 0) fail('queue', 'startup', `applying the scheduled posts response shifted the layout by ${queueShift.toFixed(3)}`)
+    const after = await evaluate<number>(cdp, queueTop)
+    if (queueShift > 0 || before !== after)
+      fail('queue', 'startup', `applying the queued posts and notices shifted the layout by ${queueShift.toFixed(6)} and moved the list from ${before} to ${after}px`)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: gate.identifier })
