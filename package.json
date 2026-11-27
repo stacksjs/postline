@@ -73,7 +73,7 @@
   "dependencies": {
     "@stacksjs/ai": "^0.75.695",
     "@stacksjs/socials": "^0.75.695",
-    "@stacksjs/stx": "^0.2.953",
+    "@stacksjs/stx": "0.2.953",
     "@stacksjs/ts-cloud": "^0.16.157",
     "stacks": "^0.75.695",
     "ts-backups": "https://github.com/stacksjs/ts-backups/releases/download/v0.1.6/ts-backups-0.1.6.tgz",
@@ -83,7 +83,9 @@
   "devDependencies": {
     "@iconify-json/hugeicons": "^1.2.36",
     "@iconify-json/simple-icons": "^1.2.92",
+    "@stacksjs/components": "0.2.953",
     "better-dx": "^0.2.22",
+    "bun-plugin-stx": "0.2.953",
     "typescript": "^7.0.2"
   },
   "workspaces": [
