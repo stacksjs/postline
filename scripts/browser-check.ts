@@ -1073,16 +1073,41 @@ async function checkQueueRescheduling(cdp: Cdp): Promise<void> {
     }
     return posts
   })()`)
-  await auditPage(`${site}/queue`, { cdp })
-  await evaluate(cdp, `
-    [...document.querySelectorAll('[aria-label="Queue view"] button')].find(button => button.textContent.trim() === 'List').click()
-    document.getElementById('queue-tab-scheduled').click()
-  `)
   const publishBlog = `[...document.querySelectorAll('#queue-results article')]
     .find(row => row.textContent.includes('Keyboard scheduling fixture'))
     ?.querySelector('button[class*="hover:bg-surface-hover"]')`
-  await waitUntil('The scheduled Blog post has a quiet Publish now button', () => evaluate<boolean>(cdp, `
-    ${publishBlog}?.textContent.trim() === 'Publish now' && !(${publishBlog}).disabled`), 5_000)
+  const gate = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    localStorage.setItem('postline.queue.view.v2', JSON.stringify('list'))
+    localStorage.setItem('postline.queue.tab', JSON.stringify('scheduled'))
+    window.queueShift = 0
+    let measuring = false
+    const gate = new Promise(resolve => { window.releaseQueue = () => { measuring = true; resolve() } })
+    new PerformanceObserver(list => {
+      if (!measuring) return
+      for (const entry of list.getEntries()) {
+        if (!entry.hadRecentInput) window.queueShift += entry.value
+      }
+    }).observe({ type: 'layout-shift' })
+    const read = window.fetch.bind(window)
+    window.fetch = async (input, options) => {
+      const request = new Request(input, options)
+      if (request.method === 'GET' && new URL(request.url).pathname === '/api/postline/queue') await gate
+      return read(input, options)
+    }
+  ` })
+  try {
+    await auditPage(`${site}/queue`, { cdp })
+    await waitUntil('The Queue lists a loading state', () => evaluate<boolean>(cdp, `
+      Boolean(document.querySelector('#queue-results [data-workspace-list-skeleton]')?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, 'window.releaseQueue()')
+    await waitUntil('The scheduled Blog post has a quiet Publish now button', () => evaluate<boolean>(cdp, `
+      ${publishBlog}?.textContent.trim() === 'Publish now' && !(${publishBlog}).disabled`), 5_000)
+    const queueShift = await evaluate<number>(cdp, 'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(window.queueShift))))')
+    if (queueShift > 0) fail('queue', 'startup', `applying the scheduled posts response shifted the layout by ${queueShift.toFixed(3)}`)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: gate.identifier })
+  }
   await evaluate(cdp, `${publishBlog}.focus()`)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('The Queue button publishes the Blog post', () => evaluate<boolean>(cdp, `(async () => {

@@ -32,13 +32,13 @@
         <div class="flex flex-wrap gap-1" role="tablist" aria-label="Queue" x-show="!activeSearch()">
           <button class="inline-flex gap-1.5 items-center px-3 h-8 font-semibold text-xs rounded-lg transition-colors" type="button" role="tab" x-for="entry in tabs()" :id="'queue-tab-' + entry.id" aria-controls="queue-results" :aria-selected="tab() === entry.id" :tabindex="tab() === entry.id ? 0 : -1" :data-active="tab() === entry.id" :data-tone="entry.tone" data-queue-tab @click="setTab(entry.id)" @keydown="moveTab($event, entry.id)">
             <span :text="entry.label"></span>
-            <span class="px-1.5 min-w-5 text-center text-xs rounded-full" data-queue-tab-count :text="entry.count"></span>
+            <span class="px-1.5 min-w-8 tabular-nums text-center text-xs rounded-full" data-queue-tab-count :text="entry.count"></span>
           </button>
         </div>
         <h2 class="m-0 px-1 font-semibold text-ui" x-show="activeSearch()">Search results</h2>
         <div class="flex gap-2 items-center">
-          <span class="pr-1 text-muted text-xs" aria-live="polite" :text="metaText()">Loading…</span>
-          <button class="px-2.5 h-8 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg disabled:opacity-50" type="button" x-show="hasSelectableRows() || selectionOpen()" :aria-pressed="selectionOpen()" :disabled="queueChanging()" @click="toggleSelection">
+          <span class="pr-1 min-w-24 text-muted text-xs" aria-live="polite" :text="metaText()">Loading…</span>
+          <button class="px-2.5 h-8 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg disabled:opacity-50" type="button" :class="{ 'invisible': !hasSelectableRows() && !selectionOpen() }" :aria-pressed="selectionOpen()" :disabled="queueChanging() || (!hasSelectableRows() && !selectionOpen())" @click="toggleSelection">
             Select posts
           </button>
         </div>
