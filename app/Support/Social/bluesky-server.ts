@@ -58,27 +58,39 @@ export async function resolveBlueskyDid(identifier: string, get: TextGetter = gu
   return typeof resolved?.did === 'string' && resolved.did.startsWith('did:') ? resolved.did : null
 }
 
-/** The server named in a DID's document, or null. */
-export async function resolvePdsOfDid(did: string, get: TextGetter = guardedGet): Promise<string | null> {
-  let documentUrl: string | null = null
-  if (did.startsWith('did:plc:')) documentUrl = `https://plc.directory/${did}`
-  else if (did.startsWith('did:web:')) documentUrl = `https://${decodeURIComponent(did.slice('did:web:'.length).split(':')[0]!)}/.well-known/did.json`
-  if (!documentUrl) return null
-
-  const document = parseJson(await get(documentUrl))
-  const services: any[] = Array.isArray(document?.service) ? document.service : []
-  const pds = services.find(service => String(service?.id).endsWith('#atproto_pds') && service?.type === 'AtprotoPersonalDataServer')
-  try {
-    const endpoint = new URL(String(pds?.serviceEndpoint))
-    return endpoint.protocol === 'https:' ? endpoint.origin : null
-  }
-  catch {
-    return null
-  }
+interface DidDocument {
+  id?: string
+  service?: Array<{ id?: string, type?: string, serviceEndpoint?: string }>
 }
 
-const remembered = new Map<string, { server: string, at: number }>()
-const TTL_MS = 60 * 60 * 1000
+/** The server named in a DID's document, or null. */
+export async function resolvePdsOfDid(did: string, get: TextGetter = guardedGet): Promise<string | null> {
+  let documentUrl: string
+  if (/^did:plc:[a-z0-9]+$/.test(did)) {
+    documentUrl = `https://plc.directory/${did}`
+  }
+  else if (did.startsWith('did:web:') && HANDLE.test(did.slice('did:web:'.length))) {
+    documentUrl = `https://${did.slice('did:web:'.length)}/.well-known/did.json`
+  }
+  else {
+    return null
+  }
+
+  const document: DidDocument | null = parseJson(await get(documentUrl))
+  if (document?.id !== did || !Array.isArray(document.service)) return null
+  const pds = document.service.find(service =>
+    service?.type === 'AtprotoPersonalDataServer' && (service.id === '#atproto_pds' || service.id === `${did}#atproto_pds`),
+  )
+  if (typeof pds?.serviceEndpoint !== 'string') return null
+  const endpoint = URL.parse(pds.serviceEndpoint)
+  if (endpoint?.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.pathname !== '/' || endpoint.search || endpoint.hash)
+    return null
+  return endpoint.origin
+}
+
+const remembered = new Map<string, { server: string, expiresAt: number }>()
+const SERVICE_TTL_MS = 60 * 60 * 1000
+const FALLBACK_TTL_MS = 60 * 1000
 
 /**
  * The server to talk to for a handle or DID. Falls back to the default when
@@ -87,15 +99,16 @@ const TTL_MS = 60 * 60 * 1000
  * message instead of with a lookup error.
  */
 export async function resolveBlueskyServer(identifier: string | null | undefined, get: TextGetter = guardedGet): Promise<string> {
-  const key = String(identifier || '').trim().toLowerCase()
+  const value = String(identifier || '').trim().replace(/^@/, '')
+  const key = value.startsWith('did:') ? value : value.toLowerCase()
   if (!key) return DEFAULT_BLUESKY_SERVER
   const known = remembered.get(key)
-  if (known && Date.now() - known.at < TTL_MS) return known.server
+  if (known && Date.now() < known.expiresAt) return known.server
 
   const did = await resolveBlueskyDid(key, get)
-  const server = (did && await resolvePdsOfDid(did, get)) || DEFAULT_BLUESKY_SERVER
-  // A fallback is remembered only briefly, so a lookup that failed once is retried.
-  remembered.set(key, { server, at: did ? Date.now() : Date.now() - TTL_MS + 60_000 })
+  const pds = did ? await resolvePdsOfDid(did, get) : null
+  const server = pds ?? DEFAULT_BLUESKY_SERVER
+  remembered.set(key, { server, expiresAt: Date.now() + (pds ? SERVICE_TTL_MS : FALLBACK_TTL_MS) })
   return server
 }
 

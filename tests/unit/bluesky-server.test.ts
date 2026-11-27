@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { BlueskyApiError, BlueskyDriver, isBlueskySessionError } from '../../app/Services/Social/Drivers/BlueskyDriver'
 import { DEFAULT_BLUESKY_SERVER, forgetBlueskyServers, resolveBlueskyDid, resolveBlueskyServer, resolvePdsOfDid } from '../../app/Support/Social/bluesky-server'
 import { parseLinkPreview } from '../../app/Support/Social/link-preview'
@@ -14,7 +14,9 @@ function network(pages: Record<string, unknown>) {
   return { get, asked }
 }
 
-const pdsDocument = (endpoint: string) => ({ service: [{ id: '#atproto_pds', type: 'AtprotoPersonalDataServer', serviceEndpoint: endpoint }] })
+function pdsDocument(id: string, endpoint: string, serviceId = '#atproto_pds') {
+  return { id, service: [{ id: serviceId, type: 'AtprotoPersonalDataServer', serviceEndpoint: endpoint }] }
+}
 
 afterEach(() => forgetBlueskyServers())
 
@@ -22,7 +24,7 @@ describe('finding the server an account lives on', () => {
   test('a handle on its own server resolves to that server', async () => {
     const { get } = network({
       'https://sam.example.com/.well-known/atproto-did': 'did:plc:abc123\n',
-      'https://plc.directory/did:plc:abc123': pdsDocument('https://pds.example.com'),
+      'https://plc.directory/did:plc:abc123': pdsDocument('did:plc:abc123', 'https://pds.example.com'),
     })
     expect(await resolveBlueskyServer('sam.example.com', get)).toBe('https://pds.example.com')
   })
@@ -30,19 +32,19 @@ describe('finding the server an account lives on', () => {
   test('a handle with no well-known file falls back to the public resolver', async () => {
     const { get } = network({
       'https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=sam.bsky.social': { did: 'did:plc:xyz' },
-      'https://plc.directory/did:plc:xyz': pdsDocument('https://morel.us-east.host.bsky.network'),
+      'https://plc.directory/did:plc:xyz': pdsDocument('did:plc:xyz', 'https://morel.us-east.host.bsky.network'),
     })
     expect(await resolveBlueskyDid('@sam.bsky.social', get)).toBe('did:plc:xyz')
     expect(await resolveBlueskyServer('sam.bsky.social', get)).toBe('https://morel.us-east.host.bsky.network')
   })
 
   test('a did:web account is read from its own domain', async () => {
-    const { get } = network({ 'https://id.example.org/.well-known/did.json': pdsDocument('https://pds.example.org/') })
+    const { get } = network({ 'https://id.example.org/.well-known/did.json': pdsDocument('did:web:id.example.org', 'https://pds.example.org/', 'did:web:id.example.org#atproto_pds') })
     expect(await resolvePdsOfDid('did:web:id.example.org', get)).toBe('https://pds.example.org')
   })
 
   test('an email, an unknown handle or a broken document falls back to the default', async () => {
-    const { get, asked } = network({ 'https://plc.directory/did:plc:bad': { service: [{ id: '#atproto_pds', type: 'AtprotoPersonalDataServer', serviceEndpoint: 'http://insecure.example.com' }] } })
+    const { get, asked } = network({ 'https://plc.directory/did:plc:bad': pdsDocument('did:plc:bad', 'http://insecure.example.com') })
     expect(await resolveBlueskyServer('sam@example.com', get)).toBe(DEFAULT_BLUESKY_SERVER)
     expect(asked).toEqual([])
     expect(await resolveBlueskyServer('nobody.example.com', get)).toBe(DEFAULT_BLUESKY_SERVER)
@@ -50,8 +52,44 @@ describe('finding the server an account lives on', () => {
     expect(await resolveBlueskyServer('', get)).toBe(DEFAULT_BLUESKY_SERVER)
   })
 
+  test('does not use a service from a DID document for another identity', async () => {
+    const { get } = network({
+      'https://plc.directory/did:plc:abc123': pdsDocument('did:plc:other', 'https://pds.example.com'),
+    })
+    expect(await resolvePdsOfDid('did:plc:abc123', get)).toBeNull()
+  })
+
+  test('rejects web DIDs with path segments and service URLs with a path prefix', async () => {
+    const { get, asked } = network({
+      'https://plc.directory/did:plc:abc123': pdsDocument('did:plc:abc123', 'https://pds.example.com/api'),
+    })
+    expect(await resolvePdsOfDid('did:web:id.example.org:users:alice', get)).toBeNull()
+    expect(asked).toEqual([])
+    expect(await resolvePdsOfDid('did:plc:abc123', get)).toBeNull()
+  })
+
+  test('retries a DID document lookup a minute after the fallback', async () => {
+    const address = 'https://plc.directory/did:plc:abc123'
+    const pages: Record<string, unknown> = {}
+    const { get, asked } = network(pages)
+    const timestamp = Date.now()
+    const clock = spyOn(Date, 'now').mockReturnValue(timestamp)
+    try {
+      expect(await resolveBlueskyServer('did:plc:abc123', get)).toBe(DEFAULT_BLUESKY_SERVER)
+      pages[address] = pdsDocument('did:plc:abc123', 'https://pds.example.com')
+      clock.mockReturnValue(timestamp + 59_000)
+      expect(await resolveBlueskyServer('did:plc:abc123', get)).toBe(DEFAULT_BLUESKY_SERVER)
+      clock.mockReturnValue(timestamp + 60_000)
+      expect(await resolveBlueskyServer('did:plc:abc123', get)).toBe('https://pds.example.com')
+      expect(asked).toEqual([address, address])
+    }
+    finally {
+      clock.mockRestore()
+    }
+  })
+
   test('the answer is remembered, not looked up on every request', async () => {
-    const { get, asked } = network({ 'https://plc.directory/did:plc:abc123': pdsDocument('https://pds.example.com') })
+    const { get, asked } = network({ 'https://plc.directory/did:plc:abc123': pdsDocument('did:plc:abc123', 'https://pds.example.com') })
     await resolveBlueskyServer('did:plc:abc123', get)
     await resolveBlueskyServer('did:plc:abc123', get)
     expect(asked).toHaveLength(1)
