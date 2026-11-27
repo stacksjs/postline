@@ -17,7 +17,7 @@ const useCases = USE_CASES
 
       <nav class="hidden md:flex gap-1 items-center" aria-label="Primary">
         {{-- Disclosure menus built on <details>: they open with a click or the
-            keyboard with no script. site-menus.ts closes them on Escape, on a
+            keyboard with no script. site-interactions.ts closes them on Escape, on a
             click elsewhere, and when the router swaps the page. --}}
         <details class="relative group" name="site-menu">
           <summary class="flex gap-1.5 items-center px-3 h-9 list-none text-[14px] text-body whitespace-nowrap hover:text-ink hover:bg-panel-2 rounded-lg transition-colors cursor-pointer">

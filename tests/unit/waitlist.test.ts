@@ -9,9 +9,11 @@ describe('waitlist', () => {
   test('the form sends the honeypot and never says whether an address was already there', () => {
     const form = read('resources/components/Marketing/Waitlist.stx')
     expect(form).toContain('name="website"')
-    expect(form).toContain(`body.set('website', website())`)
-    expect(form).not.toContain('Already subscribed')
-    expect(form).not.toContain('already on the list')
+    expect(form).toContain('action="/api/email/subscribe" method="post"')
+    const script = read('resources/assets/scripts/lib/site-waitlist.ts')
+    expect(script).toContain('new FormData(form)')
+    expect(script).toContain("accept: 'application/json'")
+    expect(form + script).not.toMatch(/already subscribed|already on the list/i)
   })
 
   test('Postline has its own confirm and welcome emails, with no framework copy in them', () => {

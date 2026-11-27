@@ -22,8 +22,8 @@ describe('marketing accessibility', () => {
   })
 
   it('loads the script that closes the header menus', () => {
-    expect(layout).toContain('/assets/scripts/site-menus.ts')
-    const script = read('resources/assets/scripts/site-menus.ts')
+    expect(layout).toContain('/assets/scripts/site-interactions.ts')
+    const script = read('resources/assets/scripts/site-interactions.ts')
     expect(script).toContain('\'Escape\'')
     expect(script).toContain('stx:load')
     expect(read('resources/components/Marketing/SiteHeader.stx').match(/name="site-menu"/g)?.length).toBe(2)

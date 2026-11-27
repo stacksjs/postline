@@ -9,7 +9,6 @@
 
 @head
   <meta name="color-scheme" content="light">
-  <CsrfScripts />
   <title>@yield('title', 'Postline — write once, publish everywhere')</title>
   <meta name="description" content="@yield('description', 'Postline publishes one draft to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Queue, campaigns, inbox and analytics in one open-source app that runs with your keys.')">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -31,7 +30,7 @@
 
   <FontFaces />
   <link rel="stylesheet" href="/assets/styles/marketing.css">
-  <script type="module" src="/assets/scripts/site-menus.ts"></script>
+  <script type="module" src="/assets/scripts/site-interactions.ts"></script>
 @endhead
 
     {{-- Shared chrome: defined once here, so a new page picks up the header

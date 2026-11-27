@@ -1,3 +1,5 @@
+import './lib/site-waitlist'
+
 /**
  * The marketing header's disclosure menus (#232).
  *
