@@ -13,11 +13,15 @@ declare global {
   const readComposerDraft: typeof autoImports.readComposerDraft
   const writeComposerDraft: typeof autoImports.writeComposerDraft
   const COMPOSER_DRAFT_KEY: typeof autoImports.COMPOSER_DRAFT_KEY
+  const COMPOSER_DEFAULT_FORMAT_KEY: typeof autoImports.COMPOSER_DEFAULT_FORMAT_KEY
+  const COMPOSER_AUTOSAVE_KEY: typeof autoImports.COMPOSER_AUTOSAVE_KEY
   const composerFileError: typeof autoImports.composerFileError
   const composerMediaWarnings: typeof autoImports.composerMediaWarnings
   const composerImageFiles: typeof autoImports.composerImageFiles
   const appendComposerImages: typeof autoImports.appendComposerImages
   const composerImageTypes: typeof autoImports.composerImageTypes
+  const composerPreviewCards: typeof autoImports.composerPreviewCards
+  const previewImageUrl: typeof autoImports.previewImageUrl
   const composerScheduleIso: typeof autoImports.composerScheduleIso
   const composerQueueTimestamp: typeof autoImports.composerQueueTimestamp
   const composerActionText: typeof autoImports.composerActionText
@@ -52,8 +56,13 @@ declare global {
   const publishCrosspost: typeof autoImports.publishCrosspost
   const formatHandle: typeof autoImports.formatHandle
   const targetLabel: typeof autoImports.targetLabel
+  const postStatusVariant: typeof autoImports.postStatusVariant
   const workspaceCommands: typeof autoImports.workspaceCommands
   const runWorkspaceCommand: typeof autoImports.runWorkspaceCommand
+  const openXBrowser: typeof autoImports.openXBrowser
+  const readXBrowserSession: typeof autoImports.readXBrowserSession
+  const xBrowserWindow: typeof autoImports.xBrowserWindow
+  const inspectXPage: typeof autoImports.inspectXPage
 }
 
 export {}

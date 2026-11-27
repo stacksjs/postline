@@ -461,6 +461,17 @@ declare module '@stacksjs/database' {
       lifted_at: string
       team_id: number
     }
+    composer_presets: {
+      // columns
+      id: number
+      uuid: string
+      created_at: string
+      updated_at: string | null
+      kind: "snippet" | "template" | "hashtags"
+      name: string
+      body: string
+      account_id: number
+    }
     consent_events: {
       // columns
       id: number
@@ -707,6 +718,28 @@ declare module '@stacksjs/database' {
       failure_reason: string
       sent_at: string
       dm_conversation_id: number
+    }
+    draft_feed_entries: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      entry_key: string
+      draft_feed_id: number
+    }
+    draft_feeds: {
+      // columns
+      id: number
+      uuid: string
+      created_at: string
+      updated_at: string | null
+      name: string
+      url: string
+      active: number
+      initialized: number
+      last_checked_at: string
+      last_error: string
+      account_id: number
     }
     drivers: {
       // columns
@@ -1473,6 +1506,16 @@ declare module '@stacksjs/database' {
       social_driver_id: number
       social_identity_id: number
     }
+    posting_slots: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      provider: string
+      weekday: number
+      minute: number
+      account_id: number
+    }
     posts: {
       // columns
       id: number
@@ -1716,6 +1759,22 @@ declare module '@stacksjs/database' {
       duration: number
       metadata: string
       print_device_id: number
+    }
+    recurring_posts: {
+      // columns
+      id: number
+      uuid: string
+      created_at: string
+      updated_at: string | null
+      title: string
+      template: unknown
+      interval: "daily" | "weekly" | "monthly"
+      starts_at: string
+      next_at: string
+      timezone: string
+      active: number
+      last_error: string
+      account_id: number
     }
     redirects: {
       // columns
@@ -2100,6 +2159,18 @@ declare module '@stacksjs/database' {
       reply_count: number
       social_driver_id: number
       social_identity_id: number
+    }
+    tracked_links: {
+      // columns
+      id: number
+      created_at: string
+      updated_at: string | null
+      code: string
+      name: string
+      destination: string
+      visits: number
+      disabled: number
+      account_id: number
     }
     transactions: {
       // columns
