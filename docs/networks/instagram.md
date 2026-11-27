@@ -38,3 +38,16 @@ Postline stores the Facebook User token for insights separately from the Page
 token it uses to publish. If you connect with a Page token in `.env`, provide
 the Facebook User token in `INSTAGRAM_INSIGHTS_ACCESS_TOKEN`. [Provider
 documentation](https://developers.facebook.com/documentation/instagram-platform/reference/instagram-media/insights).
+
+## First comments
+
+Grant `instagram_manage_comments` in your Meta app. Enable **Publish first
+comments** in its Postline network app settings, then reconnect Instagram.
+If you set up Instagram with a Page token in `.env`, set
+`INSTAGRAM_FIRST_COMMENTS=true` and provide a Facebook User token with
+the comment permission in `INSTAGRAM_COMMENTS_ACCESS_TOKEN`.
+
+In Composer, select Instagram and open **First comments**. Postline sends the
+comment after the first post goes live. A refused comment can be retried from
+**Queue > Needs attention**. If delivery is uncertain, check the published
+post for the comment. [Meta comments API](https://developers.facebook.com/documentation/instagram-platform/instagram-graph-api/reference/ig-media/comments#creating)

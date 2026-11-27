@@ -92,6 +92,13 @@
           </header>
           <p class="m-0 leading-normal text-body text-ui">{{ row.body }}</p>
           <p class="m-0 text-danger text-xs" x-show="row.failure" :text="row.failure"></p>
+          <div class="flex flex-wrap gap-2 items-center justify-between text-xs" x-for="comment in row.comments" :key="comment.targetId" :class="comment.needsAttention ? 'text-danger' : 'text-muted'">
+            <span :text="comment.message"></span>
+            <a class="text-info underline" x-show="comment.url" :href="comment.url" target="_blank" rel="noopener noreferrer">Check comments on post</a>
+            <span x-show="comment.canRetry">
+              <Button variant="secondary" size="xs" :disabled="Boolean(commentBusy())" :loading="commentBusy() === comment.targetId" @click="retryFirstComment(comment.targetId)">Retry first comment</Button>
+            </span>
+          </div>
           <footer class="flex flex-wrap gap-1.5 items-center justify-end" x-show="row.liveUrl || row.actionable || row.partial || row.resumeLabel || row.canRepeat">
             <div class="group-focus-within:opacity-100 group-hover:opacity-100 transition-opacity" :class="row.attention ? '' : 'pointer-fine:opacity-0'">
               <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl && !row.actionable && !row.partial && !row.resumeLabel" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View post</a>
@@ -211,7 +218,9 @@
       status?: string
       failureReason?: string | null
       remoteUri?: string | null
+      remoteUrl?: string | null
       nextAttemptAt?: string | null
+      firstComment?: { targetId: number, status: 'pending' | 'sending' | 'sent' | 'failed' | 'uncertain', error: string | null }
     }
 
     interface QueueApiItem {
@@ -241,6 +250,7 @@
       meta: string
       /** Failed outright or on some networks: the "Needs attention" tab. */
       attention: boolean
+      comments: Array<{ targetId: number, message: string, needsAttention: boolean, canRetry: boolean, url: string }>
       failure: string
       liveUrl: string
       editUrl: string
@@ -286,6 +296,7 @@
     const nextCursor = state(0)
     const loadingMore = state(false)
     const busyId = state(0)
+    const commentBusy = state(0)
     const selectionOpen = state(false)
     const selectedPosts = state<{ id: number, scheduledAt: string | null }[]>([])
     const canReschedule = derived(() => selectedPosts().length > 0 && selectedPosts().every(post => post.scheduledAt !== null))
@@ -406,6 +417,15 @@
           title: failed ? `${label}: ${target.failureReason || 'failed'}${retryNote(target)}` : sent ? `Sent to ${label}` : `Not sent to ${label} yet`,
         }
       })
+      const comments = item.providers.flatMap(({ firstComment, remoteUrl }, index) => {
+        if (!firstComment) return []
+        const { targetId, status, error } = firstComment
+        const canRetry = status === 'failed'
+        const needsAttention = canRetry || status === 'uncertain'
+        const detail = error || (status === 'sent' ? 'sent' : 'waiting to send')
+        const url = status === 'uncertain' ? liveUrlFor(remoteUrl) : ''
+        return [{ targetId, message: `${targets[index].label} first comment · ${detail}`, needsAttention, canRetry, url }]
+      })
       return {
         id: item.id,
         status: item.status,
@@ -413,9 +433,10 @@
         when,
         targets,
         meta: [extras, thread].filter(Boolean).join(' · '),
-        attention: item.status === 'failed' || Boolean(item.partial),
+        attention: item.status === 'failed' || Boolean(item.partial) || comments.some(comment => comment.needsAttention),
+        comments,
         failure: failureText(item),
-        liveUrl: liveUrlFor(item.providers.find(target => target.remoteUri)?.remoteUri),
+        liveUrl: item.providers.map(target => liveUrlFor(target.remoteUrl || target.remoteUri)).find(Boolean) || '',
         editUrl: `/composer?edit=${item.id}`,
         actionable: ACTIONABLE.has(item.status),
         canRepeat: targets.length > 0 && (ACTIONABLE.has(item.status) || item.status === 'published'),
@@ -485,7 +506,7 @@
           scheduled: { title: 'No scheduled posts', description: 'Choose a time in Composer to schedule a post.' },
           drafts: { title: 'No drafts', description: 'Save a draft from Composer to finish it later.' },
           published: { title: 'Nothing published yet', description: 'Posts appear here once they go out.' },
-          attention: { title: 'Nothing needs attention', description: 'Posts with a failed destination appear here.' },
+          attention: { title: 'Nothing needs attention', description: 'Posts with a failed destination or first comment appear here.' },
         })[tab()])
 
     const metaText = derived(() => {
@@ -804,9 +825,9 @@
       }
     }
 
-    const post = async (path: string, id: number): Promise<unknown> => {
+    const post = async (path: string, id: number, field = 'id'): Promise<unknown> => {
       const form = new FormData()
-      form.set('id', String(id))
+      form.set(field, String(id))
       const response = await fetch(path, { method: 'POST', body: form })
       const payload = await response.json()
       if (!response.ok || !payload.ok) throw new Error(payload.error || 'Request failed.')
@@ -893,6 +914,27 @@
       { title: 'Published', message: 'Post published.' },
       'Publish failed',
     )
+
+    async function retryFirstComment(id: number): Promise<void> {
+      if (commentBusy()) return
+      commentBusy.set(id)
+      try {
+        const result = await post('/api/postline/queue/first-comment/retry', id, 'target_id') as { status: string, error?: string }
+        if (result.status === 'sent') {
+          showNotification({ title: 'First comment sent', message: 'The comment was added to the published post.', tone: 'success' })
+        }
+        else {
+          showNotification({ title: 'First comment needs attention', message: result.error, tone: 'error' })
+        }
+      }
+      catch (error) {
+        showNotification({ title: 'Could not retry first comment', message: error instanceof Error ? error.message : String(error), tone: 'error' })
+      }
+      finally {
+        await refresh()
+        commentBusy.set(0)
+      }
+    }
 
     const retryItem = (id: number): void => void runAction(
       id,

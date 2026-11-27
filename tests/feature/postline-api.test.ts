@@ -74,6 +74,13 @@ describe('public inbox API', () => {
   })
 })
 
+test('retrying a first comment requires the owner and a refused target', async () => {
+  const path = '/api/postline/queue/first-comment/retry'
+  ;(await featureTest().post(path, { target_id: 2147483647 })).assertStatus(401)
+  const client = featureTest().actingAs(await actingUser())
+  ;(await client.post(path, { target_id: 2147483647 })).assertStatus(409)
+})
+
 describe('tracked links', () => {
   test('the authenticated owner issues and disables a link, and only GET increments the total', async () => {
     type LinkWithUrl = TrackedLink & { shortUrl: string }

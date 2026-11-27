@@ -58,6 +58,7 @@ declare global {
   const fetchWorkspace: typeof autoImports.fetchWorkspace
   const fetchProviders: typeof autoImports.fetchProviders
   const publishCrosspost: typeof autoImports.publishCrosspost
+  const appendPostOptions: typeof autoImports.appendPostOptions
   const formatHandle: typeof autoImports.formatHandle
   const targetLabel: typeof autoImports.targetLabel
   const postStatusVariant: typeof autoImports.postStatusVariant

@@ -26,6 +26,7 @@ export default new Action({
         organizationPages: flag('organization_pages'),
         engagementMetrics: flag('engagement_metrics'),
         directMessages: flag('direct_messages'),
+        firstComments: flag('first_comments'),
       })
       return response.json({ ok: true, data })
     }

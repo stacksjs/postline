@@ -28,6 +28,7 @@ export interface NetworkAppCredentials {
   organizationPages: boolean
   engagementMetrics: boolean
   directMessages: boolean
+  firstComments: boolean
   /** Where the id and secret came from. */
   source: 'settings' | 'environment' | 'none'
 }
@@ -43,6 +44,7 @@ export interface NetworkAppSummary {
   organizationPages: boolean
   engagementMetrics: boolean
   directMessages: boolean
+  firstComments: boolean
   readUsage?: Awaited<ReturnType<typeof twitterReadUsage>>
 }
 
@@ -71,6 +73,7 @@ export class NetworkAppService {
         organizationPages: network === 'linkedin' && Boolean(Number(row.organization_pages ?? 0)),
         engagementMetrics: Boolean(Number(row.engagement_metrics ?? 0)),
         directMessages: network === 'twitter' && Boolean(Number(row.direct_messages ?? 0)),
+        firstComments: network === 'instagram' && Boolean(Number(row.first_comments ?? 0)),
         source: 'settings',
       }
     }
@@ -82,6 +85,7 @@ export class NetworkAppService {
       organizationPages: network === 'linkedin' && env('PAGES').toLowerCase() === 'true',
       engagementMetrics: env('ENGAGEMENT_METRICS').toLowerCase() === 'true',
       directMessages: network === 'twitter' && env('DIRECT_MESSAGES').toLowerCase() === 'true',
+      firstComments: network === 'instagram' && env('FIRST_COMMENTS').toLowerCase() === 'true',
       source: clientId ? 'environment' : 'none',
     }
   }
@@ -99,6 +103,7 @@ export class NetworkAppService {
         organizationPages: credentials.organizationPages,
         engagementMetrics: credentials.engagementMetrics,
         directMessages: credentials.directMessages,
+        firstComments: credentials.firstComments,
         ...(provider === 'twitter' ? { readUsage: await twitterReadUsage() } : {}),
       }
     }))
@@ -108,7 +113,7 @@ export class NetworkAppService {
    * Store a network's app. A blank secret keeps the stored one, so the id can
    * be corrected without pasting the secret again.
    */
-  async save(network: AppNetwork, input: { clientId: string, clientSecret?: string, redirectUrl?: string, organizationPages?: boolean, engagementMetrics?: boolean, directMessages?: boolean }): Promise<NetworkAppSummary> {
+  async save(network: AppNetwork, input: { clientId: string, clientSecret?: string, redirectUrl?: string, organizationPages?: boolean, engagementMetrics?: boolean, directMessages?: boolean, firstComments?: boolean }): Promise<NetworkAppSummary> {
     if (!APP_NETWORKS.includes(network)) throw new UserFacingError('That network does not use an app of its own.')
     const clientId = input.clientId.trim()
     if (!clientId || clientId.length > 255 || /\s/.test(clientId)) throw new UserFacingError('Paste the client id from the network\'s developer console. It has no spaces.')
@@ -128,6 +133,7 @@ export class NetworkAppService {
       ...(input.organizationPages === undefined ? {} : { organization_pages: network === 'linkedin' && input.organizationPages }),
       ...(input.engagementMetrics === undefined ? {} : { engagement_metrics: input.engagementMetrics }),
       ...(network === 'twitter' && input.directMessages !== undefined ? { direct_messages: input.directMessages } : {}),
+      ...(network === 'instagram' && input.firstComments !== undefined ? { first_comments: input.firstComments } : {}),
       updated_at: now(),
     }
     if (existing)

@@ -16,6 +16,7 @@ import { explainNetworkError } from '../../Support/Social/network-errors'
 import { networkApps } from '../NetworkAppService'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { classifyFailure } from '../../Support/Social/retry'
+import { pendingFirstComment } from '../../Support/Social/post-options'
 
 const database = db as any
 
@@ -281,6 +282,8 @@ export class LinkedInService {
       await database.updateTable('post_targets').set({
         status: 'published',
         remote_uri: published.uri || null,
+        remote_url: published.url || null,
+        ...pendingFirstComment(content?.options, 'linkedin'),
         failure_reason: null,
         updated_at: now(),
       }).where('id', '=', target.id).execute()
@@ -310,6 +313,23 @@ export class LinkedInService {
       }).where('id', '=', target.id).execute()
 
       return { provider: 'linkedin', ok: false, error: message, targetId: Number(target.id), retry: classifyFailure(error), ...account }
+    }
+  }
+
+  async publishFirstComment(identityId: number, uri: string, message: string): Promise<string | null> {
+    const identity = await this.requireIdentity(identityId).catch(() => {
+      throw new UserFacingError('Reconnect the LinkedIn account that published this post.')
+    })
+    try {
+      return await this.driver.createComment({
+        handle: identity.handle,
+        did: identity.external_id || undefined,
+        accessToken: identity.access_token || undefined,
+      }, uri, message)
+    }
+    catch (error) {
+      if (explainNetworkError('linkedin', error).kind === 'expired') await markIdentityExpired(identity)
+      throw error
     }
   }
 

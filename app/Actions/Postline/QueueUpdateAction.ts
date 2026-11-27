@@ -66,7 +66,8 @@ export default new Action({
 
     // Sent by the composer on every edit; another client that leaves them
     // all out keeps what is stored.
-    const sendsOptions = ['language', 'mastodon_visibility', 'mastodon_spoiler'].some(key => request.get(key) !== undefined && request.get(key) !== null)
+    const sendsOptions = ['language', 'mastodon_visibility', 'mastodon_spoiler', 'linkedin_first_comment', 'instagram_first_comment']
+      .some(key => request.get(key) !== undefined && request.get(key) !== null)
     const readOptions = readPostOptions(key => request.get(key))
     if (!readOptions.ok)
       return response.json({ ok: false, error: readOptions.error }, { status: 422 })

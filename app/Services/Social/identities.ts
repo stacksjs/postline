@@ -24,7 +24,7 @@ import { now, uuid } from './support'
 
 const database = db as any
 
-const TOKEN_COLUMNS = ['access_token', 'refresh_token', 'insights_access_token'] as const
+const TOKEN_COLUMNS = ['access_token', 'refresh_token', 'insights_access_token', 'instagram_comments_access_token'] as const
 type TokenColumns = Record<typeof TOKEN_COLUMNS[number], string | null>
 // A reconnect encrypts fresh ciphertext even when the credential string is
 // unchanged. Keep that stored generation out of the public identity object.
@@ -40,6 +40,7 @@ function updateCurrentIdentity(identity: IdentityLike, values: Record<string, un
     .where('access_token', tokens.access_token == null ? 'is' : '=', tokens.access_token)
     .where('refresh_token', tokens.refresh_token == null ? 'is' : '=', tokens.refresh_token)
     .where('insights_access_token', tokens.insights_access_token == null ? 'is' : '=', tokens.insights_access_token)
+    .where('instagram_comments_access_token', tokens.instagram_comments_access_token == null ? 'is' : '=', tokens.instagram_comments_access_token)
 }
 
 /**
@@ -60,6 +61,7 @@ export async function openIdentityRow<T>(row: T | undefined): Promise<T | undefi
     access_token: typeof opened.access_token === 'string' ? opened.access_token : null,
     refresh_token: typeof opened.refresh_token === 'string' ? opened.refresh_token : null,
     insights_access_token: typeof opened.insights_access_token === 'string' ? opened.insights_access_token : null,
+    instagram_comments_access_token: typeof opened.instagram_comments_access_token === 'string' ? opened.instagram_comments_access_token : null,
   })
   for (const column of TOKEN_COLUMNS) {
     if (typeof opened[column] !== 'string')
@@ -112,6 +114,7 @@ export function sealStoredTokens(): Promise<number> {
         .where('access_token', row.access_token == null ? 'is' : '=', row.access_token)
         .where('refresh_token', row.refresh_token == null ? 'is' : '=', row.refresh_token)
         .where('insights_access_token', row.insights_access_token == null ? 'is' : '=', row.insights_access_token)
+        .where('instagram_comments_access_token', row.instagram_comments_access_token == null ? 'is' : '=', row.instagram_comments_access_token)
         .returning('id')
         .executeTakeFirst()
       if (updated) rewritten++
@@ -255,10 +258,11 @@ export async function revokeIdentityRow(provider: string, identityId: number): P
     access_token: null,
     refresh_token: null,
     insights_access_token: null,
+    instagram_comments_access_token: null,
     token_expires_at: null,
   }).where('id', '=', row.id).execute()
 
-  return { ...row, auth_status: 'revoked', access_token: null, refresh_token: null, insights_access_token: null }
+  return { ...row, auth_status: 'revoked', access_token: null, refresh_token: null, insights_access_token: null, instagram_comments_access_token: null }
 }
 
 /**

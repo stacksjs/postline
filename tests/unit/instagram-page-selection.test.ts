@@ -12,6 +12,7 @@ const selection = {
     { pageId: '701', pageName: 'Second Page', igUserId: '9002', username: 'second.page', pageAccessToken: 'private-second-page' },
   ],
   insightsAccessToken: 'private-insights-token',
+  commentsAccessToken: 'private-comments-token',
 }
 
 function request(state: string, cookie: string, fields: Record<string, unknown> = {}): RequestInstance {
@@ -58,7 +59,7 @@ test('an Instagram Page must be selected from the authorized list by its owner a
     await expect(previewInstagramPageSelection(request(state, cookie), owner)).rejects.toThrow('expired')
 
     const rows = await db.unsafe(
-      'SELECT external_id, instagram_page_id, access_token, insights_access_token FROM social_identities WHERE provider = ? AND external_id IN (?, ?)',
+      'SELECT external_id, instagram_page_id, access_token, insights_access_token, instagram_comments_access_token FROM social_identities WHERE provider = ? AND external_id IN (?, ?)',
       ['instagram', '9001', '9002'],
     )
     expect(rows).toHaveLength(1)
@@ -66,6 +67,8 @@ test('an Instagram Page must be selected from the authorized list by its owner a
     expect(rows[0]?.access_token).toStartWith('enc:v1:')
     expect(await openToken(String(rows[0]?.access_token))).toBe('private-second-page')
     expect(await openToken(String(rows[0]?.insights_access_token))).toBe('private-insights-token')
+    expect(rows[0]?.instagram_comments_access_token).toStartWith('enc:v1:')
+    expect(await openToken(String(rows[0]?.instagram_comments_access_token))).toBe('private-comments-token')
   }
   finally {
     await store.take(oauthFlowDigest(state))

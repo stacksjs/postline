@@ -36,6 +36,7 @@ export interface ProviderStatus {
   authStatus: string
   configuredFromEnv?: boolean
   oauthConfigured?: boolean
+  firstCommentsEnabled?: boolean
   accounts?: AccountStatus[]
 }
 
@@ -50,6 +51,19 @@ export interface CrosspostResultItem {
   identityId?: number
   handle?: string
   target?: string
+  firstComment?: { status: 'pending' | 'sending' | 'sent' | 'failed' | 'uncertain', error?: string }
+}
+
+export interface PostOptionFields {
+  language?: string
+  mastodon_visibility?: string
+  mastodon_spoiler?: string
+  linkedin_first_comment?: string
+  instagram_first_comment?: string
+}
+
+export function appendPostOptions(form: FormData, options?: PostOptionFields): void {
+  for (const [key, value] of Object.entries(options ?? {})) form.set(key, value)
 }
 
 export interface CrosspostInput {
@@ -68,7 +82,7 @@ export interface CrosspostInput {
   /** Several attached images, in order, each with its alt text. */
   imageFiles?: Array<{ file: File, alt?: string }>
   /** The post's language, and Mastodon's visibility and content warning. */
-  options?: { language?: string, mastodonVisibility?: string, mastodonSpoiler?: string }
+  options?: PostOptionFields
   /** Multi-segment thread; reply-chained on providers that support it. */
   thread?: string[]
   /**
@@ -129,9 +143,7 @@ export async function publishCrosspost(input: CrosspostInput): Promise<{ postId?
   }
   if (input.variants && Object.keys(input.variants).length)
     body.set('variants', JSON.stringify(input.variants))
-  if (input.options?.language) body.set('language', input.options.language)
-  if (input.options?.mastodonVisibility) body.set('mastodon_visibility', input.options.mastodonVisibility)
-  if (input.options?.mastodonSpoiler) body.set('mastodon_spoiler', input.options.mastodonSpoiler)
+  appendPostOptions(body, input.options)
 
   const response = await fetch('/api/postline/publish', { method: 'POST', body })
   const payload = await response.json()

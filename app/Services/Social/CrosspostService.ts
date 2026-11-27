@@ -23,8 +23,9 @@ import type { MediaShare } from '../../Support/Social/media-share'
 import { openMediaShare } from '../../Support/Social/media-share'
 import { MEDIA_RULES } from '../../Support/Social/media-rules'
 import { sanitizePostOptions } from '../../Support/Social/post-options'
-import { hydrateStoredContent, MissingMediaError, parseStoredContent } from '../../Support/Social/stored-content'
+import { hydrateStoredContent, InvalidFirstCommentError, MissingMediaError, parseStoredContent } from '../../Support/Social/stored-content'
 import { ensureAccount, now, uuid } from './support'
+import { postFirstComments } from './PostFirstCommentService'
 
 const database = db as any
 
@@ -178,6 +179,7 @@ export class CrosspostService {
       status: 'publishing',
       timezone: await workspace.timezone(),
       source: 'composer',
+      ...(content?.options ? { content: JSON.stringify({ options: content.options }) } : {}),
       account_id: accountId,
       created_at: createdAt,
       updated_at: createdAt,
@@ -347,7 +349,7 @@ export class CrosspostService {
           result = await this.publishTarget(target, publishingPost, threadSegmentContent(index, content, chain))
         }
         catch (error) {
-          if (!(error instanceof MissingMediaError)) throw error
+          if (!(error instanceof MissingMediaError || error instanceof InvalidFirstCommentError)) throw error
           result = await this.recordThreadFailure(target, publishingPost.id, error.message)
         }
         results.push(result)
@@ -524,6 +526,18 @@ export class CrosspostService {
     const line = `[postline] publish post=${post.id} target=${targetKey({ provider: result.provider, identityId: identityId ?? null })} ok=${result.ok} ms=${Date.now() - startedMs}${result.ok ? '' : ` error=${JSON.stringify(String(result.error || '').slice(0, 300))}`}`
     if (result.ok) log.info(line)
     else log.warn(line)
+    const provider = result.provider
+    if (result.ok && result.targetId && (provider === 'linkedin' || provider === 'instagram') && content?.options?.firstComments?.[provider]) {
+      try {
+        result.firstComment = await postFirstComments.send(result.targetId) ?? { status: 'pending' }
+      }
+      catch {
+        // The parent is already published. The outbox handles the comment
+        // separately even if a failure prevented recording its result here.
+        log.warn(`[postline] could not record first comment for target ${result.targetId}`)
+        result.firstComment = { status: 'pending' }
+      }
+    }
     return {
       ...result,
       ...(identityId ? { identityId } : {}),

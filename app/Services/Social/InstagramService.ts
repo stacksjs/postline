@@ -14,6 +14,7 @@ import { explainNetworkError } from '../../Support/Social/network-errors'
 import { networkApps } from '../NetworkAppService'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { classifyFailure } from '../../Support/Social/retry'
+import { pendingFirstComment } from '../../Support/Social/post-options'
 
 const database = db as any
 const DEFAULT_GRAPH_VERSION = 'v27.0'
@@ -28,6 +29,7 @@ type SocialIdentityRow = {
   access_token?: string | null
   refresh_token?: string | null
   insights_access_token?: string | null
+  instagram_comments_access_token?: string | null
   instagram_page_id?: string | null
   token_expires_at?: string | null
   account_id?: number | null
@@ -48,6 +50,8 @@ interface InstagramConfig {
   redirectUrl: string
   accessToken: string
   insightsAccessToken: string
+  commentsAccessToken: string
+  firstComments: boolean
   engagementMetrics: boolean
   userId: string
   username: string
@@ -57,6 +61,7 @@ interface InstagramConfig {
 export interface InstagramPageSelection {
   pages: InstagramPageAccount[]
   insightsAccessToken?: string
+  commentsAccessToken?: string
 }
 
 export class InstagramService {
@@ -79,6 +84,8 @@ export class InstagramService {
       redirectUrl: app.redirectUrl,
       accessToken: String(env.INSTAGRAM_ACCESS_TOKEN || '').trim(),
       insightsAccessToken: String(env.INSTAGRAM_INSIGHTS_ACCESS_TOKEN || '').trim(),
+      commentsAccessToken: String(env.INSTAGRAM_COMMENTS_ACCESS_TOKEN || '').trim(),
+      firstComments: app.firstComments,
       engagementMetrics: app.engagementMetrics,
       userId: String(env.INSTAGRAM_USER_ID || '').trim(),
       username: String(env.INSTAGRAM_USERNAME || '').trim(),
@@ -91,6 +98,7 @@ export class InstagramService {
         'pages_show_list',
         'pages_read_engagement',
         ...(app.engagementMetrics ? ['instagram_manage_insights'] : []),
+        ...(app.firstComments ? ['instagram_manage_comments'] : []),
       ],
     }
   }
@@ -116,6 +124,7 @@ export class InstagramService {
       characterLimit: this.driver.characterLimit,
       canPublish: connected,
       requiresMedia: true,
+      firstCommentsEnabled: cfg.firstComments,
       configuredFromEnv: Boolean(cfg.accessToken && cfg.userId),
       oauthConfigured: Boolean(cfg.clientId && cfg.clientSecret && cfg.redirectUrl),
       accounts: rows.map(row => toPublicAccount(row, { isDefault: Number(row.id) === Number(identity?.id) })),
@@ -180,13 +189,18 @@ export class InstagramService {
     const pages = await this.driver.listAccounts(userToken)
     if (!pages.length) throw new UserFacingError('Facebook did not return a Page linked to an Instagram professional account.')
     if (testOnly) return
-    return { pages, insightsAccessToken: cfg.engagementMetrics ? userToken : undefined }
+    return {
+      pages,
+      insightsAccessToken: cfg.engagementMetrics ? userToken : undefined,
+      ...(cfg.firstComments ? { commentsAccessToken: userToken } : {}),
+    }
   }
 
-  async connectAuthorizedPage(page: InstagramPageAccount, insightsAccessToken?: string) {
+  async connectAuthorizedPage(page: InstagramPageAccount, insightsAccessToken?: string, commentsAccessToken?: string) {
     const identity = await this.saveSession({
       accessToken: page.pageAccessToken,
       insightsAccessToken,
+      commentsAccessToken,
       igUserId: page.igUserId,
       username: page.username,
       pageId: page.pageId,
@@ -209,17 +223,20 @@ export class InstagramService {
     let username = cfg.username || undefined
     let pageAccessToken = cfg.accessToken
     let insightsAccessToken = cfg.insightsAccessToken
+    let commentsAccessToken = cfg.commentsAccessToken
     if (!igUserId) {
       const account = await this.driver.resolveAccount(cfg.accessToken)
       igUserId = account.igUserId
       username = account.username
       pageAccessToken = account.pageAccessToken
       insightsAccessToken ||= cfg.accessToken
+      commentsAccessToken ||= cfg.accessToken
     }
 
     const identity = await this.saveSession({
       accessToken: pageAccessToken,
       insightsAccessToken: cfg.engagementMetrics ? insightsAccessToken : undefined,
+      commentsAccessToken: cfg.firstComments ? commentsAccessToken : undefined,
       igUserId,
       username,
     }, { revive: options.revive ?? true })
@@ -293,6 +310,8 @@ export class InstagramService {
       await database.updateTable('post_targets').set({
         status: 'published',
         remote_uri: published.uri || null,
+        remote_url: published.url || null,
+        ...pendingFirstComment(content?.options, 'instagram'),
         failure_reason: null,
         updated_at: now(),
       }).where('id', '=', target.id).execute()
@@ -323,6 +342,24 @@ export class InstagramService {
 
       return { provider: 'instagram', ok: false, error: message, targetId: Number(target.id), retry: classifyFailure(error), ...account }
     }
+  }
+
+  async publishFirstComment(identityId: number, uri: string, message: string): Promise<string | null> {
+    const cfg = await this.config()
+    if (!cfg.firstComments)
+      throw new UserFacingError('Enable Instagram first comments in Channels, then reconnect the account.')
+    const identity = await this.requireIdentity(identityId).catch(() => {
+      throw new UserFacingError('Reconnect the Instagram account that published this post.')
+    })
+    if (!identity.instagram_comments_access_token)
+      throw new UserFacingError('Reconnect Instagram in Channels to allow first comments.')
+
+    // This uses Facebook's User token. Its expiry does not invalidate the Page
+    // token that posted the media and can still publish later posts.
+    return await this.driver.createComment({
+      handle: identity.handle,
+      accessToken: identity.instagram_comments_access_token,
+    }, uri, message)
   }
 
   async syncMetrics(limit = 100) {
@@ -366,7 +403,7 @@ export class InstagramService {
    * id: reconnecting an account refreshes its row, a different one is added.
    */
   private async saveSession(
-    input: { accessToken: string, insightsAccessToken?: string, igUserId: string, username?: string, pageId?: string },
+    input: { accessToken: string, insightsAccessToken?: string, commentsAccessToken?: string, igUserId: string, username?: string, pageId?: string },
     options: { revive?: boolean } = {},
   ): Promise<SocialIdentityRow> {
     const accountId = await ensureAccount()
@@ -383,6 +420,7 @@ export class InstagramService {
       access_token: input.accessToken,
       refresh_token: null,
       insights_access_token: input.insightsAccessToken || null,
+      instagram_comments_access_token: input.commentsAccessToken || null,
       token_expires_at: null,
       account_id: accountId,
       social_driver_id: driver.id,

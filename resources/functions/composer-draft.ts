@@ -12,6 +12,7 @@ export interface ComposerDraft {
   scheduledIso: string | null
   posts: Array<{ text: string }>
   variants: Array<{ provider: string, text: string, shared: string }>
+  firstComments?: { linkedin?: string, instagram?: string }
 }
 
 const MAX_DRAFT_TEXT = 10_000
@@ -26,12 +27,17 @@ export function readComposerDraft(value: string): ComposerDraft | null {
     let action: ComposerAction = 'publish'
     if (scheduledIso) action = 'schedule'
     else if (draft.mode === 'draft' || draft.action === 'draft' || draft.action === 'schedule') action = 'draft'
+    const comments = draft.firstComments as ComposerDraft['firstComments']
 
     return {
       activeIndex: typeof draft.activeIndex === 'number' && Number.isInteger(draft.activeIndex) ? draft.activeIndex : 0,
       mode: draft.mode === 'thread' ? 'thread' : 'single',
       action,
       scheduledIso,
+      ...(comments && { firstComments: {
+        linkedin: typeof comments.linkedin === 'string' ? comments.linkedin.slice(0, 1250) : undefined,
+        instagram: typeof comments.instagram === 'string' ? comments.instagram.slice(0, 1250) : undefined,
+      } }),
       // Keep up to the Blog's limit so drafts survive changes to their targets.
       posts: draft.posts.slice(0, 24).map(post => ({ text: String(post?.text || '').slice(0, MAX_DRAFT_TEXT) })),
       variants: Array.isArray(draft.variants)

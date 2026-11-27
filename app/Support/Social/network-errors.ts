@@ -44,10 +44,11 @@ const NAMES: Record<string, string> = {
  * through as it is.
  */
 /** What Postline was doing when the network said no, so the message names it. */
-export type NetworkAction = 'post' | 'delete' | 'read' | 'search' | 'metrics'
+export type NetworkAction = 'post' | 'delete' | 'read' | 'search' | 'metrics' | 'comment'
 
 const DOING: Record<NetworkAction, { thing: string, verb: string }> = {
   post: { thing: 'take this post', verb: 'post' },
+  comment: { thing: 'add the first comment', verb: 'comment' },
   delete: { thing: 'delete this post', verb: 'delete posts' },
   read: { thing: 'load your messages', verb: 'read messages' },
   search: { thing: 'run this search', verb: 'search' },
@@ -78,12 +79,13 @@ export function explainNetworkError(provider: string, error: unknown, action: Ne
     case 'permission':
       return { kind, message: `${name} did not allow this.${said} Check that the app or token has permission to ${doing.verb}, then try again.` }
     case 'rate-limited':
-      return { kind, message: `${name} is limiting how often Postline can ${doing.verb} right now. It will try again later.` }
+      return { kind, message: `${name} is limiting how often Postline can ${doing.verb} right now. ${action === 'comment' ? 'Try again later.' : 'It will try again later.'}` }
     case 'duplicate':
       return { kind, message: `${name} refused this as a duplicate of a post already there. Change the text, or leave it: the earlier post is up.` }
     case 'media':
       return { kind, message: `${name} would not take the image.${said} Try a smaller file or a different format.` }
     case 'content':
+      if (action === 'comment') return { kind, message: `${name} rejected the comment.${said}` }
       return { kind, message: `${name} rejected the post.${said} Edit it and try again.` }
     case 'temporary':
       return { kind, message: status ? `${name} is having trouble right now (${status}). Postline will try again shortly.` : `Postline could not reach ${name}. It will try again shortly.` }

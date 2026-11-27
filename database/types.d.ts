@@ -1213,6 +1213,7 @@ declare module '@stacksjs/database' {
       organization_pages: number
       engagement_metrics: number
       direct_messages: number
+      first_comments: number
     }
     notification_deliveries: {
       // columns
@@ -1488,8 +1489,14 @@ declare module '@stacksjs/database' {
       status: "draft" | "scheduled" | "publishing" | "published" | "failed" | "skipped"
       scheduled_at: string
       remote_uri: string
+      remote_url: string
       remote_cid: string
       failure_reason: string
+      first_comment_body: string
+      first_comment_status: "pending" | "sending" | "sent" | "failed" | "uncertain"
+      first_comment_started_at: string
+      first_comment_remote_id: string
+      first_comment_error: string
       attempts: number
       next_attempt_at: string
       metrics: unknown
@@ -1892,6 +1899,7 @@ declare module '@stacksjs/database' {
       twitter_dm_state: string
       instagram_page_id: string
       insights_access_token: string
+      instagram_comments_access_token: string
       token_expires_at: string
       account_id: number
       social_driver_id: number

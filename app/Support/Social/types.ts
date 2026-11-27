@@ -133,6 +133,12 @@ export interface PublishContent {
   variants?: Partial<Record<SocialProvider, string>>
 }
 
+export interface FirstCommentOutcome {
+  status: 'pending' | 'sending' | 'sent' | 'failed' | 'uncertain'
+  remoteId?: string | null
+  error?: string
+}
+
 /** Outcome of publishing one post to a single target during a crosspost. */
 export interface CrosspostTargetResult {
   provider: SocialProvider
@@ -141,6 +147,7 @@ export interface CrosspostTargetResult {
   uri?: string
   cid?: string
   targetId?: number
+  firstComment?: FirstCommentOutcome
   error?: string
   /**
    * The `social_identities` row it went out through, when the network has

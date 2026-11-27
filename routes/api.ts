@@ -182,6 +182,7 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/queue/delete', 'Actions/Postline/QueueDeleteAction').middleware('auth').rateLimit(60, 'minute')
   route.post('/queue/undo-delete', 'Actions/Postline/QueueUndoDeleteAction').middleware('auth').rateLimit(60, 'minute')
   route.post('/queue/publish-now', 'Actions/Postline/QueuePublishNowAction').middleware('auth').rateLimit(30, 'minute')
+  route.post('/queue/first-comment/retry', 'Actions/Postline/QueueFirstCommentRetryAction').middleware('auth').rateLimit(30, 'minute')
   route.post('/metrics/sync', 'Actions/Postline/MetricsSyncAction').middleware('auth').rateLimit(20, 'hour')
   route.get('/campaigns', 'Actions/Postline/CampaignListAction').middleware('auth')
   route.post('/campaigns', 'Actions/Postline/CampaignSaveAction').middleware('auth').rateLimit(60, 'minute')

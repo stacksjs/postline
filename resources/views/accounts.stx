@@ -116,6 +116,10 @@ const networkSetupGuides = await loadNetworkSetupGuides()
                   <input class="mt-0.5" type="checkbox" :checked="app.directMessages" @change="setAppFlag(app.provider, 'directMessages', $event)" data-app-direct-messages>
                   <span>Enable paid X API direct messages. Save this setting and reconnect each account to grant Inbox access.</span>
                 </label>
+                <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'instagram' ? 'flex' : 'hidden'">
+                  <input class="mt-0.5" type="checkbox" :checked="app.firstComments" @change="setAppFlag(app.provider, 'firstComments', $event)">
+                  <span>Publish first comments. Enable the comment permission in your Meta app, then reconnect Instagram.</span>
+                </label>
                 <div class="flex flex-wrap gap-2 items-center sm:col-span-2">
                   <p class="m-0 mr-auto text-muted text-xs" :text="app.note"></p>
                   <button class="px-3 h-8 font-medium text-danger text-xs bg-panel hover:bg-danger-soft border border-line rounded-lg disabled:opacity-50" type="button" x-show="app.removable" :disabled="appBusy() === app.provider" @click="clearApp(app.provider)">Remove</button>
@@ -233,9 +237,11 @@ const networkSetupGuides = await loadNetworkSetupGuides()
       const organizationPages = draft.organizationPages ?? Boolean(app.organizationPages)
       const engagementMetrics = draft.engagementMetrics ?? Boolean(app.engagementMetrics)
       const directMessages = draft.directMessages ?? Boolean(app.directMessages)
+      const firstComments = draft.firstComments ?? Boolean(app.firstComments)
       const hasChanges = clientId.trim() !== app.clientId || Boolean(clientSecret.trim())
         || organizationPages !== Boolean(app.organizationPages) || engagementMetrics !== Boolean(app.engagementMetrics)
         || directMessages !== Boolean(app.directMessages)
+        || firstComments !== Boolean(app.firstComments)
       return {
         provider: app.provider,
         label: guide?.label ?? app.provider,
@@ -252,6 +258,7 @@ const networkSetupGuides = await loadNetworkSetupGuides()
         organizationPages,
         engagementMetrics,
         directMessages,
+        firstComments,
         secretPlaceholder: app.hasSecret ? 'Stored. Leave blank to keep it.' : 'Paste the client secret',
         removable: app.source === 'settings',
         testReady: app.configured && !hasChanges,
@@ -342,6 +349,7 @@ const networkSetupGuides = await loadNetworkSetupGuides()
           if (provider === 'linkedin') body.set('organization_pages', row.organizationPages ? '1' : '0')
           body.set('engagement_metrics', row.engagementMetrics ? '1' : '0')
           if (provider === 'twitter') body.set('direct_messages', row.directMessages ? '1' : '0')
+          if (provider === 'instagram') body.set('first_comments', row.firstComments ? '1' : '0')
           await requestJson('/api/postline/network-apps', { method: 'POST', body }, 'Could not save the app.')
           const drafts = { ...appDrafts() }
           delete drafts[provider]

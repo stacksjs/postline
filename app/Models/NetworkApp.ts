@@ -77,5 +77,13 @@ export default defineModel({
       validation: { rule: schema.boolean() },
       factory: () => false,
     },
+    /** Instagram only. Request permission to add first comments. */
+    firstComments: {
+      required: false,
+      fillable: true,
+      default: false,
+      validation: { rule: schema.boolean() },
+      factory: () => false,
+    },
   },
 } as const)

@@ -119,6 +119,13 @@ export default defineModel({
       validation: { rule: schema.string().max(4000).optional() },
       factory: () => null,
     },
+    /** Facebook User token for Instagram comments, separate from publishing. */
+    instagramCommentsAccessToken: {
+      required: false,
+      hidden: true,
+      validation: { rule: schema.string().max(4000).optional() },
+      factory: () => null,
+    },
     tokenExpiresAt: {
       required: false,
       hidden: true,

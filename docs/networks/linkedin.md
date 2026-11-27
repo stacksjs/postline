@@ -36,3 +36,11 @@ off unless you turn it on.
 
 With company Pages enabled, **Read engagement metrics** requests `r_organization_social_feed`. Without company Pages, it requests `r_member_social_feed`, which LinkedIn grants to select developers. Enable the setting after your app has the matching scope, then reconnect.
 [Provider documentation](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/social-metadata-api).
+
+## First comments
+
+In Composer, select LinkedIn and open **First comments**. Postline sends the
+comment after the first post goes live, using the same LinkedIn member or
+company Page. A refused comment can be retried from **Queue > Needs attention**.
+If delivery is uncertain, check the published post for the comment.
+[LinkedIn comments API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/comments-api#create-a-comment)

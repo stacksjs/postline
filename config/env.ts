@@ -379,6 +379,11 @@ export default {
     default: '',
   },
 
+  INSTAGRAM_COMMENTS_ACCESS_TOKEN: {
+    validation: schema.string(),
+    default: '',
+  },
+
   INSTAGRAM_INSIGHTS_ACCESS_TOKEN: {
     validation: schema.string(),
     default: '',

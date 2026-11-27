@@ -844,6 +844,81 @@ async function checkSavedComposerText(cdp: Cdp): Promise<void> {
   await evaluate(cdp, `localStorage.removeItem('postline:composer-draft:v1')`)
 }
 
+async function checkFirstComments(cdp: Cdp): Promise<void> {
+  const subject = 'First comment browser fixture'
+  const body = 'Add the reading list after this post goes live.'
+  const fixture = new Database(database)
+  const identity = fixture.query(`
+    INSERT INTO social_identities (uuid, provider, handle, external_id, auth_status, access_token)
+    VALUES (?, 'linkedin', 'Comment fixture', 'urn:li:organization:8542', 'connected', 'browser-fixture-token')
+    RETURNING id
+  `).get(crypto.randomUUID()) as { id: number }
+  const provider = `document.querySelector('[data-provider-toggle="linkedin:${identity.id}"]')`
+  const details = "document.querySelector('[data-first-comments]')"
+  const field = `${details}.querySelector('textarea')`
+  const draft = "JSON.parse(localStorage.getItem('postline:composer-draft:v1') || '{}')"
+  let fixturePost = 0
+  try {
+    await auditPage(`${site}/composer`, { cdp })
+    await waitUntil('Composer offers the connected LinkedIn Page', () => evaluate<boolean>(cdp, `Boolean(${provider})`), 5_000)
+    if (!await evaluate<boolean>(cdp, `${provider}.getAttribute('aria-pressed') === 'true'`))
+      await evaluate(cdp, `${provider}.click()`)
+    await evaluate(cdp, `${details}.querySelector('summary').focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('First comments can be opened with the keyboard', () => evaluate<boolean>(cdp, `${field}.getClientRects().length > 0`), 5_000)
+    await checkAccessibleControls(cdp, 'composer (first comments)')
+    await evaluate(cdp, `${field}.focus()`)
+    await cdp.send('Input.insertText', { text: body })
+    await waitUntil('The local draft preserves a comment', () => evaluate<boolean>(cdp, `${draft}.firstComments?.linkedin === ${JSON.stringify(body)}`), 5_000)
+
+    await auditPage(`${site}/composer`, { cdp })
+    await waitUntil('Composer reloads the first comment', () => evaluate<boolean>(cdp, `${field}?.value === ${JSON.stringify(body)}`), 5_000)
+    const created = await evaluate<{ data?: { postId: number } }>(cdp, `fetch('/api/postline/queue', {
+      method: 'POST', body: new URLSearchParams({
+        text: ${JSON.stringify(subject)}, providers: 'linkedin:${identity.id}', linkedin_first_comment: ${JSON.stringify(body)},
+      }),
+    }).then(response => response.json())`)
+    fixturePost = created.data?.postId || 0
+    if (!fixturePost) throw new Error('Could not save the first-comment draft.')
+    await auditPage(`${site}/composer?edit=${fixturePost}`, { cdp })
+    await waitUntil('Editing a queued draft restores its comment', () => evaluate<boolean>(cdp, `${field}?.value === ${JSON.stringify(body)}`), 5_000)
+
+    fixture.query("UPDATE posts SET status = 'published', published_at = CURRENT_TIMESTAMP WHERE id = ?").run(fixturePost)
+    fixture.query(`
+      UPDATE post_targets SET status = 'published', social_identity_id = NULL, remote_uri = 'urn:li:share:988',
+        remote_url = 'https://www.linkedin.com/feed/update/urn:li:share:988/',
+        first_comment_body = ?, first_comment_status = 'failed', first_comment_error = 'Comment permission was refused.'
+      WHERE post_id = ?
+    `).run(body, fixturePost)
+    await auditPage(`${site}/queue`, { cdp })
+    await evaluate(cdp, `
+      [...document.querySelectorAll('[aria-label="Queue view"] button')].find(button => button.textContent.trim() === 'List').click()
+      document.getElementById('queue-tab-attention').click()
+    `)
+    const row = `[...document.querySelectorAll('#queue-results article')].find(row => row.textContent.includes(${JSON.stringify(subject)}))`
+    const retry = `(${row})?.querySelector('button')`
+    await waitUntil('Queue shows a failed comment on the published post', () => evaluate<boolean>(cdp, `
+      (${row})?.textContent.includes('Comment permission was refused.')
+        && (${row})?.textContent.includes('Published')
+        && ${retry}?.getClientRects().length > 0
+        && ${retry}.textContent.trim() === 'Retry first comment'
+        && !(${row})?.innerText.includes('Retry failed networks')`), 5_000)
+    await evaluate(cdp, `${retry}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('First comment retry requests the original publishing account', () => evaluate<boolean>(cdp, `
+      (${row})?.textContent.includes('The published post or its account could not be found.')`), 5_000)
+  }
+  finally {
+    if (fixturePost) {
+      fixture.query('DELETE FROM post_targets WHERE post_id = ?').run(fixturePost)
+      fixture.query('DELETE FROM posts WHERE id = ?').run(fixturePost)
+    }
+    fixture.query('DELETE FROM social_identities WHERE id = ?').run(identity.id)
+    fixture.close()
+    await evaluate(cdp, "localStorage.removeItem('postline:composer-draft:v1')")
+  }
+}
+
 async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
   await auditPage(`${site}/composer`, { cdp })
   const blog = "document.querySelector('[data-provider-toggle=blog]')"
@@ -2540,6 +2615,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkAnalytics(cdp)
   await checkTrackedLinks(cdp)
   await checkListStates(cdp)
+  await checkFirstComments(cdp)
 }
 
 interface FixtureServer {

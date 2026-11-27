@@ -163,6 +163,21 @@
           <input class="flex-1 px-2.5 h-8 min-w-48 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="500" placeholder="Content warning on Mastodon (optional)" aria-label="Content warning on Mastodon" x-show="showMastodonOptions()" x-model="mastodonSpoiler" data-mastodon-spoiler>
         </div>
 
+        <details class="mb-3 mx-3 text-ui" x-show="showLinkedInComment() || showInstagramComment()" data-first-comments>
+          <summary class="w-fit text-muted cursor-pointer">First comments</summary>
+          <div class="grid gap-2 mt-2">
+            <label class="grid gap-1 text-muted text-xs" x-show="showLinkedInComment()">
+              <span>LinkedIn first comment</span>
+              <textarea class="p-2 w-full text-ink text-ui bg-panel border border-field-line rounded-lg focus:border-info-solid" rows="2" maxlength="1250" x-model="linkedinFirstComment" @input="queueDraftSave()"></textarea>
+            </label>
+            <label class="grid gap-1 text-muted text-xs" x-show="showInstagramComment()">
+              <span>Instagram first comment</span>
+              <textarea class="p-2 w-full text-ink text-ui bg-panel border border-field-line rounded-lg focus:border-info-solid" rows="2" maxlength="1250" x-model="instagramFirstComment" @input="queueDraftSave()"></textarea>
+            </label>
+            <p class="m-0 text-muted text-xs">Each comment goes on the first post, after it publishes.</p>
+          </div>
+        </details>
+
         <footer class="flex flex-col gap-3 items-stretch justify-between sm:flex-row sm:items-center p-3 border-line border-t">
           <div class="flex gap-2 items-center min-w-0">
             <span class="min-w-0 text-xs truncate" data-bluesky-count :class="countSummary().tone === 'danger' ? 'text-danger' : countSummary().tone === 'warning' ? 'text-warning' : 'text-muted'" :title="countSummary().text" :text="countSummary().text">0 / 300 characters</span>
@@ -255,7 +270,7 @@
     import { composerLinkPreview, firstComposerLink } from '../functions/composer-thread'
     import { providerLabel } from '../functions/networks'
     import type { ProviderStatus } from '../functions/social-client'
-    import { fetchProviders, fetchWorkspace, publishCrosspost, targetLabel } from '../functions/social-client'
+    import { appendPostOptions, fetchProviders, fetchWorkspace, publishCrosspost, targetLabel } from '../functions/social-client'
 
     const providersFailed = state(false)
     const query = useRoute().query
@@ -534,12 +549,17 @@
     const postLanguage = state('')
     const mastodonVisibility = state('public')
     const mastodonSpoiler = state('')
+    const linkedinFirstComment = state('')
+    const instagramFirstComment = state('')
     const postTitle = state('')
     const postImageUrl = state('')
     const editHeading = state('')
     const showTitle = derived(() => composerFormat() === 'single' && selectedNetworkIds().includes('blog'))
     const showImageUrl = derived(() => selectedNetworkIds().includes('instagram'))
     const showMastodonOptions = derived(() => selectedNetworkIds().includes('mastodon'))
+    const showLinkedInComment = derived(() => selectedNetworkIds().includes('linkedin'))
+    const showInstagramComment = derived(() => selectedNetworkIds().includes('instagram')
+      && (Boolean(instagramFirstComment()) || providers().some(provider => provider.provider === 'instagram' && provider.firstCommentsEnabled)))
     const showLanguage = derived(() => selectedNetworkIds().some(id => id === 'bluesky' || id === 'mastodon'))
     const showPostOptions = derived(() => showLanguage() || showMastodonOptions())
     const languageOptions = state<Array<{ value: string, label: string }>>([])
@@ -549,19 +569,17 @@
     /** The options that apply to the selected networks; the rest go as empty, which clears them. */
     const postOptions = () => ({
       language: showLanguage() ? postLanguage() : '',
-      mastodonVisibility: showMastodonOptions() ? mastodonVisibility() : '',
-      mastodonSpoiler: showMastodonOptions() ? mastodonSpoiler().trim() : '',
+      mastodon_visibility: showMastodonOptions() ? mastodonVisibility() : '',
+      mastodon_spoiler: showMastodonOptions() ? mastodonSpoiler().trim() : '',
+      linkedin_first_comment: showLinkedInComment() ? linkedinFirstComment().trim() : '',
+      instagram_first_comment: showInstagramComment() ? instagramFirstComment().trim() : '',
     })
-    const appendOptions = (form) => {
-      const options = postOptions()
-      form.set('language', options.language)
-      form.set('mastodon_visibility', options.mastodonVisibility)
-      form.set('mastodon_spoiler', options.mastodonSpoiler)
-    }
     /** After a post goes out: the content warning was for that post. The language is kept. */
     const resetPostOptions = () => {
       mastodonVisibility.set('public')
       mastodonSpoiler.set('')
+      linkedinFirstComment.set('')
+      instagramFirstComment.set('')
     }
     const composedTitle = () => postTitle().trim() || undefined
 
@@ -722,7 +740,8 @@
       if (editParam || !autosave()) return
       const posts = segments()
       const overrides = Object.entries(variants())
-      if (posts.length === 1 && !posts[0].text && !overrides.length && postAction() === 'publish') {
+      const firstComments = { linkedin: linkedinFirstComment(), instagram: instagramFirstComment() }
+      if (posts.length === 1 && !posts[0].text && !overrides.length && !firstComments.linkedin && !firstComments.instagram && postAction() === 'publish') {
         savedDraft.set(null)
         return
       }
@@ -732,6 +751,7 @@
         action: postAction(),
         scheduledIso: scheduledIso(),
         posts: posts.map(post => ({ text: post.text })),
+        firstComments,
         variants: overrides
           .map(([provider, entry]) => ({ provider, text: entry.text, shared: entry.shared })),
       })
@@ -742,7 +762,10 @@
     const restoreDraft = () => {
       const draft = savedDraft()
       if (!autosave() || !draft) return
-      if (draft.posts.length === 1 && !draft.posts[0].text && !draft.variants.length && draft.action === 'publish') return
+      if (draft.posts.length === 1 && !draft.posts[0].text && !draft.variants.length
+        && !draft.firstComments?.linkedin && !draft.firstComments?.instagram && draft.action === 'publish') return
+      linkedinFirstComment.set(draft.firstComments?.linkedin || '')
+      instagramFirstComment.set(draft.firstComments?.instagram || '')
       composerFormat.set(draft.mode)
       postAction.set(draft.action)
       scheduledIso.set(draft.scheduledIso)
@@ -925,6 +948,8 @@
       postLanguage.set(item.options?.language || '')
       mastodonVisibility.set(item.options?.mastodon?.visibility || 'public')
       mastodonSpoiler.set(item.options?.mastodon?.spoilerText || '')
+      linkedinFirstComment.set(item.options?.firstComments?.linkedin || '')
+      instagramFirstComment.set(item.options?.firstComments?.instagram || '')
       attachedImages.set(saved ? [{ id: 'saved', file: null, name: saved === 1 ? '1 saved image' : `${saved} saved images`, alt: '', kept: true }] : [])
 
       for (const post of segments()) void updateLinkPreview(post.id)
@@ -1030,7 +1055,7 @@
       const imageUrl = postImageUrl().trim()
       if (imageUrl) form.set('image_url', imageUrl)
       if (!appendImages(form) && id && editRemoveImage) form.set('remove_image', '1')
-      appendOptions(form)
+      appendPostOptions(form, postOptions())
       const overrides = variantsPayload()
       // Updating always sends this field so an owner can clear every override.
       if (id || Object.keys(overrides).length) form.set('variants', JSON.stringify(overrides))
@@ -1174,9 +1199,9 @@
         // would send the previous post's per-network copy with the next one,
         // while the shared body reads as empty — before saveDraft persists it.
         variants.set({})
-        saveDraft()
         clearAttachment()
         resetPostOptions()
+        saveDraft()
         postTitle.set('')
         toast.dismiss('publish')
         if (failures.length && !succeeded.length) {
@@ -1193,6 +1218,9 @@
             'success',
             { title: 'Published', url: lastUrl },
           )
+        }
+        if (succeeded.some(result => result.firstComment?.status === 'failed' || result.firstComment?.status === 'uncertain')) {
+          setStatus('Check Needs attention in Queue.', 'info', { title: 'A first comment needs attention' })
         }
         if (succeeded.length) finishSetup(data.postId ?? data.postIds?.[0] ?? 0)
       }

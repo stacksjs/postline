@@ -14,6 +14,7 @@ export default defineModel({
     { name: 'post_targets_post_id_index', columns: ['post_id'] },
     // The scheduler asks each minute which failed targets are due again.
     { name: 'post_targets_status_next_attempt_at_index', columns: ['status', 'next_attempt_at'] },
+    { name: 'post_targets_first_comment_status_index', columns: ['first_comment_status', 'first_comment_started_at'] },
   ],
 
   traits: {
@@ -57,6 +58,11 @@ export default defineModel({
       validation: { rule: schema.string().max(500).optional() },
       factory: faker => faker.helpers.maybe(() => `at://${faker.string.alphanumeric(24)}/app.bsky.feed.post/${faker.string.alphanumeric(12)}`, { probability: 0.35 }) ?? null,
     },
+    remoteUrl: {
+      required: false,
+      validation: { rule: schema.string().optional() },
+      factory: () => null,
+    },
     remoteCid: {
       required: false,
       fillable: true,
@@ -68,6 +74,31 @@ export default defineModel({
       fillable: true,
       validation: { rule: schema.string().max(1000).optional() },
       factory: faker => faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.1 }) ?? null,
+    },
+    firstCommentBody: {
+      required: false,
+      validation: { rule: schema.string().optional() },
+      factory: () => null,
+    },
+    firstCommentStatus: {
+      required: false,
+      validation: { rule: schema.enum(['pending', 'sending', 'sent', 'failed', 'uncertain']).optional() },
+      factory: () => null,
+    },
+    firstCommentStartedAt: {
+      required: false,
+      validation: { rule: schema.timestamp().optional() },
+      factory: () => null,
+    },
+    firstCommentRemoteId: {
+      required: false,
+      validation: { rule: schema.string().optional() },
+      factory: () => null,
+    },
+    firstCommentError: {
+      required: false,
+      validation: { rule: schema.string().optional() },
+      factory: () => null,
     },
     // How many times this target has been sent and failed, and when it is
     // sent again. A null `nextAttemptAt` on a failed target means it will

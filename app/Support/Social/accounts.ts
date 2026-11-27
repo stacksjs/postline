@@ -28,6 +28,7 @@ export interface IdentityLike {
   auth_status: IdentityAuthStatus
   access_token?: string | null
   insights_access_token?: string | null
+  instagram_comments_access_token?: string | null
   /** SQLite stores the flag as 0 or 1. */
   is_default?: boolean | number | null
   refresh_token?: string | null

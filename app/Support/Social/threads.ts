@@ -82,5 +82,6 @@ export function threadSegmentContent(
   // The language, visibility and content warning hold for the whole thread:
   // a reply that dropped a content warning would show what the first hid.
   if (!chain && !content?.options) return undefined
-  return { ...(chain ? { reply: chain } : {}), ...(content?.options ? { options: content.options } : {}) }
+  const options = content?.options
+  return { ...(chain ? { reply: chain } : {}), ...(options ? { options: { ...options, firstComments: undefined } } : {}) }
 }

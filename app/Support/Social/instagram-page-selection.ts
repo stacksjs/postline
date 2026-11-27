@@ -68,6 +68,6 @@ export async function finishInstagramPageSelection(request: RequestInstance, own
   const page = selection.pages.find(account => account.pageId === pageId)
   if (!page) throw expired()
 
-  const account = await instagram.connectAuthorizedPage(page, selection.insightsAccessToken)
+  const account = await instagram.connectAuthorizedPage(page, selection.insightsAccessToken, selection.commentsAccessToken)
   return Response.json({ ok: true, data: account }, { headers })
 }

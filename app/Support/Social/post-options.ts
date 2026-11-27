@@ -18,6 +18,17 @@ export interface PostOptions {
     /** Text shown in place of the post until the reader opens it. */
     spoilerText?: string
   }
+  firstComments?: Partial<Record<FirstCommentProvider, string>>
+}
+
+export const FIRST_COMMENT_PROVIDERS = ['linkedin', 'instagram'] as const
+export type FirstCommentProvider = typeof FIRST_COMMENT_PROVIDERS[number]
+export const MAX_FIRST_COMMENT_LENGTH = 1250
+
+/** Queue this write in the same update that records the published parent. */
+export function pendingFirstComment(options: PostOptions | undefined, provider: FirstCommentProvider) {
+  const body = options?.firstComments?.[provider]
+  return body ? { first_comment_body: body, first_comment_status: 'pending' } : {}
 }
 
 const VISIBILITIES: readonly MastodonVisibility[] = ['public', 'unlisted', 'private', 'direct']
@@ -54,17 +65,27 @@ export function readPostOptions(get: (key: string) => unknown): PostOptionsResul
     }
   }
 
+  for (const provider of FIRST_COMMENT_PROVIDERS) {
+    const raw = get(`${provider}_first_comment`)
+    if (raw == null || raw === '') continue
+    if (typeof raw !== 'string' || raw.trim().length > MAX_FIRST_COMMENT_LENGTH)
+      return { ok: false, error: `A first comment can be up to ${MAX_FIRST_COMMENT_LENGTH.toLocaleString('en-US')} characters.` }
+    if (raw.trim()) (options.firstComments ??= {})[provider] = raw.trim()
+  }
+
   return { ok: true, options: Object.keys(options).length ? options : undefined }
 }
 
 /** Options as stored: re-checked on read, since stored content is free-form JSON. */
 export function sanitizePostOptions(value: unknown): PostOptions | undefined {
   if (!value || typeof value !== 'object') return undefined
-  const raw = value as { language?: unknown, mastodon?: { visibility?: unknown, spoilerText?: unknown } }
+  const raw = value as { language?: unknown, mastodon?: { visibility?: unknown, spoilerText?: unknown }, firstComments?: Record<string, unknown> }
   const read = readPostOptions((key) => {
     if (key === 'language') return raw.language
     if (key === 'mastodon_visibility') return raw.mastodon?.visibility
     if (key === 'mastodon_spoiler') return raw.mastodon?.spoilerText
+    if (key === 'linkedin_first_comment') return raw.firstComments?.linkedin
+    if (key === 'instagram_first_comment') return raw.firstComments?.instagram
     return undefined
   })
   return read.ok ? read.options : undefined

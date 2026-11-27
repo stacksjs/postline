@@ -45,7 +45,7 @@ export const ARCHIVE_VERSION = 8
 export const DELETE_EVERYTHING_PHRASE = 'DELETE EVERYTHING'
 
 const POST_COLUMNS = ['uuid', 'title', 'body', 'content', 'status', 'scheduled_at', 'published_at', 'timezone', 'source', 'thread_key', 'created_at', 'updated_at'] as const
-const TARGET_COLUMNS = ['uuid', 'provider', 'status', 'remote_uri', 'remote_cid', 'failure_reason', 'metrics', 'attempts', 'created_at', 'updated_at'] as const
+const TARGET_COLUMNS = ['uuid', 'provider', 'status', 'remote_uri', 'remote_url', 'remote_cid', 'failure_reason', 'metrics', 'attempts', 'first_comment_body', 'first_comment_status', 'first_comment_remote_id', 'first_comment_error', 'created_at', 'updated_at'] as const
 const CAMPAIGN_COLUMNS = ['uuid', 'name', 'objective', 'audience', 'tone', 'status', 'start_date', 'end_date', 'timezone', 'created_at', 'updated_at'] as const
 const CAMPAIGN_POST_COLUMNS = ['uuid', 'title', 'body', 'providers', 'pillar', 'status', 'scheduled_at', 'position', 'created_at', 'updated_at'] as const
 const MONITOR_COLUMNS = ['uuid', 'name', 'keywords', 'providers', 'match_mode', 'status', 'twitter_read_source', 'created_at', 'updated_at'] as const
@@ -274,7 +274,13 @@ export class WorkspaceArchiveService {
       // The same account on this install, by network and handle; otherwise the
       // result keeps its network and loses only the account it went through.
       const identity = target.account ? identities.find((row: any) => row.provider === target.account!.provider && row.handle === target.account!.handle) : null
-      await database.insertInto('post_targets').values({ ...pick(target, TARGET_COLUMNS), post_id: postId, social_identity_id: identity ? Number(identity.id) : null }).execute()
+      const restored = pick(target, TARGET_COLUMNS)
+      if (restored.first_comment_status && restored.first_comment_status !== 'sent') {
+        // The original installation may have sent it after the archive was made.
+        restored.first_comment_status = 'uncertain'
+        restored.first_comment_error = 'Check for the first comment on the published post after restoring this workspace.'
+      }
+      await database.insertInto('post_targets').values({ ...restored, post_id: postId, social_identity_id: identity ? Number(identity.id) : null }).execute()
       report.targets++
     }
 

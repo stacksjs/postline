@@ -5,11 +5,12 @@ import type { ScheduledSelection, ScheduleDestination } from '../../Support/Soci
 import type { RecurringSegment } from '../../Support/Social/recurring-posts'
 import type { StoredContent } from '../../Support/Social/stored-content'
 import { sanitizePostOptions } from '../../Support/Social/post-options'
+import { postFirstComments } from './PostFirstCommentService'
 import { isDue, MAX_ATTEMPTS, nextAttemptAt } from '../../Support/Social/retry'
 import { moveScheduledTime } from '../../Support/Social/rescheduling'
 import type { PublishTarget } from '../../Support/Social/targets'
 import type { CrosspostService } from './CrosspostService'
-import type { CrosspostTargetResult, SocialProvider } from '../../Support/Social/types'
+import type { CrosspostTargetResult, FirstCommentOutcome, SocialProvider } from '../../Support/Social/types'
 import type { VariantMap } from '../../Support/Social/variants'
 import { mkdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -19,7 +20,7 @@ import { env } from '@stacksjs/env'
 import { raw } from '@stacksjs/query-builder'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { dedupeTargets, isAccountProvider, parseTargets, targetKey, targetProviders } from '../../Support/Social/targets'
-import { hydrateStoredContent, MissingMediaError, parseStoredContent } from '../../Support/Social/stored-content'
+import { hydrateStoredContent, InvalidFirstCommentError, MissingMediaError, parseStoredContent } from '../../Support/Social/stored-content'
 import { isSafeMediaFilename, MEDIA_DIR, storedImageResponse } from '../../Support/Social/uploads'
 import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/variants'
 import { crosspost, crosspostProviders } from './CrosspostService'
@@ -242,11 +243,17 @@ export interface QueueTargetView {
   target: string
   status: string
   remoteUri: string | null
+  remoteUrl: string | null
   failureReason: string | null
   /** Sends that have failed so far. */
   attempts: number
   /** When Postline sends it again by itself, as an ISO time; null when it will not. */
   nextAttemptAt: string | null
+  firstComment?: {
+    targetId: number
+    status: FirstCommentOutcome['status']
+    error: string | null
+  }
 }
 
 export interface QueueItemView {
@@ -863,8 +870,14 @@ export class QueueService {
               target: targetKey({ provider: target.provider, identityId }),
               status: String(target.status),
               remoteUri: target.remote_uri || null,
+              remoteUrl: target.remote_url || null,
               failureReason: target.failure_reason || null,
               attempts: Number(target.attempts) || 0,
+              ...(target.first_comment_status && { firstComment: {
+                targetId: Number(target.id),
+                status: target.first_comment_status,
+                error: target.first_comment_error || null,
+              } }),
               nextAttemptAt: target.status === 'failed' && target.next_attempt_at ? `${String(target.next_attempt_at).replace(' ', 'T')}Z` : null,
             }
           }),
@@ -1554,7 +1567,7 @@ export class QueueService {
         // Refused before anything was claimed or sent. Left as it was it
         // would be picked up and refused again every minute, so it is set
         // aside with the reason for the owner to fix.
-        if (error instanceof MissingMediaError && !await this.setAside(Number(post.id), error.message, scheduledAt))
+        if ((error instanceof MissingMediaError || error instanceof InvalidFirstCommentError) && !await this.setAside(Number(post.id), error.message, scheduledAt))
           continue
         // Swallowed so one post cannot stop the rest, but never silently.
         log.error(`[postline] scheduled post ${post.id} could not be published: ${error instanceof Error ? error.message : String(error)}`)
@@ -1586,6 +1599,7 @@ export class QueueService {
       }
     }
 
+    await postFirstComments.recoverPending()
     return { published, failed, missed }
   }
 

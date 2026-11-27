@@ -48,6 +48,12 @@ export class MissingMediaError extends UserFacingError {
   }
 }
 
+export class InvalidFirstCommentError extends UserFacingError {
+  constructor() {
+    super('The saved first comment is invalid. Open this post in Composer to review it.')
+  }
+}
+
 export async function hydrateStoredContent(raw: unknown): Promise<PublishContent | undefined> {
   const stored = parseStoredContent(raw)
   if (!stored) return undefined
@@ -58,6 +64,8 @@ export async function hydrateStoredContent(raw: unknown): Promise<PublishContent
   const variants = sanitizeVariants(stored.variants)
   if (variants) content.variants = variants
   const options = sanitizePostOptions(stored.options)
+  if (stored.options?.firstComments && !options?.firstComments)
+    throw new InvalidFirstCommentError()
   if (options) content.options = options
   if (stored.reply !== undefined) {
     const { root, parent, target } = stored.reply ?? {}

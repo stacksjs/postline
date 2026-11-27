@@ -88,6 +88,7 @@ export const actions = {
   'Actions/Postline/PurgeRunAction': '../../../app/Actions/Postline/PurgeRunAction.ts',
   'Actions/Postline/PurgeStatusAction': '../../../app/Actions/Postline/PurgeStatusAction.ts',
   'Actions/Postline/QueueDeleteAction': '../../../app/Actions/Postline/QueueDeleteAction.ts',
+  'Actions/Postline/QueueFirstCommentRetryAction': '../../../app/Actions/Postline/QueueFirstCommentRetryAction.ts',
   'Actions/Postline/QueueGetAction': '../../../app/Actions/Postline/QueueGetAction.ts',
   'Actions/Postline/QueueListAction': '../../../app/Actions/Postline/QueueListAction.ts',
   'Actions/Postline/QueuePreviewImageAction': '../../../app/Actions/Postline/QueuePreviewImageAction.ts',
