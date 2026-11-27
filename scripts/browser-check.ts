@@ -2698,6 +2698,64 @@ async function captureMarketingScreenshots(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkSpanishInbox(cdp: Cdp): Promise<void> {
+  const fixture = new Database(database)
+  try {
+    const identity = fixture.query(`INSERT INTO social_identities (uuid, provider, handle, auth_status)
+      VALUES (?, 'bluesky', 'bandeja.example', 'missing') RETURNING id`).get(crypto.randomUUID()) as { id: number }
+    const conversation = fixture.query(`INSERT INTO dm_conversations (uuid, social_identity_id, provider, remote_id, participant_handle, last_message_at, last_message_preview, unread_count)
+      VALUES (?, ?, 'bluesky', 'inbox-es-dm', 'autora.example', datetime('now', '-3 minutes'), 'Hola desde Bluesky', 1) RETURNING id`)
+      .get(crypto.randomUUID(), identity.id) as { id: number }
+    fixture.query(`INSERT INTO dm_messages (uuid, dm_conversation_id, provider, remote_id, direction, author_handle, body, sent_at)
+      VALUES (?, ?, 'bluesky', 'inbox-es-message', 'incoming', 'autora.example', 'Hola desde Bluesky', datetime('now', '-3 minutes'))`)
+      .run(crypto.randomUUID(), conversation.id)
+    fixture.query(`INSERT INTO inbox_mentions (uuid, social_identity_id, remote_id, kind, author, body, url, posted_at)
+      VALUES (?, ?, 'inbox-es-mention', 'mention', 'autora.example', 'Una mención pública', ?, datetime('now', '-3 minutes'))`)
+      .run(crypto.randomUUID(), identity.id, 'https://bsky.app/profile/autora.example/post/abc')
+  }
+  finally {
+    fixture.close()
+  }
+
+  const report = await auditPage(`${site}/inbox`, { cdp })
+  for (const error of report.errors) fail('inbox', 'Spanish', error)
+  for (const request of report.failed) fail('inbox', 'Spanish', request)
+  const inbox = "document.querySelector('[data-testid=inbox-page][lang=es]')"
+  const conversation = `[...${inbox}?.querySelectorAll('aside button') || []].find(button => button.innerText.includes('autora.example'))`
+  await waitUntil('Spanish Inbox loads the unread conversation and date', () => evaluate<boolean>(cdp, `
+    document.title === 'Postline - Bandeja de entrada'
+      && ${inbox}?.querySelector('h1')?.textContent === 'Bandeja de entrada'
+      && ${inbox}?.querySelector('select[aria-label="Red"] option')?.textContent === 'Todas las redes'
+      && ${inbox}?.innerText.includes('1 conversación · 1 sin leer')
+      && ${conversation}?.querySelector('time')?.textContent.startsWith('hace ')
+  `), 5_000)
+  await evaluate(cdp, `${conversation}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Spanish Inbox opens and marks the conversation read', () => evaluate<boolean>(cdp, `
+    ${inbox}?.innerText.includes('1 conversación · 0 sin leer')
+      && ${inbox}?.querySelector('[data-inbox-thread] article p')?.textContent === 'Hola desde Bluesky'
+      && ${inbox}?.querySelector('textarea[aria-label="Responder"]')?.placeholder === 'Escribe una respuesta…'
+  `), 5_000)
+
+  const sections = `${inbox}.querySelector('[role=group][aria-label="Secciones de la bandeja de entrada"]')`
+  const publicInbox = "document.querySelector('[data-testid=public-inbox]')"
+  await evaluate(cdp, `${sections}.querySelectorAll('button')[1].focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Spanish Inbox loads the public mention', () => evaluate<boolean>(cdp, `
+    ${publicInbox}?.querySelector('h2')?.textContent === 'Respuestas y menciones'
+      && ${publicInbox}?.querySelector('article')?.innerText.includes('Mención')
+      && ${publicInbox}?.querySelector('article p')?.textContent === 'Una mención pública'
+  `), 5_000)
+  await evaluate(cdp, `${publicInbox}.querySelector('[data-open-public-reply]').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The public reply dialog has Spanish labels', () => evaluate<boolean>(cdp, `
+    ${publicInbox}?.querySelector('dialog[open] h2')?.textContent === 'Respuesta pública'
+      && ${publicInbox}?.querySelector('dialog[open] label')?.innerText.trim() === 'Texto de la respuesta'
+  `), 5_000)
+  await pressKey(cdp, 'Escape', 27)
+  await waitUntil('Escape closes the public reply dialog', () => evaluate<boolean>(cdp, `!${publicInbox}?.querySelector('dialog[open]')`), 5_000)
+}
+
 async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
@@ -2865,6 +2923,7 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
     await waitUntil('Spanish Blog import preview uses the server report', () => evaluate<boolean>(cdp, `
       document.querySelector('[aria-labelledby="import-heading"] [role="status"]')?.innerText === 'Vista previa: crear 1, actualizar 0, omitir 0.'
     `), 5_000)
+    await checkSpanishInbox(cdp)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
@@ -3018,7 +3077,7 @@ else {
   // eslint-disable-next-line no-console
   console.log(marketingScreenshots
     ? `Product screenshots written to ${productImages}.`
-    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, and Blog passed.'
+    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, Blog, and Inbox passed.'
     : `Every view opened clean in ${MODES.map(mode => mode.name).join(', ')}. Screenshots in ${out}.`)
 }
 process.exit(exitCode)

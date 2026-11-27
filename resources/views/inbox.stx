@@ -1,64 +1,72 @@
 @extends('layouts/app')
 
-@section('title', 'Postline - Inbox')
+<script server cache>
+import { workspaceInboxText, workspaceLocale } from '../../app/Support/Localization/workspace'
+
+export const inboxLocale = workspaceLocale
+export const inboxText = workspaceInboxText
+export const inboxClient = { locale: workspaceLocale, messages: inboxText }
+</script>
+
+@section('title')Postline - {{ inboxText.title }}@endsection
 
 @section('content')
-  @meta('description', 'Read direct messages from Bluesky, Mastodon and X, and keep up with public replies and mentions.')
-  <section class="grid gap-4" data-postline-page="inbox" data-testid="inbox-page">
+  @meta('description', inboxText.description)
+  <section class="grid gap-4" data-postline-page="inbox" data-testid="inbox-page" lang="{{ inboxLocale }}">
     <WorkspacePageHeader titleKey="workspace.navigation.inbox">
       <template #description><span :show="inboxSection() === 'messages' && !loading()" :text="inboxOverview()"></span>
-        <span :show="inboxSection() === 'public'">Public replies and mentions from Bluesky and Mastodon</span></template>
+        <span :show="inboxSection() === 'public'">{{ inboxText.publicDescription }}</span></template>
       <div class="flex flex-wrap gap-2 items-center" :show="inboxSection() === 'messages'">
-        <button class="inline-flex gap-2 items-center justify-center px-3 h-9 font-semibold text-ink text-xs bg-panel hover:bg-raised border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="unreadCount() === 0" @click="markAllRead">Mark all read</button>
+        <button class="inline-flex gap-2 items-center justify-center px-3 h-9 font-semibold text-ink text-xs bg-panel hover:bg-raised border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="unreadCount() === 0" @click="markAllRead">{{ inboxText.markAllRead }}</button>
         <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" :show="providerFilter() !== 'twitter'" :disabled="syncing() || connectedCount() === 0" @click="runSync">
           <span class="h-4 w-4 i-hugeicons-refresh" :class="syncing() ? 'animate-spin' : ''" aria-hidden="true"></span>
-          <span :text="syncing() ? 'Syncing…' : 'Sync now'">Sync now</span>
+          <span :text="syncing() ? copy.syncing : copy.sync">{{ inboxText.sync }}</span>
         </button>
       </div>
     </WorkspacePageHeader>
 
-    <div class="flex flex-wrap gap-2" role="group" aria-label="Inbox sections">
-      <button class="px-3 py-2 font-semibold text-ui border border-line rounded-xl" type="button" :class="inboxSection() === 'messages' ? 'bg-accent text-on-accent' : 'bg-panel text-ink hover:bg-raised'" :aria-pressed="inboxSection() === 'messages'" @click="inboxSection.set('messages')">Direct messages</button>
-      <button class="px-3 py-2 font-semibold text-ui border border-line rounded-xl" type="button" :class="inboxSection() === 'public' ? 'bg-accent text-on-accent' : 'bg-panel text-ink hover:bg-raised'" :aria-pressed="inboxSection() === 'public'" @click="inboxSection.set('public')">Replies and mentions</button>
+    <div class="flex flex-wrap gap-2" role="group" aria-label="{{ inboxText.sections }}">
+      <button class="px-3 py-2 font-semibold text-ui border border-line rounded-xl" type="button" :class="inboxSection() === 'messages' ? 'bg-accent text-on-accent' : 'bg-panel text-ink hover:bg-raised'" :aria-pressed="inboxSection() === 'messages'" @click="inboxSection.set('messages')">{{ inboxText.direct }}</button>
+      <button class="px-3 py-2 font-semibold text-ui border border-line rounded-xl" type="button" :class="inboxSection() === 'public' ? 'bg-accent text-on-accent' : 'bg-panel text-ink hover:bg-raised'" :aria-pressed="inboxSection() === 'public'" @click="inboxSection.set('public')">{{ inboxText.publicActivity }}</button>
     </div>
 
     <div :if="inboxSection() === 'public'"><InboxPublicActivity /></div>
 
     <div :show="inboxSection() === 'messages'" class="grid gap-4 lg:grid-cols-[minmax(13rem,18rem)_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]">
-      <aside class="grid content-start gap-4" aria-label="Conversations">
+      <aside class="grid content-start gap-4" aria-label="{{ inboxText.conversations }}">
         <section class="grid gap-2 p-4 bg-panel border border-line rounded-2xl" :show="xInbox().accounts.length && providerFilter() !== 'bluesky' && providerFilter() !== 'mastodon'" aria-labelledby="x-inbox-title">
-          <h2 id="x-inbox-title" class="m-0 font-semibold text-ink text-sm">X API messages</h2>
+          <h2 id="x-inbox-title" class="m-0 font-semibold text-ink text-sm">{{ inboxText.xMessages }}</h2>
           <p class="m-0 text-body text-xs" :text="xReadCost()" data-x-inbox-cost></p>
-          <div class="grid gap-1" role="group" :aria-label="'X messages for @' + account.handle" x-for="account in xInbox().accounts">
+          <div class="grid gap-1" role="group" :aria-label="words.t('xAccountMessages', { handle: account.handle })" x-for="account in xInbox().accounts">
             <p class="m-0 font-medium text-body text-xs" :text="'@' + account.handle"></p>
             <div class="flex flex-wrap gap-1.5">
-              <Button variant="secondary" size="xs" :disabled="Boolean(xSyncing())" @click="runXSync(account.id)">Sync X messages</Button>
-              <Button variant="quiet" size="xs" :show="account.older" :disabled="Boolean(xSyncing())" @click="runXSync(account.id, true)">Load older from X</Button>
+              <Button variant="secondary" size="xs" :disabled="Boolean(xSyncing())" @click="runXSync(account.id)">{{ inboxText.syncX }}</Button>
+              <Button variant="quiet" size="xs" :show="account.older" :disabled="Boolean(xSyncing())" @click="runXSync(account.id, true)">{{ inboxText.olderX }}</Button>
             </div>
           </div>
         </section>
         <Card padding="none" className="shadow-sm">
           <header class="grid gap-2.5 px-4 py-3 border-b border-line">
             <div class="flex gap-2 items-center justify-between">
-              <h2 class="m-0 font-semibold text-ink text-sm" :text="statusFilter() === 'archived' ? 'Archived' : 'Inbox'">Inbox</h2>
-              <button class="px-2.5 h-7 font-semibold text-muted text-xs hover:text-ink bg-panel-2 hover:bg-raised border border-line rounded-lg transition-colors" type="button" @click="toggleStatusFilter" :text="statusFilter() === 'archived' ? 'Show inbox' : 'Show archived'">Show archived</button>
+              <h2 class="m-0 font-semibold text-ink text-sm" :text="statusFilter() === 'archived' ? copy.archived : copy.title">{{ inboxText.title }}</h2>
+              <button class="px-2.5 h-7 font-semibold text-muted text-xs hover:text-ink bg-panel-2 hover:bg-raised border border-line rounded-lg transition-colors" type="button" @click="toggleStatusFilter" :text="statusFilter() === 'archived' ? copy.showInbox : copy.showArchived">{{ inboxText.showArchived }}</button>
             </div>
-            <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-field-line rounded-lg" aria-label="Network" @change="setProviderFilter($event.target.value)">
-              <option value="">All networks</option>
+            <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-field-line rounded-lg" aria-label="{{ inboxText.network }}" @change="setProviderFilter($event.target.value)">
+              <option value="">{{ inboxText.allNetworks }}</option>
               <option x-for="provider in providerOptions" :value="provider" :text="providerLabel(provider)"></option>
             </select>
             {{-- Each connected account has its own inbox (#136); shown once there is more than one. --}}
-            <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-field-line rounded-lg" :class="accountOptions().length > 1 ? '' : 'hidden'" aria-label="Account" @change="setAccountFilter($event.target.value)">
-              <option value="">All accounts</option>
+            <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-field-line rounded-lg" :class="accountOptions().length > 1 ? '' : 'hidden'" aria-label="{{ inboxText.account }}" @change="setAccountFilter($event.target.value)">
+              <option value="">{{ inboxText.allAccounts }}</option>
               <option x-for="account in accountOptions()" :value="account.id" :text="account.label"></option>
             </select>
           </header>
 
-          <WorkspaceListSkeleton :show="loading()" label="Loading conversations" />
-          <ErrorState :show="conversationError() && !loading()" title="Could not load conversations" :message="conversationError()" @retry="loadConversations()" />
-          <EmptyState :show="showEmptyList()" variant="bare" :title="connectedCount() || xInbox().accounts.length ? 'No conversations yet' : 'Connect a network to read messages'" :description="connectedCount() || xInbox().accounts.length ? 'Sync to pull your latest messages into Postline.' : 'The inbox supports Bluesky, Mastodon and the X API.'">
-            <StxLink class="text-info text-ui underline" to="/accounts" :show="!connectedCount() && !xInbox().accounts.length">Open Channels</StxLink>
-            <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="connectedCount() && providerFilter() !== 'twitter'" :disabled="syncing()" @click="runSync">Sync now</button>
+          <WorkspaceListSkeleton :show="loading()" label="{{ inboxText.loadingConversations }}" />
+          <ErrorState :show="conversationError() && !loading()" title="{{ inboxText.couldNotLoadConversations }}" :message="conversationError()" @retry="loadConversations()" />
+          <EmptyState :show="showEmptyList()" variant="bare" :title="connectedCount() || xInbox().accounts.length ? copy.noConversations : copy.connectNetwork" :description="connectedCount() || xInbox().accounts.length ? copy.syncLatest : copy.supportedNetworks">
+            <StxLink class="text-info text-ui underline" to="/accounts" :show="!connectedCount() && !xInbox().accounts.length">{{ inboxText.openChannels }}</StxLink>
+            <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="connectedCount() && providerFilter() !== 'twitter'" :disabled="syncing()" @click="runSync">{{ inboxText.sync }}</button>
           </EmptyState>
 
           <div class="overflow-y-auto max-h-80 lg:max-h-[32rem] divide-line divide-y" x-show="!loading() && conversations().length">
@@ -68,20 +76,20 @@
                 <div class="flex-1 min-w-0">
                   <div class="flex gap-2 items-center justify-between">
                     <strong class="text-ink text-ui truncate" :text="conversation.participantName || conversation.participantHandle"></strong>
-                    <time class="shrink-0 text-muted text-xs" :datetime="conversation.lastMessageAt" :text="relativeTime(conversation.lastMessageAt)"></time>
+                    <time class="shrink-0 text-muted text-xs" :datetime="conversation.lastMessageAt" :text="relativeTime(conversation.lastMessageAt, { formatter: elapsed })"></time>
                   </div>
                   <p class="m-0 mt-0.5 text-muted text-xs truncate" :text="previewFor(conversation)"></p>
                 </div>
                 <span class="grid place-items-center shrink-0 px-1.5 h-5 min-w-5 font-semibold text-on-solid text-xs bg-net-bluesky rounded-full" x-show="conversation.unreadCount > 0" :text="String(conversation.unreadCount)"></span>
               </div>
             </button>
-            <button class="p-3 w-full text-center text-muted text-ui hover:text-ink hover:bg-panel-2 transition-colors" type="button" x-show="nextOffset() !== null" :disabled="loadingMore()" @click="loadMoreConversations" :text="loadingMore() ? 'Loading…' : 'Load more conversations'">Load more conversations</button>
+            <button class="p-3 w-full text-center text-muted text-ui hover:text-ink hover:bg-panel-2 transition-colors" type="button" x-show="nextOffset() !== null" :disabled="loadingMore()" @click="loadMoreConversations" :text="loadingMore() ? copy.loading : copy.moreConversations">{{ inboxText.moreConversations }}</button>
           </div>
         </Card>
 
         <section class="p-4 bg-panel border border-line rounded-2xl shadow-sm" x-show="unavailable().length">
-          <h2 class="m-0 font-semibold text-ink text-sm">Not available yet</h2>
-          <p class="m-0 mt-1 text-muted text-xs">These networks are connected for publishing, but their DMs are out of reach.</p>
+          <h2 class="m-0 font-semibold text-ink text-sm">{{ inboxText.notAvailable }}</h2>
+          <p class="m-0 mt-1 text-muted text-xs">{{ inboxText.unavailableDescription }}</p>
           <ul class="grid gap-2 m-0 mt-3 p-0 list-none">
             <li class="grid gap-0.5" x-for="entry in unavailable()">
               <strong class="text-ink text-xs" :text="providerLabel(entry.provider)"></strong>
@@ -91,12 +99,12 @@
         </section>
       </aside>
 
-      <section class="flex overflow-hidden flex-col min-h-[34rem] bg-panel border border-line rounded-2xl shadow-sm" aria-label="Conversation">
+      <section class="flex overflow-hidden flex-col min-h-[34rem] bg-panel border border-line rounded-2xl shadow-sm" aria-label="{{ inboxText.conversation }}">
         <div class="grid flex-1 gap-3 place-items-center px-6 py-20 text-center" x-show="!activeId()">
           <span class="grid place-items-center h-14 w-14 text-2xl text-info bg-info-soft rounded-2xl" aria-hidden="true"><span class="i-hugeicons-message-01"></span></span>
           <div>
-            <h2 class="m-0 font-semibold text-base text-ink">Pick a conversation</h2>
-            <p class="m-0 mt-1 max-w-md text-muted text-sm">Choose a thread on the left to read it and reply. Postline marks it read as soon as you open it.</p>
+            <h2 class="m-0 font-semibold text-base text-ink">{{ inboxText.pickConversation }}</h2>
+            <p class="m-0 mt-1 max-w-md text-muted text-sm">{{ inboxText.pickDescription }}</p>
           </div>
         </div>
 
@@ -110,39 +118,39 @@
               </div>
             </div>
             <div class="flex gap-2 items-center">
-              <button class="px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :show="activeProvider() !== 'twitter'" :disabled="refreshing()" @click="refreshThread" :text="refreshing() ? 'Refreshing…' : 'Refresh'">Refresh</button>
-              <button class="px-3 h-8 font-semibold text-xs border rounded-lg transition-colors" type="button" @click="toggleArchive" :class="statusFilter() === 'archived' ? 'text-ink bg-panel-2 border-line hover:bg-raised' : 'text-danger border-danger-line hover:bg-danger-soft'" :text="statusFilter() === 'archived' ? 'Restore' : 'Archive'">Archive</button>
+              <button class="px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :show="activeProvider() !== 'twitter'" :disabled="refreshing()" @click="refreshThread" :text="refreshing() ? copy.refreshing : copy.refresh">{{ inboxText.refresh }}</button>
+              <button class="px-3 h-8 font-semibold text-xs border rounded-lg transition-colors" type="button" @click="toggleArchive" :class="statusFilter() === 'archived' ? 'text-ink bg-panel-2 border-line hover:bg-raised' : 'text-danger border-danger-line hover:bg-danger-soft'" :text="statusFilter() === 'archived' ? copy.restore : copy.archive">{{ inboxText.archive }}</button>
             </div>
           </header>
 
           <div class="grid overflow-y-auto content-start flex-1 gap-3 px-4 py-4 max-h-[30rem]" ref="threadList" data-inbox-thread>
-            <WorkspaceListSkeleton :show="threadLoading()" label="Loading messages" />
-            <ErrorState :show="threadError() && !threadLoading()" title="Could not load messages" :message="threadError()" @retry="loadThread()" />
-            <EmptyState :show="!threadLoading() && !threadError() && !messages().length" variant="bare" title="No messages synced yet" description="Sync to pull this conversation’s history.">
-              <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="activeProvider() !== 'twitter'" :disabled="syncing()" @click="runSync">Sync now</button>
+            <WorkspaceListSkeleton :show="threadLoading()" label="{{ inboxText.loadingMessages }}" />
+            <ErrorState :show="threadError() && !threadLoading()" title="{{ inboxText.couldNotLoadMessages }}" :message="threadError()" @retry="loadThread()" />
+            <EmptyState :show="!threadLoading() && !threadError() && !messages().length" variant="bare" title="{{ inboxText.noSyncedMessages }}" description="{{ inboxText.syncHistory }}">
+              <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="activeProvider() !== 'twitter'" :disabled="syncing()" @click="runSync">{{ inboxText.sync }}</button>
             </EmptyState>
-            <button class="justify-self-center px-3 py-1 text-muted text-xs hover:text-ink rounded-lg" type="button" x-show="olderOffset() !== null" :disabled="loadingOlder()" @click="loadOlderMessages" :text="loadingOlder() ? 'Loading…' : 'Show older messages'">Show older messages</button>
+            <button class="justify-self-center px-3 py-1 text-muted text-xs hover:text-ink rounded-lg" type="button" x-show="olderOffset() !== null" :disabled="loadingOlder()" @click="loadOlderMessages" :text="loadingOlder() ? copy.loading : copy.olderMessages">{{ inboxText.olderMessages }}</button>
             <article class="flex" x-for="message in messages()" :class="message.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
               <div class="grid gap-1 max-w-[80%]">
                 <div class="px-3.5 py-2.5 rounded-2xl" :class="message.direction === 'outgoing' ? 'bg-accent text-on-accent' : 'bg-panel-2 text-body border border-line'">
                   <p class="m-0 leading-5 text-ui whitespace-pre-line" :text="message.body"></p>
                 </div>
                 <div class="flex gap-2 items-center px-1" :class="message.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
-                  <span class="text-muted text-xs" :text="message.direction === 'outgoing' ? 'You' : (message.authorName || message.authorHandle)"></span>
-                  <time class="text-muted text-xs" :datetime="message.sentAt" :text="relativeTime(message.sentAt)"></time>
-                  <span class="font-semibold text-danger text-xs" x-show="message.status === 'failed'" :text="message.failureReason || 'Failed to send'"></span>
+                  <span class="text-muted text-xs" :text="message.direction === 'outgoing' ? copy.you : (message.authorName || message.authorHandle)"></span>
+                  <time class="text-muted text-xs" :datetime="message.sentAt" :text="relativeTime(message.sentAt, { formatter: elapsed })"></time>
+                  <span class="font-semibold text-danger text-xs" x-show="message.status === 'failed'" :text="message.failureReason || copy.failedToSend"></span>
                 </div>
               </div>
             </article>
           </div>
 
           <form class="grid gap-2 px-4 py-3 border-line border-t" @submit="sendReply($event)">
-            <textarea class="px-3 py-2.5 min-h-20 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus resize-y" placeholder="Write a reply…" aria-label="Reply" x-model="draftBody" :maxlength="String(characterLimit())" @keydown="maybeSend($event)"></textarea>
+            <textarea class="px-3 py-2.5 min-h-20 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus resize-y" placeholder="{{ inboxText.writeReply }}" aria-label="{{ inboxText.reply }}" x-model="draftBody" :maxlength="String(characterLimit())" @keydown="maybeSend($event)"></textarea>
             <div class="flex flex-wrap gap-2 items-center justify-between">
-              <span class="text-muted text-xs" :text="`${remaining()} characters left · ⌘↵ to send`"></span>
+              <span class="text-muted text-xs" :text="words.tc('replyCharacters', remaining())"></span>
               <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="sending() || !canReply() || !draftBody().trim()">
                 <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
-                <span :text="sending() ? 'Sending…' : replyLabel()">Send</span>
+                <span :text="sending() ? copy.sending : replyLabel()">{{ inboxText.send }}</span>
               </button>
             </div>
           </form>
@@ -154,7 +162,12 @@
   </section>
 
   <script client>
+    import { createI18n } from '@stacksjs/i18n/client'
     import { showNotification } from '../functions/notification'
+
+    const { locale: language, messages: copy } = {{ inboxClient }}
+    const words = createI18n({ locale: language, messages: { [language]: copy } })
+    const elapsed = language === 'en' ? undefined : new Intl.RelativeTimeFormat(language, { numeric: 'auto' })
 
     const inboxSection = state<'messages' | 'public'>('messages')
     interface InboxConversation {
@@ -205,11 +218,11 @@
     const accounts = state([])
     const xInbox = state({ accounts: [], readUsage: null, maxReadUsd: 0, replyUsd: 0 })
     const xSyncing = state(0)
-    const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 3 })
+    const usd = new Intl.NumberFormat(language === 'en' ? 'en-US' : language, { style: 'currency', currency: 'USD', maximumFractionDigits: 3 })
     const xReadCost = derived(() => {
       const usage = xInbox().readUsage
       if (!usage) return ''
-      return `Up to ${usd.format(xInbox().maxReadUsd)} per page. Estimated X API reads today ${usd.format(usage.estimatedUsd)} of ${usd.format(usage.limitUsd)}. Resets at midnight UTC.`
+      return words.t('xReadCost', { pageCost: usd.format(xInbox().maxReadUsd), spent: usd.format(usage.estimatedUsd), limit: usd.format(usage.limitUsd) })
     })
     const accountOptions = derived(() => accounts()
       .filter(account => !providerFilter() || account.provider === providerFilter())
@@ -237,8 +250,8 @@
     const unreadCount = state(0)
     const inboxOverview = derived(() => {
       const count = conversations().length
-      const more = nextOffset() !== null ? '+' : ''
-      return `${count}${more} conversation${count === 1 && !more ? '' : 's'} · ${unreadCount()} unread`
+      const values = { conversations: count, unread: unreadCount() }
+      return nextOffset() !== null ? words.t('pagedOverview', values) : words.tc('overview', count, values)
     })
     const nextOffset = state<number | null>(null)
     const olderOffset = state<number | null>(null)
@@ -250,8 +263,8 @@
     const activeConversation = derived(() => conversations().find(item => item.id === activeId()) || null)
     const activeProvider = derived(() => activeConversation()?.provider || 'bluesky')
     const canReply = derived(() => activeProvider() !== 'twitter' || xInbox().accounts.some(account => account.id === activeConversation()?.identityId))
-    const replyLabel = derived(() => activeProvider() === 'twitter' && xInbox().replyUsd ? `Send (${usd.format(xInbox().replyUsd)})` : 'Send')
-    const activeTitle = derived(() => activeConversation()?.participantName || activeConversation()?.participantHandle || 'Conversation')
+    const replyLabel = derived(() => activeProvider() === 'twitter' && xInbox().replyUsd ? words.t('sendCost', { cost: usd.format(xInbox().replyUsd) }) : copy.send)
+    const activeTitle = derived(() => activeConversation()?.participantName || activeConversation()?.participantHandle || copy.conversation)
     const activeSubtitle = derived(() => {
       const conversation = activeConversation()
       if (!conversation) return ''
@@ -260,18 +273,18 @@
     const characterLimit = derived(() => activeCharacterLimit())
     const remaining = derived(() => Math.max(0, characterLimit() - draftBody().length))
     const previewFor = (conversation: InboxConversation): string => {
-      const preview = conversation.lastMessagePreview || 'No messages yet'
-      return conversation.lastMessageOutgoing ? `You: ${preview}` : preview
+      const preview = conversation.lastMessagePreview || copy.noMessages
+      return conversation.lastMessageOutgoing ? words.t('youPreview', { preview }) : preview
     }
     const postJson = (url: string, body: Record<string, unknown>) =>
-      requestJson(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+      requestJson(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, copy.requestFailed)
 
     const loadConversations = async ({ quiet = false } = {}) => {
       if (!quiet) loading.set(true)
       conversationError.set('')
       try {
         const query = new URLSearchParams({ status: statusFilter(), provider: providerFilter(), identity_id: accountFilter() })
-        const payload = await requestJson(`/api/postline/inbox?${query}`)
+        const payload = await requestJson(`/api/postline/inbox?${query}`, {}, copy.requestFailed)
         const first = payload.data?.conversations || []
         // A quiet refresh updates the first page in place and keeps any pages
         // already loaded below it; a full load starts over.
@@ -315,7 +328,7 @@
       threadError.set('')
       try {
         const query = new URLSearchParams({ conversation_id: String(conversationId) })
-        const payload = await requestJson(`/api/postline/inbox/thread?${query}`)
+        const payload = await requestJson(`/api/postline/inbox/thread?${query}`, {}, copy.requestFailed)
         if (conversationId !== activeId()) return
         // A quiet refresh keeps older messages already loaded above the newest page.
         const newest = payload.data?.messages || []
@@ -354,7 +367,7 @@
       loadingMore.set(true)
       try {
         const query = new URLSearchParams({ status: statusFilter(), provider: providerFilter(), identity_id: accountFilter(), offset: String(offset) })
-        const payload = await requestJson(`/api/postline/inbox?${query}`)
+        const payload = await requestJson(`/api/postline/inbox?${query}`, {}, copy.requestFailed)
         const seen = new Set(conversations().map(item => item.id))
         conversations.set([...conversations(), ...(payload.data?.conversations || []).filter(item => !seen.has(item.id))])
         nextOffset.set(payload.data?.nextOffset ?? null)
@@ -373,7 +386,7 @@
       loadingOlder.set(true)
       try {
         const query = new URLSearchParams({ conversation_id: String(activeId()), offset: String(offset) })
-        const payload = await requestJson(`/api/postline/inbox/thread?${query}`)
+        const payload = await requestJson(`/api/postline/inbox/thread?${query}`, {}, copy.requestFailed)
         const seen = new Set(messages().map(item => item.id))
         messages.set([...(payload.data?.messages || []).filter(item => !seen.has(item.id)), ...messages()])
         olderOffset.set(payload.data?.olderOffset ?? null)
@@ -432,16 +445,17 @@
         await loadConversations({ quiet: true })
         if (activeId()) await loadThread({ markRead: false, quiet: true })
         const failures = payload.data?.errors?.length || 0
-        const suffix = failures ? ` ${failures} network${failures === 1 ? '' : 's'} need attention.` : ''
+        const message = words.tc('newMessages', payload.data?.messages || 0)
+        const attention = failures ? words.tc('syncAttention', failures) : ''
         showNotification({
-          title: 'Inbox synced',
-          message: `${payload.data?.messages || 0} new message${payload.data?.messages === 1 ? '' : 's'}.${suffix}`,
+          title: copy.synced,
+          message: [message, attention].filter(Boolean).join(' '),
           tone: failures ? 'neutral' : 'success',
           id: 'inbox-sync',
         })
       }
       catch (error) {
-        showNotification({ title: 'Inbox sync failed', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-sync' })
+        showNotification({ title: copy.syncFailed, message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-sync' })
       }
       finally {
         syncing.set(false)
@@ -454,11 +468,11 @@
       try {
         const payload = await postJson('/api/postline/inbox/sync', { twitter_identity_id: identityId, older })
         const count = payload.data?.messages || 0
-        showNotification({ title: 'X messages synced', message: `${count} new message${count === 1 ? '' : 's'}.`, tone: 'success', id: 'x-inbox-sync' })
+        showNotification({ title: copy.xSynced, message: words.tc('newMessages', count), tone: 'success', id: 'x-inbox-sync' })
         if (activeId() && activeProvider() === 'twitter') await loadThread({ markRead: false, quiet: true })
       }
       catch (error) {
-        showNotification({ title: 'Could not sync X messages', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'x-inbox-sync' })
+        showNotification({ title: copy.xSyncFailed, message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'x-inbox-sync' })
       }
       finally {
         await loadConversations({ quiet: true })
@@ -475,7 +489,7 @@
         await loadConversations({ quiet: true })
       }
       catch (error) {
-        showNotification({ title: 'Could not refresh thread', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-refresh' })
+        showNotification({ title: copy.refreshFailed, message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-refresh' })
       }
       finally {
         refreshing.set(false)
@@ -500,7 +514,7 @@
         await loadConversations({ quiet: true })
       }
       catch (error) {
-        showNotification({ title: isX ? 'Could not confirm X reply' : 'Message not sent', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-reply' })
+        showNotification({ title: isX ? copy.xReplyFailed : copy.replyFailed, message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-reply' })
       }
       finally {
         sending.set(false)
@@ -520,7 +534,7 @@
         unreadCount.set(0)
       }
       catch (error) {
-        showNotification({ title: 'Could not update the inbox', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-read' })
+        showNotification({ title: copy.updateInboxFailed, message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-read' })
       }
     }
 
@@ -532,14 +546,14 @@
         closeConversation()
         await loadConversations()
         showNotification({
-          title: nextStatus === 'archived' ? 'Conversation archived' : 'Conversation restored',
-          message: nextStatus === 'archived' ? 'It stays searchable under Archived.' : 'It is back in your inbox.',
+          title: nextStatus === 'archived' ? copy.archivedTitle : copy.restoredTitle,
+          message: nextStatus === 'archived' ? copy.archivedDescription : copy.restoredDescription,
           tone: 'success',
           id: 'inbox-archive',
         })
       }
       catch (error) {
-        showNotification({ title: 'Could not update the conversation', message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-archive' })
+        showNotification({ title: copy.updateConversationFailed, message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-archive' })
       }
     }
 

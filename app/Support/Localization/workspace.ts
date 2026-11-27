@@ -26,3 +26,5 @@ export const workspaceQueuePanelsText = workspaceI18n.tm('workspace.queuePanels'
 export const workspaceActivityText = workspaceI18n.tm('workspace.activity') as typeof en.workspace.activity
 export const workspaceTimelineText = workspaceI18n.tm('workspace.timeline') as typeof en.workspace.timeline
 export const workspaceWritingText = workspaceI18n.tm('workspace.writing') as typeof en.workspace.writing
+export const workspaceInboxText = workspaceI18n.tm('workspace.inbox') as typeof en.workspace.inbox
+export const workspaceInboxPublicText = workspaceI18n.tm('workspace.inboxPublic') as typeof en.workspace.inboxPublic
