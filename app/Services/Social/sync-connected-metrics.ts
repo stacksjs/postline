@@ -8,12 +8,12 @@ import { findIdentityRow, listIdentityRows } from './identities'
 import { saveTargetEngagement } from './save-target-engagement'
 import { now } from './support'
 
-type MetricsSource = Extract<SocialMetricsDriver['provider'], 'linkedin' | 'instagram' | 'threads'>
+type MetricsSource = Extract<SocialMetricsDriver['provider'], 'linkedin' | 'instagram' | 'threads' | 'twitter'>
 
 /** Read private metrics only with the identity that published the post. */
 export async function syncConnectedMetrics<T extends IdentityLike>(
   provider: MetricsSource,
-  driver: SocialMetricsDriver,
+  driver: Pick<SocialMetricsDriver, 'metrics'>,
   credentialsFor: (identity: T) => SocialIdentityCredentials | undefined | Promise<SocialIdentityCredentials | undefined>,
   limit = 100,
 ): Promise<{ synced: number, errors?: string[] }> {

@@ -25,13 +25,18 @@ older X accounts to grant the image upload scope.
   adds nothing on top.
 - **Daily read budget:** `TWITTER_DAILY_READ_BUDGET_USD` defaults to $2 per
   workspace and resets at midnight UTC. Postline reserves the maximum cost
-  before profile lookups, Listening searches, and cleanup reads. Check the
-  estimate in Settings > Channels > Your network apps > X and actual charges
+  before profile lookups, Listening searches, cleanup reads, and engagement
+  refreshes. Check the estimate in Settings > Channels > Your network apps > X
+  and actual charges
   in the X Developer Console. The cap covers reads from this workspace. X
   publishes [current per-resource prices](https://docs.x.com/x-api/getting-started/pricing).
 - **Deleting:** X allows 50 deletions per 15 minutes; cleanup paces itself to
   that, so a large cleanup takes hours.
 - **No inbox:** X direct messages are not supported.
+- **Engagement:** Allow paid engagement reads in the X network app settings
+  or set `TWITTER_ENGAGEMENT_METRICS=true`. Select **Refresh engagement** in
+  Analytics to update counts for up to 100 recent posts per connected X
+  account. X's public metrics use the existing `tweet.read` scope.
 - **Limits:** 280 characters, up to four images. Write a thread in the
   composer's Thread mode to go longer.
 

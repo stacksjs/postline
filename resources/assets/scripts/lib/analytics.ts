@@ -14,6 +14,7 @@ export interface AnalyticsPayload {
   }
   series: Point[]
   channelMix: Array<{ provider: string, published: number, share: number }>
+  xMetricsEnabled: boolean
   windows: Array<{ hour: number, count: number }>
   posts: Array<{ id: number, title: string, publishedAt: string, targets: Array<{ id: number, provider: string, handle: string | null, counts: EngagementCounts }> }>
   page: number

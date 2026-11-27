@@ -20,3 +20,7 @@ reports. Unmeasured posts still count toward publishing totals.
 per measured post in the last 30 days. The hour uses your workspace time
 zone. Each comparison requires enough samples in two groups and a unique
 highest average. The scheduler refreshes engagement periodically.
+
+X engagement is an opt-in paid read. Enable it in the X network app settings,
+then select **Refresh engagement** in Analytics. X reads from this button
+share the workspace's daily read budget.

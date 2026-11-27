@@ -85,6 +85,11 @@
                 <span :text="network.description"></span>
               </li>
             </ul>
+            <div class="grid gap-2 justify-items-start pb-3.5 px-3.5" :show="data()?.xMetricsEnabled">
+              <Button variant="secondary" size="xs" :aria-disabled="refreshingMetrics()" @click="refreshMetrics" aria-describedby="analytics-refresh-cost">Refresh engagement</Button>
+              <p class="m-0 text-muted text-xs" id="analytics-refresh-cost">Includes paid X API reads for up to 100 recent posts per connected X account, within your daily read budget.</p>
+            </div>
+            <p class="m-0 pb-3.5 px-3.5 text-body text-xs" role="status" :show="metricsFeedback()" :text="metricsFeedback()"></p>
           </Card>
         </section>
         <section aria-labelledby="channel-mix-title">
@@ -138,9 +143,9 @@
           </table>
         </div>
         <nav class="flex gap-3 items-center justify-between px-3 py-2.5 border-line border-t" aria-label="Published posts pages" :show="pageCount() > 1">
-          <button class="px-2.5 h-9 text-ui bg-panel-2 border border-line rounded-lg disabled:opacity-50" type="button" :disabled="page() <= 1" @click="loadAnalytics(page() - 1, true)">Previous</button>
+          <button class="px-2.5 h-9 text-ui bg-panel-2 border border-line rounded-lg disabled:opacity-50" type="button" :disabled="page() <= 1" @click="loadAnalytics(page() - 1, { focusPosts: true })">Previous</button>
           <span class="text-muted text-xs" :text="'Page ' + page() + ' of ' + pageCount()"></span>
-          <button class="px-2.5 h-9 text-ui bg-panel-2 border border-line rounded-lg disabled:opacity-50" type="button" :disabled="page() >= pageCount()" @click="loadAnalytics(page() + 1, true)">Next</button>
+          <button class="px-2.5 h-9 text-ui bg-panel-2 border border-line rounded-lg disabled:opacity-50" type="button" :disabled="page() >= pageCount()" @click="loadAnalytics(page() + 1, { focusPosts: true })">Next</button>
         </nav>
       </Card>
     </section>
@@ -160,6 +165,8 @@
     const page = state(1)
     const loading = state(true)
     const error = state('')
+    const refreshingMetrics = state(false)
+    const metricsFeedback = state('')
     let request: AbortController | undefined
     let chart: ReturnType<typeof drawPublishingChart> | undefined
 
@@ -208,20 +215,41 @@
       void loadAnalytics(1)
     }
 
-    async function loadAnalytics(nextPage: number, focusPosts = false) {
+    async function refreshMetrics() {
+      if (refreshingMetrics()) return
+      refreshingMetrics.set(true)
+      metricsFeedback.set('Refreshing engagement…')
+      try {
+        const { data: { synced, errors } } = await requestJson('/api/postline/metrics/sync', {
+          method: 'POST',
+          body: JSON.stringify({ include_x: true }),
+        }, 'Could not refresh engagement.')
+        if (synced) await loadAnalytics(page(), { background: true })
+        const status = synced ? 'Engagement refreshed.' : 'No new metrics were reported.'
+        metricsFeedback.set([status, ...errors.map((error: { explanation: string }) => error.explanation)].join(' '))
+      }
+      catch (problem) {
+        metricsFeedback.set(problem instanceof Error ? problem.message : 'Could not refresh engagement.')
+      }
+      finally {
+        refreshingMetrics.set(false)
+      }
+    }
+
+    async function loadAnalytics(nextPage: number, { focusPosts = false, background = false } = {}) {
       request?.abort()
       const controller = new AbortController()
       request = controller
-      chart?.destroy()
-      chart = undefined
       page.set(nextPage)
-      loading.set(true)
+      if (!background) loading.set(true)
       error.set('')
       try {
         const payload = await requestJson(`/api/postline/analytics?days=${days()}&page=${nextPage}`, { signal: controller.signal, cache: 'no-store' }, 'Could not load analytics.')
         if (!payload.data?.stats || !Array.isArray(payload.data.series) || !Array.isArray(payload.data.posts))
           throw new Error('Analytics data was incomplete.')
         if (controller.signal.aborted) return
+        chart?.destroy()
+        chart = undefined
         data.set(payload.data)
         page.set(payload.data.page)
         loading.set(false)

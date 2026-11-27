@@ -2,6 +2,7 @@ import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { db } from '@stacksjs/database'
 import { response } from '@stacksjs/router'
+import { networkApps } from '../../Services/NetworkAppService'
 import { workspace } from '../../Services/WorkspaceService'
 import { actionFailure } from '../../Support/Http/action-error'
 import { readEngagementMetrics, summarizeEngagement } from '../../Support/Social/engagement-analytics'
@@ -103,6 +104,7 @@ export default new Action({
         }))
 
       const timezone = await workspace.timezone()
+      const xMetricsEnabled = byProvider.has('twitter') && (await networkApps.credentials('twitter')).engagementMetrics
       const { engagement, providers, countsByProvider, minSample, bestChannel, bestHour, windows } = summarizeEngagement(targets, timezone)
 
       const pageCount = Math.ceil(posts.length / PAGE_SIZE)
@@ -142,6 +144,7 @@ export default new Action({
             pageCount,
           }),
           channelMix,
+          xMetricsEnabled,
           windows,
           timezone,
         },

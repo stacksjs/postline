@@ -106,9 +106,9 @@ const networkSetupGuides = await loadNetworkSetupGuides()
                   <input class="mt-0.5" type="checkbox" :checked="app.organizationPages" @change="setAppFlag(app.provider, 'organizationPages', $event)" data-app-organization-pages>
                   <span>Also connect the company Pages I administer. Needs the Community Management API product on this app; without it LinkedIn refuses the sign-in.</span>
                 </label>
-                <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'twitter' ? 'hidden' : 'flex'">
+                <label class="flex gap-2 items-start sm:col-span-2 text-body text-xs">
                   <input class="mt-0.5" type="checkbox" :checked="app.engagementMetrics" @change="setAppFlag(app.provider, 'engagementMetrics', $event)">
-                  <span>Read engagement metrics. Enable the permission in your developer app, then reconnect the account.</span>
+                  <span :text="app.provider === 'twitter' ? 'Allow paid X engagement reads when you refresh from Analytics. Reads count toward the daily budget.' : 'Read engagement metrics. Enable the permission in your developer app, then reconnect the account.'"></span>
                 </label>
                 <div class="flex flex-wrap gap-2 items-center sm:col-span-2">
                   <p class="m-0 mr-auto text-muted text-xs" :text="app.note"></p>
@@ -331,7 +331,7 @@ const networkSetupGuides = await loadNetworkSetupGuides()
           body.set('client_id', row.clientId || '')
           body.set('client_secret', row.clientSecret || '')
           if (provider === 'linkedin') body.set('organization_pages', row.organizationPages ? '1' : '0')
-          if (provider !== 'twitter') body.set('engagement_metrics', row.engagementMetrics ? '1' : '0')
+          body.set('engagement_metrics', row.engagementMetrics ? '1' : '0')
           await requestJson('/api/postline/network-apps', { method: 'POST', body }, 'Could not save the app.')
           const drafts = { ...appDrafts() }
           delete drafts[provider]

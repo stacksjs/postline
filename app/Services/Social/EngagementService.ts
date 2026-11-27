@@ -4,8 +4,9 @@ import { instagram } from './InstagramService'
 import { linkedin } from './LinkedInService'
 import { threads } from './ThreadsService'
 import { mastodon } from './MastodonService'
+import { twitter } from './TwitterService'
 
-export async function syncEngagement() {
+export async function syncEngagement(options: { includeTwitter?: boolean } = {}) {
   const sources: Array<{ provider: string, result: Promise<{ synced: number, errors?: string[] }> }> = [
     { provider: 'bluesky', result: bluesky.syncMetrics() },
     { provider: 'mastodon', result: mastodon.syncMetrics() },
@@ -13,6 +14,7 @@ export async function syncEngagement() {
     { provider: 'instagram', result: instagram.syncMetrics() },
     { provider: 'threads', result: threads.syncMetrics() },
   ]
+  if (options.includeTwitter) sources.push({ provider: 'twitter', result: twitter.syncMetrics() })
   const settled = await Promise.allSettled(sources.map(source => source.result))
   let synced = 0
   const errors: Array<{ provider: string, explanation: string }> = []

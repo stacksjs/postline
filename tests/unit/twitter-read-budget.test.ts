@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { db } from '@stacksjs/database'
 import { keywordMonitoring } from '../../app/Services/KeywordMonitoringService'
 import { networkApps } from '../../app/Services/NetworkAppService'
+import { syncEngagement } from '../../app/Services/Social/EngagementService'
+import { postQueue } from '../../app/Services/Social/QueueService'
 import { twitterReadUsage, withTwitterReadBudget } from '../../app/Services/Social/TwitterReadBudget'
 import { twitter } from '../../app/Services/Social/TwitterService'
 import { upsertIdentityRow } from '../../app/Services/Social/identities'
@@ -63,6 +65,71 @@ describe('X API read budget', () => {
       return { value: null, estimatedMicros: 0 }
     })).rejects.toMatchObject({ code: 'twitter_read_budget' })
     expect(dispatched).toBe(false)
+  })
+
+  test('reserves the full cost of an explicit engagement refresh and keeps unreported counts', async () => {
+    const identity = await upsertIdentityRow('twitter', { externalId: '9988' }, {
+      handle: 'engagement-budget-fixture',
+      external_id: '9988',
+      auth_status: 'connected',
+      access_token: 'metrics-test-token',
+    })
+    const identityId = Number(identity.id)
+    const posts: number[] = []
+    const calls: string[] = []
+
+    async function published(remoteId: string, previous: string | null = null) {
+      const { postId } = await postQueue.save({ text: 'X engagement fixture ' + remoteId, providers: [`twitter:${identityId}`] })
+      posts.push(postId)
+      await db.unsafe('UPDATE post_targets SET status = ?, remote_uri = ?, metrics = ? WHERE post_id = ?', ['published', remoteId, previous, postId])
+      return postId
+    }
+
+    async function counts(postId: number) {
+      const [target] = await db.unsafe('SELECT metrics FROM post_targets WHERE post_id = ?', [postId])
+      return JSON.parse(String(target?.metrics ?? 'null'))
+    }
+
+    globalThis.fetch = (async (input, init) => {
+      const request = new Request(input, init)
+      const url = new URL(request.url)
+      calls.push(url.pathname)
+      expect(url.pathname).toBe('/2/tweets')
+      expect(url.searchParams.get('ids')?.split(',').sort()).toEqual(['10', '20'])
+      expect(url.searchParams.get('tweet.fields')).toBe('public_metrics')
+      expect(request.headers.get('authorization')).toBe('Bearer metrics-test-token')
+      expect(await twitterReadUsage()).toMatchObject({ estimatedUsd: 0.01 })
+      return Response.json({ data: [{ id: '10', public_metrics: { like_count: 3, reply_count: 0 } }, { id: '20' }] })
+    }) as typeof fetch
+
+    try {
+      const measured = await published('10')
+      const unreported = await published('20', '{"likes":8}')
+      Bun.env.TWITTER_DAILY_READ_BUDGET_USD = '0.015'
+      await networkApps.save('twitter', { clientId: 'test-client', clientSecret: 'test-secret', engagementMetrics: false })
+      expect(await twitter.syncMetrics()).toEqual({ synced: 0 })
+      await networkApps.save('twitter', { clientId: 'test-client', engagementMetrics: true })
+      await syncEngagement()
+      expect(calls).toEqual([])
+
+      expect(await syncEngagement({ includeTwitter: true })).toMatchObject({ synced: 1, errors: [] })
+      expect(await counts(measured)).toMatchObject({ likes: 3, replies: 0 })
+      expect(await counts(unreported)).toEqual({ likes: 8 })
+      expect(await syncEngagement({ includeTwitter: true })).toMatchObject({
+        synced: 0,
+        errors: [{ provider: 'twitter', explanation: expect.stringContaining('daily read budget') }],
+      })
+      expect(calls).toEqual(['/2/tweets'])
+      expect(await twitterReadUsage()).toMatchObject({ estimatedUsd: 0.01 })
+    }
+    finally {
+      for (const postId of posts) {
+        await db.unsafe('DELETE FROM post_targets WHERE post_id = ?', [postId])
+        await db.unsafe('DELETE FROM posts WHERE id = ?', [postId])
+      }
+      await db.unsafe('DELETE FROM social_identities WHERE id = ?', [identityId])
+      await networkApps.clear('twitter')
+    }
   })
 
   test('resumes Listening from its stored bounds and advances after the whole window', async () => {

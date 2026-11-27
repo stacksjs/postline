@@ -14,6 +14,7 @@ import { networkApps } from '../NetworkAppService'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { classifyFailure } from '../../Support/Social/retry'
 import { TWITTER_READ_PRICE, withTwitterReadBudget } from './TwitterReadBudget'
+import { syncConnectedMetrics } from './sync-connected-metrics'
 
 const database = db as any
 
@@ -306,6 +307,28 @@ export class TwitterService {
       }),
       deletePost: ref => this.driver.deletePost(credentials, ref),
     }
+  }
+
+  async syncMetrics() {
+    if (!(await networkApps.credentials('twitter')).engagementMetrics) return { synced: 0 }
+    return await syncConnectedMetrics<SocialIdentityRow>('twitter', {
+      metrics: (identity, uris) => {
+        // A post can still be billed if X returns it without public counts.
+        const estimate = new Set(uris).size * TWITTER_READ_PRICE.post
+        return withTwitterReadBudget(estimate, async () => ({
+          value: await this.driver.metrics(identity, uris),
+          estimatedMicros: estimate,
+        }))
+      },
+    }, async (identity) => {
+      const current = await this.refreshIfExpiring(identity)
+      if (!current) return
+      return {
+        handle: current.handle,
+        did: current.external_id || undefined,
+        accessToken: current.access_token || undefined,
+      }
+    })
   }
 
   /**

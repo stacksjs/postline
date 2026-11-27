@@ -1588,24 +1588,34 @@ async function checkAnalytics(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
     window.analyticsReads = 0
+    window.xMetricsEnabled = false
+    window.xMetricsRefreshes = 0
     window.fetch = (input, options) => {
       const url = new URL(input instanceof Request ? input.url : input, location.href)
+      if (url.pathname === '/api/postline/metrics/sync') {
+        if (options?.method !== 'POST' || JSON.parse(options.body).include_x !== true)
+          return Promise.resolve(Response.json({ ok: false, error: 'Missing explicit paid refresh' }, { status: 422 }))
+        window.xMetricsRefreshes++
+        return Promise.resolve(Response.json({ ok: true, data: { synced: 1, errors: [] } }))
+      }
       if (url.pathname !== '/api/postline/analytics' || !url.searchParams.has('page')) return actualFetch(input, options)
       const days = Number(url.searchParams.get('days'))
       const page = Number(url.searchParams.get('page'))
       window.analyticsReads++
-      const counts = { likes: 1, replies: 0, views: 12 }
+      const counts = { likes: 1 + window.xMetricsRefreshes, replies: 0, views: 12 }
+      const provider = window.xMetricsEnabled ? 'twitter' : 'instagram'
       return Promise.resolve(Response.json({ ok: true, data: {
         totalPosts: days === 7 ? 1 : 26,
         stats: {
           minSample: 3,
-          engagement: { likes: 1, replies: 0, reposts: 0, countsByProvider: [{ provider: 'instagram', ...counts }] },
+          engagement: { likes: counts.likes, replies: 0, reposts: 0, countsByProvider: [{ provider, ...counts }] },
         },
         series: [{ label: 'Monday', value: days === 7 ? 0 : 25 }, { label: 'Tuesday', value: 1 }],
-        channelMix: [{ provider: 'instagram', published: days === 7 ? 1 : 26, share: 100 }],
-        posts: [{ id: page, title: page === 1 ? 'First example' : 'Next example', publishedAt: '2026-11-25 10:00:00', targets: [{ id: page, provider: 'instagram', handle: null, counts }] }],
+        channelMix: [{ provider, published: days === 7 ? 1 : 26, share: 100 }],
+        posts: [{ id: page, title: page === 1 ? 'First example' : 'Next example', publishedAt: '2026-11-25 10:00:00', targets: [{ id: page, provider, handle: null, counts }] }],
         page,
         pageCount: days === 7 ? 1 : 2,
+        xMetricsEnabled: window.xMetricsEnabled,
       } }))
     }
   ` })
@@ -1646,6 +1656,22 @@ async function checkAnalytics(cdp: Cdp): Promise<void> {
     await waitUntil('Analytics reloads its data on revisit', () => evaluate<boolean>(cdp, `
       location.pathname === '/analytics' && window.analyticsReads === 4
         && document.querySelector('[data-analytics-total]')?.textContent === '26'`), 5_000)
+    const refresh = `document.querySelector('button[aria-describedby="analytics-refresh-cost"]')`
+    if (await evaluate<boolean>(cdp, `Boolean(${refresh}?.getClientRects().length)`))
+      fail('analytics', 'X engagement', 'the paid refresh was visible before opt-in')
+    await evaluate(cdp, `
+      window.xMetricsEnabled = true
+      const paidRange = document.querySelector('[data-postline-page=analytics] select')
+      paidRange.value = '90'; paidRange.dispatchEvent(new Event('change', { bubbles: true }))`)
+    await waitUntil('The paid refresh appears with its cost description', () => evaluate<boolean>(cdp, `
+      Boolean(${refresh}?.getClientRects().length && document.getElementById('analytics-refresh-cost')?.textContent.includes('daily read budget'))`), 5_000)
+    await evaluate(cdp, `${refresh}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The paid refresh reports updated counts and retains focus', () => evaluate<boolean>(cdp, `
+      window.xMetricsRefreshes === 1
+        && document.querySelector('[data-analytics-engagement]')?.textContent === '2'
+        && document.activeElement === ${refresh}
+        && document.querySelector('[aria-labelledby=network-engagement-title] [role=status]')?.textContent === 'Engagement refreshed.'`), 5_000)
   }
   finally {
     await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] })

@@ -1,3 +1,4 @@
+import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { actionFailure } from '../../Support/Http/action-error'
@@ -9,9 +10,9 @@ export default new Action({
   description: 'Refresh engagement metrics for published posts on demand.',
   method: 'POST',
 
-  async handle() {
+  async handle(request: RequestInstance) {
     try {
-      const data = await syncEngagement()
+      const data = await syncEngagement({ includeTwitter: request.get('include_x') === true })
       if (!data.synced && data.errors.length)
         return actionFailure(new UserFacingError(data.errors.map(({ explanation }) => explanation).join(' '), 'engagement_sync_failed'), 422)
       return response.json({ ok: true, data })

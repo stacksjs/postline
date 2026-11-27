@@ -67,7 +67,7 @@ export class NetworkAppService {
         clientSecret: (await openToken(row.client_secret)) || '',
         redirectUrl: String(row.redirect_url || '').trim() || env('REDIRECT_URL') || defaultRedirectUrl(network),
         organizationPages: network === 'linkedin' && Boolean(Number(row.organization_pages ?? 0)),
-        engagementMetrics: network !== 'twitter' && Boolean(Number(row.engagement_metrics ?? 0)),
+        engagementMetrics: Boolean(Number(row.engagement_metrics ?? 0)),
         source: 'settings',
       }
     }
@@ -77,7 +77,7 @@ export class NetworkAppService {
       clientSecret: env('CLIENT_SECRET'),
       redirectUrl: env('REDIRECT_URL') || defaultRedirectUrl(network),
       organizationPages: network === 'linkedin' && env('PAGES').toLowerCase() === 'true',
-      engagementMetrics: network !== 'twitter' && env('ENGAGEMENT_METRICS').toLowerCase() === 'true',
+      engagementMetrics: env('ENGAGEMENT_METRICS').toLowerCase() === 'true',
       source: clientId ? 'environment' : 'none',
     }
   }
@@ -121,7 +121,7 @@ export class NetworkAppService {
       redirect_url: redirectUrl || null,
       // Left as it is when not given, so a form without the switch keeps it.
       ...(input.organizationPages === undefined ? {} : { organization_pages: network === 'linkedin' && input.organizationPages }),
-      ...(input.engagementMetrics === undefined ? {} : { engagement_metrics: network !== 'twitter' && input.engagementMetrics }),
+      ...(input.engagementMetrics === undefined ? {} : { engagement_metrics: input.engagementMetrics }),
       updated_at: now(),
     }
     if (existing)
