@@ -241,7 +241,7 @@
     import { countText } from '../../app/Support/Social/count-text'
     import { instantFromWallTime, systemTimeZone } from '../../app/Support/time'
     import type { ComposerAction, ComposerDraft, ComposerFormat } from '../functions/composer-draft'
-    import { COMPOSER_DRAFT_KEY, readComposerDraft, writeComposerDraft } from '../functions/composer-draft'
+    import { COMPOSER_AUTOSAVE_KEY, COMPOSER_DEFAULT_FORMAT_KEY, COMPOSER_DRAFT_KEY, readComposerDraft, writeComposerDraft } from '../functions/composer-draft'
     import type { ComposerImage } from '../functions/composer-media'
     import { appendComposerImages, composerFileError, composerImageFiles, composerImageTypes, composerMediaWarnings } from '../functions/composer-media'
     import { composerActionText, composerQueueTimestamp, composerScheduleIso } from '../functions/composer-schedule'
@@ -267,7 +267,9 @@
       if (setupActive && Number.isSafeInteger(postId) && postId > 0) navigate(`/setup?step=complete&post=${postId}`)
     }
     const editingId = state<number | null>(null)
-    const composerFormat = state<ComposerFormat>('single')
+    const defaultFormat = useLocalStorage<ComposerFormat>(COMPOSER_DEFAULT_FORMAT_KEY, 'single')
+    const autosave = useLocalStorage(COMPOSER_AUTOSAVE_KEY, true)
+    const composerFormat = state<ComposerFormat>(!editParam && !setupActive && defaultFormat() === 'thread' ? 'thread' : 'single')
     const editingQueued = () => Boolean(editParam)
     const canPublish = derived(() => selectedConnected().length > 0 && (!editParam || editingId() !== null))
     const submitting = state(false)
@@ -704,15 +706,20 @@
     }
 
     const saveDraft = () => {
-      if (editParam) return
+      if (editParam || !autosave()) return
       const posts = segments()
+      const overrides = Object.entries(variants())
+      if (posts.length === 1 && !posts[0].text && !overrides.length && postAction() === 'publish') {
+        savedDraft.set(null)
+        return
+      }
       savedDraft.set({
         activeIndex: Math.max(0, posts.findIndex(post => post.id === activeSegmentId())),
         mode: composerFormat(),
         action: postAction(),
         scheduledIso: scheduledIso(),
         posts: posts.map(post => ({ text: post.text })),
-        variants: Object.entries(variants())
+        variants: overrides
           .map(([provider, entry]) => ({ provider, text: entry.text, shared: entry.shared })),
       })
     }
@@ -721,7 +728,8 @@
 
     const restoreDraft = () => {
       const draft = savedDraft()
-      if (!draft) return
+      if (!autosave() || !draft) return
+      if (draft.posts.length === 1 && !draft.posts[0].text && !draft.variants.length && draft.action === 'publish') return
       composerFormat.set(draft.mode)
       postAction.set(draft.action)
       scheduledIso.set(draft.scheduledIso)

@@ -1,4 +1,6 @@
 export const COMPOSER_DRAFT_KEY = 'postline:composer-draft:v1'
+export const COMPOSER_DEFAULT_FORMAT_KEY = 'postline:composer-format'
+export const COMPOSER_AUTOSAVE_KEY = 'postline:composer-autosave'
 
 export type ComposerFormat = 'single' | 'thread'
 export type ComposerAction = 'publish' | 'schedule' | 'draft'

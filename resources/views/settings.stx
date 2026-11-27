@@ -152,8 +152,12 @@
           <SettingsRow label="Character limit" :description="charLimitSource()" setting="character-limit">
             <span :text="charLimitText()">—</span>
           </SettingsRow>
-          <SettingsRow label="Default mode" setting="default-mode"><span>Single post</span></SettingsRow>
-          <SettingsRow label="Auto-save drafts" setting="auto-save"><span>On</span></SettingsRow>
+          <SettingsRow label="Default mode" description="Format for a new post on this device." setting="default-mode" keywords="single thread post format">
+            <Select variant="mac" v-model:value="composerFormat" placeholder="" :options="composerFormatOptions" />
+          </SettingsRow>
+          <SettingsRow label="Auto-save drafts" description="Keep unfinished text on this device." setting="auto-save" keywords="draft save local">
+            <Switch variant="mac" v-model:checked="composerAutosave" />
+          </SettingsRow>
         </SettingsGroup>
       </SettingsPane>
 
@@ -315,6 +319,8 @@
 
 
   <script client>
+    import type { ComposerFormat } from '../functions/composer-draft'
+    import { COMPOSER_AUTOSAVE_KEY, COMPOSER_DEFAULT_FORMAT_KEY } from '../functions/composer-draft'
     import { passkeys } from '../functions/passkeys'
     import { fetchProviders } from '../functions/social-client'
 
@@ -339,6 +345,9 @@
 
     const themePref = state(readStoredTheme())
     const pane = state('general')
+    const composerFormat = useLocalStorage<ComposerFormat>(COMPOSER_DEFAULT_FORMAT_KEY, 'single')
+    const composerAutosave = useLocalStorage(COMPOSER_AUTOSAVE_KEY, true)
+    const composerFormatOptions = [{ value: 'single', label: 'Single post' }, { value: 'thread', label: 'Thread' }]
 
     /**
      * Whether this page is the desktop app's Settings window.

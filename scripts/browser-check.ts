@@ -645,6 +645,50 @@ async function checkLocalComposerDraft(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkComposerPreferences(cdp: Cdp): Promise<void> {
+  const editor = `document.querySelector('[data-bluesky-text]')`
+  const tab = `document.querySelector('[data-settings-item=composer]')`
+  const format = `document.querySelector('[data-setting=default-mode] select')`
+  const autosave = `document.querySelector('[data-setting=auto-save] button[role=switch]')`
+  const thread = `document.querySelector('[data-stx-segmented-control][aria-label="Post format"] [aria-label=Thread]')`
+  try {
+    await auditPage(`${site}/settings`, { cdp })
+    await evaluate(cdp, `localStorage.removeItem('postline:composer-draft:v1'); ${tab}.click()`)
+    await waitUntil('Settings exposes the Composer format and autosave controls', () => evaluate<boolean>(cdp, `
+      ${format}?.getClientRects().length > 0 && ${format}.value === 'single'
+        && ${autosave}?.getAttribute('aria-checked') === 'true'
+        && document.getElementById(${format}.getAttribute('aria-labelledby'))?.textContent === 'Default mode'
+        && document.getElementById(${autosave}.getAttribute('aria-labelledby'))?.textContent === 'Auto-save drafts'`), 5_000)
+    await evaluate(cdp, `
+      ${format}.value = 'thread'
+      ${format}.dispatchEvent(new Event('change', { bubbles: true }))
+      ${autosave}.focus()
+    `)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Settings disables local draft autosave', () => evaluate<boolean>(cdp, `
+      ${autosave}.getAttribute('aria-checked') === 'false'`), 5_000)
+
+    await auditPage(`${site}/composer`, { cdp })
+    await waitUntil('A new Composer opens in the default Thread format', () => evaluate<boolean>(cdp, `
+      ${thread}?.getAttribute('aria-pressed') === 'true' && Boolean(${editor})`), 5_000)
+    await evaluate(cdp, `${editor}.focus()`)
+    await cdp.send('Input.insertText', { text: 'A draft with autosave disabled' })
+    await waitUntil('Composer receives the text', () => evaluate<boolean>(cdp, `
+      ${editor}.value === 'A draft with autosave disabled'`), 5_000)
+    await auditPage(`${site}/composer`, { cdp })
+    await waitUntil('A fresh Composer opens without an autosaved draft', () => evaluate<boolean>(cdp, `
+      ${thread}?.getAttribute('aria-pressed') === 'true' && ${editor}?.value === ''`), 5_000)
+  }
+  finally {
+    await auditPage(`${site}/settings`, { cdp })
+    await evaluate(cdp, `
+      localStorage.removeItem('postline:composer-format')
+      localStorage.removeItem('postline:composer-autosave')
+      localStorage.removeItem('postline:composer-draft:v1')
+    `)
+  }
+}
+
 async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
   await auditPage(`${site}/composer`, { cdp })
   const blog = "document.querySelector('[data-provider-toggle=blog]')"
@@ -1681,6 +1725,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkNetworkComponents(cdp)
   await checkLocalComposerDraft(cdp)
   await checkComposerThreadDraft(cdp)
+  await checkComposerPreferences(cdp)
   await checkBrowserPasskey(cdp)
   await checkPhoneNavigation(cdp)
   await checkQueueRescheduling(cdp)
