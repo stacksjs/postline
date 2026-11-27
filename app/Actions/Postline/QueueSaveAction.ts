@@ -5,7 +5,7 @@ import { actionFailure } from '../../Support/Http/action-error'
 import { crosspostProviders } from '../../Services/Social/CrosspostService'
 import { postQueue } from '../../Services/Social/QueueService'
 import { parseTargets, targetKey } from '../../Support/Social/targets'
-import { readImagesInput } from '../../Support/Social/image-input'
+import { readPostAttachments } from '../../Support/Social/attachment-input'
 import { readPostOptions } from '../../Support/Social/post-options'
 import { readQueuedThread } from '../../Support/Social/threads'
 import { UserFacingError } from '../../Support/Http/user-error'
@@ -36,10 +36,10 @@ export default new Action({
         }
       : null
 
-    const imageInput = await readImagesInput(request)
-    if (!imageInput.ok)
-      return response.json({ ok: false, error: imageInput.error }, { status: 422 })
-    const images = imageInput.images
+    const attachments = await readPostAttachments(request)
+    if (!attachments.ok)
+      return response.json({ ok: false, error: attachments.error }, { status: 422 })
+    const images = attachments.images
 
     // Rejected rather than dropped: silently discarding the per-network text
     // would publish the shared body everywhere with no indication why.
@@ -54,7 +54,7 @@ export default new Action({
     try {
       const texts = readQueuedThread(request.get('thread'))
       if (texts && parsedVariants.variants) throw new UserFacingError('Per-network text is available for single posts.')
-      const input = { text, providers, title, scheduledAt, external, images, options: readOptions.options, variants: parsedVariants.variants }
+      const input = { text, providers, title, scheduledAt, external, images, video: attachments.video ?? undefined, options: readOptions.options, variants: parsedVariants.variants }
       const data = String(request.get('next_slot') || '') === '1'
         ? await postQueue.enqueueAtNextSlot({ ...input, texts: texts ?? undefined })
         : texts ? await postQueue.saveThread({ ...input, texts }) : await postQueue.save(input)

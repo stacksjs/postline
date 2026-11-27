@@ -8,12 +8,13 @@
 3. In Postline, open **Settings > Channels > Mastodon**, enter the instance
    address (`https://mastodon.social`) and the token, and connect.
 
-- **Limits:** whatever your instance allows, 500 characters on most; up to four
-  images. Visibility and content warnings are set per post in the composer.
+- **Limits:** 500 characters on most instances. Postline accepts up to four
+  images or one MP4 video within your instance’s limits. Set visibility and
+  content warnings in Composer.
 - **Polls and quotes:** choose **Mastodon poll or quote** in Composer. Poll
   limits come from your instance. Quoting requires an instance that
   supports quote posts and the `read:search` scope, which is included in
-  `read`. Use a poll, a quote, or images on a post. In threads, the poll or
+  `read`. Choose a poll, a quote, or media for each post. In threads, the poll or
   quote goes on the first post.
 - **Inbox:** direct conversations (posts with Mentioned people only visibility)
   appear in Direct messages. Public replies and mentions use the token’s

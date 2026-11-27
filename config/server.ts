@@ -4,10 +4,9 @@ import { marketingRedirects } from '../app/Support/Marketing/site'
 /**
  * **Server Configuration**
  *
- * The largest things Postline accepts are a post with four images of up to
- * 10 MB each (`app/Support/Social/image-input.ts`) and a workspace import,
- * whose images travel inside it. 64 MB covers both with room for the form
- * around them; it was 12 MB, which refused a post with two large images.
+ * A post can attach four 10 MiB images or one MP4 up to 40 MiB. The request
+ * limit leaves room for multipart framing and base64-encoded workspace
+ * attachments during import.
  * Without a limit the runtime's default applies, which is 128 MB per request.
  */
 export default {
@@ -22,6 +21,6 @@ export default {
   // policy that still lets OAuth popups report back, and a permissions policy.
   // STX precompiles bindings so nonce-authorized scripts run without eval.
   security: {
-    csp: true,
+    csp: { directives: { 'media-src': ["'self'", 'blob:'] } },
   },
 } satisfies ServerConfig

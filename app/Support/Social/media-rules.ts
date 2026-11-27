@@ -38,6 +38,7 @@ const COMMON = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const
 export const POST_IMAGE_FORMATS: readonly string[] = COMMON
 export const MAX_POST_IMAGES = 4
 export const MAX_IMAGE_BYTES = 10 * MB
+export const MAX_VIDEO_BYTES = MAX_POST_IMAGES * MAX_IMAGE_BYTES
 
 export const MEDIA_RULES: Record<string, MediaRule> = {
   bluesky: { count: 4, converts: true, maxBytes: 1_000_000, formats: COMMON },
@@ -49,6 +50,11 @@ export const MEDIA_RULES: Record<string, MediaRule> = {
 }
 
 const NAMES: Record<string, string> = { bluesky: 'Bluesky', twitter: 'X', mastodon: 'Mastodon', linkedin: 'LinkedIn', instagram: 'Instagram', threads: 'Threads' }
+export function videoObjection(providers: readonly string[]): string | undefined {
+  const unsupported = [...new Set(providers)].filter(provider => provider !== 'bluesky' && provider !== 'mastodon')
+  if (unsupported.length) return `Video publishing is unavailable on ${list(unsupported.map(provider => NAMES[provider] || provider))}. Choose Bluesky or Mastodon for this post.`
+}
+
 const FORMATS: Record<string, string> = { 'image/jpeg': 'JPEG', 'image/png': 'PNG', 'image/webp': 'WebP', 'image/gif': 'GIF' }
 
 function megabytes(bytes: number): string {

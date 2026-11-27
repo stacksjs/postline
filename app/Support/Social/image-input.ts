@@ -9,7 +9,7 @@
  */
 import { assertPublicHttpUrl, safeFetch, UnsafeUrlError } from '../Http/safe-fetch'
 import { MAX_IMAGE_BYTES, MAX_POST_IMAGES } from './media-rules'
-import { readUploadedImage } from './uploads'
+import { readUploadedMedia } from './uploads'
 
 export { MAX_IMAGE_BYTES } from './media-rules'
 
@@ -56,7 +56,7 @@ interface ImageRequest {
 
 /** Read and vet the `image` upload and the `image_url` field of a request. */
 export async function readImageInput(request: ImageRequest): Promise<ImageInput> {
-  const raw = await readUploadedImage(request.file?.('image'))
+  const raw = await readUploadedMedia(request.file?.('image'))
   let uploaded: { bytes: Uint8Array, mimeType: ImageMimeType } | null = null
   if (raw) {
     const checked = checkImageBytes(raw.bytes)
@@ -118,7 +118,7 @@ export async function readImagesInput(request: ImagesRequest): Promise<ImagesInp
 
   const files = request.getFiles?.('images') ?? []
   for (const [index, file] of files.entries()) {
-    const raw = await readUploadedImage(file)
+    const raw = await readUploadedMedia(file)
     if (!raw) continue
     const checked = checkImageBytes(raw.bytes)
     if (!checked.ok)

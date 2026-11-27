@@ -6,6 +6,8 @@ import { UserFacingError } from '../Http/user-error'
 import { requireStoredPostOptions } from './post-options'
 import { isSafeMediaFilename, MEDIA_DIR, publicMediaUrl } from './uploads'
 import { sanitizeVariants } from './variants'
+import { checkVideoBytes } from './video-input'
+import { MAX_VIDEO_BYTES } from './media-rules'
 
 /** The non-text content persisted with a post. */
 export interface StoredContent {
@@ -35,7 +37,7 @@ export function referencedMediaFiles(raw: unknown): string[] {
   const paths: string[] = []
   for (const item of parseStoredContent(raw)?.media ?? []) {
     if (!item.path) continue
-    if (!isSafeMediaFilename(item.path)) throw new Error('A post contains an invalid stored image reference.')
+    if (!isSafeMediaFilename(item.path)) throw new Error('A post contains an invalid stored attachment reference.')
     paths.push(item.path)
   }
   return paths
@@ -43,8 +45,8 @@ export function referencedMediaFiles(raw: unknown): string[] {
 
 /** A missing attachment must never turn an image post into a text post. */
 export class MissingMediaError extends UserFacingError {
-  constructor() {
-    super('The image attached to this post is missing, so it was not sent. Attach it again, or remove it from the post.')
+  constructor(message = 'The image attached to this post is missing, so it was not sent. Attach it again, or remove it from the post.') {
+    super(message)
   }
 }
 
@@ -69,7 +71,17 @@ export async function hydrateStoredContent(raw: unknown): Promise<PublishContent
 
   const media: NonNullable<PublishContent['media']> = []
   for (const item of stored.media || []) {
-    if (item.path) {
+    if (item.mimeType === 'video/mp4') {
+      if (stored.media?.length !== 1 || !item.path || !isSafeMediaFilename(item.path) || !item.path.toLowerCase().endsWith('.mp4'))
+        throw new MissingMediaError('The saved video attachment could not be read. Attach it again in Composer.')
+      const file = Bun.file(join(MEDIA_DIR, item.path))
+      if (!(await file.exists())) throw new MissingMediaError('The saved video is missing. Attach it again in Composer.')
+      if (file.size > MAX_VIDEO_BYTES) throw new MissingMediaError('The saved video exceeds the upload limit. Attach a smaller MP4 in Composer.')
+      const checked = checkVideoBytes(new Uint8Array(await file.arrayBuffer()), item.altText)
+      if (!checked.ok) throw new MissingMediaError(checked.error)
+      content.video = checked.video
+    }
+    else if (item.path) {
       if (!isSafeMediaFilename(item.path)) throw new MissingMediaError()
       const file = Bun.file(join(MEDIA_DIR, item.path))
       if (!(await file.exists())) throw new MissingMediaError()

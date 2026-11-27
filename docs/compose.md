@@ -14,9 +14,11 @@ Open **Saved text** in Composer to create, edit, or delete a snippet, post templ
 
 Select **Thread** and add one segment for each post. Check the limits while editing each segment. Thread-capable networks publish subsequent segments as replies. The composer identifies channels that can only receive the first segment. Variants are available in Single mode. In a thread, each segment uses the shared text.
 
-## Images and link cards
+## Images, video and link cards
 
-Use the image button to attach images to a post or thread segment. Add a description in each image's **Alt text** field. Check the selected network's limits and image requirements before publishing. Bluesky displays an attached image in place of a link card when both are present. Instagram needs an image it can fetch over the internet. [Check Instagram setup](./networks/instagram.md).
+Use **Attach images or video** to add up to four images or one MP4 to the first post. Fill in the attachment’s **Alt text** field. Video is available for Bluesky and Mastodon, up to 40 MiB in Postline. Your Mastodon instance may set a lower limit. A video draft in Queue retains the file and its description so you can reopen it or retry a failed send.
+
+Bluesky displays the attachment in place of a link card when both are present. Instagram needs an image it can fetch over the internet. [Check Instagram setup](./networks/instagram.md).
 
 To track a link, open **Analytics > Tracked links**. Enter the full destination address and the UTM tags your destination's analytics expects. **Build tagged URL** gives you a link to copy into a post. On a server with a public HTTPS `APP_URL`, you can also name the link and choose **Create short link**. Postline reports all-time redirects for each short link, including repeat visits and automated previews. Disabling a short link stops it from working wherever it was shared.
 

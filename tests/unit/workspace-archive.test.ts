@@ -186,7 +186,7 @@ describe('workspace archive', () => {
       format: 'postline-workspace',
       version: 1,
       posts: [{ uuid, content: JSON.stringify({ media: [{ path: 'nested/image.jpg' }] }) }],
-    })).rejects.toThrow('invalid stored image reference')
+    })).rejects.toThrow('invalid stored attachment reference')
     expect(await database.selectFrom('posts').select(['id']).where('uuid', '=', uuid).executeTakeFirst()).toBeUndefined()
   })
 })

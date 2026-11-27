@@ -259,14 +259,14 @@ export class BlueskyService {
 
     const targetUuid = uuid()
     const createdAt = now()
-    const publishInput: BlueskyPublishInput = { text: post.body }
+    const publishInput: BlueskyPublishInput = { text: post.body, video: content?.video }
     // Bluesky takes a list; Postline records one language per post.
     if (content?.options?.language) publishInput.langs = [content.options.language]
     if (content?.external) {
       publishInput.external = { ...content.external }
       // A card without its picture is a grey box. Only when no image is
       // attached: Bluesky shows images or a card, never both.
-      if (!content.media?.length) {
+      if (!content.media?.length && !content.video) {
         const thumb = await this.cardThumbnail(content.external.uri)
         if (thumb) publishInput.external.thumb = thumb
       }

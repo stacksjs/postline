@@ -20,7 +20,8 @@ import { db } from '@stacksjs/database'
 import { UserFacingError } from '../Support/Http/user-error'
 import { readBlogAttachments } from '../Support/Social/blog-attachments'
 import { checkImageBytes } from '../Support/Social/image-input'
-import { MAX_IMAGE_BYTES, MAX_POST_IMAGES } from '../Support/Social/media-rules'
+import { checkVideoBytes } from '../Support/Social/video-input'
+import { MAX_IMAGE_BYTES, MAX_POST_IMAGES, MAX_VIDEO_BYTES } from '../Support/Social/media-rules'
 import type { PostingSlot } from '../Support/Social/posting-slots'
 import { referencedMediaFiles } from '../Support/Social/stored-content'
 import { isSafeMediaFilename, MEDIA_DIR } from '../Support/Social/uploads'
@@ -111,6 +112,18 @@ function readArchivedImage(data: unknown, message: string) {
   const checked = checkImageBytes(Buffer.from(data, 'base64'))
   if (!checked.ok) throw new UserFacingError(message)
   return checked
+}
+
+function readArchivedMedia(name: string, data: unknown): Uint8Array {
+  if (!name.toLowerCase().endsWith('.mp4'))
+    return readArchivedImage(data, 'That export contains an invalid queued image.').bytes
+
+  const message = 'That export contains an invalid queued video.'
+  if (typeof data !== 'string' || data.length > Math.ceil(MAX_VIDEO_BYTES / 3) * 4)
+    throw new UserFacingError(message)
+  const checked = checkVideoBytes(Buffer.from(data, 'base64'))
+  if (!checked.ok) throw new UserFacingError(message)
+  return checked.video.bytes
 }
 
 export class WorkspaceArchiveService {
@@ -222,15 +235,13 @@ export class WorkspaceArchiveService {
     const mediaEntries = Object.entries(archive.media || {})
     try {
       for (const post of archive.posts || []) referencedMediaFiles(post.content)
-      if (mediaEntries.some(([name]) => !isSafeMediaFilename(name))) throw new Error('Invalid image filename')
+      if (mediaEntries.some(([name]) => !isSafeMediaFilename(name))) throw new Error('Invalid media filename')
     }
     catch {
-      throw new UserFacingError('That export contains an invalid stored image reference.')
+      throw new UserFacingError('That export contains an invalid stored attachment reference.')
     }
 
-    const media = mediaEntries.map(([name, data]) => [
-      name, readArchivedImage(data, 'That export contains an invalid queued image.').bytes,
-    ] as const)
+    const media = mediaEntries.map(([name, data]) => [name, readArchivedMedia(name, data)] as const)
 
     const blogPosts = (archive.blogPosts || []).filter(post => post.status === 'published' || post.status === 'draft')
       .map((post) => {

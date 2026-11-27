@@ -105,7 +105,7 @@
             </article>
           </div>
           {{-- Bluesky shows images or a link card, never both (#132). --}}
-          <p class="m-0 mt-2 text-muted text-xs" :class="linkCardShown() && previewImages().length ? '' : 'hidden'" data-card-replaced>The attached image is shown on Bluesky instead of the link card.</p>
+          <p class="m-0 mt-2 text-muted text-xs" :class="linkCardShown() && (previewImages().length || attachedVideo()) ? '' : 'hidden'" data-card-replaced>Bluesky shows the attachment instead of the link card.</p>
         </div>
 
         {{--
@@ -116,8 +116,8 @@
         <div class="grid hidden gap-2 pb-3 px-3" :class="{ 'hidden': imageRows().length === 0 && imageWarnings().length === 0 }" data-attached-images>
           <div class="grid gap-2 grid-cols-[minmax(0,1fr)_auto] items-center px-2.5 py-2 bg-panel-2 border border-line rounded-xl" x-for="image in imageRows()" :key="image.id" data-attached-image>
             <div class="flex gap-2 items-center min-w-0">
-              <img :if="image.preview" class="object-cover shrink-0 h-8 w-8 rounded-md" :src="image.preview" alt="">
-              <span :if="!image.preview" class="shrink-0 h-4 w-4 text-muted i-hugeicons-image-01" aria-hidden="true"></span>
+              <img :if="image.preview && !image.video" class="object-cover shrink-0 h-8 w-8 rounded-md" :src="image.preview" alt="">
+              <span :if="!image.preview || image.video" class="shrink-0 h-4 w-4 text-muted i-hugeicons-image-01" aria-hidden="true"></span>
               <span class="text-ink text-xs truncate" :text="image.name" :title="image.name" data-image-name></span>
             </div>
             <div class="flex gap-0.5">
@@ -131,8 +131,9 @@
                 <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
               </button>
             </div>
+            <video :if="image.video" class="block col-span-2 max-h-72 w-full bg-panel rounded-lg" :src="image.preview" :aria-label="image.alt || 'Video preview'" controls preload="metadata" playsinline data-attached-video></video>
             <input class="col-span-2 px-2.5 h-8 min-w-0 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="1000" placeholder="Describe it for people who cannot see it" x-show="image.editable" :disabled="submitting()" :value="image.alt" :aria-label="image.altLabel" @input="setImageAlt(image.id, $event)" data-image-alt>
-            <span class="col-span-2 text-muted text-xs" x-show="!image.editable">Saved with the post. Attach new images to replace them.</span>
+            <span class="col-span-2 text-muted text-xs" x-show="!image.editable">Saved with the post. Attach new files to replace it.</span>
           </div>
           <ul class="grid gap-1 m-0 p-0 list-none text-danger text-xs" role="status" data-image-warnings>
             <li x-for="warning in imageWarnings()" :text="warning"></li>
@@ -178,7 +179,7 @@
                   <span>Quote a Mastodon post</span>
                   <input class="px-2 h-8 text-ink text-ui bg-panel border border-field-line rounded-lg" type="url" maxlength="2048" name="mastodonQuote" data-mastodon-quote>
                 </label>
-                <p class="m-0 text-muted">Choose a poll, a quote, or images. In a thread, the poll or quote goes on the first post.</p>
+                <p class="m-0 text-muted">Choose a poll, a quote, or media. In a thread, the poll or quote goes on the first post.</p>
               </div>
             </details>
             <details class="w-full text-body text-xs" x-show="showBlueskyOptions()">
@@ -219,15 +220,15 @@
           </div>
           <div class="flex flex-wrap gap-2 items-center justify-end w-full sm:w-auto">
             <ComposerPresetLibrary :disabled="submitting()" @insert="insertSavedText" />
-            <input class="hidden" type="file" :accept="acceptedImageTypes" multiple aria-label="Attach images" ref="attachInput" @change="chooseImages" data-attach-input>
-            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach images" title="Choose, drop, or paste up to four images" :disabled="submitting()" @click="openImageChooser" data-attach-button>
+            <input class="hidden" type="file" :accept="composerAttachmentTypes" multiple aria-label="Attach images or video" ref="attachInput" @change="chooseImages" data-attach-input>
+            <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Attach images or video" title="Attach up to four images or one MP4 video" :disabled="submitting()" @click="openImageChooser" data-attach-button>
               <span class="h-4 w-4 i-hugeicons-image-01" aria-hidden="true"></span>
             </button>
             <button class="inline-flex items-center justify-center h-9 w-9 text-ink bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" type="button" aria-label="Add post" title="Add post" data-add-post :disabled="submitting()" x-show="!editingQueued() || composerFormat() === 'thread'" @click="appendSegment">
               <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
             </button>
             <div class="inline-flex ml-auto sm:ml-0 text-on-accent bg-accent rounded-xl">
-              <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold hover:bg-accent-hover rounded-l-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" ref="publishTrigger" data-bluesky-publish aria-keyshortcuts="Meta+Enter Control+Enter" :disabled="!canPublish() || submitting() || mediaWarnings().length > 0" @click="runPostAction">
+              <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold hover:bg-accent-hover rounded-l-xl disabled:opacity-50 transition-colors disabled:cursor-not-allowed" type="button" ref="publishTrigger" data-bluesky-publish aria-keyshortcuts="Meta+Enter Control+Enter" :disabled="!canPublish() || submitting() || attaching() || mediaWarnings().length > 0" @click="runPostAction">
                 <span class="shrink-0 h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
                 <span data-bluesky-publish-label :text="postActionLabel()">Publish</span>
               </button>
@@ -238,7 +239,7 @@
                 <div class="grid absolute bottom-full right-0 z-30 gap-1 mb-1 p-1.5 min-w-40 text-ink text-ui bg-panel border border-line rounded-xl shadow-lg">
                   <button class="px-3 py-2 text-left hover:bg-hover rounded-lg" type="button" x-show="!editingQueued()" @click="choosePostAction('publish')">Publish now</button>
                   <PostlineSchedulePicker :value="scheduledIso" :timeZone="scheduleZone" label="Schedule" @change="selectSchedule" />
-                  <button class="px-3 py-2 text-left hover:bg-hover rounded-lg disabled:opacity-50" type="button" x-show="!editingQueued() || editingDraft()" :disabled="!canPublish() || submitting() || mediaWarnings().length > 0" @click="addToQueue">Add to queue</button>
+                  <button class="px-3 py-2 text-left hover:bg-hover rounded-lg disabled:opacity-50" type="button" x-show="!editingQueued() || editingDraft()" :disabled="!canPublish() || submitting() || attaching() || mediaWarnings().length > 0" @click="addToQueue">Add to queue</button>
                   <button class="px-3 py-2 text-left hover:bg-hover rounded-lg" type="button" aria-keyshortcuts="Meta+S Control+S" @click="choosePostAction('draft')">Save draft</button>
                 </div>
               </details>
@@ -249,7 +250,7 @@
 
       <aside class="grid content-start gap-3 min-w-0" aria-labelledby="composer-preview-title">
         <h2 id="composer-preview-title" class="m-0 font-semibold text-ink text-sm">Live preview</h2>
-        <p :if="providersLoaded() && !previewCards().length" class="m-0 p-4 text-muted text-ui bg-panel border border-line rounded-2xl">Select a publishing channel to preview your post.</p>
+        <p :if="providersLoaded() && !selectedNetworks().length" class="m-0 p-4 text-muted text-ui bg-panel border border-line rounded-2xl">Select a publishing channel to preview your post.</p>
         <section x-for="card in previewCards()" :key="card.provider" :data-network-preview="card.provider" class="grid overflow-hidden min-w-0 bg-panel border border-line rounded-2xl">
           <header class="flex gap-2.5 items-center p-3 bg-panel-2 border-b border-line">
             <span class="shrink-0 h-4 w-4 text-ink" :class="card.icon" aria-hidden="true"></span>
@@ -294,7 +295,7 @@
     import type { ComposerAction, ComposerDraft, ComposerFormat } from '../functions/composer-draft'
     import { COMPOSER_AUTOSAVE_KEY, COMPOSER_DEFAULT_FORMAT_KEY, COMPOSER_DRAFT_KEY, readComposerDraft, writeComposerDraft } from '../functions/composer-draft'
     import type { ComposerImage } from '../functions/composer-media'
-    import { composerFileError, composerImageFiles, composerImageTypes, composerMediaWarnings } from '../functions/composer-media'
+    import { composerAttachmentTypes, composerImageFiles } from '../functions/composer-media'
     import { composerActionText, composerQueueTimestamp, composerScheduleIso } from '../functions/composer-schedule'
     import { composerPreviewCards, previewImageUrl } from '../functions/composer-preview'
     import { composerKeyForSpec, composerSelection, composerTargetRows, composerTargets, uniqueComposerNetworks } from '../functions/composer-targets'
@@ -465,37 +466,41 @@
       variantChanged()
     }
 
-    const acceptedImageTypes = composerImageTypes
     const attachInput = useRef('attachInput')
     const dragDepth = state(0)
     const imageError = state('')
     const attachedImages = state<ComposerImage[]>([])
+    const attachedVideo = derived(() => attachedImages()[0]?.video ? attachedImages()[0] : undefined)
     const savedPreviewImages = state<ComposerPreviewImage[]>([])
-    let nextImageId = 0
-    const mediaWarnings = derived(() => composerMediaWarnings(selectedNetworkIds(), attachedImages()))
+    const attaching = state(false)
+    const attachmentRules = state<typeof import('../assets/scripts/composer-attachments') | null>(null)
+    async function loadAttachmentRules() {
+      const path = '/assets/scripts/composer-attachments.ts'
+      const rules = attachmentRules() || await import(path)
+      attachmentRules.set(rules)
+      return rules
+    }
+    const mediaWarnings = derived(() => attachmentRules()?.composerMediaWarnings(selectedNetworkIds(), attachedImages()) ?? [])
     const imageWarnings = derived(() => imageError() ? [imageError(), ...mediaWarnings()] : mediaWarnings())
 
-    const imageRows = derived(() => attachedImages().map((image, index) => ({
-      id: image.id,
-      name: image.name,
-      alt: image.alt,
-      preview: image.preview,
+    const imageRows = derived(() => attachedImages().map((image, index, images) => ({
+      ...image,
       editable: !image.kept,
       canMoveEarlier: index > 0,
-      canMoveLater: index < attachedImages().length - 1,
-      altLabel: `Alt text for image ${index + 1}`,
-      removeLabel: image.kept ? 'Remove the saved images' : `Remove ${image.name}`,
+      canMoveLater: index < images.length - 1,
+      altLabel: image.video ? 'Video alt text' : `Alt text for image ${index + 1}`,
+      removeLabel: image.video ? 'Remove video' : image.kept ? 'Remove the saved images' : `Remove ${image.name}`,
     })))
 
     function setImageAlt(id: string, event: Event) {
       const alt = (event.target as HTMLInputElement).value
-      attachedImages.set(attachedImages().map(image => image.id === id ? { ...image, alt } : image))
+      attachedImages.update(images => images.map(image => image.id === id ? { ...image, alt } : image))
       markEdited()
     }
 
     function clearImagePreviews() {
       for (const image of attachedImages()) {
-        if (image.preview) URL.revokeObjectURL(image.preview)
+        if (image.file && image.preview) URL.revokeObjectURL(image.preview)
       }
     }
 
@@ -503,7 +508,7 @@
       if (submitting()) return
       const removed = attachedImages().find(image => image.id === id)
       if (!removed) return
-      if (removed.preview) URL.revokeObjectURL(removed.preview)
+      if (removed.file && removed.preview) URL.revokeObjectURL(removed.preview)
       if (removed.kept && editingId()) editRemoveImage = true
       attachedImages.set(attachedImages().filter(image => image.id !== id))
       imageError.set('')
@@ -522,31 +527,38 @@
       markEdited()
     }
 
-    function addImages(files: FileList | null | undefined) {
-      if (!files?.length || submitting()) return
+    async function addAttachments(files: FileList | null | undefined) {
+      if (!files?.length || submitting() || attaching()) return
       const picked = [...files]
-      const images = attachedImages().filter(image => !image.kept)
-      const error = composerFileError(picked, images.length)
-      if (error) {
+      attaching.set(true)
+      try {
+        const rules = await loadAttachmentRules()
+        const previous = attachedImages()
+        const { error, items } = rules.prepareAttachments(picked, previous)
         imageError.set(error)
-        return
+        if (!items) return
+        for (const item of previous) {
+          if (items.includes(item)) continue
+          if (item.file && item.preview) URL.revokeObjectURL(item.preview)
+          if (item.kept && editingId()) editRemoveImage = true
+        }
+        if (items[0]?.video) postImageUrl.set('')
+        attachedImages.set(items)
+        markEdited()
       }
-      attachedImages.set([...images, ...picked.map(file => ({
-        id: String(++nextImageId),
-        file,
-        name: file.name,
-        alt: '',
-        preview: URL.createObjectURL(file),
-      }))])
-      imageError.set('')
-      markEdited()
+      catch {
+        imageError.set('Could not prepare the attachment. Try choosing the file again.')
+      }
+      finally {
+        attaching.set(false)
+      }
     }
 
     const openImageChooser = () => attachInput.current?.click()
 
     function chooseImages(event: Event) {
       const input = event.target as HTMLInputElement
-      addImages(input.files)
+      void addAttachments(input.files)
       input.value = ''
     }
 
@@ -568,14 +580,14 @@
     function dropImages(event: DragEvent) {
       dragDepth.set(0)
       if (!overImageDrop(event)) return
-      addImages(event.dataTransfer?.files)
+      void addAttachments(event.dataTransfer?.files)
     }
 
     function pasteImages(event: ClipboardEvent) {
       const clipboard = event.clipboardData
       if (!clipboard?.files.length) return
       if (!clipboard.getData('text/plain') && !clipboard.getData('text/html')) event.preventDefault()
-      addImages(clipboard.files)
+      void addAttachments(clipboard.files)
     }
 
     onDestroy(clearImagePreviews)
@@ -591,7 +603,7 @@
     const postImageUrl = state('')
     const editHeading = state('')
     const showTitle = derived(() => composerFormat() === 'single' && selectedNetworkIds().includes('blog'))
-    const showImageUrl = derived(() => selectedNetworkIds().includes('instagram'))
+    const showImageUrl = derived(() => !attachedVideo() && selectedNetworkIds().includes('instagram'))
     const showMastodonOptions = derived(() => selectedNetworkIds().includes('mastodon'))
     const showLinkedInComment = derived(() => selectedNetworkIds().includes('linkedin'))
     const showInstagramComment = derived(() => selectedNetworkIds().includes('instagram')
@@ -600,6 +612,10 @@
     const showLanguage = derived(() => showBlueskyOptions() || showMastodonOptions())
     const languageOptions = state<Array<{ value: string, label: string }>>([])
     const attachedFiles = () => composerImageFiles(attachedImages())
+    function videoFile() {
+      const video = attachedVideo()
+      return video?.file ? { file: video.file, alt: video.alt.trim() } : undefined
+    }
 
     const loadNetworkOptions = () => {
       const path = '/assets/scripts/composer-network-options.ts'
@@ -652,7 +668,6 @@
     const selectedHas = (key) => selectedList().includes(key)
     const selectedAdd = (key) => { if (!selectedHas(key)) selectedList.set([...selectedList(), key]) }
     const selectedDelete = (key) => selectedList.set(selectedList().filter(entry => entry !== key))
-    const selectedClear = () => selectedList.set([])
 
     // Edit mode: /?edit=<id> loads a queued post into the composer.
     let editRemoveImage = false
@@ -962,45 +977,29 @@
       }
       postTitle.set(item.title || '')
 
-      // Overrides. `shared` is seeded from the stored body so a restored
-      // override only reads as stale once this edit actually changes the text.
-      variants.set(Object.fromEntries(Object.entries(item.variants || {}).flatMap(([provider, text]) =>
-        typeof text === 'string' && text.trim() ? [[provider, { text, shared: item.text || '' }]] : [])))
-
-      // Targets: select exactly the post's accounts (intersected with what is
-      // still connected). `targets` holds specs; older payloads only had
-      // network names, which map to each network's default account.
-      selectedClear()
-      for (const spec of item.targets || item.providers || []) {
-        const key = composerKeyForSpec(publishTargets(), String(spec))
-        if (key) selectedAdd(key)
-      }
-
-      // Schedule.
+      const { readQueuedAttachments, readQueuedVariants } = await loadSubmission()
+      variants.set(readQueuedVariants(item))
+      selectedList.set([...new Set<string>((item.targets || item.providers || [])
+        .map(spec => composerKeyForSpec(publishTargets(), String(spec)))
+        .filter(Boolean))])
       scheduledIso.set(composerScheduleIso(item.scheduledAt))
       postAction.set(scheduledIso() ? 'schedule' : item.status === 'draft' ? 'draft' : 'publish')
-
-      // Link card.
       if (item.external?.uri) {
         const source = firstComposerLink(segments()[0].text) ?? item.external.uri
         const preview = composerLinkPreview(source, { ...item.external, url: item.external.uri })
         segments.update(([lead, ...rest]) => [{ ...lead, preview }, ...rest])
       }
 
-      // Existing image → show a "kept" chip; attaching a new file replaces,
-      // clearing it marks removal.
-      const saved = item.images?.length || (item.image ? 1 : 0)
-      savedPreviewImages.set((item.images || []).flatMap((image, index) => {
-        const src = image.previewUrl || previewImageUrl(image.url || '')
-        return src ? [{ id: `saved-${index}`, src, alt: image.altText || '' }] : []
-      }))
+      const { images, previews } = readQueuedAttachments(item)
+      if (images[0]?.video) await loadAttachmentRules()
       editRemoveImage = false
+      savedPreviewImages.set(previews)
+      attachedImages.set(images)
       postLanguage.set(item.options?.language || '')
       mastodonVisibility.set(item.options?.mastodon?.visibility || 'public')
       mastodonSpoiler.set(item.options?.mastodon?.spoilerText || '')
       linkedinFirstComment.set(item.options?.firstComments?.linkedin || '')
       instagramFirstComment.set(item.options?.firstComments?.instagram || '')
-      attachedImages.set(saved ? [{ id: 'saved', file: null, name: saved === 1 ? '1 saved image' : `${saved} saved images`, alt: '', kept: true }] : [])
 
       for (const post of segments()) void updateLinkPreview(post.id)
     }
@@ -1026,6 +1025,7 @@
       return ready.length ? ready : segments().slice(0, 1)
     })
     const previewImages = derived(() => {
+      if (attachedVideo()) return []
       const images = attachedImages()
       if (images.some(image => image.kept)) return savedPreviewImages()
       const files = images.flatMap(image => image.preview ? [{ id: image.id, src: image.preview, alt: image.alt }] : [])
@@ -1035,7 +1035,7 @@
     const blogPreviewHtml = state<ReadonlyMap<string, string>>(new Map())
     const previewCards = derived(() => composerPreviewCards({
       networks: selectedNetworks(), segments: previewSegments(), variants: variantsPayload(), images: previewImages(),
-      title: composedTitle() || '', spoiler: mastodonSpoiler(), blogHtml: blogPreviewHtml(),
+      hasVideo: Boolean(attachedVideo()), title: composedTitle() || '', spoiler: mastodonSpoiler(), blogHtml: blogPreviewHtml(),
     }))
 
     let blogPreviewRequest: AbortController | undefined
@@ -1068,68 +1068,54 @@
       renderBlogPreview.cancel()
     })
 
-    function clearSentSegments(sent: ComposerSegment[]) {
+    function clearSubmittedPost(sent: ComposerSegment[]) {
       const texts = new Map(sent.map(post => [post.id, post.text]))
       segments.update(posts => posts.map(post => texts.get(post.id) === post.text
         ? { ...post, text: '', preview: null }
         : post))
+      postTitle.set('')
+      variants.set({})
+      clearAttachment()
+      resetPostOptions()
+      saveDraft()
     }
-
-    const linkCardFor = (post: ComposerSegment) => post.preview
-      ? {
-          uri: post.preview.url,
-          title: post.preview.title,
-          description: post.preview.description,
-        }
-      : undefined
 
     function loadSubmission() {
       const path = '/assets/scripts/composer-submit.ts'
       return import(path) as Promise<typeof import('../assets/scripts/composer-submit')>
     }
 
-    async function queueForm(posts: ComposerSegment[], providers: string[], schedule: string | null, id: number | null, nextSlot: boolean) {
-      const { postForm } = await loadSubmission()
+    async function submissionInput(posts: ComposerSegment[], providers: string[]) {
+      const lead = posts[0]!
       const url = postImageUrl().trim()
-      return postForm({
-        text: posts[0].text.trim(),
+      const { preview } = lead
+      const thread = posts.length > 1 ? posts.map(post => post.text.trim()) : undefined
+      return {
+        text: lead.text.trim(),
         providers,
         title: composedTitle(),
-        thread: posts.map(post => post.text.trim()),
-        external: linkCardFor(posts[0]),
+        thread,
+        external: preview ? { uri: preview.url, title: preview.title, description: preview.description } : undefined,
         image: url ? { url } : undefined,
         imageFiles: attachedFiles(),
+        video: videoFile(),
         options: await postOptions(),
-        variants: variantsPayload(),
-      }, { id, scheduledAt: schedule ? composerQueueTimestamp(schedule) : undefined, nextSlot, removeImage: editRemoveImage })
+        variants: thread ? undefined : variantsPayload(),
+      }
     }
 
-    const updateQueued = async (nextSlot: boolean) => {
-      const posts = segmentsToSend()
-      const isThread = composerFormat() === 'thread'
-      if (isThread && posts.length < 2) {
-        setStatus('Write at least two posts before updating the thread.', 'error')
-        focusSegment()
-        return
-      }
-      if (!posts.length) {
-        setStatus('Write something before updating.', 'error')
-        focusSegment()
-        return
-      }
-      const targetProviders = selectedConnected().map(target => target.key)
-      if (targetProviders.length === 0) {
-        setStatus('Select a connected account.', 'error', { title: 'Not connected' })
-        return
-      }
+    async function saveQueued(posts: ComposerSegment[], providers: string[], schedule: string | null, id: number | null, nextSlot: boolean) {
+      const { saveQueuedPost } = await loadSubmission()
+      return saveQueuedPost(await submissionInput(posts, providers), {
+        id, scheduledAt: schedule ? composerQueueTimestamp(schedule) : undefined, nextSlot, removeMedia: editRemoveImage,
+      })
+    }
 
+    async function updateQueued(posts: ComposerSegment[], targetProviders: string[], nextSlot: boolean) {
       try {
-        const form = await queueForm(posts, targetProviders, scheduledIso(), editingId(), nextSlot)
-        const response = await fetch('/api/postline/queue/update', { method: 'POST', body: form })
-        const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not update the post.')
+        await saveQueued(posts, targetProviders, scheduledIso(), editingId(), nextSlot)
         editDirty = false
-        setStatus(nextSlot ? 'Added to queue.' : isThread ? 'Thread updated.' : 'Post updated.', 'success', { title: nextSlot ? 'Scheduled' : 'Updated' })
+        setStatus(nextSlot ? 'Added to queue.' : composerFormat() === 'thread' ? 'Thread updated.' : 'Post updated.', 'success', { title: nextSlot ? 'Scheduled' : 'Updated' })
         // Back to the queue to see the change. A router visit, not a full
         // load: a reload took the "Post updated" toast down with the page.
         navigate('/queue')
@@ -1141,41 +1127,22 @@
 
     // Draft mode and schedule-time both save to the server-side queue
     // instead of publishing immediately.
-    const saveToQueue = async (scheduleValue: string | null, nextSlot: boolean) => {
-      const posts = segmentsToSend()
-      if (!posts.length) {
-        setStatus('Write something before saving.', 'error')
-        focusSegment()
-        return
-      }
-      const targetProviders = selectedConnected().map(target => target.key)
-      if (targetProviders.length === 0) {
-        setStatus('Select a connected account before saving to the queue.', 'error', { title: 'Not connected' })
-        return
-      }
+    async function saveToQueue(posts: ComposerSegment[], targetProviders: string[], nextSlot: boolean) {
+      const scheduleValue = postAction() === 'schedule' ? scheduledIso() : null
       try {
-        const form = await queueForm(posts, targetProviders, scheduleValue, null, nextSlot)
-        const response = await fetch('/api/postline/queue', { method: 'POST', body: form })
-        const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save to the queue.')
+        const data = await saveQueued(posts, targetProviders, scheduleValue, null, nextSlot)
 
-        clearSentSegments(posts)
         scheduledIso.set(null)
         if (scheduleValue || nextSlot) postAction.set('publish')
-        postTitle.set('')
-        clearAttachment()
-        resetPostOptions()
-        // Same reason as the publish path: the overrides went with that post.
-        variants.set({})
-        saveDraft()
+        clearSubmittedPost(posts)
         setStatus(
-          payload.data.status === 'scheduled'
+          data.status === 'scheduled'
             ? `Scheduled. Check the Queue page to manage it.`
             : 'Draft saved to the queue.',
           'success',
-          { title: payload.data.status === 'scheduled' ? 'Scheduled' : 'Draft saved' },
+          { title: data.status === 'scheduled' ? 'Scheduled' : 'Draft saved' },
         )
-        if (payload.data.status === 'scheduled') finishSetup(payload.data.postId ?? payload.data.postIds?.[0])
+        if (data.status === 'scheduled') finishSetup(data.postId ?? data.postIds?.[0])
       }
       catch (error) {
         setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Queue' })
@@ -1191,21 +1158,7 @@
       if (!options.skipSave) saveDraft()
     }
 
-    const publish = async () => {
-      const targetProviders = selectedConnected().map(target => target.key)
-      if (targetProviders.length === 0) {
-        setStatus('Select a connected account in Settings → Channels before publishing.', 'error', { title: 'Not connected' })
-        return
-      }
-
-      const targets = segmentsToSend()
-
-      if (targets.length === 0) {
-        setStatus('Write something before publishing.', 'error')
-        focusSegment()
-        return
-      }
-
+    async function publish(targets: ComposerSegment[], targetProviders: string[]) {
       const providerNames = selectedConnected()
         .map(target => target.multi ? targetLabel(target.provider, target.account?.handle) : providerLabel(target.provider))
         .join(', ')
@@ -1216,56 +1169,16 @@
       )
 
       try {
-        const thread = targets.length > 1 ? targets.map(post => post.text.trim()) : undefined
-        const imageUrl = postImageUrl().trim()
-        const { publishCrosspost } = await loadSubmission()
-        const data = await publishCrosspost({
-          text: targets[0].text.trim(),
-          thread,
-          title: composedTitle(),
-          providers: targetProviders,
-          external: linkCardFor(targets[0]),
-          image: imageUrl ? { url: imageUrl } : undefined,
-          imageFiles: attachedFiles(),
-          variants: thread ? undefined : variantsPayload(),
-          options: await postOptions(),
-        })
-        const results = data.results || []
-        const succeeded = results.filter(result => result.ok)
-        const lastUrl = succeeded.reverse().find(result => result.url)?.url
-        const failures = results.filter(result => !result.ok)
-          .map(result => `${targetLabel(result.provider, result.handle)}: ${result.error || 'failed'}`)
+        const { publishCrosspost, summarizePublish } = await loadSubmission()
+        const data = await publishCrosspost(await submissionInput(targets, targetProviders))
+        const outcome = summarizePublish(data.results || [], targets.length, providerNames, targetLabel)
 
-        clearSentSegments(targets)
-
-        // Overrides belong to the post that just went out. Leaving them set
-        // would send the previous post's per-network copy with the next one,
-        // while the shared body reads as empty — before saveDraft persists it.
-        variants.set({})
-        clearAttachment()
-        resetPostOptions()
-        saveDraft()
-        postTitle.set('')
+        clearSubmittedPost(targets)
         toast.dismiss('publish')
-        if (failures.length && !succeeded.length) {
-          setStatus(`Publish failed. ${failures.join('; ')}`, 'error', { title: 'Publish failed' })
-        }
-        else if (failures.length) {
-          setStatus(`Published to some channels. ${failures.join('; ')}`, 'info', { title: 'Partially published', url: lastUrl })
-        }
-        else {
-          setStatus(
-            targets.length > 1
-              ? `Published ${targets.length} posts to ${providerNames}.`
-              : `Your post is live on ${providerNames}.`,
-            'success',
-            { title: 'Published', url: lastUrl },
-          )
-        }
-        if (succeeded.some(result => result.firstComment?.status === 'failed' || result.firstComment?.status === 'uncertain')) {
+        setStatus(outcome.notice.text, outcome.notice.tone, { title: outcome.notice.title, url: outcome.lastUrl })
+        if (outcome.firstCommentNeedsAttention)
           setStatus('Check Needs attention in Queue.', 'info', { title: 'A first comment needs attention' })
-        }
-        if (succeeded.length) finishSetup(data.postId ?? data.postIds?.[0] ?? 0)
+        if (outcome.anySucceeded) finishSetup(data.postId ?? data.postIds?.[0] ?? 0)
       }
       catch (error) {
         toast.dismiss('publish')
@@ -1274,12 +1187,26 @@
     }
 
     async function submitPost(nextSlot = false) {
-      if (!canPublish() || submitting() || mediaWarnings().length) return
+      if (!canPublish() || submitting() || attaching() || mediaWarnings().length) return
+      const posts = segmentsToSend()
+      const editing = Boolean(editingId())
+      const now = !nextSlot && postAction() === 'publish'
+      if (editing && composerFormat() === 'thread' && posts.length < 2) {
+        setStatus('Write at least two posts before updating the thread.', 'error')
+        focusSegment()
+        return
+      }
+      if (!posts.length) {
+        setStatus(`Write something before ${editing ? 'updating' : now ? 'publishing' : 'saving'}.`, 'error')
+        focusSegment()
+        return
+      }
+      const targets = selectedConnected().map(target => target.key)
       submitting.set(true)
       try {
-        if (editingId()) await updateQueued(nextSlot)
-        else if (!nextSlot && postAction() === 'publish') await publish()
-        else await saveToQueue(postAction() === 'schedule' ? scheduledIso() : null, nextSlot)
+        if (editing) await updateQueued(posts, targets, nextSlot)
+        else if (now) await publish(posts, targets)
+        else await saveToQueue(posts, targets, nextSlot)
       }
       finally {
         submitting.set(false)

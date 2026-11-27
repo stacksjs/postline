@@ -16,6 +16,7 @@ export function composerPreviewCards(input: {
   segments: readonly ComposerSegment[]
   variants: Readonly<Record<string, string>>
   images: readonly ComposerPreviewImage[]
+  hasVideo?: boolean
   title: string
   spoiler: string
   blogHtml: ReadonlyMap<string, string>
@@ -38,7 +39,7 @@ export function composerPreviewCards(input: {
         const title = index === 0 ? input.title : undefined
         const article = blog && (text || title) ? blogArticle(text, title) : null
         const images = index === 0 ? input.images : []
-        const card = index === 0 && images.length === 0 && (provider === 'bluesky' || provider === 'linkedin')
+        const card = index === 0 && images.length === 0 && !input.hasVideo && (provider === 'bluesky' || provider === 'linkedin')
           ? segment.preview
           : null
         return {

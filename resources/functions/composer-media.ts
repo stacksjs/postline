@@ -1,4 +1,4 @@
-import { MAX_IMAGE_BYTES, MAX_POST_IMAGES, mediaObjections, POST_IMAGE_FORMATS } from '../../app/Support/Social/media-rules'
+import { MAX_IMAGE_BYTES, MAX_POST_IMAGES, MAX_VIDEO_BYTES, mediaObjections, POST_IMAGE_FORMATS, videoObjection } from '../../app/Support/Social/media-rules'
 
 export interface ComposerImage {
   id: string
@@ -7,9 +7,21 @@ export interface ComposerImage {
   alt: string
   preview?: string
   kept?: boolean
+  video?: boolean
 }
 
-export const composerImageTypes = POST_IMAGE_FORMATS.join(',')
+export const composerAttachmentTypes = [...POST_IMAGE_FORMATS, 'video/mp4', '.mp4'].join(',')
+
+export function isComposerVideo(file: File): boolean {
+  return file.type === 'video/mp4' || /\.mp4$/i.test(file.name)
+}
+
+export function composerVideoError(files: readonly File[]): string {
+  if (files.length !== 1) return 'Attach images or one video per post.'
+  const file = files[0]!
+  if (!file.size) return 'Attach a non-empty MP4 video.'
+  return file.size > MAX_VIDEO_BYTES ? `${file.name} is larger than ${MAX_VIDEO_BYTES / 1024 / 1024} MB.` : ''
+}
 
 export function composerFileError(files: readonly File[], currentCount: number): string {
   if (currentCount + files.length > MAX_POST_IMAGES)
@@ -21,9 +33,13 @@ export function composerFileError(files: readonly File[], currentCount: number):
 }
 
 export function composerMediaWarnings(networks: readonly string[], images: readonly ComposerImage[]): string[] {
+  if (images[0]?.video) {
+    const objection = videoObjection(networks)
+    return objection ? [objection] : []
+  }
   return mediaObjections(networks, images.flatMap(image => image.file ? [{ bytes: image.file.size, mimeType: image.file.type }] : []))
 }
 
 export function composerImageFiles(images: readonly ComposerImage[]): Array<{ file: File, alt: string }> {
-  return images.flatMap(image => image.file ? [{ file: image.file, alt: image.alt.trim() }] : [])
+  return images.flatMap(image => image.file && !image.video ? [{ file: image.file, alt: image.alt.trim() }] : [])
 }

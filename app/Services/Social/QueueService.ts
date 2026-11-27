@@ -11,10 +11,8 @@ import { isDue, MAX_ATTEMPTS, nextAttemptAt } from '../../Support/Social/retry'
 import { moveScheduledTime } from '../../Support/Social/rescheduling'
 import type { PublishTarget } from '../../Support/Social/targets'
 import type { CrosspostService } from './CrosspostService'
-import type { CrosspostTargetResult, FirstCommentOutcome, SocialProvider } from '../../Support/Social/types'
+import type { CrosspostTargetResult, FirstCommentOutcome, PublishContent, SocialProvider } from '../../Support/Social/types'
 import type { VariantMap } from '../../Support/Social/variants'
-import { mkdir, unlink } from 'node:fs/promises'
-import { join } from 'node:path'
 import process from 'node:process'
 import { db } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
@@ -22,7 +20,9 @@ import { raw } from '@stacksjs/query-builder'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { dedupeTargets, isAccountProvider, parseTargets, targetKey, targetProviders } from '../../Support/Social/targets'
 import { hydrateStoredContent, MissingMediaError, parseStoredContent } from '../../Support/Social/stored-content'
-import { isSafeMediaFilename, MEDIA_DIR, storedImageResponse } from '../../Support/Social/uploads'
+import { storedImageResponse, storedVideoResponse } from '../../Support/Social/uploads'
+import { removeMediaFiles, storeAttachments } from '../../Support/Social/stored-attachments'
+import { assertVideoAllowed, checkVideoBytes } from '../../Support/Social/video-input'
 import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/variants'
 import { crosspost, crosspostProviders } from './CrosspostService'
 import { findIdentityRow, unavailableAccountError } from './identities'
@@ -133,47 +133,15 @@ function missedReason(scheduledAt: string): string {
  * name, instead of letting it fail on that network at publish time. An image
  * given by address is not in hand and is not measured.
  */
-function assertMediaAllowed(providers: string[], images: QueueImage[] | undefined): void {
-  if (!images?.length) return
-  const objections = mediaObjections(providers, images.map(image => image.bytes?.length ? { bytes: image.bytes.length, mimeType: image.mimeType } : {}))
+function assertMediaAllowed(providers: readonly string[], media: QueueImage[] | undefined, options?: PostOptions | null): void {
+  if (!media?.length) return
+  if (media.some(item => item.mimeType === 'video/mp4')) {
+    assertVideoAllowed(providers, media.length > 1, options)
+    return
+  }
+  const objections = mediaObjections(providers, media.map(image => image.bytes?.length ? { bytes: image.bytes.length, mimeType: image.mimeType } : {}))
   if (objections.length)
     throw new UserFacingError(`${objections.join(' ')} Use a different image, or leave that network out.`)
-}
-
-/**
- * Write each uploaded image to the media folder and describe all of them for
- * the stored content. An image given by address is kept as its address.
- */
-async function storeImages(postUuid: string, images: QueueImage[]): Promise<NonNullable<StoredContent['media']>> {
-  const media: NonNullable<StoredContent['media']> = []
-  try {
-    for (const image of images) {
-      if (image.bytes?.length) {
-        const extension = (image.mimeType || 'image/jpeg').split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'jpg'
-        const filename = `${postUuid}-${uuid().slice(0, 8)}.${extension}`
-        media.push({ path: filename, mimeType: image.mimeType, altText: image.altText })
-        await mkdir(MEDIA_DIR, { recursive: true })
-        await Bun.write(join(MEDIA_DIR, filename), image.bytes)
-      }
-      else if (image.url) {
-        media.push({ url: image.url, altText: image.altText })
-      }
-    }
-  }
-  catch (error) {
-    await removeMediaFiles(media)
-    throw error
-  }
-  return media
-}
-
-async function removeMediaFiles(media: StoredContent['media'], failOnError = false): Promise<void> {
-  for (const item of media || []) {
-    if (!item.path || !isSafeMediaFilename(item.path)) continue
-    await unlink(join(MEDIA_DIR, item.path)).catch((error: NodeJS.ErrnoException) => {
-      if (failOnError && error.code !== 'ENOENT') throw error
-    })
-  }
 }
 
 /**
@@ -190,9 +158,10 @@ export async function copyRecurringSegments<T>(segments: readonly RecurringSegme
       if (!content.media?.length && providers.includes('instagram'))
         throw new UserFacingError('Instagram needs an image. Attach one before setting up the repeat.')
       if (content.media?.length) {
-        const images = (await hydrateStoredContent(segment.content))?.media ?? []
-        assertMediaAllowed(providers, images)
-        content.media = await storeImages(uuid(), images)
+        const hydrated = await hydrateStoredContent(segment.content)
+        const attachments = hydrated?.video ? [hydrated.video] : hydrated?.media ?? []
+        assertMediaAllowed(providers, attachments, content.options)
+        content.media = await storeAttachments(uuid(), attachments)
         media.push(...content.media)
       }
       copies.push({ ...segment, content: JSON.stringify(content) })
@@ -267,6 +236,7 @@ export interface QueueItemView {
   createdAt: string
   providers: QueueTargetView[]
   hasImage: boolean
+  hasVideo: boolean
   hasLink: boolean
   /**
    * True for a post that went out on some networks and failed on others. Its
@@ -305,6 +275,7 @@ export interface SaveQueueInput {
   image?: QueueImage | null
   /** Several images, in order, up to four. Wins over `image` when given. */
   images?: QueueImage[] | null
+  video?: PublishContent['video']
   /** Language and Mastodon options. On an edit, undefined keeps what is stored. */
   options?: PostOptions | null
   /** Per-provider body overrides; providers without one publish `text`. */
@@ -344,7 +315,7 @@ export function findPostSubmission(submission: PostSubmission, tx = database): Q
  */
 export type UpdateQueueInput = SaveQueueInput
 
-interface QueueThreadInput extends Pick<SaveQueueInput, 'providers' | 'scheduledAt' | 'options' | 'title' | 'external' | 'images'> {
+interface QueueThreadInput extends Pick<SaveQueueInput, 'providers' | 'scheduledAt' | 'options' | 'title' | 'external' | 'images' | 'video'> {
   texts: readonly string[]
 }
 
@@ -375,6 +346,20 @@ function imagesOf(input: { image?: QueueImage | null, images?: QueueImage[] | nu
   return usable(input.image) ? [input.image] : []
 }
 
+function attachmentsOf(input: Pick<SaveQueueInput, 'image' | 'images' | 'video'>): QueueImage[] | undefined {
+  const images = imagesOf(input)
+  if (!input.video) return images
+  if (images?.length) throw new UserFacingError('Attach images or one video per post.')
+  const checked = checkVideoBytes(input.video.bytes, input.video.altText)
+  if (!checked.ok) throw new UserFacingError(checked.error)
+  return [checked.video]
+}
+
+function assertSavedVideoAllowed(providers: readonly string[], stored: StoredContent | null, options?: PostOptions | null): void {
+  if (stored?.media?.some(item => item.mimeType === 'video/mp4'))
+    assertVideoAllowed(providers, stored.media.length > 1, options)
+}
+
 /** Editable snapshot of a queued post for prefilling the composer. */
 export interface QueueEditView {
   id: number
@@ -392,6 +377,7 @@ export interface QueueEditView {
   /** Every image, in order, with its alt text. */
   images: Array<{ kind: 'file' | 'url', url: string | null, altText: string | null, previewUrl: string | null }>
   /** Per-provider overrides, so an edit round-trips them instead of dropping them. */
+  video: { altText: string | null, previewUrl: string } | null
   variants: VariantMap | null
   options: PostOptions | null
   thread: { postIds: number[], texts: string[] } | null
@@ -422,8 +408,8 @@ export class QueueService {
 
     const targets = await this.validTargets(input.providers)
     assertReplyTarget(input.reply?.target, targets)
-    const images = imagesOf(input)
-    assertMediaAllowed(targets.map(target => target.provider), images)
+    const attachments = attachmentsOf(input)
+    assertMediaAllowed(targetProviders(targets), attachments, input.options)
 
     const scheduledAt = input.scheduledAt?.trim() || null
     if (scheduledAt) {
@@ -448,7 +434,7 @@ export class QueueService {
     if (savedVariants) stored.variants = savedVariants
     const savedOptions = sanitizePostOptions(input.options)
     if (savedOptions) stored.options = savedOptions
-    if (images?.length) stored.media = await storeImages(postUuid, images)
+    if (attachments?.length) stored.media = await storeAttachments(postUuid, attachments)
 
     const column = await contentColumn()
     const timezone = await workspace.timezone()
@@ -515,17 +501,19 @@ export class QueueService {
     assertReplyTarget(parseStoredContent(draft?.[column])?.reply?.target, targets)
     const networks = targetProviders(targets)
     const drafts: any[] = draft?.thread_key ? await this.threadPosts(draft.thread_key) : draft ? [draft] : []
-    const suppliedImages = imagesOf(input)
-    const keptMedia = suppliedImages === undefined ? parseStoredContent(drafts[0]?.[column])?.media : undefined
-    const images = keptMedia?.length ? (await hydrateStoredContent(drafts[0][column]))?.media : suppliedImages
-    assertMediaAllowed(networks, images)
+    const supplied = attachmentsOf(input)
+    const storedDraft = parseStoredContent(drafts[0]?.[column])
+    const keptMedia = supplied === undefined ? storedDraft?.media : undefined
+    const hydrated = keptMedia?.length ? await hydrateStoredContent(drafts[0][column]) : undefined
+    const attachments = hydrated?.video ? [hydrated.video] : hydrated?.media ?? supplied
+    assertMediaAllowed(networks, attachments, input.options === undefined ? storedDraft?.options : input.options)
     const stagedMedia = new Map<SocialProvider, StoredContent['media']>()
 
     try {
       for (const [index, provider] of networks.entries()) {
         // Copies can be edited, published, and deleted independently.
         if (index === 0 && keptMedia?.length) continue
-        if (images?.length) stagedMedia.set(provider, await storeImages(uuid(), images))
+        if (attachments?.length) stagedMedia.set(provider, await storeAttachments(uuid(), attachments))
       }
 
       const result = await database.transaction((tx: typeof database) => {
@@ -636,8 +624,8 @@ export class QueueService {
     const segments = input.texts.map(text => String(text).trim()).filter(Boolean)
     if (segments.length < 2) throw new UserFacingError('A thread needs at least two posts.')
     const targets = await this.validTargets(input.providers)
-    const images = imagesOf(input)
-    assertMediaAllowed(targets.map(target => target.provider), images)
+    const attachments = attachmentsOf(input)
+    const providers = targetProviders(targets)
 
     const scheduledAt = input.scheduledAt?.trim() || null
     if (scheduledAt) {
@@ -651,7 +639,11 @@ export class QueueService {
     const options = sanitizePostOptions(input.options)
     const column = await contentColumn()
     const timezone = original?.timezone ?? await workspace.timezone()
-    const media = images?.length ? await storeImages(threadKey, images) : undefined
+    const storedLead = original ? parseStoredContent(await storedContentOf((await this.threadPosts(threadKey))[0] ?? original)) : null
+    const effectiveOptions = input.options === undefined ? storedLead?.options : options
+    if (attachments === undefined) assertSavedVideoAllowed(providers, storedLead, effectiveOptions)
+    else assertMediaAllowed(providers, attachments, effectiveOptions)
+    const media = attachments?.length ? await storeAttachments(threadKey, attachments) : undefined
     const write = (tx: typeof database) => {
       const existing: any[] = original ? this.threadPosts(threadKey, tx) : []
       if (original) {
@@ -679,7 +671,7 @@ export class QueueService {
             if (input.external?.uri && input.external.title) stored.external = input.external
             else delete stored.external
           }
-          if (images !== undefined) {
+          if (attachments !== undefined) {
             if (media?.length) stored.media = media
             else delete stored.media
           }
@@ -711,7 +703,7 @@ export class QueueService {
 
       const removed = existing.slice(segments.length)
       for (const row of removed) this.deletePostRows(tx, Number(row.id))
-      return { postIds, unlinked: images !== undefined && existing[0] ? [existing[0], ...removed] : removed }
+      return { postIds, unlinked: attachments !== undefined && existing[0] ? [existing[0], ...removed] : removed }
     }
     let result: ReturnType<typeof write>
     try {
@@ -850,7 +842,8 @@ export class QueueService {
         scheduledAt: post.scheduled_at || null,
         publishedAt: post.published_at || null,
         createdAt: String(post.created_at),
-        hasImage: Boolean(stored?.media?.length),
+        hasImage: Boolean(stored?.media?.some(item => item.mimeType !== 'video/mp4')),
+        hasVideo: Boolean(stored?.media?.some(item => item.mimeType === 'video/mp4')),
         hasLink: Boolean(stored?.external),
         partial: String(post.status) === 'published'
           && targets.some((target: any) => Number(target.post_id) === Number(post.id) && target.status === 'failed'),
@@ -1001,7 +994,14 @@ export class QueueService {
   async previewImage(id: number, index: number): Promise<Response | null> {
     const post = await this.findActionable(id)
     const image = parseStoredContent(await storedContentOf(post))?.media?.[index]
-    return image?.path ? storedImageResponse(image.path, 'private, no-store') : null
+    return image?.path && image.mimeType !== 'video/mp4' ? storedImageResponse(image.path, 'private, no-store') : null
+  }
+
+  async previewVideo(id: number, range: string | null): Promise<Response | null> {
+    const post = await this.findActionable(id)
+    if (Number(post.account_id) !== await ensureAccount()) return null
+    const [video, extra] = parseStoredContent(await storedContentOf(post))?.media ?? []
+    return !extra && video?.path && video.mimeType === 'video/mp4' ? storedVideoResponse(video.path, range) : null
   }
 
   /**
@@ -1025,6 +1025,7 @@ export class QueueService {
     const lead = thread ? segments[0] : post
     const stored = parseStoredContent(await storedContentOf(lead))
     const media = stored?.media?.[0]
+    const video = media?.mimeType === 'video/mp4' ? media : undefined
     return {
       id: Number(post.id),
       text: String(post.body || ''),
@@ -1034,13 +1035,14 @@ export class QueueService {
       providers: targetProviders(targets),
       targets: targets.map(targetKey),
       external: stored?.external || null,
-      image: media ? { kind: media.path ? 'file' : 'url', url: media.url || null } : null,
-      images: (stored?.media || []).map((item, index) => ({
+      image: media && !video ? { kind: media.path ? 'file' : 'url', url: media.url || null } : null,
+      images: (video ? [] : stored?.media ?? []).map((item, index) => ({
         kind: item.path ? 'file' as const : 'url' as const,
         url: item.url || null,
         altText: item.altText || null,
         previewUrl: item.path ? `/api/postline/queue/image?id=${lead.id}&index=${index}` : null,
       })),
+      video: video?.path ? { altText: video.altText || null, previewUrl: `/api/postline/queue/video?id=${lead.id}` } : null,
       variants: sanitizeVariants(stored?.variants) || null,
       options: sanitizePostOptions(stored?.options) || null,
       thread,
@@ -1061,8 +1063,8 @@ export class QueueService {
       throw new Error('Post text is required.')
 
     const targets = await this.validTargets(input.providers)
-    const images = imagesOf(input)
-    assertMediaAllowed(targets.map(target => target.provider), images)
+    const attachments = attachmentsOf(input)
+    const providers = targetProviders(targets)
 
     const scheduledAt = input.scheduledAt?.trim() || null
     if (scheduledAt) {
@@ -1088,12 +1090,14 @@ export class QueueService {
     if (updatedVariants) stored.variants = updatedVariants
     const updatedOptions = input.options === undefined ? sanitizePostOptions(existing?.options) : sanitizePostOptions(input.options)
     if (updatedOptions) stored.options = updatedOptions
+    assertMediaAllowed(providers, attachments, updatedOptions)
 
     // Media: replace / remove / keep. Replacing or removing drops the old files.
-    if (images !== undefined) {
-      if (images.length) stored.media = await storeImages(String(post.uuid), images)
+    if (attachments !== undefined) {
+      if (attachments.length) stored.media = await storeAttachments(String(post.uuid), attachments)
     }
     else if (existing?.media?.length) {
+      assertSavedVideoAllowed(providers, existing, updatedOptions)
       stored.media = existing.media
     }
 
@@ -1116,11 +1120,11 @@ export class QueueService {
       })
     }
     catch (error) {
-      if (images !== undefined && stored.media?.length)
+      if (attachments !== undefined && stored.media?.length)
         await this.removeStoredMedia({ [column]: JSON.stringify({ media: stored.media }) })
       throw error
     }
-    if (images !== undefined) await this.removeStoredMedia(post)
+    if (attachments !== undefined) await this.removeStoredMedia(post)
 
     return { postId: Number(post.id), status }
   }
@@ -1279,7 +1283,7 @@ export class QueueService {
         .where('thread_key', '=', threadKey).where('status', '=', 'publishing').execute()
       if (results.length && results.every(result => result.ok)) {
         const [lead] = await this.threadPosts(threadKey)
-        if (lead) await this.removeStoredMedia(lead)
+        if (lead) await this.removePublishedImages(lead)
       }
       return { postId: Number(post.id), results }
     }
@@ -1321,6 +1325,16 @@ export class QueueService {
       // Nothing to send: hand the post back as it was.
       await database.updateTable('posts').set({ status: post.status, updated_at: now() }).where('id', '=', post.id).execute()
       throw new Error('This post has no pending targets to publish.')
+    }
+
+    if (content?.video) {
+      try {
+        assertVideoAllowed(targetProviders(targets), Boolean(content.media?.length), content.options)
+      }
+      catch (error) {
+        await database.updateTable('posts').set({ status: post.status, updated_at: now() }).where('id', '=', post.id).execute()
+        throw error
+      }
     }
 
     // The placeholders are kept, marked `publishing`, until the results are
@@ -1433,9 +1447,15 @@ export class QueueService {
       .where('post_id', '=', post.id)
       .where('status', '=', 'failed')
       .execute()
-    if (published && stillFailed.length === 0) await this.removeStoredMedia(post)
+    if (published && stillFailed.length === 0) await this.removePublishedImages(post)
 
     return { postId: Number(post.id), results }
+  }
+
+  private async removePublishedImages(post: any): Promise<void> {
+    const stored = parseStoredContent(await storedContentOf(post))
+    // Keep the source video available for repeats and workspace backups.
+    await removeMediaFiles(stored?.media?.filter(item => item.mimeType !== 'video/mp4'))
   }
 
   private async removeStoredMedia(post: any, failOnError = false): Promise<void> {

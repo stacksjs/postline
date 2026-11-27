@@ -52,6 +52,7 @@ describe('postline api — auth', () => {
     ['/api/postline/queue'],
     ['/api/postline/setup/post-status?id=1'],
     ['/api/postline/queue/image?id=1&index=0'],
+    ['/api/postline/queue/video?id=1'],
     ['/api/postline/campaigns'],
     ['/api/postline/listening'],
     ['/api/postline/inbox/mentions'],

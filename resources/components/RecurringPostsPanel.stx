@@ -158,7 +158,7 @@ function nextTime(rule: RecurringPost): string {
         </label>
         <p class="m-0 text-muted text-xs" id="recurring-zone" :text="editing()?.timezone || timeZone()"></p>
         <label class="flex gap-2 items-center" x-show="!editing() && source()?.hasImages">
-          <input type="checkbox" name="without-images"> Repeat without the original images
+          <input type="checkbox" name="without-images"> Repeat without the original attachments
         </label>
         <p class="m-0 text-danger text-xs" role="alert" x-show="formError()" :text="formError()"></p>
         <div class="flex gap-2 justify-end">

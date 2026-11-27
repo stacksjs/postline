@@ -1,4 +1,5 @@
 import process from 'node:process'
+import type { StoredContent } from '../../Support/Social/stored-content'
 import type { PublishTarget } from '../../Support/Social/targets'
 import type { ThreadChain } from '../../Support/Social/threads'
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
@@ -24,6 +25,8 @@ import { openMediaShare } from '../../Support/Social/media-share'
 import { MEDIA_RULES } from '../../Support/Social/media-rules'
 import { InvalidStoredPostOptionsError, requireStoredPostOptions } from '../../Support/Social/post-options'
 import { hydrateStoredContent, MissingMediaError, parseStoredContent } from '../../Support/Social/stored-content'
+import { removeMediaFiles, storeAttachments } from '../../Support/Social/stored-attachments'
+import { assertVideoAllowed, checkVideoBytes } from '../../Support/Social/video-input'
 import { ensureAccount, now, uuid } from './support'
 import { postFirstComments } from './PostFirstCommentService'
 
@@ -114,6 +117,13 @@ async function fitContentFor(provider: string, content: PublishContent | undefin
   return { content: { ...content, media }, tempFiles }
 }
 
+function validateVideo(targets: readonly PublishTarget[], content?: PublishContent): void {
+  if (!content?.video) return
+  assertVideoAllowed(targets.map(target => target.provider), Boolean(content.media?.length), content.options)
+  const checked = checkVideoBytes(content.video.bytes, content.video.altText)
+  if (!checked.ok) throw new UserFacingError(checked.error)
+}
+
 export class CrosspostService {
   /**
    * The publisher registry is injectable so tests can drive target resolution,
@@ -168,22 +178,32 @@ export class CrosspostService {
       throw new Error('Select at least one connected provider to publish.')
     }
 
+    validateVideo(selected, content)
     const accountId = await ensureAccount()
     const postUuid = uuid()
     const createdAt = now()
+    const timezone = await workspace.timezone()
+    const stored: StoredContent = { options: content?.options }
+    if (content?.video) stored.media = await storeAttachments(postUuid, [content.video])
 
-    await database.insertInto('posts').values({
-      uuid: postUuid,
-      title: body.slice(0, 80),
-      body,
-      status: 'publishing',
-      timezone: await workspace.timezone(),
-      source: 'composer',
-      ...(content?.options ? { content: JSON.stringify({ options: content.options }) } : {}),
-      account_id: accountId,
-      created_at: createdAt,
-      updated_at: createdAt,
-    }).execute()
+    try {
+      await database.insertInto('posts').values({
+        uuid: postUuid,
+        title: body.slice(0, 80),
+        body,
+        status: 'publishing',
+        timezone,
+        source: 'composer',
+        ...(stored.options || stored.media ? { content: JSON.stringify(stored) } : {}),
+        account_id: accountId,
+        created_at: createdAt,
+        updated_at: createdAt,
+      }).execute()
+    }
+    catch (error) {
+      await removeMediaFiles(stored.media)
+      throw error
+    }
 
     const post = await database
       .selectFrom('posts')
@@ -219,6 +239,7 @@ export class CrosspostService {
       throw new Error('Select at least one connected provider to publish.')
     }
 
+    validateVideo(selected, content)
     const accountId = await ensureAccount()
     const threadKey = uuid()
     const postIds: number[] = []
@@ -233,25 +254,32 @@ export class CrosspostService {
     const halted = new Map<string, number>()
 
     for (const [index, body] of segments.entries()) {
-      const segmentOptions = threadPostOptions(index, content?.options)
       const postUuid = uuid()
       const createdAt = now()
+      const timezone = await workspace.timezone()
+      // On resume, the lead keeps its video and each segment keeps its options.
+      const stored: StoredContent = { options: threadPostOptions(index, content?.options) }
+      if (index === 0 && content?.video) stored.media = await storeAttachments(postUuid, [content.video])
 
-      await database.insertInto('posts').values({
-        uuid: postUuid,
-        title: body.slice(0, 80),
-        body,
-        status: 'publishing',
-        timezone: await workspace.timezone(),
-        source: 'composer',
-        thread_key: threadKey,
-        // The thread's language and content warning, so resuming it later
-        // sends the rest the same way (resumeThread).
-        ...(segmentOptions ? { content: JSON.stringify({ options: segmentOptions }) } : {}),
-        account_id: accountId,
-        created_at: createdAt,
-        updated_at: createdAt,
-      }).execute()
+      try {
+        await database.insertInto('posts').values({
+          uuid: postUuid,
+          title: body.slice(0, 80),
+          body,
+          status: 'publishing',
+          timezone,
+          source: 'composer',
+          thread_key: threadKey,
+          ...(stored.options || stored.media ? { content: JSON.stringify(stored) } : {}),
+          account_id: accountId,
+          created_at: createdAt,
+          updated_at: createdAt,
+        }).execute()
+      }
+      catch (error) {
+        await removeMediaFiles(stored.media)
+        throw error
+      }
 
       const post = await database
         .selectFrom('posts')
@@ -428,7 +456,9 @@ export class CrosspostService {
       if (!explicit?.identityId || targetKey(explicit) !== content.replyTarget)
         throw new UserFacingError('This reply must use the account that received the original conversation.')
     }
-    for (const target of await this.resolve(targets)) {
+    const selected = await this.resolve(targets)
+    validateVideo(selected, content)
+    for (const target of selected) {
       const body = resolveVariantBody(post.body, target.provider, content)
       results.push(await this.publishTarget(target, { id: post.id, body }, content))
     }
@@ -486,6 +516,7 @@ export class CrosspostService {
     // its format or size limit needs it, untouched where it does not.
     let fitted: Awaited<ReturnType<typeof fitContentFor>>
     try {
+      if (content?.video) assertVideoAllowed([target.provider], Boolean(content.media?.length), content.options)
       fitted = await fitContentFor(target.provider, content)
     }
     catch (error) {

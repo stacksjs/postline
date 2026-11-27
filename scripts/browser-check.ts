@@ -1086,6 +1086,56 @@ async function checkComposerNetworkOptions(cdp: Cdp): Promise<void> {
       && ${field('blueskyLabels')}?.value === 'graphic-media'`), 5_000)
 }
 
+async function checkComposerVideo(cdp: Cdp): Promise<void> {
+  const clip = readFileSync(join(root, 'tests/fixtures/postline-video.mp4')).toString('base64')
+  const text = 'Browser fixture with a private MP4'
+  const bluesky = "document.querySelector('[data-provider-toggle^=\"bluesky:\"]')"
+  const video = "document.querySelector('video[data-attached-video]')"
+  await evaluate(cdp, "localStorage.removeItem('postline:composer-draft:v1')")
+  await auditPage(`${site}/composer`, { cdp })
+  await waitUntil('Composer loads the Bluesky video target', () => evaluate<boolean>(cdp,
+    `Boolean(${bluesky}?.getClientRects().length)`), 5_000)
+  await evaluate(cdp, `(() => {
+    const selected = ${bluesky}
+    for (const chip of document.querySelectorAll('[data-provider-toggle][aria-pressed="true"]'))
+      if (chip !== selected) chip.click()
+    if (selected.getAttribute('aria-pressed') !== 'true') selected.click()
+    const transfer = new DataTransfer()
+    const bytes = Uint8Array.from(atob('${clip}'), char => char.charCodeAt(0))
+    transfer.items.add(new File([bytes], 'test.mp4', { type: 'video/mp4' }))
+    const input = document.querySelector('[data-attach-input]')
+    input.files = transfer.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await waitUntil('Composer plays the selected MP4', () => evaluate<boolean>(cdp,
+    `${video}?.videoWidth === 32`), 5_000)
+  await evaluate(cdp, `(() => {
+    const alt = document.querySelector('[data-image-alt][aria-label="Video alt text"]')
+    alt.value = 'A blue rectangle'
+    alt.dispatchEvent(new Event('input', { bubbles: true }))
+    const editor = document.querySelector('[data-bluesky-text]')
+    editor.value = ${JSON.stringify(text)}
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
+    editor.focus()
+  })()`)
+  await pressKey(cdp, 's', 83, 4)
+  await waitUntil('Composer clears the video draft after saving', () => evaluate<boolean>(cdp,
+    `document.querySelector('[data-bluesky-text]')?.value === '' && !${video}?.getClientRects().length`), 5_000)
+  const id = await evaluate<number>(cdp, `(async () => {
+    const { data } = await (await fetch('/api/postline/queue')).json()
+    return data.items.find(item => item.body === ${JSON.stringify(text)} && item.hasVideo)?.id
+  })()`)
+  if (!id) throw new Error('Composer did not save a video attachment.')
+  try {
+    await auditPage(`${site}/composer?edit=${id}`, { cdp })
+    await waitUntil('The saved video plays with its original description', () => evaluate<boolean>(cdp,
+      `${video}?.videoWidth === 32 && ${video}.getAttribute('aria-label') === 'A blue rectangle'`), 5_000)
+  }
+  finally {
+    await evaluate(cdp, "localStorage.removeItem('postline:composer-draft:v1')")
+  }
+}
+
 async function checkXBrowserSession(cdp: Cdp): Promise<void> {
   const endpoint = '/api/postline/twitter/browser-session'
   await auditPage(`${site}/accounts`, { cdp })
@@ -2669,6 +2719,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkTrackedLinks(cdp)
   await checkListStates(cdp)
   await checkComposerNetworkOptions(cdp)
+  await checkComposerVideo(cdp)
   await checkFirstComments(cdp)
 }
 

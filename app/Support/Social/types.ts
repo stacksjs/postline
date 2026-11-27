@@ -16,7 +16,7 @@
  * reason.
  */
 
-import type { SocialPublishingProvider } from '@stacksjs/socials'
+import type { PostVideo, SocialPublishingProvider } from '@stacksjs/socials'
 
 export type {
   /** One page of an account's own posts, for a purge. */
@@ -112,6 +112,7 @@ export interface PublishContent {
     mimeType?: string
     altText?: string
   }>
+  video?: PostVideo
   /** The post's language, and Mastodon's visibility and content warning. */
   options?: import('./post-options').PostOptions
   /** Conversation references for a public reply or a chained thread segment. */

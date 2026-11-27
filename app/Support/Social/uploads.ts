@@ -26,12 +26,12 @@ export function mediaDirectory(env: Record<string, string | undefined> = process
 export const MEDIA_DIR: string = mediaDirectory()
 
 /**
- * Read an uploaded image regardless of shape: the router's multipart
+ * Read an uploaded file regardless of shape: the router's multipart
  * parser stores raw Web `File` objects on `request.files`, while the
  * typed `FileInfo` contract (`buffer`/`mimetype`) describes the upload
  * middleware's processed form. Accept both.
  */
-export async function readUploadedImage(uploaded: unknown): Promise<{ bytes: Uint8Array, mimeType: string } | null> {
+export async function readUploadedMedia(uploaded: unknown): Promise<{ bytes: Uint8Array, mimeType: string } | null> {
   if (!uploaded || typeof uploaded !== 'object') return null
   const candidate = uploaded as { buffer?: ArrayBuffer, mimetype?: string, type?: string, arrayBuffer?: () => Promise<ArrayBuffer> }
 
@@ -72,12 +72,13 @@ export function mediaContentType(name: string): string {
 
 /** Stream an image after its caller verifies ownership and visibility. */
 export async function storedImageResponse(file: string, cacheControl: string): Promise<Response | null> {
-  if (!isSafeMediaFilename(file)) return null
+  const contentType = mediaContentType(file)
+  if (!isSafeMediaFilename(file) || !contentType.startsWith('image/')) return null
   const stored = Bun.file(join(MEDIA_DIR, file))
   if (!(await stored.exists())) return null
   return new Response(stored, {
     headers: {
-      'content-type': mediaContentType(file),
+      'content-type': contentType,
       'content-length': String(stored.size),
       'x-content-type-options': 'nosniff',
       'content-disposition': 'inline',
@@ -85,6 +86,41 @@ export async function storedImageResponse(file: string, cacheControl: string): P
     },
   })
 }
+
+/** Stream a queued MP4, including the single-byte ranges browsers use to seek. */
+export async function storedVideoResponse(file: string, range: string | null): Promise<Response | null> {
+  if (!isSafeMediaFilename(file) || !file.toLowerCase().endsWith('.mp4')) return null
+  const stored = Bun.file(join(MEDIA_DIR, file))
+  if (!(await stored.exists()) || !stored.size) return null
+
+  const headers = new Headers({
+    'accept-ranges': 'bytes',
+    'cache-control': 'private, no-store',
+    'content-disposition': 'inline',
+    'content-type': 'video/mp4',
+    'x-content-type-options': 'nosniff',
+  })
+  if (!range) {
+    headers.set('content-length', String(stored.size))
+    return new Response(stored, { headers })
+  }
+
+  const match = /^bytes=(\d*)-(\d*)$/i.exec(range)
+  const first = match?.[1]
+  const last = match?.[2]
+  if (first || last) {
+    const start = first ? Number(first) : Math.max(0, stored.size - Number(last))
+    const end = first && last ? Math.min(stored.size - 1, Number(last)) : stored.size - 1
+    if (start <= end && start < stored.size) {
+      headers.set('content-range', `bytes ${start}-${end}/${stored.size}`)
+      headers.set('content-length', String(end - start + 1))
+      return new Response(stored.slice(start, end + 1), { headers, status: 206 })
+    }
+  }
+  headers.set('content-range', `bytes */${stored.size}`)
+  return new Response(null, { headers, status: 416 })
+}
+
 
 /**
  * Pure URL builder: given a public base and a stored filename, produce the

@@ -178,7 +178,7 @@ export class MastodonService {
       const quotedStatusId = quote ? await this.driver.resolvePostId(credentials, quote) : undefined
       const published = await this.driver.publish(
         credentials,
-        { text: post.body, media: content?.media, reply: content?.reply },
+        { text: post.body, media: content?.media, video: content?.video, reply: content?.reply },
         // A retry of the same text to the same account gets the status the
         // first attempt created, instead of creating a second.
         {

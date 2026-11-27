@@ -232,6 +232,7 @@
       scheduledAt?: string | null
       publishedAt?: string | null
       hasImage?: boolean
+      hasVideo?: boolean
       hasLink?: boolean
       partial?: boolean
       thread?: { position: number, length: number, resumeFrom: number | null } | null
@@ -404,7 +405,7 @@
           : item.status === 'draft'
             ? `Draft · saved ${formatTime(item.createdAt)}`
             : `${item.status[0].toUpperCase()}${item.status.slice(1)} · ${formatTime(item.createdAt)}`
-      const extras = [item.hasImage ? 'image' : '', item.hasLink ? 'link card' : ''].filter(Boolean).join(' · ')
+      const extras = [item.hasImage ? 'image' : '', item.hasVideo ? 'video' : '', item.hasLink ? 'link card' : ''].filter(Boolean).join(' · ')
       const thread = item.thread ? `thread · post ${item.thread.position} of ${item.thread.length}` : ''
       const labels = channelLabels(item.providers)
       const targets = item.providers.map((target, index) => {
@@ -440,7 +441,7 @@
         editUrl: `/composer?edit=${item.id}`,
         actionable: ACTIONABLE.has(item.status),
         canRepeat: targets.length > 0 && (ACTIONABLE.has(item.status) || item.status === 'published'),
-        hasImages: Boolean(item.hasImage || item.thread),
+        hasImages: Boolean(item.hasImage || item.hasVideo || item.thread),
         partial: Boolean(item.partial),
         resumeLabel: item.thread?.resumeFrom ? `Resume thread from ${item.thread.resumeFrom}` : '',
         // A post that reached only some networks is not simply "published".

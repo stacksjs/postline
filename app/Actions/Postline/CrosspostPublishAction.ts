@@ -4,7 +4,7 @@ import { response } from '@stacksjs/router'
 import { actionFailure } from '../../Support/Http/action-error'
 import { crosspost, crosspostProviders } from '../../Services/Social/CrosspostService'
 import { parseTargets } from '../../Support/Social/targets'
-import { readImagesInput } from '../../Support/Social/image-input'
+import { readPostAttachments } from '../../Support/Social/attachment-input'
 import { mediaObjections } from '../../Support/Social/media-rules'
 import { readPostOptions } from '../../Support/Social/post-options'
 import { persistTempMedia, removeTempMedia } from '../../Support/Social/uploads'
@@ -34,18 +34,18 @@ export default new Action({
         }
       : undefined
 
-    const imageInput = await readImagesInput(request)
-    if (!imageInput.ok)
-      return response.json({ ok: false, error: imageInput.error }, { status: 422 })
+    const attachments = await readPostAttachments(request)
+    if (!attachments.ok)
+      return response.json({ ok: false, error: attachments.error }, { status: 422 })
 
     // Refused before anything is sent, naming the network that objects.
-    const objections = mediaObjections(providers.map(target => target.provider), imageInput.images.map(image => image.bytes?.length ? { bytes: image.bytes.length, mimeType: image.mimeType } : {}))
+    const objections = mediaObjections(providers.map(target => target.provider), attachments.images.map(image => image.bytes?.length ? { bytes: image.bytes.length, mimeType: image.mimeType } : {}))
     if (objections.length)
       return response.json({ ok: false, error: `${objections.join(' ')} Use a different image, or leave that network out.` }, { status: 422 })
 
     const media: NonNullable<Parameters<typeof crosspost.publish>[2]>['media'] = []
     const tempMediaFiles: string[] = []
-    for (const image of imageInput.images) {
+    for (const image of attachments.images) {
       if (image.bytes?.length) {
         // Persist briefly so URL-only providers (Instagram/Threads) can fetch
         // the upload server-side; byte-upload providers use the bytes.
@@ -85,6 +85,7 @@ export default new Action({
         title,
         external,
         media: media.length ? media : undefined,
+        video: attachments.video ?? undefined,
         variants: parsedVariants.variants || undefined,
         options: readOptions.options,
       }

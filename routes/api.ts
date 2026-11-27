@@ -176,6 +176,7 @@ route.group({ prefix: '/postline' }, () => {
   route.post('/draft-feeds/remove', 'Actions/Postline/DraftFeedRemoveAction').middleware('auth').rateLimit(30, 'minute')
   route.get('/queue/item', 'Actions/Postline/QueueGetAction').middleware('auth')
   route.get('/queue/image', 'Actions/Postline/QueuePreviewImageAction').middleware('auth').rateLimit(240, 'minute')
+  route.get('/queue/video', 'Actions/Postline/QueuePreviewVideoAction').middleware('auth').rateLimit(240, 'minute')
   route.post('/queue', 'Actions/Postline/QueueSaveAction').middleware('auth').rateLimit(60, 'minute')
   route.post('/queue/update', 'Actions/Postline/QueueUpdateAction').middleware('auth').rateLimit(60, 'minute')
   route.post('/queue/reschedule', 'Actions/Postline/QueueRescheduleAction').middleware('auth').rateLimit(60, 'minute')

@@ -92,6 +92,7 @@ export const actions = {
   'Actions/Postline/QueueGetAction': '../../../app/Actions/Postline/QueueGetAction.ts',
   'Actions/Postline/QueueListAction': '../../../app/Actions/Postline/QueueListAction.ts',
   'Actions/Postline/QueuePreviewImageAction': '../../../app/Actions/Postline/QueuePreviewImageAction.ts',
+  'Actions/Postline/QueuePreviewVideoAction': '../../../app/Actions/Postline/QueuePreviewVideoAction.ts',
   'Actions/Postline/QueuePublishNowAction': '../../../app/Actions/Postline/QueuePublishNowAction.ts',
   'Actions/Postline/QueueRescheduleAction': '../../../app/Actions/Postline/QueueRescheduleAction.ts',
   'Actions/Postline/QueueSaveAction': '../../../app/Actions/Postline/QueueSaveAction.ts',

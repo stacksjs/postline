@@ -6,7 +6,7 @@ import { actionFailure } from '../../Support/Http/action-error'
 import { crosspostProviders } from '../../Services/Social/CrosspostService'
 import { postQueue } from '../../Services/Social/QueueService'
 import { parseTargets, targetKey } from '../../Support/Social/targets'
-import { readImagesInput } from '../../Support/Social/image-input'
+import { readPostAttachments } from '../../Support/Social/attachment-input'
 import { POST_OPTION_FIELDS, readPostOptions } from '../../Support/Social/post-options'
 import { parseVariantsField } from '../../Support/Social/variants'
 import { readQueuedThread } from '../../Support/Social/threads'
@@ -36,15 +36,15 @@ export default new Action({
       ? { uri: externalUri, title: externalTitle, description: String(request.get('external_description') || '').trim() || undefined }
       : null
 
-    // Images tri-state: new uploads or an address replace every stored image;
-    // `remove_image=1` clears them; otherwise (undefined) they are kept.
-    const imageInput = await readImagesInput(request)
-    if (!imageInput.ok)
-      return response.json({ ok: false, error: imageInput.error }, { status: 422 })
-    const removeImage = String(request.get('remove_image') || '') === '1'
-    const images = imageInput.images.length
-      ? imageInput.images
-      : removeImage
+    // Uploaded media and image addresses replace the existing attachment.
+    // An explicit removal clears it, and omission keeps it.
+    const attachments = await readPostAttachments(request)
+    if (!attachments.ok)
+      return response.json({ ok: false, error: attachments.error }, { status: 422 })
+    const removeMedia = String(request.get('remove_media') || request.get('remove_image') || '') === '1'
+    const images = attachments.images.length
+      ? attachments.images
+      : removeMedia
         ? null
         : undefined
 
@@ -75,7 +75,7 @@ export default new Action({
       const texts = readQueuedThread(request.get('thread'))
       if (texts && variants) throw new UserFacingError('Per-network text is available for single posts.')
       const options = sendsOptions ? (readOptions.options ?? null) : undefined
-      const input = { text, providers, title, scheduledAt, external, images, variants, options }
+      const input = { text, providers, title, scheduledAt, external, images, video: attachments.video ?? undefined, variants, options }
       const data = String(request.get('next_slot') || '') === '1'
         ? await postQueue.enqueueAtNextSlot({ ...input, texts: texts ?? undefined }, id)
         : texts ? await postQueue.updateThread(id, { ...input, texts }) : await postQueue.update(id, input)

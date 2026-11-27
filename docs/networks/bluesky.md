@@ -12,9 +12,8 @@ Accounts on another server than bsky.social work too: Postline finds the
 account's server from its handle. Add a second account by connecting again
 with another handle.
 
-- **Limits:** 300 characters per post, up to four images. Links get a preview
-  card with its picture, unless the post has an image, which Bluesky shows
-  instead.
+- **Limits:** 300 characters per post, up to four images or one MP4 video.
+  Bluesky shows the attachment in place of a link card when both are present.
 - **Quotes and content labels:** choose **Bluesky quote and labels** in
   Composer. Paste the link or AT URI of a post whose author allows quoting.
   Separate content labels with commas. In threads, the quote goes on the
