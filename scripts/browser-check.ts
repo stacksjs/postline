@@ -15,13 +15,15 @@
  * Unit tests render nothing; this is what would have caught a Settings window
  * whose bindings all went dead, or an editor that never mounted.
  */
+import type { OwnedProcess } from '@stacksjs/cli/owned-process'
 import type { Cdp } from '@stacksjs/testing/browser'
 import { Database } from 'bun:sqlite'
 import { randomBytes } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
+import { spawnOwnedProcess } from '@stacksjs/cli/owned-process'
 import { auditPage, closeSharedBrowsers, launch } from '@stacksjs/testing/browser'
 import { nextPostingSlot } from '../app/Support/Social/posting-slots'
 import { wallTimeInZone } from '../app/Support/time'
@@ -2442,18 +2444,38 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkListStates(cdp)
 }
 
+interface FixtureServer {
+  label: string
+  process: OwnedProcess
+  log: string
+}
+
+const servers: FixtureServer[] = []
+function startServer(label: string, command: string[]): void {
+  const log = join(work, `${label}.stderr.log`)
+  const stderr = openSync(log, 'w')
+  // Buddy's production relay gives its independently owned worker 15 seconds
+  // by default. Let the relay close that worker before its own owner exits.
+  const configuredGrace = Number(process.env.SHUTDOWN_GRACE_MS)
+  const buddyGrace = Number.isFinite(configuredGrace) && configuredGrace > 0 ? configuredGrace : 15_000
+  try {
+    const child = spawnOwnedProcess(command, { cwd: root, env, stdout: 'ignore', stderr, stopGraceMs: buddyGrace + 2_000 })
+    servers.push({ label, process: child, log })
+  }
+  finally {
+    closeSync(stderr)
+  }
+}
+
 let exitCode = 0
-const servers: Bun.Subprocess<'ignore', 'ignore', 'pipe'>[] = []
 try {
   const migration = Bun.spawnSync(['./buddy', 'migrate', '--no-generate'], { cwd: root, env })
   if (migration.exitCode !== 0)
     throw new Error(`Could not migrate the browser fixture.
 ${migration.stdout.toString()}
 ${migration.stderr.toString()}`)
-  servers.push(
-    Bun.spawn(production ? ['./buddy', 'serve:api', '--port', String(API_PORT)] : ['./buddy', 'dev:api'], { cwd: root, env, stdout: 'ignore', stderr: 'pipe' }),
-    Bun.spawn(['./buddy', production ? 'serve' : 'dev:frontend'], { cwd: root, env, stdout: 'ignore', stderr: 'pipe' }),
-  )
+  startServer('API', production ? ['./buddy', 'serve:api', '--port', String(API_PORT)] : ['./buddy', 'dev:api'])
+  startServer('site', ['./buddy', production ? 'serve' : 'dev:frontend'])
   await waitUntil('The API', async () => (await fetch(`http://localhost:${API_PORT}/api/postline/health`)).status < 500)
   await waitUntil('The site', async () => (await fetch(`${site}/login`)).ok)
   mkdirSync(out, { recursive: true })
@@ -2472,15 +2494,18 @@ ${migration.stderr.toString()}`)
 }
 catch (error) {
   failures.push(error instanceof Error ? error.message : String(error))
-  // A server that never came up says why on its own stderr.
-  for (const [index, server] of servers.entries()) {
-    server.kill()
-    const said = (await new Response(server.stderr).text().catch(() => '')).trim().split('\n').slice(-15).join('\n')
-    if (said) failures.push(`${index === 0 ? 'API' : 'site'} said:\n${said}`)
-  }
 }
 finally {
-  for (const server of servers) server.kill()
+  const stopped = await Promise.allSettled(servers.map(server => server.process.stop()))
+  for (const [index, result] of stopped.entries()) {
+    if (result.status === 'rejected') failures.push(`Could not stop ${servers[index]!.label}: ${String(result.reason)}`)
+  }
+  if (failures.length) {
+    for (const server of servers) {
+      const said = readFileSync(server.log, 'utf8').trim().split('\n').slice(-15).join('\n')
+      if (said) failures.push(`${server.label} said:\n${said}`)
+    }
+  }
   rmSync(work, { recursive: true, force: true })
 }
 
