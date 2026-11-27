@@ -5,6 +5,7 @@ import { describe, expect, test } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { db } from '@stacksjs/database'
+import { composerPresets } from '../../app/Services/ComposerPresetService'
 import { keywordMonitoring } from '../../app/Services/KeywordMonitoringService'
 import { DELETE_EVERYTHING_PHRASE, workspaceArchive } from '../../app/Services/WorkspaceArchiveService'
 import { MEDIA_DIR } from '../../app/Support/Social/uploads'
@@ -35,8 +36,10 @@ describe('workspace archive', () => {
     const watch = await keywordMonitoring.save(0, {
       name: `Browser watch ${tag}`, keywords: ['Postline'], providers: ['twitter'], twitterReadSource: 'browser',
     })
+    const preset = await composerPresets.save(undefined, { kind: 'snippet', name: `Sign-off ${tag}`, body: 'Thanks for reading.' })
     const archive = await workspaceArchive.export()
-    expect(archive.version).toBe(3)
+    expect(archive.version).toBe(4)
+    expect(archive.composerPresets).toContainEqual(preset)
     const archivedWatch = archive.monitors.find(row => row.name === watch.name)
     expect(archivedWatch?.twitter_read_source).toBe('browser')
     expect(archive.posts.some(row => row.uuid === postUuid)).toBe(true)
@@ -45,6 +48,7 @@ describe('workspace archive', () => {
 
     await expect(workspaceArchive.deleteEverything('delete everything')).rejects.toThrow(DELETE_EVERYTHING_PHRASE)
     await workspaceArchive.deleteEverything(DELETE_EVERYTHING_PHRASE)
+    expect(await composerPresets.list()).toEqual([])
     expect(await database.selectFrom('posts').select(['id']).where('uuid', '=', postUuid).executeTakeFirst()).toBeUndefined()
     expect(existsSync(join(MEDIA_DIR, `${tag}.png`))).toBe(false)
 
@@ -53,6 +57,8 @@ describe('workspace archive', () => {
     const report = await workspaceArchive.import(JSON.parse(JSON.stringify(archive)))
     expect(report.posts).toBeGreaterThanOrEqual(1)
     expect(report.media).toBeGreaterThanOrEqual(1)
+    expect(report.composerPresets).toBe(1)
+    expect(await composerPresets.list()).toContainEqual(preset)
 
     const back = await database.selectFrom('posts').select(['id']).where('uuid', '=', postUuid).executeTakeFirstOrThrow()
     const target = await database.selectFrom('post_targets').selectAll().where('post_id', '=', back.id).executeTakeFirstOrThrow()
@@ -70,6 +76,7 @@ describe('workspace archive', () => {
     // A second import changes nothing.
     const again = await workspaceArchive.import(archive)
     expect(again.posts).toBe(0)
+    expect(again.composerPresets).toBe(0)
     expect(again.skipped).toBeGreaterThan(0)
   })
 
@@ -100,6 +107,20 @@ describe('workspace archive', () => {
 
   test('something that is not an export is refused', async () => {
     await expect(workspaceArchive.import({ hello: 'world' })).rejects.toThrow('not a Postline workspace export')
+  })
+
+  test('invalid saved text is rejected before settings or posts are written', async () => {
+    const uuid = crypto.randomUUID()
+    const before = await workspaceArchive.export()
+    await expect(workspaceArchive.import({
+      format: 'postline-workspace', version: 4,
+      settings: { workspace_name: 'Unapplied archive name' },
+      posts: [{ uuid, body: 'A post that must stay out of the queue' }],
+      composerPresets: [{ uuid: crypto.randomUUID(), kind: 'hashtags', name: 'Invalid tags', body: '#not-a-tag' }],
+    })).rejects.toThrow('Separate hashtags')
+    const after = await workspaceArchive.export()
+    expect(after.settings).toEqual(before.settings)
+    expect(after.posts.some(post => post.uuid === uuid)).toBe(false)
   })
 
   test('an invalid queued image leaves settings, posts and media untouched', async () => {

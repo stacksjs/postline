@@ -105,6 +105,17 @@ check('a write without the CSRF token is refused', refused.status === 403, `${re
 csrfToken = unsigned
 check('the agent issued a CSRF token', csrfToken.length === 64, String(csrfToken.length))
 
+const presetsPath = '/api/postline/composer/presets'
+const saved = await call('POST', presetsPath, { kind: 'hashtags', name: 'Product update', body: '#Postline, OpenSource' })
+const preset = saved.status === 200 ? JSON.parse(saved.text).data : null
+check('the agent stores saved Composer text', preset?.body === '#Postline #OpenSource', `${saved.status} ${saved.text.slice(0, 160)}`)
+const presets = await call('GET', presetsPath)
+check('the agent lists saved Composer text', presets.status === 200 && JSON.parse(presets.text).data.some((row: { uuid: string }) => row.uuid === preset?.uuid))
+if (preset) {
+  const removed = await call('POST', `${presetsPath}/delete`, { uuid: preset.uuid })
+  check('the agent deletes saved Composer text', removed.status === 200)
+}
+
 const app = await call('POST', '/api/postline/network-apps', {
   provider: 'twitter',
   client_id: 'postline-desktop-test',

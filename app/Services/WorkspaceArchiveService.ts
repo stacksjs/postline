@@ -2,7 +2,7 @@
  * Take a workspace with you, bring one in, or delete it (#209).
  *
  * An archive is one JSON file: the workspace settings, every post with its
- * results on each network, threads, campaigns, blog posts and Listening
+ * results on each network, threads, campaigns, saved Composer text, blog posts and Listening
  * rules, and the images attached to queued posts and Blog articles, embedded. Rows travel by
  * their uuid, never their numeric id, so links between them (a result to its
  * post, a campaign post to its campaign) survive the move, and importing the
@@ -23,13 +23,15 @@ import { checkImageBytes } from '../Support/Social/image-input'
 import { MAX_IMAGE_BYTES, MAX_POST_IMAGES } from '../Support/Social/media-rules'
 import { referencedMediaFiles } from '../Support/Social/stored-content'
 import { isSafeMediaFilename, MEDIA_DIR } from '../Support/Social/uploads'
+import type { ComposerPreset } from './ComposerPresetService'
+import { composerPresets, readComposerPreset } from './ComposerPresetService'
 import { blog } from './Social/BlogService'
 import { ensureAccount, now } from './Social/support'
 
 const database = db as any
 
 export const ARCHIVE_FORMAT = 'postline-workspace'
-export const ARCHIVE_VERSION = 3
+export const ARCHIVE_VERSION = 4
 
 /** Typed to delete everything, so a stray click cannot. */
 export const DELETE_EVERYTHING_PHRASE = 'DELETE EVERYTHING'
@@ -65,6 +67,7 @@ export interface WorkspaceArchive {
   campaignPosts: Array<Record<string, unknown> & { campaign: string, post: string | null }>
   blogPosts: ArchivedBlogPost[]
   monitors: Array<Record<string, unknown>>
+  composerPresets: ComposerPreset[]
   /** Images attached to queued posts, by file name, as base64. */
   media: Record<string, string>
 }
@@ -76,6 +79,7 @@ export interface ImportReport {
   campaignPosts: number
   blogPosts: number
   monitors: number
+  composerPresets: number
   media: number
   /** Rows already here (same uuid), left as they are. */
   skipped: number
@@ -148,6 +152,7 @@ export class WorkspaceArchiveService {
       })),
       blogPosts,
       monitors: monitors.map((row: any) => pick(row, MONITOR_COLUMNS)),
+      composerPresets: await composerPresets.list(accountId),
       media,
     }
   }
@@ -161,6 +166,10 @@ export class WorkspaceArchiveService {
       throw new UserFacingError('That workspace export has an invalid version.')
     if (version > ARCHIVE_VERSION)
       throw new UserFacingError('That export is from a newer Postline. Update this one, then import it.')
+
+    if (version >= 4 && !Array.isArray(archive.composerPresets))
+      throw new UserFacingError('That export is missing its saved Composer text.')
+    const presets = version >= 4 ? archive.composerPresets.map(readComposerPreset) : []
 
     const monitors = (archive.monitors || []).map((monitor) => {
       // Browser-session watches first appeared in version 3. Require the source
@@ -197,7 +206,7 @@ export class WorkspaceArchiveService {
         return { ...post, images }
       })
 
-    const report: ImportReport = { posts: 0, targets: 0, campaigns: 0, campaignPosts: 0, blogPosts: 0, monitors: 0, media: 0, skipped: 0 }
+    const report: ImportReport = { posts: 0, targets: 0, campaigns: 0, campaignPosts: 0, blogPosts: 0, monitors: 0, composerPresets: 0, media: 0, skipped: 0 }
     const accountId = await ensureAccount()
     const exists = async (table: string, uuid: unknown) => Boolean(uuid) && Boolean(await database.selectFrom(table).select(['id']).where('uuid', '=', String(uuid)).executeTakeFirst())
     const idOf = async (table: string, uuid: unknown): Promise<number | null> => {
@@ -265,6 +274,11 @@ export class WorkspaceArchiveService {
       report.monitors++
     }
 
+    for (const preset of presets) {
+      if (await composerPresets.restore(accountId, preset)) report.composerPresets++
+      else report.skipped++
+    }
+
     await mkdir(MEDIA_DIR, { recursive: true })
     for (const [name, bytes] of media) {
       const path = join(MEDIA_DIR, name)
@@ -296,7 +310,7 @@ export class WorkspaceArchiveService {
     const blogPosts = await database.selectFrom('blog_posts').select(['id']).execute()
     for (const post of blogPosts) await blog.remove(Number(post.id)).catch(() => {})
 
-    for (const table of ['campaign_posts', 'launch_campaigns', 'post_targets', 'posts', 'keyword_mentions', 'keyword_monitors', 'dm_messages', 'dm_conversations', 'timeline_items', 'purge_runs', 'alerts', 'social_identities', 'network_apps', 'twitter_read_usage'])
+    for (const table of ['campaign_posts', 'launch_campaigns', 'post_targets', 'posts', 'keyword_mentions', 'keyword_monitors', 'composer_presets', 'dm_messages', 'dm_conversations', 'timeline_items', 'purge_runs', 'alerts', 'social_identities', 'network_apps', 'twitter_read_usage'])
       await wipe(table)
 
     const accountId = await ensureAccount()

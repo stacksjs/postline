@@ -13,7 +13,7 @@ export default defineModel({
     useSeeder: { count: 1 },
   },
 
-  hasMany: ['SocialIdentity', 'Post', 'BlogPost', 'LaunchCampaign', 'PurgeRun', 'KeywordMonitor'],
+  hasMany: ['SocialIdentity', 'Post', 'BlogPost', 'LaunchCampaign', 'PurgeRun', 'KeywordMonitor', 'ComposerPreset'],
 
   attributes: {
     name: {
