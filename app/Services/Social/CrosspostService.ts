@@ -3,7 +3,7 @@ import type { StoredContent } from '../../Support/Social/stored-content'
 import type { PublishTarget } from '../../Support/Social/targets'
 import type { ThreadChain } from '../../Support/Social/threads'
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
-import { db } from '@stacksjs/database'
+import { db, sqliteWriteOptions } from '@stacksjs/database'
 import { log } from '@stacksjs/logging'
 import { parseTarget, resolveTargets, targetKey } from '../../Support/Social/targets'
 import { advanceChain, threadPostOptions, threadSegmentContent } from '../../Support/Social/threads'
@@ -29,6 +29,7 @@ import { removeMediaFiles, storeAttachments } from '../../Support/Social/stored-
 import { assertVideoAllowed, checkVideoBytes } from '../../Support/Social/video-input'
 import { ensureAccount, now, uuid } from './support'
 import { postFirstComments } from './PostFirstCommentService'
+import { bindRestoredTargets } from './identities'
 
 const database = db as any
 
@@ -334,7 +335,8 @@ export class CrosspostService {
       .where('status', '!=', 'archived').orderBy('id', 'asc').execute()
     if (!posts.length) throw new UserFacingError('That thread is not in the queue any more.')
 
-    const rows = await database.selectFrom('post_targets').selectAll().where('post_id', 'in', posts.map((post: any) => post.id)).execute()
+    const rows = await database.transaction((tx: typeof database) => bindRestoredTargets(tx, tx.selectFrom('post_targets')
+      .selectAll().where('post_id', 'in', posts.map((post: any) => post.id)).execute()), sqliteWriteOptions())
     const keyOf = (row: any) => targetKey({ provider: row.provider, identityId: row.social_identity_id ? Number(row.social_identity_id) : null })
     const targets = new Map<string, PublishTarget>()
     for (const row of rows) targets.set(keyOf(row), { provider: row.provider, identityId: row.social_identity_id ? Number(row.social_identity_id) : null })

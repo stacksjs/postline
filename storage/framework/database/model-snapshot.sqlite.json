@@ -1525,6 +1525,14 @@
             "isUnique": false,
             "isNullable": true,
             "hasDefault": false
+          },
+          {
+            "name": "archived_account",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
           }
         ],
         "indexes": [
@@ -3836,7 +3844,7 @@
       }
     ]
   },
-  "hash": "1cd08d50e72f2d25f52eadc8d6f6590a29613db010e2035c85def55843e00392",
+  "hash": "1e6ee40b0db19c67199c228acdb7b19d3c06b4acc69d472cfecc657e816ee3c3",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-27T21:23:44.259Z"
+  "updatedAt": "2026-11-27T23:08:14.547Z"
 }

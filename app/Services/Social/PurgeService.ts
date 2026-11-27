@@ -648,6 +648,7 @@ export class PurgeService {
       .select(['id', 'post_id', 'remote_uri', 'remote_cid', 'updated_at', 'social_identity_id'])
       .where('provider', '=', provider)
       .where('status', '=', 'published')
+      .where('archived_account', 'is', null)
       .orderBy('id', 'desc')
       .execute() as any[])
       .filter(target => Number(target.social_identity_id) === Number(identityId)

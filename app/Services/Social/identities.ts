@@ -14,15 +14,45 @@
  * They are hidden from every default lookup and listing instead.
  */
 
-import type { IdentityKey, IdentityLike } from '../../Support/Social/accounts'
+import type { ArchivedTargetAccount, IdentityKey, IdentityLike } from '../../Support/Social/accounts'
 import { db } from '@stacksjs/database'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { alerts } from '../AlertService'
-import { matchIdentity, pickDefaultIdentity } from '../../Support/Social/accounts'
+import { matchArchivedTargetAccount, matchIdentity, pickDefaultIdentity, reconnectArchivedTargetMessage } from '../../Support/Social/accounts'
 import { isSealed, openToken, sealToken } from '../../Support/Social/token-vault'
 import { now, uuid } from './support'
 
 const database = db as any
+
+export class RestoredTargetAccountError extends UserFacingError {
+  constructor(account: ArchivedTargetAccount) {
+    super(reconnectArchivedTargetMessage(account), 'restored_target_account_unavailable')
+  }
+}
+
+interface RestoredTargetRow {
+  id: number
+  social_identity_id?: number | null
+  archived_account?: string | null
+}
+
+/** Bind portable account references before claiming or sending their posts. */
+export function bindRestoredTargets<T extends RestoredTargetRow>(tx: typeof database, rows: T[]): T[] {
+  if (!rows.some(row => row.archived_account)) return rows
+
+  const identities: IdentityLike[] = tx.selectFrom('social_identities')
+    .select(['id', 'provider', 'handle', 'external_id', 'auth_status']).execute()
+  return rows.map((row) => {
+    if (!row.archived_account) return row
+    const account: ArchivedTargetAccount = JSON.parse(row.archived_account)
+    const identity = matchArchivedTargetAccount(identities, account)
+    if (!identity) throw new RestoredTargetAccountError(account)
+
+    const changes = { social_identity_id: Number(identity.id), archived_account: null }
+    tx.updateTable('post_targets').set(changes).where('id', '=', row.id).execute()
+    return { ...row, ...changes }
+  })
+}
 
 const TOKEN_COLUMNS = ['access_token', 'refresh_token', 'insights_access_token', 'instagram_comments_access_token'] as const
 type TokenColumns = Record<typeof TOKEN_COLUMNS[number], string | null>

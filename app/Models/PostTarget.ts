@@ -75,6 +75,13 @@ export default defineModel({
       validation: { rule: schema.string().max(1000).optional() },
       factory: faker => faker.helpers.maybe(() => faker.lorem.sentence(), { probability: 0.1 }) ?? null,
     },
+    // The portable account reference of a restored target until it can bind to
+    // a local identity. A missing local row must never imply the default.
+    archivedAccount: {
+      required: false,
+      validation: { rule: schema.string().optional() },
+      factory: () => null,
+    },
     firstCommentBody: {
       required: false,
       validation: { rule: schema.string().optional() },

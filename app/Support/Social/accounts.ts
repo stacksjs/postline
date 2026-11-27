@@ -82,6 +82,34 @@ export function matchIdentity<T extends IdentityLike>(rows: readonly T[], key: I
   })
 }
 
+/** Portable address of a target's selected account, without credentials. */
+export interface ArchivedTargetAccount {
+  provider: string
+  handle: string
+  externalId?: string
+}
+
+export function archivedTargetAccount(row: Pick<IdentityLike, 'provider' | 'handle' | 'external_id'>): ArchivedTargetAccount {
+  const externalId = row.provider === 'mastodon' ? '' : String(row.external_id || '').trim()
+  return { provider: row.provider, handle: row.handle, ...(externalId && { externalId }) }
+}
+
+/** A portable target must identify exactly one account on the destination. */
+export function matchArchivedTargetAccount(rows: readonly IdentityLike[], account: ArchivedTargetAccount): IdentityLike | undefined {
+  const handle = normalizeIdentityHandle(account.handle)
+  const matches = rows.filter((row) => {
+    if (row.provider !== account.provider) return false
+    if (account.externalId) return String(row.external_id || '').trim() === account.externalId
+    return Boolean(handle) && normalizeIdentityHandle(row.handle) === handle
+  })
+  const [match] = matches
+  return matches.length === 1 && match?.auth_status !== 'revoked' ? match : undefined
+}
+
+export function reconnectArchivedTargetMessage(account: ArchivedTargetAccount): string {
+  return `Reconnect ${account.handle} in Settings → Channels to send this restored post.`
+}
+
 /** A row the services can publish with today: connected and holding a token. */
 export function isUsableIdentity(row: Pick<IdentityLike, 'auth_status' | 'access_token'> | undefined | null): boolean {
   return Boolean(row && row.auth_status === 'connected' && row.access_token)

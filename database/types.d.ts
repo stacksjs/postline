@@ -1493,6 +1493,7 @@ declare module '@stacksjs/database' {
       remote_url: string
       remote_cid: string
       failure_reason: string
+      archived_account: string
       first_comment_body: string
       first_comment_status: "pending" | "sending" | "sent" | "failed" | "uncertain"
       first_comment_started_at: string

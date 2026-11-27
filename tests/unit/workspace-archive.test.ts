@@ -10,7 +10,8 @@ import { draftFeeds } from '../../app/Services/DraftFeedService'
 import { changePostingSlot, listPostingSlots } from '../../app/Services/PostingSlotService'
 import { keywordMonitoring } from '../../app/Services/KeywordMonitoringService'
 import { recurringPosts } from '../../app/Services/RecurringPostService'
-import { postQueue } from '../../app/Services/Social/QueueService'
+import { CrosspostService } from '../../app/Services/Social/CrosspostService'
+import { postQueue, QueueService } from '../../app/Services/Social/QueueService'
 import { ensureAccount } from '../../app/Services/Social/support'
 import { rememberTwitterBrowserHandle, twitterBrowserSession } from '../../app/Services/Social/TwitterBrowserSession'
 import { trackedLinks } from '../../app/Services/TrackedLinkService'
@@ -58,7 +59,7 @@ describe('workspace archive', () => {
     const repeat = await recurringPosts.create({ id: draft.postId, interval: 'monthly', startAt: startsAt })
     await recurringPosts.change(repeat.uuid, 'pause')
     const archive = await workspaceArchive.export()
-    expect(archive.version).toBe(8)
+    expect(archive.version).toBe(9)
     expect(archive.recurringPosts).toContainEqual(expect.objectContaining({ uuid: repeat.uuid, active: false, nextAt: repeat.nextAt }))
     expect(archive.postingSlots).toContainEqual(slot)
     expect(archive.composerPresets).toContainEqual(preset)
@@ -189,6 +190,117 @@ describe('workspace archive', () => {
       await database.deleteFrom('posts').where('uuid', '=', tag).execute()
       await workspaceArchive.import({ format: 'postline-workspace', version: 1, settings: before })
       if (existsSync(path)) await Bun.file(path).delete()
+    }
+  })
+
+  test('a restored named target waits for the original account instead of sending to the default', async () => {
+    const tag = crypto.randomUUID()
+    const original = { provider: 'bluesky', handle: `${tag}.bsky.social`, externalId: `did:plc:${tag}` }
+    const second = { provider: 'bluesky', handle: `second-${tag}.bsky.social` }
+    const connect = async (handle: string, externalId: string | null, isDefault = false) => (await database
+      .insertInto('social_identities').values({
+        uuid: crypto.randomUUID(), provider: 'bluesky', handle, external_id: externalId, auth_status: 'connected', is_default: isDefault,
+      }).returning('id').executeTakeFirstOrThrow()).id
+    const other = await connect(original.handle, `did:plc:other-${tag}`, true)
+    const secondId = await connect(second.handle.toUpperCase(), null)
+    const sends: Array<number | null | undefined> = []
+    const service = new CrosspostService({
+      bluesky: {
+        defaultIdentityId: async () => other,
+        // eslint-disable-next-line unused-imports/no-unused-vars
+        async publishToPost(post, content, identityId) {
+          sends.push(identityId)
+          await database.insertInto('post_targets').values({
+            uuid: crypto.randomUUID(), post_id: post.id, provider: 'bluesky', status: 'published', social_identity_id: identityId,
+          }).execute()
+          return { provider: 'bluesky', ok: true, identityId: identityId ?? undefined }
+        },
+      },
+    })
+    const queue = new QueueService(service)
+    const scheduled = new Date(Date.now() - 10_000).toISOString().slice(0, 19).replace('T', ' ')
+    const archive = {
+      format: 'postline-workspace',
+      version: 1,
+      posts: [{ uuid: tag, body: 'Restored queue fixture', status: 'scheduled', scheduled_at: scheduled, timezone: 'UTC', source: 'composer', created_at: at, updated_at: at }],
+      targets: [original, second].map(account => ({
+        uuid: crypto.randomUUID(), post: tag, provider: account.provider, account, status: 'scheduled', attempts: 0, created_at: at, updated_at: at,
+      })),
+    }
+    let restoredId: number | undefined
+    let originalId: number | undefined
+
+    try {
+      await workspaceArchive.import(archive)
+      restoredId = Number((await database.selectFrom('posts').select('id').where('uuid', '=', tag).executeTakeFirstOrThrow()).id)
+      expect((await workspaceArchive.export()).targets.find(target => target.uuid === archive.targets[0]?.uuid)?.account).toEqual(original)
+      expect((await queue.get(restoredId)).targets).toEqual([`bluesky:${secondId}`])
+      await expect(queue.publishNow(restoredId)).rejects.toThrow(`Reconnect ${original.handle}`)
+      await queue.publishDue()
+      expect(sends).toEqual([])
+      const item = (await queue.listPage({ limit: 500 })).items.find(item => item.id === restoredId)
+      expect(item?.status).toBe('failed')
+      expect(item?.providers).toContainEqual(expect.objectContaining({ handle: original.handle, failureReason: expect.stringContaining('Reconnect') }))
+
+      originalId = await connect(`renamed-${tag}.bsky.social`, original.externalId)
+      await queue.publishNow(restoredId)
+      expect(sends).toEqual([originalId, secondId])
+    }
+    finally {
+      if (restoredId) {
+        await database.deleteFrom('post_targets').where('post_id', '=', restoredId).execute()
+        await database.deleteFrom('posts').where('id', '=', restoredId).execute()
+      }
+      await database.deleteFrom('social_identities').where('id', 'in', [other, secondId, ...(originalId ? [originalId] : [])]).execute()
+    }
+  })
+
+  test('a restored thread resumes from its published parent after the named account reconnects', async () => {
+    const threadKey = crypto.randomUUID()
+    const account = { provider: 'bluesky', handle: `${threadKey}.bsky.social` }
+    const rootUri = 'at://did:plc:archive/app.bsky.feed.post/root'
+    const uuids = [crypto.randomUUID(), crypto.randomUUID()]
+    const sends: Array<{ id: number, accountId?: number | null, parent?: string }> = []
+    const service = new CrosspostService({
+      bluesky: {
+        async publishToPost(post, content, accountId) {
+          sends.push({ id: post.id, accountId, parent: content?.reply?.parent?.uri })
+          await database.insertInto('post_targets').values({
+            uuid: crypto.randomUUID(), post_id: post.id, provider: account.provider, status: 'published', social_identity_id: accountId,
+          }).execute()
+          return { provider: 'bluesky', ok: true, identityId: accountId ?? undefined }
+        },
+      },
+    })
+    const archive = {
+      format: 'postline-workspace',
+      version: 1,
+      posts: uuids.map((uuid, index) => ({
+        uuid, thread_key: threadKey, body: index ? 'Second segment' : 'First segment', status: index ? 'failed' : 'published',
+        timezone: 'UTC', source: 'composer', created_at: at, updated_at: at,
+      })),
+      targets: uuids.map((post, index) => ({
+        uuid: crypto.randomUUID(), post, provider: account.provider, account, status: index ? 'failed' : 'published',
+        remote_uri: index ? null : rootUri, remote_cid: index ? null : 'root-cid', attempts: 0, created_at: at, updated_at: at,
+      })),
+    }
+    let accountId: number | undefined
+    try {
+      await workspaceArchive.import(archive)
+      await expect(service.resumeThread(threadKey)).rejects.toThrow(`Reconnect ${account.handle}`)
+      expect(sends).toEqual([])
+      accountId = (await database.insertInto('social_identities').values({
+        uuid: crypto.randomUUID(), ...account, auth_status: 'connected',
+      }).returning('id').executeTakeFirstOrThrow()).id
+      const reply = await database.selectFrom('posts').select('id').where('uuid', '=', uuids[1]).executeTakeFirstOrThrow()
+      await new QueueService(service).publishNow(Number(reply.id))
+      expect(sends).toEqual([{ id: Number(reply.id), accountId, parent: rootUri }])
+    }
+    finally {
+      const rows: Array<{ id: number }> = await database.selectFrom('posts').select('id').where('thread_key', '=', threadKey).execute()
+      if (rows.length) await database.deleteFrom('post_targets').where('post_id', 'in', rows.map(row => row.id)).execute()
+      await database.deleteFrom('posts').where('thread_key', '=', threadKey).execute()
+      if (accountId) await database.deleteFrom('social_identities').where('id', '=', accountId).execute()
     }
   })
 

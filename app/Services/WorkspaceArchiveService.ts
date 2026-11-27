@@ -18,12 +18,15 @@ import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { db, sqliteWriteOptions } from '@stacksjs/database'
 import { UserFacingError } from '../Support/Http/user-error'
+import type { ArchivedTargetAccount, IdentityLike } from '../Support/Social/accounts'
+import { archivedTargetAccount, matchArchivedTargetAccount } from '../Support/Social/accounts'
 import { readBlogAttachments } from '../Support/Social/blog-attachments'
 import { checkImageBytes } from '../Support/Social/image-input'
 import { checkVideoBytes } from '../Support/Social/video-input'
 import { MAX_IMAGE_BYTES, MAX_POST_IMAGES, MAX_VIDEO_BYTES } from '../Support/Social/media-rules'
 import type { PostingSlot } from '../Support/Social/posting-slots'
 import { referencedMediaFiles } from '../Support/Social/stored-content'
+import { isAccountProvider } from '../Support/Social/targets'
 import { isSafeMediaFilename, MEDIA_DIR } from '../Support/Social/uploads'
 import type { ComposerPreset } from './ComposerPresetService'
 import type { ArchivedDraftFeed } from './DraftFeedService'
@@ -40,7 +43,7 @@ import { readArchivedTrackedLink, trackedLinks } from './TrackedLinkService'
 const database = db as any
 
 export const ARCHIVE_FORMAT = 'postline-workspace'
-export const ARCHIVE_VERSION = 8
+export const ARCHIVE_VERSION = 9
 
 /** Typed to delete everything, so a stray click cannot. */
 export const DELETE_EVERYTHING_PHRASE = 'DELETE EVERYTHING'
@@ -71,7 +74,7 @@ export interface WorkspaceArchive {
   exportedAt: string
   settings: Record<string, unknown>
   posts: Array<Record<string, unknown>>
-  targets: Array<Record<string, unknown> & { post: string, account: { provider: string, handle: string } | null }>
+  targets: Array<Record<string, unknown> & { post: string, account: ArchivedTargetAccount | null }>
   campaigns: Array<Record<string, unknown>>
   campaignPosts: Array<Record<string, unknown> & { campaign: string, post: string | null }>
   blogPosts: ArchivedBlogPost[]
@@ -104,6 +107,17 @@ export interface ImportReport {
 
 function pick(row: Record<string, unknown>, columns: readonly string[]): Record<string, unknown> {
   return Object.fromEntries(columns.map(column => [column, row[column] ?? null]))
+}
+
+function readTargetAccount(provider: unknown, value: unknown): ArchivedTargetAccount | null {
+  if (value == null) return null
+  const account = value as Partial<ArchivedTargetAccount>
+  if (typeof provider !== 'string' || !isAccountProvider(provider) || account.provider !== provider
+    || typeof account.handle !== 'string' || !account.handle.trim()
+    || (account.externalId !== undefined && (typeof account.externalId !== 'string' || !account.externalId.trim() || provider === 'mastodon')))
+    throw new UserFacingError('A publishing target in this export has an invalid account reference.')
+
+  return { provider, handle: account.handle.trim(), ...(account.externalId && { externalId: account.externalId.trim() }) }
 }
 
 function readArchivedImage(data: unknown, message: string) {
@@ -163,14 +177,14 @@ export class WorkspaceArchiveService {
       return {
         posts,
         targets: posts.length ? tx.selectFrom('post_targets').selectAll().where('post_id', 'in', posts.map((post: any) => post.id)).execute() : [],
-        identities: tx.selectFrom('social_identities').select(['id', 'provider', 'handle']).execute(),
+        identities: tx.selectFrom('social_identities').select(['id', 'provider', 'handle', 'external_id']).execute(),
         feeds: draftFeeds.export(accountId, tx),
         slots: listPostingSlots(accountId, tx),
         repeats: recurringPosts.export(accountId, tx),
       }
     })
     const postUuid = new Map<number, string>(posts.map((post: any) => [Number(post.id), String(post.uuid)]))
-    const identityOf = new Map<number, { provider: string, handle: string }>(identities.map((row: any) => [Number(row.id), { provider: String(row.provider), handle: String(row.handle) }]))
+    const identityOf = new Map<number, ArchivedTargetAccount>(identities.map((row: IdentityLike) => [Number(row.id), archivedTargetAccount(row)]))
     const campaigns = await database.selectFrom('launch_campaigns').selectAll().orderBy('id', 'asc').execute()
     const campaignUuid = new Map<number, string>(campaigns.map((row: any) => [Number(row.id), String(row.uuid)]))
     const campaignPosts = await database.selectFrom('campaign_posts').selectAll().orderBy('id', 'asc').execute()
@@ -208,7 +222,7 @@ export class WorkspaceArchiveService {
       targets: targets.filter((row: any) => postUuid.has(Number(row.post_id))).map((row: any) => ({
         ...pick(row, TARGET_COLUMNS),
         post: postUuid.get(Number(row.post_id))!,
-        account: row.social_identity_id ? identityOf.get(Number(row.social_identity_id)) ?? null : null,
+        account: row.archived_account ? JSON.parse(row.archived_account) : identityOf.get(Number(row.social_identity_id)) ?? null,
       })),
       campaigns: campaigns.map((row: any) => pick(row, CAMPAIGN_COLUMNS)),
       campaignPosts: campaignPosts.filter((row: any) => campaignUuid.has(Number(row.launch_campaign_id))).map((row: any) => ({
@@ -252,6 +266,11 @@ export class WorkspaceArchiveService {
     if (version >= 8 && !Array.isArray(archive.recurringPosts))
       throw new UserFacingError('That export is missing its recurring posts.')
     const repeats = version >= 8 ? archive.recurringPosts.map(readArchivedRecurringPost) : []
+
+    const targets: WorkspaceArchive['targets'] = (archive.targets || []).map(target => ({
+      ...target,
+      account: readTargetAccount(target.provider, target.account),
+    }))
 
     const monitors = (archive.monitors || []).map((monitor) => {
       // Browser-session watches first appeared in version 3. Require the source
@@ -308,19 +327,23 @@ export class WorkspaceArchiveService {
         report.posts++
       }
 
-      const identities = tx.selectFrom('social_identities').select(['id', 'provider', 'handle']).execute()
-      for (const target of archive.targets || []) {
+      const identities: IdentityLike[] = tx.selectFrom('social_identities')
+        .select(['id', 'provider', 'handle', 'external_id', 'auth_status']).execute()
+      for (const target of targets) {
         if (exists('post_targets', target.uuid, tx)) { report.skipped++; continue }
         const postId = idOf('posts', target.post, tx)
         if (!postId) continue
-        const identity = target.account ? identities.find((row: any) => row.provider === target.account!.provider && row.handle === target.account!.handle) : null
+        const identity = target.account ? matchArchivedTargetAccount(identities, target.account) : undefined
         const restored = pick(target, TARGET_COLUMNS)
         if (restored.first_comment_status && restored.first_comment_status !== 'sent') {
           // The original installation may have sent it after the archive was made.
           restored.first_comment_status = 'uncertain'
           restored.first_comment_error = 'Check for the first comment on the published post after restoring this workspace.'
         }
-        tx.insertInto('post_targets').values({ ...restored, post_id: postId, social_identity_id: identity ? Number(identity.id) : null }).execute()
+        tx.insertInto('post_targets').values({
+          ...restored, post_id: postId, social_identity_id: identity ? Number(identity.id) : null,
+          archived_account: target.account && !identity ? JSON.stringify(target.account) : null,
+        }).execute()
         report.targets++
       }
 

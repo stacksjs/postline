@@ -14,10 +14,11 @@ import type { CrosspostService } from './CrosspostService'
 import type { CrosspostTargetResult, FirstCommentOutcome, PublishContent, SocialProvider } from '../../Support/Social/types'
 import type { VariantMap } from '../../Support/Social/variants'
 import process from 'node:process'
-import { db } from '@stacksjs/database'
+import { db, sqliteWriteOptions } from '@stacksjs/database'
 import { env } from '@stacksjs/env'
 import { raw } from '@stacksjs/query-builder'
 import { UserFacingError } from '../../Support/Http/user-error'
+import { reconnectArchivedTargetMessage } from '../../Support/Social/accounts'
 import { dedupeTargets, isAccountProvider, parseTargets, targetKey, targetProviders } from '../../Support/Social/targets'
 import { hydrateStoredContent, MissingMediaError, parseStoredContent } from '../../Support/Social/stored-content'
 import { storedImageResponse, storedVideoResponse } from '../../Support/Social/uploads'
@@ -25,7 +26,7 @@ import { removeMediaFiles, storeAttachments } from '../../Support/Social/stored-
 import { assertVideoAllowed, checkVideoBytes } from '../../Support/Social/video-input'
 import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/variants'
 import { crosspost, crosspostProviders } from './CrosspostService'
-import { findIdentityRow, unavailableAccountError } from './identities'
+import { bindRestoredTargets, findIdentityRow, RestoredTargetAccountError, unavailableAccountError } from './identities'
 import { nextPostingSlot } from '../../Support/Social/posting-slots'
 import { isRealTimestamp, isValidTimeZone } from '../../Support/time'
 import { listPostingSlots } from '../PostingSlotService'
@@ -727,11 +728,13 @@ export class QueueService {
       const rows: any[] = post.thread_key ? this.threadPosts(post.thread_key, tx) : [post]
       if (rows.some(row => row.status === 'publishing') || (post.thread_key && this.pendingThreadRemoval(post.thread_key, tx)))
         throw new UserFacingError('Wait until this thread is available in the Queue.')
-      const targets = targetsOf(tx.selectFrom('post_targets').select(['provider', 'social_identity_id'])
-        .where('post_id', 'in', rows.map(row => row.id)).execute())
+      const sourceTargets: Array<{ id: number, provider: SocialProvider, social_identity_id: number | null, archived_account: string | null }> = tx
+        .selectFrom('post_targets').select(['id', 'provider', 'social_identity_id', 'archived_account'])
+        .where('post_id', 'in', rows.map(row => row.id)).execute()
+      const targets = targetsOf(bindRestoredTargets(tx, sourceTargets))
       const segments: RecurringSegment[] = rows.map(row => ({ title: row.title || row.body.slice(0, 80), body: row.body, content: row[column] || null }))
       return { segments, targets }
-    })
+    }, sqliteWriteOptions())
     const targets = await this.validTargets(source.targets.map(targetKey))
     return { segments: source.segments as RecurringSegment[], targets }
   }
@@ -858,15 +861,16 @@ export class QueueService {
           .filter((target: any) => Number(target.post_id) === Number(post.id))
           .map((target: any): QueueTargetView => {
             const identityId = Number(target.social_identity_id) || null
+            const archived = target.archived_account ? JSON.parse(target.archived_account) : null
             return {
               provider: target.provider,
               identityId,
-              handle: identityId ? handles.get(identityId) || null : null,
+              handle: identityId ? handles.get(identityId) || null : archived?.handle ?? null,
               target: targetKey({ provider: target.provider, identityId }),
               status: String(target.status),
               remoteUri: target.remote_uri || null,
               remoteUrl: target.remote_url || null,
-              failureReason: target.failure_reason || null,
+              failureReason: archived && target.status !== 'published' ? reconnectArchivedTargetMessage(archived) : target.failure_reason || null,
               attempts: Number(target.attempts) || 0,
               ...(target.first_comment_status && { firstComment: {
                 targetId: Number(target.id),
@@ -1015,6 +1019,7 @@ export class QueueService {
       .selectFrom('post_targets')
       .select(['provider', 'social_identity_id'])
       .where('post_id', '=', post.id)
+      .where('archived_account', 'is', null)
       .execute()
     const targets = targetsOf(rows)
 
@@ -1230,15 +1235,15 @@ export class QueueService {
    * statement changed a row. SQLite runs one write at a time, so exactly one
    * caller sees 1.
    */
-  private async claim(post: { id: number | string, status: string }, expectedScheduledAt?: string): Promise<void> {
+  private claim(tx: typeof database, post: { id: number | string, status: string }, expectedScheduledAt?: string): void {
     // From the exact state that was read: anything else means another run
     // moved the post in between.
-    let claim = database.updateTable('posts').set({
+    let claim = tx.updateTable('posts').set({
       status: 'publishing',
       updated_at: now(),
     }).where('id', '=', post.id).where('status', '=', post.status)
     if (expectedScheduledAt) claim = claim.where('scheduled_at', '=', expectedScheduledAt)
-    const changed = affected(await claim.execute())
+    const changed = affected(claim.execute())
 
     if (changed !== 1)
       throw new AlreadyPublishingError()
@@ -1263,20 +1268,22 @@ export class QueueService {
     // that went out in part resumes from where each account stopped (#100, #255).
     if (post.thread_key) {
       const threadKey = String(post.thread_key)
-      if (String(post.status) === 'scheduled' || String(post.status) === 'draft') {
-        const claimed = await database.transaction((tx: typeof database) => {
-          if (this.pendingThreadRemoval(threadKey, tx)) throw new ThreadRemovalPendingError()
-          if (expected && !tx.selectFrom('posts').select('id').where('id', '=', post.id)
-            .where('status', '=', 'scheduled').where('scheduled_at', '=', expected).executeTakeFirst())
-            return 0
-          return affected(tx.updateTable('posts').set({ status: 'publishing', updated_at: now() })
+      await database.transaction((tx: typeof database) => {
+        if (this.pendingThreadRemoval(threadKey, tx)) throw new ThreadRemovalPendingError()
+        if (expected && !tx.selectFrom('posts').select('id').where('id', '=', post.id)
+          .where('status', '=', 'scheduled').where('scheduled_at', '=', expected).executeTakeFirst())
+          throw new AlreadyPublishingError()
+
+        const segments = this.threadPosts(threadKey, tx)
+        bindRestoredTargets(tx, tx.selectFrom('post_targets').select(['id', 'social_identity_id', 'archived_account'])
+          .where('post_id', 'in', segments.map((row: any) => row.id)).where('archived_account', 'is not', null).execute())
+
+        if (post.status === 'scheduled' || post.status === 'draft') {
+          const claimed = affected(tx.updateTable('posts').set({ status: 'publishing', updated_at: now() })
             .where('thread_key', '=', threadKey).where('status', 'in', ['scheduled', 'draft']).execute())
-        })
-        if (claimed === 0) throw new AlreadyPublishingError()
-      }
-      else if (await this.pendingThreadRemoval(threadKey)) {
-        throw new ThreadRemovalPendingError()
-      }
+          if (claimed === 0) throw new AlreadyPublishingError()
+        }
+      }, sqliteWriteOptions())
       const { results } = await this.publisher.resumeThread(threadKey)
       // A segment still marked publishing did not go out anywhere.
       await database.updateTable('posts').set({ status: 'failed', updated_at: now() })
@@ -1291,51 +1298,24 @@ export class QueueService {
     // Read before the claim: a post whose image is gone is refused here, with
     // nothing changed, instead of being claimed and then failing halfway.
     const content = await hydrateStoredContent(await storedContentOf(post))
-    if (content?.replyTarget) {
-      // A workspace archive can restore a target without its connected account.
-      // Refuse before taking a publishing claim or resolving a default account.
-      const bound = await database.selectFrom('post_targets').select(['provider', 'social_identity_id'])
-        .where('post_id', '=', post.id).where('status', 'in', ['draft', 'scheduled', 'failed']).execute()
-      assertReplyTarget(content.replyTarget, targetsOf(bound))
-    }
-    await this.claim(post, expected)
+    const { placeholders, targets, attemptsBefore } = await database.transaction((tx: typeof database) => {
+      const pending: any[] = tx.selectFrom('post_targets').selectAll().where('post_id', '=', post.id)
+        .where('status', 'in', ['draft', 'scheduled', 'failed']).execute()
+      // Automatic retries only consider failed targets whose wait is over.
+      const selected = options.retriesOnly ? pending.filter(row => row.status === 'failed' && isDue(row.next_attempt_at)) : pending
+      const placeholders = bindRestoredTargets(tx, selected)
+      const targets = targetsOf(placeholders)
+      if (content?.replyTarget) assertReplyTarget(content.replyTarget, targets)
+      if (!targets.length) throw new UserFacingError('This post has no pending targets to publish.')
+      if (content?.video) assertVideoAllowed(targetProviders(targets), Boolean(content.media?.length), content.options)
 
-    const pending: any[] = await database
-      .selectFrom('post_targets')
-      .selectAll()
-      .where('post_id', '=', post.id)
-      .where('status', 'in', ['draft', 'scheduled', 'failed'])
-      .execute()
-    // An automatic retry sends only the networks whose wait is over. One
-    // that was refused, or is still waiting, is left exactly as it is.
-    const placeholders = options.retriesOnly
-      ? pending.filter(row => row.status === 'failed' && isDue(row.next_attempt_at))
-      : pending
-
-    // How many sends each target has had, carried across this one: the
-    // provider services write fresh rows, which start again from nothing.
-    const attemptsBefore = new Map<string, number>(
-      placeholders.map((row: any) => [recordKey(row.provider, row.social_identity_id), Number(row.attempts) || 0]),
-    )
-
-    // De-duplicated per account, not per network: two Bluesky accounts on one
-    // post are two targets and both publish.
-    const targets = targetsOf(placeholders)
-    if (targets.length === 0) {
-      // Nothing to send: hand the post back as it was.
-      await database.updateTable('posts').set({ status: post.status, updated_at: now() }).where('id', '=', post.id).execute()
-      throw new Error('This post has no pending targets to publish.')
-    }
-
-    if (content?.video) {
-      try {
-        assertVideoAllowed(targetProviders(targets), Boolean(content.media?.length), content.options)
-      }
-      catch (error) {
-        await database.updateTable('posts').set({ status: post.status, updated_at: now() }).where('id', '=', post.id).execute()
-        throw error
-      }
-    }
+      // Send attempts belong to a specific account, even on the same network.
+      const attemptsBefore = new Map<string, number>(
+        placeholders.map(row => [recordKey(row.provider, row.social_identity_id), Number(row.attempts) || 0]),
+      )
+      this.claim(tx, post, expected)
+      return { placeholders, targets, attemptsBefore }
+    }, sqliteWriteOptions())
 
     // The placeholders are kept, marked `publishing`, until the results are
     // in. They used to be deleted here, which meant a process that stopped
@@ -1589,6 +1569,18 @@ export class QueueService {
         // Refused before anything was claimed or sent. Left as it was it
         // would be picked up and refused again every minute, so it is set
         // aside with the reason for the owner to fix.
+        if (error instanceof RestoredTargetAccountError) {
+          const scheduled = post.thread_key
+            ? await database.selectFrom('posts').select(['id', 'scheduled_at']).where('thread_key', '=', post.thread_key)
+                .where('status', '=', 'scheduled').where('scheduled_at', '=', scheduledAt).execute() as Pick<ScheduledRow, 'id' | 'scheduled_at'>[]
+            : [post]
+          let held = 0
+          for (const segment of scheduled) {
+            if (segment.scheduled_at) held += await this.setAside(Number(segment.id), error.message, segment.scheduled_at)
+          }
+          if (held) failed += 1
+          continue
+        }
         if ((error instanceof MissingMediaError || error instanceof InvalidStoredPostOptionsError) && !await this.setAside(Number(post.id), error.message, scheduledAt))
           continue
         // Swallowed so one post cannot stop the rest, but never silently.
