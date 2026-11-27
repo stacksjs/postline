@@ -440,7 +440,7 @@
 
     "clone": ["clone@2.1.2", "", {}, "sha512-3Pe/CF1Nn94hyhIYpjtiLhdCoEoz0DqQ+988E9gmeEdQZlojxnOb74wctFyuwWQHzqyf9X7C7MG8juUpqBJT8w=="],
 
-    "craft-native": ["craft-native@0.0.541", "", { "bin": { "craft-sdk": "dist/cli.js" } }, "sha512-GgQo5oV3Os9MY6nVF/4ODHcrWnMLdQF7Ldr0F7RHKSRnmewyHuPyQ/3YVw0J3q4JOyQsH6PawlViLbyO4E7ATg=="],
+    "craft-native": ["craft-native@0.0.546", "", { "bin": { "craft-sdk": "dist/cli.js" } }, "sha512-mi9VMxyAh3mILRtlbnRbABqNhNxpmp7nwoa5z0SFQ+yoc4PNGsSAvYemQAdM3jAVGHxioxgQQP874gJD91GKug=="],
 
     "cz-git": ["cz-git@1.14.0", "", {}, "sha512-QjwlXZrGWsXQkyregBHhA2qNNGB2TCuf0ovkW1Q5OLgdJDs9Tq1yahfKpSMLyqOBjVRuv1iHBTDP83zJDBlJdg=="],
 

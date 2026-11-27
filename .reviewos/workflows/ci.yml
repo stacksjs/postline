@@ -124,7 +124,7 @@ jobs:
           (cd "$CHECK_DIR" && ./postline-check)
       - name: Build and verify the Mac app bundle
         run: |
-          DESKTOP_SIGNING_IDENTITY=- ./buddy build:desktop
+          DESKTOP_SIGNING_IDENTITY=- bun scripts/build-desktop-release.ts
           codesign --verify --deep --strict storage/framework/desktop/webview/darwin-arm64/Postline.app
 
   # The site as a static host serves it (#179): every page built, every client

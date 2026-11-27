@@ -121,9 +121,7 @@ jobs:
           (cd "$CHECK_DIR" && ./postline-check)
 
       # Compiles the agent with the built views inside it and assembles
-      # Postline.app. The Craft web view runtime is the one Craft published for
-      # the installed craft-native version: the build fetches it, and passes
-      # over a `craft` shim on the runner's PATH.
+      # Postline.app with the verified Craft runtime that matches bun.lock.
       #
       - name: Build the app
         env:
@@ -139,7 +137,7 @@ jobs:
           # (#203): the number of commits behind this one, which only grows.
           DESKTOP_BUILD_NUMBER="$(git rev-list --count HEAD)"
           export DESKTOP_BUILD_NUMBER
-          bun node_modules/@stacksjs/buddy/dist/cli.js build:desktop
+          bun scripts/build-desktop-release.ts
           app=storage/framework/desktop/webview/darwin-arm64/Postline.app
           codesign --verify --deep --strict "$app"
           codesign --display --verbose=4 "$app" 2>&1 | grep '^Authority=Developer ID Application:'
