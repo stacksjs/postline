@@ -199,74 +199,6 @@
   color: rgb(37 99 235);
 }
 
-.postline-feed__empty,
-.postline-feed__loading {
-  margin: 0;
-  padding: 2.5rem 1.5rem;
-  text-align: center;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  color: rgb(113 113 122);
-}
-
-.postline-feed__skeleton {
-  display: grid;
-  gap: 0.75rem;
-  padding: 1rem;
-  border-bottom: 1px solid rgb(244 244 245);
-}
-
-.postline-feed__skeleton-row {
-  display: grid;
-  grid-template-columns: 2.75rem 1fr;
-  gap: 0.75rem;
-}
-
-.postline-feed__skeleton-avatar {
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 9999px;
-  background: linear-gradient(90deg, rgb(244 244 245) 25%, rgb(250 250 250) 50%, rgb(244 244 245) 75%);
-  background-size: 200% 100%;
-  animation: postline-feed-shimmer 1.2s ease-in-out infinite;
-}
-
-.postline-feed__skeleton-lines {
-  display: grid;
-  gap: 0.5rem;
-  padding-top: 0.15rem;
-}
-
-.postline-feed__skeleton-line {
-  height: 0.65rem;
-  border-radius: 9999px;
-  background: linear-gradient(90deg, rgb(244 244 245) 25%, rgb(250 250 250) 50%, rgb(244 244 245) 75%);
-  background-size: 200% 100%;
-  animation: postline-feed-shimmer 1.2s ease-in-out infinite;
-}
-
-.postline-feed__skeleton-line--short {
-  width: 42%;
-}
-
-.postline-feed__skeleton-line--medium {
-  width: 88%;
-}
-
-.postline-feed__skeleton-line--long {
-  width: 100%;
-}
-
-@keyframes postline-feed-shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-
-  100% {
-    background-position: -100% 0;
-  }
-}
-
 /* Dark theme — the feed uses its own classes (not utilities), so it needs
   its own overrides to match the app's .dark remap. */
 .dark .postline-feed__header,
@@ -276,12 +208,4 @@
 .dark .postline-feed-post:hover { background: #202024; }
 .dark .postline-feed-post__name { color: #f4f4f5; }
 .dark .postline-feed-post__body { color: #d4d4d8; }
-.dark .postline-feed__empty,
-.dark .postline-feed__loading { color: #a1a1aa; }
 .dark .postline-feed-post__avatar { border-color: rgb(255 255 255 / 0.12); }
-.dark .postline-feed__skeleton { border-bottom-color: #232327; }
-.dark .postline-feed__skeleton-avatar,
-.dark .postline-feed__skeleton-line {
-  background: linear-gradient(90deg, #232327 25%, #2c2c31 50%, #232327 75%);
-  background-size: 200% 100%;
-}

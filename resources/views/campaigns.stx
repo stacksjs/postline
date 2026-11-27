@@ -45,27 +45,14 @@
       <div><span>In queue</span><strong>{{ queuedCount() }}</strong></div>
     </div>
 
-    <div class="campaign-loading" x-show="loading()" aria-live="polite">
-      <div></div><div></div><div></div>
-      <p>Opening your campaign workspace…</p>
-    </div>
-
-    <section class="campaign-empty" x-show="!loading() && loadFailed()" role="alert">
-      <span class="campaign-empty__mark i-hugeicons-alert-02" aria-hidden="true"></span>
-      <h2>Campaigns could not be loaded</h2>
-      <p class="campaign-empty__copy">Your campaigns are still saved. Check that Postline is running, then try again.</p>
-      <button class="campaign-primary-button" type="button" @click="retryLoad">Try again</button>
-    </section>
-    <section class="campaign-empty" x-show="!loading() && !loadFailed() && !campaign() && panelMode() !== 'campaign'">
-      <span class="campaign-empty__mark i-hugeicons-flowchart-01" aria-hidden="true"></span>
-      <p>Campaigns turn a launch brief into a sequence of useful posts.</p>
-      <h2>Start with the story, not the schedule.</h2>
-      <p class="campaign-empty__copy">Set the goal and launch window. Postline will give you a six-week planning board you can fill by hand or draft with AI.</p>
+    <WorkspaceListSkeleton :show="loading()" label="Loading campaigns" />
+    <ErrorState :show="!loading() && loadError()" title="Could not load campaigns" :message="loadError()" @retry="retryLoad()" />
+    <EmptyState :show="!loading() && !loadError() && !campaign() && panelMode() !== 'campaign'" title="Plan your first campaign" description="Set a launch window and add posts to the campaign calendar.">
       <button class="inline-flex gap-2 items-center justify-center px-5 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors" type="button" @click="openCampaignForm()">
         <span class="h-4 w-4 i-hugeicons-plus-sign" aria-hidden="true"></span>
         Create a campaign
       </button>
-    </section>
+    </EmptyState>
 
     <div class="campaign-workspace" x-show="!loading() && (campaign() || panelMode() === 'campaign')">
       <section class="campaign-board" x-show="campaign()">
@@ -129,7 +116,7 @@
         </div>
 
         <div class="campaign-list" x-show="view() === 'list'">
-          <div class="campaign-list__empty" x-show="posts().length === 0">No posts planned yet. Add one or ask the planner to draft a sequence.</div>
+          <EmptyState :show="posts().length === 0" variant="bare" title="No posts planned yet" description="Add a post or ask the planner to draft a sequence." />
           <article class="campaign-list-row" x-for="item in posts()" @click="openPostForm(item)" @keydown="openOnKey($event, item)" tabindex="0" role="button">
             <div class="campaign-list-row__date">
               <strong>{{ shortDate(item.scheduledAt) }}</strong>
@@ -336,7 +323,7 @@
     const postScheduleZone = derived(() => campaign()?.timezone || systemTimeZone())
     const selectPostSchedule = ({ value }: { value: string | null }) => postScheduledAt.set(value)
     // The campaigns could not be read: not the same as having none.
-    const loadFailed = state(false)
+    const loadError = state('')
     // Closing an edited form asks for a second click to discard its changes.
     const discardArmed = state(false)
     // What the open form held when it opened, to tell an edit from a glance.
@@ -496,13 +483,14 @@
         campaign.set(data.selected?.campaign || null)
         posts.set(data.selected?.posts || [])
         if (campaign()) calendarStart.set(sundayFor(campaign().startDate))
-        loadFailed.set(false)
+        loadError.set('')
       }
       catch (error) {
         // Only a first load that failed hides the board; with campaigns
         // already on screen the notice is enough.
-        if (!campaignsList().length) loadFailed.set(true)
-        showNotice('Could not open campaigns', error instanceof Error ? error.message : String(error), 'error')
+        const message = error instanceof Error ? error.message : String(error)
+        if (!campaignsList().length) loadError.set(message)
+        else showNotice('Could not open campaigns', message, 'error')
       }
       finally {
         loading.set(false)

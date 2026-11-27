@@ -266,25 +266,8 @@ function formatHour(hour: number): string {
   return clock.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' })
 }
 
-function fillStats(payload: AnalyticsPayload): void {
-  const page = document.querySelector<HTMLElement>('[data-testid="analytics-page"]')
-  // The mount observer refires on any DOM change; fill once per page mount
-  // or the fill's own mutations retrigger it in a microtask loop.
-  if (!page || page.dataset.analyticsFilled === 'true') return
-
-  // `payload.data` reaches here through an `as` cast, so nothing has checked
-  // its shape at runtime. A response missing `stats` used to throw an uncaught
-  // TypeError on the first read — and because the fill-once latch was set
-  // above this line, the page stayed marked filled and could never recover.
-  // The fetch's own catch never saw it either, because it happens after the
-  // promise resolves. Latch after the guard so a later attempt can succeed.
-  const stats = payload?.stats
-  if (!stats) {
-    showAnalyticsError('Analytics data was incomplete.')
-    return
-  }
-  page.dataset.analyticsFilled = 'true'
-
+function fillStats(page: HTMLElement, payload: AnalyticsPayload): void {
+  const stats = payload.stats
   const delta = stats.postsThisWeek - stats.postsLastWeek
   const set = (selector: string, value: string): void => {
     const element = page.querySelector(selector)
@@ -365,47 +348,16 @@ function fillStats(payload: AnalyticsPayload): void {
 
 let lastAnalyticsError: string | null = null
 
-function hideAnalyticsError(): void {
-  const banner = document.querySelector<HTMLElement>('[data-analytics-error]')
-  if (banner) {
-    banner.classList.add('hidden')
-    banner.classList.remove('flex')
-  }
-}
-
-function showAnalyticsError(message: string): void {
-  const page = document.querySelector<HTMLElement>('[data-testid="analytics-page"]')
-  if (!page)
-    return
-
-  const msg = page.querySelector('[data-analytics-error-message]')
-  if (msg)
-    msg.textContent = message
-  const banner = page.querySelector<HTMLElement>('[data-analytics-error]')
-  if (banner) {
-    banner.classList.remove('hidden')
-    banner.classList.add('flex')
-  }
-
-  // Stop the stat trends from claiming they're still loading forever.
-  page.querySelectorAll('[data-analytics-posts-trend], [data-analytics-engagement-trend], [data-analytics-best-channel-trend], [data-analytics-best-window-trend]')
-    .forEach((el) => { if (el.textContent === 'Loading…') el.textContent = 'Unavailable' })
-
-  const retry = page.querySelector<HTMLElement>('[data-analytics-retry]')
-  if (retry && !retry.dataset.wired) {
-    retry.dataset.wired = 'true'
-    retry.addEventListener('click', () => {
-      hideAnalyticsError()
-      void loadAnalytics()
-    })
-  }
+function setAnalyticsState(page: HTMLElement, state: 'loading' | 'error' | 'empty' | 'ready', message?: string): void {
+  page.dispatchEvent(new CustomEvent('postline-analytics-state', { detail: { state, message } }))
 }
 
 /** How long one fetch of the numbers serves repeat visits before it is asked for again (#182). */
 const ANALYTICS_FRESH_MS = 60_000
 let analyticsFetchedAt = 0
 
-async function loadAnalytics(): Promise<void> {
+async function loadAnalytics(page: HTMLElement): Promise<void> {
+  setAnalyticsState(page, 'loading')
   if (analyticsPromise && Date.now() - analyticsFetchedAt > ANALYTICS_FRESH_MS)
     analyticsPromise = null
   if (!analyticsPromise) {
@@ -414,6 +366,7 @@ async function loadAnalytics(): Promise<void> {
       .then(async (response) => {
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load analytics.')
+        if (!payload.data?.stats) throw new Error('Analytics data was incomplete.')
         lastAnalyticsError = null
         return payload.data as AnalyticsPayload
       })
@@ -425,14 +378,16 @@ async function loadAnalytics(): Promise<void> {
   }
 
   const data = await analyticsPromise
+  if (!page.isConnected) return
   if (!data) {
-    // Previously returned silently, leaving the dashboard stuck on "Loading…".
-    showAnalyticsError(lastAnalyticsError || 'Could not load analytics.')
+    setAnalyticsState(page, 'error', lastAnalyticsError || 'Could not load analytics.')
     return
   }
-  hideAnalyticsError()
   points = data.series || []
-  fillStats(data)
+  const hasData = Boolean(data.channelMix?.length || points.some(point => point.value > 0))
+  setAnalyticsState(page, hasData ? 'ready' : 'empty')
+  if (!hasData) return
+  fillStats(page, data)
   scheduleAnalyticsRender()
 }
 
@@ -458,13 +413,15 @@ window.addEventListener('stx:load', () => {
 
 function mountAnalyticsIfShown(): void {
   const chart = document.querySelector<SVGSVGElement>('[data-analytics-chart]')
-  if (!chart) return
+  const page = chart?.closest<HTMLElement>('[data-testid="analytics-page"]')
+  if (!chart || !page) return
   if (observedChart !== chart) {
     chartResize.disconnect()
     chartResize.observe(chart)
     observedChart = chart
+    page.addEventListener('postline-analytics-retry', () => { void loadAnalytics(page) })
+    void loadAnalytics(page)
   }
-  void loadAnalytics()
   scheduleAnalyticsRender()
 }
 

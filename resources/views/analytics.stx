@@ -4,7 +4,7 @@
 
 @section('content')
   @meta('description', 'Review lightweight publishing analytics in Postline.')
-  <section class="grid gap-5" data-postline-page="analytics" data-testid="analytics-page">
+  <section class="grid gap-5" data-postline-page="analytics" data-testid="analytics-page" ref="analyticsPage" @postline-analytics-state="showAnalyticsState($event)">
     <header class="flex gap-4 items-center justify-between min-h-11">
       <div>
         <p class="mb-1.5 font-semibold text-muted text-xs tracking-wider uppercase">Analytics</p>
@@ -13,12 +13,13 @@
       </div>
     </header>
 
-    <div class="hidden gap-3 items-center justify-between p-3.5 text-danger text-ui bg-danger-soft border border-danger-line rounded-2xl" data-analytics-error>
-      <span data-analytics-error-message>Couldn't load analytics.</span>
-      <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg transition-colors" type="button" data-analytics-retry>Retry</button>
-    </div>
+    <WorkspaceListSkeleton :show="analyticsState() === 'loading'" label="Loading analytics" />
+    <ErrorState :show="analyticsState() === 'error'" title="Could not load analytics" :message="analyticsError()" @retry="retryAnalytics()" />
+    <EmptyState :show="analyticsState() === 'empty'" title="No publishing activity in the last 30 days" description="Publish a post to start seeing activity here.">
+      <StxLink class="text-info text-ui underline" to="/composer">Write a post</StxLink>
+    </EmptyState>
 
-    <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4" x-cloak :show="analyticsState() === 'ready'">
       <article class="grid gap-2 p-3.5 bg-panel border border-line rounded-2xl shadow-sm">
         <span class="text-muted text-xs">Posts this week</span>
         <strong class="text-2xl" data-analytics-posts-week>0</strong>
@@ -41,7 +42,7 @@
       </article>
     </div>
 
-    <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <div class="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_320px]" x-cloak :show="analyticsState() === 'ready'">
       <section class="bg-panel border border-line rounded-2xl shadow-sm">
         <header class="flex gap-3 items-center justify-between p-3.5 border-b border-line">
           <strong class="text-ui">Publishing activity</strong>
@@ -94,4 +95,20 @@
       </aside>
     </div>
   </section>
+
+  <script client>
+    type AnalyticsState = 'loading' | 'error' | 'empty' | 'ready'
+    const analyticsPage = useRef('analyticsPage')
+    const analyticsState = state<AnalyticsState>('loading')
+    const analyticsError = state('')
+
+    function showAnalyticsState(event: CustomEvent<{ state: AnalyticsState, message?: string }>) {
+      analyticsState.set(event.detail.state)
+      analyticsError.set(event.detail.message ?? '')
+    }
+
+    function retryAnalytics() {
+      analyticsPage.current?.dispatchEvent(new Event('postline-analytics-retry'))
+    }
+  </script>
 @endsection

@@ -52,10 +52,10 @@
           </div>
         @endfor
       </div>
-      <div class="grid gap-2 justify-items-start p-4" x-cloak x-show="bootstrap.error() && !channelsReady()" data-channels-error>
-        <p class="m-0 text-danger text-sm" role="alert" :text="bootstrap.error()"></p>
-        <button class="px-3 h-9 font-semibold text-ink text-xs bg-panel-2 border border-line rounded-xl" type="button" @click="bootstrap.refresh()">Try again</button>
-      </div>
+      <ErrorState :show="bootstrap.error() && !channelsReady()" title="Could not load publishing channels" :message="bootstrap.error()" @retry="bootstrap.refresh()" testID="channels-error" />
+      <EmptyState :show="channelsReady() && !channelProviders().length" variant="bare" title="No publishing channels available" description="Refresh to check which channels this workspace can use.">
+        <button class="text-info text-ui underline" type="button" @click="bootstrap.refresh()">Refresh channels</button>
+      </EmptyState>
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" x-cloak x-show="channelsReady()" data-publishing-channels>
         <div class="min-w-0" x-for="provider in channelProviders()" :key="provider">
           <NetworkChannelCard :provider="provider" />

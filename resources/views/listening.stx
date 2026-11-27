@@ -82,13 +82,11 @@
           </div>
         </header>
 
-        <div class="grid gap-3 place-items-center px-6 py-20 text-center" x-show="loading()">
-          <span class="h-7 w-7 text-muted animate-spin i-hugeicons-loading-03" aria-hidden="true"></span><p class="m-0 text-muted text-sm">Loading listening rules…</p>
-        </div>
-        <div class="grid gap-3 place-items-center px-6 py-20 text-center" x-show="showEmpty()">
-          <span class="grid place-items-center h-14 w-14 text-2xl text-note bg-note-soft rounded-2xl" aria-hidden="true"><span class="i-hugeicons-radar-02"></span></span>
-          <div><h2 class="m-0 font-semibold text-base text-ink" :text="monitors().length ? 'No mentions found yet' : 'Create your first listening rule'">Create your first listening rule</h2><p class="m-0 mt-1 max-w-md text-muted text-sm" :text="monitors().length ? 'Run a scan now. New matching posts will be saved here and highlighted as unread.' : 'Choose the terms and networks you care about. Postline will keep checking them for you.'"></p></div>
-        </div>
+        <WorkspaceListSkeleton :show="loading()" label="Loading mentions" />
+        <ErrorState :show="mentionLoadError() && !loading()" title="Could not load mentions" :message="mentionLoadError()" @retry="loadData()" />
+        <EmptyState :show="showEmpty()" variant="bare" :title="monitors().length ? 'No mentions found yet' : 'Create your first listening rule'" :description="monitors().length ? 'New matching posts will appear here.' : 'Choose the terms and networks you want to watch.'">
+          <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="activeCount()" :disabled="scanning()" @click="runScan">Run a scan</button>
+        </EmptyState>
 
         <div class="divide-line divide-y" x-show="!loading() && filteredMentions().length">
           <article class="grid gap-3 p-4 hover:bg-panel-2/45 transition-colors" x-for="mention in filteredMentions()" :data-command-context="mention.authorName || mention.authorHandle" :class="mention.status === 'unread' ? 'bg-info-soft' : ''">
@@ -151,6 +149,7 @@
     const deleting = state(false)
     const scanning = state(false)
     const errorMessage = state('')
+    const mentionLoadError = state('')
     const filterMonitorId = state(0)
     // Mentions come a page at a time (#105).
     const nextOffset = state<number | null>(null)
@@ -166,7 +165,7 @@
     const filteredMentions = derived(() => filterMonitorId() ? mentions().filter(item => item.monitorId === filterMonitorId()) : mentions())
     const unreadCount = derived(() => mentions().filter(item => item.status === 'unread').length)
     const activeCount = derived(() => monitors().filter(item => item.status === 'active').length)
-    const showEmpty = derived(() => loaded() && !loading() && !errorMessage() && filteredMentions().length === 0)
+    const showEmpty = derived(() => loaded() && !loading() && !mentionLoadError() && filteredMentions().length === 0)
     const inboxSummary = derived(() => `${filteredMentions().length} mention${filteredMentions().length === 1 ? '' : 's'}, ${filteredMentions().filter(item => item.status === 'unread').length} unread`)
     const lastCheckedLabel = derived(() => {
       const values = monitors().map(item => item.lastCheckedAt).filter(Boolean).sort().reverse()
@@ -175,7 +174,7 @@
 
     const loadData = async ({ quiet = false } = {}) => {
       if (!quiet) loading.set(true)
-      errorMessage.set('')
+      mentionLoadError.set('')
       try {
         const payload = await requestJson('/api/postline/listening')
         const monitorRows = Array.isArray(payload.data?.monitors) ? payload.data.monitors : []
@@ -192,7 +191,7 @@
         }
       }
       catch (error) {
-        errorMessage.set(error instanceof Error ? error.message : String(error))
+        mentionLoadError.set(error instanceof Error ? error.message : String(error))
       }
       finally {
         loading.set(false)

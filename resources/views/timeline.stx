@@ -33,28 +33,14 @@
         <span class="px-2.5 py-1 font-semibold text-info text-xs bg-info-soft border border-info-line rounded-full">Bluesky</span>
       </div>
       <div class="postline-feed__list">
-        {{-- x-show lives on a wrapper, never on the x-for element itself:
-            bindFor returns as soon as it sees the loop attribute, so an x-show
-            sharing that element is silently never bound. --}}
-        <div x-show="busy()">
-          <div class="postline-feed__skeleton" x-for="row in skeletonRows()">
-            <div class="postline-feed__skeleton-row">
-              <div class="postline-feed__skeleton-avatar"></div>
-              <div class="postline-feed__skeleton-lines">
-                <div class="postline-feed__skeleton-line postline-feed__skeleton-line--short"></div>
-                <div class="postline-feed__skeleton-line postline-feed__skeleton-line--medium"></div>
-                <div class="postline-feed__skeleton-line postline-feed__skeleton-line--long"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <p class="postline-feed__empty" x-show="feedError()" :text="feedError()"></p>
-        <p class="postline-feed__empty" x-show="showEmpty()">No posts in your feed yet. Publish from the composer or refresh again.</p>
-        <p class="postline-feed__empty" x-show="notConnected()">
-          Your Bluesky home timeline shows here once an account is connected.
-          <a class="block mt-2 font-semibold text-ink underline" href="/accounts" data-stx-link>Connect Bluesky</a>
-        </p>
+        <WorkspaceListSkeleton :show="busy()" label="Loading timeline" />
+        <ErrorState :show="feedError()" title="Could not load the timeline" :message="feedError()" @retry="refresh()" />
+        <EmptyState :show="showEmpty() && !busy()" variant="bare" title="No posts in your feed yet" description="Refresh to check for new posts on Bluesky.">
+          <button class="text-info text-ui underline" type="button" @click="refresh()">Refresh</button>
+        </EmptyState>
+        <EmptyState :show="notConnected() && !busy() && !feedError()" variant="bare" title="Connect Bluesky to see your timeline">
+          <StxLink class="text-info text-ui underline" to="/accounts">Open Channels</StxLink>
+        </EmptyState>
 
         <article class="postline-feed-post" x-for="item in items()">
           <div class="postline-feed-post__layout">
@@ -147,7 +133,6 @@
     const feedError = state('')
     const loaded = state(false)
 
-    const skeletonRows = () => [1, 2, 3, 4]
     /** No Bluesky account to read from: the page says how to connect one. */
     const notConnected = state(false)
     const showEmpty = derived(() => loaded() && !feedError() && !notConnected() && items().length === 0)

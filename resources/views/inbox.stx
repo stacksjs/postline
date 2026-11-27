@@ -54,18 +54,12 @@
             </select>
           </header>
 
-          <div class="grid gap-3 place-items-center px-6 py-16 text-center" x-show="loading()">
-            <span class="h-6 w-6 text-muted animate-spin i-hugeicons-loading-03" aria-hidden="true"></span>
-            <p class="m-0 text-muted text-sm">Loading conversations…</p>
-          </div>
-
-          <div class="grid gap-3 place-items-center px-6 py-16 text-center" x-show="showEmptyList()">
-            <span class="grid place-items-center h-12 w-12 text-info text-xl bg-info-soft rounded-2xl" aria-hidden="true"><span class="i-hugeicons-message-01"></span></span>
-            <div>
-              <h3 class="m-0 font-semibold text-ink text-sm" :text="connectedCount() ? 'No conversations yet' : 'Connect a network first'"></h3>
-              <p class="m-0 mt-1 text-muted text-xs" :text="connectedCount() ? 'Run a sync to pull your latest DMs into Postline.' : 'Connect Bluesky or Mastodon on Accounts to start reading DMs here.'"></p>
-            </div>
-          </div>
+          <WorkspaceListSkeleton :show="loading()" label="Loading conversations" />
+          <ErrorState :show="conversationError() && !loading()" title="Could not load conversations" :message="conversationError()" @retry="loadConversations()" />
+          <EmptyState :show="showEmptyList()" variant="bare" :title="connectedCount() ? 'No conversations yet' : 'Connect a network to read messages'" :description="connectedCount() ? 'Sync to pull your latest messages into Postline.' : 'The inbox supports Bluesky and Mastodon.'">
+            <StxLink class="text-info text-ui underline" to="/accounts" :show="!connectedCount()">Open Channels</StxLink>
+            <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="connectedCount()" :disabled="syncing()" @click="runSync">Sync now</button>
+          </EmptyState>
 
           <div class="overflow-y-auto max-h-80 lg:max-h-[32rem] divide-line divide-y" x-show="!loading() && conversations().length">
             <button class="grid gap-1.5 p-3 w-full text-left hover:bg-panel-2 transition-colors" type="button" x-for="conversation in conversations()" :aria-current="conversation.id === activeId() ? 'true' : 'false'" @click="openConversation(conversation.id)" :class="conversation.id === activeId() ? 'bg-panel-2' : conversation.unreadCount ? 'bg-info-soft' : ''">
@@ -122,8 +116,11 @@
           </header>
 
           <div class="grid overflow-y-auto content-start flex-1 gap-3 px-4 py-4 max-h-[30rem]" ref="threadList" data-inbox-thread>
-            <p class="m-0 py-8 text-center text-muted text-sm" x-show="threadLoading()">Loading messages…</p>
-            <p class="m-0 py-8 text-center text-muted text-sm" x-show="!threadLoading() && messages().length === 0">No messages mirrored yet. Run a sync to pull this thread's history.</p>
+            <WorkspaceListSkeleton :show="threadLoading()" label="Loading messages" />
+            <ErrorState :show="threadError() && !threadLoading()" title="Could not load messages" :message="threadError()" @retry="loadThread()" />
+            <EmptyState :show="!threadLoading() && !threadError() && !messages().length" variant="bare" title="No messages synced yet" description="Sync to pull this conversation’s history.">
+              <button class="text-info text-ui underline disabled:opacity-50" type="button" :disabled="syncing()" @click="runSync">Sync now</button>
+            </EmptyState>
             <button class="justify-self-center px-3 py-1 text-muted text-xs hover:text-ink rounded-lg" type="button" x-show="olderOffset() !== null" :disabled="loadingOlder()" @click="loadOlderMessages" :text="loadingOlder() ? 'Loading…' : 'Show older messages'">Show older messages</button>
             <article class="flex" x-for="message in messages()" :class="message.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
               <div class="grid gap-1 max-w-[80%]">
@@ -196,6 +193,8 @@
     const refreshing = state(false)
     const sending = state(false)
     const errorMessage = state('')
+    const conversationError = state('')
+    const threadError = state('')
     const activeId = state(0)
     const statusFilter = state('open')
     const providerFilter = state('')
@@ -232,7 +231,7 @@
     const connected = derived(() => supported().filter(item => item.connected))
     const connectedCount = derived(() => connected().length)
     const connectedLabel = derived(() => connected().length ? connected().map(item => providerLabel(item.provider)).join(', ') : 'None yet')
-    const showEmptyList = derived(() => !loading() && conversations().length === 0)
+    const showEmptyList = derived(() => !loading() && !conversationError() && conversations().length === 0)
     const activeConversation = derived(() => conversations().find(item => item.id === activeId()) || null)
     const activeProvider = derived(() => activeConversation()?.provider || 'bluesky')
     const activeTitle = derived(() => activeConversation()?.participantName || activeConversation()?.participantHandle || 'Conversation')
@@ -252,7 +251,7 @@
 
     const loadConversations = async ({ quiet = false } = {}) => {
       if (!quiet) loading.set(true)
-      errorMessage.set('')
+      conversationError.set('')
       try {
         const query = new URLSearchParams({ status: statusFilter(), provider: providerFilter(), identity_id: accountFilter() })
         const payload = await requestJson(`/api/postline/inbox?${query}`)
@@ -275,7 +274,7 @@
         if (activeId() && !conversations().some(item => item.id === activeId())) closeConversation()
       }
       catch (error) {
-        errorMessage.set(error instanceof Error ? error.message : String(error))
+        conversationError.set(error instanceof Error ? error.message : String(error))
       }
       finally {
         loading.set(false)
@@ -286,17 +285,20 @@
       keepDraft()
       activeId.set(0)
       messages.set([])
+      threadError.set('')
       olderOffset.set(null)
       draftBody.set('')
     }
 
     const loadThread = async ({ markRead = true, quiet = false } = {}) => {
-      if (!activeId()) return
+      const conversationId = activeId()
+      if (!conversationId) return
       if (!quiet) threadLoading.set(true)
+      threadError.set('')
       try {
-        const conversationId = activeId()
         const query = new URLSearchParams({ conversation_id: String(conversationId) })
         const payload = await requestJson(`/api/postline/inbox/thread?${query}`)
+        if (conversationId !== activeId()) return
         // A quiet refresh keeps older messages already loaded above the newest page.
         const newest = payload.data?.messages || []
         // A quiet refresh follows new messages only for someone already at the
@@ -317,14 +319,14 @@
           await postJson('/api/postline/inbox/read', { conversation_id: conversationId })
           const opened = conversations().find(item => item.id === conversationId)
           unreadCount.set(Math.max(0, unreadCount() - Number(opened?.unreadCount || 0)))
-          conversations.set(conversations().map(item => item.id === activeId() ? { ...item, unreadCount: 0 } : item))
+          conversations.set(conversations().map(item => item.id === conversationId ? { ...item, unreadCount: 0 } : item))
         }
       }
       catch (error) {
-        errorMessage.set(error instanceof Error ? error.message : String(error))
+        if (conversationId === activeId()) threadError.set(error instanceof Error ? error.message : String(error))
       }
       finally {
-        threadLoading.set(false)
+        if (conversationId === activeId()) threadLoading.set(false)
       }
     }
 

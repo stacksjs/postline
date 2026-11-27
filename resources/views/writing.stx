@@ -44,19 +44,11 @@
         </button>
       </header>
 
-      <div class="grid gap-3 place-items-center px-6 py-16 text-center" x-show="loading()">
-        <span class="h-7 w-7 text-muted animate-spin i-hugeicons-loading-03" aria-hidden="true"></span>
-        <p class="m-0 text-muted text-sm">Loading published posts…</p>
-      </div>
-
-      <div class="grid gap-3 place-items-center px-6 py-16 text-center" x-show="showEmpty()">
-        <span class="grid place-items-center h-12 w-12 text-muted text-xl bg-panel-2 rounded-2xl" aria-hidden="true"><span class="i-hugeicons-quill-write-02"></span></span>
-        <div>
-          <h2 class="m-0 font-semibold text-base text-ink">Your first article starts in Composer</h2>
-          <p class="m-0 mt-1 max-w-md text-muted text-sm">Choose Blog as a channel, add a title, and publish. It will appear here without leaving the app shell.</p>
-        </div>
-        <a class="inline-flex items-center justify-center px-4 h-9 font-semibold text-ink text-sm bg-panel-2 hover:bg-raised border border-line rounded-xl" href="/composer" data-stx-link>Open Composer</a>
-      </div>
+      <WorkspaceListSkeleton :show="loading()" label="Loading blog posts" />
+      <ErrorState :show="errorMessage() && !loading()" title="Could not load blog posts" :message="errorMessage()" @retry="loadPosts()" />
+      <EmptyState :show="showEmpty()" variant="bare" title="No blog posts yet" description="Choose Blog as a publishing channel in Composer.">
+        <StxLink class="text-info text-ui underline" to="/composer">Open Composer</StxLink>
+      </EmptyState>
 
       <div class="divide-line divide-y" x-show="!loading() && items().length">
         <article class="grid gap-3 p-4" x-for="item in rows()" data-blog-row>
@@ -90,7 +82,6 @@
         </article>
       </div>
 
-      <p class="m-0 px-4 py-3 text-danger text-sm bg-danger-soft border-danger-line border-t" x-show="errorMessage()" :text="errorMessage()"></p>
     </section>
 
     {{--
@@ -133,7 +124,7 @@
     const latestTitle = derived(() => items().find(item => item.status === 'published')?.title || 'No posts yet')
     const showEmpty = derived(() => loaded() && !loading() && !errorMessage() && items().length === 0)
     const summaryText = derived(() => {
-      if (errorMessage()) return errorMessage()
+      if (errorMessage()) return 'Posts unavailable'
       const down = items().length - publishedCount()
       return `${publishedCount()} published${down ? `, ${down} taken down` : ''}`
     })

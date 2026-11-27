@@ -1322,6 +1322,61 @@ async function checkSetupProviderRetry(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkListStates(cdp: Cdp): Promise<void> {
+  const views = [
+    { route: 'queue', path: '/api/postline/queue', title: 'No scheduled posts', loading: 'Loading posts', data: { items: [], nextCursor: null } },
+    {
+      route: 'accounts', path: '/api/postline/bootstrap', title: 'No publishing channels available', loading: 'Loading publishing channels',
+      data: { providers: [], accounts: [], networkApps: [], unread: { inbox: 0, listening: 0 } },
+    },
+    { route: 'campaigns', path: '/api/postline/campaigns', title: 'Plan your first campaign', loading: 'Loading campaigns', data: { campaigns: [], selected: null } },
+    {
+      route: 'analytics', path: '/api/postline/analytics', title: 'No publishing activity in the last 30 days', loading: 'Loading analytics',
+      data: { stats: { postsThisWeek: 0, postsLastWeek: 0 }, series: [], channelMix: [], windows: [] },
+    },
+  ]
+  for (const view of views) {
+    const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+      const actualFetch = window.fetch.bind(window)
+      const failedRead = new Promise(resolve => { window.failListLoad = resolve })
+      let reads = 0
+      window.fetch = async (input, options) => {
+        const url = new URL(input instanceof Request ? input.url : input, location.href)
+        if (url.pathname !== ${JSON.stringify(view.path)} || url.searchParams.has('calendar_from')) return actualFetch(input, options)
+        if (++reads === 1) {
+          await failedRead
+          return Response.json({ ok: false, error: 'Temporary list failure' }, { status: 503 })
+        }
+        return Response.json({ ok: true, data: ${JSON.stringify(view.data)} })
+      }
+    ` })
+    try {
+      await auditPage(`${site}/${view.route}`, { cdp })
+      if (view.route === 'queue')
+        await evaluate(cdp, `[...document.querySelectorAll('[aria-label="Queue view"] button')].find(button => button.textContent.trim() === 'List').click()`)
+      const container = view.route === 'queue' ? '#queue-results' : `[data-postline-page="${view.route}"]`
+      const loadingSelector = view.route === 'accounts' ? '[data-channels-loading] [role=status]' : '[data-workspace-list-skeleton]'
+      const skeleton = `document.querySelector('${container} ${loadingSelector}')`
+      const errorState = `document.querySelector('${container} [data-stx-error-state]')`
+      const empty = `document.querySelector('${container} [data-stx-empty-state]')`
+      await waitUntil(`${view.route} shows a named loading status`, () => evaluate<boolean>(cdp, `
+        ${skeleton}?.getAttribute('role') === 'status' && ${skeleton}.textContent.trim() === ${JSON.stringify(view.loading)} && ${skeleton}.getClientRects().length > 0`), 5_000)
+      await evaluate(cdp, 'window.failListLoad()')
+      await waitUntil(`${view.route} announces the load failure`, () => evaluate<boolean>(cdp, `
+        ${errorState}?.getAttribute('role') === 'alert' && ${errorState}.getClientRects().length > 0
+          && ${errorState}.textContent.includes('Temporary list failure') && !${empty}?.getClientRects().length`), 5_000)
+      await evaluate(cdp, `${errorState}.querySelector('button').focus()`)
+      await pressKey(cdp, 'Enter', 13)
+      await waitUntil(`${view.route} displays the empty result after retry`, () => evaluate<boolean>(cdp, `
+        ${empty}?.getClientRects().length > 0 && ${empty}.textContent.includes(${JSON.stringify(view.title)})
+          && !${errorState}.getClientRects().length && !${skeleton}.getClientRects().length`), 5_000)
+    }
+    finally {
+      await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+    }
+  }
+}
+
 async function captureMarketingScreenshots(cdp: Cdp): Promise<void> {
   const draft = 'Our spring field guide is out. We spent a weekend walking the coastline to find the trails worth taking slowly.\n\nhttps://northstar.example/field-notes'
   const posts = [
@@ -1474,6 +1529,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkQueueCalendar(cdp)
   await checkCampaignScheduling(cdp)
   await checkEngagementCountLabels(cdp)
+  await checkListStates(cdp)
 }
 
 let exitCode = 0

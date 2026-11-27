@@ -45,8 +45,11 @@
           <strong class="font-semibold text-ink text-sm">Sends</strong>
           <span class="text-muted text-xs" :text="countText()"></span>
         </div>
-        <p class="m-0 p-4 text-danger text-ui" x-show="loadError()" :text="loadError()" role="alert"></p>
-        <p class="m-0 p-4 text-muted text-ui" x-show="showEmpty()" :text="emptyText()"></p>
+        <WorkspaceListSkeleton :show="!loaded()" label="Loading activity" />
+        <ErrorState :show="loadError() && loaded()" title="Could not load activity" :message="loadError()" @retry="refresh()" />
+        <EmptyState :show="showEmpty()" variant="bare" :title="filter() === 'failed' ? 'Nothing has failed' : 'Nothing has been sent yet'" description="Your publishing activity will appear here.">
+          <StxLink class="text-info text-ui underline" to="/composer" :show="filter() !== 'failed'">Write a post</StxLink>
+        </EmptyState>
         <div>
           <article class="grid gap-1 px-4 py-3 border-b border-line last:border-b-0" x-for="row in rows()" data-activity-row>
             <div class="flex flex-wrap gap-2 items-center">
@@ -116,6 +119,7 @@
     const scheduler = state<{ state: string, lastRunAt: string | null }>({ state: 'ok', lastRunAt: null })
     const filter = state('')
     const loaded = state(false)
+    let activityRequest = 0
     const loadError = state('')
     const nextCursor = state(0)
     const loadingMore = state(false)
@@ -237,7 +241,6 @@
 
     const showEmpty = derived(() => loaded() && !loadError() && events().length === 0)
     const showNoJobs = derived(() => loaded() && jobs().length === 0)
-    const emptyText = derived(() => filter() === 'failed' ? 'Nothing has failed.' : 'Nothing has been sent yet. Publish a post and it shows up here.')
     const countText = derived(() => !loaded() ? 'Loading…' : `${events().length}${nextCursor() ? '+' : ''} shown`)
 
     const schedulerWarning = derived(() => {
@@ -257,9 +260,13 @@
     }
 
     const refresh = async () => {
+      const request = ++activityRequest
+      loadingMore.set(false)
+      loaded.set(false)
       try {
         const response = await fetch(url())
         const payload = await response.json()
+        if (request !== activityRequest) return
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the activity.')
         events.set(payload.data.events || [])
         nextCursor.set(payload.data.nextCursor || 0)
@@ -268,29 +275,33 @@
         loadError.set('')
       }
       catch (error) {
+        if (request !== activityRequest) return
         events.set([])
+        nextCursor.set(0)
         loadError.set(error instanceof Error ? error.message : String(error))
       }
       finally {
-        loaded.set(true)
+        if (request === activityRequest) loaded.set(true)
       }
     }
 
     const loadMore = async () => {
-      if (!nextCursor() || loadingMore()) return
+      if (!loaded() || !nextCursor() || loadingMore()) return
+      const request = activityRequest
       loadingMore.set(true)
       try {
         const response = await fetch(url(nextCursor()))
         const payload = await response.json()
+        if (request !== activityRequest) return
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load older activity.')
         events.set([...events(), ...(payload.data.events || [])])
         nextCursor.set(payload.data.nextCursor || 0)
       }
       catch (error) {
-        loadError.set(error instanceof Error ? error.message : String(error))
+        if (request === activityRequest) loadError.set(error instanceof Error ? error.message : String(error))
       }
       finally {
-        loadingMore.set(false)
+        if (request === activityRequest) loadingMore.set(false)
       }
     }
 

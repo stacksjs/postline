@@ -1,0 +1,12 @@
+<script server cache>
+export const skeletonLabelText = $props.label || 'Loading…'
+</script>
+
+<div class="grid gap-4 p-4" role="status" data-workspace-list-skeleton>
+  <span class="sr-only">{{ skeletonLabelText }}</span>
+  <div class="grid gap-3" aria-hidden="true">
+    <Skeleton variant="text" className="w-2/5 bg-panel-2" />
+    <Skeleton variant="text" className="w-4/5 bg-panel-2" />
+    <Skeleton variant="text" className="w-3/5 bg-panel-2" />
+  </div>
+</div>

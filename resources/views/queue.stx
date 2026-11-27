@@ -73,11 +73,12 @@
         </button>
       </div>
       <div class="grid gap-2.5 p-3" id="queue-results" :role="activeSearch() ? 'region' : 'tabpanel'" :aria-label="activeSearch() ? 'Matching posts' : null" :aria-labelledby="activeSearch() ? null : 'queue-tab-' + tab()">
-        <p class="m-0 p-3 text-muted text-ui" x-show="loadError()" :text="loadError()"></p>
-        <div class="grid gap-2 p-3" x-show="showEmpty()">
-          <p class="m-0 text-muted text-ui" :text="emptyText()"></p>
-          <a class="justify-self-start text-info text-ui underline" href="/composer" data-stx-link x-show="!activeSearch() && tab() !== 'attention'">Write a post</a>
-        </div>
+        <WorkspaceListSkeleton :show="!loaded() && !loadError()" label="Loading posts" />
+        <ErrorState :show="loadError()" title="Could not load posts" :message="loadError()" :busy="readingQueue()" @retry="refresh()" />
+        <EmptyState :show="showEmpty()" variant="bare" :title="emptyQueue().title" :description="emptyQueue().description">
+          <StxLink class="text-info text-ui underline" to="/composer" :show="!activeSearch() && tab() !== 'attention'">Write a post</StxLink>
+          <button class="text-info text-ui underline" type="button" :show="activeSearch()" @click="clearSearch">Clear search</button>
+        </EmptyState>
         <article class="grid gap-2.5 p-3.5 bg-panel border border-line rounded-2xl group" x-for="row in visible()" :data-command-context="row.body">
           <header class="flex gap-3 items-start justify-between">
             <div class="grid gap-1.5 min-w-0">
@@ -142,10 +143,8 @@
           <button class="px-3 py-1.5 font-semibold text-xs rounded-lg" type="button" data-view-toggle :data-active="calendarPeriod() === 'week'" :aria-pressed="calendarPeriod() === 'week'" @click="calendarPeriod.set('week')">Week</button>
         </div>
       </header>
-      <div class="flex gap-2 items-center px-3.5 py-2" x-show="calendarBusy() || calendarError()">
-        <p class="m-0 text-muted text-ui" role="status" :text="calendarBusy() ? 'Loading calendar…' : calendarError()"></p>
-        <button class="px-2 py-1 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg" type="button" x-show="calendarError()" @click="loadCalendar">Retry</button>
-      </div>
+      <WorkspaceListSkeleton :show="calendarBusy()" label="Loading calendar" />
+      <ErrorState :show="calendarError() && !calendarBusy()" title="Could not load the calendar" :message="calendarError()" @retry="loadCalendar()" />
       <div class="sm:hidden divide-line divide-y" :aria-label="calendarPeriod() === 'week' ? 'Weekly agenda' : 'Monthly agenda'" role="list">
         <article class="grid gap-2 px-3 py-2" role="listitem" x-for="day in calDays()" :key="day.key">
           <header class="flex gap-3 items-center justify-between">
@@ -268,6 +267,7 @@
     const items = state([])
     const loadError = state('')
     const loaded = state(false)
+    const readingQueue = state(false)
     const searchText = state('')
     const activeSearch = state('')
     const queueRequest = state(0)
@@ -462,12 +462,14 @@
     })
     const visible = derived(() => activeSearch() ? rows() : rows().filter(row => inTab(row, tab())))
     const showEmpty = derived(() => loaded() && !loadError() && visible().length === 0)
-    const emptyText = derived(() => activeSearch() ? 'No posts match your search.' : ({
-      scheduled: 'Nothing scheduled. Pick a time in the composer and the post waits here.',
-      drafts: 'No drafts. Save one from the composer to finish it later.',
-      published: 'Nothing published yet.',
-      attention: 'Nothing needs attention. A post that fails on any network shows up here.',
-    } as Record<string, string>)[tab()] || '')
+    const emptyQueue = derived(() => activeSearch()
+      ? { title: 'No posts match your search', description: 'Search for another word or clear the search to see the queue.' }
+      : ({
+          scheduled: { title: 'No scheduled posts', description: 'Choose a time in Composer to schedule a post.' },
+          drafts: { title: 'No drafts', description: 'Save a draft from Composer to finish it later.' },
+          published: { title: 'Nothing published yet', description: 'Posts appear here once they go out.' },
+          attention: { title: 'Nothing needs attention', description: 'Posts with a failed destination appear here.' },
+        })[tab()])
 
     const metaText = derived(() => {
       if (!loaded()) return 'Loading…'
@@ -670,6 +672,7 @@
     const refresh = async (includeUndo = false) => {
       const request = queueRequest() + 1
       queueRequest.set(request)
+      readingQueue.set(true)
       loadingMore.set(false)
       try {
         // Reload as many rows as are on screen, so a refresh after an action
@@ -694,7 +697,10 @@
         console.warn('[postline] queue load failed:', error)
       }
       finally {
-        if (request === queueRequest()) loaded.set(true)
+        if (request === queueRequest()) {
+          readingQueue.set(false)
+          loaded.set(true)
+        }
       }
     }
 
