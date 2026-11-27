@@ -1,0 +1,171 @@
+<script client>
+import type { RecurringPost } from '../../app/Services/RecurringPostService'
+import { wallTimeInZone } from '../../app/Support/time'
+import { providerLabel } from '../functions/networks'
+import { requestJson } from '../functions/postline-client'
+
+interface RepeatSource {
+  id: number
+  title?: string | null
+  hasImages: boolean
+}
+
+const endpoint = '/api/postline/recurring-posts'
+const source = useReactiveProp<RepeatSource | null>('source', null, { parse: value => value })
+const timeZone = useReactiveProp('timeZone', 'UTC')
+const emit = defineEmits(['closed'])
+const panel = useRef<HTMLDetailsElement>('recurringPanel')
+const dialog = useRef<HTMLDialogElement>('recurringDialog')
+const form = useRef<HTMLFormElement>('recurringForm')
+const editing = state<RecurringPost | null>(null)
+const rules = state<RecurringPost[]>([])
+const loaded = state(false)
+const busy = state(false)
+const error = state('')
+const formError = state('')
+const status = state('')
+const startValue = derived(() => editing()
+  ? wallTimeInZone(new Date(editing()!.nextAt.replace(' ', 'T') + 'Z'), editing()!.timezone).slice(0, 16).replace(' ', 'T')
+  : '')
+
+async function run(work: () => Promise<void>, inDialog = false): Promise<void> {
+  if (busy()) return
+  busy.set(true)
+  const message = inDialog ? formError : error
+  message.set('')
+  status.set('')
+  try { await work() }
+  catch (problem) { message.set(problem instanceof Error ? problem.message : String(problem)) }
+  finally { busy.set(false) }
+}
+
+function load() {
+  return run(refreshList)
+}
+
+function showPanel(event: Event) {
+  if ((event.currentTarget as HTMLDetailsElement).open) void load()
+}
+
+function open(rule: RecurringPost | null) {
+  editing.set(rule)
+  formError.set('')
+  form.current?.reset()
+  if (!dialog.current?.open) dialog.current?.showModal()
+}
+
+effect(() => {
+  if (source()) open(null)
+})
+
+function close() {
+  dialog.current?.close()
+}
+
+function closed() {
+  editing.set(null)
+  emit('closed')
+}
+
+function submit(event: SubmitEvent) {
+  const fields = new FormData(event.currentTarget as HTMLFormElement)
+  const rule = editing()
+  const original = source()
+  const action = rule ? 'reschedule' : 'create'
+  void run(async () => {
+    const { data } = await requestJson(endpoint, {
+      method: 'POST',
+      body: JSON.stringify({
+        action, id: original?.id, uuid: rule?.uuid, interval: fields.get('interval'),
+        startAt: fields.get('startAt'), withoutImages: fields.has('without-images'),
+      }),
+    }, 'Could not save the repeat.')
+    rules.update(items => [...items.filter(item => item.uuid !== data.uuid), data])
+    status.set('Repeat saved.')
+    close()
+    if (panel.current) panel.current.open = true
+    try { await refreshList() }
+    catch (problem) { error.set(problem instanceof Error ? problem.message : String(problem)) }
+  }, true)
+}
+
+async function refreshList() {
+  const { data } = await requestJson(endpoint, { cache: 'no-store' }, 'Could not load recurring posts.')
+  rules.set(data.rules)
+  loaded.set(true)
+}
+
+async function change(rule: RecurringPost, action: 'pause' | 'resume' | 'remove') {
+  if (action === 'remove' && !await stxConfirm('Posts already in the Queue will stay there.', { title: 'Remove this repeat?', type: 'warning', confirmText: 'Remove repeat' })) return
+  await run(async () => {
+    const { data } = await requestJson(endpoint, { method: 'POST', body: JSON.stringify({ action, uuid: rule.uuid }) }, 'Could not change this repeat.')
+    rules.update(items => data ? items.map(item => item.uuid === rule.uuid ? data : item) : items.filter(item => item.uuid !== rule.uuid))
+    status.set(action === 'pause' ? 'Repeat paused.' : action === 'resume' ? 'Repeat resumed.' : 'Repeat removed.')
+  })
+}
+
+function destinations(rule: RecurringPost): string {
+  return rule.targets.map(({ provider, handle }) => handle ? `${providerLabel(provider)} · ${handle}` : providerLabel(provider)).join(', ')
+}
+
+function nextTime(rule: RecurringPost): string {
+  if (!rule.active) return 'Paused'
+  const date = new Date(rule.nextAt.replace(' ', 'T') + 'Z')
+  return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: rule.timezone }) + ' · ' + rule.timezone
+}
+</script>
+
+<template>
+  <div>
+    <details class="min-w-0 bg-panel border border-line rounded-xl" ref="recurringPanel" @toggle="showPanel" data-recurring-posts>
+      <summary class="px-3 py-2 font-semibold text-ink text-ui cursor-pointer">Recurring posts</summary>
+      <div class="grid gap-3 p-3 border-line border-t">
+        <p class="m-0 text-muted text-ui">Choose Repeat in a post’s actions to schedule it again.</p>
+        <p class="m-0 text-muted text-ui" role="status" x-show="busy() || status()" :text="busy() ? 'Working…' : status()"></p>
+        <p class="m-0 text-danger text-ui" role="alert" x-show="error()" :text="error()"></p>
+        <button class="w-fit text-info text-ui" type="button" x-show="error() && !loaded()" @click="load">Try again</button>
+        <p class="m-0 text-muted text-ui" x-show="loaded() && !rules().length">No recurring posts yet.</p>
+        <ul class="grid gap-2 m-0 p-0 list-none text-ui">
+          <li class="grid gap-1 p-3 min-w-0 bg-panel-2 rounded-lg" x-for="rule in rules()" :key="rule.uuid" data-recurring-rule>
+            <strong class="break-words" :text="rule.title"></strong>
+            <span class="capitalize text-muted text-xs" :text="rule.interval"></span>
+            <span class="break-words text-muted text-xs" :text="destinations(rule)"></span>
+            <span class="text-muted text-xs" :text="nextTime(rule)"></span>
+            <span class="text-danger text-xs" x-show="rule.lastError" :text="rule.lastError"></span>
+            <div class="flex flex-wrap gap-3">
+              <button class="text-info disabled:opacity-50" type="button" :disabled="busy()" @click="open(rule)">Edit schedule</button>
+              <button class="text-info disabled:opacity-50" type="button" :disabled="busy()" @click="change(rule, rule.active ? 'pause' : 'resume')" :text="rule.active ? 'Pause' : 'Resume'"></button>
+              <button class="text-danger disabled:opacity-50" type="button" :disabled="busy()" @click="change(rule, 'remove')">Remove</button>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </details>
+
+    <dialog class="p-4 max-w-[min(92vw,28rem)] w-full text-ink bg-panel backdrop:bg-black/35 border border-line rounded-2xl shadow-xl" ref="recurringDialog" aria-labelledby="recurring-dialog-title" @close="closed" data-recurring-dialog>
+      <form class="grid gap-3 text-ui" ref="recurringForm" @submit.prevent="submit">
+        <h2 class="m-0 font-semibold text-base" id="recurring-dialog-title" :text="editing() ? 'Edit repeat schedule' : 'Repeat post'"></h2>
+        <p class="m-0 break-words text-body" :text="editing()?.title || source()?.title || ''"></p>
+        <label class="grid gap-1">Repeat
+          <select class="px-2 h-9 bg-panel-2 border border-line rounded-lg" name="interval" :value="editing()?.interval || 'weekly'" required>
+            <option value="daily">Every day</option>
+            <option value="weekly" selected>Every week</option>
+            <option value="monthly">Every month</option>
+          </select>
+        </label>
+        <label class="grid gap-1" for="recurring-start">Next publishing time
+          <input class="px-2 h-9 min-w-0 w-full bg-panel-2 border border-line rounded-lg" name="startAt" id="recurring-start" type="datetime-local" :value="startValue()" aria-describedby="recurring-zone" required>
+        </label>
+        <p class="m-0 text-muted text-xs" id="recurring-zone" :text="editing()?.timezone || timeZone()"></p>
+        <label class="flex gap-2 items-center" x-show="!editing() && source()?.hasImages">
+          <input type="checkbox" name="without-images"> Repeat without the original images
+        </label>
+        <p class="m-0 text-danger text-xs" role="alert" x-show="formError()" :text="formError()"></p>
+        <div class="flex gap-2 justify-end">
+          <button class="px-3 h-9 border border-line rounded-lg" type="button" @click="close">Cancel</button>
+          <button class="px-3 h-9 font-semibold text-on-accent bg-accent rounded-lg disabled:opacity-50" type="submit" :disabled="busy()">Save repeat</button>
+        </div>
+      </form>
+    </dialog>
+  </div>
+</template>

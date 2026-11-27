@@ -828,7 +828,8 @@
       const links = r.trackedLinks ? `, ${r.trackedLinks} tracked links` : ''
       const feeds = r.draftFeeds ? `, ${r.draftFeeds} draft feeds` : ''
       const slots = r.postingSlots ? `, ${r.postingSlots} posting slots` : ''
-      return `Imported ${r.posts} posts, ${r.campaigns} campaigns, ${r.blogPosts} blog posts, ${r.monitors} Listening rules${presets}${links}${feeds}${slots} and ${r.media} images${r.skipped ? `; ${r.skipped} already here were left alone` : ''}.`
+      const repeats = r.recurringPosts ? `, ${r.recurringPosts} recurring posts` : ''
+      return `Imported ${r.posts} posts, ${r.campaigns} campaigns, ${r.blogPosts} blog posts, ${r.monitors} Listening rules${presets}${links}${feeds}${slots}${repeats} and ${r.media} images${r.skipped ? `; ${r.skipped} already here were left alone` : ''}.`
     })
 
     const deleteEverything = async (): Promise<void> => {

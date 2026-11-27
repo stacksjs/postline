@@ -20,6 +20,7 @@
 
     <PostingSlotsPanel />
     <DraftFeedsPanel @drafts-created="refresh()" />
+    <RecurringPostsPanel :source="repeatSelection()" :timeZone="zone()" @closed="repeatSelection.set(null)" />
 
     <form class="flex flex-wrap gap-2 items-center" role="search" aria-label="Posts" @submit.prevent="searchPosts">
       <label class="sr-only" for="queue-search">Search posts</label>
@@ -92,7 +93,7 @@
           </header>
           <p class="m-0 leading-normal text-body text-ui">{{ row.body }}</p>
           <p class="m-0 text-danger text-xs" x-show="row.failure" :text="row.failure"></p>
-          <footer class="flex flex-wrap gap-1.5 items-center justify-end" x-show="row.liveUrl || row.actionable || row.partial || row.resumeLabel">
+          <footer class="flex flex-wrap gap-1.5 items-center justify-end" x-show="row.liveUrl || row.actionable || row.partial || row.resumeLabel || row.canRepeat">
             <div class="group-focus-within:opacity-100 group-hover:opacity-100 transition-opacity" :class="row.attention ? '' : 'pointer-fine:opacity-0'">
               <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl && !row.actionable && !row.partial && !row.resumeLabel" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View post</a>
               <span x-show="row.resumeLabel">
@@ -106,13 +107,14 @@
               </span>
               <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-info text-xs" x-show="row.actionable && !row.targets.length" :href="row.editUrl" data-stx-link>Choose channels</a>
             </div>
-            <details class="relative" x-show="row.actionable || (row.liveUrl && (row.partial || row.resumeLabel))" @keydown="closeActionsOnEscape($event)">
+            <details class="relative" x-show="row.actionable || row.canRepeat || (row.liveUrl && (row.partial || row.resumeLabel))" @keydown="closeActionsOnEscape($event)">
               <summary class="grid place-items-center h-7 w-8 list-none text-muted bg-panel hover:bg-hover border border-line rounded-lg cursor-pointer" aria-label="More post actions" title="More post actions">
                 <span class="h-4 w-4 i-hugeicons-more-horizontal" aria-hidden="true"></span>
               </summary>
               <div class="grid absolute right-0 top-full z-10 gap-0.5 mt-1 p-1 min-w-28 text-ui bg-panel border border-line rounded-lg shadow-sm">
                 <a class="block px-2 py-1 text-ink hover:bg-hover rounded-md" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">View post</a>
                 <a class="block px-2 py-1 text-ink hover:bg-hover rounded-md" x-show="row.actionable" :href="row.editUrl" data-stx-link>Edit</a>
+                <button class="px-2 py-1 text-left hover:bg-hover rounded-md" type="button" x-show="row.canRepeat" @click="chooseRepeat(row, $event)">Repeat…</button>
                 <button class="px-2 py-1 text-danger text-left hover:bg-danger-soft rounded-md disabled:opacity-50" type="button" x-show="row.actionable" :disabled="queueChanging() || busyId() === row.id" @click="deleteItem(row.id)">Delete</button>
               </div>
             </details>
@@ -244,6 +246,8 @@
       liveUrl: string
       editUrl: string
       actionable: boolean
+      canRepeat: boolean
+      hasImages: boolean
       /** Went out on some networks and failed on others. */
       partial: boolean
       /** "Resume thread from 3", for a thread that stopped part way; '' otherwise. */
@@ -261,6 +265,16 @@
     }
 
     const ACTIONABLE = new Set(['draft', 'scheduled', 'failed'])
+    const repeatSelection = state<{ id: number, title?: string | null, hasImages: boolean } | null>(null)
+
+    function chooseRepeat(row: QueueRow, event: Event) {
+      const menu = (event.currentTarget as HTMLElement).closest('details')
+      if (menu) {
+        menu.open = false
+        menu.querySelector('summary')?.focus()
+      }
+      repeatSelection.set({ id: row.id, title: row.title, hasImages: row.hasImages })
+    }
 
     const items = state([])
     const loadError = state('')
@@ -405,6 +419,8 @@
         liveUrl: liveUrlFor(item.providers.find(target => target.remoteUri)?.remoteUri),
         editUrl: `/composer?edit=${item.id}`,
         actionable: ACTIONABLE.has(item.status),
+        canRepeat: targets.length > 0 && (ACTIONABLE.has(item.status) || item.status === 'published'),
+        hasImages: Boolean(item.hasImage || item.thread),
         partial: Boolean(item.partial),
         resumeLabel: item.thread?.resumeFrom ? `Resume thread from ${item.thread.resumeFrom}` : '',
         // A post that reached only some networks is not simply "published".

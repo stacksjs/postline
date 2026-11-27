@@ -15,13 +15,17 @@
  * they exercise the API rather than the cookie the client cannot read.
  */
 import type { PostingSlot } from '../../app/Support/Social/posting-slots'
+import type { RecurringPost } from '../../app/Services/RecurringPostService'
 import type { TrackedLink } from '../../app/Services/TrackedLinkService'
 import { describe, expect, test } from 'bun:test'
 import process from 'node:process'
 import { db } from '@stacksjs/database'
 import { featureTest } from '@stacksjs/testing'
+import { recurringPosts } from '../../app/Services/RecurringPostService'
 import { postQueue } from '../../app/Services/Social/QueueService'
+import { nextRecurringAt } from '../../app/Support/Social/recurring-posts'
 import { nextPostingSlot } from '../../app/Support/Social/posting-slots'
+import { wallTimeInZone } from '../../app/Support/time'
 import User from '../../storage/framework/defaults/app/Models/User'
 
 /** Every Postline endpoint below is behind `middleware('auth')`. */
@@ -44,6 +48,7 @@ describe('postline api — auth', () => {
     ['/api/postline/analytics/links'],
     ['/api/postline/draft-feeds'],
     ['/api/postline/posting-slots'],
+    ['/api/postline/recurring-posts'],
     ['/api/postline/queue'],
     ['/api/postline/setup/post-status?id=1'],
     ['/api/postline/queue/image?id=1&index=0'],
@@ -273,6 +278,69 @@ describe('postline api — reads', () => {
     finally {
       await database.deleteFrom('post_targets').where('post_id', 'in', [current, earlier]).execute()
       await database.deleteFrom('posts').where('id', 'in', [current, earlier]).execute()
+    }
+  })
+})
+
+describe('recurring posts', () => {
+  test('recycles a saved thread with independent media and claims the due time once', async () => {
+    const endpoint = '/api/postline/recurring-posts'
+    const client = featureTest().actingAs(await actingUser())
+    const database = db as any
+    const tag = crypto.randomUUID()
+    const texts = [`Lead ${tag}`, `Reply ${tag}`]
+    const draft = await postQueue.saveThread({
+      texts, providers: ['blog', 'bluesky'], images: [{ bytes: new Uint8Array([0x89, 0x50, 0x4E, 0x47]), mimeType: 'image/png', altText: 'Repeating image' }],
+    })
+    const originals = new Set(draft.postIds)
+    let key: string | undefined
+    try {
+      const { data } = await (await client.get(endpoint)).json<{ data: { timezone: string } }>()
+      const startAt = wallTimeInZone(new Date(Date.now() + 120_000), data.timezone).replace(' ', 'T')
+      const input = { action: 'create', id: draft.postIds[0], interval: 'weekly', startAt }
+      ;(await featureTest().post(endpoint, input)).assertStatus(401)
+      ;(await client.post(endpoint, { ...input, interval: 'invalid' })).assertStatus(422)
+      const created = await client.post(endpoint, input)
+      created.assertStatus(201)
+      const rule = (await created.json<{ data: RecurringPost }>()).data
+      key = rule.uuid
+      expect(rule.targets.map(target => target.provider).sort()).toEqual(['blog', 'bluesky'])
+      for (const id of originals) await postQueue.remove(id)
+      originals.clear()
+
+      ;(await client.post(endpoint, { action: 'pause', uuid: key })).assertStatus(200)
+      expect((await recurringPosts.queueDue(rule.nextAt)).queued).toBe(0)
+      ;(await client.post(endpoint, { action: 'resume', uuid: key })).assertStatus(200)
+      const reports = await Promise.all([recurringPosts.queueDue(rule.nextAt), recurringPosts.queueDue(rule.nextAt)])
+      expect(reports.reduce((sum, report) => sum + report.queued, 0)).toBe(1)
+      const queued = await database.selectFrom('posts').select(['id', 'body', 'thread_key', 'scheduled_at', 'status'])
+        .where('body', 'in', texts).orderBy('id', 'asc').execute()
+      expect(queued.map((row: { body: string }) => row.body)).toEqual(texts)
+      expect(queued[0].thread_key).toBeTruthy()
+      expect(queued[1].thread_key).toBe(queued[0].thread_key)
+      expect(queued[0].status).toBe('scheduled')
+      expect(queued[0].scheduled_at).toBe(rule.nextAt)
+      expect((await postQueue.get(Number(queued[0].id))).images[0]?.altText).toBe('Repeating image')
+      expect(await postQueue.previewImage(Number(queued[0].id), 0)).not.toBeNull()
+
+      const onceMore = nextRecurringAt(rule, rule.nextAt)
+      const latestDue = nextRecurringAt(rule, onceMore)
+      const shortlyAfter = new Date(Date.parse(latestDue.replace(' ', 'T') + 'Z') + 5 * 60_000).toISOString().slice(0, 19).replace('T', ' ')
+      expect(await recurringPosts.queueDue(shortlyAfter)).toEqual({ queued: 1, skipped: 0, paused: 0 })
+      const occurrences = await database.selectFrom('posts').select('scheduled_at').where('body', '=', texts[0]).orderBy('id', 'asc').execute()
+      expect(occurrences.map((post: { scheduled_at: string }) => post.scheduled_at)).toEqual([rule.nextAt, latestDue])
+
+      const afterOutage = new Date(Date.parse(rule.nextAt.replace(' ', 'T') + 'Z') + 35 * 86_400_000 + 3_600_000).toISOString().slice(0, 19).replace('T', ' ')
+      expect(await recurringPosts.queueDue(afterOutage)).toEqual({ queued: 0, skipped: 1, paused: 0 })
+      expect((await recurringPosts.list()).rules.find(item => item.uuid === key)!.nextAt > afterOutage).toBe(true)
+      ;(await client.post(endpoint, { action: 'remove', uuid: key })).assertStatus(200)
+      key = undefined
+      expect(await postQueue.previewImage(Number(queued[0].id), 0)).not.toBeNull()
+    }
+    finally {
+      if (key) await recurringPosts.change(key, 'remove')
+      const posts = await database.selectFrom('posts').select('id').where('body', 'in', texts).execute() as { id: number }[]
+      for (const id of new Set([...originals, ...posts.map(row => Number(row.id))])) await postQueue.remove(id)
     }
   })
 })

@@ -2,6 +2,7 @@ import { log } from '@stacksjs/logging'
 import { MAX_POST_IMAGES, mediaObjections } from '../../Support/Social/media-rules'
 import type { PostOptions } from '../../Support/Social/post-options'
 import type { ScheduledSelection, ScheduleDestination } from '../../Support/Social/rescheduling'
+import type { RecurringSegment } from '../../Support/Social/recurring-posts'
 import type { StoredContent } from '../../Support/Social/stored-content'
 import { sanitizePostOptions } from '../../Support/Social/post-options'
 import { isDue, MAX_ATTEMPTS, nextAttemptAt } from '../../Support/Social/retry'
@@ -170,6 +171,41 @@ async function removeMediaFiles(media: StoredContent['media'], failOnError = fal
       if (failOnError && error.code !== 'ENOENT') throw error
     })
   }
+}
+
+/**
+ * A recurring rule owns its attachments. Every queued occurrence gets its
+ * own copies so editing, deleting, or publishing it cannot change the rule.
+ */
+export async function copyRecurringSegments<T>(segments: readonly RecurringSegment[], providers: SocialProvider[], withoutImages: boolean, commit: (copies: RecurringSegment[]) => T | Promise<T>): Promise<T> {
+  const media: NonNullable<StoredContent['media']> = []
+  try {
+    const copies: RecurringSegment[] = []
+    for (const segment of segments) {
+      const content = parseStoredContent(segment.content) ?? {}
+      if (withoutImages) delete content.media
+      if (!content.media?.length && providers.includes('instagram'))
+        throw new UserFacingError('Instagram needs an image. Attach one before setting up the repeat.')
+      if (content.media?.length) {
+        const images = (await hydrateStoredContent(segment.content))?.media ?? []
+        assertMediaAllowed(providers, images)
+        content.media = await storeImages(uuid(), images)
+        media.push(...content.media)
+      }
+      copies.push({ ...segment, content: JSON.stringify(content) })
+    }
+    const result = await commit(copies)
+    if (result === null) await removeMediaFiles(media)
+    return result
+  }
+  catch (error) {
+    await removeMediaFiles(media)
+    throw error
+  }
+}
+
+export async function removeRecurringMedia(segments: readonly RecurringSegment[]): Promise<void> {
+  for (const segment of segments) await removeMediaFiles(parseStoredContent(segment.content)?.media)
 }
 
 export { MissingMediaError } from '../../Support/Social/stored-content'
@@ -624,6 +660,40 @@ export class QueueService {
     }
     for (const row of result.unlinked) await this.removeStoredMedia(row)
     return { postIds: result.postIds, status, scheduledAt }
+  }
+
+  /** Capture the whole thread and its actual account targets from one snapshot. */
+  async repeatSource(id: number, accountId: number) {
+    const column = await contentColumn()
+    const source = await database.transaction((tx: typeof database) => {
+      const post = tx.selectFrom('posts').selectAll().where('id', '=', id).where('account_id', '=', accountId).executeTakeFirst()
+      if (!post || post.status === 'archived' || post.status === 'publishing')
+        throw new UserFacingError('Choose a post that is available in the Queue.')
+      const rows: any[] = post.thread_key ? this.threadPosts(post.thread_key, tx) : [post]
+      if (rows.some(row => row.status === 'publishing') || (post.thread_key && this.pendingThreadRemoval(post.thread_key, tx)))
+        throw new UserFacingError('Wait until this thread is available in the Queue.')
+      const targets = targetsOf(tx.selectFrom('post_targets').select(['provider', 'social_identity_id'])
+        .where('post_id', 'in', rows.map(row => row.id)).execute())
+      const segments: RecurringSegment[] = rows.map(row => ({ title: row.title || row.body.slice(0, 80), body: row.body, content: row[column] || null }))
+      return { segments, targets }
+    })
+    const targets = await this.validTargets(source.targets.map(targetKey))
+    return { segments: source.segments as RecurringSegment[], targets }
+  }
+
+  /** Write an occurrence and its placeholders in the rule's transaction. */
+  writeRecurringOccurrence(tx: typeof database, accountId: number, timezone: string, scheduledAt: string, segments: RecurringSegment[], targets: PublishTarget[]): void {
+    const at = now()
+    const threadKey = segments.length > 1 ? uuid() : null
+    for (const segment of segments) {
+      const postUuid = uuid()
+      tx.insertInto('posts').values({
+        ...segment, uuid: postUuid, account_id: accountId, timezone, scheduled_at: scheduledAt,
+        thread_key: threadKey, status: 'scheduled', source: 'composer', created_at: at, updated_at: at,
+      }).execute()
+      const post = tx.selectFrom('posts').select('id').where('uuid', '=', postUuid).executeTakeFirstOrThrow()
+      this.writePlaceholders(Number(post.id), targets, 'scheduled', scheduledAt, at, tx)
+    }
   }
 
   /** Recent posts with their per-provider targets, newest first. */

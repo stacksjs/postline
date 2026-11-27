@@ -17,6 +17,15 @@ function requiredMedia(databasePath: string): Map<string, string> {
         ))
     `).all()
     const files = new Map(posts.flatMap(post => referencedMediaFiles(post.stored)).map(name => [name, 'a queued post']))
+    if (database.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'recurring_posts'").get()) {
+      const repeats = database.query<{ stored: string | null }, []>(`
+        SELECT json_extract(segment.value, '$.content') AS stored
+        FROM recurring_posts, json_each(recurring_posts.template, '$.segments') AS segment
+      `).all()
+      for (const repeat of repeats) {
+        for (const name of referencedMediaFiles(repeat.stored)) files.set(name, 'a recurring post')
+      }
+    }
     const blogColumns = database.query<{ name: string }, []>('PRAGMA table_info(blog_posts)').all()
     if (blogColumns.some(column => column.name === 'attachments')) {
       const articles = database.query<{ attachments: string | null }, []>(`

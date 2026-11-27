@@ -380,6 +380,9 @@ async function checkQueueKeyboard(cdp: Cdp): Promise<void> {
   await pressKey(cdp, 'Enter', 13)
   await pressKey(cdp, 'Tab', 9)
   await pressKey(cdp, 'Tab', 9)
+  if (await evaluate<string>(cdp, 'document.activeElement?.textContent?.trim()') !== 'Repeat…')
+    fail('queue', 'keyboard', 'Tab did not reach Repeat in the search result')
+  await pressKey(cdp, 'Tab', 9)
   if (await evaluate<string>(cdp, 'document.activeElement?.textContent?.trim()') !== 'Delete')
     fail('queue', 'keyboard', 'Tab did not reach Delete in the search result')
   await pressKey(cdp, 'Enter', 13)
@@ -1497,6 +1500,52 @@ async function checkPostingSlots(cdp: Cdp): Promise<void> {
   })()`), 5_000)
 }
 
+async function checkRecurringPosts(cdp: Cdp): Promise<void> {
+  const title = 'Recurring post keyboard fixture'
+  await evaluate(cdp, `(async () => {
+    const response = await fetch('/api/postline/queue', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: ${JSON.stringify(title)}, providers: 'blog' }) })
+    if (!response.ok) throw new Error('Could not create the recurring post fixture.')
+  })()`)
+  await auditPage(`${site}/queue`, { cdp })
+  await waitUntil('Queue has a Drafts tab', () => evaluate<boolean>(cdp, `
+    [...document.querySelectorAll('[data-queue-tab]')].some(tab => tab.textContent.includes('Drafts'))`), 5_000)
+  await evaluate(cdp, `
+    [...document.querySelectorAll('[aria-label="Queue view"] button')].find(button => button.textContent.includes('List'))?.click()
+    ;[...document.querySelectorAll('[data-queue-tab]')].find(tab => tab.textContent.includes('Drafts')).click()
+  `)
+  const row = `[...document.querySelectorAll('[data-postline-page=queue] article')].find(row => row.innerText.includes(${JSON.stringify(title)}))`
+  await waitUntil('The draft is available to repeat', () => evaluate<boolean>(cdp, `Boolean(${row}?.getClientRects().length)`), 5_000)
+  await evaluate(cdp, `${row}.querySelector('[aria-label="More post actions"]').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await evaluate(cdp, `[...${row}.querySelectorAll('button')].find(button => button.innerText === 'Repeat…').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  const dialog = "document.querySelector('[data-recurring-dialog]')"
+  await waitUntil('The repeat dialog opens for the selected draft', () => evaluate<boolean>(cdp, `
+    ${dialog}.open && ${dialog}.textContent.includes(${JSON.stringify(title)})`), 5_000)
+  const timezone = await evaluate<string>(cdp, `document.querySelector('#recurring-zone').textContent`)
+  const startAt = wallTimeInZone(new Date(Date.now() + 172_800_000), timezone).slice(0, 16).replace(' ', 'T')
+  await evaluate(cdp, `
+    ${dialog}.querySelector('[name=interval]').value = 'monthly'
+    ${dialog}.querySelector('[name=startAt]').value = ${JSON.stringify(startAt)}
+    ${dialog}.querySelector('button[type=submit]').focus()
+  `)
+  await pressKey(cdp, 'Enter', 13)
+  const panel = "document.querySelector('[data-recurring-posts]')"
+  const rule = `${panel}.querySelector('[data-recurring-rule]')`
+  await waitUntil('The next monthly repeat is listed', () => evaluate<boolean>(cdp, `
+    !${dialog}.open && ${panel}.open && ${rule}?.textContent.includes(${JSON.stringify(title)})
+      && ${rule}.textContent.includes('monthly') && ${rule}.textContent.includes('Blog')`), 5_000)
+  await evaluate(cdp, `[...${rule}.querySelectorAll('button')].find(button => button.textContent === 'Pause').click()`)
+  await waitUntil('The repeat can be paused', () => evaluate<boolean>(cdp, `${rule}?.innerText.includes('Paused')`), 5_000)
+  await evaluate(cdp, `[...${rule}.querySelectorAll('button')].find(button => button.textContent === 'Edit schedule').click()`)
+  await waitUntil('Editing shows the existing local time and cadence', () => evaluate<boolean>(cdp, `
+    ${dialog}.open && ${dialog}.querySelector('[name=startAt]').value === ${JSON.stringify(startAt)}
+      && ${dialog}.querySelector('[name=interval]').value === 'monthly'`), 5_000)
+  await pressKey(cdp, 'Escape', 27)
+  await waitUntil('Escape closes the repeat dialog', () => evaluate<boolean>(cdp, `!${dialog}.open`), 5_000)
+}
+
 async function checkDraftFeeds(cdp: Cdp): Promise<void> {
   await auditPage(`${site}/queue`, { cdp })
   const panel = "document.querySelector('[data-draft-feeds]')"
@@ -1504,7 +1553,8 @@ async function checkDraftFeeds(cdp: Cdp): Promise<void> {
   await evaluate(cdp, `${panel}.querySelector('summary').focus()`)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Draft feeds open from the keyboard', () => evaluate<boolean>(cdp, `
-    ${panel}?.open && [...${panel}.querySelectorAll('p')].some(p => p.innerText === 'No draft feeds yet.')`), 5_000)
+    ${panel}?.open && [...${panel}.querySelectorAll('p')].some(p => p.innerText === 'No draft feeds yet.')
+      && !${form}.querySelector('button[type=submit]').disabled`), 5_000)
   await evaluate(cdp, `
     ${form}.elements.name.value = 'Private fixture'
     ${form}.elements.url.value = 'http://localhost/feed.xml'
@@ -1971,7 +2021,10 @@ async function checkListStates(cdp: Cdp): Promise<void> {
     try {
       await auditPage(`${site}/${view.route}`, { cdp })
       if (view.route === 'queue')
-        await evaluate(cdp, `[...document.querySelectorAll('[aria-label="Queue view"] button')].find(button => button.textContent.trim() === 'List').click()`)
+        await evaluate(cdp, `
+          [...document.querySelectorAll('[aria-label="Queue view"] button')].find(button => button.textContent.trim() === 'List').click()
+          document.getElementById('queue-tab-scheduled').click()
+        `)
       const container = view.route === 'queue' ? '#queue-results' : `[data-postline-page="${view.route}"]`
       const loadingSelector = view.route === 'accounts' ? '[data-channels-loading] [role=status]' : '[data-workspace-list-skeleton]'
       const skeleton = `document.querySelector('${container} ${loadingSelector}')`
@@ -2153,6 +2206,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkQueueRescheduling(cdp)
   await checkQueueCalendar(cdp)
   await checkPostingSlots(cdp)
+  await checkRecurringPosts(cdp)
   await checkDraftFeeds(cdp)
   await checkCampaignScheduling(cdp)
   await checkCampaignLocalDates(cdp)

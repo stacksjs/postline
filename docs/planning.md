@@ -12,6 +12,12 @@ Open **Queue > Posting slots** and add the weekdays and times you want for each 
 
 A time that disappears when the clocks go forward is skipped. Adding or removing slots applies to future uses of **Add to queue**. Already scheduled times stay in the Queue.
 
+## Repeat or recycle a post
+
+From a draft, scheduled, or published post in **Queue**, open **More post actions > Repeat…**. Choose the first publishing time and a daily, weekly, or monthly repeat. The rule saves its own copy of the post, including the full thread, account targets, and available images. If a published post’s original uploads have been cleaned up, the form can repeat without them when the selected networks accept text.
+
+**Queue > Recurring posts** shows the next time for each rule and lets you edit its schedule, pause, resume, or remove it. A repeat uses the time zone shown on its rule. Monthly repeats on the 29th through 31st move to the last day in shorter months. A time that falls in a daylight-saving gap is skipped. After an outage, Postline only queues a repeat that falls within the usual publishing grace period. Once Postline queues an occurrence, it works like any other scheduled post, including the usual retry controls.
+
 ## Pause, resume, and handle missed posts
 
 Use **Settings > General > Pause scheduled publishing** or the Mac menu-bar control. Scheduled posts stay in the Queue until you resume. You can still publish manually while paused.

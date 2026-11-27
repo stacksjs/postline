@@ -9,9 +9,13 @@ import { composerPresets } from '../../app/Services/ComposerPresetService'
 import { draftFeeds } from '../../app/Services/DraftFeedService'
 import { changePostingSlot, listPostingSlots } from '../../app/Services/PostingSlotService'
 import { keywordMonitoring } from '../../app/Services/KeywordMonitoringService'
+import { recurringPosts } from '../../app/Services/RecurringPostService'
+import { postQueue } from '../../app/Services/Social/QueueService'
 import { ensureAccount } from '../../app/Services/Social/support'
 import { trackedLinks } from '../../app/Services/TrackedLinkService'
 import { DELETE_EVERYTHING_PHRASE, workspaceArchive } from '../../app/Services/WorkspaceArchiveService'
+import { wallTimeInZone } from '../../app/Support/time'
+import { workspace } from '../../app/Services/WorkspaceService'
 import { MEDIA_DIR } from '../../app/Support/Social/uploads'
 
 const database = db as any
@@ -48,8 +52,13 @@ describe('workspace archive', () => {
     await draftFeeds.restore(accountId, feed)
     const slot = { provider: 'blog', weekday: 5, minute: 540 } as const
     await changePostingSlot(slot, false)
+    const draft = await postQueue.save({ text: `Repeat ${tag}`, providers: ['blog'] })
+    const startsAt = wallTimeInZone(new Date(Date.now() + 86_400_000), await workspace.timezone()).replace(' ', 'T')
+    const repeat = await recurringPosts.create({ id: draft.postId, interval: 'monthly', startAt: startsAt })
+    await recurringPosts.change(repeat.uuid, 'pause')
     const archive = await workspaceArchive.export()
-    expect(archive.version).toBe(7)
+    expect(archive.version).toBe(8)
+    expect(archive.recurringPosts).toContainEqual(expect.objectContaining({ uuid: repeat.uuid, active: false, nextAt: repeat.nextAt }))
     expect(archive.postingSlots).toContainEqual(slot)
     expect(archive.composerPresets).toContainEqual(preset)
     expect(archive.trackedLinks).toContainEqual(link)
@@ -66,6 +75,7 @@ describe('workspace archive', () => {
     expect(await trackedLinks.export(accountId)).toEqual([])
     expect(await draftFeeds.list()).toEqual([])
     expect(await listPostingSlots(accountId)).toEqual([])
+    expect((await recurringPosts.list()).rules).toEqual([])
     expect(await database.selectFrom('posts').select(['id']).where('uuid', '=', postUuid).executeTakeFirst()).toBeUndefined()
     expect(existsSync(join(MEDIA_DIR, `${tag}.png`))).toBe(false)
 
@@ -78,6 +88,8 @@ describe('workspace archive', () => {
     expect(report.trackedLinks).toBe(1)
     expect(report.draftFeeds).toBe(1)
     expect(report.postingSlots).toBe(1)
+    expect(report.recurringPosts).toBe(1)
+    expect((await recurringPosts.list()).rules).toContainEqual(expect.objectContaining({ uuid: repeat.uuid, active: false, nextAt: repeat.nextAt }))
     expect(await listPostingSlots(accountId)).toContainEqual(slot)
     expect(await composerPresets.list()).toContainEqual(preset)
     expect(await trackedLinks.export(accountId)).toContainEqual(link)
@@ -103,6 +115,8 @@ describe('workspace archive', () => {
     expect(again.trackedLinks).toBe(0)
     expect(again.draftFeeds).toBe(0)
     expect(again.postingSlots).toBe(0)
+    expect(again.recurringPosts).toBe(0)
+    await recurringPosts.change(repeat.uuid, 'remove')
     expect(again.skipped).toBeGreaterThan(0)
   })
 
