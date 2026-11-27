@@ -29,7 +29,7 @@ import { ensureAccount, now } from './Social/support'
 const database = db as any
 
 export const ARCHIVE_FORMAT = 'postline-workspace'
-export const ARCHIVE_VERSION = 2
+export const ARCHIVE_VERSION = 3
 
 /** Typed to delete everything, so a stray click cannot. */
 export const DELETE_EVERYTHING_PHRASE = 'DELETE EVERYTHING'
@@ -38,7 +38,7 @@ const POST_COLUMNS = ['uuid', 'title', 'body', 'content', 'status', 'scheduled_a
 const TARGET_COLUMNS = ['uuid', 'provider', 'status', 'remote_uri', 'remote_cid', 'failure_reason', 'metrics', 'attempts', 'created_at', 'updated_at'] as const
 const CAMPAIGN_COLUMNS = ['uuid', 'name', 'objective', 'audience', 'tone', 'status', 'start_date', 'end_date', 'timezone', 'created_at', 'updated_at'] as const
 const CAMPAIGN_POST_COLUMNS = ['uuid', 'title', 'body', 'providers', 'pillar', 'status', 'scheduled_at', 'position', 'created_at', 'updated_at'] as const
-const MONITOR_COLUMNS = ['uuid', 'name', 'keywords', 'providers', 'match_mode', 'status', 'created_at', 'updated_at'] as const
+const MONITOR_COLUMNS = ['uuid', 'name', 'keywords', 'providers', 'match_mode', 'status', 'twitter_read_source', 'created_at', 'updated_at'] as const
 // Not the AI provider: it means nothing without its key, which stays behind.
 // Nor whether automatic deletion is on: switching on a schedule that deletes
 // posts takes the owner's own confirmation in Settings, on each install.
@@ -148,8 +148,20 @@ export class WorkspaceArchiveService {
     const archive = input as WorkspaceArchive
     if (!archive || archive.format !== ARCHIVE_FORMAT)
       throw new UserFacingError('That is not a Postline workspace export.')
-    if (Number(archive.version) > ARCHIVE_VERSION)
+    const version = Number(archive.version)
+    if (!Number.isSafeInteger(version) || version < 1)
+      throw new UserFacingError('That workspace export has an invalid version.')
+    if (version > ARCHIVE_VERSION)
       throw new UserFacingError('That export is from a newer Postline. Update this one, then import it.')
+
+    const monitors = (archive.monitors || []).map((monitor) => {
+      // Browser-session watches first appeared in version 3. Require the source
+      // in these exports so losing the field cannot turn a watch into API spend.
+      const source = version < 3 ? monitor.twitter_read_source ?? 'api' : monitor.twitter_read_source
+      if (source !== 'api' && source !== 'browser')
+        throw new UserFacingError('A Listening watch in this export has an invalid X read source.')
+      return { ...pick(monitor, MONITOR_COLUMNS), uuid: monitor.uuid ?? null, twitter_read_source: source }
+    })
     const media = Object.entries(archive.media || {})
     try {
       for (const post of archive.posts || []) referencedMediaFiles(post.content)
@@ -236,9 +248,9 @@ export class WorkspaceArchiveService {
       report.media += post.images?.length || 0
     }
 
-    for (const monitor of archive.monitors || []) {
+    for (const monitor of monitors) {
       if (await exists('keyword_monitors', monitor.uuid)) { report.skipped++; continue }
-      await database.insertInto('keyword_monitors').values({ ...pick(monitor, MONITOR_COLUMNS), account_id: accountId }).execute()
+      await database.insertInto('keyword_monitors').values({ ...monitor, account_id: accountId }).execute()
       report.monitors++
     }
 

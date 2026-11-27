@@ -2,7 +2,7 @@
 
 ## Export or move a workspace
 
-Open **Settings > Data > Export this workspace** to download a JSON archive. On the destination install, use **Import an export**. Imports accept archives up to 64 MB and leave existing records in place. Reconnect accounts and re-enter credentials on the destination. [Connect a network](./networks/index.md).
+Open **Settings > Data > Export this workspace** to download a JSON archive. On the destination install, use **Import an export**. Imports accept archives up to 64 MB and leave existing records in place. Reconnect accounts and re-enter credentials on the destination. The archive keeps each X Listening watch’s selected source. To resume browser-session imports on another Mac, confirm your X sign-in there. [Connect a network](./networks/index.md).
 
 Treat an export as private. It contains workspace content. For disaster recovery on a server, use the database, media, and application-key backup. [Back up and restore a server](./recovery.md).
 

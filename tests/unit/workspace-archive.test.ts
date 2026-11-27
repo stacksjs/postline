@@ -5,6 +5,7 @@ import { describe, expect, test } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { db } from '@stacksjs/database'
+import { keywordMonitoring } from '../../app/Services/KeywordMonitoringService'
 import { DELETE_EVERYTHING_PHRASE, workspaceArchive } from '../../app/Services/WorkspaceArchiveService'
 import { MEDIA_DIR } from '../../app/Support/Social/uploads'
 
@@ -30,7 +31,13 @@ describe('workspace archive', () => {
     const campaign = await database.selectFrom('launch_campaigns').select(['id']).where('uuid', '=', campaignUuid).executeTakeFirstOrThrow()
     await database.insertInto('campaign_posts').values({ uuid: crypto.randomUUID(), title: 'cp', body: 'campaign post', providers: '["bluesky"]', pillar: 'story', status: 'idea', scheduled_at: '2026-12-02 09:00:00', position: 0, launch_campaign_id: campaign.id, post_id: post.id, created_at: at }).execute()
 
+    const watch = await keywordMonitoring.save(0, {
+      name: `Browser watch ${tag}`, keywords: ['Postline'], providers: ['twitter'], twitterReadSource: 'browser',
+    })
     const archive = await workspaceArchive.export()
+    expect(archive.version).toBe(3)
+    const archivedWatch = archive.monitors.find(row => row.name === watch.name)
+    expect(archivedWatch?.twitter_read_source).toBe('browser')
     expect(archive.posts.some(row => row.uuid === postUuid)).toBe(true)
     expect(archive.media[`${tag}.jpg`]).toBe(Buffer.from([1, 2, 3]).toString('base64'))
     expect(JSON.stringify(archive)).not.toContain('access_token')
@@ -54,11 +61,40 @@ describe('workspace archive', () => {
     const cp = await database.selectFrom('campaign_posts').selectAll().where('launch_campaign_id', '=', campaignBack.id).executeTakeFirstOrThrow()
     expect(Number(cp.post_id)).toBe(Number(back.id))
     expect(existsSync(join(MEDIA_DIR, `${tag}.jpg`))).toBe(true)
+    const restoredWatch = await database.selectFrom('keyword_monitors').select(['id', 'twitter_read_source'])
+      .where('uuid', '=', archivedWatch?.uuid).executeTakeFirstOrThrow()
+    expect(restoredWatch.twitter_read_source).toBe('browser')
+    expect(await keywordMonitoring.scan(Number(restoredWatch.id))).toEqual({ scanned: 0, found: 0, created: 0, errors: [] })
 
     // A second import changes nothing.
     const again = await workspaceArchive.import(archive)
     expect(again.posts).toBe(0)
     expect(again.skipped).toBeGreaterThan(0)
+  })
+
+  test('an older archive preserves the X API default', async () => {
+    const uuid = crypto.randomUUID()
+    const monitor = {
+      uuid, name: 'Old X watch', providers: '["twitter"]', keywords: '["Postline"]',
+      match_mode: 'any', status: 'active', created_at: at, updated_at: at,
+    }
+    try {
+      expect((await workspaceArchive.import({ format: 'postline-workspace', version: 2, monitors: [monitor] })).monitors).toBe(1)
+      const row = await database.selectFrom('keyword_monitors').select('twitter_read_source').where('uuid', '=', uuid).executeTakeFirstOrThrow()
+      expect(row.twitter_read_source).toBe('api')
+    }
+    finally {
+      await database.deleteFrom('keyword_monitors').where('uuid', '=', uuid).execute()
+    }
+  })
+
+  test('a version 3 archive with a missing X source is rejected before any writes', async () => {
+    const uuid = crypto.randomUUID()
+    await expect(workspaceArchive.import({
+      format: 'postline-workspace', version: 3, monitors: [{ name: 'Missing source' }],
+      posts: [{ uuid, body: 'A post that must stay out of the queue', status: 'scheduled' }],
+    })).rejects.toThrow('invalid X read source')
+    expect(await database.selectFrom('posts').select(['id']).where('uuid', '=', uuid).executeTakeFirst()).toBeUndefined()
   })
 
   test('something that is not an export is refused', async () => {
