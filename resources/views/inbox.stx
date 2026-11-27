@@ -5,7 +5,7 @@
 @section('content')
   @meta('description', 'Read direct messages and keep up with public replies and mentions from Bluesky and Mastodon.')
   <section class="grid gap-4" data-postline-page="inbox" data-testid="inbox-page">
-    <WorkspacePageHeader title="Inbox">
+    <WorkspacePageHeader titleKey="workspace.navigation.inbox">
       <template #description><span :show="inboxSection() === 'messages' && !loading()" :text="inboxOverview()"></span>
         <span :show="inboxSection() === 'public'">Public replies and mentions from Bluesky and Mastodon</span></template>
       <div class="flex flex-wrap gap-2 items-center" :show="inboxSection() === 'messages'">

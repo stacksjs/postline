@@ -5,13 +5,12 @@
 @section('content')
   @meta('description', 'Plan multi-week social launches, draft campaign posts with AI, and send them into Postline queue.')
   <section class="grid gap-4" data-postline-page="campaigns" data-testid="campaigns-page">
-    <WorkspacePageHeader title="Campaigns">
+    <WorkspacePageHeader titleKey="workspace.navigation.campaigns" descriptionKey="workspace.pages.campaigns.description">
       <template #status>
         <span x-show="campaign()">
           <Badge size="sm" className="capitalize" :variant="postStatusVariant(campaign()?.status)">{{ campaign()?.status }}</Badge>
         </span>
       </template>
-      <template #description>Plan posts across weeks, then send them to your publishing queue.</template>
       <div class="flex flex-wrap gap-2 items-center">
         <label class="sr-only" for="campaign-picker">Current campaign</label>
         <select id="campaign-picker" class="px-3 h-9 min-w-44 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus" x-show="campaignsList().length" @change="selectCampaign($event)">

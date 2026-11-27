@@ -5,7 +5,7 @@
 @section('content')
   @meta('description', 'Review lightweight publishing analytics in Postline.')
   <section class="grid gap-5" data-postline-page="analytics" data-testid="analytics-page">
-    <WorkspacePageHeader title="Publishing insights">
+    <WorkspacePageHeader titleKey="workspace.pages.analytics.title">
       <label class="grid gap-1 text-muted text-xs">
         <span>Date range</span>
         <select class="px-2.5 h-9 text-ink text-ui bg-panel border border-field-line rounded-xl" @change="changeRange(Number($event.target.value))">

@@ -7,6 +7,7 @@
       "dependencies": {
         "@stacksjs/ai": "^0.75.705",
         "@stacksjs/charts": "0.75.705",
+        "@stacksjs/i18n": "^0.75.705",
         "@stacksjs/sanitizer": "0.2.957",
         "@stacksjs/socials": "^0.75.705",
         "@stacksjs/stx": "0.2.957",

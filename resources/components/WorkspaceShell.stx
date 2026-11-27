@@ -1,3 +1,9 @@
+<script server cache>
+import { workspaceShellText } from '../../app/Support/Localization/workspace'
+
+export const shellText = workspaceShellText
+</script>
+
 <script client>
 import type { CraftBridgeAPI } from 'craft-native'
 import { bindDesktopAlerts } from '../functions/desktop-alerts'
@@ -150,17 +156,17 @@ onDestroy(() => {
       <button
         class="inline-flex fixed left-3.5 top-3.5 z-[90] items-center justify-center h-9 w-9 text-body hover:text-ink bg-glass-strong hover:bg-raised border border-line rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus shadow-lg backdrop-blur-sm"
         type="button"
-        aria-label="Expand sidebar"
+        aria-label="{{ shellText.expandSidebar }}"
         aria-controls="workspace-sidebar"
         aria-expanded="false"
-        title="Expand sidebar"
+        title="{{ shellText.expandSidebar }}"
         data-sidebar-expand-fab
         data-craft-no-drag
         @click="toggleSidebar"
       >
         <span class="h-[18px] w-[18px] i-hugeicons-sidebar-right" aria-hidden="true"></span>
       </button>
-      <section class="overflow-hidden lg:overflow-y-auto min-h-screen min-w-0 lg:h-screen bg-bg border-line border-t lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_var(--workspace-shadow)]" aria-label="Postline workspace" data-postline-workspace data-postline-router data-craft-drag>
+      <section class="overflow-hidden lg:overflow-y-auto min-h-screen min-w-0 lg:h-screen bg-bg border-line border-t lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_var(--workspace-shadow)]" aria-label="{{ shellText.workspaceRegion }}" data-postline-workspace data-postline-router data-craft-drag>
         <div class="flex justify-end pt-3.5 px-3.5 sm:pt-4 sm:px-4">
           <WorkspaceCommands />
         </div>

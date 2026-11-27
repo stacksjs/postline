@@ -5,8 +5,7 @@
 @section('content')
   @meta('description', 'What Postline sent, what failed, and when each job last ran.')
   <section class="grid gap-5" data-postline-page="activity" data-testid="activity-page">
-    <WorkspacePageHeader title="Activity">
-      <template #description>Every send to a network and when each background job last ran.</template>
+    <WorkspacePageHeader titleKey="workspace.navigation.activity" descriptionKey="workspace.pages.activity.description">
       <SegmentedControl label="Send status" size="sm" :value="filter()" :options="[{ value: '', label: 'All' }, { value: 'published', label: 'Sent' }, { value: 'failed', label: 'Failed' }]" @change="setFilter" />
     </WorkspacePageHeader>
 

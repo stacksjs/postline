@@ -1,0 +1,75 @@
+{
+  "workspace": {
+    "navigation": {
+      "composer": "Composer",
+      "compose": "Compose",
+      "queue": "Queue",
+      "timeline": "Timeline",
+      "analytics": "Analytics",
+      "campaigns": "Campaigns",
+      "listening": "Listening",
+      "inbox": "Inbox",
+      "writing": "Blog",
+      "activity": "Activity",
+      "channels": "Channels",
+      "settings": "Settings"
+    },
+    "shell": {
+      "skipToContent": "Skip to content",
+      "primaryNavigation": "Primary",
+      "more": "More",
+      "moreViews": "More views",
+      "closeMenu": "Close menu",
+      "brandLink": "Postline composer",
+      "openView": "Open {view} ({shortcut})",
+      "shortcut": "Shortcut {shortcut}",
+      "settingsShortcut": "Shortcut comma",
+      "openSettings": "Open Settings (,)",
+      "expandSidebar": "Expand sidebar",
+      "workspaceRegion": "Postline workspace"
+    },
+    "commands": {
+      "label": "Commands",
+      "open": "Open command palette",
+      "tooltip": "Commands (Command+K or Ctrl+K)",
+      "search": "Search commands",
+      "placeholder": "Search views and actions",
+      "close": "Close commands",
+      "noMatches": "No matching commands",
+      "showKeyboardShortcuts": "Show keyboard shortcuts",
+      "closeDialog": "Close dialog"
+    },
+    "pages": {
+      "composer": {
+        "title": "Write a post",
+        "description": "Draft once, then publish to every connected account."
+      },
+      "queue": {
+        "title": "Scheduled posts",
+        "description": "What's drafted, scheduled, and recently published."
+      },
+      "timeline": {
+        "title": "Bluesky timeline",
+        "description": "Posts from your connected Bluesky account."
+      },
+      "analytics": {
+        "title": "Publishing insights"
+      },
+      "listening": {
+        "title": "Social listening"
+      },
+      "accounts": {
+        "title": "Connect your channels"
+      },
+      "writing": {
+        "title": "Long-form publishing"
+      },
+      "campaigns": {
+        "description": "Plan posts across weeks, then send them to your publishing queue."
+      },
+      "activity": {
+        "description": "Every send to a network and when each background job last ran."
+      }
+    }
+  }
+}

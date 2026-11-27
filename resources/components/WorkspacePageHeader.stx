@@ -1,5 +1,8 @@
 <script server cache>
-export const workspacePageTitle = $props.title || ''
+import { workspaceText } from '../../app/Support/Localization/workspace'
+
+export const workspacePageTitle = workspaceText($props.titleKey)
+export const workspacePageDescription = $props.descriptionKey ? workspaceText($props.descriptionKey) : ''
 </script>
 
 <header class="flex flex-wrap gap-x-5 gap-y-2 items-end justify-between" data-workspace-page-header>
@@ -8,7 +11,7 @@ export const workspacePageTitle = $props.title || ''
       <h1 class="m-0 font-semibold text-2xl text-ink tracking-normal">{{ workspacePageTitle }}</h1>
       <slot name="status" />
     </div>
-    <p class="empty:hidden mb-0 mt-1.5 text-muted text-ui"><slot name="description" /></p>
+    <p class="empty:hidden mb-0 mt-1.5 text-muted text-ui">{{ workspacePageDescription }}<slot name="description" /></p>
   </div>
   <div class="flex empty:hidden flex-wrap gap-2 items-center"><slot /></div>
 </header>

@@ -5,7 +5,7 @@
 @section('content')
   @meta('description', 'Manage long-form posts published through Postline.')
   <section class="grid gap-4" data-postline-page="blog" data-testid="blog-page">
-    <WorkspacePageHeader title="Long-form publishing">
+    <WorkspacePageHeader titleKey="workspace.pages.writing.title">
       <template #description><span :text="summaryText()"></span> · <a class="underline hover:text-ink" href="/blog" target="_blank" rel="noopener">View published Blog</a></template>
       <a class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors" href="/composer" data-stx-link data-craft-no-drag x-show="!loaded() || items().length > 0">
         <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>

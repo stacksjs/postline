@@ -1,1 +1,7 @@
-<a class="fixed left-4 top-3 z-[100] px-4 py-2 font-medium text-on-accent text-ui bg-accent rounded-lg focus:translate-y-0 -translate-y-20" href="#workspace-content">Skip to content</a>
+<script server cache>
+import { workspaceText } from '../../app/Support/Localization/workspace'
+
+export const skipToContent = workspaceText('workspace.shell.skipToContent')
+</script>
+
+<a class="fixed left-4 top-3 z-[100] px-4 py-2 font-medium text-on-accent text-ui bg-accent rounded-lg focus:translate-y-0 -translate-y-20" href="#workspace-content">{{ skipToContent }}</a>

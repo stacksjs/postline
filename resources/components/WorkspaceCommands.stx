@@ -1,3 +1,9 @@
+<script server cache>
+import { workspaceCommandsText } from '../../app/Support/Localization/workspace'
+
+export const commandText = workspaceCommandsText
+</script>
+
 <script client>
 const commandDialog = useRef<HTMLDialogElement>('commandDialog')
 const commandSearch = useRef<HTMLInputElement>('commandSearch')
@@ -105,17 +111,17 @@ useEventListener('keydown', handleShortcut)
     <button
       class="inline-flex gap-2 items-center justify-center px-3 h-11 min-w-11 sm:h-9 font-medium text-muted text-ui hover:text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl"
       type="button"
-      aria-label="Open command palette"
+      aria-label="{{ commandText.open }}"
       aria-controls="workspace-commands"
       aria-haspopup="dialog"
       aria-keyshortcuts="Meta+K Control+K"
       data-command-ignore
-      title="Commands (Command+K or Ctrl+K)"
+      title="{{ commandText.tooltip }}"
       :aria-expanded="open()"
       @click="showCommands()"
     >
       <span class="h-4 w-4 i-hugeicons-search-01" aria-hidden="true"></span>
-      <span class="hidden sm:inline">Commands</span>
+      <span class="hidden sm:inline">{{ commandText.label }}</span>
     </button>
     <dialog
       id="workspace-commands"
@@ -131,7 +137,7 @@ useEventListener('keydown', handleShortcut)
           <h2 class="m-0 font-semibold text-base" id="workspace-commands-title" :text="sheet() ? 'Keyboard shortcuts' : 'Command palette'">Command palette</h2>
           <div class="flex gap-2 items-center">
             <button class="px-2 h-9 text-muted text-xs hover:bg-panel-2 rounded-lg" type="button" :text="sheet() ? 'Commands' : 'Shortcuts'" @click="sheet.set(!sheet())">Shortcuts</button>
-            <button class="grid place-items-center h-9 w-9 text-muted bg-panel-2 hover:bg-raised rounded-xl" type="button" aria-label="Close commands" autofocus @click="closeCommands">
+            <button class="grid place-items-center h-9 w-9 text-muted bg-panel-2 hover:bg-raised rounded-xl" type="button" aria-label="{{ commandText.close }}" autofocus @click="closeCommands">
               <span class="h-5 w-5 i-hugeicons-cancel-01" aria-hidden="true"></span>
             </button>
           </div>
@@ -142,18 +148,18 @@ useEventListener('keydown', handleShortcut)
             type="search"
             ref="commandSearch"
             role="combobox"
-            aria-label="Search commands"
+            aria-label="{{ commandText.search }}"
             aria-controls="workspace-command-results"
             aria-autocomplete="list"
             :aria-expanded="open() && results().length > 0"
             :aria-activedescendant="results()[selected()]?.id ?? null"
-            placeholder="Search views and actions"
+            placeholder="{{ commandText.placeholder }}"
             autocomplete="off"
             :value="query()"
             @input="searchCommands($event)"
             @keydown="moveSelection($event)"
           >
-          <div class="overflow-y-auto max-h-[min(55dvh,24rem)]" id="workspace-command-results" ref="commandResults" role="listbox" aria-label="Commands" x-show="results().length > 0">
+          <div class="overflow-y-auto max-h-[min(55dvh,24rem)]" id="workspace-command-results" ref="commandResults" role="listbox" aria-label="{{ commandText.label }}" x-show="results().length > 0">
             <button
               class="flex gap-2 items-center justify-between px-3 py-2 min-h-10 w-full text-left text-ui hover:bg-panel-2 rounded-lg"
               type="button"
@@ -169,13 +175,13 @@ useEventListener('keydown', handleShortcut)
               <span class="shrink-0 max-w-[40%] text-muted text-xs truncate" :text="command.context"></span>
             </button>
           </div>
-          <p class="m-0 px-3 py-2 text-muted text-sm" role="status" x-show="results().length === 0">No matching commands</p>
+          <p class="m-0 px-3 py-2 text-muted text-sm" role="status" x-show="results().length === 0">{{ commandText.noMatches }}</p>
         </div>
         <dl class="grid overflow-y-auto gap-2 m-0 max-h-[min(55dvh,24rem)] text-ui" x-cloak x-show="sheet()">
-          <div class="flex gap-3 items-center justify-between"><dt>Open command palette</dt><dd class="m-0"><kbd>⌘ K</kbd> / <kbd>Ctrl K</kbd></dd></div>
-          <div class="flex gap-3 items-center justify-between"><dt>Show keyboard shortcuts</dt><dd class="m-0"><kbd>?</kbd></dd></div>
+          <div class="flex gap-3 items-center justify-between"><dt>{{ commandText.open }}</dt><dd class="m-0"><kbd>⌘ K</kbd> / <kbd>Ctrl K</kbd></dd></div>
+          <div class="flex gap-3 items-center justify-between"><dt>{{ commandText.showKeyboardShortcuts }}</dt><dd class="m-0"><kbd>?</kbd></dd></div>
           <div class="flex gap-3 items-center justify-between" x-for="command in shortcuts()"><dt :text="command.label"></dt><dd class="m-0"><kbd :text="command.shortcut"></kbd></dd></div>
-          <div class="flex gap-3 items-center justify-between"><dt>Close dialog</dt><dd class="m-0"><kbd>Esc</kbd></dd></div>
+          <div class="flex gap-3 items-center justify-between"><dt>{{ commandText.closeDialog }}</dt><dd class="m-0"><kbd>Esc</kbd></dd></div>
         </dl>
       </div>
     </dialog>

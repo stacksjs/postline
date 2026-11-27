@@ -5,7 +5,7 @@
 @section('content')
   @meta('description', 'Watch brand and product keywords across social networks and collect new mentions.')
   <section class="grid gap-4" data-postline-page="listening" data-testid="listening-page">
-    <WorkspacePageHeader title="Social listening">
+    <WorkspacePageHeader titleKey="workspace.pages.listening.title">
       <template #description><span :show="!loading()" :text="watchOverview()"></span></template>
       <div class="flex flex-wrap gap-2 items-center">
         {{-- New matches raise an alert on the server (#112): a Mac notification

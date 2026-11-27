@@ -5,8 +5,7 @@
 @section('content')
   @meta('description', 'Write, schedule, publish, and review social posts from a clean personal workspace.')
   <section class="grid gap-5" data-postline-page="composer" data-testid="composer-page">
-    <WorkspacePageHeader title="Write a post">
-      <template #description>Draft once, then publish to every connected account.</template>
+    <WorkspacePageHeader titleKey="workspace.pages.composer.title" descriptionKey="workspace.pages.composer.description">
     </WorkspacePageHeader>
     <div class="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <section class="grid content-start grid-rows-[auto_auto_auto] self-start min-w-0 bg-panel border border-line rounded-2xl shadow-sm" aria-label="Post composer" :class="dragDepth() > 0 ? 'ring-2 ring-accent' : ''" @input="markEdited" @change="markEdited" @dragenter="enterImageDrop" @dragleave="leaveImageDrop" @dragover="overImageDrop" @drop="dropImages" @paste="pasteImages" data-composer-image-drop>

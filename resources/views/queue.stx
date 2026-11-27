@@ -7,8 +7,7 @@
   <section class="grid gap-5" data-postline-page="queue" data-testid="queue-page">
     <p class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !schedulerWarning() }" :text="schedulerWarning()" role="status" data-scheduler-warning></p>
     <a class="hidden m-0 px-3 py-2 text-ui text-warning bg-warning-soft border border-warning-line rounded-xl" :class="{ 'hidden': !attentionText() }" href="/activity" data-stx-link :text="attentionText()" data-attention-link></a>
-    <WorkspacePageHeader title="Scheduled posts">
-      <template #description>What's drafted, scheduled, and recently published.</template>
+    <WorkspacePageHeader titleKey="workspace.pages.queue.title" descriptionKey="workspace.pages.queue.description">
       <div class="flex flex-wrap gap-2 items-center">
         <SegmentedControl label="Queue view" size="sm" :show="!activeSearch()" :value="view()" :options="queueViews()" @change="setView" />
         <a href="/composer" data-stx-link class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl transition-colors">

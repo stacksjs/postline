@@ -1,4 +1,10 @@
 <script server>
+import { workspaceShellText, workspaceText } from '../../app/Support/Localization/workspace'
+
+const shellText = workspaceShellText
+const settingsLabel = workspaceText('workspace.navigation.settings')
+const channelsLabel = workspaceText('workspace.navigation.channels')
+
 const requestUrl = (typeof requestContext !== 'undefined' && requestContext.url)
   ? requestContext.url()
   : 'http://localhost/'
@@ -12,27 +18,36 @@ catch {
 }
 
 const navLinks = [
-  { href: '/composer', label: 'Composer', shortcut: '1', icon: 'i-hugeicons-edit-02' },
-  { href: '/queue', label: 'Queue', shortcut: '2', icon: 'i-hugeicons-calendar-03' },
-  { href: '/timeline', label: 'Timeline', shortcut: '3', icon: 'i-hugeicons-news' },
-  { href: '/analytics', label: 'Analytics', shortcut: '4', icon: 'i-hugeicons-chart-line-data-01' },
-  { href: '/campaigns', label: 'Campaigns', shortcut: '5', icon: 'i-hugeicons-flowchart-01' },
-  { href: '/listening', label: 'Listening', shortcut: '6', icon: 'i-hugeicons-radar-02' },
-  { href: '/inbox', label: 'Inbox', shortcut: '7', icon: 'i-hugeicons-message-01' },
-  { href: '/writing', label: 'Blog', shortcut: '8', icon: 'i-hugeicons-quill-write-02' },
-  { href: '/activity', label: 'Activity', shortcut: '9', icon: 'i-hugeicons-activity-01' },
-].map((link) => ({
-  ...link,
-  active: currentPath === link.href || currentPath.startsWith(`${link.href}/`),
-}))
+  { href: '/composer', labelKey: 'workspace.navigation.composer', shortcut: '1', icon: 'i-hugeicons-edit-02' },
+  { href: '/queue', labelKey: 'workspace.navigation.queue', shortcut: '2', icon: 'i-hugeicons-calendar-03' },
+  { href: '/timeline', labelKey: 'workspace.navigation.timeline', shortcut: '3', icon: 'i-hugeicons-news' },
+  { href: '/analytics', labelKey: 'workspace.navigation.analytics', shortcut: '4', icon: 'i-hugeicons-chart-line-data-01' },
+  { href: '/campaigns', labelKey: 'workspace.navigation.campaigns', shortcut: '5', icon: 'i-hugeicons-flowchart-01' },
+  { href: '/listening', labelKey: 'workspace.navigation.listening', shortcut: '6', icon: 'i-hugeicons-radar-02' },
+  { href: '/inbox', labelKey: 'workspace.navigation.inbox', shortcut: '7', icon: 'i-hugeicons-message-01' },
+  { href: '/writing', labelKey: 'workspace.navigation.writing', shortcut: '8', icon: 'i-hugeicons-quill-write-02' },
+  { href: '/activity', labelKey: 'workspace.navigation.activity', shortcut: '9', icon: 'i-hugeicons-activity-01' },
+].map(({ labelKey, ...link }) => {
+  const label = workspaceText(labelKey)
+  return {
+    ...link,
+    label,
+    tooltip: workspaceText('workspace.shell.openView', { view: label, shortcut: link.shortcut }),
+    shortcutLabel: workspaceText('workspace.shell.shortcut', { shortcut: link.shortcut }),
+    active: currentPath === link.href || currentPath.startsWith(`${link.href}/`),
+  }
+})
 
 const settingsActive = currentPath === '/accounts' || currentPath === '/settings' || currentPath.startsWith('/settings/')
 const mobilePrimary = new Set(['/composer', '/queue', '/inbox'])
-const mobileLinks = navLinks.filter(link => mobilePrimary.has(link.href))
+const mobileLinks = navLinks.filter(link => mobilePrimary.has(link.href)).map(link => ({
+  ...link,
+  label: link.href === '/composer' ? workspaceText('workspace.navigation.compose') : link.label,
+}))
 const moreLinks = [
   ...navLinks.filter(link => !mobilePrimary.has(link.href)),
-  { href: '/accounts', label: 'Channels', icon: 'i-hugeicons-share-08', active: currentPath === '/accounts' },
-  { href: '/settings', label: 'Settings', icon: 'i-hugeicons-settings-02', active: settingsActive && currentPath !== '/accounts' },
+  { href: '/accounts', label: channelsLabel, icon: 'i-hugeicons-share-08', active: currentPath === '/accounts' },
+  { href: '/settings', label: settingsLabel, icon: 'i-hugeicons-settings-02', active: settingsActive && currentPath !== '/accounts' },
 ]
 </script>
 
@@ -89,7 +104,7 @@ effect(() => {
 
 <template>
   <div class="contents">
-  <nav class="grid lg:hidden bottom-0 fixed inset-x-0 z-50 grid-cols-4 items-center px-2 bg-panel border-line border-t" aria-label="Primary" data-postline-mobile-nav>
+  <nav class="grid lg:hidden bottom-0 fixed inset-x-0 z-50 grid-cols-4 items-center px-2 bg-panel border-line border-t" aria-label="{{ shellText.primaryNavigation }}" data-postline-mobile-nav>
     @foreach (mobileLinks as link)
       <a
         href="{{ link.href }}"
@@ -100,7 +115,7 @@ effect(() => {
         aria-current="{{ link.active ? 'page' : 'false' }}"
       >
         <span class="h-5 w-5 {{ link.icon }}" aria-hidden="true"></span>
-        <span>{{ link.href === '/composer' ? 'Compose' : link.label }}</span>
+        <span>{{ link.label }}</span>
         @if(link.href === '/inbox')
           <span class="absolute right-1 top-0.5 px-1 min-w-4 font-semibold text-center text-on-accent text-xs bg-accent rounded-full" x-cloak x-show="unreadFor('/inbox') > 0" :text="unreadBadge('/inbox')" aria-hidden="true"></span>
           <span class="sr-only" x-show="unreadFor('/inbox') > 0" :text="unreadLabel('/inbox')"></span>
@@ -109,19 +124,19 @@ effect(() => {
     @endforeach
     <button class="grid content-center gap-0.5 justify-items-center mx-0.5 px-1 h-12 font-semibold text-muted text-xs rounded-xl" type="button" aria-controls="workspace-more" aria-haspopup="dialog" :aria-expanded="moreOpen()" @click="showMore">
       <span class="h-5 w-5 i-hugeicons-more-horizontal" aria-hidden="true"></span>
-      <span>More</span>
+      <span>{{ shellText.more }}</span>
     </button>
   </nav>
 
   <dialog id="workspace-more" ref="moreDialog" class="p-0 text-ink bg-panel border border-line rounded-t-2xl shadow-xl" aria-labelledby="workspace-more-title" data-postline-mobile-menu @close="moreOpen.set(false)" @click="dismissOutside($event)">
     <div class="p-4">
       <header class="flex gap-3 items-center justify-between mb-2">
-        <h2 id="workspace-more-title" class="m-0 font-semibold text-base">More views</h2>
-        <button class="grid place-items-center h-11 w-11 text-muted bg-panel-2 hover:bg-raised rounded-xl" type="button" aria-label="Close menu" autofocus @click="closeMore">
+        <h2 id="workspace-more-title" class="m-0 font-semibold text-base">{{ shellText.moreViews }}</h2>
+        <button class="grid place-items-center h-11 w-11 text-muted bg-panel-2 hover:bg-raised rounded-xl" type="button" aria-label="{{ shellText.closeMenu }}" autofocus @click="closeMore">
           <span class="h-5 w-5 i-hugeicons-cancel-01" aria-hidden="true"></span>
         </button>
       </header>
-      <nav class="grid gap-1.5 grid-cols-2" aria-label="More views">
+      <nav class="grid gap-1.5 grid-cols-2" aria-label="{{ shellText.moreViews }}">
         @foreach (moreLinks as link)
           <a
             href="{{ link.href }}"
@@ -131,7 +146,7 @@ effect(() => {
             aria-current="{{ link.active ? 'page' : 'false' }}"
             @click="closeMore"
             @if(link.href === '/accounts')
-              data-command-destination="Channels"
+              data-command-destination="{{ channelsLabel }}"
             @endif
           >
             <span class="shrink-0 h-5 w-5 {{ link.icon }}" aria-hidden="true"></span>
@@ -160,7 +175,7 @@ effect(() => {
       data-stx-link
       data-stx-exact-active-class="text-ink"
       data-craft-no-drag
-      aria-label="Postline composer"
+      aria-label="{{ shellText.brandLink }}"
     >
       {{-- The same mark as the favicon and the sign-in page (`.brand-mark`
           in config/css.ts), so the three agree. --}}
@@ -168,7 +183,7 @@ effect(() => {
       <span class="font-semibold text-sm">Postline</span>
     </a>
 
-    <nav class="grid relative z-10 gap-1" aria-label="Primary" data-stx-nav data-testid="postline-nav">
+    <nav class="grid relative z-10 gap-1" aria-label="{{ shellText.primaryNavigation }}" data-stx-nav data-testid="postline-nav">
       @foreach (navLinks as link)
         <a
           href="{{ link.href }}"
@@ -176,7 +191,7 @@ effect(() => {
           data-stx-active-class="text-ink bg-nav-active"
           data-stx-exact-active-class="text-ink bg-nav-active"
           data-craft-no-drag
-          title="Open {{ link.label }} ({{ link.shortcut }})"
+          title="{{ link.tooltip }}"
           data-command-destination="{{ link.label }}"
           data-command-shortcut="{{ link.shortcut }}"
           aria-keyshortcuts="{{ link.shortcut }}"
@@ -189,7 +204,7 @@ effect(() => {
             <span class="px-1.5 min-w-5 font-semibold text-center text-on-accent text-xs bg-accent rounded-full" x-cloak x-show="unreadFor('{{ link.href }}') > 0" :text="unreadBadge('{{ link.href }}')" aria-hidden="true"></span>
             <span class="sr-only" x-show="unreadFor('{{ link.href }}') > 0" :text="unreadLabel('{{ link.href }}')"></span>
           @endif
-          <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-mono text-muted text-xs bg-panel border border-b-2 border-line rounded-md" aria-label="Shortcut {{ link.shortcut }}">{{ link.shortcut }}</kbd>
+          <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-mono text-muted text-xs bg-panel border border-b-2 border-line rounded-md" aria-label="{{ link.shortcutLabel }}">{{ link.shortcut }}</kbd>
         </a>
       @endforeach
     </nav>
@@ -200,16 +215,16 @@ effect(() => {
       data-stx-active-class="text-ink bg-nav-active"
       data-stx-exact-active-class="text-ink bg-nav-active"
       data-craft-no-drag
-      title="Open Settings (,)"
-      data-command-destination="Settings"
+      title="{{ shellText.openSettings }}"
+      data-command-destination="{{ settingsLabel }}"
       data-command-shortcut=","
       aria-keyshortcuts=","
       class="relative z-10 mt-auto flex w-full items-center gap-3 rounded-[14px] px-3 py-1.5 text-left text-ui transition-colors hover:bg-glass-hover focus-visible:bg-glass-hover focus-visible:outline-none {{ settingsActive ? 'bg-nav-active text-ink' : 'text-body' }}"
       aria-current="{{ settingsActive ? 'page' : 'false' }}"
     >
       <span class="h-[18px] w-[18px] i-hugeicons-settings-02 {{ settingsActive ? 'text-ink' : 'text-muted' }}" aria-hidden="true"></span>
-      <span class="flex-1 font-medium">Settings</span>
-      <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-mono text-muted text-xs bg-panel border border-b-2 border-line rounded-md" aria-label="Shortcut comma">,</kbd>
+      <span class="flex-1 font-medium">{{ settingsLabel }}</span>
+      <kbd class="grid place-items-center px-1.5 h-5 min-w-5 font-mono text-muted text-xs bg-panel border border-b-2 border-line rounded-md" aria-label="{{ shellText.settingsShortcut }}">,</kbd>
     </a>
   </aside>
   </div>

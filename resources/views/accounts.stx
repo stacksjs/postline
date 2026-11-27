@@ -11,7 +11,7 @@ const networkSetupGuides = await loadNetworkSetupGuides()
 @section('content')
   @meta('description', 'Connect and manage publishing channels in Postline settings.')
   <section class="grid gap-4" data-postline-page="accounts" data-testid="accounts-page">
-    <WorkspacePageHeader title="Connect your channels">
+    <WorkspacePageHeader titleKey="workspace.pages.accounts.title">
       <template #description><span class="block min-h-5" :text="channelsReady() ? channelProviders().length + (channelProviders().length === 1 ? ' publishing channel' : ' publishing channels') : ''"></span></template>
       <a class="inline-flex gap-2 items-center justify-center px-4 h-9 w-fit font-semibold text-ink text-sm bg-panel hover:bg-raised border border-line rounded-xl shadow-sm transition-colors" :href="returnToSetup() ? '/setup?step=channels' : '/composer'" data-stx-link>
         <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>

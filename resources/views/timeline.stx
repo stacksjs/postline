@@ -5,8 +5,7 @@
 @section('content')
   @meta('description', 'Read your Bluesky home timeline in Postline.')
   <section class="grid gap-4" data-postline-page="timeline" data-testid="timeline-page">
-    <WorkspacePageHeader title="Bluesky timeline">
-      <template #description>Posts from your connected Bluesky account.</template>
+    <WorkspacePageHeader titleKey="workspace.pages.timeline.title" descriptionKey="workspace.pages.timeline.description">
       <div class="grid sm:flex gap-2 grid-cols-2 items-center">
         <a class="inline-flex items-center justify-center px-4 h-9 font-semibold text-ink text-sm bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" href="/composer" data-stx-link>Compose</a>
         <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="busy()" @click="refreshManual">
