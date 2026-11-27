@@ -3,13 +3,14 @@ import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { actionFailure } from '../../Support/Http/action-error'
+import { workspaceComposerErrors } from '../../Support/Localization/workspace'
 import { crosspostProviders } from '../../Services/Social/CrosspostService'
 import { postQueue } from '../../Services/Social/QueueService'
 import { parseTargets, targetKey } from '../../Support/Social/targets'
 import { readPostAttachments } from '../../Support/Social/attachment-input'
 import { POST_OPTION_FIELDS, readPostOptions } from '../../Support/Social/post-options'
 import { parseVariantsField } from '../../Support/Social/variants'
-import { readQueuedThread } from '../../Support/Social/threads'
+import { readThreadInput } from '../../Support/Social/threads'
 import { UserFacingError } from '../../Support/Http/user-error'
 
 export default new Action({
@@ -60,7 +61,7 @@ export default new Action({
     else {
       const parsed = parseVariantsField(rawVariants)
       if (!parsed.ok)
-        return response.json({ ok: false, error: 'Could not read the per-network text.' }, { status: 422 })
+      return response.json({ ok: false, error: workspaceComposerErrors.invalidVariants }, { status: 422 })
       variants = parsed.variants
     }
 
@@ -72,8 +73,8 @@ export default new Action({
       return response.json({ ok: false, error: readOptions.error }, { status: 422 })
 
     try {
-      const texts = readQueuedThread(request.get('thread'))
-      if (texts && variants) throw new UserFacingError('Per-network text is available for single posts.')
+      const texts = readThreadInput(request.get('thread'))
+      if (texts && variants) throw new UserFacingError(workspaceComposerErrors.variantsSingleOnly)
       const options = sendsOptions ? (readOptions.options ?? null) : undefined
       const input = { text, providers, title, scheduledAt, external, images, video: attachments.video ?? undefined, variants, options }
       const data = String(request.get('next_slot') || '') === '1'

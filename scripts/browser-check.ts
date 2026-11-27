@@ -2717,6 +2717,35 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
   await click("document.getElementById('queue-tab-scheduled')")
 }
 
+async function checkRejectedPublishInputs(cdp: Cdp): Promise<void> {
+  const text = 'Publish validation fixture fallback'
+  const lead = 'Publish validation fixture lead'
+  const reply = 'Publish validation fixture reply'
+  const variant = 'Publish validation fixture variant'
+  const threadError = spanishWorkspace ? 'No se pudo leer el hilo.' : 'Could not read the thread.'
+  const variantError = spanishWorkspace
+    ? 'El texto por canal está disponible para publicaciones individuales.'
+    : 'Per-network text is available for single posts.'
+  const cases = [
+    { thread: '[', error: threadError },
+    { thread: JSON.stringify([lead, ' ']), error: threadError },
+    { thread: JSON.stringify([lead, reply]), variants: JSON.stringify({ blog: variant }), error: variantError },
+  ]
+  for (const { error, ...fields } of cases) {
+    const result = await evaluate<{ status: number, error: string }>(cdp, `(async () => {
+      const body = new URLSearchParams(${JSON.stringify({ text, providers: 'blog', ...fields })})
+      const response = await fetch('/api/postline/publish', { method: 'POST', body })
+      return { status: response.status, error: (await response.json()).error }
+    })()`)
+    if (result.status !== 422 || result.error !== error)
+      throw new Error(`Publishing invalid thread input should return 422 with “${error}”. Got ${JSON.stringify(result)}.`)
+  }
+
+  using fixture = new Database(database, { readonly: true })
+  if (fixture.query('SELECT id FROM posts WHERE body IN (?, ?, ?, ?)').get(text, lead, reply, variant))
+    throw new Error('The rejected publishing request wrote a post.')
+}
+
 async function checkSetupProviderRetry(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
@@ -3650,6 +3679,7 @@ ${migration.stderr.toString()}`)
   try {
     if (production) await watchPageSecurity(cdp)
     await checkFirstRun(cdp)
+    if (!marketingScreenshots) await checkRejectedPublishInputs(cdp)
     if (marketingScreenshots) await captureMarketingScreenshots(cdp)
     else if (spanishWorkspace) await checkSpanishWorkspace(cdp)
     else await checkWorkspace(cdp)

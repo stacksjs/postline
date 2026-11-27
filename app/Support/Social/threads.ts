@@ -1,15 +1,16 @@
 import type { PostOptions } from './post-options'
 import type { CrosspostTargetResult, PublishContent } from './types'
 import { UserFacingError } from '../Http/user-error'
+import { workspaceComposerErrors } from '../Localization/workspace'
 
-export function readQueuedThread(value: unknown): string[] | null {
+export function readThreadInput(value: unknown): string[] | null {
   if (value === undefined || value === null || value === '') return null
   try {
     const texts = typeof value === 'string' ? JSON.parse(value) : value
     if (Array.isArray(texts) && texts.every(text => typeof text === 'string')) return texts
   }
   catch {}
-  throw new UserFacingError('Could not read the thread.')
+  throw new UserFacingError(workspaceComposerErrors.invalidThread)
 }
 
 /**

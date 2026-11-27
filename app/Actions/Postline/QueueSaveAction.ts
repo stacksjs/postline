@@ -2,12 +2,13 @@ import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { actionFailure } from '../../Support/Http/action-error'
+import { workspaceComposerErrors } from '../../Support/Localization/workspace'
 import { crosspostProviders } from '../../Services/Social/CrosspostService'
 import { postQueue } from '../../Services/Social/QueueService'
 import { parseTargets, targetKey } from '../../Support/Social/targets'
 import { readPostAttachments } from '../../Support/Social/attachment-input'
 import { readPostOptions } from '../../Support/Social/post-options'
-import { readQueuedThread } from '../../Support/Social/threads'
+import { readThreadInput } from '../../Support/Social/threads'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { parseVariantsField } from '../../Support/Social/variants'
 
@@ -45,15 +46,15 @@ export default new Action({
     // would publish the shared body everywhere with no indication why.
     const parsedVariants = parseVariantsField(request.get('variants'))
     if (!parsedVariants.ok)
-      return response.json({ ok: false, error: 'Could not read the per-network text.' }, { status: 422 })
+      return response.json({ ok: false, error: workspaceComposerErrors.invalidVariants }, { status: 422 })
 
     const readOptions = readPostOptions(key => request.get(key))
     if (!readOptions.ok)
       return response.json({ ok: false, error: readOptions.error }, { status: 422 })
 
     try {
-      const texts = readQueuedThread(request.get('thread'))
-      if (texts && parsedVariants.variants) throw new UserFacingError('Per-network text is available for single posts.')
+      const texts = readThreadInput(request.get('thread'))
+      if (texts && parsedVariants.variants) throw new UserFacingError(workspaceComposerErrors.variantsSingleOnly)
       const input = { text, providers, title, scheduledAt, external, images, video: attachments.video ?? undefined, options: readOptions.options, variants: parsedVariants.variants }
       const data = String(request.get('next_slot') || '') === '1'
         ? await postQueue.enqueueAtNextSlot({ ...input, texts: texts ?? undefined })

@@ -41,3 +41,4 @@ export const workspaceSettingsText = workspaceI18n.tm('workspace.settings') as t
 export const workspaceLoginText = workspaceI18n.tm('workspace.login') as typeof en.workspace.login
 export const workspaceSetupText = workspaceI18n.tm('workspace.setup') as typeof en.workspace.setup
 export const workspaceComposerText = workspaceI18n.tm('workspace.composer') as typeof en.workspace.composer
+export const workspaceComposerErrors = workspaceI18n.tm('workspace.composerErrors') as typeof en.workspace.composerErrors

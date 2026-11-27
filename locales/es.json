@@ -1485,6 +1485,11 @@
         "saveProfileFailed": "No se pudieron guardar los datos del espacio de trabajo."
       }
     },
+    "composerErrors": {
+      "invalidThread": "No se pudo leer el hilo.",
+      "invalidVariants": "No se pudo leer el texto por canal.",
+      "variantsSingleOnly": "El texto por canal está disponible para publicaciones individuales."
+    },
     "composer": {
       "labels": {
         "documentTitle": "Postline - Redactar",

@@ -1485,6 +1485,11 @@
         "saveProfileFailed": "Could not save workspace details."
       }
     },
+    "composerErrors": {
+      "invalidThread": "Could not read the thread.",
+      "invalidVariants": "Could not read the per-network text.",
+      "variantsSingleOnly": "Per-network text is available for single posts."
+    },
     "composer": {
       "labels": {
         "documentTitle": "Postline - Composer",
