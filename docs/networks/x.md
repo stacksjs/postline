@@ -72,13 +72,13 @@ imports and brings the X window forward. Complete the check there, then
 select **Check sign-in** in Postline.
 X [restricts scripted website use](https://help.x.com/en/rules-and-policies/x-automation).
 
-With your profile open in the X window, choose **Read visible engagement** in
-Postline. Exact counts shown on your own posts update matching published posts
+Choose **Open X profile** to bring up your profile in the X window. Once it loads,
+choose **Read visible engagement** in Postline. Exact counts shown on your own posts update matching published posts
 in Analytics. This reads the open page through WebKit and needs no developer
 app credentials.
 
 For Listening, create an active watch with **X** selected and choose **X
-browser session** under **X source**. In the X window, open Search or Mentions.
-Return to Channels and choose **Import visible mentions**. Posts matching the
+browser session** under **X source**. Choose **Open X Mentions** in Channels, or
+open Search in the X window. Once the results load, choose **Import visible mentions**. Posts matching the
 watch appear in Listening. Browser-session watches do not make scheduled X API
 requests. If you also chose other networks, the scheduler still checks those.

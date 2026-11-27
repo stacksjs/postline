@@ -435,7 +435,12 @@
       "check": "Verificar sesión",
       "metrics": "Leer interacciones visibles",
       "mentions": "Importar menciones visibles",
-      "rules": "Reglas de automatización de X"
+      "rules": "Reglas de automatización de X",
+      "profile": "Abrir el perfil de X",
+      "openMentionsPage": "Abrir las menciones de X",
+      "profileOpened": "Tu perfil se está abriendo en la ventana de X. Cuando cargue, selecciona Leer interacciones visibles.",
+      "mentionsOpened": "Las menciones se están abriendo en la ventana de X. Cuando carguen, selecciona Importar menciones visibles.",
+      "pageOpenFailed": "No se pudo abrir esa página en la ventana de X."
     },
     "analytics": {
       "title": "Estadísticas",

@@ -1252,6 +1252,7 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     window.xSessionWrites = 0
     window.xSessionImports = 0
     window.xSessionOpens = []
+    window.xSessionNavigations = []
     window.xSessionState = { state: 'connected', handle: 'postline_test', measurements: [{ id: '4321', counts: { likes: 2 } }] }
     window.craft = { app: { nativePlatformControls: false }, capabilities: { nativePlatformControls: false }, window: {
       async openExternal(options) {
@@ -1261,6 +1262,10 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
       },
       async _call(action, input, name) {
         if (!sessionStorage.getItem('test-x-window-open')) throw new Error('Window not found')
+        if (action === 'loadURL' && name === profile) {
+          window.xSessionNavigations.push({ url: input.url, name })
+          return
+        }
         if (action !== 'executeJavaScript' || name !== profile || !input.code.includes('AppTabBar_Profile_Link'))
           throw new Error('Unexpected X window inspection')
         return JSON.stringify(window.xSessionState)
@@ -1312,6 +1317,20 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('The checked X handle is saved', () => evaluate<boolean>(cdp, `
       ${section}.textContent.includes('Last confirmed as @postline_test') && window.xSessionWrites === 1`), 5_000)
+    await evaluate(cdp, `${section}.querySelectorAll('button')[4].focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The confirmed X profile opens in the isolated child window', () => evaluate<boolean>(cdp, `
+      window.xSessionNavigations[0]?.url === 'https://x.com/postline_test'
+        && window.xSessionNavigations[0].name === window.xSessionOpens[0].dataStore
+        && ${section}.textContent.includes('Your profile is opening in the X window')
+        && window.xSessionWrites === 1 && window.xSessionImports === 0`), 5_000)
+    await evaluate(cdp, `${section}.querySelectorAll('button')[5].focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('X Mentions opens without importing any posts', () => evaluate<boolean>(cdp, `
+      window.xSessionNavigations[1]?.url === 'https://x.com/notifications/mentions'
+        && window.xSessionNavigations[1].name === window.xSessionOpens[0].dataStore
+        && ${section}.textContent.includes('Mentions is opening in the X window')
+        && window.xSessionWrites === 1 && window.xSessionImports === 0`), 5_000)
     await evaluate(cdp, `${section}.querySelectorAll('button')[2].focus()`)
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('Reading visible engagement saves the X measurements', () => evaluate<boolean>(cdp, `
@@ -1336,13 +1355,14 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     await waitUntil('The confirmed handle survives a reload', () => evaluate<boolean>(cdp, `
       ${section}?.textContent.includes('Last confirmed as @postline_test')`), 5_000)
 
-    await evaluate(cdp, `window.xSessionState = { state: 'needs-attention' }; ${section}.querySelectorAll('button')[2].focus()`)
+    await evaluate(cdp, `window.xSessionState = { state: 'needs-attention' }; ${section}.querySelectorAll('button')[5].focus()`)
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('An account challenge stops imports and reopens the same named window', () => evaluate<boolean>(cdp, `
       ${section}.textContent.includes('X needs your attention')
         && ${section}.querySelectorAll('button')[2].disabled && ${section}.querySelectorAll('button')[3].disabled
         && window.xSessionWrites === 0 && window.xSessionImports === 0
-        && window.xSessionOpens.length === 1 && window.xSessionOpens[0].name === window.xSessionOpens[0].dataStore`), 5_000)
+        && window.xSessionNavigations.length === 0 && window.xSessionOpens.length === 2
+        && window.xSessionOpens.every(opened => opened.name === opened.dataStore)`), 5_000)
 
     await evaluate(cdp, `window.xSessionState = { state: 'connected', handle: 'postline_test' }; ${check}.focus()`)
     await pressKey(cdp, 'Enter', 13)
@@ -1356,7 +1376,7 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     await waitUntil('A signed-out page stops Listening imports', () => evaluate<boolean>(cdp, `
       ${section}.textContent.includes('Sign in to X, then select Check sign-in')
         && ${section}.querySelectorAll('button')[3].disabled && window.xSessionWrites === 1
-        && window.xSessionImports === 0 && window.xSessionOpens.length === 2`), 5_000)
+        && window.xSessionImports === 0 && window.xSessionOpens.length === 3`), 5_000)
 
     await evaluate(cdp, `${check}.focus()`)
     await pressKey(cdp, 'Enter', 13)

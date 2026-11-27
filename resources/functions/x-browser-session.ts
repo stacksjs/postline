@@ -2,7 +2,10 @@ import type { EngagementCounts } from '../../app/Support/Social/engagement-analy
 
 export interface XBrowserWindow {
   openExternal: (options: { name: string, url: string, title: string, dataStore: string }) => Promise<{ name: string }>
-  _call: (action: 'executeJavaScript', input: { code: string }, name: string) => Promise<unknown>
+  _call: {
+    (action: 'executeJavaScript', input: { code: string }, name: string): Promise<unknown>
+    (action: 'loadURL', input: { url: string }, name: string): void | Promise<unknown>
+  }
 }
 
 interface XBrowserPost {
@@ -25,10 +28,10 @@ export function xBrowserWindow(host: unknown): XBrowserWindow | null {
     : null
 }
 
-export async function openXBrowser(browser: XBrowserWindow, profile: string): Promise<void> {
+export async function openXBrowser(browser: XBrowserWindow, profile: string, url = 'https://x.com/home'): Promise<void> {
   await browser.openExternal({
     name: profile,
-    url: 'https://x.com/home',
+    url,
     title: 'X browser session',
     dataStore: profile,
   })

@@ -97,7 +97,7 @@ async function checkSignIn() {
   }
 }
 
-async function readConfirmedSession(browser: XBrowserWindow, profile: string, handle: string, kind: 'metrics' | 'listening') {
+async function readConfirmedSession(browser: XBrowserWindow, profile: string, handle: string, kind: 'sign-in' | 'metrics' | 'listening') {
   const result = await readXBrowserSession(browser, profile, kind)
   if (result.state === 'needs-attention' || result.state === 'signed-out') {
     await returnToX(browser, profile, result.state)
@@ -110,6 +110,31 @@ async function readConfirmedSession(browser: XBrowserWindow, profile: string, ha
     return
   }
   xSessionFeedback.set(copy.importReady)
+}
+
+async function openReadPage(page: 'profile' | 'mentions') {
+  const windowApi = xBrowser()
+  const current = xSession()
+  if (!windowApi || !current?.handle || xSessionBusy() || xSessionNeedsCheck()) return
+  const url = page === 'profile'
+    ? 'https://x.com/' + encodeURIComponent(current.handle)
+    : 'https://x.com/notifications/mentions'
+  xSessionBusy.set(true)
+  try {
+    // Craft reuses a named window without replacing its page. On a cold
+    // launch it opens the destination directly in the same WebKit store.
+    await openXBrowser(windowApi, current.profile, url)
+    const confirmed = await readConfirmedSession(windowApi, current.profile, current.handle, 'sign-in')
+    if (!confirmed) return
+    await windowApi._call('loadURL', { url }, current.profile)
+    xSessionFeedback.set(page === 'profile' ? copy.profileOpened : copy.mentionsOpened)
+  }
+  catch {
+    xSessionFeedback.set(copy.pageOpenFailed)
+  }
+  finally {
+    xSessionBusy.set(false)
+  }
 }
 
 async function captureMetrics() {
@@ -181,6 +206,8 @@ async function captureListening() {
           <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.check }}" :disabled="!xSession() || xSessionBusy()" @click="checkSignIn" />
           <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.metrics }}" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="captureMetrics" />
           <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.mentions }}" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="captureListening" />
+          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.profile }}" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="openReadPage('profile')" />
+          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.openMentionsPage }}" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="openReadPage('mentions')" />
           <a class="text-info text-xs underline" href="https://help.x.com/en/rules-and-policies/x-automation" target="_blank" rel="noopener noreferrer">{{ xBrowserSessionText.rules }}</a>
         </div>
         <p class="m-0 text-body text-xs" role="status" :show="xSessionFeedback()" :text="xSessionFeedback()"></p>

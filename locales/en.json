@@ -435,7 +435,12 @@
       "check": "Check sign-in",
       "metrics": "Read visible engagement",
       "mentions": "Import visible mentions",
-      "rules": "X automation rules"
+      "rules": "X automation rules",
+      "profile": "Open X profile",
+      "openMentionsPage": "Open X Mentions",
+      "profileOpened": "Your profile is opening in the X window. When it loads, select Read visible engagement.",
+      "mentionsOpened": "Mentions is opening in the X window. When it loads, select Import visible mentions.",
+      "pageOpenFailed": "Could not open that page in the X window."
     },
     "analytics": {
       "title": "Analytics",
