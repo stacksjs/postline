@@ -1,9 +1,11 @@
+import type { BlogAttachment } from '../../Support/Social/blog-attachments'
 import type { CrosspostTargetResult, PublishContent } from '../../Support/Social/types'
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { db } from '@stacksjs/database'
 import { ensureAccount, now, uuid } from './support'
 import { classifyFailure } from '../../Support/Social/retry'
+import { blogBodyWithAttachments, readBlogAttachments, removeBlogAttachments, saveBlogAttachments } from '../../Support/Social/blog-attachments'
 import { blogFile, writePublishedBlogFile } from '../../Support/Social/blog-files'
 import { UserFacingError } from '../../Support/Http/user-error'
 
@@ -99,6 +101,8 @@ export class BlogService {
       .where('uuid', '=', targetUuid)
       .executeTakeFirstOrThrow()
 
+    let attachments: BlogAttachment[] = []
+    let markdownPath: string | null = null
     try {
       // Explicit title (long-form composer) keeps the whole text as body;
       // otherwise the first line doubles as the title and is stripped.
@@ -111,38 +115,46 @@ export class BlogService {
       const publishedAt = now()
 
       const firstContentIndex = post.body.split('\n').findIndex(line => line.trim())
-      const markdownBody = explicitTitle
+      const articleText = explicitTitle
         ? body
         : post.body.split('\n').slice(firstContentIndex + 1).join('\n').trim() || body
 
-      await writePublishedBlogFile(slug, title, publishedAt, markdownBody)
-
-      await database.insertInto('blog_posts').values({
-        uuid: uuid(),
-        title,
-        slug,
-        body,
-        published_body: markdownBody,
-        excerpt: body.slice(0, 280),
-        status: 'published',
-        published_at: publishedAt,
-        post_id: post.id,
-        account_id: accountId,
-        created_at: publishedAt,
-        updated_at: publishedAt,
-      }).execute()
+      attachments = await saveBlogAttachments(content?.media || [])
+      const markdownBody = blogBodyWithAttachments(articleText, slug, attachments)
+      await writePublishedBlogFile(slug, title, publishedAt, markdownBody, undefined, 'wx')
+      markdownPath = blogFile(slug)
 
       const url = `/blog/${slug}`
-      await database.updateTable('post_targets').set({
-        status: 'published',
-        remote_uri: url,
-        failure_reason: null,
-        updated_at: publishedAt,
-      }).where('id', '=', target.id).execute()
+      await database.transaction((tx: typeof database) => {
+        tx.insertInto('blog_posts').values({
+          uuid: uuid(),
+          title,
+          slug,
+          body,
+          published_body: markdownBody,
+          attachments: attachments.length ? JSON.stringify(attachments) : null,
+          excerpt: body.slice(0, 280),
+          status: 'published',
+          published_at: publishedAt,
+          post_id: post.id,
+          account_id: accountId,
+          created_at: publishedAt,
+          updated_at: publishedAt,
+        }).execute()
+
+        tx.updateTable('post_targets').set({
+          status: 'published',
+          remote_uri: url,
+          failure_reason: null,
+          updated_at: publishedAt,
+        }).where('id', '=', target.id).execute()
+      })
 
       return { provider: 'blog', ok: true, url, uri: url, targetId: Number(target.id) }
     }
     catch (error) {
+      if (markdownPath) await rm(markdownPath, { force: true }).catch(() => {})
+      await removeBlogAttachments(attachments).catch(() => {})
       const message = error instanceof Error ? error.message : String(error)
       await database.updateTable('post_targets').set({
         status: 'failed',
@@ -160,7 +172,15 @@ export class BlogService {
    * twice does not duplicate it. A new one is published with its file, so it
    * appears on the blog like any other.
    */
-  async importPost(input: { title: string, body: string, slug?: string, publishedAt: string }, options: { dryRun?: boolean, createdThisRun?: Set<string> } = {}): Promise<'created' | 'updated'> {
+  async importPost(input: {
+    title: string
+    body: string
+    slug?: string
+    publishedAt: string
+    status?: 'published' | 'draft'
+    access?: 'free' | 'paid'
+    images?: PublishContent['media']
+  }, options: { dryRun?: boolean, createdThisRun?: Set<string> } = {}): Promise<'created' | 'updated'> {
     const title = input.title.trim().slice(0, 200)
     const body = input.body.trim()
     const wanted = input.slug?.trim() ? slugify(input.slug) : slugify(title)
@@ -173,38 +193,75 @@ export class BlogService {
     const madeThisRun = options.createdThisRun?.has(wanted) ?? false
     const same = existing && !madeThisRun && (input.slug?.trim() || String(existing.title) === title)
 
-    if (same) {
-      if (!options.dryRun) {
-        if (existing.status === 'published') await writePublishedBlogFile(String(existing.slug), title, input.publishedAt, body)
-        await database.updateTable('blog_posts')
-          .set({ title, body, published_body: body, excerpt: body.slice(0, 280), published_at: input.publishedAt, updated_at: now() })
-          .where('id', '=', existing.id)
-          .execute()
-      }
-      return 'updated'
+    if (options.dryRun) {
+      if (!same) options.createdThisRun?.add(wanted)
+      return same ? 'updated' : 'created'
     }
 
-    if (options.dryRun) {
-      options.createdThisRun?.add(wanted)
-      return 'created'
-    }
-    const slug = await uniqueSlug(wanted)
+    const slug = same ? String(existing.slug) : await uniqueSlug(wanted)
+    const status = input.status ?? (same && existing.status === 'draft' ? 'draft' : 'published')
+    const access = input.access ?? (same && existing.access === 'paid' ? 'paid' : 'free')
+    const publicArticle = status === 'published' && access === 'free'
+    const wasPublic = same && existing.status === 'published' && existing.access === 'free'
     options.createdThisRun?.add(wanted)
     options.createdThisRun?.add(slug)
-    await writePublishedBlogFile(slug, title, input.publishedAt, body)
-    await database.insertInto('blog_posts').values({
-      uuid: uuid(),
+    const previous = same ? readBlogAttachments(existing.attachments) : []
+    const attachments = input.images === undefined ? previous : await saveBlogAttachments(input.images)
+    const markdownBody = blogBodyWithAttachments(body, slug, attachments)
+    const updatedAt = now()
+    const values = {
       title,
-      slug,
       body,
-      published_body: body,
+      published_body: markdownBody,
+      attachments: attachments.length ? JSON.stringify(attachments) : null,
       excerpt: body.slice(0, 280),
-      status: 'published',
+      status,
+      access,
       published_at: input.publishedAt,
-      account_id: await ensureAccount(),
-      created_at: now(),
-      updated_at: now(),
-    }).execute()
+      updated_at: updatedAt,
+    }
+
+    let changedFile = false
+    try {
+      if (same) {
+        if (publicArticle) {
+          const flag = wasPublic ? 'w' : 'wx'
+          await writePublishedBlogFile(slug, title, input.publishedAt, markdownBody, undefined, flag)
+          changedFile = true
+        }
+        else if (wasPublic) {
+          await rm(blogFile(slug), { force: true })
+          changedFile = true
+        }
+        await database.updateTable('blog_posts').set(values).where('id', '=', existing.id).execute()
+      }
+      else {
+        if (publicArticle) {
+          await writePublishedBlogFile(slug, title, input.publishedAt, markdownBody, undefined, 'wx')
+          changedFile = true
+        }
+        await database.insertInto('blog_posts').values({
+          ...values,
+          uuid: uuid(),
+          slug,
+          account_id: await ensureAccount(),
+          created_at: updatedAt,
+        }).execute()
+      }
+    }
+    catch (error) {
+      if (changedFile) {
+        if (wasPublic) {
+          await writePublishedBlogFile(slug, String(existing.title), String(existing.published_at || existing.created_at),
+            String(existing.published_body ?? existing.body)).catch(() => {})
+        }
+        else await rm(blogFile(slug), { force: true }).catch(() => {})
+      }
+      if (input.images !== undefined) await removeBlogAttachments(attachments).catch(() => {})
+      throw error
+    }
+    if (input.images !== undefined) await removeBlogAttachments(previous)
+    if (same) return 'updated'
     return 'created'
   }
 
@@ -232,9 +289,11 @@ export class BlogService {
     if (!body) throw new UserFacingError('A blog post needs some text.')
 
     const updatedAt = now()
-    if (row.status === 'published') await writePublishedBlogFile(String(row.slug), title, String(row.published_at || updatedAt), body)
+    const slug = String(row.slug)
+    const markdownBody = blogBodyWithAttachments(body, slug, readBlogAttachments(row.attachments))
+    if (row.status === 'published' && row.access === 'free') await writePublishedBlogFile(slug, title, String(row.published_at || updatedAt), markdownBody)
     await database.updateTable('blog_posts')
-      .set({ title, body, published_body: body, excerpt: body.slice(0, 280), updated_at: updatedAt })
+      .set({ title, body, published_body: markdownBody, excerpt: body.slice(0, 280), updated_at: updatedAt })
       .where('id', '=', row.id)
       .execute()
     return toView({ ...row, title, body, excerpt: body.slice(0, 280) })
@@ -251,10 +310,10 @@ export class BlogService {
   /** Put a taken-down post back on the site, at the address it had. */
   async republish(id: number): Promise<BlogPostView> {
     const row = await this.find(id)
-    if (row.status !== 'published' && existsSync(blogFile(String(row.slug))))
+    if (row.access === 'free' && row.status !== 'published' && existsSync(blogFile(String(row.slug))))
       throw new UserFacingError(`Another file already uses /blog/${row.slug}. Rename it, then try again.`)
     const publishedAt = row.published_at || now()
-    await writePublishedBlogFile(String(row.slug), String(row.title), String(publishedAt), String(row.published_body ?? row.body))
+    if (row.access === 'free') await writePublishedBlogFile(String(row.slug), String(row.title), String(publishedAt), String(row.published_body ?? row.body))
     await database.updateTable('blog_posts').set({ status: 'published', published_at: publishedAt, updated_at: now() }).where('id', '=', row.id).execute()
     return toView({ ...row, status: 'published', published_at: publishedAt })
   }
@@ -264,6 +323,7 @@ export class BlogService {
     const row = await this.find(id)
     await rm(blogFile(String(row.slug)), { force: true })
     await database.deleteFrom('blog_posts').where('id', '=', row.id).execute()
+    await removeBlogAttachments(readBlogAttachments(row.attachments))
   }
 
   private async find(id: number): Promise<any> {

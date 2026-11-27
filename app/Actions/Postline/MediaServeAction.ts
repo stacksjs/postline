@@ -1,8 +1,8 @@
 import type { RequestInstance } from '@stacksjs/types'
-import { join } from 'node:path'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
-import { isSafeMediaFilename, MEDIA_DIR, mediaContentType } from '../../Support/Social/uploads'
+import { isBlogAttachmentFile } from '../../Support/Social/blog-attachments'
+import { isSafeMediaFilename, storedImageResponse } from '../../Support/Social/uploads'
 
 /**
  * Serve a stored post image so a remote platform can fetch it server-side.
@@ -27,24 +27,8 @@ export default new Action({
     if (!isSafeMediaFilename(file))
       return response.json({ ok: false, error: 'Invalid media reference.' }, { status: 400 })
 
-    const stored = Bun.file(join(MEDIA_DIR, file))
-    if (!(await stored.exists()))
-      return response.json({ ok: false, error: 'Media not found.' }, { status: 404 })
-
-    // Handed over as a file, so it is streamed from disk rather than read
-    // into memory first. This route is public; a large file must not cost a
-    // large allocation per request.
-    return new Response(stored, {
-      status: 200,
-      headers: {
-        'content-type': mediaContentType(file),
-        'content-length': String(stored.size),
-        'x-content-type-options': 'nosniff',
-        'content-disposition': 'inline',
-        // Filenames are unique per upload, so the bytes never change — let a
-        // platform re-fetching the same URL hit its cache instead of the app.
-        'cache-control': 'public, max-age=31536000, immutable',
-      },
-    })
+    // Blog attachments are public only while their own article is public.
+    const stored = isBlogAttachmentFile(file) ? null : await storedImageResponse(file, 'public, max-age=31536000, immutable')
+    return stored ?? response.json({ ok: false, error: 'Media not found.' }, { status: 404 })
   },
 })

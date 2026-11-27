@@ -70,6 +70,22 @@ export function mediaContentType(name: string): string {
   }
 }
 
+/** Stream an image after its caller verifies ownership and visibility. */
+export async function storedImageResponse(file: string, cacheControl: string): Promise<Response | null> {
+  if (!isSafeMediaFilename(file)) return null
+  const stored = Bun.file(join(MEDIA_DIR, file))
+  if (!(await stored.exists())) return null
+  return new Response(stored, {
+    headers: {
+      'content-type': mediaContentType(file),
+      'content-length': String(stored.size),
+      'x-content-type-options': 'nosniff',
+      'content-disposition': 'inline',
+      'cache-control': cacheControl,
+    },
+  })
+}
+
 /**
  * Pure URL builder: given a public base and a stored filename, produce the
  * media URL a remote platform fetches — or null when the base is empty or the

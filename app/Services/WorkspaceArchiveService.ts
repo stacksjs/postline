@@ -3,7 +3,7 @@
  *
  * An archive is one JSON file: the workspace settings, every post with its
  * results on each network, threads, campaigns, blog posts and Listening
- * rules, and the images attached to queued posts, embedded. Rows travel by
+ * rules, and the images attached to queued posts and Blog articles, embedded. Rows travel by
  * their uuid, never their numeric id, so links between them (a result to its
  * post, a campaign post to its campaign) survive the move, and importing the
  * same archive twice changes nothing the second time.
@@ -18,6 +18,9 @@ import { mkdir, readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { db } from '@stacksjs/database'
 import { UserFacingError } from '../Support/Http/user-error'
+import { readBlogAttachments } from '../Support/Social/blog-attachments'
+import { checkImageBytes } from '../Support/Social/image-input'
+import { MAX_IMAGE_BYTES, MAX_POST_IMAGES } from '../Support/Social/media-rules'
 import { referencedMediaFiles } from '../Support/Social/stored-content'
 import { isSafeMediaFilename, MEDIA_DIR } from '../Support/Social/uploads'
 import { blog } from './Social/BlogService'
@@ -26,7 +29,7 @@ import { ensureAccount, now } from './Social/support'
 const database = db as any
 
 export const ARCHIVE_FORMAT = 'postline-workspace'
-export const ARCHIVE_VERSION = 1
+export const ARCHIVE_VERSION = 2
 
 /** Typed to delete everything, so a stray click cannot. */
 export const DELETE_EVERYTHING_PHRASE = 'DELETE EVERYTHING'
@@ -41,6 +44,16 @@ const MONITOR_COLUMNS = ['uuid', 'name', 'keywords', 'providers', 'match_mode', 
 // posts takes the owner's own confirmation in Settings, on each install.
 const SETTINGS_COLUMNS = ['name', 'workspace_name', 'timezone', 'share_media_by_tunnel', 'default_audience', 'auto_delete_days', 'auto_delete_providers', 'auto_delete_scope'] as const
 
+interface ArchivedBlogPost {
+  title: string
+  slug: string
+  body: string
+  status: string
+  publishedAt: string | null
+  access?: 'free' | 'paid'
+  attachments?: Array<{ data: string, alt: string }>
+}
+
 export interface WorkspaceArchive {
   format: typeof ARCHIVE_FORMAT
   version: number
@@ -50,7 +63,7 @@ export interface WorkspaceArchive {
   targets: Array<Record<string, unknown> & { post: string, account: { provider: string, handle: string } | null }>
   campaigns: Array<Record<string, unknown>>
   campaignPosts: Array<Record<string, unknown> & { campaign: string, post: string | null }>
-  blogPosts: Array<{ title: string, slug: string, body: string, status: string, publishedAt: string | null }>
+  blogPosts: ArchivedBlogPost[]
   monitors: Array<Record<string, unknown>>
   /** Images attached to queued posts, by file name, as base64. */
   media: Record<string, string>
@@ -84,7 +97,7 @@ export class WorkspaceArchiveService {
     const campaigns = await database.selectFrom('launch_campaigns').selectAll().orderBy('id', 'asc').execute()
     const campaignUuid = new Map<number, string>(campaigns.map((row: any) => [Number(row.id), String(row.uuid)]))
     const campaignPosts = await database.selectFrom('campaign_posts').selectAll().orderBy('id', 'asc').execute()
-    const blogPosts = await database.selectFrom('blog_posts').selectAll().orderBy('id', 'asc').execute()
+    const blogRows = await database.selectFrom('blog_posts').selectAll().where('status', 'in', ['draft', 'published']).orderBy('id', 'asc').execute()
     const monitors = await database.selectFrom('keyword_monitors').selectAll().orderBy('id', 'asc').execute()
 
     const media: Record<string, string> = {}
@@ -93,6 +106,19 @@ export class WorkspaceArchiveService {
         const path = join(MEDIA_DIR, name)
         if (existsSync(path)) media[name] = Buffer.from(await readFile(path)).toString('base64')
       }
+    }
+
+    const blogPosts: ArchivedBlogPost[] = []
+    for (const row of blogRows) {
+      const attachments = await Promise.all(readBlogAttachments(row.attachments).map(async ({ file, alt }) => ({
+        data: (await readFile(join(MEDIA_DIR, file))).toString('base64'),
+        alt,
+      })))
+      blogPosts.push({
+        title: String(row.title), slug: String(row.slug), body: String(row.body),
+        status: String(row.status), publishedAt: row.published_at || null,
+        access: row.access === 'paid' ? 'paid' : 'free', attachments,
+      })
     }
 
     return {
@@ -112,7 +138,7 @@ export class WorkspaceArchiveService {
         campaign: campaignUuid.get(Number(row.launch_campaign_id))!,
         post: row.post_id ? postUuid.get(Number(row.post_id)) ?? null : null,
       })),
-      blogPosts: blogPosts.map((row: any) => ({ title: String(row.title), slug: String(row.slug), body: String(row.body), status: String(row.status), publishedAt: row.published_at || null })),
+      blogPosts,
       monitors: monitors.map((row: any) => pick(row, MONITOR_COLUMNS)),
       media,
     }
@@ -132,6 +158,21 @@ export class WorkspaceArchiveService {
     catch {
       throw new UserFacingError('That export contains an invalid stored image reference.')
     }
+
+    const blogPosts = (archive.blogPosts || []).filter(post => post.status === 'published' || post.status === 'draft')
+      .map((post) => {
+        const attachments = post.attachments
+        if (attachments !== undefined && (!Array.isArray(attachments) || attachments.length > MAX_POST_IMAGES))
+          throw new UserFacingError('That export contains invalid Blog attachments.')
+        const images = attachments?.map((image) => {
+          if (typeof image?.data !== 'string' || image.data.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4 || typeof image.alt !== 'string')
+            throw new UserFacingError('That export contains an invalid Blog image.')
+          const checked = checkImageBytes(Buffer.from(image.data, 'base64'))
+          if (!checked.ok) throw new UserFacingError('That export contains an invalid Blog image.')
+          return { bytes: checked.bytes, mimeType: checked.mimeType, altText: image.alt }
+        })
+        return { ...post, images }
+      })
 
     const report: ImportReport = { posts: 0, targets: 0, campaigns: 0, campaignPosts: 0, blogPosts: 0, monitors: 0, media: 0, skipped: 0 }
     const accountId = await ensureAccount()
@@ -180,11 +221,19 @@ export class WorkspaceArchiveService {
     }
 
     const createdThisRun = new Set<string>()
-    for (const post of archive.blogPosts || []) {
-      if (post.status !== 'published') continue
-      const outcome = await blog.importPost({ title: post.title, body: post.body, slug: post.slug, publishedAt: post.publishedAt || now() }, { createdThisRun })
+    for (const post of blogPosts) {
+      const outcome = await blog.importPost({
+        title: post.title,
+        body: post.body,
+        slug: post.slug,
+        publishedAt: post.publishedAt || now(),
+        status: post.status === 'draft' ? 'draft' : 'published',
+        access: post.access === 'paid' ? 'paid' : post.access === 'free' ? 'free' : undefined,
+        images: post.images,
+      }, { createdThisRun })
       if (outcome === 'created') report.blogPosts++
       else report.skipped++
+      report.media += post.images?.length || 0
     }
 
     for (const monitor of archive.monitors || []) {

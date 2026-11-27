@@ -175,6 +175,7 @@ declare module '@stacksjs/database' {
       slug: string
       body: string
       published_body: string | null
+      attachments: string | null
       excerpt: string
       status: "draft" | "published" | "archived"
       published_at: string

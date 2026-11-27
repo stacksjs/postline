@@ -13,6 +13,7 @@ test('recovery keeps earlier queued images even when the live copy changes', asy
     database.exec(`
       CREATE TABLE posts (id INTEGER PRIMARY KEY, status TEXT, content TEXT, notes TEXT);
       CREATE TABLE post_targets (post_id INTEGER, status TEXT);
+      CREATE TABLE blog_posts (status TEXT, attachments TEXT);
       INSERT INTO post_targets VALUES (2, 'failed'), (3, 'published');
     `)
     const write = database.prepare('INSERT INTO posts VALUES (?, ?, ?, ?)')
@@ -20,6 +21,9 @@ test('recovery keeps earlier queued images even when the live copy changes', asy
     write.run(1, 'scheduled', image('queued.jpg'), null)
     write.run(2, 'published', null, image('retry.jpg'))
     write.run(3, 'published', image('sent.jpg'), null)
+
+    const publishedImage = 'blog-12345678-1234-1234-1234-123456789abc.png'
+    database.run('INSERT INTO blog_posts VALUES (?, ?)', ['draft', JSON.stringify([{ file: publishedImage, alt: 'Example photo' }])])
 
     const source = join(directory, 'live')
     const staged = join(directory, 'staged')
@@ -29,11 +33,14 @@ test('recovery keeps earlier queued images even when the live copy changes', asy
     await expect(captureRecoveryMedia(databasePath, source, join(directory, 'incomplete'))).rejects.toThrow('missing an image')
 
     await Bun.write(join(source, 'retry.jpg'), 'retry bytes')
+    await expect(captureRecoveryMedia(databasePath, source, join(directory, 'missing-blog'))).rejects.toThrow('needed by a Blog article')
+    await Bun.write(join(source, publishedImage), 'article bytes')
     await captureRecoveryMedia(databasePath, source, staged)
     await rm(join(source, 'queued.jpg'))
     await verifyRecoveryMedia(databasePath, staged)
     expect(await Bun.file(join(staged, 'queued.jpg')).text()).toBe('queued bytes')
     expect(await Bun.file(join(staged, 'retry.jpg')).text()).toBe('retry bytes')
+    expect(await Bun.file(join(staged, publishedImage)).text()).toBe('article bytes')
 
     await rm(join(staged, 'retry.jpg'))
     await expect(verifyRecoveryMedia(databasePath, staged)).rejects.toThrow('missing an image')

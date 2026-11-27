@@ -304,6 +304,14 @@
             "isUnique": false,
             "isNullable": true,
             "hasDefault": false
+          },
+          {
+            "name": "attachments",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
           }
         ],
         "indexes": [
@@ -2749,7 +2757,7 @@
       }
     ]
   },
-  "hash": "93ca22bdbe45e6564f9772b4b83e4a1b44fcb7a6021c3abca58f0692f260b9fb",
+  "hash": "6e2a1d1656a610c21ba05cffc9a8ab9261fee0804fea772a19834a0ba59b82c0",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-26T23:12:13.430Z"
+  "updatedAt": "2026-11-27T00:42:07.692Z"
 }

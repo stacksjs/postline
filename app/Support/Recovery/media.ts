@@ -1,10 +1,11 @@
 import { Database } from 'bun:sqlite'
 import { copyFile, lstat, mkdir, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import { readBlogAttachments } from '../Social/blog-attachments'
 import { referencedMediaFiles } from '../Social/stored-content'
 import { isSafeMediaFilename } from '../Social/uploads'
 
-function requiredMedia(databasePath: string): Set<string> {
+function requiredMedia(databasePath: string): Map<string, string> {
   const database = new Database(databasePath, { readonly: true })
   try {
     const posts = database.query<{ stored: string | null }, []>(`
@@ -15,7 +16,17 @@ function requiredMedia(databasePath: string): Set<string> {
           SELECT 1 FROM post_targets WHERE post_targets.post_id = posts.id AND post_targets.status = 'failed'
         ))
     `).all()
-    return new Set(posts.flatMap(post => referencedMediaFiles(post.stored)))
+    const files = new Map(posts.flatMap(post => referencedMediaFiles(post.stored)).map(name => [name, 'a queued post']))
+    const blogColumns = database.query<{ name: string }, []>('PRAGMA table_info(blog_posts)').all()
+    if (blogColumns.some(column => column.name === 'attachments')) {
+      const articles = database.query<{ attachments: string | null }, []>(`
+        SELECT attachments FROM blog_posts WHERE status IN ('draft', 'published')
+      `).all()
+      for (const article of articles) {
+        for (const attachment of readBlogAttachments(article.attachments)) files.set(attachment.file, 'a Blog article')
+      }
+    }
+    return files
   }
   finally {
     database.close()
@@ -24,12 +35,12 @@ function requiredMedia(databasePath: string): Set<string> {
 
 /** Read references from the exact database that will be uploaded or restored. */
 export async function verifyRecoveryMedia(databasePath: string, directory: string): Promise<void> {
-  for (const name of requiredMedia(databasePath)) {
+  for (const [name, owner] of requiredMedia(databasePath)) {
     const file = await lstat(join(directory, name)).catch((error) => {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
       return null
     })
-    if (!file?.isFile()) throw new Error('The recovery set is missing an image needed by a queued post.')
+    if (!file?.isFile()) throw new Error(`The recovery set is missing an image needed by ${owner}.`)
   }
 }
 

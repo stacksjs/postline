@@ -44,6 +44,12 @@ export default defineModel({
       fillable: true,
       validation: { rule: schema.string().optional() },
     },
+    attachments: {
+      required: false,
+      nullable: true,
+      fillable: true,
+      validation: { rule: schema.string().optional() },
+    },
     excerpt: {
       required: false,
       fillable: true,

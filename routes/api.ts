@@ -75,6 +75,7 @@ if (isMarketingSite())
 // route is intentionally unauthenticated. The filename is an unguessable
 // per-upload UUID and strictly validated against traversal (MediaServeAction).
 route.get('/postline/media', 'Actions/Postline/MediaServeAction').rateLimit(120, 'minute')
+route.get('/postline/blog/media', 'Actions/Postline/BlogMediaAction').rateLimit(120, 'minute')
 
 // For a load balancer or an uptime monitor: fails when the scheduler has
 // stopped, which the framework's own health check cannot see.
