@@ -30,7 +30,7 @@ const faqs = [
   { q: 'Is Postline free?', a: 'Yes. Postline is MIT licensed and free to run yourself, with no limit on accounts or posts. A hosted plan is in development. Leave your address below to hear when it opens.' },
   { q: 'Which networks does it publish to?', a: 'Bluesky, X, LinkedIn, Instagram, Threads and Mastodon, plus long-form posts to a blog on your own site. You can connect several accounts on the same network.' },
   { q: 'Where are my access tokens kept?', a: 'In your own database, encrypted with a key your instance generates. Postline has no service in the middle, so there is nobody else who could hold a copy.' },
-  { q: 'Do I need a server?', a: 'No. It runs on a laptop. Scheduled posts go out while Postline is running, so put it on a small always-on server when you want the queue to publish overnight. Instagram and Threads fetch images from a public address, so on a laptop switch on temporary image links in Settings.' },
+  { q: 'Do I need a server?', a: 'You can run the desktop app on an Apple silicon Mac with macOS 13 or later. For overnight publishing or access from another device, self-host Postline on an always-on server and use it in your browser. On a Mac, you can switch on temporary image links in Settings so Instagram and Threads can fetch your images.' },
   { q: 'What do the networks charge?', a: 'Most of them nothing. X bills API access per use, and that cost is between you and X: Postline adds nothing on top and tells you which network a failed post was rejected by.' },
 ]
 
@@ -40,7 +40,8 @@ const structuredData = [
     '@type': 'SoftwareApplication',
     'name': 'Postline',
     'applicationCategory': 'BusinessApplication',
-    'operatingSystem': 'macOS, Linux, Windows',
+    'operatingSystem': 'macOS 13 or later',
+    'processorRequirements': 'Apple silicon (ARM64)',
     'description': 'Write a post once and publish it to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon. Open source, and it runs with your own keys.',
     'url': urlTo('/'),
     'license': 'https://opensource.org/licenses/MIT',
@@ -88,7 +89,7 @@ useHead({
           Get the source
         </a>
       </div>
-      <p class="m-0 mt-4 text-[13px] text-muted">Download the Mac app or self-host. Light and dark themes are built in.</p>
+      <p class="m-0 mt-4 text-[13px] text-muted">Requires Apple silicon and macOS 13 or later. You can also self-host and use Postline in a browser.</p>
     </div>
 
     <div class="relative mx-auto pb-20 px-5 sm:px-8 max-w-[1040px]">

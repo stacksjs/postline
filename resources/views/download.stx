@@ -20,7 +20,7 @@ const dmg = version ? `${releases}/latest/download/Postline-${version}-macos-arm
 @section('content')
   <LegalPage heading="Get Postline" intro="Free and open source. Run it on your Mac, or on a server of your own. Either way your posts and access tokens stay with you.">
     <section class="grid gap-4" id="mac">
-      <h2 class="m-0 text-2xl text-ink">On your Mac</h2>
+      <h2 class="m-0 text-2xl text-ink">Desktop app for Apple silicon</h2>
       <p class="m-0 leading-relaxed text-[16px] text-body">The simplest way: an app that runs itself, with no server and no account to create. Scheduled posts go out while it runs, including from the menu bar with its window closed.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="{{ dmg }}" data-download-dmg>
@@ -40,8 +40,8 @@ const dmg = version ? `${releases}/latest/download/Postline-${version}-macos-arm
     </section>
 
     <section class="grid gap-4" id="source">
-      <h2 class="m-0 text-2xl text-ink">On a server, from source</h2>
-      <p class="m-0 leading-relaxed text-[16px] text-body">For a Postline that is up while your Mac sleeps, or that more than one machine can reach. It needs <a class="text-ink underline underline-offset-4" href="https://bun.sh">Bun</a> 1.3.14 or newer and SQLite 3.47.2 or newer, and HTTPS anywhere beyond the machine itself.</p>
+      <h2 class="m-0 text-2xl text-ink">Self-host and open in a browser</h2>
+      <p class="m-0 leading-relaxed text-[16px] text-body">Run Postline on a server so it stays up while your computer sleeps. Open your instance in a browser to use Postline on an Intel Mac, Windows, or Linux. Running from source requires <a class="text-ink underline underline-offset-4" href="https://bun.sh">Bun</a> 1.3.14 or newer, SQLite 3.47.2 or newer, and HTTPS for access from another machine.</p>
       <pre class="overflow-x-auto m-0 p-4 font-mono text-[13px] text-ink bg-panel-2 border border-line rounded-xl"><code>git clone https://github.com/stacksjs/postline
 cd postline && ./bootstrap
 cp .env.example .env && ./buddy key:generate

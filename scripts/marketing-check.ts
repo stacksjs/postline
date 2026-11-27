@@ -47,9 +47,18 @@ for (const path of paths) {
       }
     }
     const json = html.match(/<script\b[^>]*type="application\/ld\+json"[^>]*>([^<]*)<\/script>/)?.[1]
-    const graph = json ? JSON.parse(json)['@graph'] : null
-    if (!Array.isArray(graph) || !graph.some(entry => entry['@type'] === 'SoftwareApplication' && entry.url === canonical)
-      || !graph.some(entry => entry['@type'] === 'FAQPage' && entry.mainEntity?.length))
+    const graph: Record<string, unknown>[] = json ? JSON.parse(json)['@graph'] : []
+    if (!Array.isArray(graph)) throw new Error('The home page is missing its structured data graph.')
+    const application = graph.find(entry => entry['@type'] === 'SoftwareApplication')
+    if (!application || application.url !== canonical
+      || !graph.some(entry => entry['@type'] === 'FAQPage' && Array.isArray(entry.mainEntity) && entry.mainEntity.length))
       throw new Error('The home page is missing application or FAQ structured data.')
+    if (application.operatingSystem !== 'macOS 13 or later' || application.processorRequirements !== 'Apple silicon (ARM64)')
+      throw new Error('The software listing must describe the Apple silicon macOS desktop release.')
+  }
+  if (path === '/download') {
+    if (!attribute('a[data-download-dmg]', 'href').endsWith('-macos-arm64.dmg')
+      || !html.includes('Needs macOS 13 or later on Apple silicon') || !html.includes('Self-host and open in a browser'))
+      throw new Error('The download page must identify the Mac build and describe browser access.')
   }
 }
