@@ -7,6 +7,7 @@ import { PendingOAuthStates } from '../../Support/Social/oauth-state'
 import { InstagramDriver } from './Drivers/InstagramDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
 import { exceedsLimit } from '../../Support/Social/count-text'
+import { syncConnectedMetrics } from './sync-connected-metrics'
 import { ensureAccount, now, uuid } from './support'
 import { explainNetworkError } from '../../Support/Social/network-errors'
 import { networkApps } from '../NetworkAppService'
@@ -72,7 +73,7 @@ export class InstagramService {
       accessToken: String(env.INSTAGRAM_ACCESS_TOKEN || '').trim(),
       userId: String(env.INSTAGRAM_USER_ID || '').trim(),
       username: String(env.INSTAGRAM_USERNAME || '').trim(),
-      // Publishing only. The messaging permissions are not asked for: the
+      // The messaging permissions are not asked for: the
       // inbox cannot read Instagram without Meta's app review (#129), and a
       // permission nothing uses is one more thing to explain at consent.
       scopes: [
@@ -80,6 +81,7 @@ export class InstagramService {
         'instagram_content_publish',
         'pages_show_list',
         'pages_read_engagement',
+        ...(app.engagementMetrics ? ['instagram_manage_insights'] : []),
       ],
     }
   }
@@ -302,6 +304,15 @@ export class InstagramService {
 
       return { provider: 'instagram', ok: false, error: message, targetId: Number(target.id), retry: classifyFailure(error), ...account }
     }
+  }
+
+  async syncMetrics(limit = 100) {
+    if (!(await networkApps.credentials('instagram')).engagementMetrics) return { synced: 0 }
+    return await syncConnectedMetrics<SocialIdentityRow>('instagram', this.driver, identity => ({
+      handle: identity.handle,
+      did: identity.external_id || undefined,
+      accessToken: identity.access_token || undefined,
+    }), limit)
   }
 
   /**

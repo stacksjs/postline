@@ -105,8 +105,12 @@
               </label>
               {{-- LinkedIn company Pages (#130): opt-in, since the scopes need a product the app may not have. --}}
               <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'linkedin' ? 'flex' : 'hidden'">
-                <input class="mt-0.5" type="checkbox" :checked="app.organizationPages" @change="setAppPages(app.provider, $event)" data-app-organization-pages>
+                <input class="mt-0.5" type="checkbox" :checked="app.organizationPages" @change="setAppFlag(app.provider, 'organizationPages', $event)" data-app-organization-pages>
                 <span>Also connect the company Pages I administer. Needs the Community Management API product on this app; without it LinkedIn refuses the sign-in.</span>
+              </label>
+              <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'twitter' ? 'hidden' : 'flex'">
+                <input class="mt-0.5" type="checkbox" :checked="app.engagementMetrics" @change="setAppFlag(app.provider, 'engagementMetrics', $event)">
+                <span>Read engagement metrics. Enable the permission in your developer app, then reconnect the account.</span>
               </label>
               <div class="flex flex-wrap gap-2 items-center sm:col-span-2">
                 <p class="m-0 mr-auto text-muted text-xs" :text="app.note"></p>
@@ -265,6 +269,7 @@
         clientId: draft.clientId ?? app.clientId,
         clientSecret: draft.clientSecret ?? '',
         organizationPages: draft.organizationPages ?? Boolean(app.organizationPages),
+        engagementMetrics: draft.engagementMetrics ?? Boolean(app.engagementMetrics),
         secretPlaceholder: app.hasSecret ? 'Stored. Leave blank to keep it.' : 'Paste the client secret',
         removable: app.source === 'settings',
         note: app.source === 'environment' ? 'Read from .env. Saving here takes over from it.' : app.configured ? 'Saved. Connect the account in its card above.' : '',
@@ -275,9 +280,9 @@
       drafts[provider] = { ...(drafts[provider] || {}), [field]: String(event?.target?.value || '') }
       appDrafts.set(drafts)
     }
-    const setAppPages = (provider, event) => {
+    const setAppFlag = (provider, field, event) => {
       const drafts = { ...appDrafts() }
-      drafts[provider] = { ...(drafts[provider] || {}), organizationPages: Boolean(event?.target?.checked) }
+      drafts[provider] = { ...(drafts[provider] || {}), [field]: Boolean(event?.target?.checked) }
       appDrafts.set(drafts)
     }
     const appHandlers = { save: null, clear: null, copy: null }
@@ -349,6 +354,7 @@
           body.set('client_id', row.clientId || '')
           body.set('client_secret', row.clientSecret || '')
           if (provider === 'linkedin') body.set('organization_pages', row.organizationPages ? '1' : '0')
+          if (provider !== 'twitter') body.set('engagement_metrics', row.engagementMetrics ? '1' : '0')
           await requestJson('/api/postline/network-apps', { method: 'POST', body }, 'Could not save the app.')
           const drafts = { ...appDrafts() }
           delete drafts[provider]

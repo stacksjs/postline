@@ -2743,6 +2743,15 @@
             "isNullable": true,
             "hasDefault": true,
             "defaultValue": false
+          },
+          {
+            "name": "engagement_metrics",
+            "type": "boolean",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": true,
+            "defaultValue": false
           }
         ],
         "indexes": [
@@ -2757,7 +2766,7 @@
       }
     ]
   },
-  "hash": "6e2a1d1656a610c21ba05cffc9a8ab9261fee0804fea772a19834a0ba59b82c0",
+  "hash": "f89edf2ee1dfbefba9c6439f5a15c4b3e18965d59a2ffa72ae2148865d00695c",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-27T00:42:07.692Z"
+  "updatedAt": "2026-11-27T01:22:07.097Z"
 }

@@ -25,6 +25,7 @@ export interface NetworkAppCredentials {
   redirectUrl: string
   /** LinkedIn: connect the owner's company Pages as well (`LINKEDIN_PAGES=true` from the environment). */
   organizationPages: boolean
+  engagementMetrics: boolean
   /** Where the id and secret came from. */
   source: 'settings' | 'environment' | 'none'
 }
@@ -38,6 +39,7 @@ export interface NetworkAppSummary {
   hasSecret: boolean
   redirectUrl: string
   organizationPages: boolean
+  engagementMetrics: boolean
 }
 
 /** This install's public origin, from APP_URL (the Mac app sets it to its own address). */
@@ -63,6 +65,7 @@ export class NetworkAppService {
         clientSecret: (await openToken(row.client_secret)) || '',
         redirectUrl: String(row.redirect_url || '').trim() || env('REDIRECT_URL') || defaultRedirectUrl(network),
         organizationPages: network === 'linkedin' && Boolean(Number(row.organization_pages ?? 0)),
+        engagementMetrics: network !== 'twitter' && Boolean(Number(row.engagement_metrics ?? 0)),
         source: 'settings',
       }
     }
@@ -72,6 +75,7 @@ export class NetworkAppService {
       clientSecret: env('CLIENT_SECRET'),
       redirectUrl: env('REDIRECT_URL') || defaultRedirectUrl(network),
       organizationPages: network === 'linkedin' && env('PAGES').toLowerCase() === 'true',
+      engagementMetrics: network !== 'twitter' && env('ENGAGEMENT_METRICS').toLowerCase() === 'true',
       source: clientId ? 'environment' : 'none',
     }
   }
@@ -87,6 +91,7 @@ export class NetworkAppService {
         hasSecret: Boolean(credentials.clientSecret),
         redirectUrl: credentials.redirectUrl,
         organizationPages: credentials.organizationPages,
+        engagementMetrics: credentials.engagementMetrics,
       }
     }))
   }
@@ -95,7 +100,7 @@ export class NetworkAppService {
    * Store a network's app. A blank secret keeps the stored one, so the id can
    * be corrected without pasting the secret again.
    */
-  async save(network: AppNetwork, input: { clientId: string, clientSecret?: string, redirectUrl?: string, organizationPages?: boolean }): Promise<NetworkAppSummary> {
+  async save(network: AppNetwork, input: { clientId: string, clientSecret?: string, redirectUrl?: string, organizationPages?: boolean, engagementMetrics?: boolean }): Promise<NetworkAppSummary> {
     if (!APP_NETWORKS.includes(network)) throw new UserFacingError('That network does not use an app of its own.')
     const clientId = input.clientId.trim()
     if (!clientId || clientId.length > 255 || /\s/.test(clientId)) throw new UserFacingError('Paste the client id from the network\'s developer console. It has no spaces.')
@@ -113,6 +118,7 @@ export class NetworkAppService {
       redirect_url: redirectUrl || null,
       // Left as it is when not given, so a form without the switch keeps it.
       ...(input.organizationPages === undefined ? {} : { organization_pages: network === 'linkedin' && input.organizationPages }),
+      ...(input.engagementMetrics === undefined ? {} : { engagement_metrics: network !== 'twitter' && input.engagementMetrics }),
       updated_at: now(),
     }
     if (existing)

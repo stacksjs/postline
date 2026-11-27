@@ -38,4 +38,21 @@ describe('engagement recommendations', () => {
     expect(tied.bestChannel).toBeNull()
     expect(tied.bestHour).toBeNull()
   })
+
+  test('displays reported counts and compares only likes and replies', () => {
+    const bluesky = { ...target('bluesky', '03', 4), metrics: JSON.stringify({ likes: 4, replies: 0, reposts: 70 }) }
+    const instagram = { ...target('instagram', '16', 5), metrics: JSON.stringify({ likes: 5, replies: 2 }) }
+    const threads = { ...target('threads', '12', 0), metrics: JSON.stringify({ reposts: 1 }) }
+
+    const result = summarizeEngagement([bluesky, bluesky, bluesky, instagram, instagram, instagram, threads, threads, threads], 'UTC')
+
+    expect(result.countsByProvider).toEqual([
+      { provider: 'bluesky', measured: 3, likes: 12, replies: 0, reposts: 210 },
+      { provider: 'instagram', measured: 3, likes: 15, replies: 6 },
+      { provider: 'threads', measured: 3, reposts: 3 },
+    ])
+    expect(result.bestChannel).toEqual({ provider: 'instagram', count: 3, average: 7 })
+    expect(result.bestHour).toEqual({ hour: 16, count: 3, average: 7 })
+  })
+
 })

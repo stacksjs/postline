@@ -13,17 +13,23 @@ interface Sample {
   interactions: number
 }
 
-function readMetrics(value: string | null) {
-  if (!value) return null
+const metricFields = ['likes', 'reposts', 'replies'] as const
+type MetricField = typeof metricFields[number]
+type Counts = Partial<Record<MetricField, number>>
+
+function readMetrics(value: string | null): Counts {
+  if (!value) return {}
   try {
-    const { likes, reposts, replies } = JSON.parse(value)
-    if ([likes, reposts, replies].every(count => Number.isSafeInteger(count) && count >= 0))
-      return { likes: Number(likes), reposts: Number(reposts), replies: Number(replies) }
+    const counts = JSON.parse(value) as Partial<Record<MetricField, unknown>> | null
+    return Object.fromEntries(metricFields.flatMap((field) => {
+      const count = counts?.[field]
+      return typeof count === 'number' && Number.isSafeInteger(count) && count >= 0 ? [[field, count]] : []
+    }))
   }
   catch {
-    // Older or damaged snapshots cannot be counted as zero engagement.
+    // A damaged snapshot has no usable measurements.
+    return {}
   }
-  return null
 }
 
 function record<Key>(samples: Map<Key, Sample>, key: Key, interactions: number): void {
@@ -39,6 +45,7 @@ function rank<Key>(samples: Map<Key, Sample>) {
 
 export function summarizeEngagement(targets: readonly PublishedTarget[], timezone: string) {
   const byProvider = new Map<string, Sample>()
+  const countsByProvider = new Map<string, Counts & { measured: number }>()
   const byHour = new Map<number, Sample>()
   const postsByHour = new Map<number, number>()
   const engagement = { likes: 0, reposts: 0, replies: 0, syncedTargets: 0 }
@@ -49,13 +56,22 @@ export function summarizeEngagement(targets: readonly PublishedTarget[], timezon
     if (hour !== null) postsByHour.set(hour, (postsByHour.get(hour) ?? 0) + 1)
 
     const metrics = readMetrics(target.metrics)
-    if (!metrics) continue
-    engagement.likes += metrics.likes
-    engagement.reposts += metrics.reposts
-    engagement.replies += metrics.replies
+    if (!Object.keys(metrics).length) continue
     engagement.syncedTargets++
+    const providerCounts = countsByProvider.get(target.provider) ?? { measured: 0 }
+    providerCounts.measured++
+    for (const field of metricFields) {
+      const count = metrics[field]
+      if (count === undefined) continue
+      engagement[field] += count
+      providerCounts[field] = (providerCounts[field] ?? 0) + count
+    }
+    countsByProvider.set(target.provider, providerCounts)
 
-    const interactions = metrics.likes + metrics.reposts + metrics.replies
+    // Likes (or reactions) and replies are comparable across networks.
+    // Reposts are displayed above but cannot influence a cross-network rank.
+    if (metrics.likes === undefined || metrics.replies === undefined) continue
+    const interactions = metrics.likes + metrics.replies
     record(byProvider, target.provider, interactions)
     if (hour !== null) record(byHour, hour, interactions)
   }
@@ -65,7 +81,8 @@ export function summarizeEngagement(targets: readonly PublishedTarget[], timezon
 
   return {
     engagement,
-    providers: [...byProvider.keys()],
+    providers: [...countsByProvider.keys()],
+    countsByProvider: [...countsByProvider].map(([provider, counts]) => ({ provider, ...counts })),
     minSample: MIN_SAMPLE,
     bestChannel: channel && otherChannel && channel.average > otherChannel.average
       ? { provider: channel.key, count: channel.count, average: channel.average }

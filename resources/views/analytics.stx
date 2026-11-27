@@ -66,6 +66,14 @@
       </section>
 
       <aside class="grid content-start gap-3.5">
+        <section class="bg-panel border border-line rounded-2xl shadow-sm" aria-labelledby="network-engagement-title">
+          <header class="p-3.5 border-b border-line">
+            <h2 class="m-0 font-semibold text-ui" id="network-engagement-title">Engagement by network</h2>
+          </header>
+          <ul class="grid gap-2 m-0 p-3.5 list-none text-muted text-xs" data-analytics-network-engagement>
+            <li>Waiting for reported engagement.</li>
+          </ul>
+        </section>
         <section class="bg-panel border border-line rounded-2xl shadow-sm">
           <header class="p-3.5 border-b border-line">
             <strong class="text-ui">Publishing by network</strong>

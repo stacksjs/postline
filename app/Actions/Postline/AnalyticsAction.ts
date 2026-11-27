@@ -89,7 +89,7 @@ export default new Action({
         }))
 
       const timezone = await workspace.timezone()
-      const { engagement, providers, minSample, bestChannel, bestHour, windows } = summarizeEngagement(targets, timezone)
+      const { engagement, providers, countsByProvider, minSample, bestChannel, bestHour, windows } = summarizeEngagement(targets, timezone)
 
       return response.json({
         ok: true,
@@ -99,7 +99,7 @@ export default new Action({
             postsLastWeek,
             bestChannel,
             bestHour,
-            engagement: { ...engagement, providers },
+            engagement: { ...engagement, providers, countsByProvider },
             minSample,
           },
           series,

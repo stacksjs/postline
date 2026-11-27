@@ -1179,6 +1179,7 @@ declare module '@stacksjs/database' {
       client_secret: string
       redirect_url: string
       organization_pages: number
+      engagement_metrics: number
     }
     notification_deliveries: {
       // columns

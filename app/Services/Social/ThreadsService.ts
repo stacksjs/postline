@@ -9,6 +9,7 @@ import { ThreadsDriver } from './Drivers/ThreadsDriver'
 import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow, saveIdentityTokens } from './identities'
 import { refreshOnce } from '../../Support/Social/token-refresh'
 import { exceedsLimit } from '../../Support/Social/count-text'
+import { syncConnectedMetrics } from './sync-connected-metrics'
 import { ensureAccount, expiresAt, now, uuid } from './support'
 import { explainNetworkError } from '../../Support/Social/network-errors'
 import { networkApps } from '../NetworkAppService'
@@ -75,7 +76,7 @@ export class ThreadsService {
       accessToken: String(env.THREADS_ACCESS_TOKEN || '').trim(),
       userId: String(env.THREADS_USER_ID || '').trim(),
       username: String(env.THREADS_USERNAME || '').trim(),
-      scopes: ['threads_basic', 'threads_content_publish'],
+      scopes: ['threads_basic', 'threads_content_publish', ...(app.engagementMetrics ? ['threads_manage_insights'] : [])],
     }
   }
 
@@ -328,6 +329,18 @@ export class ThreadsService {
       },
       deletePost: ref => this.driver.deletePost(credentials, ref),
     }
+  }
+
+  async syncMetrics(limit = 100) {
+    if (!(await networkApps.credentials('threads')).engagementMetrics) return { synced: 0 }
+    return await syncConnectedMetrics<SocialIdentityRow>('threads', this.driver, async (identity) => {
+      const current = await this.refreshIfExpiring(identity)
+      return {
+        handle: current.handle,
+        did: current.external_id || undefined,
+        accessToken: current.access_token || undefined,
+      }
+    }, limit)
   }
 
   /**

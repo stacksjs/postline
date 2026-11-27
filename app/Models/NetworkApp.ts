@@ -61,5 +61,13 @@ export default defineModel({
       validation: { rule: schema.boolean() },
       factory: () => false,
     },
+    /** Optional read scopes for the app's engagement analytics. */
+    engagementMetrics: {
+      required: false,
+      fillable: true,
+      default: false,
+      validation: { rule: schema.boolean() },
+      factory: () => false,
+    },
   },
 } as const)

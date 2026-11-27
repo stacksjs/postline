@@ -1,11 +1,17 @@
 import { publicMessage } from '../../Support/Http/action-error'
 import { bluesky } from './BlueskyService'
+import { instagram } from './InstagramService'
+import { linkedin } from './LinkedInService'
+import { threads } from './ThreadsService'
 import { mastodon } from './MastodonService'
 
 export async function syncEngagement() {
   const sources: Array<{ provider: string, result: Promise<{ synced: number, errors?: string[] }> }> = [
     { provider: 'bluesky', result: bluesky.syncMetrics() },
     { provider: 'mastodon', result: mastodon.syncMetrics() },
+    { provider: 'linkedin', result: linkedin.syncMetrics() },
+    { provider: 'instagram', result: instagram.syncMetrics() },
+    { provider: 'threads', result: threads.syncMetrics() },
   ]
   const settled = await Promise.allSettled(sources.map(source => source.result))
   let synced = 0

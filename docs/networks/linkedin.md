@@ -31,3 +31,8 @@ off unless you turn it on.
   refresh tokens; Postline says when an account needs connecting again.
 - Cleanup can delete posts Postline published; listing older history needs a
   partner permission LinkedIn grants rarely.
+
+## Engagement metrics
+
+With company Pages enabled, **Read engagement metrics** requests `r_organization_social_feed`. Without company Pages, it requests `r_member_social_feed`, which LinkedIn grants to select developers. Enable the setting after your app has the matching scope, then reconnect.
+[Provider documentation](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/social-metadata-api).

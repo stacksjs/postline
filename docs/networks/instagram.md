@@ -28,3 +28,8 @@ Postline asks for `instagram_basic`, `instagram_content_publish`,
   which an app made for one person does not get.
 - **No deleting:** the API cannot delete Instagram posts.
 - **Limits:** 2,200 characters in a caption, up to four images.
+
+## Engagement metrics
+
+Grant the app `instagram_manage_insights`, then enable **Read engagement metrics** in its Postline network app settings and reconnect. The connected Facebook account needs permission to analyze the linked Page.
+[Provider documentation](https://developers.facebook.com/docs/insights/overview/).

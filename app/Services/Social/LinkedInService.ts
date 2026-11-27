@@ -10,6 +10,7 @@ import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityR
 import { resolveLinkedInVersion } from '../../Support/Social/linkedin-text'
 import { refreshOnce } from '../../Support/Social/token-refresh'
 import { exceedsLimit } from '../../Support/Social/count-text'
+import { syncConnectedMetrics } from './sync-connected-metrics'
 import { ensureAccount, expiresAt, now, uuid } from './support'
 import { explainNetworkError } from '../../Support/Social/network-errors'
 import { networkApps } from '../NetworkAppService'
@@ -52,8 +53,9 @@ interface LinkedInConfig {
 }
 
 /** What signing in asks LinkedIn for: posting as the member, and as their Pages when that is on. */
-export function linkedInScopes(organizationPages: boolean): string[] {
+export function linkedInScopes(organizationPages: boolean, engagementMetrics = false): string[] {
   const member = ['openid', 'profile', 'w_member_social']
+  if (engagementMetrics) member.push(organizationPages ? 'r_organization_social_feed' : 'r_member_social_feed')
   // Posting as a Page, and listing the Pages the member administers.
   return organizationPages ? [...member, 'w_organization_social', 'r_organization_admin'] : member
 }
@@ -82,7 +84,7 @@ export class LinkedInService {
       apiVersion: resolveLinkedInVersion(env.LINKEDIN_API_VERSION),
       accessToken: String(env.LINKEDIN_ACCESS_TOKEN || '').trim(),
       authorUrn: String(env.LINKEDIN_AUTHOR_URN || '').trim(),
-      scopes: linkedInScopes(app.organizationPages),
+      scopes: linkedInScopes(app.organizationPages, app.engagementMetrics),
       organizationPages: app.organizationPages,
     }
   }
@@ -340,6 +342,18 @@ export class LinkedInService {
       listPage: cursor => this.driver.listAuthoredPosts(credentials, { cursor }),
       deletePost: ref => this.driver.deletePost(credentials, ref),
     }
+  }
+
+  async syncMetrics(limit = 100) {
+    if (!(await networkApps.credentials('linkedin')).engagementMetrics) return { synced: 0 }
+    return await syncConnectedMetrics<SocialIdentityRow>('linkedin', this.driver, async (identity) => {
+      const current = await this.refreshIfExpiring(identity)
+      return {
+        handle: current.handle,
+        did: current.external_id || undefined,
+        accessToken: current.access_token || undefined,
+      }
+    }, limit)
   }
 
   /**

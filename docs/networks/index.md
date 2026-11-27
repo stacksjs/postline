@@ -24,8 +24,8 @@ app shows you.
 | | Publish | Threads | Images | Delete | Inbox | Listening | Engagement numbers |
 |---|---|---|---|---|---|---|---|
 | Bluesky | Yes | Yes | Up to 4 | Yes | Yes | Yes | Yes |
-| Mastodon | Yes | Yes | Up to 4 | Yes | Yes | Yes | Not yet |
+| Mastodon | Yes | Yes | Up to 4 | Yes | Yes | Yes | Yes |
 | X | Yes | Yes | Up to 4 | Yes | No | Yes | Not yet |
-| LinkedIn | Yes | No | Up to 4 | Yes | No | No | Not yet |
-| Threads | Yes | No | Up to 4 | Up to 100 a day | No | No | Not yet |
-| Instagram | Yes, with an image | No | Required, up to 4 | No | No | No | Not yet |
+| LinkedIn | Yes | No | Up to 4 | Yes | No | No | With approved scopes |
+| Threads | Yes | No | Up to 4 | Up to 100 a day | No | No | With insights access |
+| Instagram | Yes, with an image | No | Required, up to 4 | No | No | No | With insights access |

@@ -10,6 +10,13 @@ Open **Listening** and create a rule with the terms and networks you want to wat
 
 ## Analytics
 
-Publishing totals come from posts sent through Postline. Engagement comes from networks that supply metrics to the sync job. Postline syncs engagement from Bluesky and Mastodon. Mastodon boosts count as reposts. A post with missing metrics still contributes to publishing totals once it is sent. Check the source network and date range before comparing engagement.
+Publishing totals come from posts sent through Postline. Bluesky and Mastodon
+report engagement using their existing connections. LinkedIn, Instagram, and
+Threads require opt-in read access in **Settings > Channels > Your network
+apps**. The **Engagement by network** list shows the counts each network
+reports. Unmeasured posts still count toward publishing totals.
 
-**Best window** compares average interactions for measured posts by day of week and hour in the last 30 days. Each comparison requires enough samples in at least two groups and a unique highest average. The scheduler refreshes engagement periodically.
+**Best channel** and **Best window** compare likes or reactions plus replies
+per measured post in the last 30 days. The hour uses your workspace time
+zone. Each comparison requires enough samples in two groups and a unique
+highest average. The scheduler refreshes engagement periodically.

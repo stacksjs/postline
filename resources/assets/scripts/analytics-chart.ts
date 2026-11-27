@@ -39,7 +39,14 @@ interface AnalyticsPayload {
     postsLastWeek: number
     bestChannel: { provider: string, count: number, average: number } | null
     bestHour: { hour: number, count: number, average: number } | null
-    engagement?: { likes: number, reposts: number, replies: number, syncedTargets: number, providers: string[] }
+    engagement?: {
+      likes: number
+      reposts: number
+      replies: number
+      syncedTargets: number
+      providers: string[]
+      countsByProvider?: Array<{ provider: string, measured: number, likes?: number, reposts?: number, replies?: number }>
+    }
     minSample: number
   }
   series: Point[]
@@ -56,6 +63,10 @@ const blue = '#2563eb'
 const text = '#18181b'
 const muted = '#71717a'
 const rule = '#e4e4e7'
+
+function engagementCount(value: number | undefined, noun: string): string | null {
+  return value === undefined ? null : `${value.toLocaleString()} ${noun}${value === 1 ? '' : 's'}`
+}
 
 function formatTick(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
@@ -277,7 +288,7 @@ function fillStats(payload: AnalyticsPayload): void {
     '[data-analytics-engagement-trend]',
     engagement?.syncedTargets
       ? `${measuredNetworks || 'Measured posts'} · ${engagement.likes} likes · ${engagement.reposts} reposts · ${engagement.replies} replies`
-      : 'Syncs after publishing to Bluesky',
+      : 'Waiting for a supported network to report engagement',
   )
   const sampleLabel = ({ average, count }: { average: number, count: number }): string =>
     `${average.toLocaleString(undefined, { maximumFractionDigits: 1 })} interactions per post across ${count} posts`
@@ -285,6 +296,20 @@ function fillStats(payload: AnalyticsPayload): void {
   set('[data-analytics-best-channel-trend]', stats.bestChannel ? sampleLabel(stats.bestChannel) : `Needs a clear leader and ${stats.minSample} measured posts on each of two channels`)
   set('[data-analytics-best-window]', stats.bestHour ? formatHour(stats.bestHour.hour) : 'No recommendation')
   set('[data-analytics-best-window-trend]', stats.bestHour ? sampleLabel(stats.bestHour) : `Needs a clear leader and ${stats.minSample} measured posts in each of two hours`)
+
+  const networkEngagement = page.querySelector('[data-analytics-network-engagement]')
+  if (networkEngagement && payload.channelMix?.length) {
+    const byProvider = new Map(engagement?.countsByProvider?.map(counts => [counts.provider, counts]))
+    networkEngagement.innerHTML = payload.channelMix.map(({ provider }) => {
+      const counts = byProvider.get(provider)
+      const summary = counts ? [
+        engagementCount(counts.likes, provider === 'linkedin' ? 'reaction' : 'like'),
+        engagementCount(counts.reposts, 'repost'),
+        counts.replies === undefined ? null : `${counts.replies.toLocaleString()} ${counts.replies === 1 ? 'reply' : 'replies'}`,
+      ].filter(Boolean).join(' · ') : 'No reported metrics'
+      return `<li><strong class="block text-ink">${escapeHtml(providerLabel(provider))}</strong><span>${escapeHtml(summary)}</span></li>`
+    }).join('')
+  }
 
   const mix = page.querySelector('[data-analytics-channel-mix]')
   if (mix) {

@@ -15,13 +15,16 @@ export default new Action({
     if (!APP_NETWORKS.includes(provider))
       return response.json({ ok: false, error: 'That network does not use an app of its own.' }, { status: 422 })
     try {
+      const flag = (name: string): boolean | undefined => {
+        const value = request.get(name)
+        return value == null ? undefined : ['1', 'true', 'on'].includes(String(value))
+      }
       const data = await networkApps.save(provider, {
         clientId: String(request.get('client_id') || ''),
         clientSecret: String(request.get('client_secret') || ''),
         redirectUrl: String(request.get('redirect_url') || ''),
-        ...(request.get('organization_pages') === undefined || request.get('organization_pages') === null
-          ? {}
-          : { organizationPages: ['1', 'true', 'on'].includes(String(request.get('organization_pages'))) }),
+        organizationPages: flag('organization_pages'),
+        engagementMetrics: flag('engagement_metrics'),
       })
       return response.json({ ok: true, data })
     }

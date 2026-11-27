@@ -23,3 +23,8 @@ install needs: no app review.
 - **Deleting:** Threads allows 100 deletions a day per profile; cleanup stops
   at that and says so.
 - **No inbox:** Threads has no messaging API.
+
+## Engagement metrics
+
+Grant the app `threads_manage_insights`, enable **Read engagement metrics** in its Postline network app settings, and reconnect the account.
+[Provider documentation](https://developers.facebook.com/docs/threads/insights/).
