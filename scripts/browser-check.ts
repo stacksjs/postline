@@ -1018,6 +1018,7 @@ async function checkChannels(cdp: Cdp): Promise<void> {
       window.releaseChannels = () => { measuringChannels = true; resolve() }
     })
     const status = { provider: 'bluesky', connected: true, canPublish: true, authStatus: 'connected' }
+    let channelNeedsReconnect = false
     let accounts = [
       { ...status, id: 101, handle: 'news.example', isDefault: true, expiresSoon: true, expiresAt: new Date(Date.now() + 172800000).toISOString() },
       { ...status, id: 102, handle: 'radio.example', isDefault: false, expiresSoon: false },
@@ -1030,6 +1031,7 @@ async function checkChannels(cdp: Cdp): Promise<void> {
       if (path === '/api/postline/accounts/default' || path === '/api/postline/accounts/disconnect') {
         const id = Number((await request.formData()).get('id'))
         accounts = path.endsWith('/default') ? accounts.map(account => ({ ...account, isDefault: account.id === id })) : accounts.filter(account => account.id !== id)
+        if (path.endsWith('/disconnect')) channelNeedsReconnect = true
         return Response.json({ ok: true })
       }
       if (path !== '/api/postline/bootstrap') return send(input, options)
@@ -1042,7 +1044,7 @@ async function checkChannels(cdp: Cdp): Promise<void> {
         ? { ...app, configured: true, source: 'settings', clientId: 'test-app', hasSecret: true }
         : app)
       payload.data.providers = payload.data.providers.map(provider => provider.provider === 'bluesky'
-        ? { ...provider, ...status, handle: accounts.find(account => account.isDefault)?.handle, accounts }
+        ? { ...provider, ...status, canPublish: !channelNeedsReconnect, handle: accounts.find(account => account.isDefault)?.handle, accounts }
         : provider)
       return Response.json(payload)
     }
@@ -1061,6 +1063,11 @@ async function checkChannels(cdp: Cdp): Promise<void> {
       && ${card}?.innerText.includes('@news.example')
       && ${card}.innerText.includes('Expires in')
       && document.querySelectorAll('[data-network-app]').length === 4`), 5_000)
+    const channelBadge = `${card}.querySelector('[data-channel-status] .rounded-pill')`
+    await waitUntil('The channel badge shows a connected state', () => evaluate<boolean>(cdp, `
+      ${channelBadge}?.textContent.trim() === 'Connected'
+        && ${channelBadge}.classList.contains('bg-success-soft')
+        && !${channelBadge}.hasAttribute('aria-live')`), 5_000)
     const channelShift = await evaluate<number>(cdp, 'window.channelShift')
     if (channelShift > 0) fail('accounts', 'channels', `applying the channel response shifted the layout by ${channelShift.toFixed(3)}`)
     const requests = await evaluate<string[]>(cdp, 'window.channelReads')
@@ -1107,6 +1114,10 @@ async function checkChannels(cdp: Cdp): Promise<void> {
     await evaluate(cdp, `${disconnect}.click(); ${card}.querySelector('dialog button[type=button]').click()`)
     await waitUntil('The disconnected account is removed from its card', () => evaluate<boolean>(cdp, `
       !${disconnect} && ${card}.innerText.includes('@radio.example') && !${card}.querySelector('dialog').open`), 5_000)
+    await waitUntil('A live channel status change updates the badge text and color', () => evaluate<boolean>(cdp, `
+      ${channelBadge}?.textContent.trim() === 'Reconnect'
+        && ${channelBadge}.classList.contains('bg-warning-soft')
+        && !${channelBadge}.classList.contains('bg-success-soft')`), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })

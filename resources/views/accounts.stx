@@ -75,7 +75,7 @@ const networkSetupGuides = await loadNetworkSetupGuides()
             <summary class="flex gap-3 items-center justify-between px-4 py-3 list-none hover:bg-panel-2 cursor-pointer">
               <span class="font-medium text-ink text-ui" :text="app.label"></span>
               <span class="flex gap-2 items-center">
-                <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="app.configured ? 'text-success bg-success-soft' : 'text-muted bg-panel-2'" :text="app.status"></span>
+                <Badge size="sm" :variant="app.configured ? 'success' : 'default'">{{ app.status }}</Badge>
                 <span class="h-4 w-4 text-muted transition-transform group-open:rotate-180 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
               </span>
             </summary>

@@ -130,7 +130,9 @@ function confirmDisconnect(id: number) {
     <div>
       <div class="flex gap-3 items-start justify-between">
         <span class="grid place-items-center h-10 w-10 text-ink bg-panel-2 rounded-xl" aria-hidden="true"><span class="h-5 w-5" :class="providerIcon(provider())"></span></span>
-        <span class="px-2.5 py-1 font-semibold text-xs whitespace-nowrap border rounded-full" :class="connected() ? 'text-success bg-success-soft border-success-line' : status()?.handle ? 'text-warning bg-warning-soft border-warning-line' : 'text-muted border-line'" :text="pill()" data-channel-status></span>
+        <span data-channel-status>
+          <Badge size="sm" className="whitespace-nowrap" :variant="connected() ? 'success' : status()?.handle ? 'warning' : 'default'">{{ pill() }}</Badge>
+        </span>
       </div>
       <h2 class="mb-0 mt-4 font-semibold text-sm" :text="name()"></h2>
       <p class="my-1.5 text-body text-ui" :text="summary()"></p>
@@ -139,7 +141,7 @@ function confirmDisconnect(id: number) {
         <li class="grid gap-1.5 p-2 bg-panel-2 border border-line rounded-xl" x-for="account in accounts()" :key="account.id">
           <div class="flex flex-wrap gap-1.5 items-center justify-between">
             <span class="max-w-full min-w-0 text-ink text-xs truncate" :title="account.displayName || channelHandle(account.handle)" :text="channelHandle(account.handle)"></span>
-            <span class="px-2 py-0.5 font-semibold text-xs rounded-full" :class="account.connected && !account.expiresSoon ? 'text-success bg-success-soft' : 'text-warning bg-warning-soft'" :text="!account.connected ? 'Reconnect' : account.expiresSoon ? expiryLabel(account.expiresAt) : 'Connected'"></span>
+            <Badge size="sm" :variant="account.connected && !account.expiresSoon ? 'success' : 'warning'">{{ !account.connected ? 'Reconnect' : account.expiresSoon ? expiryLabel(account.expiresAt) : 'Connected' }}</Badge>
           </div>
           <div class="flex flex-wrap gap-2 justify-end">
             <span class="mr-auto text-muted text-xs" x-show="account.isDefault && accounts().length > 1">Default</span>

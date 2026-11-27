@@ -88,7 +88,7 @@
                 <span class="text-muted text-xs" x-show="row.meta" :text="row.meta"></span>
               </div>
             </div>
-            <span class="px-2 py-1 font-semibold text-xs whitespace-nowrap border rounded-full" data-status-pill :data-status="row.pill">{{ row.statusLabel }}</span>
+            <Badge size="sm" className="whitespace-nowrap" :variant="postStatusVariant(row.statusLabel)">{{ row.statusLabel }}</Badge>
           </header>
           <p class="m-0 leading-normal text-body text-ui">{{ row.body }}</p>
           <p class="m-0 text-danger text-xs" x-show="row.failure" :text="row.failure"></p>
@@ -191,6 +191,7 @@
     import { requestJson } from '../functions/postline-client'
     import { showNotification } from '../functions/notification'
     import { fetchWorkspace, targetLabel } from '../functions/social-client'
+    import { postStatusVariant } from '../functions/status-badge'
 
     /**
      * Wire shapes for `/api/postline/queue/*`, declared where they are used.
@@ -248,7 +249,6 @@
       /** "Resume thread from 3", for a thread that stopped part way; '' otherwise. */
       resumeLabel: string
       statusLabel: string
-      pill: string
       scheduledAt?: string | null
       publishedAt?: string | null
       title?: string | null
@@ -410,7 +410,6 @@
         // A post that reached only some networks is not simply "published".
         // It borrows the amber of an unfinished publish.
         statusLabel: item.partial ? 'partly sent' : isMissed(item) ? 'missed' : item.status,
-        pill: item.partial || isMissed(item) ? 'publishing' : item.status,
         scheduledAt: item.scheduledAt,
         publishedAt: item.publishedAt,
         title: item.title,

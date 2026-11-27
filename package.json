@@ -73,9 +73,9 @@
   "dependencies": {
     "@stacksjs/ai": "^0.75.695",
     "@stacksjs/charts": "0.75.695",
-    "@stacksjs/sanitizer": "0.2.955",
+    "@stacksjs/sanitizer": "0.2.957",
     "@stacksjs/socials": "^0.75.695",
-    "@stacksjs/stx": "0.2.955",
+    "@stacksjs/stx": "0.2.957",
     "@stacksjs/ts-cloud": "^0.16.157",
     "@xmldom/xmldom": "0.9.12",
     "marked": "18.3.0",
@@ -87,9 +87,9 @@
   "devDependencies": {
     "@iconify-json/hugeicons": "^1.2.36",
     "@iconify-json/simple-icons": "^1.2.92",
-    "@stacksjs/components": "0.2.955",
+    "@stacksjs/components": "0.2.957",
     "better-dx": "^0.2.22",
-    "bun-plugin-stx": "0.2.955",
+    "bun-plugin-stx": "0.2.957",
     "typescript": "^7.0.2"
   },
   "workspaces": [

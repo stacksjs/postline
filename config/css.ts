@@ -421,12 +421,6 @@ const QUEUE_STATUS: string = `
 [data-target-chip][data-state="failed"] { color: var(--danger); border-color: var(--danger-line); background: var(--danger-soft); }
 [data-target-chip][data-state="failed"] [data-target-dot] { background: var(--danger); }
 
-[data-status-pill] { color: var(--muted); background: var(--panel-3); border-color: var(--line); }
-[data-status-pill][data-status="published"] { color: var(--success); background: var(--success-soft); border-color: var(--success-line); }
-[data-status-pill][data-status="scheduled"] { color: var(--info); background: var(--info-soft); border-color: var(--info-line); }
-[data-status-pill][data-status="publishing"] { color: var(--warning); background: var(--warning-soft); border-color: var(--warning-line); }
-[data-status-pill][data-status="failed"] { color: var(--danger); background: var(--danger-soft); border-color: var(--danger-line); }
-
 [data-cal-dot] { background: var(--muted); }
 [data-cal-dot][data-status="published"] { background: var(--success); }
 [data-cal-dot][data-status="failed"] { background: var(--danger); }

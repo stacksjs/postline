@@ -7,7 +7,9 @@
   <section class="grid gap-4" data-postline-page="campaigns" data-testid="campaigns-page">
     <WorkspacePageHeader title="Campaigns">
       <template #status>
-        <span class="inline-flex px-2 py-0.5 capitalize data-[status=active]:text-success font-medium text-muted text-xs bg-panel-3 data-[status=active]:bg-success-soft border border-line data-[status=active]:border-success-line rounded-full" :data-status="campaign()?.status" x-show="campaign()" :text="campaign()?.status"></span>
+        <span x-show="campaign()">
+          <Badge size="sm" className="capitalize" :variant="postStatusVariant(campaign()?.status)">{{ campaign()?.status }}</Badge>
+        </span>
       </template>
       <template #description>Plan posts across weeks, then send them to your publishing queue.</template>
       <div class="flex flex-wrap gap-2 items-center">
@@ -99,7 +101,7 @@
                   <p class="m-0 line-clamp-2 text-body text-xs">{{ item.body }}</p>
                   <footer class="flex flex-wrap gap-1 items-center justify-between">
                     <span class="flex pl-0.5"><span class="grid place-items-center -ml-0.5 size-5 font-medium text-body text-xs bg-panel-3 border border-panel rounded-full" x-for="provider in item.providers.slice(0, 3)" :title="providerLabel(provider)">{{ providerInitial(provider) }}</span></span>
-                    <span class="px-1.5 capitalize data-[status=published]:text-success data-[status=queued]:text-success data-[status=ready]:text-info text-muted text-xs bg-panel-3 data-[status=published]:bg-success-soft data-[status=queued]:bg-success-soft data-[status=ready]:bg-info-soft rounded-full" :data-status="item.status">{{ item.status }}</span>
+                    <Badge size="sm" className="capitalize" :variant="postStatusVariant(item.status)">{{ item.status }}</Badge>
                   </footer>
                 </article>
               </div>
@@ -120,7 +122,7 @@
             </div>
             <span class="hidden sm:inline-flex px-2 py-0.5 capitalize text-muted text-xs bg-panel-3 rounded-full">{{ item.pillar }}</span>
             <span class="hidden xl:block text-muted text-xs truncate">{{ item.providers.map(providerLabel).join(', ') }}</span>
-            <span class="px-2 py-0.5 capitalize data-[status=published]:text-success data-[status=queued]:text-success data-[status=ready]:text-info text-muted text-xs bg-panel-3 data-[status=published]:bg-success-soft data-[status=queued]:bg-success-soft data-[status=ready]:bg-info-soft rounded-full" :data-status="item.status">{{ item.status }}</span>
+            <Badge size="sm" className="capitalize" :variant="postStatusVariant(item.status)">{{ item.status }}</Badge>
           </article>
         </div>
       </section>
@@ -327,6 +329,7 @@
   <script client>
     import { instantFromWallTime, systemTimeZone, wallTimeInZone } from '../../app/Support/time'
     import { fetchProviders } from '../functions/social-client'
+    import { postStatusVariant } from '../functions/status-badge'
 
     const campaignsList = state([])
     const campaign = state(null)
