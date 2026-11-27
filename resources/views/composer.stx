@@ -23,13 +23,13 @@
     </header>
     <div class="grid">
       <section class="grid content-start grid-rows-[auto_auto_auto] self-start bg-panel border border-line rounded-2xl shadow-sm" aria-label="Post composer" :class="dragDepth() > 0 ? 'ring-2 ring-accent' : ''" @dragenter="enterImageDrop" @dragleave="leaveImageDrop" @dragover="overImageDrop" @drop="dropImages" @paste="pasteImages" data-composer-image-drop>
-        <div class="hidden flex-wrap gap-3 items-center justify-between px-3 py-2 text-xs bg-info-soft border-b border-info-line" data-edit-banner>
+        <div class="hidden flex-wrap gap-3 items-center justify-between px-3 py-2 text-xs bg-info-soft border-b border-info-line" :class="{ 'hidden': !editHeading(), 'flex': !!editHeading() }" data-edit-banner>
           <span class="font-semibold text-info">Editing a queued post</span>
           <a class="inline-flex items-center px-2.5 min-h-6 font-semibold text-info bg-panel hover:bg-info-line border border-info-line rounded-lg transition-colors" href="/composer" data-stx-link>Cancel</a>
         </div>
         <header class="flex flex-wrap gap-3 items-center justify-between p-3 border-b border-line">
           <div class="flex gap-2 items-center">
-            <strong class="text-ui" data-composer-heading>New post</strong>
+            <strong class="text-ui" :text="editHeading() || 'New post'" data-composer-heading>New post</strong>
             <a class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg transition-colors" href="/accounts" data-stx-link data-bluesky-connection data-no-window-drag>
               <span class="h-2 w-2 bg-line-strong rounded-full" data-bluesky-connection-dot aria-hidden="true"></span>
               <span data-bluesky-connection-label>Checking accounts…</span>
@@ -88,11 +88,11 @@
             </button>
             <div class="hidden gap-2 mt-2" data-variant-panel></div>
           </div>
-          <label class="hidden gap-2 items-center mb-2.5" data-compose-image-row>
+          <label class="hidden gap-2 items-center mb-2.5" :class="{ 'hidden': !showImageUrl(), 'flex': showImageUrl() }" data-compose-image-row>
             <span class="h-4 w-4 text-muted i-hugeicons-image-01" aria-hidden="true"></span>
-            <input class="px-3 h-9 w-full text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="url" inputmode="url" placeholder="Image URL (required for Instagram)" aria-label="Image URL for Instagram" data-compose-image>
+            <input class="px-3 h-9 w-full text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="url" inputmode="url" placeholder="Image URL for Instagram" aria-label="Image URL for Instagram" x-model="postImageUrl" data-compose-image>
           </label>
-          <input class="hidden mb-2 w-full font-semibold leading-snug text-2xl text-ink placeholder:text-muted bg-transparent border-0 outline-none rounded-md" data-focus-outline type="text" maxlength="200" placeholder="Post title" aria-label="Blog post title" data-compose-title>
+          <input class="hidden mb-2 w-full font-semibold leading-snug text-2xl text-ink placeholder:text-muted bg-transparent border-0 outline-none rounded-md" :class="{ 'hidden': !showTitle(), 'block': showTitle() }" data-focus-outline type="text" maxlength="200" placeholder="Post title" aria-label="Blog post title" x-model="postTitle" data-compose-title>
           <div class="grid overflow-y-auto content-start gap-4 pr-1 max-h-72" data-composer-posts>
             <article class="grid gap-2 pb-3 last:pb-0 border-b border-line last:border-b-0" data-composer-post data-active="true">
               <header class="flex gap-3 items-center justify-between">
@@ -214,6 +214,8 @@
     import { countText } from '../../app/Support/Social/count-text'
     import { MAX_IMAGE_BYTES, MAX_POST_IMAGES, mediaObjections, POST_IMAGE_FORMATS } from '../../app/Support/Social/media-rules'
     import { instantFromWallTime, systemTimeZone } from '../../app/Support/time'
+    import type { ComposerAction, ComposerDraft, ComposerFormat } from '../functions/composer-draft'
+    import { COMPOSER_DRAFT_KEY, readComposerDraft, writeComposerDraft } from '../functions/composer-draft'
     import { fetchLinkPreview, fetchProviders, fetchWorkspace, formatHandle, publishCrosspost, targetLabel } from '../functions/social-client'
 
     // What the template reads lives at the top level: stx binds `x-for`,
@@ -228,11 +230,15 @@
     // as having none, so it says so and offers to try again.
     const providersFailed = state(false)
     const composerHandlers = { toggleProvider: null, retryProviders: null, scheduleChanged: null, setFormat: null, publish: null }
-    const composerFormat = state<'single' | 'thread'>('single')
+    const composerFormat = state<ComposerFormat>('single')
     const editingQueued = state(Boolean(useRoute().query.edit))
     const canPublish = state(false)
     const submitting = state(false)
-    const postAction = state<'publish' | 'schedule' | 'draft'>('publish')
+    const postAction = state<ComposerAction>('publish')
+    const savedDraft = useLocalStorage<ComposerDraft | null>(COMPOSER_DRAFT_KEY, null, {
+      serializer: { read: readComposerDraft, write: writeComposerDraft },
+      listenToStorageChanges: false,
+    })
     const scheduledIso = state<string | null>(null)
     const scheduleZone = state(systemTimeZone())
     const publishTrigger = useRef('publishTrigger')
@@ -249,7 +255,7 @@
       if (editingQueued() && postAction() !== 'draft') return 'Update post'
       return postAction() === 'draft' ? 'Save draft' : 'Publish'
     })
-    const chooseFormat = (format: 'single' | 'thread') => {
+    const chooseFormat = (format: ComposerFormat) => {
       if (!editingQueued() && !submitting()) composerHandlers.setFormat?.(format)
     }
     const runPostAction = () => composerHandlers.publish?.()
@@ -439,6 +445,11 @@
     const postLanguage = state('')
     const mastodonVisibility = state('public')
     const mastodonSpoiler = state('')
+    const postTitle = state('')
+    const postImageUrl = state('')
+    const editHeading = state('')
+    const showTitle = derived(() => composerFormat() === 'single' && selectedNetworkIds().includes('blog'))
+    const showImageUrl = derived(() => selectedNetworkIds().includes('instagram'))
     const showMastodonOptions = derived(() => selectedNetworkIds().includes('mastodon'))
     const showLanguage = derived(() => selectedNetworkIds().some(id => id === 'bluesky' || id === 'mastodon'))
     const showPostOptions = derived(() => showLanguage() || showMastodonOptions())
@@ -469,8 +480,6 @@
       const variantToggle = root.querySelector('[data-variant-toggle]')
       const variantToggleLabel = root.querySelector('[data-variant-toggle-label]')
       const variantPanel = root.querySelector('[data-variant-panel]')
-      const composeImageRow = root.querySelector('[data-compose-image-row]')
-      const composeImage = root.querySelector('[data-compose-image]')
 
       /** The images attached in this session, with their alt text; saved ones are not included. */
       const attachedFiles = () => attachedImages().filter(image => image.file).map(image => ({ file: image.file, alt: image.alt.trim() }))
@@ -498,13 +507,13 @@
         mastodonVisibility.set('public')
         mastodonSpoiler.set('')
       }
-      const composeTitle = root.querySelector('[data-compose-title]')
-      const composedTitle = () => composeTitle?.value.trim() || undefined
+      const composedTitle = () => postTitle().trim() || undefined
 
       const clearAttachment = () => {
         clearImagePreviews()
         attachedImages.set([])
         imageError.set('')
+        postImageUrl.set('')
       }
       const postsRoot = root.querySelector('[data-composer-posts]')
       const addPostButton = root.querySelector('[data-add-post]')
@@ -512,7 +521,6 @@
       const refreshButton = root.querySelector('[data-composer-refresh]')
       const searchButton = root.querySelector('[data-composer-search]')
       const urlPattern = /https?:\/\/[^\s<>"']+/i
-      const draftKey = 'postline:composer-draft:v1'
       let activePost = root.querySelector('[data-composer-post]')
       let postCounter = root.querySelectorAll('[data-composer-post]').length
       let savedActiveIndex = 0
@@ -533,8 +541,6 @@
       const selectedClear = () => selectedList.set([])
 
       // Edit mode: /?edit=<id> loads a queued post into the composer.
-      const editBanner = root.querySelector('[data-edit-banner]')
-      const composerHeading = root.querySelector('[data-composer-heading]')
       const editParam = useRoute().query.edit || null
       let editingId = null
       let editHadImage = false
@@ -588,7 +594,6 @@
       /** One selected target per network — what per-network overrides are keyed on. */
       const selectedNetworks = () => selectedConnected().filter((target, index, list) =>
         list.findIndex(other => other.provider === target.provider) === index)
-      const isNetworkSelected = provider => selectedConnected().some(target => target.provider === provider)
 
       /**
        * The chip key a stored target spec maps to. An account spec maps to its
@@ -896,14 +901,6 @@
 
       const updatePublishability = () => {
         canPublish.set(selectedConnected().length > 0 && (!editParam || editingId !== null))
-        // The image field is only meaningful for Instagram, which rejects
-        // text-only posts.
-        const needsImage = isNetworkSelected('instagram')
-        composeImageRow?.classList.toggle('hidden', !needsImage)
-        composeImageRow?.classList.toggle('flex', needsImage)
-        const wantsTitle = composerFormat() === 'single' && isNetworkSelected('blog')
-        composeTitle?.classList.toggle('hidden', !wantsTitle)
-        composeTitle?.classList.toggle('block', wantsTitle)
         renderVariantPanel()
         updateCount()
       }
@@ -982,65 +979,18 @@
         return post
       }
 
-      const readDraft = () => {
-        try {
-          const draft = JSON.parse(localStorage.getItem(draftKey) || 'null')
-          if (!draft || !Array.isArray(draft.posts) || draft.posts.length === 0) return null
-
-          const restoredSchedule = draft.action === 'schedule' && typeof draft.scheduledIso === 'string'
-            && Number.isFinite(Date.parse(draft.scheduledIso)) ? draft.scheduledIso : null
-          return {
-            activeIndex: Number.isFinite(draft.activeIndex) ? draft.activeIndex : 0,
-            mode: draft.mode === 'thread' ? 'thread' : 'single',
-            action: restoredSchedule
-              ? 'schedule'
-              : draft.mode === 'draft' || draft.action === 'draft' || draft.action === 'schedule' ? 'draft' : 'publish',
-            scheduledIso: restoredSchedule,
-            posts: draft.posts
-              .slice(0, 24)
-              // Corruption guard, not a content cap: 10000 mirrors the largest
-              // target limit (BLOG_CHARACTER_LIMIT). Capping at the tightest
-              // network's limit here would silently destroy a long post on
-              // reload, since saveDraft stores the full text.
-              .map(post => ({ text: String(post?.text || '').slice(0, 10000) })),
-            variants: Array.isArray(draft.variants)
-              ? draft.variants
-                  .slice(0, 12)
-                  .filter(entry => entry && typeof entry.provider === 'string')
-                  .map(entry => ({
-                    provider: entry.provider,
-                    text: String(entry.text || '').slice(0, 10000),
-                    shared: String(entry.shared || '').slice(0, 10000),
-                  }))
-              : [],
-          }
-        }
-        catch {
-          return null
-        }
-      }
-
       const saveDraft = () => {
-        // Editing a queued post must never write into the local composer draft,
-        // or that post's text and overrides leak into the next fresh post.
-        // Guarding the writer covers every caller, not just the two that used
-        // to be inside the edit-mode check at the bottom of this file.
         if (editParam) return
-        try {
-          const posts = allPosts()
-          localStorage.setItem(draftKey, JSON.stringify({
-            activeIndex: Math.max(0, posts.indexOf(activePost)),
-            mode: composerFormat(),
-            action: postAction(),
-            scheduledIso: scheduledIso(),
-            posts: posts.map(post => ({ text: textareaFor(post)?.value || '' })),
-            variants: Array.from(variants.entries())
-              .map(([provider, entry]) => ({ provider, text: entry.text, shared: entry.shared })),
-            updatedAt: new Date().toISOString(),
-            version: 1,
-          }))
-        }
-        catch {}
+        const posts = allPosts()
+        savedDraft.set({
+          activeIndex: Math.max(0, posts.indexOf(activePost)),
+          mode: composerFormat(),
+          action: postAction(),
+          scheduledIso: scheduledIso(),
+          posts: posts.map(post => ({ text: textareaFor(post)?.value || '' })),
+          variants: Array.from(variants.entries())
+            .map(([provider, entry]) => ({ provider, text: entry.text, shared: entry.shared })),
+        })
       }
 
       // useDebounce, not a bare timer: it cancels its own pending call and is
@@ -1049,7 +999,7 @@
       const queueDraftSave = useDebounce(saveDraft, 100)
 
       const restoreDraft = () => {
-        const draft = readDraft()
+        const draft = savedDraft()
         if (!draft || !postsRoot) return
 
         postsRoot.replaceChildren(...draft.posts.map((post, index) => createPost(index + 1, post.text)))
@@ -1299,9 +1249,7 @@
 
       const enterEditMode = (item) => {
         editingId = item.id
-        editBanner?.classList.remove('hidden')
-        editBanner?.classList.add('flex')
-        if (composerHeading) composerHeading.textContent = item.thread ? 'Editing thread' : `Editing post #${item.id}`
+        editHeading.set(item.thread ? 'Editing thread' : `Editing post #${item.id}`)
 
         if (item.thread && postsRoot) {
           const posts = item.thread.texts.map((text, index) => createPost(index + 1, text))
@@ -1315,7 +1263,7 @@
           const textarea = activeTextarea()
           if (textarea) textarea.value = item.text || ''
         }
-        if (composeTitle) composeTitle.value = item.title || ''
+        postTitle.set(item.title || '')
 
         // Overrides. `shared` is seeded from the stored body so a restored
         // override only reads as stale once this edit actually changes the text.
@@ -1427,7 +1375,7 @@
         const scheduled = scheduledIso()
         if (scheduled) form.set('scheduled_at', scheduleTimestamp(scheduled))
         appendLinkCard(form, threadTexts.length ? leadingPost() : activePost)
-        const editImageUrl = composeImage?.value.trim()
+        const editImageUrl = postImageUrl().trim()
         if (editImageUrl) form.set('image_url', editImageUrl)
         // New images replace the saved ones; with none, the saved ones stay
         // unless their row was removed.
@@ -1475,7 +1423,7 @@
         if (queueTitle) form.set('title', queueTitle)
         if (scheduleValue) form.set('scheduled_at', scheduleTimestamp(scheduleValue))
         appendLinkCard(form, threadTexts.length > 1 ? leadingPost() : activePost)
-        const queueImageUrl = composeImage?.value.trim()
+        const queueImageUrl = postImageUrl().trim()
         if (queueImageUrl) form.set('image_url', queueImageUrl)
         appendImages(form)
         appendOptions(form)
@@ -1499,7 +1447,7 @@
           if (textarea) textarea.value = ''
           scheduledIso.set(null)
           if (scheduleValue) postAction.set('publish')
-          if (composeTitle) composeTitle.value = ''
+          postTitle.set('')
           clearAttachment()
           resetPostOptions()
           renderLinkPreview(activePost, null)
@@ -1540,7 +1488,7 @@
         const text = textarea.value.trim()
         if (!text) throw new Error('Write something before publishing.')
         const external = linkCardFor(post)
-        const imageUrl = composeImage?.value.trim()
+        const imageUrl = postImageUrl().trim()
         const image = imageUrl ? { url: imageUrl } : undefined
         return await publishCrosspost({ text, title: composedTitle(), providers: targetProviders, external, image, imageFiles: attachedFiles(), variants: variantsPayload(), options: postOptions() })
       }
@@ -1592,7 +1540,7 @@
             // segments on providers that support it (Bluesky).
             const first = targets[0]
             const external = linkCardFor(first)
-            const imageUrl = composeImage?.value.trim()
+            const imageUrl = postImageUrl().trim()
             const thread = targets.map(post => textareaFor(post)?.value.trim() || '')
             collect(await publishCrosspost({
               text: thread[0],
@@ -1631,7 +1579,7 @@
           saveDraft()
           clearAttachment()
           resetPostOptions()
-          if (composeTitle) composeTitle.value = ''
+          postTitle.set('')
           dismissPostlineToast('publish')
           if (failures.length && successCount === 0) {
             setStatus(`Publish failed. ${failures.join('; ')}`, 'error', { title: 'Publish failed' })

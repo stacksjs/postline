@@ -10,6 +10,9 @@ Object.assign(globalThis, autoImports)
 
 // TypeScript declarations
 declare global {
+  const readComposerDraft: typeof autoImports.readComposerDraft
+  const writeComposerDraft: typeof autoImports.writeComposerDraft
+  const COMPOSER_DRAFT_KEY: typeof autoImports.COMPOSER_DRAFT_KEY
   const bindDesktopAlerts: typeof autoImports.bindDesktopAlerts
   const providerLabel: typeof autoImports.providerLabel
   const providerInitial: typeof autoImports.providerInitial

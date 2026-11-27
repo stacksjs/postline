@@ -519,6 +519,36 @@ async function checkWorkspaceBootstrap(cdp: Cdp): Promise<void> {
   await waitUntil('The bootstrap after a change in another window', () => evaluate<boolean>(cdp, `${reads}.length === ${requests.length + 1}`), 5_000)
 }
 
+async function checkLocalComposerDraft(cdp: Cdp): Promise<void> {
+  await auditPage(`${site}/queue`, { cdp })
+  const draftKey = 'postline:composer-draft:v1'
+  const original = 'A local draft from before the composer format switch'
+  const edited = 'Updated local draft'
+  const editor = "document.querySelector('[data-bluesky-text]')"
+  await evaluate(cdp, `localStorage.setItem('${draftKey}', JSON.stringify({
+    activeIndex: 0, mode: 'draft', posts: [{ text: ${JSON.stringify(original)} }], version: 1,
+  }))`)
+  try {
+    await auditPage(`${site}/composer`, { cdp })
+    await waitUntil('Legacy local draft text and intent are restored', () => evaluate<boolean>(cdp, `
+      ${editor}?.value === ${JSON.stringify(original)}
+        && document.querySelector('[data-bluesky-publish-label]').textContent === 'Save draft'`), 5_000)
+    await evaluate(cdp, `${editor}.value = ${JSON.stringify(edited)}
+      ${editor}.dispatchEvent(new Event('input', { bubbles: true }))`)
+    await waitUntil('Edited local draft is saved in the current format', () => evaluate<boolean>(cdp, `(() => {
+      const draft = JSON.parse(localStorage.getItem('${draftKey}') || '{}')
+      return draft.posts?.[0]?.text === ${JSON.stringify(edited)} && draft.mode === 'single' && draft.action === 'draft'
+    })()`), 5_000)
+    await auditPage(`${site}/composer`, { cdp })
+    await waitUntil('Updated composer draft survives a reload', () => evaluate<boolean>(cdp, `
+      ${editor}?.value === ${JSON.stringify(edited)}`), 5_000)
+  }
+  finally {
+    await auditPage(`${site}/queue`, { cdp })
+    await evaluate(cdp, `localStorage.removeItem('${draftKey}')`)
+  }
+}
+
 async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
   await auditPage(`${site}/composer`, { cdp })
   const blog = "document.querySelector('[data-provider-toggle=blog]')"
@@ -1085,6 +1115,7 @@ try {
     await checkWorkspaceBootstrap(cdp)
     await checkChannels(cdp)
     await checkNetworkComponents(cdp)
+    await checkLocalComposerDraft(cdp)
     await checkComposerThreadDraft(cdp)
     await checkBrowserPasskey(cdp)
     await checkPhoneNavigation(cdp)
