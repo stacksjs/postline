@@ -5,6 +5,7 @@
 !database/migrations/**
 !database/types.d.ts
 !docs/networks/*.md
+!locales/**
 !public/**
 !resources/**
 !routes/**
