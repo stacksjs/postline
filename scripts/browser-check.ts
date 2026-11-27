@@ -1215,7 +1215,7 @@ async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
     const post = `[...document.querySelectorAll('article[role=button]')].find(item => item.textContent.includes('Plan the scheduling fixture') && item.getClientRects().length > 0)`
     await waitUntil('The planned campaign post', () => evaluate<boolean>(cdp, `Boolean(${post})`), 5_000)
     await evaluate(cdp, `${post}.focus()`)
-  await pressKey(cdp, 'Enter', 13)
+    await pressKey(cdp, 'Enter', 13)
     const picker = `document.querySelector('[data-postline-schedule-picker] [data-date-time-trigger]')`
     await waitUntil('The campaign editor opens with the saved post fields', () => evaluate<boolean>(cdp, `
       Boolean(${picker}?.getClientRects().length)
@@ -1241,6 +1241,26 @@ async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
       ${views}.querySelector('[aria-label=List]').getAttribute('aria-pressed') === 'true'
         && ${views}.querySelector('[aria-label=Calendar]').getAttribute('aria-pressed') === 'false'
         && [...document.querySelectorAll('.campaign-list-row')].some(row => row.getClientRects().length && row.textContent.includes('Plan the scheduling fixture'))`), 5_000)
+    await evaluate(cdp, `${post}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const remove = `[...document.querySelectorAll('button')].find(button => button.getClientRects().length && button.textContent.trim() === 'Delete')`
+    await waitUntil('The saved campaign post can be deleted', () => evaluate<boolean>(cdp, `Boolean(${remove})`), 5_000)
+    await evaluate(cdp, `${remove}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const dialog = `document.activeElement?.closest('[role=alertdialog]')`
+    await waitUntil('The delete dialog focuses Cancel first', () => evaluate<boolean>(cdp, `
+      document.activeElement?.textContent === 'Cancel' && ${dialog}?.textContent.includes('Delete this planned post?')`), 5_000)
+    await pressKey(cdp, 'Escape', 27)
+    await waitUntil('Cancel keeps the planned post in the editor', () => evaluate<boolean>(cdp, `
+      document.activeElement === ${remove}
+        && document.querySelector('input[placeholder="The first signal"]')?.value === 'Plan the scheduling fixture'`), 5_000)
+    await pressKey(cdp, 'Enter', 13)
+    await pressKey(cdp, 'Tab', 9)
+    if (!await evaluate<boolean>(cdp, `${dialog} && document.activeElement.textContent === 'Delete post'`))
+      fail('campaigns', 'keyboard', 'Tab did not reach the delete confirmation')
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Confirming delete removes the planned post', () => evaluate<boolean>(cdp, `
+      !${post} && document.querySelector('#stx-toast-container')?.textContent.includes('Post removed')`), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: recommendation.identifier })
@@ -1273,6 +1293,13 @@ async function checkCampaignLocalDates(cdp: Cdp): Promise<void> {
       ${name}?.getClientRects().length > 0 && ${start}.value === '2026-11-26'`), 5_000)
     await evaluate(cdp, `${name}.focus()`)
     await cdp.send('Input.insertText', { text: 'Pacific kickoff' })
+    await pressKey(cdp, 'Escape', 27)
+    await waitUntil('Closing an edited campaign asks before discarding', () => evaluate<boolean>(cdp, `
+      document.activeElement?.textContent === 'Cancel'
+        && document.activeElement.closest('[role=alertdialog]')?.textContent.includes('Discard changes?')`), 5_000)
+    await pressKey(cdp, 'Escape', 27)
+    await waitUntil('Cancel restores focus and preserves the campaign edit', () => evaluate<boolean>(cdp, `
+      document.activeElement === ${name} && ${name}.value === 'Pacific kickoff'`), 5_000)
     await evaluate(cdp, `${name}.closest('form').querySelector('textarea').focus()`)
     await cdp.send('Input.insertText', { text: 'Verify the local campaign date.' })
     await evaluate(cdp, `${name}.closest('form').querySelector('button[type=submit]').click()`)

@@ -14,7 +14,7 @@
       <template #description>Plan posts across weeks, then send them to your publishing queue.</template>
       <div class="flex flex-wrap gap-2 items-center">
         <label class="sr-only" for="campaign-picker">Current campaign</label>
-        <select id="campaign-picker" class="px-3 h-9 min-w-44 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus" x-show="campaignsList().length" @change="selectCampaign($event.target.value)">
+        <select id="campaign-picker" class="px-3 h-9 min-w-44 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus" x-show="campaignsList().length" @change="selectCampaign($event)">
           <option x-for="option in campaignsList()" :value="option.id" :selected="option.id === campaign()?.id">{{ option.name }}</option>
         </select>
         <SegmentedControl label="Campaign view" size="sm" :show="campaign()" v-model:value="view" :options="[{ value: 'calendar', label: 'Calendar' }, { value: 'list', label: 'List' }]" />
@@ -226,7 +226,7 @@
               <label class="campaign-field"><span>End</span><input required type="date" x-model="campaignEndDate"></label>
             </div>
             <div class="campaign-form__footer">
-              <button class="campaign-secondary-button" type="button" @click="closePanel"><span :text="closeLabel('Cancel')">Cancel</span></button>
+              <button class="campaign-secondary-button" type="button" :disabled="busy()" @click="closePanel">Cancel</button>
               <button class="campaign-primary-button" type="submit" :disabled="busy()"><span :text="busyAction() === 'campaign' ? 'Saving…' : 'Save campaign'"></span></button>
             </div>
           </form>
@@ -256,7 +256,7 @@
             </div>
             <div class="campaign-form__footer">
               <button class="campaign-danger-button" type="button" x-show="postDraftId() && !queuedPostId()" :disabled="busy()" @click="deletePost"><span :text="busyAction() === 'delete' ? 'Removing…' : 'Delete'">Delete</span></button>
-              <button class="campaign-secondary-button" type="button" @click="closePanel"><span :text="closeLabel('Close')">Close</span></button>
+              <button class="campaign-secondary-button" type="button" :disabled="busy()" @click="closePanel">Close</button>
               <a class="campaign-primary-button" x-show="queuedPostId()" :href="`/composer?edit=${queuedPostId()}`" data-stx-link>Edit in Composer</a>
               <button class="campaign-primary-button" type="submit" x-show="!queuedPostId()" :disabled="busy() || !postScheduledAt()"><span :text="busyAction() === 'post' ? 'Saving…' : 'Save post'"></span></button>
             </div>
@@ -311,17 +311,15 @@
     const selectPostSchedule = ({ value }: { value: string | null }) => postScheduledAt.set(value)
     // The campaigns could not be read: not the same as having none.
     const loadError = state('')
-    // Closing an edited form asks for a second click to discard its changes.
-    const discardArmed = state(false)
     // What the open form held when it opened, to tell an edit from a glance.
     let openedWith = ''
+    let confirmingDiscard = false
     const formSnapshot = () => JSON.stringify(panelMode() === 'campaign'
       ? [campaignName(), campaignObjective(), campaignAudience(), campaignTone(), campaignStartDate(), campaignEndDate()]
       : panelMode() === 'post'
         ? [postTitle(), postBody(), postProviders(), postPillar(), postStatus(), postScheduledAt()]
         : [])
     const formChanged = () => (panelMode() === 'campaign' || panelMode() === 'post') && formSnapshot() !== openedWith
-    const closeLabel = (idle) => discardArmed() ? 'Discard changes' : idle
 
     const busy = derived(() => Boolean(busyAction()))
     const readyCount = derived(() => posts().filter(item => item.status === 'ready').length)
@@ -510,12 +508,17 @@
       direction.set(suggestion.prompt)
     }
 
-    function selectCampaign(id) {
+    async function selectCampaign(event) {
+      const select = event.target
+      const id = Number(select.value)
+      select.value = String(campaign()?.id || '')
+      if (!await canLeaveForm()) return
       panelMode.set('planner')
-      void loadCampaigns(Number(id))
+      await loadCampaigns(id)
     }
 
-    function openCampaignForm(current) {
+    async function openCampaignForm(current) {
+      if (!await canLeaveForm()) return
       const source = current || null
       const draft = source
         ? { id: source.id, name: source.name, objective: source.objective, audience: source.audience, tone: source.tone, startDate: source.startDate, endDate: source.endDate }
@@ -529,7 +532,6 @@
       campaignEndDate.set(draft.endDate)
       panelMode.set('campaign')
       openedWith = formSnapshot()
-      discardArmed.set(false)
     }
 
     function applyStacksLaunchPreset() {
@@ -549,7 +551,8 @@
       direction.set(creativeDirection)
     }
 
-    function openPostForm(item, day) {
+    async function openPostForm(item, day) {
+      if (!await canLeaveForm()) return
       if (!campaign()) return
       const draft = item
         ? item
@@ -566,7 +569,6 @@
       postScheduledAt.set(selected?.toISOString() ?? null)
       panelMode.set('post')
       openedWith = formSnapshot()
-      discardArmed.set(false)
     }
 
     // Cards that open a post answer the keyboard as a button does (#160).
@@ -576,14 +578,20 @@
       openPostForm(item)
     }
 
-    function closePanel() {
-      // Unsaved edits are not thrown away on one click: the first says what
-      // the second will do.
-      if (formChanged() && !discardArmed()) {
-        discardArmed.set(true)
-        return
+    async function canLeaveForm() {
+      if (busy() || confirmingDiscard) return false
+      if (!formChanged()) return true
+      confirmingDiscard = true
+      try {
+        return await stxConfirm('Your unsaved edits will be lost.', { title: 'Discard changes?', type: 'error', confirmText: 'Discard changes' })
       }
-      discardArmed.set(false)
+      finally {
+        confirmingDiscard = false
+      }
+    }
+
+    async function closePanel() {
+      if (!await canLeaveForm()) return
       panelMode.set(campaign() ? 'planner' : '')
     }
 
