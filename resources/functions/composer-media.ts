@@ -27,10 +27,3 @@ export function composerMediaWarnings(networks: readonly string[], images: reado
 export function composerImageFiles(images: readonly ComposerImage[]): Array<{ file: File, alt: string }> {
   return images.flatMap(image => image.file ? [{ file: image.file, alt: image.alt.trim() }] : [])
 }
-
-export function appendComposerImages(form: FormData, images: readonly ComposerImage[]): number {
-  const files = composerImageFiles(images)
-  for (const { file } of files) form.append('images', file, file.name)
-  if (files.length) form.set('image_alts', JSON.stringify(files.map(entry => entry.alt)))
-  return files.length
-}

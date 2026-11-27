@@ -294,7 +294,7 @@
     import type { ComposerAction, ComposerDraft, ComposerFormat } from '../functions/composer-draft'
     import { COMPOSER_AUTOSAVE_KEY, COMPOSER_DEFAULT_FORMAT_KEY, COMPOSER_DRAFT_KEY, readComposerDraft, writeComposerDraft } from '../functions/composer-draft'
     import type { ComposerImage } from '../functions/composer-media'
-    import { appendComposerImages, composerFileError, composerImageFiles, composerImageTypes, composerMediaWarnings } from '../functions/composer-media'
+    import { composerFileError, composerImageFiles, composerImageTypes, composerMediaWarnings } from '../functions/composer-media'
     import { composerActionText, composerQueueTimestamp, composerScheduleIso } from '../functions/composer-schedule'
     import { composerPreviewCards, previewImageUrl } from '../functions/composer-preview'
     import { composerKeyForSpec, composerSelection, composerTargetRows, composerTargets, uniqueComposerNetworks } from '../functions/composer-targets'
@@ -305,7 +305,7 @@
     import { composerLinkPreview, firstComposerLink } from '../functions/composer-thread'
     import { providerLabel } from '../functions/networks'
     import type { ProviderStatus } from '../functions/social-client'
-    import { appendPostOptions, fetchProviders, fetchWorkspace, publishCrosspost, targetLabel } from '../functions/social-client'
+    import { fetchProviders, fetchWorkspace, targetLabel } from '../functions/social-client'
 
     const providersFailed = state(false)
     const query = useRoute().query
@@ -600,7 +600,6 @@
     const showLanguage = derived(() => showBlueskyOptions() || showMastodonOptions())
     const languageOptions = state<Array<{ value: string, label: string }>>([])
     const attachedFiles = () => composerImageFiles(attachedImages())
-    const appendImages = (form: FormData) => appendComposerImages(form, attachedImages())
 
     const loadNetworkOptions = () => {
       const path = '/assets/scripts/composer-network-options.ts'
@@ -1084,33 +1083,25 @@
         }
       : undefined
 
-    function appendLinkCard(form: FormData, post: ComposerSegment) {
-      const external = linkCardFor(post)
-      if (!external) return
-      form.set('external_uri', external.uri)
-      form.set('external_title', external.title)
-      form.set('external_description', external.description)
+    function loadSubmission() {
+      const path = '/assets/scripts/composer-submit.ts'
+      return import(path) as Promise<typeof import('../assets/scripts/composer-submit')>
     }
 
-    async function queueForm(posts: ComposerSegment[], targetProviders: string[], schedule: string | null, id: number | null, nextSlot: boolean) {
-      const form = new FormData()
-      if (id) form.set('id', String(id))
-      form.set('text', posts[0].text.trim())
-      if (posts.length > 1) form.set('thread', JSON.stringify(posts.map(post => post.text.trim())))
-      form.set('providers', targetProviders.join(','))
-      const title = composedTitle()
-      if (title) form.set('title', title)
-      if (nextSlot) form.set('next_slot', '1')
-      else if (schedule) form.set('scheduled_at', composerQueueTimestamp(schedule))
-      appendLinkCard(form, posts[0])
-      const imageUrl = postImageUrl().trim()
-      if (imageUrl) form.set('image_url', imageUrl)
-      if (!appendImages(form) && id && editRemoveImage) form.set('remove_image', '1')
-      appendPostOptions(form, await postOptions())
-      const overrides = variantsPayload()
-      // Updating always sends this field so an owner can clear every override.
-      if (id || Object.keys(overrides).length) form.set('variants', JSON.stringify(overrides))
-      return form
+    async function queueForm(posts: ComposerSegment[], providers: string[], schedule: string | null, id: number | null, nextSlot: boolean) {
+      const { postForm } = await loadSubmission()
+      const url = postImageUrl().trim()
+      return postForm({
+        text: posts[0].text.trim(),
+        providers,
+        title: composedTitle(),
+        thread: posts.map(post => post.text.trim()),
+        external: linkCardFor(posts[0]),
+        image: url ? { url } : undefined,
+        imageFiles: attachedFiles(),
+        options: await postOptions(),
+        variants: variantsPayload(),
+      }, { id, scheduledAt: schedule ? composerQueueTimestamp(schedule) : undefined, nextSlot, removeImage: editRemoveImage })
     }
 
     const updateQueued = async (nextSlot: boolean) => {
@@ -1227,6 +1218,7 @@
       try {
         const thread = targets.length > 1 ? targets.map(post => post.text.trim()) : undefined
         const imageUrl = postImageUrl().trim()
+        const { publishCrosspost } = await loadSubmission()
         const data = await publishCrosspost({
           text: targets[0].text.trim(),
           thread,

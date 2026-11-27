@@ -18,7 +18,6 @@ declare global {
   const composerFileError: typeof autoImports.composerFileError
   const composerMediaWarnings: typeof autoImports.composerMediaWarnings
   const composerImageFiles: typeof autoImports.composerImageFiles
-  const appendComposerImages: typeof autoImports.appendComposerImages
   const composerImageTypes: typeof autoImports.composerImageTypes
   const composerPreviewCards: typeof autoImports.composerPreviewCards
   const previewImageUrl: typeof autoImports.previewImageUrl
@@ -57,8 +56,6 @@ declare global {
   const bindWorkspaceChanges: typeof autoImports.bindWorkspaceChanges
   const fetchWorkspace: typeof autoImports.fetchWorkspace
   const fetchProviders: typeof autoImports.fetchProviders
-  const publishCrosspost: typeof autoImports.publishCrosspost
-  const appendPostOptions: typeof autoImports.appendPostOptions
   const formatHandle: typeof autoImports.formatHandle
   const targetLabel: typeof autoImports.targetLabel
   const postStatusVariant: typeof autoImports.postStatusVariant

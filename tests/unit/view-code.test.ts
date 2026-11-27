@@ -25,7 +25,7 @@ describe('code loads only where it is used', () => {
 
   it('bundles optional Composer features for on-demand loading', () => {
     const scripts = referencedClientScripts(root)
-    for (const filename of ['composer-previews.ts', 'composer-languages.ts', 'composer-network-options.ts']) {
+    for (const filename of ['composer-previews.ts', 'composer-languages.ts', 'composer-network-options.ts', 'composer-submit.ts']) {
       expect(scripts).toContain(filename)
       expect(layout).not.toContain(filename)
     }
