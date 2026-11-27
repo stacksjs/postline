@@ -48,7 +48,7 @@ export const settingsAppearanceOptions = [
         </SettingsSidebarGroup>
         <div x-show="!ownWindow()">
           <SettingsSidebarGroup>
-            <SettingsSidebarItem id="account" label="{{ settingsText.account }}" icon="i-hugeicons-user" tone="indigo" keywords="sign out log out passkey two-factor 2fa authenticator recovery codes security" />
+            <SettingsSidebarItem id="account" label="{{ settingsText.account }}" icon="i-hugeicons-user" tone="indigo" keywords="{{ settingsText.accountKeywords }}" />
           </SettingsSidebarGroup>
         </div>
         <SettingsSidebarGroup>
@@ -254,52 +254,52 @@ export const settingsAppearanceOptions = [
           working, so neither a lost passkey nor a lost phone locks the owner
           out; the recovery codes cover the phone, ./buddy user:add the rest.
         --}}
-        <SettingsGroup title="Passkeys" footer="Sign in with Touch ID, your phone or a security key instead of typing the password. The password keeps working.">
-          <SettingsRow label="Your passkeys" layout="stacked" setting="passkeys" keywords="passkey webauthn touch id face id security key">
+        <SettingsGroup title="{{ settingsText.passkeys }}" footer="{{ settingsText.passkeysHelp }}">
+          <SettingsRow label="{{ settingsText.yourPasskeys }}" layout="stacked" setting="passkeys" keywords="{{ settingsText.passkeyKeywords }}">
             <ul class="grid gap-1.5 m-0 p-0 list-none" data-passkey-list>
               <li class="flex gap-2 items-center justify-between px-2.5 py-1.5 bg-panel-2 border border-line rounded-lg" x-for="key in passkeyRows()" data-passkey-row>
                 <span class="grid min-w-0">
                   <span class="text-ink text-ui truncate" :text="key.name"></span>
                   <span class="text-muted text-xs" :text="key.detail"></span>
                 </span>
-                <button class="px-2 h-6 text-danger text-xs bg-panel border border-line rounded-md disabled:opacity-50" type="button" :disabled="securityBusy()" @click="askRemovePasskey(key.id)">Remove</button>
+                <button class="px-2 h-6 text-danger text-xs bg-panel border border-line rounded-md disabled:opacity-50" type="button" :disabled="securityBusy()" @click="askRemovePasskey(key.id)">{{ settingsText.removePasskey }}</button>
               </li>
-              <li class="text-muted text-xs" x-show="!passkeyRows().length" :text="passkeyEmpty()">No passkeys yet.</li>
+              <li class="text-muted text-xs" x-show="!passkeyRows().length" :text="passkeyEmpty()">{{ settingsCopy.messages.emptyPasskeys }}</li>
             </ul>
           </SettingsRow>
-          <SettingsRow label="Add a passkey" :description="passkeyHint()" setting="passkey-add">
-            <Button appearance="mac" :disabled="securityBusy() || !passkeysSupported()" @click="addPasskey">Add Passkey…</Button>
+          <SettingsRow label="{{ settingsText.addPasskey }}" :description="passkeyHint()" setting="passkey-add">
+            <Button appearance="mac" :disabled="securityBusy() || !passkeysSupported()" @click="addPasskey">{{ settingsText.addPasskeyAction }}</Button>
           </SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup title="Two-factor sign-in" footer="After the password, Postline asks for a code from an authenticator app such as 1Password, Google Authenticator or Authy. Recovery codes stand in for the phone if you lose it; each works once.">
-          <SettingsRow label="Authenticator app" setting="two-factor" keywords="2fa totp otp code">
-            <span :class="!twoFactorOn() && !setupQr() ? '' : 'hidden'"><Button appearance="mac" :disabled="securityBusy() || !securityLoaded()" @click="startTwoFactor">Turn On…</Button></span>
-            <span :class="twoFactorOn() ? '' : 'hidden'"><Button appearance="mac" variant="danger" :disabled="securityBusy()" @click="askDisableTwoFactor">Turn Off…</Button></span>
+        <SettingsGroup title="{{ settingsText.twoFactor }}" footer="{{ settingsText.twoFactorHelp }}">
+          <SettingsRow label="{{ settingsText.authenticator }}" setting="two-factor" keywords="{{ settingsText.authenticatorKeywords }}">
+            <span :class="!twoFactorOn() && !setupQr() ? '' : 'hidden'"><Button appearance="mac" :disabled="securityBusy() || !securityLoaded()" @click="startTwoFactor">{{ settingsText.turnOnDialog }}</Button></span>
+            <span :class="twoFactorOn() ? '' : 'hidden'"><Button appearance="mac" variant="danger" :disabled="securityBusy()" @click="askDisableTwoFactor">{{ settingsText.turnOffDialog }}</Button></span>
           </SettingsRow>
           <div class="gap-3 px-4 py-3" :class="setupQr() ? 'grid' : 'hidden'" data-two-factor-setup>
-            <p class="m-0 text-body text-ui">Scan this with your authenticator app, then enter the 6-digit code it shows.</p>
-            <img class="h-44 w-44 rounded-lg" :src="setupQr()" alt="QR code for your authenticator app">
-            <p class="m-0 text-muted text-xs">Can't scan it? Enter this key instead: <code class="break-all text-body" :text="setupSecret()"></code></p>
+            <p class="m-0 text-body text-ui">{{ settingsText.scanQr }}</p>
+            <img class="h-44 w-44 rounded-lg" :src="setupQr()" alt="{{ settingsText.qrLabel }}">
+            <p class="m-0 text-muted text-xs">{{ settingsText.manualCode }} <code class="break-all text-body" :text="setupSecret()"></code></p>
             <div class="flex flex-wrap gap-2 items-center">
               <TextInput variant="mac" v-model:value="setupCode" placeholder="123456" autocomplete="one-time-code" maxlength="6" data-two-factor-setup-code />
-              <Button appearance="mac" variant="primary" :disabled="securityBusy() || setupCode().trim().length !== 6" @click="confirmTwoFactor">Turn On</Button>
-              <Button appearance="mac" :disabled="securityBusy()" @click="cancelTwoFactorSetup">Cancel</Button>
+              <Button appearance="mac" variant="primary" :disabled="securityBusy() || setupCode().trim().length !== 6" @click="confirmTwoFactor">{{ settingsText.turnOn }}</Button>
+              <Button appearance="mac" :disabled="securityBusy()" @click="cancelTwoFactorSetup">{{ settingsText.cancel }}</Button>
             </div>
           </div>
           <div :class="twoFactorOn() ? '' : 'hidden'">
-            <SettingsRow label="Recovery codes" :description="recoveryDescription()" setting="recovery-codes" keywords="backup codes">
-              <Button appearance="mac" :disabled="securityBusy()" @click="askNewRecoveryCodes">New Codes…</Button>
+            <SettingsRow label="{{ settingsText.recoveryCodes }}" :description="recoveryDescription()" setting="recovery-codes" keywords="{{ settingsText.recoveryKeywords }}">
+              <Button appearance="mac" :disabled="securityBusy()" @click="askNewRecoveryCodes">{{ settingsText.newCodes }}</Button>
             </SettingsRow>
           </div>
           <div class="gap-2 px-4 py-3" :class="recoveryCodes().length ? 'grid' : 'hidden'" data-recovery-codes>
-            <p class="m-0 text-body text-ui">Save these recovery codes somewhere safe, such as your password manager. They are shown only now; each one signs you in once.</p>
+            <p class="m-0 text-body text-ui">{{ settingsText.storeCodes }}</p>
             <ul class="grid gap-1 m-0 p-0 font-mono list-none text-ink text-ui">
               <li x-for="item in recoveryCodes()" :text="item"></li>
             </ul>
             <div class="flex gap-2">
-              <Button appearance="mac" @click="copyRecoveryCodes">Copy</Button>
-              <Button appearance="mac" @click="recoveryCodes.set([])">I Saved Them</Button>
+              <Button appearance="mac" @click="copyRecoveryCodes">{{ settingsText.copyCodes }}</Button>
+              <Button appearance="mac" @click="recoveryCodes.set([])">{{ settingsText.codesSaved }}</Button>
             </div>
           </div>
         </SettingsGroup>
@@ -310,22 +310,22 @@ export const settingsAppearanceOptions = [
         <div class="gap-2 mt-3 p-3 bg-panel-2 border border-line rounded-lg" :class="confirming() ? 'grid' : 'hidden'" data-security-confirm>
           <p class="m-0 text-body text-ui" :text="confirmPrompt()"></p>
           <div class="flex flex-wrap gap-2 items-center">
-            <span :class="confirming() === 'codes' ? 'hidden' : ''"><TextInput variant="mac" type="password" v-model:value="confirmValue" autocomplete="current-password" placeholder="Password" data-security-confirm-password /></span>
+            <span :class="confirming() === 'codes' ? 'hidden' : ''"><TextInput variant="mac" type="password" v-model:value="confirmValue" autocomplete="current-password" placeholder="{{ settingsText.passwordLabel }}" data-security-confirm-password /></span>
             <span :class="confirming() === 'codes' ? '' : 'hidden'"><TextInput variant="mac" v-model:value="confirmValue" autocomplete="one-time-code" placeholder="123456" data-security-confirm-code /></span>
-            <Button appearance="mac" variant="primary" :disabled="securityBusy() || !confirmValue().trim()" @click="runConfirmed">Confirm</Button>
-            <Button appearance="mac" :disabled="securityBusy()" @click="cancelConfirm">Cancel</Button>
+            <Button appearance="mac" variant="primary" :disabled="securityBusy() || !confirmValue().trim()" @click="runConfirmed">{{ settingsText.confirmSecurity }}</Button>
+            <Button appearance="mac" :disabled="securityBusy()" @click="cancelConfirm">{{ settingsText.cancel }}</Button>
           </div>
         </div>
         <p class="m-0 mt-2 text-xs" :data-tone="securityTone()" x-show="securityMessage()" :text="securityMessage()" role="status" aria-live="polite" data-security-message></p>
 
-        <SettingsGroup footer="Signing out ends this session on the server and clears it from this browser.">
-          <SettingsRow label="Sign out of Postline" setting="sign-out">
-            <Button appearance="mac" variant="danger" @click="signOut">Sign Out</Button>
+        <SettingsGroup footer="{{ settingsText.signOutHelp }}">
+          <SettingsRow label="{{ settingsText.signOutLabel }}" setting="sign-out">
+            <Button appearance="mac" variant="danger" @click="signOut">{{ settingsText.signOut }}</Button>
           </SettingsRow>
         </SettingsGroup>
-        <SettingsGroup footer="Ends every session and revokes every token, on every browser and device, this one included. Use it if a device is lost or a token may have leaked.">
-          <SettingsRow label="Sign out everywhere" setting="sign-out-everywhere" keywords="sessions devices revoke tokens">
-            <Button appearance="mac" variant="danger" @click="signOutEverywhere">Sign Out Everywhere</Button>
+        <SettingsGroup footer="{{ settingsText.signOutEverywhereHelp }}">
+          <SettingsRow label="{{ settingsText.signOutEverywhereLabel }}" setting="sign-out-everywhere" keywords="{{ settingsText.everywhereKeywords }}">
+            <Button appearance="mac" variant="danger" @click="signOutEverywhere">{{ settingsText.signOutEverywhere }}</Button>
           </SettingsRow>
         </SettingsGroup>
       </SettingsPane>
@@ -564,7 +564,7 @@ export const settingsAppearanceOptions = [
 
     /** Every session and token, everywhere; then this browser leaves like a normal sign-out. */
     const signOutEverywhere = async (): Promise<void> => {
-      if (!await stxConfirm('This signs you out from this browser and every other device.', { title: 'Sign out everywhere?', type: 'error', confirmText: 'Sign out everywhere' })) return
+      if (!await stxConfirm(copy.signOutConfirm, { title: copy.signOutTitle, type: 'error', confirmText: copy.signOutAction })) return
       await endSession('/api/logout-all')
     }
 
@@ -593,27 +593,31 @@ export const settingsAppearanceOptions = [
 
     const shortDate = (value: unknown): string => {
       const date = value ? new Date(String(value).replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(String(value)) ? '' : 'Z')) : null
-      return date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : ''
+      return date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString(language, { year: 'numeric', month: 'short', day: 'numeric' }) : ''
     }
     const passkeyRows = derived(() => passkeyList().map((key) => {
       const added = shortDate(key.created_at)
       const used = shortDate(key.last_used_at)
       return {
         id: key.id,
-        name: key.device === 'multiDevice' ? 'Synced passkey' : key.device === 'singleDevice' ? 'Device-bound passkey' : (key.device || 'Passkey'),
-        detail: [added && `Added ${added}`, used ? `last used ${used}` : 'never used'].filter(Boolean).join(' · '),
+        name: key.device === 'multiDevice' ? copy.syncedPasskey : key.device === 'singleDevice' ? copy.devicePasskey : (key.device || copy.passkey),
+        detail: [added && copy.addedPasskey.replace('{date}', added), used ? copy.usedPasskey.replace('{date}', used) : copy.unusedPasskey].filter(Boolean).join(' · '),
       }
     }))
-    const passkeyEmpty = derived(() => passkeysLoaded() ? 'No passkeys yet.' : 'Loading…')
+    const passkeyEmpty = derived(() => passkeysLoaded() ? copy.emptyPasskeys : copy.loadingPasskeys)
     const passkeyHint = derived(() => passkeysSupported()
-      ? 'Your browser or password manager asks where to keep it.'
-      : 'This browser cannot make passkeys.')
-    const recoveryDescription = derived(() => `${recoveryLeft()} unused ${recoveryLeft() === 1 ? 'code' : 'codes'} left.`)
+      ? copy.passkeyStorage
+      : copy.passkeyUnsupported)
+    const recoveryDescription = derived(() => {
+      const count = recoveryLeft()
+      return (plural.select(count) === 'one' ? copy.unusedCodeOne : copy.unusedCodeMany)
+        .replace('{count}', numbers.format(count))
+    })
     const confirmPrompt = derived(() => confirming() === 'codes'
-      ? 'Enter a code from your authenticator app to replace every recovery code.'
+      ? copy.replaceCodesPrompt
       : confirming() === 'disable'
-        ? 'Enter your password to turn two-factor sign-in off. Your recovery codes stop working too.'
-        : 'Enter your password to remove this passkey.')
+        ? copy.disableTwoFactorPrompt
+        : copy.removePasskeyPrompt)
 
     const saySecurity = (message: string, tone = 'muted'): void => {
       securityMessage.set(message)
@@ -656,7 +660,7 @@ export const settingsAppearanceOptions = [
     const addPasskey = (): Promise<void> => busyWhile(async () => {
       if (await passkeys.register()) {
         await loadSecurity()
-        saySecurity('Passkey added. Use it next time you sign in.', 'success')
+        saySecurity(copy.passkeyAdded, 'success')
       }
     })
 
@@ -678,7 +682,7 @@ export const settingsAppearanceOptions = [
       cancelTwoFactorSetup()
       recoveryCodes.set(Array.isArray(result.recoveryCodes) ? result.recoveryCodes : [])
       await loadSecurity()
-      saySecurity('Two-factor sign-in is on.', 'success')
+      saySecurity(copy.twoFactorOn, 'success')
     })
 
     const askRemovePasskey = (id: string): void => {
@@ -710,17 +714,17 @@ export const settingsAppearanceOptions = [
           .catch((error) => {
             if (!(error instanceof Error) || error.message !== 'Not found.') throw error
           })
-        saySecurity('Passkey removed.', 'success')
+        saySecurity(copy.passkeyRemoved, 'success')
       }
       else if (action === 'disable') {
         await requestJson('/api/auth/two-factor/disable', { method: 'POST', body: JSON.stringify({ password: confirmValue() }) })
         recoveryCodes.set([])
-        saySecurity('Two-factor sign-in is off.', 'success')
+        saySecurity(copy.twoFactorOff, 'success')
       }
       else if (action === 'codes') {
         const result = await requestJson('/api/auth/two-factor/recovery-codes', { method: 'POST', body: JSON.stringify({ code: value }) })
         recoveryCodes.set(Array.isArray(result.data?.recoveryCodes) ? result.data.recoveryCodes : [])
-        saySecurity('New recovery codes made. The old ones no longer work.', 'success')
+        saySecurity(copy.codesGenerated, 'success')
       }
       cancelConfirm()
       await loadSecurity()
@@ -730,10 +734,10 @@ export const settingsAppearanceOptions = [
       try {
         // stx-strict-ignore-next-line navigator.clipboard
         await navigator.clipboard.writeText(recoveryCodes().join('\n'))
-        saySecurity('Copied.', 'success')
+        saySecurity(copy.codesCopied, 'success')
       }
       catch {
-        saySecurity('Copy did not work here; select the codes instead.', 'error')
+        saySecurity(copy.codesCopyFailed, 'error')
       }
     }
 

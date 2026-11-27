@@ -3121,6 +3121,29 @@ async function checkSpanishSettings(cdp: Cdp): Promise<void> {
       && ${settings}.querySelector('[data-setting=desktop-version]')?.innerText.match(/[0-9]+[.][0-9]+[.][0-9]+/)
   `), 5_000)
 
+  await evaluate(cdp, `${tab('account')}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  const enable = `[...${settings}.querySelectorAll('[data-setting=two-factor] button')].find(button => button.textContent.trim() === 'Activar…')`
+  await waitUntil('Spanish Account shows passkeys and two-factor controls', () => evaluate<boolean>(cdp, `
+    ${tab('account')}.getAttribute('aria-selected') === 'true'
+      && ${settings}.querySelector('[data-passkey-list]')?.innerText.includes('Aún no hay llaves de acceso.')
+      && (${enable})?.disabled === false
+  `), 5_000)
+  await evaluate(cdp, `(${enable}).focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  const securitySetup = `${settings}.querySelector('[data-two-factor-setup]')`
+  await waitUntil('The local authenticator setup shows Spanish instructions and a named QR code', () => evaluate<boolean>(cdp, `
+    Boolean(${securitySetup}?.getClientRects().length)
+      && ${securitySetup}.querySelector('img')?.alt === 'Código QR para tu aplicación de autenticación'
+      && ${securitySetup}.innerText.includes('Escanea el código con tu aplicación de autenticación')
+  `), 5_000)
+  await evaluate(cdp, `[...${securitySetup}.querySelectorAll('button')].find(button => button.textContent.trim() === 'Cancelar').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Cancelling the Spanish authenticator setup leaves two-factor off', () => evaluate<boolean>(cdp, `(async () => {
+    const result = await fetch('/api/auth/two-factor').then(response => response.json())
+    return !${securitySetup}?.getClientRects().length && result.data?.twoFactor === false
+  })()`), 5_000)
+
   await evaluate(cdp, `${tab('notifications')}.focus()`)
   await pressKey(cdp, 'Enter', 13)
   const activity = `${settings}.querySelector('[data-setting=activity-alerts] button')`
