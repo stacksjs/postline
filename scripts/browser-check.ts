@@ -2444,8 +2444,22 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
     }))()`)
     throw new Error(`${String(error)}. Browser state: ${JSON.stringify(state)}`)
   }
-  await click(`${setup}.querySelector('a[href="/queue"]')`)
-  await waitUntil('The Queue opens after setup', () => evaluate<boolean>(cdp, `location.pathname === '/queue' && !!document.getElementById('queue-tab-published')`), 15_000)
+  const queueLink = `${setup}.querySelector('a[href="/queue"]')`
+  await waitUntil('The setup link to Queue is available', () => evaluate<boolean>(cdp, `Boolean(${queueLink}?.getClientRects().length)`), 5_000)
+  await evaluate(cdp, `${queueLink}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  try {
+    await waitUntil('The Queue opens after setup', () => evaluate<boolean>(cdp, `location.pathname === '/queue' && !!document.getElementById('queue-tab-published')`), 15_000)
+  }
+  catch (error) {
+    const state = await evaluate(cdp, `({
+      path: location.pathname,
+      heading: document.querySelector('h1')?.textContent,
+      queue: Boolean(document.querySelector('[data-postline-page=queue]')),
+      tabs: document.querySelectorAll('[data-queue-tab]').length,
+    })`)
+    throw new Error(`${String(error)}. Browser state: ${JSON.stringify(state)}`)
+  }
   await click("document.getElementById('queue-tab-published')")
   await waitUntil('The first Blog post is published in the queue', () => evaluate<boolean>(cdp, `
     [...document.querySelectorAll('#queue-results article')].some(row =>
