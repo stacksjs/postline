@@ -1003,6 +1003,26 @@
       form.set('external_description', external.description)
     }
 
+    function queueForm(posts: ComposerSegment[], targetProviders: string[], schedule: string | null, id?: number | null) {
+      const form = new FormData()
+      if (id) form.set('id', String(id))
+      form.set('text', posts[0].text.trim())
+      if (posts.length > 1) form.set('thread', JSON.stringify(posts.map(post => post.text.trim())))
+      form.set('providers', targetProviders.join(','))
+      const title = composedTitle()
+      if (title) form.set('title', title)
+      if (schedule) form.set('scheduled_at', composerQueueTimestamp(schedule))
+      appendLinkCard(form, posts[0])
+      const imageUrl = postImageUrl().trim()
+      if (imageUrl) form.set('image_url', imageUrl)
+      if (!appendImages(form) && id && editRemoveImage) form.set('remove_image', '1')
+      appendOptions(form)
+      const overrides = variantsPayload()
+      // Updating always sends this field so an owner can clear every override.
+      if (id || Object.keys(overrides).length) form.set('variants', JSON.stringify(overrides))
+      return form
+    }
+
     const updateQueued = async () => {
       const posts = segmentsToSend()
       const isThread = composerFormat() === 'thread'
@@ -1022,27 +1042,8 @@
         return
       }
 
-      const form = new FormData()
-      form.set('id', String(editingId()))
-      form.set('text', posts[0].text.trim())
-      if (isThread) form.set('thread', JSON.stringify(posts.map(post => post.text.trim())))
-      form.set('providers', targetProviders.join(','))
-      const editTitle = composedTitle()
-      if (editTitle) form.set('title', editTitle)
-      const scheduled = scheduledIso()
-      if (scheduled) form.set('scheduled_at', composerQueueTimestamp(scheduled))
-      appendLinkCard(form, posts[0])
-      const editImageUrl = postImageUrl().trim()
-      if (editImageUrl) form.set('image_url', editImageUrl)
-      // New images replace the saved ones; with none, the saved ones stay
-      // unless their row was removed.
-      if (!appendImages(form) && editRemoveImage) form.set('remove_image', '1')
-      appendOptions(form)
-      // Always sent, never conditional: the server treats an absent field as
-      // "keep what is stored", so clearing every override has to be explicit.
-      form.set('variants', JSON.stringify(variantsPayload()))
-
       try {
+        const form = queueForm(posts, targetProviders, scheduledIso(), editingId())
         const response = await fetch('/api/postline/queue/update', { method: 'POST', body: form })
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not update the post.')
@@ -1071,22 +1072,8 @@
         setStatus('Select a connected account before saving to the queue.', 'error', { title: 'Not connected' })
         return
       }
-      const form = new FormData()
-      if (posts.length > 1) form.set('thread', JSON.stringify(posts.map(post => post.text.trim())))
-      form.set('text', posts[0].text.trim())
-      form.set('providers', targetProviders.join(','))
-      const queueTitle = composedTitle()
-      if (queueTitle) form.set('title', queueTitle)
-      if (scheduleValue) form.set('scheduled_at', composerQueueTimestamp(scheduleValue))
-      appendLinkCard(form, posts[0])
-      const queueImageUrl = postImageUrl().trim()
-      if (queueImageUrl) form.set('image_url', queueImageUrl)
-      appendImages(form)
-      appendOptions(form)
-      const queueVariants = variantsPayload()
-      if (Object.keys(queueVariants).length) form.set('variants', JSON.stringify(queueVariants))
-
       try {
+        const form = queueForm(posts, targetProviders, scheduleValue)
         const response = await fetch('/api/postline/queue', { method: 'POST', body: form })
         const payload = await response.json()
         if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not save to the queue.')
@@ -1123,14 +1110,6 @@
       if (!options.skipSave) saveDraft()
     }
 
-    const publishOne = async (post: ComposerSegment, targetProviders: string[]) => {
-      const text = post.text.trim()
-      const external = linkCardFor(post)
-      const imageUrl = postImageUrl().trim()
-      const image = imageUrl ? { url: imageUrl } : undefined
-      return await publishCrosspost({ text, title: composedTitle(), providers: targetProviders, external, image, imageFiles: attachedFiles(), variants: variantsPayload(), options: postOptions() })
-    }
-
     const publish = async () => {
       const targetProviders = selectedConnected().map(target => target.key)
       if (targetProviders.length === 0) {
@@ -1156,44 +1135,24 @@
       )
 
       try {
-        let lastUrl
-        const failures = []
-        let successCount = 0
-        let publishedPostId = 0
-        const collect = (data: Awaited<ReturnType<typeof publishCrosspost>>) => {
-          publishedPostId = data.postId ?? data.postIds?.[0] ?? 0
-          for (const result of data.results || []) {
-            if (result.ok) {
-              successCount += 1
-              if (result.url) lastUrl = result.url
-            }
-            else {
-              failures.push(`${targetLabel(result.provider, result.handle)}: ${result.error || 'failed'}`)
-            }
-          }
-        }
-
-        if (targets.length > 1) {
-          // Threads go up in one request so the server can reply-chain the
-          // segments on providers that support it (Bluesky).
-          const first = targets[0]
-          const external = linkCardFor(first)
-          const imageUrl = postImageUrl().trim()
-          const thread = targets.map(post => post.text.trim())
-          collect(await publishCrosspost({
-            text: thread[0],
-            title: composedTitle(),
-            thread,
-            providers: targetProviders,
-            external,
-            image: imageUrl ? { url: imageUrl } : undefined,
-            imageFiles: attachedFiles(),
-            options: postOptions(),
-          }))
-        }
-        else {
-          collect(await publishOne(targets[0], targetProviders))
-        }
+        const thread = targets.length > 1 ? targets.map(post => post.text.trim()) : undefined
+        const imageUrl = postImageUrl().trim()
+        const data = await publishCrosspost({
+          text: targets[0].text.trim(),
+          thread,
+          title: composedTitle(),
+          providers: targetProviders,
+          external: linkCardFor(targets[0]),
+          image: imageUrl ? { url: imageUrl } : undefined,
+          imageFiles: attachedFiles(),
+          variants: thread ? undefined : variantsPayload(),
+          options: postOptions(),
+        })
+        const results = data.results || []
+        const succeeded = results.filter(result => result.ok)
+        const lastUrl = succeeded.reverse().find(result => result.url)?.url
+        const failures = results.filter(result => !result.ok)
+          .map(result => `${targetLabel(result.provider, result.handle)}: ${result.error || 'failed'}`)
 
         clearSentSegments(targets)
 
@@ -1206,7 +1165,7 @@
         resetPostOptions()
         postTitle.set('')
         toast.dismiss('publish')
-        if (failures.length && successCount === 0) {
+        if (failures.length && !succeeded.length) {
           setStatus(`Publish failed. ${failures.join('; ')}`, 'error', { title: 'Publish failed' })
         }
         else if (failures.length) {
@@ -1221,7 +1180,7 @@
             { title: 'Published', url: lastUrl },
           )
         }
-        if (successCount > 0) finishSetup(publishedPostId)
+        if (succeeded.length) finishSetup(data.postId ?? data.postIds?.[0] ?? 0)
       }
       catch (error) {
         toast.dismiss('publish')
