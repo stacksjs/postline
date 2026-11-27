@@ -3,7 +3,7 @@ import type { IdentityLike } from '../../Support/Social/accounts'
 import { db } from '@stacksjs/database'
 import { isUsableIdentity } from '../../Support/Social/accounts'
 import { describeNetworkError } from '../../Support/Social/network-errors'
-import { listIdentityRows } from './identities'
+import { findIdentityRow, listIdentityRows } from './identities'
 import { now } from './support'
 
 type MetricsSource = Extract<SocialMetricsDriver['provider'], 'linkedin' | 'instagram' | 'threads'>
@@ -17,7 +17,7 @@ function measuredCounts(counts: PostMetrics): TargetMetrics {
 export async function syncConnectedMetrics<T extends IdentityLike>(
   provider: MetricsSource,
   driver: SocialMetricsDriver,
-  credentialsFor: (identity: T) => SocialIdentityCredentials | Promise<SocialIdentityCredentials>,
+  credentialsFor: (identity: T) => SocialIdentityCredentials | undefined | Promise<SocialIdentityCredentials | undefined>,
   limit = 100,
 ): Promise<{ synced: number, errors?: string[] }> {
   const identities = await listIdentityRows<T>(provider)
@@ -38,7 +38,11 @@ export async function syncConnectedMetrics<T extends IdentityLike>(
 
     let counts: PostMetrics[]
     try {
-      counts = await driver.metrics(await credentialsFor(identity), references.map(target => target.uri))
+      const current = await findIdentityRow<T>(provider, identity.id)
+      if (!current || !isUsableIdentity(current)) continue
+      const credentials = await credentialsFor(current)
+      if (!credentials) continue
+      counts = await driver.metrics(credentials, references.map(target => target.uri))
     }
     catch (error) {
       errors.push(describeNetworkError(provider, error, 'metrics'))

@@ -5,7 +5,7 @@ import type { IdentityAuthStatus } from '../../app/Support/Social/accounts'
  */
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { db } from '@stacksjs/database'
-import { findIdentityRow, listIdentityRows, resetTokenSealing, revokeIdentityRow, saveIdentityTokens, sealStoredTokens, upsertIdentityRow } from '../../app/Services/Social/identities'
+import { findIdentityRow, listIdentityRows, markIdentityExpired, resetTokenSealing, revokeIdentityRow, saveIdentityTokens, sealStoredTokens, upsertIdentityRow } from '../../app/Services/Social/identities'
 import { isSealed, openToken, sealToken } from '../../app/Support/Social/token-vault'
 
 const database = db as any
@@ -89,12 +89,28 @@ describe('tokens in the identities table', () => {
     const h = handle()
     const row = await upsertIdentityRow<Row>('twitter', { handle: h }, { handle: h, auth_status: 'connected', access_token: 'old' })
 
-    await saveIdentityTokens(row.id, { access_token: 'rotated-access', refresh_token: 'rotated-refresh' })
+    await saveIdentityTokens(row, { access_token: 'rotated-access', refresh_token: 'rotated-refresh' })
 
     const onDisk = await stored(row.id)
     expect(isSealed(onDisk.access_token)).toBe(true)
     expect(onDisk.access_token).not.toContain('rotated-access')
     expect((await findIdentityRow<Row>('twitter', row.id))?.refresh_token).toBe('rotated-refresh')
+  })
+
+  test('stale renewals and refusals leave a disconnected or reconnected account alone', async () => {
+    const h = handle()
+    const values = { handle: h, auth_status: 'connected', access_token: 'same-access', refresh_token: 'same-refresh' }
+    const stale = await upsertIdentityRow<Row>('twitter', { handle: h }, values)
+
+    await revokeIdentityRow('twitter', stale.id)
+    expect(await saveIdentityTokens(stale, { access_token: 'late-renewal', auth_status: 'connected' })).toBeUndefined()
+    expect(await findIdentityRow<Row>('twitter', stale.id)).toMatchObject({ auth_status: 'revoked', access_token: null, refresh_token: null })
+
+    // Even reconnecting with the same plaintext tokens writes a new generation.
+    await upsertIdentityRow<Row>('twitter', { handle: h }, values)
+    expect(await saveIdentityTokens(stale, { access_token: 'late-renewal' })).toBeUndefined()
+    await markIdentityExpired(stale)
+    expect(await findIdentityRow<Row>('twitter', stale.id)).toMatchObject({ auth_status: 'connected', access_token: 'same-access' })
   })
 
   test('an install that stored tokens in the clear is sealed on first use', async () => {

@@ -272,7 +272,7 @@ export class TwitterService {
       const explained = explainNetworkError('twitter', error)
       const message = explained.message
       if (explained.kind === 'expired')
-        await markIdentityExpired(identity.id)
+        await markIdentityExpired(identity)
       await database.updateTable('post_targets').set({
         status: 'failed',
         failure_reason: message,
@@ -316,12 +316,17 @@ export class TwitterService {
   private async requireIdentity(identityId?: number | null): Promise<SocialIdentityRow> {
     if (identityId) {
       const chosen = await findIdentityRow<SocialIdentityRow>('twitter', identityId)
-      if (isUsableIdentity(chosen)) return await this.refreshIfExpiring(chosen!)
+      const current = isUsableIdentity(chosen) ? await this.refreshIfExpiring(chosen!) : undefined
+      if (current) return current
       throw unavailableAccountError('X', chosen)
     }
 
     const existing = await findIdentityRow<SocialIdentityRow>('twitter')
-    if (isUsableIdentity(existing)) return await this.refreshIfExpiring(existing!)
+    if (isUsableIdentity(existing)) {
+      const current = await this.refreshIfExpiring(existing!)
+      if (current) return current
+      throw unavailableAccountError('X', await findIdentityRow<SocialIdentityRow>('twitter', existing!.id))
+    }
 
     if ((await this.config()).accessToken) {
       const connected = await this.connectFromEnv({ revive: false })
@@ -338,7 +343,7 @@ export class TwitterService {
    * scope). Best-effort: any failure leaves the current token in place so a real
    * auth failure still surfaces at publish time.
    */
-  private async refreshIfExpiring(identity: SocialIdentityRow): Promise<SocialIdentityRow> {
+  private async refreshIfExpiring(identity: SocialIdentityRow): Promise<SocialIdentityRow | undefined> {
     const cfg = (await this.config())
     if (!identity.refresh_token || !cfg.clientId) return identity
 
@@ -355,16 +360,15 @@ export class TwitterService {
         })
         const nextExpiry = expiresAt(refreshed.expiresIn)
         const nextRefresh = refreshed.refreshToken ?? current.refresh_token
-        await saveIdentityTokens(current.id, {
+        return await saveIdentityTokens(current, {
           access_token: refreshed.accessToken,
           refresh_token: nextRefresh,
           token_expires_at: nextExpiry,
           auth_status: 'connected',
           updated_at: now(),
         })
-        return { ...current, access_token: refreshed.accessToken, refresh_token: nextRefresh, token_expires_at: nextExpiry }
       },
-      refused: async current => await markIdentityExpired(current.id),
+      refused: async current => await markIdentityExpired(current),
     })
   }
 
@@ -377,7 +381,7 @@ export class TwitterService {
     let renewed = 0
     for (const row of rows.filter(row => isUsableIdentity(row))) {
       const after = await this.refreshIfExpiring(row)
-      if (after.token_expires_at !== row.token_expires_at) renewed++
+      if (after && after.token_expires_at !== row.token_expires_at) renewed++
     }
     return renewed
   }

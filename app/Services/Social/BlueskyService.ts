@@ -10,7 +10,7 @@ import { DEFAULT_BLUESKY_SERVER, resolveBlueskyServer } from '../../Support/Soci
 import { fetchLinkPreview } from '../../Support/Social/link-preview'
 import { blueskyRecordKey } from '../../Support/Social/bluesky-rkey'
 import { exceedsLimit } from '../../Support/Social/count-text'
-import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, unavailableAccountError, upsertIdentityRow } from './identities'
+import { findIdentityRow, listIdentityRows, markIdentityExpired, revokeIdentityRow, saveIdentityTokens, unavailableAccountError, upsertIdentityRow } from './identities'
 import { workspace } from '../WorkspaceService'
 import { ensureAccount as ensureWorkspaceAccount } from './support'
 import { classifyFailure } from '../../Support/Social/retry'
@@ -586,11 +586,10 @@ export class BlueskyService {
       try {
         const session = await (await this.driverFor(identity)).refreshSession(identity.refresh_token)
         const driver = await this.ensureDriver()
-        // `revive: false`: a refresh racing a disconnect must not undo it.
-        refreshed = await this.saveSession(session, driver, { revive: false })
+        refreshed = await this.saveSession(session, driver, { expected: identity })
       }
       catch {
-        await markIdentityExpired(identity.id)
+        await markIdentityExpired(identity)
         throw new Error(`Bluesky session for @${identity.handle} expired — reconnect it on the Accounts page.`)
       }
       onRefresh?.(refreshed)
@@ -630,12 +629,12 @@ export class BlueskyService {
   private async saveSession(
     session: BlueskySession,
     driver: SocialDriverRow,
-    options: { revive?: boolean } = {},
+    options: { revive?: boolean, expected?: SocialIdentityRow } = {},
   ): Promise<SocialIdentityRow> {
     const accountId = await this.ensureAccount()
     const handle = normalizeHandle(session.handle)
 
-    return await upsertIdentityRow<SocialIdentityRow>('bluesky', { externalId: session.did, handle }, {
+    const values = {
       handle,
       display_name: session.displayName || null,
       provider: 'bluesky',
@@ -645,7 +644,15 @@ export class BlueskyService {
       refresh_token: session.refreshJwt,
       account_id: accountId,
       social_driver_id: driver.id,
-    }, { revive: options.revive, label: 'This Bluesky' })
+    }
+    if (options.expected) {
+      const updated = await saveIdentityTokens(options.expected, { ...values, updated_at: now() })
+      if (updated) return updated
+      const current = await findIdentityRow<SocialIdentityRow>('bluesky', options.expected.id)
+      if (current && hasSession(current)) return current
+      throw unavailableAccountError('Bluesky', current)
+    }
+    return await upsertIdentityRow<SocialIdentityRow>('bluesky', { externalId: session.did, handle }, values, { revive: options.revive, label: 'This Bluesky' })
   }
 
   /**

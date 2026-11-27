@@ -294,7 +294,7 @@ export class ThreadsService {
       const explained = explainNetworkError('threads', error)
       const message = explained.message
       if (explained.kind === 'expired')
-        await markIdentityExpired(identity.id)
+        await markIdentityExpired(identity)
       await database.updateTable('post_targets').set({
         status: 'failed',
         failure_reason: message,
@@ -335,6 +335,7 @@ export class ThreadsService {
     if (!(await networkApps.credentials('threads')).engagementMetrics) return { synced: 0 }
     return await syncConnectedMetrics<SocialIdentityRow>('threads', this.driver, async (identity) => {
       const current = await this.refreshIfExpiring(identity)
+      if (!current) return
       return {
         handle: current.handle,
         did: current.external_id || undefined,
@@ -350,12 +351,17 @@ export class ThreadsService {
   private async requireIdentity(identityId?: number | null): Promise<SocialIdentityRow> {
     if (identityId) {
       const chosen = await findIdentityRow<SocialIdentityRow>('threads', identityId)
-      if (isUsableIdentity(chosen)) return await this.refreshIfExpiring(chosen!)
+      const current = isUsableIdentity(chosen) ? await this.refreshIfExpiring(chosen!) : undefined
+      if (current) return current
       throw unavailableAccountError('Threads', chosen)
     }
 
     const existing = await findIdentityRow<SocialIdentityRow>('threads')
-    if (isUsableIdentity(existing)) return await this.refreshIfExpiring(existing!)
+    if (isUsableIdentity(existing)) {
+      const current = await this.refreshIfExpiring(existing!)
+      if (current) return current
+      throw unavailableAccountError('Threads', await findIdentityRow<SocialIdentityRow>('threads', existing!.id))
+    }
 
     if ((await this.config()).accessToken) {
       const connected = await this.connectFromEnv({ revive: false })
@@ -372,7 +378,7 @@ export class ThreadsService {
    * token in place, so a genuinely dead token still surfaces at publish time
    * (marking the identity expired and prompting a reconnect) rather than here.
    */
-  private async refreshIfExpiring(identity: SocialIdentityRow): Promise<SocialIdentityRow> {
+  private async refreshIfExpiring(identity: SocialIdentityRow): Promise<SocialIdentityRow | undefined> {
     if (!identity.access_token) return identity
 
     return await refreshOnce(identity, {
@@ -383,15 +389,14 @@ export class ThreadsService {
       refresh: async (current) => {
         const refreshed = await this.driver.refreshLongLivedToken(String(current.access_token))
         const nextExpiry = expiresAt(refreshed.expiresIn)
-        await saveIdentityTokens(current.id, {
+        return await saveIdentityTokens(current, {
           access_token: refreshed.accessToken,
           token_expires_at: nextExpiry,
           auth_status: 'connected',
           updated_at: now(),
         })
-        return { ...current, access_token: refreshed.accessToken, token_expires_at: nextExpiry }
       },
-      refused: async current => await markIdentityExpired(current.id),
+      refused: async current => await markIdentityExpired(current),
     })
   }
 
@@ -404,7 +409,7 @@ export class ThreadsService {
     let renewed = 0
     for (const row of rows.filter(row => isUsableIdentity(row))) {
       const after = await this.refreshIfExpiring(row)
-      if (after.token_expires_at !== row.token_expires_at) renewed++
+      if (after && after.token_expires_at !== row.token_expires_at) renewed++
     }
     return renewed
   }

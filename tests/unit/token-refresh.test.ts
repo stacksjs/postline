@@ -58,7 +58,20 @@ describe('refreshing once', () => {
     const results = await Promise.all([refreshOnce(row, steps), refreshOnce(row, steps), refreshOnce(row, steps)])
 
     expect(calls).toBe(1)
-    expect(results.map(result => result.access_token)).toEqual(['new', 'new', 'new'])
+    expect(results.map(result => result?.access_token)).toEqual(['new', 'new', 'new'])
+  })
+
+  test('does not contact the network if the active credential disappeared', async () => {
+    const row = identity('threads', 60)
+    let refreshes = 0
+    const result = await refreshOnce(row, {
+      lockFile: lockFile(),
+      reload: async () => undefined,
+      refresh: async (current) => { refreshes++; return current },
+      refused: async () => {},
+    })
+    expect(refreshes).toBe(0)
+    expect(result).toBeUndefined()
   })
 
   test('a row another process already refreshed is used, not refreshed again', async () => {
@@ -72,8 +85,8 @@ describe('refreshing once', () => {
     })
 
     expect(calls).toBe(0)
-    expect(result.access_token).toBe('theirs')
-    expect(result.refresh_token).toBe('r2')
+    expect(result?.access_token).toBe('theirs')
+    expect(result?.refresh_token).toBe('r2')
   })
 
   test('while another process holds the lock, no second refresh is sent', async () => {
@@ -93,7 +106,7 @@ describe('refreshing once', () => {
     }).catch(() => row)
 
     expect(calls).toBe(0)
-    expect(result.access_token).toBe('old')
+    expect(result?.access_token).toBe('old')
   })
 
   test('a refusal marks the account, a network failure does not', async () => {
@@ -113,8 +126,8 @@ describe('refreshing once', () => {
     const offline = await run(new Error('fetch failed'))
 
     expect(refused).toEqual([denied.row.id])
-    expect(denied.result.access_token).toBe('old')
-    expect(offline.result.access_token).toBe('old')
+    expect(denied.result?.access_token).toBe('old')
+    expect(offline.result?.access_token).toBe('old')
   })
 
   test('which failures are refusals', () => {

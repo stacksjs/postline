@@ -109,13 +109,13 @@ function takeLock(path: string): (() => void) | null {
   return null
 }
 
-const inFlight = new Map<number, Promise<unknown>>()
+const inFlight = new Map<number, Promise<RefreshableIdentity | undefined>>()
 
 export interface RefreshSteps<T extends RefreshableIdentity> {
   /** Read the account again from the database. */
   reload: () => Promise<T | undefined>
   /** Ask the network for new tokens and store them. Returns the updated row. */
-  refresh: (current: T) => Promise<T>
+  refresh: (current: T) => Promise<T | undefined>
   /** Called when the network refuses: the account needs reconnecting. */
   refused: (current: T) => Promise<void>
   /** For tests. */
@@ -127,10 +127,10 @@ export interface RefreshSteps<T extends RefreshableIdentity> {
  * Return the account with a token that is good for a while yet, refreshing it
  * at most once across every caller and process.
  */
-export async function refreshOnce<T extends RefreshableIdentity>(identity: T, steps: RefreshSteps<T>): Promise<T> {
+export async function refreshOnce<T extends RefreshableIdentity>(identity: T, steps: RefreshSteps<T>): Promise<T | undefined> {
   if (!needsRefresh(identity)) return identity
 
-  const running = inFlight.get(identity.id) as Promise<T> | undefined
+  const running = inFlight.get(identity.id) as Promise<T | undefined> | undefined
   if (running) return await running
 
   const work = run(identity, steps).finally(() => inFlight.delete(identity.id))
@@ -138,7 +138,7 @@ export async function refreshOnce<T extends RefreshableIdentity>(identity: T, st
   return await work
 }
 
-async function run<T extends RefreshableIdentity>(identity: T, steps: RefreshSteps<T>): Promise<T> {
+async function run<T extends RefreshableIdentity>(identity: T, steps: RefreshSteps<T>): Promise<T | undefined> {
   const path = steps.lockFile ?? lockPath(identity.id)
   const wait = steps.wait ?? ((ms: number) => new Promise<void>(done => setTimeout(done, ms)))
 
@@ -152,14 +152,15 @@ async function run<T extends RefreshableIdentity>(identity: T, steps: RefreshSte
   try {
     // Whoever held the lock may have refreshed already, and with a rotating
     // refresh token ours is then cancelled: always work from the stored row.
-    const current = await steps.reload() ?? identity
-    if (!needsRefresh(current)) return current
+    const current = await steps.reload()
+    if (!current || !needsRefresh(current)) return current
     // Another process still holds the lock. Do not send a second refresh
     // beside it; use what is stored and let the next call try again.
     if (!release) return current
 
     try {
-      return await steps.refresh(current)
+      const refreshed = await steps.refresh(current)
+      if (refreshed) return refreshed
     }
     catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -171,8 +172,8 @@ async function run<T extends RefreshableIdentity>(identity: T, steps: RefreshSte
       else {
         log.warn(`[postline] ${who} could not renew its token, will try again: ${message}`)
       }
-      return current
     }
+    return await steps.reload()
   }
   finally {
     release?.()

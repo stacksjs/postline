@@ -36,7 +36,7 @@ describe('the default account on a network', () => {
     const second = await connect('tiktok', 'second')
 
     // What a refresh does: new tokens, and a newer `updated_at` than any other row.
-    await saveIdentityTokens(second, { access_token: 'refreshed', updated_at: '2099-01-01 00:00:00' })
+    await saveIdentityTokens((await findIdentityRow('tiktok', second))!, { access_token: 'refreshed', updated_at: '2099-01-01 00:00:00' })
 
     expect(Number((await findIdentityRow<any>('tiktok'))!.id)).toBe(first)
     await clear('tiktok')

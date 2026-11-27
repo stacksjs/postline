@@ -209,7 +209,7 @@ export class MastodonService {
       const explained = explainNetworkError('mastodon', error)
       const message = explained.message
       if (explained.kind === 'expired')
-        await markIdentityExpired(identity.id)
+        await markIdentityExpired(identity)
       await database.updateTable('post_targets').set({
         status: 'failed',
         failure_reason: message,

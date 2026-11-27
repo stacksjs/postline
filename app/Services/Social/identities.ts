@@ -25,6 +25,21 @@ import { now, uuid } from './support'
 const database = db as any
 
 const TOKEN_COLUMNS = ['access_token', 'refresh_token'] as const
+type TokenColumns = Record<typeof TOKEN_COLUMNS[number], string | null>
+// A reconnect encrypts fresh ciphertext even when the credential string is
+// unchanged. Keep that stored generation out of the public identity object.
+const tokenSnapshots = new WeakMap<object, TokenColumns>()
+
+function updateCurrentIdentity(identity: IdentityLike, values: Record<string, unknown>) {
+  const tokens = tokenSnapshots.get(identity)
+  if (!tokens) return
+  return database.updateTable('social_identities').set(values)
+    .where('id', '=', identity.id)
+    .where('provider', '=', identity.provider)
+    .where('auth_status', '=', identity.auth_status)
+    .where('access_token', tokens.access_token == null ? 'is' : '=', tokens.access_token)
+    .where('refresh_token', tokens.refresh_token == null ? 'is' : '=', tokens.refresh_token)
+}
 
 /**
  * A row as the rest of the app sees it: tokens readable.
@@ -40,6 +55,10 @@ export async function openIdentityRow<T>(row: T | undefined): Promise<T | undefi
     return row
 
   const opened = { ...row } as Record<string, unknown>
+  tokenSnapshots.set(opened, {
+    access_token: typeof opened.access_token === 'string' ? opened.access_token : null,
+    refresh_token: typeof opened.refresh_token === 'string' ? opened.refresh_token : null,
+  })
   for (const column of TOKEN_COLUMNS) {
     if (typeof opened[column] !== 'string')
       continue
@@ -86,8 +105,13 @@ export function sealStoredTokens(): Promise<number> {
 
       const values: Record<string, unknown> = {}
       for (const column of plain) values[column] = await sealToken(row[column])
-      await database.updateTable('social_identities').set(values).where('id', '=', row.id).execute()
-      rewritten++
+      const updated = await database.updateTable('social_identities').set(values)
+        .where('id', '=', row.id)
+        .where('access_token', row.access_token == null ? 'is' : '=', row.access_token)
+        .where('refresh_token', row.refresh_token == null ? 'is' : '=', row.refresh_token)
+        .returning('id')
+        .executeTakeFirst()
+      if (updated) rewritten++
     }
     return rewritten
   })().catch((error) => {
@@ -104,15 +128,11 @@ export function resetTokenSealing(): void {
   sealing = undefined
 }
 
-/**
- * Store refreshed tokens on one account. The only way a service should write
- * a token outside `upsertIdentityRow`.
- */
-export async function saveIdentityTokens(identityId: number, values: Record<string, unknown>): Promise<void> {
-  await database.updateTable('social_identities')
-    .set(await sealValues(values))
-    .where('id', '=', identityId)
-    .execute()
+/** Update only the credential generation sent to the network. */
+export async function saveIdentityTokens<T extends IdentityLike>(identity: T, values: Record<string, unknown>): Promise<T | undefined> {
+  const update = updateCurrentIdentity(identity, await sealValues(values))
+  const row = await update?.returningAll().executeTakeFirst() as T | undefined
+  return await openIdentityRow(row)
 }
 
 /**
@@ -177,20 +197,16 @@ export async function upsertIdentityRow<T extends IdentityLike>(
   values = await sealValues(values)
 
   if (existing) {
-    if (existing.auth_status === 'revoked' && options.revive === false) {
+    const valuesToSave = { ...values, provider, updated_at: savedAt }
+    if (existing.auth_status === 'revoked' && options.revive === false)
       throw new Error(`${options.label || 'This'} account was disconnected. Reconnect it on the Accounts page to publish with it again.`)
-    }
-
-    await database.updateTable('social_identities')
-      .set({ ...values, provider, updated_at: savedAt })
-      .where('id', '=', existing.id)
-      .execute()
-
-    return await openIdentityRow(await database
-      .selectFrom('social_identities')
-      .selectAll()
-      .where('id', '=', existing.id)
-      .executeTakeFirstOrThrow() as T)
+    const update = options.revive === false
+      ? updateCurrentIdentity(existing, valuesToSave)
+      : database.updateTable('social_identities').set(valuesToSave).where('id', '=', existing.id)
+    const saved = await update?.returningAll().executeTakeFirst()
+    if (!saved)
+      throw new Error(`${options.label || 'This'} account changed. Reconnect it on the Accounts page to publish with it again.`)
+    return await openIdentityRow(saved as T)
   }
 
   // The first account on a network is its default. A later one never takes
@@ -262,25 +278,21 @@ export async function setDefaultIdentityRow(identityId: number): Promise<Identit
  * Flag an account whose token the network rejected, so /accounts prompts a
  * reconnect. Never downgrades a revoked row back into view.
  */
-export async function markIdentityExpired(identityId: number): Promise<void> {
-  await database.updateTable('social_identities')
-    .set({ auth_status: 'expired', updated_at: now() })
-    .where('id', '=', identityId)
-    .where('auth_status', '!=', 'revoked')
-    .execute()
+export async function markIdentityExpired(identity: IdentityLike): Promise<void> {
+  if (identity.auth_status === 'revoked') return
+  const expired = await updateCurrentIdentity(identity, { auth_status: 'expired', updated_at: now() })
+    ?.returning(['provider', 'handle'])
+    .executeTakeFirst()
+  if (!expired) return
 
-  // Posts to this account fail until it is connected again, so say so now
-  // and not when the next scheduled post bounces. Once a day at most.
-  const row = await database.selectFrom('social_identities').select(['provider', 'handle', 'auth_status']).where('id', '=', identityId).executeTakeFirst()
-  if (row && row.auth_status === 'expired') {
-    await alerts.raise({
-      kind: 'account-expired',
-      title: `${String(row.provider).replace(/^./, (letter: string) => letter.toUpperCase())} account ${row.handle} needs reconnecting`,
-      body: 'The network turned its sign-in down. Posts to it will fail until you connect it again under Settings, Channels.',
-      link: '/accounts',
-      key: `account-expired:${identityId}:${now().slice(0, 10)}`,
-    })
-  }
+  // Announce only a credential generation that the database actually expired.
+  await alerts.raise({
+    kind: 'account-expired',
+    title: `${String(expired.provider).replace(/^./, (letter: string) => letter.toUpperCase())} account ${expired.handle} needs reconnecting`,
+    body: 'The network turned its sign-in down. Posts to it will fail until you connect it again under Settings, Channels.',
+    link: '/accounts',
+    key: `account-expired:${identity.id}:${now().slice(0, 10)}`,
+  })
 }
 
 /** The error a service returns when an explicitly chosen account is unusable. */

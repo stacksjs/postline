@@ -306,7 +306,7 @@ export class LinkedInService {
       const explained = explainNetworkError('linkedin', error)
       const message = explained.message
       if (explained.kind === 'expired')
-        await markIdentityExpired(identity.id)
+        await markIdentityExpired(identity)
       await database.updateTable('post_targets').set({
         status: 'failed',
         failure_reason: message,
@@ -348,6 +348,7 @@ export class LinkedInService {
     if (!(await networkApps.credentials('linkedin')).engagementMetrics) return { synced: 0 }
     return await syncConnectedMetrics<SocialIdentityRow>('linkedin', this.driver, async (identity) => {
       const current = await this.refreshIfExpiring(identity)
+      if (!current) return
       return {
         handle: current.handle,
         did: current.external_id || undefined,
@@ -363,12 +364,17 @@ export class LinkedInService {
   private async requireIdentity(identityId?: number | null): Promise<SocialIdentityRow> {
     if (identityId) {
       const chosen = await findIdentityRow<SocialIdentityRow>('linkedin', identityId)
-      if (isUsableIdentity(chosen)) return await this.refreshIfExpiring(chosen!)
+      const current = isUsableIdentity(chosen) ? await this.refreshIfExpiring(chosen!) : undefined
+      if (current) return current
       throw unavailableAccountError('LinkedIn', chosen)
     }
 
     const existing = await findIdentityRow<SocialIdentityRow>('linkedin')
-    if (isUsableIdentity(existing)) return await this.refreshIfExpiring(existing!)
+    if (isUsableIdentity(existing)) {
+      const current = await this.refreshIfExpiring(existing!)
+      if (current) return current
+      throw unavailableAccountError('LinkedIn', await findIdentityRow<SocialIdentityRow>('linkedin', existing!.id))
+    }
 
     // Fall back to an env-configured token if one is available.
     if ((await this.config()).accessToken) {
@@ -386,7 +392,7 @@ export class LinkedInService {
    * in the refresh-token program). Best-effort: any failure leaves the current
    * token in place so a real auth failure still surfaces at publish time.
    */
-  private async refreshIfExpiring(identity: SocialIdentityRow): Promise<SocialIdentityRow> {
+  private async refreshIfExpiring(identity: SocialIdentityRow): Promise<SocialIdentityRow | undefined> {
     const cfg = (await this.config())
     if (!identity.refresh_token || !cfg.clientId || !cfg.clientSecret) return identity
 
@@ -396,6 +402,9 @@ export class LinkedInService {
         return isUsableIdentity(row) ? row : undefined
       },
       refresh: async (current) => {
+        const siblings = (await listIdentityRows<SocialIdentityRow>('linkedin')).filter(sibling =>
+          sibling.id !== current.id && isUsableIdentity(sibling) && sibling.refresh_token === current.refresh_token,
+        )
         const refreshed = await this.driver.refreshAccessToken({
           clientId: cfg.clientId,
           clientSecret: cfg.clientSecret,
@@ -410,16 +419,14 @@ export class LinkedInService {
           auth_status: 'connected',
           updated_at: now(),
         }
-        await saveIdentityTokens(current.id, tokens)
+        const updated = await saveIdentityTokens(current, tokens)
+        if (!updated) return
         // The member and their Pages share one sign-in: renew them together,
         // so a Page is not left holding a token its member has moved past.
-        for (const sibling of await listIdentityRows<SocialIdentityRow>('linkedin')) {
-          if (Number(sibling.id) !== Number(current.id) && isUsableIdentity(sibling) && sibling.refresh_token === current.refresh_token)
-            await saveIdentityTokens(sibling.id, tokens)
-        }
-        return { ...current, access_token: refreshed.accessToken, refresh_token: nextRefresh, token_expires_at: nextExpiry }
+        for (const sibling of siblings) await saveIdentityTokens(sibling, tokens)
+        return updated
       },
-      refused: async current => await markIdentityExpired(current.id),
+      refused: async current => await markIdentityExpired(current),
     })
   }
 
@@ -432,7 +439,7 @@ export class LinkedInService {
     let renewed = 0
     for (const row of rows.filter(row => isUsableIdentity(row))) {
       const after = await this.refreshIfExpiring(row)
-      if (after.token_expires_at !== row.token_expires_at) renewed++
+      if (after && after.token_expires_at !== row.token_expires_at) renewed++
     }
     return renewed
   }

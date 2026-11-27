@@ -2,17 +2,18 @@
  * Engagement sync on a fresh install (#202): nothing published to Bluesky is
  * nothing to do, not a failure to log every half hour.
  */
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, spyOn, test } from 'bun:test'
 import { db } from '@stacksjs/database'
 import { networkApps } from '../../app/Services/NetworkAppService'
 import { bluesky } from '../../app/Services/Social/BlueskyService'
+import { ThreadsDriver } from '../../app/Services/Social/Drivers/ThreadsDriver'
 import { syncEngagement } from '../../app/Services/Social/EngagementService'
 import { instagram } from '../../app/Services/Social/InstagramService'
 import { linkedin } from '../../app/Services/Social/LinkedInService'
 import { threads } from '../../app/Services/Social/ThreadsService'
 import { mastodon } from '../../app/Services/Social/MastodonService'
 import { postQueue } from '../../app/Services/Social/QueueService'
-import { upsertIdentityRow } from '../../app/Services/Social/identities'
+import { findIdentityRow, revokeIdentityRow, upsertIdentityRow } from '../../app/Services/Social/identities'
 
 const database = db as any
 
@@ -201,4 +202,43 @@ describe('optional engagement drivers', () => {
       for (const { provider } of sources) await networkApps.clear(provider)
     }
   })
+
+  test('a credential revoked while renewing is never used for a metrics read', async () => {
+    const began = Promise.withResolvers<void>()
+    const finish = Promise.withResolvers<{ accessToken: string, expiresIn: number }>()
+    const renewal = spyOn(ThreadsDriver.prototype, 'refreshLongLivedToken').mockImplementation(async () => {
+      began.resolve()
+      return await finish.promise
+    })
+    const metrics = spyOn(ThreadsDriver.prototype, 'metrics').mockResolvedValue([])
+    const account = await upsertIdentityRow('threads', { externalId: '701' }, {
+      handle: 'renewal-race', external_id: '701', access_token: 'old-access',
+      auth_status: 'connected', token_expires_at: '2000-01-01 00:00:00',
+    })
+    const { postId } = await postQueue.save({ text: 'Metrics renewal race fixture', providers: [`threads:${account.id}`] })
+    await database.updateTable('post_targets').set({ status: 'published', remote_uri: '702' }).where('post_id', '=', postId).execute()
+    await networkApps.save('threads', { clientId: 'test-client', clientSecret: 'test-secret', engagementMetrics: true })
+
+    const sync = threads.syncMetrics()
+    try {
+      await began.promise
+      await revokeIdentityRow('threads', account.id)
+      finish.resolve({ accessToken: 'late-token', expiresIn: 3600 })
+
+      expect(await sync).toEqual({ synced: 0 })
+      expect(metrics).not.toHaveBeenCalled()
+      expect(await findIdentityRow('threads', account.id)).toMatchObject({ auth_status: 'revoked', access_token: null })
+    }
+    finally {
+      finish.resolve({ accessToken: 'late-token', expiresIn: 3600 })
+      await sync.catch(() => {})
+      renewal.mockRestore()
+      metrics.mockRestore()
+      await database.deleteFrom('post_targets').where('post_id', '=', postId).execute()
+      await database.deleteFrom('posts').where('id', '=', postId).execute()
+      await database.deleteFrom('social_identities').where('id', '=', account.id).execute()
+      await networkApps.clear('threads')
+    }
+  })
+
 })
