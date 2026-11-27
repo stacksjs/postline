@@ -1163,6 +1163,12 @@ async function checkComposerNetworkOptions(cdp: Cdp): Promise<void> {
   await evaluate(cdp, `(() => {
     for (const chip of [${target('mastodon')}, ${target('bluesky')}])
       if (chip.getAttribute('aria-pressed') !== 'true') chip.click()
+  })()`)
+  await waitUntil('Composer shows the selected Mastodon and Bluesky options', () => evaluate<boolean>(cdp, `
+    ${target('mastodon')}?.getAttribute('aria-pressed') === 'true'
+      && ${target('bluesky')}?.getAttribute('aria-pressed') === 'true'
+      && Boolean(${field('pollChoices')} && ${field('blueskyQuote')})`), 5_000)
+  await evaluate(cdp, `(() => {
     ${field('pollChoices')}.closest('details').open = true
     ${field('blueskyQuote')}.closest('details').open = true
     const editor = document.querySelector('[data-bluesky-text]')
@@ -1175,13 +1181,14 @@ async function checkComposerNetworkOptions(cdp: Cdp): Promise<void> {
     editor.focus()
   })()`)
   await pressKey(cdp, 's', 83, 4)
-  await waitUntil('Composer saves the draft with its network options', () => evaluate<boolean>(cdp,
-    "document.querySelector('#stx-toast-container')?.textContent.includes('Draft saved to the queue.')"), 5_000)
-  const id = await evaluate<number>(cdp, `(async () => {
-    const { data } = await (await fetch('/api/postline/queue')).json()
-    return data.items.find(item => item.body === ${JSON.stringify(text)})?.id
-  })()`)
-  if (!id) throw new Error('Composer did not save the network options fixture to Queue.')
+  let id: number | undefined
+  await waitUntil('Composer saves the network options draft to Queue', async () => {
+    id = await evaluate<number | undefined>(cdp, `(async () => {
+      const { data } = await (await fetch('/api/postline/queue')).json()
+      return data.items.find(item => item.status === 'draft' && item.body === ${JSON.stringify(text)})?.id
+    })()`)
+    return typeof id === 'number'
+  }, 5_000)
 
   await auditPage(`${site}/composer?edit=${id}`, { cdp })
   await waitUntil('Opening a queued draft restores its poll, labels and quote', () => evaluate<boolean>(cdp, `
