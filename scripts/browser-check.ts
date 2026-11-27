@@ -1290,11 +1290,17 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
       if (url.pathname !== '${endpoint}') return send(input, options)
       if (options?.method === 'POST') {
         window.xSessionWrites++
-        const { handle, signed_out } = JSON.parse(options.body)
-        if (signed_out) localStorage.removeItem('test-x-session-handle')
-        else localStorage.setItem('test-x-session-handle', handle)
+        const { handle, signed_out, needs_check } = JSON.parse(options.body)
+        if (needs_check) localStorage.setItem('test-x-session-needs-check', '1')
+        else {
+          localStorage.removeItem('test-x-session-needs-check')
+          if (signed_out) localStorage.removeItem('test-x-session-handle')
+          else localStorage.setItem('test-x-session-handle', handle)
+        }
       }
-      return Promise.resolve(Response.json({ ok: true, data: { profile, handle: localStorage.getItem('test-x-session-handle') } }))
+      return Promise.resolve(Response.json({ ok: true, data: {
+        profile, handle: localStorage.getItem('test-x-session-handle'), needsCheck: localStorage.getItem('test-x-session-needs-check') === '1',
+      } }))
     }
   ` })
 
@@ -1360,10 +1366,15 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     await waitUntil('An account challenge stops imports and reopens the same named window', () => evaluate<boolean>(cdp, `
       ${section}.textContent.includes('X needs your attention')
         && ${section}.querySelectorAll('button')[2].disabled && ${section}.querySelectorAll('button')[3].disabled
-        && window.xSessionWrites === 0 && window.xSessionImports === 0
+        && window.xSessionWrites === 1 && window.xSessionImports === 0
         && window.xSessionNavigations.length === 0 && window.xSessionOpens.length === 2
         && window.xSessionOpens.every(opened => opened.name === opened.dataStore)`), 5_000)
 
+    await auditPage(`${site}/accounts`, { cdp })
+    await waitUntil('The requested sign-in check survives a document reload', () => evaluate<boolean>(cdp, `
+      ${section}?.textContent.includes('Check sign-in to resume browser reads')
+        && ${section}.querySelectorAll('button')[2].disabled && ${section}.querySelectorAll('button')[3].disabled
+        && !${check}.disabled && window.xSessionWrites === 0`), 5_000)
     await evaluate(cdp, `window.xSessionState = { state: 'connected', handle: 'postline_test' }; ${check}.focus()`)
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('Confirming sign-in enables X imports again', () => evaluate<boolean>(cdp, `
@@ -1375,19 +1386,19 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('A signed-out page stops Listening imports', () => evaluate<boolean>(cdp, `
       ${section}.textContent.includes('Sign in to X, then select Check sign-in')
-        && ${section}.querySelectorAll('button')[3].disabled && window.xSessionWrites === 1
-        && window.xSessionImports === 0 && window.xSessionOpens.length === 3`), 5_000)
+        && ${section}.querySelectorAll('button')[3].disabled && window.xSessionWrites === 2
+        && window.xSessionImports === 0 && window.xSessionOpens.length === 1 && !${check}.disabled`), 5_000)
 
     await evaluate(cdp, `${check}.focus()`)
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('Checking after signing out clears the confirmed handle', () => evaluate<boolean>(cdp, `
       ${section}.textContent.includes('Signed out of X.')
         && !${section}.querySelectorAll('button')[2].getClientRects().length
-        && !${section}.querySelectorAll('button')[3].getClientRects().length && window.xSessionWrites === 2`), 5_000)
+        && !${section}.querySelectorAll('button')[3].getClientRects().length && window.xSessionWrites === 3`), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
-    await evaluate(cdp, `sessionStorage.removeItem('test-x-window-open'); localStorage.removeItem('test-x-session-handle')`)
+    await evaluate(cdp, `sessionStorage.removeItem('test-x-window-open'); localStorage.removeItem('test-x-session-handle'); localStorage.removeItem('test-x-session-needs-check')`)
   }
 }
 

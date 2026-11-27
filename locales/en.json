@@ -623,7 +623,9 @@
       "openMentionsPage": "Open X Mentions",
       "profileOpened": "Your profile is opening in the X window. When it loads, select Read visible engagement.",
       "mentionsOpened": "Mentions is opening in the X window. When it loads, select Import visible mentions.",
-      "pageOpenFailed": "Could not open that page in the X window."
+      "pageOpenFailed": "Could not open that page in the X window.",
+      "attentionTitle": "X browser sign-in needs attention",
+      "attentionBody": "Open the X browser in Channels, finish signing in, and select Check sign-in to resume browser reads."
     },
     "analytics": {
       "title": "Analytics",

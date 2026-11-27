@@ -7,6 +7,7 @@ export const xBrowserSessionClient = { locale: workspaceLocale, messages: worksp
 
 <script client>
 import { createI18n } from '@stacksjs/i18n/client'
+import type { TwitterBrowserSessionSnapshot } from '../../app/Services/Social/TwitterBrowserSession'
 import type { XBrowserWindow } from '../functions/x-browser-session'
 import { requestJson } from '../functions/postline-client'
 import { openXBrowser, readXBrowserSession, xBrowserWindow } from '../functions/x-browser-session'
@@ -18,7 +19,7 @@ const plural = new Intl.PluralRules(language)
 
 const xSessionDesktop = useNativeDesktop()
 const xBrowser = state<XBrowserWindow | null>(null)
-const xSession = state<{ profile: string, handle: string | null } | null>(null)
+const xSession = state<TwitterBrowserSessionSnapshot | null>(null)
 const xSessionBusy = state(false)
 const xSessionNeedsCheck = state(false)
 const xSessionFeedback = state('')
@@ -29,6 +30,8 @@ async function loadSession() {
   try {
     const { data } = await requestJson(xSessionEndpoint, { cache: 'no-store' }, copy.loadFailed)
     xSession.set(data)
+    xSessionNeedsCheck.set(data.needsCheck)
+    if (data.needsCheck) xSessionFeedback.set(copy.attentionBody)
   }
   catch (error) {
     xSessionFeedback.set(error instanceof Error ? error.message : copy.loadFailed)
@@ -59,12 +62,24 @@ async function openSession() {
   }
 }
 
-async function returnToX(browser: XBrowserWindow, profile: string, reason: 'needs-attention' | 'signed-out') {
+async function pauseReads(message: string) {
   xSessionNeedsCheck.set(true)
-  xSessionFeedback.set(reason === 'needs-attention'
+  xSessionFeedback.set(message)
+  try {
+    const { data } = await requestJson(xSessionEndpoint, { method: 'POST', body: JSON.stringify({ needs_check: true }) }, copy.saveFailed)
+    xSession.set(data)
+  }
+  catch {
+    xSessionFeedback.set(`${message} ${copy.saveFailed}`)
+  }
+}
+
+async function returnToX(browser: XBrowserWindow, profile: string, reason: 'needs-attention' | 'signed-out') {
+  const paused = pauseReads(reason === 'needs-attention'
     ? copy.attention
     : copy.signInFirst)
   await openXBrowser(browser, profile).catch(() => {})
+  await paused
 }
 
 async function checkSignIn() {
@@ -85,8 +100,8 @@ async function checkSignIn() {
 
     const body = status.state === 'connected' ? { handle: status.handle } : { signed_out: true }
     const { data } = await requestJson(xSessionEndpoint, { method: 'POST', body: JSON.stringify(body) }, copy.saveFailed)
-    xSession.set({ ...current, handle: data.handle })
-    xSessionNeedsCheck.set(false)
+    xSession.set(data)
+    xSessionNeedsCheck.set(data.needsCheck)
     xSessionFeedback.set(data.handle ? words.t('signedIn', { handle: data.handle }) : copy.signedOut)
   }
   catch (error) {
@@ -105,8 +120,7 @@ async function readConfirmedSession(browser: XBrowserWindow, profile: string, ha
   }
   if (result.state === 'connected') {
     if (result.handle.toLowerCase() === handle.toLowerCase()) return result
-    xSessionNeedsCheck.set(true)
-    xSessionFeedback.set(copy.differentAccount)
+    await pauseReads(copy.differentAccount)
     return
   }
   xSessionFeedback.set(copy.importReady)

@@ -1,28 +1,56 @@
 import type { EngagementCounts } from '../../Support/Social/engagement-analytics'
 import { db } from '@stacksjs/database'
 import { UserFacingError } from '../../Support/Http/user-error'
+import { workspaceXBrowserSessionText } from '../../Support/Localization/workspace'
 import { engagementCounts } from '../../Support/Social/engagement-analytics'
+import { alerts } from '../AlertService'
 import { saveTargetEngagement } from './save-target-engagement'
 import { ensureAccount, now } from './support'
 
-export async function twitterBrowserSession(): Promise<{ profile: string, handle: string | null }> {
-  const account = await db.selectFrom('accounts').select(['uuid', 'twitter_browser_handle'])
-    .where('id', '=', await ensureAccount()).executeTakeFirstOrThrow()
-  return { profile: `postline-x-${account.uuid}`, handle: account.twitter_browser_handle ?? null }
+export interface TwitterBrowserSessionSnapshot {
+  profile: string
+  handle: string | null
+  needsCheck: boolean
 }
 
-export async function rememberTwitterBrowserHandle(handle: unknown): Promise<string | null> {
+export async function twitterBrowserSession(): Promise<TwitterBrowserSessionSnapshot> {
+  const account = await db.selectFrom('accounts').select(['uuid', 'twitter_browser_handle', 'twitter_browser_needs_check'])
+    .where('id', '=', await ensureAccount()).executeTakeFirstOrThrow()
+  return {
+    profile: `postline-x-${account.uuid}`,
+    handle: account.twitter_browser_handle ?? null,
+    needsCheck: Boolean(account.twitter_browser_needs_check),
+  }
+}
+
+export async function rememberTwitterBrowserHandle(handle: unknown): Promise<void> {
   if (handle !== null && (typeof handle !== 'string' || !/^[A-Za-z0-9_]{1,15}$/.test(handle)))
     throw new UserFacingError('Postline could not identify the signed-in X account.')
 
-  await db.updateTable('accounts').set({ twitter_browser_handle: handle, updated_at: now() })
+  await db.updateTable('accounts').set({ twitter_browser_handle: handle, twitter_browser_needs_check: false, updated_at: now() })
     .where('id', '=', await ensureAccount()).execute()
-  return handle
+}
+
+export async function pauseTwitterBrowserReads(): Promise<void> {
+  const account = await db.updateTable('accounts')
+    .set({ twitter_browser_needs_check: true, updated_at: now() })
+    .where('id', '=', await ensureAccount())
+    .where('twitter_browser_needs_check', '=', false)
+    .returning(['uuid']).executeTakeFirst()
+  if (!account) return
+
+  await alerts.raise({
+    kind: 'account-expired',
+    title: workspaceXBrowserSessionText.attentionTitle,
+    body: workspaceXBrowserSessionText.attentionBody,
+    link: '/accounts',
+    key: `x-browser-attention:${account.uuid}:${now().slice(0, 10)}`,
+  })
 }
 
 export async function requireTwitterBrowserHandle(handle: unknown): Promise<string> {
   const session = await twitterBrowserSession()
-  if (!session.handle || typeof handle !== 'string' || handle.toLowerCase() !== session.handle.toLowerCase())
+  if (session.needsCheck || !session.handle || typeof handle !== 'string' || handle.toLowerCase() !== session.handle.toLowerCase())
     throw new UserFacingError('Check the X browser sign-in before reading its data.')
   return session.handle
 }

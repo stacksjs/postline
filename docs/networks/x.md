@@ -67,8 +67,9 @@ X browser session** and choose **Open X**. Sign in directly on X, then return
 to Postline and choose **Check sign-in**. This requires macOS 14 or later.
 WebKit keeps the sign-in on this Mac, and Postline remembers the confirmed
 handle. To sign out, use X's menu in that window and check the session again.
-If X asks you to verify your account during an import, Postline suspends
-imports and brings the X window forward. Complete the check there, then
+If X asks you to verify your account during an import, Postline pauses browser
+reads, records an alert in Activity, and brings the X window forward. The pause
+survives a reload. Complete the check there, then
 select **Check sign-in** in Postline.
 X [restricts scripted website use](https://help.x.com/en/rules-and-policies/x-automation).
 

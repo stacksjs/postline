@@ -17,6 +17,7 @@ declare module '@stacksjs/database' {
       share_media_by_tunnel: number
       publishing_paused: number
       twitter_browser_handle: string
+      twitter_browser_needs_check: number
       ai_provider: "" | "anthropic" | "openai" | "ollama"
       ai_api_key: string
       ai_model: string

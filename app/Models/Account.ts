@@ -62,6 +62,12 @@ export default defineModel({
       hidden: true,
       validation: { rule: schema.string().max(15).optional() },
     },
+    twitterBrowserNeedsCheck: {
+      required: false,
+      hidden: true,
+      default: false,
+      validation: { rule: schema.boolean().optional() },
+    },
     // The AI provider for campaign planning, chosen in Settings (#138). Empty
     // means the environment's AI_PROVIDER / ANTHROPIC_API_KEY / OPENAI_API_KEY
     // decide, as before; the Mac app has no environment, so it needs these.

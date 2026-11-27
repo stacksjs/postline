@@ -45,7 +45,7 @@ describe('upgrading the Mac app from v0.1.1', () => {
       expect(db.query('SELECT status FROM posts ORDER BY id').all()).toEqual([{ status: 'published' }, { status: 'scheduled' }])
       expect(db.query('SELECT remote_uri FROM post_targets WHERE id = 1').get()).toEqual({ remote_uri: 'at://did:plc:owner/app.bsky.feed.post/3kv011' })
       // Columns added since v0.1.1 are there, with their defaults.
-      expect(db.query('SELECT publishing_paused, twitter_browser_handle FROM accounts WHERE id = 1').get()).toEqual({ publishing_paused: 0, twitter_browser_handle: null })
+      expect(db.query('SELECT publishing_paused, twitter_browser_handle, twitter_browser_needs_check FROM accounts WHERE id = 1').get()).toEqual({ publishing_paused: 0, twitter_browser_handle: null, twitter_browser_needs_check: 0 })
       expect(db.query('SELECT twitter_read_source FROM keyword_monitors WHERE id = 1985').get()).toEqual({ twitter_read_source: 'api' })
       expect(db.query("SELECT name FROM sqlite_schema WHERE type = 'table' AND (name LIKE 'publication%' OR name IN ('discover_entries', 'post_comments'))").all()).toEqual([])
       expect(db.query('PRAGMA foreign_key_check').all()).toEqual([])

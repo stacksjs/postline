@@ -183,9 +183,9 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   const connectedBrowser = await call('POST', browserSessionPath, { handle: 'postline_test' })
   const savedBrowser = await call('GET', browserSessionPath)
   const savedProfile = JSON.parse(savedBrowser.text).data
-  check('the native session remembers only its X handle and profile', connectedBrowser.status === 200
+  check('the native session remembers its X handle, profile and confirmation state', connectedBrowser.status === 200
     && savedBrowser.status === 200 && savedProfile?.handle === 'postline_test' && savedProfile?.profile === initialProfile?.profile
-    && Object.keys(savedProfile).sort().join(',') === 'handle,profile')
+    && savedProfile.needsCheck === false && Object.keys(savedProfile).sort().join(',') === 'handle,needsCheck,profile')
   const foreignMetrics = await call('POST', `${browserSessionPath}/metrics`, { handle: 'another_user' })
   check('the native session rejects engagement from a different handle', foreignMetrics.status === 422
     && JSON.parse(foreignMetrics.text)?.error?.includes('Check the X browser sign-in') === true)
@@ -197,15 +197,34 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   }))
   const watchResult = JSON.parse(watch.text)?.data?.monitor
   check('the native agent saves an X browser watch', watch.status === 200 && watchResult?.twitterReadSource === 'browser')
-  const importedMentions = await call('POST', `${browserSessionPath}/listening`, JSON.stringify({
+  const visibleMentions = JSON.stringify({
     handle: 'postline_test',
     posts: [{ id: '8724', authorHandle: 'fixture_author', body: 'Postline launch fixture', postedAt: '2026-11-27T05:00:00.000Z' }],
-  }))
+  })
+  const importedMentions = await call('POST', `${browserSessionPath}/listening`, visibleMentions)
   check('the native agent imports visible X posts without calling the X API', importedMentions.status === 200
     && JSON.parse(importedMentions.text)?.data?.created === 1)
   const savedMentions = await call('GET', `/api/postline/listening?monitor_id=${watchResult?.id}`)
   check('the imported X post appears in Listening', savedMentions.status === 200
     && JSON.parse(savedMentions.text)?.data?.mentions?.[0]?.url === 'https://x.com/fixture_author/status/8724')
+
+  const challenge = JSON.stringify({ needs_check: true })
+  await call('POST', browserSessionPath, challenge)
+  await call('POST', browserSessionPath, challenge)
+  const paused = await call('GET', browserSessionPath)
+  const pausedSession = JSON.parse(paused.text)?.data
+  check('the native agent persists an X sign-in hold and preserves the last confirmed handle', paused.status === 200
+    && pausedSession?.handle === savedProfile?.handle && pausedSession?.needsCheck === true)
+  const blockedImport = await call('POST', `${browserSessionPath}/listening`, visibleMentions)
+  check('the native agent rejects an X browser import while sign-in needs checking', blockedImport.status === 422
+    && JSON.parse(blockedImport.text)?.error?.includes('Check the X browser sign-in') === true)
+  const activity = await call('GET', '/api/postline/alerts')
+  const xAlerts = JSON.parse(activity.text)?.data?.alerts?.filter((item: { title: string }) => item.title === 'X browser sign-in needs attention')
+  check('a repeated X sign-in challenge raises one owner alert', activity.status === 200 && xAlerts?.length === 1)
+  const confirmedAgain = await call('POST', browserSessionPath, { handle: 'postline_test' })
+  check('confirming the X sign-in removes the hold', confirmedAgain.status === 200 && JSON.parse(confirmedAgain.text)?.data?.needsCheck === false)
+  const resumedImport = await call('POST', `${browserSessionPath}/listening`, visibleMentions)
+  check('the native agent accepts X browser imports after a new sign-in check', resumedImport.status === 200)
 
   const missingReply = await call('POST', '/api/postline/inbox/mentions/reply', { id: '99999', text: 'A fixture reply' })
   check('the compiled agent rejects a public reply without a saved mention', missingReply.status === 422
