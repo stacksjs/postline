@@ -91,7 +91,10 @@ describe('X session browser reads', () => {
       },
     })
     const document = {
-      querySelector: (selector: string) => selector.includes('Profile_Link') ? { getAttribute: () => '/postline_test' } : null,
+      querySelector(selector: string) {
+        if (selector.includes('Profile_Link')) return { getAttribute: () => '/postline_test' }
+        return selector.includes('primaryColumn') ? { querySelectorAll: () => [] } : null
+      },
       querySelectorAll: (selector: string) => selector.includes('primaryColumn')
         ? [article('/another_user/status/42'), article('/hidden/status/43', false), article('https://example.test/foreign/status/44')]
         : [],
@@ -101,6 +104,22 @@ describe('X session browser reads', () => {
     expect(inspectXPage(document, 'https://x.com/notifications/mentions', 'listening')).toMatchObject({ state: 'connected', posts })
     expect(inspectXPage(document, 'https://x.com/home', 'listening')).not.toHaveProperty('posts')
     expect(inspectXPage(document, 'https://x.com/account/access', 'listening')).toEqual({ state: 'needs-attention' })
+  })
+
+  test('distinguishes an empty X timeline from one that cannot be read', () => {
+    const page = (rows: { getClientRects: () => number[] }[] | null) => ({
+      querySelector(selector: string) {
+        if (selector.includes('Profile_Link')) return { getAttribute: () => '/postline_test' }
+        return selector.includes('primaryColumn') && rows ? { querySelectorAll: () => rows } : null
+      },
+      querySelectorAll: () => [],
+    }) as unknown as Document
+    const search = 'https://x.com/search?q=postline'
+    expect(inspectXPage(page(null), search, 'listening')).toMatchObject({ state: 'connected', readIssue: 'layout' })
+    expect(inspectXPage(page([{ getClientRects: () => [1] }]), search, 'listening')).toMatchObject({ state: 'connected', readIssue: 'layout' })
+    expect(inspectXPage(page([{ getClientRects: () => [] }]), search, 'listening')).toEqual({
+      state: 'connected', handle: 'postline_test', measurements: [], posts: [],
+    })
   })
 
   test('imports matching posts once for active browser watches and skips paid API scans', async () => {

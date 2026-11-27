@@ -15,7 +15,7 @@ interface XBrowserPost {
 type XBrowserRead = 'sign-in' | 'listening' | 'metrics'
 
 type XBrowserStatus =
-  | { state: 'connected', handle: string, measurements: Array<{ id: string, counts: EngagementCounts }>, posts?: XBrowserPost[] }
+  | { state: 'connected', handle: string, measurements: Array<{ id: string, counts: EngagementCounts }>, posts?: XBrowserPost[], readIssue?: 'layout' }
   | { state: 'signed-out' | 'needs-attention' | 'unavailable' }
 
 export function xBrowserWindow(host: unknown): XBrowserWindow | null {
@@ -55,7 +55,12 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
     if (profile.origin === url.origin && handle) {
       const measurements: Array<{ id: string, counts: EngagementCounts }> = []
       const listening = read === 'listening' && ['/search', '/notifications/mentions'].includes(url.pathname)
+      const column = listening ? page.querySelector('[data-testid="primaryColumn"]') : null
+      if (listening && !column)
+        return { state: 'connected', handle, measurements, readIssue: 'layout' }
+
       const posts: XBrowserPost[] | undefined = listening ? [] : undefined
+      let recognizedPost = false
       if (read === 'metrics' || listening) {
         const articleSelector = listening
           ? '[data-testid="primaryColumn"] article[data-testid="tweet"]'
@@ -72,6 +77,7 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
           if (!post || post.origin !== url.origin || !match?.[1] || !match[2]) continue
           const [, authorHandle, id] = match
           if (posts) {
+            recognizedPost = true
             const body = article.querySelector<HTMLElement>('[data-testid="tweetText"]')?.innerText.trim()
             const postedAt = time?.getAttribute('datetime')
             if (body && postedAt) posts.push({ id, authorHandle, body: body.slice(0, 10000), postedAt })
@@ -98,6 +104,10 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
           if (Object.keys(counts).length) measurements.push({ id, counts })
         }
       }
+      // A loaded empty column is a valid result. Visible rows without any
+      // recognizable status links mean the layout has changed.
+      if (column && !recognizedPost && Array.from(column.querySelectorAll('article')).slice(0, 100).some(article => article.getClientRects().length))
+        return { state: 'connected', handle, measurements, readIssue: 'layout' }
       return { state: 'connected', handle, measurements, ...(posts && { posts }) }
     }
   }

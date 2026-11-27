@@ -1250,7 +1250,12 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('Importing requires Search or Mentions', () => evaluate<boolean>(cdp, `
       ${section}.textContent.includes('Open Search or Mentions')`), 5_000)
+    await evaluate(cdp, `window.xSessionState.readIssue = 'layout'; ${section}.querySelectorAll('button')[3].focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Unrecognized X layout reports a retry and writes no imports', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('Postline could not read this X page') && window.xSessionImports === 1`), 5_000)
     await evaluate(cdp, `(() => {
+      delete window.xSessionState.readIssue
       window.xSessionState.posts = [{ id: '4321', authorHandle: 'fixture_author', body: 'Postline launch', postedAt: '2026-11-27T05:00:00.000Z' }]
       ${section}.querySelectorAll('button')[3].focus()
     })()`)

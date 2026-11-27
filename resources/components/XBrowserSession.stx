@@ -131,6 +131,10 @@ async function captureListening() {
   try {
     const result = await readConfirmedSession(windowApi, current.profile, current.handle, 'listening')
     if (!result) return
+    if (result.readIssue === 'layout') {
+      xSessionFeedback.set('Postline could not read this X page. Let Search or Mentions finish loading, then try again.')
+      return
+    }
     if (!result.posts) {
       xSessionFeedback.set('Open Search or Mentions in the X window first.')
       return
