@@ -820,7 +820,17 @@ async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
 async function checkChannels(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const send = window.fetch.bind(window)
-    const gate = new Promise(resolve => { window.releaseChannels = resolve })
+    window.channelShift = 0
+    let measuringChannels = false
+    new PerformanceObserver(list => {
+      if (!measuringChannels) return
+      for (const entry of list.getEntries()) {
+        if (!entry.hadRecentInput) window.channelShift += entry.value
+      }
+    }).observe({ type: 'layout-shift' })
+    const gate = new Promise(resolve => {
+      window.releaseChannels = () => { measuringChannels = true; resolve() }
+    })
     const status = { provider: 'bluesky', connected: true, canPublish: true, authStatus: 'connected' }
     let accounts = [
       { ...status, id: 101, handle: 'news.example', isDefault: true, expiresSoon: true, expiresAt: new Date(Date.now() + 172800000).toISOString() },
@@ -865,6 +875,8 @@ async function checkChannels(cdp: Cdp): Promise<void> {
       && ${card}?.innerText.includes('@news.example')
       && ${card}.innerText.includes('Expires in')
       && document.querySelectorAll('[data-network-app]').length === 4`), 5_000)
+    const channelShift = await evaluate<number>(cdp, 'window.channelShift')
+    if (channelShift > 0) fail('accounts', 'channels', `applying the channel response shifted the layout by ${channelShift.toFixed(3)}`)
     const requests = await evaluate<string[]>(cdp, 'window.channelReads')
     if (requests.length !== 1 || requests[0] !== '/api/postline/bootstrap')
       fail('accounts', 'channels', `expected one bootstrap request, saw ${requests.join(', ')}`)

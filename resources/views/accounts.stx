@@ -12,7 +12,7 @@ const networkSetupGuides = await loadNetworkSetupGuides()
   @meta('description', 'Connect and manage publishing channels in Postline settings.')
   <section class="grid gap-4" data-postline-page="accounts" data-testid="accounts-page">
     <WorkspacePageHeader title="Connect your channels">
-      <template #description><span :show="channelsReady()" :text="channelProviders().length + (channelProviders().length === 1 ? ' publishing channel' : ' publishing channels')"></span></template>
+      <template #description><span class="block min-h-5" :text="channelsReady() ? channelProviders().length + (channelProviders().length === 1 ? ' publishing channel' : ' publishing channels') : ''"></span></template>
       <a class="inline-flex gap-2 items-center justify-center px-4 h-9 w-fit font-semibold text-ink text-sm bg-panel hover:bg-raised border border-line rounded-xl shadow-sm transition-colors" :href="returnToSetup() ? '/setup?step=channels' : '/composer'" data-stx-link>
         <span class="h-4 w-4 i-hugeicons-edit-02" aria-hidden="true"></span>
         <span :text="returnToSetup() ? 'Continue setup' : 'Open Composer'">Open Composer</span>
@@ -121,7 +121,7 @@ const networkSetupGuides = await loadNetworkSetupGuides()
       </Card>
     </section>
 
-    <details class="overflow-hidden bg-panel border border-line rounded-2xl open:border-danger-line shadow-sm group" data-purge-card>
+    <details class="overflow-hidden bg-panel border border-line rounded-2xl open:border-danger-line shadow-sm group" x-cloak x-show="channelsReady() || bootstrap.error()" data-purge-card>
       <summary class="flex gap-3 items-center justify-between p-4 list-none hover:bg-panel-2 transition-colors cursor-pointer">
         <div class="flex gap-3 items-center"><span class="grid place-items-center h-9 w-9 text-danger text-lg bg-danger-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-alert-02"></span></span><div>
           <strong class="text-ink text-ui">Cleanup</strong>
