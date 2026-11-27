@@ -871,6 +871,12 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     } }
     window.fetch = (input, options) => {
       const url = new URL(input instanceof Request ? input.url : input, location.href)
+      if (url.pathname === '${endpoint}/listening') {
+        const { handle, posts } = JSON.parse(options.body)
+        if (options.method !== 'POST' || handle !== 'postline_test' || posts[0]?.authorHandle !== 'fixture_author')
+          return Promise.resolve(Response.json({ ok: false, error: 'Invalid session Listening request' }, { status: 422 }))
+        return Promise.resolve(Response.json({ ok: true, data: { watches: 1, created: 1 } }))
+      }
       if (url.pathname === '${endpoint}/metrics') {
         const { handle, measurements } = JSON.parse(options.body)
         if (options.method !== 'POST' || handle !== 'postline_test' || measurements[0]?.counts.likes !== 2)
@@ -911,6 +917,17 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('Reading visible engagement saves the X measurements', () => evaluate<boolean>(cdp, `
       ${section}.textContent.includes('Updated 1 published post in Analytics.')`), 5_000)
+    await evaluate(cdp, `${section}.querySelectorAll('button')[3].focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Importing requires Search or Mentions', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('Open Search or Mentions')`), 5_000)
+    await evaluate(cdp, `(() => {
+      window.xSessionState.posts = [{ id: '4321', authorHandle: 'fixture_author', body: 'Postline launch', postedAt: '2026-11-27T05:00:00.000Z' }]
+      ${section}.querySelectorAll('button')[3].focus()
+    })()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The visible X posts are imported into Listening', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('Saved 1 new X mention in Listening.')`), 5_000)
     await auditPage(`${site}/accounts`, { cdp })
     await waitUntil('The confirmed handle survives a reload', () => evaluate<boolean>(cdp, `
       ${section}?.textContent.includes('Last confirmed as @postline_test')`), 5_000)
@@ -924,7 +941,8 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('Signing out clears the confirmed handle', () => evaluate<boolean>(cdp, `
       ${section}.textContent.includes('Signed out of X.')
-        && !${section}.querySelectorAll('button')[2].getClientRects().length && window.xSessionWrites === 1`), 5_000)
+        && !${section}.querySelectorAll('button')[2].getClientRects().length
+        && !${section}.querySelectorAll('button')[3].getClientRects().length && window.xSessionWrites === 1`), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })

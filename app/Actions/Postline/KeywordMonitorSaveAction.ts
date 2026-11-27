@@ -1,6 +1,7 @@
 import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
+import { isDesktopAgent } from '../../Support/Auth/native'
 import { actionFailure } from '../../Support/Http/action-error'
 import { keywordMonitoring } from '../../Services/KeywordMonitoringService'
 
@@ -15,6 +16,7 @@ export default new Action({
         name: String(request.get('name') || ''),
         keywords: request.get('keywords'),
         providers: request.get('providers'),
+        twitterReadSource: isDesktopAgent() ? request.get('twitter_read_source') : undefined,
         matchMode: String(request.get('match_mode') || 'any'),
         status: String(request.get('status') || 'active'),
       })

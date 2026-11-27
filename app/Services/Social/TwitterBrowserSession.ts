@@ -20,10 +20,15 @@ export async function rememberTwitterBrowserHandle(handle: unknown): Promise<str
   return handle
 }
 
-export async function saveTwitterBrowserMetrics(handle: unknown, reports: unknown): Promise<number> {
+export async function requireTwitterBrowserHandle(handle: unknown): Promise<string> {
   const session = await twitterBrowserSession()
   if (!session.handle || typeof handle !== 'string' || handle.toLowerCase() !== session.handle.toLowerCase())
-    throw new UserFacingError('Check the X browser sign-in before reading its engagement.')
+    throw new UserFacingError('Check the X browser sign-in before reading its data.')
+  return session.handle
+}
+
+export async function saveTwitterBrowserMetrics(handle: unknown, reports: unknown): Promise<number> {
+  const confirmedHandle = await requireTwitterBrowserHandle(handle)
   if (!Array.isArray(reports) || reports.length > 100)
     throw new UserFacingError('Postline could not read the visible X post counts.')
 
@@ -46,7 +51,7 @@ export async function saveTwitterBrowserMetrics(handle: unknown, reports: unknow
   const syncedAt = now()
   let synced = 0
   for (const target of targets) {
-    if (typeof target.handle !== 'string' || target.handle.toLowerCase() !== handle.toLowerCase()
+    if (typeof target.handle !== 'string' || target.handle.toLowerCase() !== confirmedHandle.toLowerCase()
       || typeof target.remote_uri !== 'string' || typeof target.social_identity_id !== 'number') continue
     const counts = measurements.get(target.remote_uri)
     if (counts && await saveTargetEngagement({ id: Number(target.id), identityId: target.social_identity_id, uri: target.remote_uri }, counts, syncedAt))

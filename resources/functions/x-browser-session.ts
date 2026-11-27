@@ -5,8 +5,17 @@ export interface XBrowserWindow {
   _call: (action: 'executeJavaScript', input: { code: string }, name: string) => Promise<unknown>
 }
 
+interface XBrowserPost {
+  id: string
+  authorHandle: string
+  body: string
+  postedAt: string
+}
+
+type XBrowserRead = 'sign-in' | 'listening' | 'metrics'
+
 type XBrowserStatus =
-  | { state: 'connected', handle: string, measurements: Array<{ id: string, counts: EngagementCounts }> }
+  | { state: 'connected', handle: string, measurements: Array<{ id: string, counts: EngagementCounts }>, posts?: XBrowserPost[] }
   | { state: 'signed-out' | 'needs-attention' | 'unavailable' }
 
 export function xBrowserWindow(host: unknown): XBrowserWindow | null {
@@ -25,8 +34,8 @@ export async function openXBrowser(browser: XBrowserWindow, profile: string): Pr
   })
 }
 
-/** Read the visible X account and, on request, engagement on its rendered posts. */
-export function inspectXPage(page: Document, href: string, includeMetrics = false): XBrowserStatus {
+/** Read the account and the requested data from the open X page. */
+export function inspectXPage(page: Document, href: string, read: XBrowserRead = 'sign-in'): XBrowserStatus {
   const url = new URL(href)
   if (!['https://x.com', 'https://twitter.com'].includes(url.origin))
     return { state: 'unavailable' }
@@ -39,13 +48,27 @@ export function inspectXPage(page: Document, href: string, includeMetrics = fals
     const handle = /^\/([A-Za-z0-9_]{1,15})\/?$/.exec(profile.pathname)?.[1]
     if (profile.origin === url.origin && handle) {
       const measurements: Array<{ id: string, counts: EngagementCounts }> = []
-      if (includeMetrics) {
-        for (const article of Array.from(page.querySelectorAll('article[data-testid="tweet"]')).slice(0, 100)) {
+      const listening = read === 'listening' && ['/search', '/notifications/mentions'].includes(url.pathname)
+      const posts: XBrowserPost[] | undefined = listening ? [] : undefined
+      if (read === 'metrics' || listening) {
+        const articleSelector = listening
+          ? '[data-testid="primaryColumn"] article[data-testid="tweet"]'
+          : 'article[data-testid="tweet"]'
+        for (const article of Array.from(page.querySelectorAll(articleSelector)).slice(0, 100)) {
           if (!article.getClientRects().length) continue
-          const path = article.querySelector('time')?.closest('a')?.getAttribute('href')
+          const time = article.querySelector('time')
+          const path = time?.closest('a')?.getAttribute('href')
           const post = path ? new URL(path, url) : null
           const match = post && /^\/([A-Za-z0-9_]{1,15})\/status\/([0-9]{1,19})\/?$/.exec(post.pathname)
-          if (!post || post.origin !== url.origin || !match || match[1]?.toLowerCase() !== handle.toLowerCase()) continue
+          if (!post || post.origin !== url.origin || !match?.[1] || !match[2]) continue
+          const [, authorHandle, id] = match
+          if (posts) {
+            const body = article.querySelector<HTMLElement>('[data-testid="tweetText"]')?.innerText.trim()
+            const postedAt = time?.getAttribute('datetime')
+            if (body && postedAt) posts.push({ id, authorHandle, body: body.slice(0, 10000), postedAt })
+            continue
+          }
+          if (authorHandle.toLowerCase() !== handle.toLowerCase()) continue
 
           const counts: EngagementCounts = {}
           const selectors = {
@@ -63,10 +86,10 @@ export function inspectXPage(page: Document, href: string, includeMetrics = fals
             const number = count === undefined ? NaN : Number(count.replaceAll(',', ''))
             if (Number.isSafeInteger(number)) counts[field as keyof typeof selectors] = number
           }
-          if (Object.keys(counts).length) measurements.push({ id: match[2]!, counts })
+          if (Object.keys(counts).length) measurements.push({ id, counts })
         }
       }
-      return { state: 'connected', handle, measurements }
+      return { state: 'connected', handle, measurements, ...(posts && { posts }) }
     }
   }
 
@@ -75,10 +98,10 @@ export function inspectXPage(page: Document, href: string, includeMetrics = fals
   return { state: 'unavailable' }
 }
 
-export async function readXBrowserSession(browser: XBrowserWindow, profile: string, includeMetrics = false): Promise<XBrowserStatus> {
+export async function readXBrowserSession(browser: XBrowserWindow, profile: string, read: XBrowserRead = 'sign-in'): Promise<XBrowserStatus> {
   try {
     const result = await browser._call('executeJavaScript', {
-      code: `JSON.stringify((${inspectXPage.toString()})(document, location.href, ${includeMetrics}))`,
+      code: `JSON.stringify((${inspectXPage.toString()})(document, location.href, ${JSON.stringify(read)}))`,
     }, profile)
     if (typeof result !== 'string') return { state: 'unavailable' }
     const status: XBrowserStatus = JSON.parse(result)

@@ -21,6 +21,11 @@ describe('upgrading the Mac app from v0.1.1', () => {
     const dataDir = mkdtempSync(join(tmpdir(), 'postline-upgrade-'))
     try {
       copyFileSync(join(root, 'tests/fixtures/desktop-v0.1.1.sqlite'), join(dataDir, 'postline.sqlite'))
+      const oldDb = new Database(join(dataDir, 'postline.sqlite'))
+      oldDb.query('INSERT INTO keyword_monitors (id, name, keywords, providers, account_id) VALUES (?, ?, ?, ?, ?)').run(
+        1985, 'Existing X watch', '["Postline"]', '["twitter"]', 1,
+      )
+      oldDb.close()
       const run = Bun.spawnSync([process.execPath, join(root, 'tests/support/desktop-upgrade-run.ts'), dataDir, String(process.env.DB_DATABASE_PATH)], { cwd: root, env: { ...process.env, POSTLINE_DESKTOP_AGENT: '' }, stdout: 'pipe', stderr: 'pipe' })
       expect(run.exitCode, run.stderr.toString().slice(-1500)).toBe(0)
       const result = JSON.parse(run.stdout.toString().trim().split('\n').pop()!) as { applied: string[], created: boolean }
@@ -37,6 +42,7 @@ describe('upgrading the Mac app from v0.1.1', () => {
       expect(db.query('SELECT remote_uri FROM post_targets WHERE id = 1').get()).toEqual({ remote_uri: 'at://did:plc:owner/app.bsky.feed.post/3kv011' })
       // Columns added since v0.1.1 are there, with their defaults.
       expect(db.query('SELECT publishing_paused, twitter_browser_handle FROM accounts WHERE id = 1').get()).toEqual({ publishing_paused: 0, twitter_browser_handle: null })
+      expect(db.query('SELECT twitter_read_source FROM keyword_monitors WHERE id = 1985').get()).toEqual({ twitter_read_source: 'api' })
       db.close()
     }
     finally {

@@ -16,6 +16,7 @@ const workspaceWrites = new Set([
   '/api/postline/accounts/disconnect',
   '/api/postline/bluesky/connect',
   '/api/postline/twitter/connect',
+  '/api/postline/twitter/browser-session/listening',
   '/api/postline/mastodon/connect',
   '/api/postline/linkedin/connect',
   '/api/postline/instagram/connect',

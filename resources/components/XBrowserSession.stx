@@ -80,7 +80,7 @@ async function captureMetrics() {
   if (!windowApi || !current?.handle || xSessionBusy()) return
   xSessionBusy.set(true)
   try {
-    const result = await readXBrowserSession(windowApi, current.profile, true)
+    const result = await readXBrowserSession(windowApi, current.profile, 'metrics')
     if (result.state !== 'connected' || result.handle.toLowerCase() !== current.handle.toLowerCase()) {
       xSessionFeedback.set('Open X and check the sign-in before reading engagement.')
       return
@@ -100,6 +100,37 @@ async function captureMetrics() {
     xSessionBusy.set(false)
   }
 }
+
+async function captureListening() {
+  const windowApi = xBrowser()
+  const current = xSession()
+  if (!windowApi || !current?.handle || xSessionBusy()) return
+  xSessionBusy.set(true)
+  try {
+    const result = await readXBrowserSession(windowApi, current.profile, 'listening')
+    if (result.state !== 'connected' || result.handle.toLowerCase() !== current.handle.toLowerCase()) {
+      xSessionFeedback.set('Open X and check the sign-in before importing posts.')
+      return
+    }
+    if (!result.posts) {
+      xSessionFeedback.set('Open Search or Mentions in the X window first.')
+      return
+    }
+    const { data } = await requestJson(`${xSessionEndpoint}/listening`, {
+      method: 'POST',
+      body: JSON.stringify({ handle: result.handle, posts: result.posts }),
+    }, 'Could not import X posts.')
+    xSessionFeedback.set(data.watches
+      ? `Saved ${data.created} new X ${data.created === 1 ? 'mention' : 'mentions'} in Listening.`
+      : 'Create an active Listening watch with X browser session as its source.')
+  }
+  catch (error) {
+    xSessionFeedback.set(error instanceof Error ? error.message : 'Could not import X posts.')
+  }
+  finally {
+    xSessionBusy.set(false)
+  }
+}
 </script>
 
 <template>
@@ -113,6 +144,7 @@ async function captureMetrics() {
           <Button variant="secondary" size="xs" label="Open X" :disabled="!xSession() || xSessionBusy()" @click="openSession" />
           <Button variant="secondary" size="xs" label="Check sign-in" :disabled="!xSession() || xSessionBusy()" @click="checkSignIn" />
           <Button variant="secondary" size="xs" label="Read visible engagement" :show="xSession()?.handle" :disabled="xSessionBusy()" @click="captureMetrics" />
+          <Button variant="secondary" size="xs" label="Import visible mentions" :show="xSession()?.handle" :disabled="xSessionBusy()" @click="captureListening" />
           <a class="text-info text-xs underline" href="https://help.x.com/en/rules-and-policies/x-automation" target="_blank" rel="noopener noreferrer">X automation rules</a>
         </div>
         <p class="m-0 text-body text-xs" role="status" :show="xSessionFeedback()" :text="xSessionFeedback()"></p>

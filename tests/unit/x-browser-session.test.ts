@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { db } from '@stacksjs/database'
+import { keywordMonitoring } from '../../app/Services/KeywordMonitoringService'
 import { postQueue } from '../../app/Services/Social/QueueService'
 import { rememberTwitterBrowserHandle, saveTwitterBrowserMetrics, twitterBrowserSession } from '../../app/Services/Social/TwitterBrowserSession'
 import { upsertIdentityRow } from '../../app/Services/Social/identities'
@@ -26,13 +27,76 @@ describe('X session browser reads', () => {
       querySelector: (selector: string) => selector.includes('Profile_Link') ? { getAttribute: () => '/postline_test' } : null,
       querySelectorAll: () => [article('postline_test'), article('another_user')],
     } as unknown as Document
-    expect(inspectXPage(document, 'https://x.com/postline_test', true)).toEqual({
+    expect(inspectXPage(document, 'https://x.com/postline_test', 'metrics')).toEqual({
       state: 'connected',
       handle: 'postline_test',
       measurements: [{ id: '42', counts: { likes: 0, views: 1440 } }],
     })
-    expect(inspectXPage(document, 'https://x.com/account/access', true)).toEqual({ state: 'needs-attention' })
-    expect(inspectXPage(document, 'https://example.test/postline_test', true)).toEqual({ state: 'unavailable' })
+    expect(inspectXPage(document, 'https://x.com/account/access', 'metrics')).toEqual({ state: 'needs-attention' })
+    expect(inspectXPage(document, 'https://example.test/postline_test', 'metrics')).toEqual({ state: 'unavailable' })
+  })
+
+  test('reads rendered search and mention posts on the expected X pages', () => {
+    const stamp = '2026-11-27T05:00:00.000Z'
+    const article = (href: string, visible = true) => ({
+      getClientRects: () => visible ? [1] : [],
+      querySelector(selector: string) {
+        if (selector === 'time') return { getAttribute: () => stamp, closest: () => ({ getAttribute: () => href }) }
+        if (selector.includes('tweetText')) return { innerText: 'Postline launch watch' }
+        return null
+      },
+    })
+    const document = {
+      querySelector: (selector: string) => selector.includes('Profile_Link') ? { getAttribute: () => '/postline_test' } : null,
+      querySelectorAll: (selector: string) => selector.includes('primaryColumn')
+        ? [article('/another_user/status/42'), article('/hidden/status/43', false), article('https://example.test/foreign/status/44')]
+        : [],
+    } as unknown as Document
+    const posts = [{ id: '42', authorHandle: 'another_user', body: 'Postline launch watch', postedAt: stamp }]
+    expect(inspectXPage(document, 'https://x.com/search?q=postline', 'listening')).toMatchObject({ state: 'connected', posts })
+    expect(inspectXPage(document, 'https://x.com/notifications/mentions', 'listening')).toMatchObject({ state: 'connected', posts })
+    expect(inspectXPage(document, 'https://x.com/home', 'listening')).not.toHaveProperty('posts')
+    expect(inspectXPage(document, 'https://x.com/account/access', 'listening')).toEqual({ state: 'needs-attention' })
+  })
+
+  test('imports matching posts once for active browser watches and skips paid API scans', async () => {
+    const ids: number[] = []
+    const tag = 'PostlineBrowserFixture' + crypto.randomUUID().replaceAll('-', '')
+    const input = { name: tag, providers: ['twitter'], keywords: [tag, 'launch'], matchMode: 'all' }
+    try {
+      const browser = await keywordMonitoring.save(0, { ...input, twitterReadSource: 'browser' })
+      ids.push(browser.id)
+      const api = await keywordMonitoring.save(0, input)
+      ids.push(api.id)
+      const paused = await keywordMonitoring.save(0, { ...input, status: 'paused', twitterReadSource: 'browser' })
+      ids.push(paused.id)
+      const unrelated = await keywordMonitoring.save(0, { ...input, providers: ['bluesky'], twitterReadSource: 'browser' })
+      ids.push(unrelated.id)
+      expect(browser.twitterReadSource).toBe('browser')
+      expect(api.twitterReadSource).toBe('api')
+      expect(await keywordMonitoring.scan(browser.id)).toEqual({ scanned: 0, found: 0, created: 0, errors: [] })
+
+      const post = { id: '17482', authorHandle: 'fixture_author', body: `${tag} launch`, postedAt: '2026-11-27T05:00:00.000Z' }
+      const posts = [post, { ...post, id: '17483', body: tag }, { ...post, id: '17484', authorHandle: 'invalid handle' }]
+      const imports = await Promise.all([keywordMonitoring.importTwitterBrowserPosts(posts), keywordMonitoring.importTwitterBrowserPosts(posts)])
+      expect(imports.reduce((total, item) => total + item.created, 0)).toBe(1)
+      const found = (await keywordMonitoring.list(browser.id)).mentions
+      expect(found).toHaveLength(1)
+      expect(found[0]).toMatchObject({
+        provider: 'twitter', remoteUri: post.id, authorHandle: post.authorHandle, matchedKeywords: [tag, 'launch'],
+        url: 'https://x.com/fixture_author/status/17482',
+      })
+      for (const id of [api.id, paused.id, unrelated.id])
+        expect((await keywordMonitoring.list(id)).mentions).toHaveLength(0)
+      const [alert] = await db.unsafe('SELECT body FROM alerts WHERE dedupe_key = ?', [`keyword:${browser.id}:twitter:${post.id}`])
+      expect(alert?.body).toBe('Review the X results in Listening.')
+    }
+    finally {
+      for (const id of ids) {
+        await db.unsafe('DELETE FROM alerts WHERE dedupe_key LIKE ?', [`keyword:${id}:%`])
+        await keywordMonitoring.remove(id)
+      }
+    }
   })
 
   test('stores visible counts only for matching published posts from the confirmed user', async () => {

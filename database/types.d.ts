@@ -956,6 +956,7 @@ declare module '@stacksjs/database' {
       status: "active" | "paused"
       last_checked_at: string
       last_error: string
+      twitter_read_source: "api" | "browser"
       twitter_search_cursor: unknown
       account_id: number
     }

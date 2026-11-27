@@ -793,6 +793,19 @@
             "isUnique": false,
             "isNullable": true,
             "hasDefault": false
+          },
+          {
+            "name": "twitter_read_source",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "api",
+            "enumValues": [
+              "api",
+              "browser"
+            ]
           }
         ],
         "indexes": [
@@ -2831,7 +2844,7 @@
       }
     ]
   },
-  "hash": "b043ef6ce5c371e1248cb1fabd513d43420481fe8a18ebd7ff8be58fb46e1e38",
+  "hash": "a5dd1625c19fb6e1a6165fd0b2a8161f8ccc1b506c90d0c20522c30da86024c7",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-27T05:36:10.961Z"
+  "updatedAt": "2026-11-27T06:25:00.409Z"
 }

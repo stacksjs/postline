@@ -39,13 +39,15 @@ function check(what: string, passed: boolean, detail = ''): void {
   if (!passed) failures.push(what)
 }
 
-async function call(method: string, path: string, form?: Record<string, string>, cookie?: string): Promise<{ status: number | null, type: string, text: string, headers: Headers }> {
-  const body = form
-    ? Object.entries(form).reduce((data, [key, value]) => (data.set(key, value), data), new FormData())
-    : undefined
+async function call(method: string, path: string, payload?: Record<string, string> | string, cookie?: string): Promise<{ status: number | null, type: string, text: string, headers: Headers }> {
+  const isJson = typeof payload === 'string'
+  const body = isJson
+    ? payload
+    : payload && Object.entries(payload).reduce((data, [key, value]) => (data.set(key, value), data), new FormData())
   // A write has to carry the CSRF token the way the window's own `fetch`
   // wrapper does: the cookie's value echoed in a header.
   const headers: Record<string, string> = { origin }
+  if (isJson) headers['content-type'] = 'application/json'
   if (cookie) headers.cookie = cookie
   if (csrfToken && method !== 'GET') {
     headers.cookie = [headers.cookie, `X-CSRF-Token=${csrfToken}`].filter(Boolean).join('; ')
@@ -139,6 +141,23 @@ check('the native session remembers only its X handle and profile', connectedBro
 const foreignMetrics = await call('POST', `${browserSessionPath}/metrics`, { handle: 'another_user' })
 check('the native session rejects engagement from a different handle', foreignMetrics.status === 422
   && JSON.parse(foreignMetrics.text)?.error?.includes('Check the X browser sign-in') === true)
+const foreignMentions = await call('POST', `${browserSessionPath}/listening`, { handle: 'another_user' })
+check('the native session rejects Listening posts from a different handle', foreignMentions.status === 422
+  && JSON.parse(foreignMentions.text)?.error?.includes('Check the X browser sign-in') === true)
+const watch = await call('POST', '/api/postline/listening', JSON.stringify({
+  name: 'X browser fixture', keywords: ['Postline launch'], providers: ['twitter'], twitter_read_source: 'browser',
+}))
+const watchResult = JSON.parse(watch.text)?.data?.monitor
+check('the native agent saves an X browser watch', watch.status === 200 && watchResult?.twitterReadSource === 'browser')
+const importedMentions = await call('POST', `${browserSessionPath}/listening`, JSON.stringify({
+  handle: 'postline_test',
+  posts: [{ id: '8724', authorHandle: 'fixture_author', body: 'Postline launch fixture', postedAt: '2026-11-27T05:00:00.000Z' }],
+}))
+check('the native agent imports visible X posts without calling the X API', importedMentions.status === 200
+  && JSON.parse(importedMentions.text)?.data?.created === 1)
+const savedMentions = await call('GET', `/api/postline/listening?monitor_id=${watchResult?.id}`)
+check('the imported X post appears in Listening', savedMentions.status === 200
+  && JSON.parse(savedMentions.text)?.data?.mentions?.[0]?.url === 'https://x.com/fixture_author/status/8724')
 
 const published = await call('POST', '/api/postline/publish', { text: 'Published by the desktop check.', title: 'Desktop check', providers: 'blog' })
 check('publishing to the blog', published.status === 200 && JSON.parse(published.text)?.data?.results?.[0]?.ok === true, `${published.status} ${published.text.slice(0, 200)}`)

@@ -15,7 +15,7 @@
           <span class="h-4 w-4 i-hugeicons-notification-01" aria-hidden="true"></span>
           Where alerts go
         </a>
-        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="scanning() || activeCount() === 0" @click="runScan">
+        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="scanning() || !canScan()" @click="runScan">
           <span class="h-4 w-4 i-hugeicons-radar-02" :class="scanning() ? 'animate-spin' : ''" aria-hidden="true"></span>
           <span :text="scanning() ? 'Scanning…' : 'Scan now'">Scan now</span>
         </button>
@@ -34,7 +34,17 @@
             <label class="grid gap-1.5"><span class="font-semibold text-body text-xs">Keywords</span><textarea class="px-3 py-2 min-h-24 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus resize-y" required placeholder="Postline, stacks.js, launch tool" x-model="draftKeywords"></textarea><small class="text-muted text-xs">Up to 20 keywords. Matching is case-insensitive.</small></label>
             <label class="grid gap-1.5"><span class="font-semibold text-body text-xs">Trigger when</span><select class="px-3 h-9 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" x-model="draftMatchMode"><option value="any">Any keyword appears</option><option value="all">All keywords appear</option><option value="phrase">The exact phrase appears</option></select></label>
             <fieldset class="grid gap-2 m-0 p-0 border-0"><legend class="mb-1 font-semibold text-body text-xs">Networks</legend><div class="grid gap-2 grid-cols-3"><button class="px-2 h-9 font-semibold text-xs border rounded-xl transition-colors" type="button" x-for="provider in providerOptions" :class="draftProviders().includes(provider) ? 'text-ink bg-panel-2 border-line-strong' : 'text-muted bg-bg border-line'" @click="toggleProvider(provider)" :aria-pressed="draftProviders().includes(provider)" :text="providerLabel(provider)"></button></div></fieldset>
-            <label class="flex gap-3 items-center p-3 bg-panel-2 border border-line rounded-xl"><input type="checkbox" :checked="draftStatus() === 'active'" @change="draftStatus.set($event.target.checked ? 'active' : 'paused')"><span><strong class="block text-ink text-xs">Watch automatically</strong><small class="block mt-0.5 text-muted text-xs">The scheduler checks active rules every five minutes.</small></span></label>
+            <label class="grid gap-1.5" :show="canReadXInBrowser() && draftProviders().includes('twitter')">
+              <span class="font-semibold text-body text-xs">X source</span>
+              <select class="px-3 h-9 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus" x-model="draftTwitterReadSource">
+                <option value="api">X API</option>
+                <option value="browser">X browser session</option>
+              </select>
+              <small class="text-muted text-xs" :show="draftTwitterReadSource() === 'browser'">
+                Import posts from Search or Mentions using the X browser controls in <a href="/accounts" data-stx-link class="text-info underline">Channels</a>.
+              </small>
+            </label>
+            <label class="flex gap-3 items-center p-3 bg-panel-2 border border-line rounded-xl"><input type="checkbox" :checked="draftStatus() === 'active'" @change="draftStatus.set($event.target.checked ? 'active' : 'paused')"><span><strong class="block text-ink text-xs">Watch active</strong><small class="block mt-0.5 text-muted text-xs">The scheduler checks API sources every five minutes.</small></span></label>
             <div class="flex gap-2 items-center pt-1">
               <button class="inline-flex flex-1 items-center justify-center h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="submit" :disabled="saving()"><span :text="saving() ? 'Saving…' : draftId() ? 'Update rule' : 'Create rule'">Create rule</span></button>
               <button class="inline-flex items-center justify-center px-3 h-9 font-semibold text-danger text-xs hover:bg-danger-soft border border-danger-line rounded-xl disabled:opacity-50" type="button" x-show="draftId()" :disabled="deleting()" @click="deleteMonitor"><span :text="deleting() ? 'Deleting…' : 'Delete'">Delete</span></button>
@@ -97,12 +107,14 @@
 
   <script client>
     import { showNotification } from '../functions/notification'
+    import { xBrowserWindow } from '../functions/x-browser-session'
     interface ListeningMonitor {
       id: number
       name: string
       keywords: string[]
       providers: string[]
       matchMode: string
+      twitterReadSource: 'api' | 'browser'
       status: string
       lastCheckedAt?: string | null
       lastError?: string | null
@@ -142,12 +154,18 @@
     const draftKeywords = state('')
     const draftProviders = state(['bluesky'])
     const draftMatchMode = state('any')
+    const draftTwitterReadSource = state<'api' | 'browser'>('api')
+    const canReadXInBrowser = state(false)
+    useNativeDesktop().onReady(host => canReadXInBrowser.set(Boolean(xBrowserWindow(host))))
     const draftStatus = state('active')
     let pollTimer = 0
 
     const filteredMentions = derived(() => filterMonitorId() ? mentions().filter(item => item.monitorId === filterMonitorId()) : mentions())
     const unreadCount = derived(() => mentions().filter(item => item.status === 'unread').length)
     const activeCount = derived(() => monitors().filter(item => item.status === 'active').length)
+    const canScan = derived(() => monitors().some(monitor => monitor.status === 'active'
+      && (!filterMonitorId() || monitor.id === filterMonitorId())
+      && monitor.providers.some(provider => provider !== 'twitter' || monitor.twitterReadSource !== 'browser')))
     const showEmpty = derived(() => loaded() && !loading() && !mentionLoadError() && filteredMentions().length === 0)
     const inboxSummary = derived(() => `${filteredMentions().length} mention${filteredMentions().length === 1 ? '' : 's'}, ${filteredMentions().filter(item => item.status === 'unread').length} unread`)
     const lastCheckedLabel = derived(() => {
@@ -211,6 +229,7 @@
       draftKeywords.set('')
       draftProviders.set(['bluesky'])
       draftMatchMode.set('any')
+      draftTwitterReadSource.set('api')
       draftStatus.set('active')
     }
 
@@ -220,6 +239,7 @@
       draftKeywords.set(monitor.keywords.join(', '))
       draftProviders.set([...monitor.providers])
       draftMatchMode.set(monitor.matchMode)
+      draftTwitterReadSource.set(monitor.twitterReadSource === 'browser' ? 'browser' : 'api')
       draftStatus.set(monitor.status)
       filterMonitorId.set(monitor.id)
     }
@@ -235,9 +255,9 @@
         await requestJson('/api/postline/listening', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ id: draftId(), name: draftName(), keywords: draftKeywords().split(',').map(item => item.trim()).filter(Boolean), providers: draftProviders(), match_mode: draftMatchMode(), status: draftStatus() }),
+          body: JSON.stringify({ id: draftId(), name: draftName(), keywords: draftKeywords().split(',').map(item => item.trim()).filter(Boolean), providers: draftProviders(), match_mode: draftMatchMode(), status: draftStatus(), twitter_read_source: canReadXInBrowser() ? draftTwitterReadSource() : undefined }),
         })
-        showNotification({ title: 'Listening rule saved', message: 'Postline will watch these keywords automatically.', tone: 'success', id: 'listening-save' })
+        showNotification({ title: 'Listening rule saved', message: 'New matches will appear in Listening.', tone: 'success', id: 'listening-save' })
         resetForm()
         await loadData()
       }

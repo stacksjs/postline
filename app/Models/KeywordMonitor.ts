@@ -65,6 +65,13 @@ export default defineModel({
       validation: { rule: schema.string().max(2000).optional() },
       factory: () => null,
     },
+    twitterReadSource: {
+      required: true,
+      fillable: true,
+      default: 'api',
+      validation: { rule: schema.enum(['api', 'browser']).required() },
+      factory: () => 'api',
+    },
     twitterSearchCursor: {
       required: false,
       fillable: false,
