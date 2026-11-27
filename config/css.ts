@@ -520,10 +520,7 @@ html.dark [data-cal-cell][data-today]:not([data-today="false"]) [data-cal-day] {
  * Checked for specificity ties against the chip's own static classes — those
  * are layout and typography only, so nothing here competes with a utility.
  */
-const COMPOSER: string = `
-[data-composer-format="single"] [data-composer-post][data-active="false"],
-[data-composer-format="single"] [data-remove-post] { display: none; }
-
+const COMPOSER_CHIPS: string = `
 [data-provider-toggle] { border-color: var(--line); background: var(--panel-2); color: var(--muted); }
 [data-provider-toggle]:not([disabled]):hover { background: #ffffff; }
 [data-provider-toggle][data-selected]:not([data-selected="false"]) { border-color: #0a0a0a; background: var(--accent); color: var(--on-accent); }
@@ -678,6 +675,6 @@ export default {
     { getCSS: (): string => APP_UI },
     { getCSS: (): string => QUEUE_STATUS },
     { getCSS: (): string => SETTINGS_STATUS },
-    { getCSS: (): string => COMPOSER },
+    { getCSS: (): string => COMPOSER_CHIPS },
   ],
 } satisfies CrosswindOptions

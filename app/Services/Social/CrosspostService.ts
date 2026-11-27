@@ -21,6 +21,8 @@ import { persistTempMedia, removeTempMedia } from '../../Support/Social/uploads'
 import type { MediaShare } from '../../Support/Social/media-share'
 import { openMediaShare } from '../../Support/Social/media-share'
 import { MEDIA_RULES } from '../../Support/Social/media-rules'
+import { sanitizePostOptions } from '../../Support/Social/post-options'
+import { hydrateStoredContent, MissingMediaError, parseStoredContent } from '../../Support/Social/stored-content'
 import { ensureAccount, now, uuid } from './support'
 
 const database = db as any
@@ -317,11 +319,8 @@ export class CrosspostService {
     const targets = new Map<string, PublishTarget>()
     for (const row of rows) targets.set(keyOf(row), { provider: row.provider, identityId: row.social_identity_id ? Number(row.social_identity_id) : null })
 
-    let options: PublishContent['options']
-    try {
-      options = JSON.parse(String(posts[0].content || '{}'))?.options
-    }
-    catch {}
+    const options = sanitizePostOptions(parseStoredContent(posts[0].content)?.options)
+    let lead: Promise<PublishContent | undefined> | undefined
 
     const results: CrosspostTargetResult[] = []
     let resumed = 0
@@ -350,7 +349,18 @@ export class CrosspostService {
           results.push(await this.recordHeldBack(target, Number(post.id), halted, posts.length))
           continue
         }
-        const result = await this.publishTarget(target, { id: Number(post.id), body: String(post.body) }, threadSegmentContent(index, options ? { options } as PublishContent : undefined, chain))
+        const publishingPost = { id: Number(post.id), body: String(post.body) }
+        let result: CrosspostTargetResult
+        try {
+          const content = index === 0
+            ? await (lead ??= hydrateStoredContent(post.content))
+            : options ? { options } : undefined
+          result = await this.publishTarget(target, publishingPost, threadSegmentContent(index, content, chain))
+        }
+        catch (error) {
+          if (!(error instanceof MissingMediaError)) throw error
+          result = await this.recordThreadFailure(target, publishingPost.id, error.message)
+        }
         results.push(result)
         if (!result.ok) halted = index
         const advanced = advanceChain(chain, result)
@@ -374,7 +384,10 @@ export class CrosspostService {
     failedIndex: number,
     total: number,
   ): Promise<CrosspostTargetResult> {
-    const error = `Not sent: post ${failedIndex + 1} of ${total} in this thread failed here, so the rest were held back.`
+    return this.recordThreadFailure(target, postId, `Not sent: post ${failedIndex + 1} of ${total} in this thread failed here, so the rest were held back.`)
+  }
+
+  private async recordThreadFailure(target: PublishTarget, postId: number, error: string): Promise<CrosspostTargetResult> {
     const at = now()
     await database.insertInto('post_targets').values({
       uuid: uuid(),

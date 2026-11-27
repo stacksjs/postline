@@ -6,9 +6,12 @@
  */
 import type { ProviderPublisher } from '../../app/Services/Social/CrosspostService'
 import type { CrosspostTargetResult } from '../../app/Support/Social/types'
+import { rmSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
 import { db } from '@stacksjs/database'
 import { CrosspostService } from '../../app/Services/Social/CrosspostService'
+import { MEDIA_DIR } from '../../app/Support/Social/uploads'
 
 const database = db as any
 
@@ -173,12 +176,14 @@ describe('resuming a thread (#100)', () => {
 })
 
 describe('scheduling a thread (#255)', () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+
   test('a five-post thread goes out when due, once, in order, as one thread', async () => {
     const { QueueService } = await import('../../app/Services/Social/QueueService')
-    const sent: Array<{ body: string, replyTo?: string }> = []
+    const sent: Array<{ body: string, replyTo?: string, altText?: Array<string | undefined> }> = []
     const publisher: ProviderPublisher = {
       async publishToPost(post, content): Promise<CrosspostTargetResult> {
-        sent.push({ body: post.body, replyTo: content?.reply?.parent?.uri })
+        sent.push({ body: post.body, replyTo: content?.reply?.parent?.uri, altText: content?.media?.map(image => image.altText) })
         const uri = `at://me/${post.body}`
         await database.insertInto('post_targets').values({ uuid: crypto.randomUUID(), provider: 'blog', status: 'published', remote_uri: uri, remote_cid: `c-${post.body}`, post_id: post.id }).execute()
         return { provider: 'blog', ok: true, uri, cid: `c-${post.body}`, target: 'blog' } as CrosspostTargetResult
@@ -189,7 +194,8 @@ describe('scheduling a thread (#255)', () => {
     const texts = five.map(text => `${text}-${tag}`)
     const soon = new Date(Date.now() + 60_000).toISOString().slice(0, 19).replace('T', ' ')
 
-    const saved = await queue.saveThread({ texts, providers: ['blog'], scheduledAt: soon })
+    const images = ['First image', 'Second image'].map(altText => ({ bytes: png, altText, mimeType: 'image/png' }))
+    const saved = await queue.saveThread({ texts, providers: ['blog'], scheduledAt: soon, images })
     expect(saved.postIds).toHaveLength(5)
 
     // Make it due, then run the scheduler twice: the thread goes out once.
@@ -200,8 +206,27 @@ describe('scheduling a thread (#255)', () => {
     const mine = sent.filter(item => item.body.endsWith(tag))
     expect(mine.map(item => item.body)).toEqual(texts)
     expect(mine.map(item => item.replyTo)).toEqual([undefined, ...texts.slice(0, 4).map(text => `at://me/${text}`)])
+    expect(mine.map(item => item.altText)).toEqual([['First image', 'Second image'], undefined, undefined, undefined, undefined])
     const statuses = await database.selectFrom('posts').select(['status']).where('id', 'in', saved.postIds).execute()
     expect(statuses.every((row: { status: string }) => row.status === 'published')).toBe(true)
+  })
+
+  test('an unavailable attachment holds the whole thread before it sends anything', async () => {
+    const { QueueService } = await import('../../app/Services/Social/QueueService')
+    const blog = network('blog')
+    const queue = new QueueService(new CrosspostService({ blog: blog.publisher } as never))
+    const { postIds } = await queue.saveThread({
+      texts: ['With picture', 'A reply'],
+      providers: ['blog'],
+      images: [{ bytes: png, mimeType: 'image/png' }],
+    })
+    const lead = await database.selectFrom('posts').select('content').where('id', '=', postIds[0]).executeTakeFirstOrThrow()
+    rmSync(join(MEDIA_DIR, JSON.parse(lead.content).media[0].path), { force: true })
+    const { results } = await queue.publishNow(postIds[1]!)
+    expect(blog.sent).toEqual([])
+    expect(results.map(result => result.ok)).toEqual([false, false])
+    expect(results[0]?.error).toContain('image attached to this post is missing')
+    expect((await rows(postIds)).map(row => row.status)).toEqual(['failed', 'failed'])
   })
 
   test('a thread needs a future time and two posts', async () => {

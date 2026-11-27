@@ -35,6 +35,10 @@ export interface MediaRule {
 const MB = 1024 * 1024
 const COMMON = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const
 
+export const POST_IMAGE_FORMATS: readonly string[] = COMMON
+export const MAX_POST_IMAGES = 4
+export const MAX_IMAGE_BYTES = 10 * MB
+
 export const MEDIA_RULES: Record<string, MediaRule> = {
   bluesky: { count: 4, converts: true, maxBytes: 1_000_000, formats: COMMON },
   twitter: { count: 4, converts: true, maxBytes: 5 * MB, formats: COMMON },

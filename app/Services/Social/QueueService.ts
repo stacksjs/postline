@@ -1,5 +1,5 @@
 import { log } from '@stacksjs/logging'
-import { mediaObjections } from '../../Support/Social/media-rules'
+import { MAX_POST_IMAGES, mediaObjections } from '../../Support/Social/media-rules'
 import type { PostOptions } from '../../Support/Social/post-options'
 import type { ScheduledSelection, ScheduleDestination } from '../../Support/Social/rescheduling'
 import type { StoredContent } from '../../Support/Social/stored-content'
@@ -8,7 +8,7 @@ import { isDue, MAX_ATTEMPTS, nextAttemptAt } from '../../Support/Social/retry'
 import { moveScheduledTime } from '../../Support/Social/rescheduling'
 import type { PublishTarget } from '../../Support/Social/targets'
 import type { CrosspostService } from './CrosspostService'
-import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../Support/Social/types'
+import type { CrosspostTargetResult, SocialProvider } from '../../Support/Social/types'
 import type { VariantMap } from '../../Support/Social/variants'
 import { mkdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -18,8 +18,8 @@ import { env } from '@stacksjs/env'
 import { raw } from '@stacksjs/query-builder'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { dedupeTargets, isAccountProvider, parseTargets, targetKey, targetProviders } from '../../Support/Social/targets'
-import { parseStoredContent } from '../../Support/Social/stored-content'
-import { isSafeMediaFilename, MEDIA_DIR, publicMediaUrl } from '../../Support/Social/uploads'
+import { hydrateStoredContent, MissingMediaError, parseStoredContent } from '../../Support/Social/stored-content'
+import { isSafeMediaFilename, MEDIA_DIR } from '../../Support/Social/uploads'
 import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/variants'
 import { crosspost, crosspostProviders } from './CrosspostService'
 import { findIdentityRow, unavailableAccountError } from './identities'
@@ -140,27 +140,37 @@ function assertMediaAllowed(providers: string[], images: QueueImage[] | undefine
  */
 async function storeImages(postUuid: string, images: QueueImage[]): Promise<NonNullable<StoredContent['media']>> {
   const media: NonNullable<StoredContent['media']> = []
-  for (const image of images) {
-    if (image.bytes?.length) {
-      const extension = (image.mimeType || 'image/jpeg').split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'jpg'
-      const filename = `${postUuid}-${uuid().slice(0, 8)}.${extension}`
-      await mkdir(MEDIA_DIR, { recursive: true })
-      await Bun.write(join(MEDIA_DIR, filename), image.bytes)
-      media.push({ path: filename, mimeType: image.mimeType, altText: image.altText })
+  try {
+    for (const image of images) {
+      if (image.bytes?.length) {
+        const extension = (image.mimeType || 'image/jpeg').split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'jpg'
+        const filename = `${postUuid}-${uuid().slice(0, 8)}.${extension}`
+        media.push({ path: filename, mimeType: image.mimeType, altText: image.altText })
+        await mkdir(MEDIA_DIR, { recursive: true })
+        await Bun.write(join(MEDIA_DIR, filename), image.bytes)
+      }
+      else if (image.url) {
+        media.push({ url: image.url, altText: image.altText })
+      }
     }
-    else if (image.url) {
-      media.push({ url: image.url, altText: image.altText })
-    }
+  }
+  catch (error) {
+    await removeMediaFiles(media)
+    throw error
   }
   return media
 }
 
-/** Thrown when a queued post's attached image is no longer on disk. */
-export class MissingMediaError extends UserFacingError {
-  constructor() {
-    super('The image attached to this post is missing, so it was not sent. Attach it again, or remove it from the post.')
+async function removeMediaFiles(media: StoredContent['media'], failOnError = false): Promise<void> {
+  for (const item of media || []) {
+    if (!item.path || !isSafeMediaFilename(item.path)) continue
+    await unlink(join(MEDIA_DIR, item.path)).catch((error: NodeJS.ErrnoException) => {
+      if (failOnError && error.code !== 'ENOENT') throw error
+    })
   }
 }
+
+export { MissingMediaError } from '../../Support/Social/stored-content'
 
 /** Thrown when a post is already being published by another run. */
 export class AlreadyPublishingError extends UserFacingError {
@@ -260,11 +270,8 @@ export interface SaveQueueInput {
  */
 export type UpdateQueueInput = SaveQueueInput
 
-interface QueueThreadInput {
+interface QueueThreadInput extends Pick<SaveQueueInput, 'providers' | 'scheduledAt' | 'options' | 'title' | 'external' | 'images'> {
   texts: readonly string[]
-  providers: readonly string[]
-  scheduledAt?: string | null
-  options?: PostOptions | null
 }
 
 interface SavedQueueThread {
@@ -280,9 +287,6 @@ export interface QueueImage {
   mimeType?: string
   altText?: string
 }
-
-/** The most images a post carries: the most any network takes. */
-export const MAX_POST_IMAGES = 4
 
 /** The images an input names. Undefined keeps what is stored; an empty list removes it. */
 function imagesOf(input: { image?: QueueImage | null, images?: QueueImage[] | null }): QueueImage[] | undefined {
@@ -415,6 +419,8 @@ export class QueueService {
     const segments = input.texts.map(text => String(text).trim()).filter(Boolean)
     if (segments.length < 2) throw new UserFacingError('A thread needs at least two posts.')
     const targets = await this.validTargets(input.providers)
+    const images = imagesOf(input)
+    assertMediaAllowed(targets.map(target => target.provider), images)
 
     const scheduledAt = input.scheduledAt?.trim() || null
     if (scheduledAt) {
@@ -428,7 +434,8 @@ export class QueueService {
     const options = sanitizePostOptions(input.options)
     const column = await contentColumn()
     const timezone = original?.timezone ?? await workspace.timezone()
-    const { postIds, removed } = await database.transaction((tx: typeof database) => {
+    const media = images?.length ? await storeImages(threadKey, images) : undefined
+    const write = (tx: typeof database) => {
       const existing: any[] = original ? this.threadPosts(threadKey, tx) : []
       if (original) {
         const current = existing.find(row => row.id === original.id)
@@ -444,6 +451,20 @@ export class QueueService {
         if (input.options !== undefined || !row) {
           if (options) stored.options = options
           else delete stored.options
+        }
+        if (index === 0) {
+          if (input.title !== undefined) {
+            if (input.title?.trim()) stored.title = input.title.trim()
+            else delete stored.title
+          }
+          if (input.external !== undefined) {
+            if (input.external?.uri && input.external.title) stored.external = input.external
+            else delete stored.external
+          }
+          if (images !== undefined) {
+            if (media?.length) stored.media = media
+            else delete stored.media
+          }
         }
         const values = {
           title: stored.title || body.slice(0, 80),
@@ -472,10 +493,18 @@ export class QueueService {
 
       const removed = existing.slice(segments.length)
       for (const row of removed) this.deletePostRows(tx, Number(row.id))
-      return { postIds, removed }
-    })
-    for (const row of removed) await this.removeStoredMedia(row)
-    return { postIds, status, scheduledAt }
+      return { postIds, unlinked: images !== undefined && existing[0] ? [existing[0], ...removed] : removed }
+    }
+    let result: ReturnType<typeof write>
+    try {
+      result = await database.transaction(write)
+    }
+    catch (error) {
+      await removeMediaFiles(media)
+      throw error
+    }
+    for (const row of result.unlinked) await this.removeStoredMedia(row)
+    return { postIds: result.postIds, status, scheduledAt }
   }
 
   /** Recent posts with their per-provider targets, newest first. */
@@ -713,7 +742,6 @@ export class QueueService {
    */
   async get(id: number): Promise<QueueEditView> {
     const post = await this.findActionable(id)
-    const stored = parseStoredContent(await storedContentOf(post))
     const rows = await database
       .selectFrom('post_targets')
       .select(['provider', 'social_identity_id'])
@@ -721,11 +749,12 @@ export class QueueService {
       .execute()
     const targets = targetsOf(rows)
 
-    const media = stored?.media?.[0]
     const segments: Array<{ id: number, body: string, status: string }> = post.thread_key ? await this.threadPosts(post.thread_key) : []
-    const thread = segments.length && segments.every(segment => segment.status === 'draft' || segment.status === 'scheduled')
+    const thread = segments.length > 1 && segments.every(segment => segment.status === 'draft' || segment.status === 'scheduled')
       ? { postIds: segments.map(segment => Number(segment.id)), texts: segments.map(segment => segment.body) }
       : null
+    const stored = parseStoredContent(await storedContentOf(thread ? segments[0] : post))
+    const media = stored?.media?.[0]
     return {
       id: Number(post.id),
       text: String(post.body || ''),
@@ -971,12 +1000,16 @@ export class QueueService {
       // A segment still marked publishing did not go out anywhere.
       await database.updateTable('posts').set({ status: 'failed', updated_at: now() })
         .where('thread_key', '=', threadKey).where('status', '=', 'publishing').execute()
+      if (results.length && results.every(result => result.ok)) {
+        const [lead] = await this.threadPosts(threadKey)
+        if (lead) await this.removeStoredMedia(lead)
+      }
       return { postId: Number(post.id), results }
     }
     const wasPublished = String(post.status) === 'published'
     // Read before the claim: a post whose image is gone is refused here, with
     // nothing changed, instead of being claimed and then failing halfway.
-    const content = await this.hydrateContent(post)
+    const content = await hydrateStoredContent(await storedContentOf(post))
     await this.claim(post, expected)
 
     const pending: any[] = await database
@@ -1116,61 +1149,9 @@ export class QueueService {
     return { postId: Number(post.id), results }
   }
 
-  /** Rebuild PublishContent from a queued post's stored content JSON. */
-  private async hydrateContent(post: any): Promise<PublishContent | undefined> {
-    const stored = parseStoredContent(await storedContentOf(post))
-    if (!stored) return undefined
-
-    const content: PublishContent = {}
-    if (stored.title) content.title = stored.title
-    if (stored.external) content.external = stored.external
-    // Re-sanitized on read: posts.content is free-form JSON, so a hand-edited
-    // or stale row must not reach the publish path unchecked.
-    const variants = sanitizeVariants(stored.variants)
-    if (variants) content.variants = variants
-    const options = sanitizePostOptions(stored.options)
-    if (options) content.options = options
-
-    if (stored.media?.length) {
-      const media: NonNullable<PublishContent['media']> = []
-      for (const item of stored.media) {
-        if (item.path) {
-          if (!isSafeMediaFilename(item.path)) throw new MissingMediaError()
-          const file = Bun.file(join(MEDIA_DIR, item.path))
-          // A post saved with an image must not go out without it. This used
-          // to be skipped silently, which is how a deploy that wiped the
-          // media folder turned image posts into text posts.
-          if (!(await file.exists()))
-            throw new MissingMediaError()
-          media.push({
-            bytes: new Uint8Array(await file.arrayBuffer()),
-            // Also expose a public URL so URL-only providers (Instagram,
-            // Threads) can publish the same uploaded file; byte-upload
-            // providers (Bluesky, LinkedIn, Mastodon) keep using `bytes`.
-            // Null when no public base is configured — then it's bytes-only.
-            url: publicMediaUrl(item.path) ?? undefined,
-            mimeType: item.mimeType,
-            altText: item.altText,
-          })
-        }
-        else if (item.url) {
-          media.push({ url: item.url, altText: item.altText })
-        }
-      }
-      if (media.length) content.media = media
-    }
-
-    return Object.keys(content).length ? content : undefined
-  }
-
   private async removeStoredMedia(post: any, failOnError = false): Promise<void> {
     const stored = parseStoredContent(await storedContentOf(post))
-    for (const item of stored?.media || []) {
-      if (!item.path || !isSafeMediaFilename(item.path)) continue
-      await unlink(join(MEDIA_DIR, item.path)).catch((error: NodeJS.ErrnoException) => {
-        if (failOnError && error.code !== 'ENOENT') throw error
-      })
-    }
+    await removeMediaFiles(stored?.media, failOnError)
   }
 
   /**

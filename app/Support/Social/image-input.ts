@@ -8,10 +8,10 @@
  * a driver must not be sent.
  */
 import { assertPublicHttpUrl, safeFetch, UnsafeUrlError } from '../Http/safe-fetch'
+import { MAX_IMAGE_BYTES, MAX_POST_IMAGES } from './media-rules'
 import { readUploadedImage } from './uploads'
 
-/** Larger than any network accepts; each network's own limit is checked at publish. */
-export const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+export { MAX_IMAGE_BYTES } from './media-rules'
 
 export type ImageMimeType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 
@@ -93,9 +93,6 @@ interface ImagesRequest extends ImageRequest {
   getFiles?: (key: string) => unknown[]
 }
 
-/** The most images one request may attach. */
-export const MAX_REQUEST_IMAGES = 4
-
 function altTextList(raw: unknown): string[] {
   if (raw === undefined || raw === null || raw === '') return []
   try {
@@ -135,8 +132,8 @@ export async function readImagesInput(request: ImagesRequest): Promise<ImagesInp
   if (single.uploaded) images.push({ ...single.uploaded, altText: singleAlt })
   if (single.url) images.push({ url: single.url, altText: singleAlt })
 
-  if (images.length > MAX_REQUEST_IMAGES)
-    return { ok: false, error: `A post can carry up to ${MAX_REQUEST_IMAGES} images; this one has ${images.length}.` }
+  if (images.length > MAX_POST_IMAGES)
+    return { ok: false, error: `A post can carry up to ${MAX_POST_IMAGES} images; this one has ${images.length}.` }
   return { ok: true, images }
 }
 

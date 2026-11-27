@@ -54,8 +54,8 @@ export default new Action({
     try {
       const texts = readQueuedThread(request.get('thread'))
       if (texts) {
-        if (images?.length) throw new UserFacingError('Remove the images before saving this thread to Queue.')
-        const data = await postQueue.saveThread({ texts, providers, scheduledAt, options: readOptions.options })
+        if (parsedVariants.variants) throw new UserFacingError('Per-network text is available for single posts.')
+        const data = await postQueue.saveThread({ texts, providers, scheduledAt, title, external, images, options: readOptions.options })
         return response.json({ ok: true, data })
       }
       const data = await postQueue.save({ text, providers, title, scheduledAt, external, images, options: readOptions.options, variants: parsedVariants.variants })

@@ -74,8 +74,8 @@ export default new Action({
     try {
       const texts = readQueuedThread(request.get('thread'))
       if (texts) {
-        if (images !== undefined) throw new UserFacingError('Save the thread without changing its images.')
-        const data = await postQueue.updateThread(id, { texts, providers, scheduledAt, options: sendsOptions ? (readOptions.options ?? null) : undefined })
+        if (variants) throw new UserFacingError('Per-network text is available for single posts.')
+        const data = await postQueue.updateThread(id, { texts, providers, scheduledAt, title, external, images, options: sendsOptions ? (readOptions.options ?? null) : undefined })
         return response.json({ ok: true, data })
       }
       const data = await postQueue.update(id, { text, providers, title, scheduledAt, external, images, variants, options: sendsOptions ? (readOptions.options ?? null) : undefined })

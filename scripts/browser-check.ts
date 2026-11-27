@@ -393,15 +393,18 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
       { id: 2, provider: 'mastodon', participantName: 'Morgan Example', participantHandle: 'morgan.example', lastMessageAt: postedAt, lastMessagePreview: 'Hello' },
     ]
     const account = { id: 101, provider: 'bluesky', handle: 'alice.example', connected: true, canPublish: true, isDefault: true }
+    const instagram = { ...account, id: 102, provider: 'instagram' }
     window.fetch = (input, options) => {
       const request = new Request(input, options)
       const path = new URL(request.url).pathname
       if (path === '/api/postline/bootstrap') return actualFetch(input, options).then(async response => {
         if (!response.ok) return response
         const payload = await response.json()
-        const providers = payload.data.providers.map(provider => provider.provider === 'bluesky'
-          ? { ...provider, ...account, accounts: [account], characterLimit: 300 }
-          : provider)
+        const providers = payload.data.providers.map(provider => {
+          if (provider.provider === 'bluesky') return { ...provider, ...account, accounts: [account], characterLimit: 300 }
+          if (provider.provider === 'instagram') return { ...provider, ...instagram, accounts: [instagram] }
+          return provider
+        })
         return Response.json({ ...payload, data: { ...payload.data, providers, unread: { inbox: inboxUnread, listening: 106 } } })
       })
       if (path === '/api/postline/publish') return request.formData().then(async body => {
@@ -460,6 +463,25 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
       editor.focus()
     })()`)
     await waitUntil('The shared grapheme counter', () => evaluate<boolean>(cdp, "document.querySelector('[data-bluesky-count]').textContent.includes('1 / 300')"), 5_000)
+    const instagram = "document.querySelector('[data-provider-toggle=\"instagram:102\"]')"
+    await evaluate(cdp, `(() => {
+      ${instagram}.click()
+      const bytes = Uint8Array.from(atob('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'), char => char.charCodeAt(0))
+      const clipboardData = new DataTransfer()
+      clipboardData.items.add(new File([bytes], 'Pasted.gif', { type: 'image/gif' }))
+      document.querySelector('[data-bluesky-text]').dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }))
+    })()`)
+    await waitUntil('Pasted GIF shows an inline warning specific to Instagram', () => evaluate<boolean>(cdp, `
+      !!document.querySelector('[data-image-alt]')
+        && document.querySelector('[data-image-warnings]').textContent.includes('Instagram takes JPEG')
+        && document.querySelector('[data-bluesky-publish]').disabled`), 5_000)
+    await evaluate(cdp, `${instagram}.click()`)
+    await waitUntil('Deselecting Instagram clears its warning without removing the image', () => evaluate<boolean>(cdp, `
+      !!document.querySelector('[data-image-alt]')
+        && !document.querySelector('[data-image-warnings]').textContent.trim()
+        && !document.querySelector('[data-bluesky-publish]').disabled`), 5_000)
+    await evaluate(cdp, `document.querySelector('[aria-label="Remove Pasted.gif"]').click()
+      document.querySelector('[data-bluesky-text]').focus()`)
     await pressKey(cdp, 'Enter', 13, 4)
     await waitUntil('The imported publish function', () => evaluate<boolean>(cdp, `
       window.composerPublish?.text === ${JSON.stringify(text)} && window.composerPublish.providers === 'bluesky:101'`), 5_000)
@@ -528,6 +550,36 @@ async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
       && ${editors}[1].value === ${JSON.stringify(segments[1])}`), 5_000)
   await evaluate(cdp, `${format}.focus()`)
   await pressKey(cdp, 'Enter', 13)
+  await evaluate(cdp, `(() => {
+    const bytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD1sAAAAASUVORK5CYII='), char => char.charCodeAt(0))
+    const transfer = new DataTransfer()
+    for (const name of ['First', 'Second', 'Third', 'Fourth'])
+      transfer.items.add(new File([bytes], name + '.png', { type: 'image/png' }))
+    const dropTarget = document.querySelector('[data-composer-image-drop]')
+    dropTarget.dispatchEvent(new DragEvent('dragenter', { dataTransfer: transfer, bubbles: true, cancelable: true }))
+    dropTarget.dispatchEvent(new DragEvent('drop', { dataTransfer: transfer, bubbles: true, cancelable: true }))
+  })()`)
+  const alts = "document.querySelectorAll('[data-image-alt]')"
+  await waitUntil('Dropping four images adds four alt-text fields', () => evaluate<boolean>(cdp, `${alts}.length === 4`), 5_000)
+  await evaluate(cdp, `(() => {
+    ${alts}.forEach((input, index) => {
+      input.value = 'Description ' + (index + 1)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    document.querySelector('[aria-label="Move Fourth.png earlier"]').focus()
+  })()`)
+  await pressKey(cdp, 'Enter', 13)
+  const orderedAlts = ['Description 1', 'Description 2', 'Description 4', 'Description 3']
+  await waitUntil('Keyboard reordering moves images with their alt text', () => evaluate<boolean>(cdp, `
+    JSON.stringify([...${alts}].map(input => input.value)) === ${JSON.stringify(JSON.stringify(orderedAlts))}`), 5_000)
+  await evaluate(cdp, `(() => {
+    const bytes = Uint8Array.from(atob('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'), char => char.charCodeAt(0))
+    const clipboardData = new DataTransfer()
+    clipboardData.items.add(new File([bytes], 'Pasted.gif', { type: 'image/gif' }))
+    ${editors}[1].dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }))
+  })()`)
+  await waitUntil('Pasting a fifth image explains the limit inline without losing attachments', () => evaluate<boolean>(cdp, `
+    ${alts}.length === 4 && document.querySelector('[data-image-warnings]').textContent.includes('up to 4 images')`), 5_000)
   await evaluate(cdp, `${editors}[1].focus()`)
   await pressKey(cdp, 's', 83, 4)
   await waitUntil('Cmd+S saves the thread draft', () => evaluate<boolean>(cdp, `
@@ -540,6 +592,12 @@ async function checkComposerThreadDraft(cdp: Cdp): Promise<void> {
   const draft = drafts.find(item => item.body === segments[1])
   if (!draft || drafts.length !== 2 || drafts.some(item => item.status !== 'draft'))
     throw new Error('The queue did not store both keyboard-saved segments as a draft.')
+  const savedAlts = await evaluate<string[]>(cdp, `(async () => {
+    const { data } = await (await fetch('/api/postline/queue/item?id=${draft.id}')).json()
+    return data.images.map(image => image.altText)
+  })()`)
+  if (JSON.stringify(savedAlts) !== JSON.stringify(orderedAlts))
+    throw new Error('Opening a later thread segment did not return all four images in order with their alt text.')
 
   try {
     await auditPage(`${site}/composer?edit=${draft.id}`, { cdp })
