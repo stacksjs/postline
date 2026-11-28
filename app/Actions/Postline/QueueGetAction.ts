@@ -2,6 +2,7 @@ import type { RequestInstance } from '@stacksjs/types'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { actionFailure } from '../../Support/Http/action-error'
+import { workspaceComposerErrors } from '../../Support/Localization/workspace'
 import { postQueue } from '../../Services/Social/QueueService'
 
 export default new Action({
@@ -12,7 +13,7 @@ export default new Action({
   async handle(request: RequestInstance) {
     const id = Number(request.get('id') || 0)
     if (!id)
-      return response.json({ ok: false, error: 'Post id is required.' }, { status: 422 })
+      return response.json({ ok: false, error: workspaceComposerErrors.postIdRequired }, { status: 422 })
 
     try {
       const data = await postQueue.get(id)

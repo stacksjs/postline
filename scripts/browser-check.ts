@@ -3776,6 +3776,51 @@ async function checkSpanishComposerAttachments(cdp: Cdp): Promise<void> {
   await evaluate(cdp, "localStorage.removeItem('postline:composer-draft:v1')")
 }
 
+async function checkSpanishComposerEditing(cdp: Cdp): Promise<void> {
+  const draftId = await evaluate<number>(cdp, `(async () => {
+    const body = new URLSearchParams({ providers: 'blog', text: 'Borrador para revisar' })
+    const response = await fetch('/api/postline/queue', { method: 'POST', body })
+    if (!response.ok) throw new Error('Could not create the queued edit fixture')
+    return (await response.json()).data.postId
+  })()`)
+  if (!Number.isSafeInteger(draftId)) throw new Error('The queued edit fixture did not return a post ID.')
+
+  await auditPage(`${site}/composer?edit=99999999`, { cdp })
+  await waitUntil('Composer reports the missing queued post in Spanish', () => evaluate<boolean>(cdp, `
+    document.querySelector('#stx-toast-container')?.textContent.includes('No se encontró la publicación.')
+  `), 5_000)
+
+  await auditPage(`${site}/composer?edit=${draftId}`, { cdp })
+  const editor = "document.querySelector('[data-richtext-host] [contenteditable=true]')"
+  const count = "document.querySelector('[data-bluesky-count]')"
+  await waitUntil('The Spanish Composer shows the queued post heading and count', () => evaluate<boolean>(cdp, `
+    document.querySelector('[data-composer-heading]')?.textContent === 'Editando la publicación #${draftId}'
+      && ${editor}?.textContent === 'Borrador para revisar'
+      && ${count}?.textContent.includes('21 / 10000 caracteres')
+      && ${count}.textContent.includes('1 publicación')
+  `), 5_000)
+  await evaluate(cdp, `${editor}.focus()`)
+  await cdp.send('Input.insertText', { text: 'Cambio sin guardar. ' })
+  await waitUntil('The queued post edit reaches the editor', () => evaluate<boolean>(cdp, `
+    ${editor}?.textContent.includes('Cambio sin guardar.')
+  `), 5_000)
+  await evaluate(cdp, "document.querySelector('[data-postline-page=composer] a[href=\"/composer\"]').click()")
+  const notice = "document.querySelector('[data-stx-toast-key=composer-unsaved]:not([data-stx-toast-exiting])')"
+  const discard = `${notice}?.querySelector('[data-stx-toast-action]')`
+  await waitUntil('Composer offers to discard the Spanish edit', () => evaluate<boolean>(cdp, `
+    new URL(location.href).searchParams.get('edit') === '${draftId}'
+      && ${notice}?.textContent.includes('Cambios sin guardar')
+      && ${discard}?.textContent.trim() === 'Salir sin guardar'
+  `), 5_000)
+  await evaluate(cdp, `${discard}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Discarding returns without changing the queued post', () => evaluate<boolean>(cdp, `(async () => {
+    if (new URL(location.href).searchParams.has('edit')) return false
+    const response = await fetch('/api/postline/queue/item?id=${draftId}')
+    return (await response.json()).data?.text === 'Borrador para revisar'
+  })()`), 5_000)
+}
+
 async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
@@ -4090,6 +4135,7 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
   }
   await checkSavedComposerText(cdp)
   await checkSpanishComposerAttachments(cdp)
+  await checkSpanishComposerEditing(cdp)
 }
 
 async function checkWorkspace(cdp: Cdp): Promise<void> {

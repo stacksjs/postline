@@ -1566,7 +1566,10 @@
     "composerErrors": {
       "invalidThread": "No se pudo leer el hilo.",
       "invalidVariants": "No se pudo leer el texto por canal.",
-      "variantsSingleOnly": "El texto por canal está disponible para publicaciones individuales."
+      "variantsSingleOnly": "El texto por canal está disponible para publicaciones individuales.",
+      "postIdRequired": "Indica el identificador de la publicación.",
+      "postNotFound": "No se encontró la publicación.",
+      "postNotEditable": "Solo se pueden editar borradores, publicaciones programadas o publicaciones fallidas."
     },
     "composer": {
       "labels": {
@@ -1634,6 +1637,25 @@
       },
       "client": {
         "newPost": "Nueva publicación",
+        "connectAnAccount": "Conecta una cuenta",
+        "networksReady": "{networks} con conexión",
+        "languagesFailed": "No se pudieron cargar los idiomas de publicación.",
+        "countSummary": "{length} / {limit} caracteres - {posts}",
+        "countTooLong": "{length} caracteres - supera el límite de {networks}",
+        "onePost": "1 publicación",
+        "manyPosts": "{count} publicaciones",
+        "separateThreadParts": "Cada parte se publicará por separado en {networks}",
+        "editingPost": "Editando la publicación #{number}",
+        "editingThread": "Editando el hilo",
+        "edit": "Editar",
+        "editLoadFailed": "No se pudo cargar la publicación.",
+        "unsavedEdit": "Aún no has guardado los cambios en la publicación #{number}.",
+        "unsavedChanges": "Cambios sin guardar",
+        "discardEdits": "Salir sin guardar",
+        "writeThread": "Escribe al menos dos publicaciones antes de actualizar el hilo.",
+        "writeBeforeUpdate": "Escribe algo antes de actualizar.",
+        "writeBeforePublish": "Escribe algo antes de publicar.",
+        "writeBeforeSave": "Escribe algo antes de guardar.",
         "single": "Individual",
         "thread": "Hilo",
         "writePrompt": "¿Qué quieres compartir?",

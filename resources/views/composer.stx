@@ -5,7 +5,7 @@ import { workspaceComposerText, workspaceLocale } from '../../app/Support/Locali
 
 export const composerLocale = workspaceLocale
 export const composerText = workspaceComposerText.labels
-export const composerMessages = workspaceComposerText.client
+export const composerMessages = { ...workspaceComposerText.client, checkingAccounts: composerText.checkingAccounts }
 </script>
 
 @section('title'){{ composerText.documentTitle }}@endsection
@@ -319,7 +319,10 @@ export const composerMessages = workspaceComposerText.client
 
     const copy = {{ composerMessages }}
     const locale = {{ composerLocale }}
-    const numberedPost = (label: string, number: number) => label.replace('{number}', String(number))
+    const listFormatter = new Intl.ListFormat(locale)
+    const composerMessage = (text: string, fields: Record<string, string | number>) =>
+      text.replace(/\{(\w+)\}/g, (token, name) => String(fields[name] ?? token))
+    const numberedPost = (label: string, number: number) => composerMessage(label, { number })
     const providersFailed = state(false)
     const query = useRoute().query
     const editParam = query.edit || null
@@ -710,8 +713,8 @@ export const composerMessages = workspaceComposerText.client
       if (!showLanguage() || languageOptions().length) return
       const path = '/assets/scripts/composer-languages.ts'
       void import(path)
-        .then(module => languageOptions.set(module.composerLanguages(navigator.language)))
-        .catch(() => setStatus('Could not load post languages.', 'error'))
+        .then(module => languageOptions.set(module.composerLanguages(locale)))
+        .catch(() => setStatus(copy.languagesFailed, 'error'))
     })
 
     // The tightest limit among selected targets. Used for the counter's
@@ -757,12 +760,14 @@ export const composerMessages = workspaceComposerText.client
 
     const accountsConnected = derived(() => connectedProviders().length > 0)
     const connectionLabel = derived(() => {
-      if (!providersLoaded()) return 'Checking accounts…'
+      if (!providersLoaded()) return copy.checkingAccounts
       const connected = connectedProviders()
-      if (!connected.length) return 'Connect an account'
+      if (!connected.length) return copy.connectAnAccount
       const counts = new Map<string, number>()
       for (const target of connected) counts.set(target.provider, (counts.get(target.provider) || 0) + 1)
-      return `${[...counts].map(([provider, total]) => total > 1 ? `${providerLabel(provider)} (${total})` : providerLabel(provider)).join(', ')} ready`
+      const networks = listFormatter.format([...counts].map(([provider, total]) =>
+        total > 1 ? `${providerLabel(provider)} (${total})` : providerLabel(provider)))
+      return composerMessage(copy.networksReady, { networks })
     })
 
     let setupTargetPending = setupActive
@@ -858,7 +863,7 @@ export const composerMessages = workspaceComposerText.client
     const unthreadedNote = (posts) => {
       if (posts < 2) return ''
       const names = selectedNetworkIds().filter(provider => provider === 'instagram' || provider === 'linkedin').map(providerLabel)
-      return names.length ? ` - ${names.join(' and ')} will post each part separately` : ''
+      return names.length ? ` - ${composerMessage(copy.separateThreadParts, { networks: listFormatter.format(names) })}` : ''
     }
 
     const countSummary = derived(() => {
@@ -866,9 +871,10 @@ export const composerMessages = workspaceComposerText.client
       const limit = effectiveLimit()
       const over = overLimitNetworks()
       const count = composerFormat() === 'thread' ? segments().length : 1
+      const posts = count === 1 ? copy.onePost : composerMessage(copy.manyPosts, { count })
       const text = over.length
-        ? `${length} characters - too long for ${over.map(provider => providerLabel(provider.provider)).join(', ')}`
-        : `${length} / ${limit} characters - ${count} post${count === 1 ? '' : 's'}${unthreadedNote(count)}`
+        ? composerMessage(copy.countTooLong, { length, networks: listFormatter.format(over.map(provider => providerLabel(provider.provider))) })
+        : composerMessage(copy.countSummary, { length, limit, posts }) + unthreadedNote(count)
       return { text, tone: over.length ? 'danger' : length > limit - 40 ? 'warning' : 'muted' }
     })
 
@@ -950,16 +956,17 @@ export const composerMessages = workspaceComposerText.client
     // why and offers the way out. Back and forward cannot be held (the URL
     // has already moved); closing the window gets the browser's own prompt.
     useEventListener('stx:before-navigate', (event) => {
-      if (!editingId() || !editDirty || !event.cancelable) return
+      const id = editingId()
+      if (!id || !editDirty || !event.cancelable) return
       event.preventDefault()
       const destination = event.detail?.url
-      setStatus(`Your changes to post #${editingId()} are not saved yet.`, 'neutral', {
-        title: 'Unsaved changes',
+      setStatus(numberedPost(copy.unsavedEdit, id), 'neutral', {
+        title: copy.unsavedChanges,
         id: 'composer-unsaved',
         dedupeMs: 0,
         durationMs: 10000,
         action: {
-          label: 'Leave without saving',
+          label: copy.discardEdits,
           run: () => {
             editDirty = false
             if (typeof destination === 'string') navigate(destination)
@@ -981,7 +988,7 @@ export const composerMessages = workspaceComposerText.client
         (await loadNetworkOptions()).restoreNetworkOptions(networkOptionsForm.current, item.options)
       editingId.set(item.id)
       editingDraft.set(item.status === 'draft')
-      editHeading.set(item.thread ? 'Editing thread' : `Editing post #${item.id}`)
+      editHeading.set(item.thread ? copy.editingThread : numberedPost(copy.editingPost, item.id))
 
       if (item.thread) {
         composerFormat.set('thread')
@@ -1017,16 +1024,20 @@ export const composerMessages = workspaceComposerText.client
     }
 
     const loadEditPost = async (id) => {
+      let message = copy.editLoadFailed
       try {
         const response = await fetch(`/api/postline/queue/item?id=${encodeURIComponent(id)}`)
         const payload = await response.json()
-        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Could not load the post.')
-        await zoneReady
-        await enterEditMode(payload.data)
+        if (response.ok && payload?.ok) {
+          await zoneReady
+          await enterEditMode(payload.data)
+          return
+        }
+        if (payload?.code !== 'internal_error' && typeof payload?.error === 'string' && payload.error)
+          message = payload.error
       }
-      catch (error) {
-        setStatus(error instanceof Error ? error.message : String(error), 'error', { title: 'Edit' })
-      }
+      catch {}
+      setStatus(message, 'error', { title: copy.edit })
     }
 
     const segmentsToSend = () => (composerFormat() === 'thread' ? segments() : segments().slice(0, 1))
@@ -1202,12 +1213,12 @@ export const composerMessages = workspaceComposerText.client
       const editing = Boolean(editingId())
       const now = !nextSlot && postAction() === 'publish'
       if (editing && composerFormat() === 'thread' && posts.length < 2) {
-        setStatus('Write at least two posts before updating the thread.', 'error')
+        setStatus(copy.writeThread, 'error')
         focusSegment()
         return
       }
       if (!posts.length) {
-        setStatus(`Write something before ${editing ? 'updating' : now ? 'publishing' : 'saving'}.`, 'error')
+        setStatus(editing ? copy.writeBeforeUpdate : now ? copy.writeBeforePublish : copy.writeBeforeSave, 'error')
         focusSegment()
         return
       }

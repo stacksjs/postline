@@ -1566,7 +1566,10 @@
     "composerErrors": {
       "invalidThread": "Could not read the thread.",
       "invalidVariants": "Could not read the per-network text.",
-      "variantsSingleOnly": "Per-network text is available for single posts."
+      "variantsSingleOnly": "Per-network text is available for single posts.",
+      "postIdRequired": "Post id is required.",
+      "postNotFound": "Post not found.",
+      "postNotEditable": "Only draft, scheduled, or failed posts can be changed."
     },
     "composer": {
       "labels": {
@@ -1634,6 +1637,25 @@
       },
       "client": {
         "newPost": "New post",
+        "connectAnAccount": "Connect an account",
+        "networksReady": "{networks} ready",
+        "languagesFailed": "Could not load post languages.",
+        "countSummary": "{length} / {limit} characters - {posts}",
+        "countTooLong": "{length} characters - too long for {networks}",
+        "onePost": "1 post",
+        "manyPosts": "{count} posts",
+        "separateThreadParts": "{networks} will post each part separately",
+        "editingPost": "Editing post #{number}",
+        "editingThread": "Editing thread",
+        "edit": "Edit",
+        "editLoadFailed": "Could not load the post.",
+        "unsavedEdit": "Your changes to post #{number} are not saved yet.",
+        "unsavedChanges": "Unsaved changes",
+        "discardEdits": "Leave without saving",
+        "writeThread": "Write at least two posts before updating the thread.",
+        "writeBeforeUpdate": "Write something before updating.",
+        "writeBeforePublish": "Write something before publishing.",
+        "writeBeforeSave": "Write something before saving.",
         "single": "Single",
         "thread": "Thread",
         "writePrompt": "What do you want to share?",

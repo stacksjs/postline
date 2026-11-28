@@ -1,4 +1,4 @@
-import { workspaceLocale } from '../../Support/Localization/workspace'
+import { workspaceComposerErrors, workspaceLocale } from '../../Support/Localization/workspace'
 import { composerMediaText } from '../../Support/Social/media-messages'
 import { log } from '@stacksjs/logging'
 import { MAX_POST_IMAGES, mediaObjections } from '../../Support/Social/media-rules'
@@ -1789,9 +1789,9 @@ export class QueueService {
       .executeTakeFirst()
 
     if (!post)
-      throw new Error('Post not found.')
+      throw new UserFacingError(workspaceComposerErrors.postNotFound)
     if (!ACTIONABLE.has(String(post.status)))
-      throw new Error('Only draft, scheduled, or failed posts can be changed.')
+      throw new UserFacingError(workspaceComposerErrors.postNotEditable)
 
     return post
   }
