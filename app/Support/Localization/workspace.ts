@@ -51,6 +51,7 @@ export const workspaceListeningText = workspaceI18n.tm('workspace.listening') as
 export const workspaceAnalyticsText = workspaceI18n.tm('workspace.analytics') as typeof en.workspace.analytics
 export const workspaceAnalyticsLinksText = workspaceI18n.tm('workspace.analyticsLinks') as typeof en.workspace.analyticsLinks
 export const workspaceWritingText = workspaceI18n.tm('workspace.writing') as typeof en.workspace.writing
+export const workspaceBlogErrors = workspaceI18n.tm('workspace.blogErrors') as typeof en.workspace.blogErrors
 export const workspaceInboxText = workspaceI18n.tm('workspace.inbox') as typeof en.workspace.inbox
 export const workspaceInboxPublicText = workspaceI18n.tm('workspace.inboxPublic') as typeof en.workspace.inboxPublic
 export const workspaceChannelsText = workspaceI18n.tm('workspace.channels') as typeof en.workspace.channels

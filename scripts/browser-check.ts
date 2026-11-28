@@ -3978,15 +3978,28 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
         && document.querySelector('[aria-label="Publicaciones del blog"] [data-blog-row]')?.innerText.includes('Publicada')
         && document.getElementById('import-heading')?.textContent === 'Importar publicaciones'
     `), 5_000)
+    const blogRow = "document.querySelector('[aria-label=\"Publicaciones del blog\"] [data-blog-row]')"
+    await evaluate(cdp, `[...${blogRow}.querySelectorAll('button')].find(button => button.textContent.trim() === 'Editar').focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const blogTitle = `${blogRow}.querySelector('[data-blog-edit-title]')`
+    await waitUntil('The Spanish Blog edit form opens', () => evaluate<boolean>(cdp, `Boolean(${blogTitle}?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, `${blogTitle}.select()`)
+    await pressKey(cdp, 'Backspace', 8)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Saving an empty Blog title gives a Spanish error without closing the edit form', () => evaluate<boolean>(cdp, `
+      document.querySelector('#stx-toast-container')?.textContent.includes('La publicación del blog necesita un título.')
+        && ${blogTitle}.getClientRects().length > 0 && ${blogTitle}.value === ''
+    `), 5_000)
     await evaluate(cdp, `(() => {
       const transfer = new DataTransfer()
-      transfer.items.add(new File(['title,body\\nOtra entrada,Texto de prueba\\n'], 'entradas.csv', { type: 'text/csv' }))
+      transfer.items.add(new File(['title,body,date\\nOtra entrada,Texto de prueba,\\nFecha inválida,Texto de prueba,martes pasado\\n'], 'entradas.csv', { type: 'text/csv' }))
       const input = document.querySelector('[aria-labelledby="import-heading"] input[type="file"]')
       input.files = transfer.files
       input.dispatchEvent(new Event('change', { bubbles: true }))
     })()`)
-    await waitUntil('Spanish Blog import preview uses the server report', () => evaluate<boolean>(cdp, `
-      document.querySelector('[aria-labelledby="import-heading"] [role="status"]')?.innerText === 'Vista previa: crear 1, actualizar 0, omitir 0.'
+    await waitUntil('Spanish Blog import preview translates the server report and skipped row', () => evaluate<boolean>(cdp, `
+      document.querySelector('[aria-labelledby="import-heading"] [role="status"]')?.innerText === 'Vista previa: crear 1, actualizar 0, omitir 1.'
+        && document.querySelector('[aria-labelledby="import-heading"] li')?.innerText === 'Fila 2: Postline no reconoce «martes pasado» como fecha'
     `), 5_000)
     await checkSpanishInbox(cdp)
     await checkSpanishListening(cdp)
@@ -4036,7 +4049,11 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
     await waitUntil('Spanish Composer loads the Blog channel', () => evaluate<boolean>(cdp, `Boolean(${blog}?.getClientRects().length)`), 5_000)
     await evaluate(cdp, `if (${blog}.getAttribute('aria-pressed') !== 'true') ${blog}.click()`)
     const rich = `${editor}.querySelector('[data-richtext-host] [contenteditable=true]')`
-    await waitUntil('The Spanish Blog editor opens', () => evaluate<boolean>(cdp, `Boolean(${rich}?.getClientRects().length)`), 10_000)
+    await waitUntil('The Spanish Blog editor opens with a translated label and placeholder', () => evaluate<boolean>(cdp, `
+      ${rich}?.getClientRects().length > 0
+        && ${rich}.getAttribute('aria-label') === 'Texto de la publicación 1'
+        && ${rich}.getAttribute('data-placeholder') === 'Escribe el artículo…'
+    `), 10_000)
     const variants = `${editor}.querySelector('[data-variant-toggle]')`
     await evaluate(cdp, `${variants}.focus()`)
     await pressKey(cdp, 'Enter', 13)

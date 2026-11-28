@@ -9,6 +9,7 @@ import { blogBodyWithAttachments, readBlogAttachments, removeBlogAttachments, sa
 import { blogArticle } from '../../Support/Social/blog-article'
 import { blogFile, writePublishedBlogFile } from '../../Support/Social/blog-files'
 import { UserFacingError } from '../../Support/Http/user-error'
+import { workspaceBlogErrors, workspaceText } from '../../Support/Localization/workspace'
 
 const database = db as any
 
@@ -279,8 +280,8 @@ export class BlogService {
     const row = await this.find(id)
     const title = input.title.trim().slice(0, 200)
     const body = input.body.trim()
-    if (!title) throw new UserFacingError('A blog post needs a title.')
-    if (!body) throw new UserFacingError('A blog post needs some text.')
+    if (!title) throw new UserFacingError(workspaceBlogErrors.titleRequired)
+    if (!body) throw new UserFacingError(workspaceBlogErrors.bodyRequired)
 
     const updatedAt = now()
     const slug = String(row.slug)
@@ -305,7 +306,7 @@ export class BlogService {
   async republish(id: number): Promise<BlogPostView> {
     const row = await this.find(id)
     if (row.access === 'free' && row.status !== 'published' && existsSync(blogFile(String(row.slug))))
-      throw new UserFacingError(`Another file already uses /blog/${row.slug}. Rename it, then try again.`)
+      throw new UserFacingError(workspaceText('workspace.blogErrors.slugConflict', { slug: String(row.slug) }))
     const publishedAt = row.published_at || now()
     if (row.access === 'free') await writePublishedBlogFile(String(row.slug), String(row.title), String(publishedAt), String(row.published_body ?? row.body))
     await database.updateTable('blog_posts').set({ status: 'published', published_at: publishedAt, updated_at: now() }).where('id', '=', row.id).execute()
@@ -322,7 +323,7 @@ export class BlogService {
 
   private async find(id: number): Promise<any> {
     const row = await database.selectFrom('blog_posts').selectAll().where('id', '=', id).executeTakeFirst()
-    if (!row || !['published', 'draft'].includes(String(row.status))) throw new UserFacingError('That blog post no longer exists.')
+    if (!row || !['published', 'draft'].includes(String(row.status))) throw new UserFacingError(workspaceBlogErrors.notFound)
     return row
   }
 }

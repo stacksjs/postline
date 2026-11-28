@@ -13,6 +13,7 @@
  */
 
 import { publicMessage } from '../Support/Http/action-error'
+import { workspaceBlogErrors, workspaceLocale, workspaceText } from '../Support/Localization/workspace'
 import { blog } from './Social/BlogService'
 import { now } from './Social/support'
 
@@ -132,20 +133,22 @@ export class ImportService {
     for (const [index, row] of rows.entries()) {
       const number = index + 1
       if (index >= MAX_ROWS) {
-        skip(number, `Past the ${MAX_ROWS.toLocaleString('en-US')}-post limit for one import; import the rest as a second file`)
+        skip(number, workspaceText('workspace.blogErrors.importRowLimit', {
+          limit: MAX_ROWS.toLocaleString(workspaceLocale, { useGrouping: 'always' }),
+        }))
         continue
       }
 
       const title = String(row.title ?? '').trim()
       const body = String(row.body ?? '').trim()
       if (!title || !body) {
-        skip(number, 'A post needs both a title and a body')
+        skip(number, workspaceBlogErrors.importRowMissingContent)
         continue
       }
 
       const publishedAt = this.timestamp(row.publishedAt)
       if (publishedAt === null) {
-        skip(number, `"${String(row.publishedAt).slice(0, 40)}" is not a date Postline can read`)
+        skip(number, workspaceText('workspace.blogErrors.importRowInvalidDate', { date: String(row.publishedAt).slice(0, 40) }))
         continue
       }
 
@@ -155,7 +158,7 @@ export class ImportService {
         else report.updated++
       }
       catch (error) {
-        skip(number, publicMessage(error, 'Could not be saved'))
+        skip(number, publicMessage(error, workspaceBlogErrors.importRowSaveFailed))
       }
     }
 

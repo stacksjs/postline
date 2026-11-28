@@ -913,6 +913,20 @@
       "confirmAction": "Delete post",
       "deleted": "Deleted."
     },
+    "blogErrors": {
+      "idRequired": "Blog post id is required.",
+      "titleRequired": "A blog post needs a title.",
+      "bodyRequired": "A blog post needs some text.",
+      "notFound": "That blog post no longer exists.",
+      "slugConflict": "Another file already uses /blog/{slug}. Rename it, then try again.",
+      "previewTooLong": "Too much text to render in a preview.",
+      "invalidImportJson": "That is not valid JSON. Send an array of { title, body, slug, publishedAt }, or a CSV file.",
+      "importArrayRequired": "Send an array of { title, body, slug, publishedAt }, or a CSV file.",
+      "importRowLimit": "Past the {limit}-post limit for one import; import the rest as a second file",
+      "importRowMissingContent": "A post needs both a title and a body",
+      "importRowInvalidDate": "\"{date}\" is not a date Postline can read",
+      "importRowSaveFailed": "Could not be saved"
+    },
     "queue": {
       "tablist": "Queue",
       "view": "Queue view",
@@ -1593,6 +1607,8 @@
         "variantStale": "The shared text changed after you customised this.",
         "imageUrl": "Image URL for Instagram",
         "blogTitle": "Blog post title",
+        "blogBody": "Blog post body",
+        "blogPrompt": "Write the piece…",
         "postTitle": "Post title",
         "writePrompt": "What do you want to share?",
         "linkCardAttachment": "Bluesky shows the attachment instead of the link card.",

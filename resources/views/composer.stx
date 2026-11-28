@@ -110,7 +110,7 @@ export const composerMessages = { ...workspaceComposerText.client, checkingAccou
                 </button>
               </header>
               <ComposerSegmentField :text="row.text" :label="numberedPost(copy.postBody, row.number)" :placeholder="row.number === 1 ? copy.writePrompt : ''" :focusRequest="segmentFocus().id === row.id ? segmentFocus().revision : 0" :readonly="submitting()" @activate="activateSegment(row.id)" @edit="editSegment(row.id, $event)" />
-              <div :if="row.number === 1" class="hidden" data-richtext-host></div>
+              <div :if="row.number === 1" class="hidden" data-richtext-host data-editor-label="{{ composerText.blogBody }}" data-editor-placeholder="{{ composerText.blogPrompt }}"></div>
             </article>
           </div>
           {{-- Bluesky shows images or a link card, never both (#132). --}}

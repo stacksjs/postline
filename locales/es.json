@@ -913,6 +913,20 @@
       "confirmAction": "Eliminar publicación",
       "deleted": "Publicación eliminada."
     },
+    "blogErrors": {
+      "idRequired": "Indica el ID de la publicación del blog.",
+      "titleRequired": "La publicación del blog necesita un título.",
+      "bodyRequired": "La publicación del blog necesita texto.",
+      "notFound": "Esa publicación del blog ya no existe.",
+      "slugConflict": "Otro archivo ya usa /blog/{slug}. Cambia su nombre e inténtalo de nuevo.",
+      "previewTooLong": "Hay demasiado texto para generar una vista previa.",
+      "invalidImportJson": "El JSON no es válido. Envía una lista de objetos con title, body, slug y publishedAt, o un archivo CSV.",
+      "importArrayRequired": "Envía una lista de objetos con title, body, slug y publishedAt, o un archivo CSV.",
+      "importRowLimit": "Se superó el límite de {limit} publicaciones por importación. Importa el resto en otro archivo.",
+      "importRowMissingContent": "La publicación necesita un título y texto",
+      "importRowInvalidDate": "Postline no reconoce «{date}» como fecha",
+      "importRowSaveFailed": "No se pudo guardar"
+    },
     "queue": {
       "tablist": "Cola",
       "view": "Vista de la cola",
@@ -1593,6 +1607,8 @@
         "variantStale": "El texto compartido cambió después de esta personalización.",
         "imageUrl": "URL de la imagen para Instagram",
         "blogTitle": "Título de la entrada del blog",
+        "blogBody": "Texto de la entrada del blog",
+        "blogPrompt": "Escribe el artículo…",
         "postTitle": "Título de la publicación",
         "writePrompt": "¿Qué quieres compartir?",
         "linkCardAttachment": "Bluesky muestra el archivo adjunto en lugar de la vista previa del enlace.",

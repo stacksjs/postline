@@ -5,6 +5,7 @@ import { response } from '@stacksjs/router'
 import { imports, parseCsv } from '../../Services/ImportService'
 import { actionFailure } from '../../Support/Http/action-error'
 import { UserFacingError } from '../../Support/Http/user-error'
+import { workspaceBlogErrors } from '../../Support/Localization/workspace'
 
 /** A CSV header for each field, in the spellings platform exports use. */
 const COLUMNS: Record<keyof PostImportRow, string[]> = {
@@ -46,9 +47,9 @@ export default new Action({
           parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
         }
         catch {
-          throw new UserFacingError('That is not valid JSON. Send an array of { title, body, slug, publishedAt }, or a CSV file.')
+          throw new UserFacingError(workspaceBlogErrors.invalidImportJson)
         }
-        if (!Array.isArray(parsed)) throw new UserFacingError('Send an array of { title, body, slug, publishedAt }, or a CSV file.')
+        if (!Array.isArray(parsed)) throw new UserFacingError(workspaceBlogErrors.importArrayRequired)
         rows = parsed as PostImportRow[]
       }
 

@@ -30,7 +30,7 @@ export function setupRichText(root: HTMLElement): void {
     surface.className = 'min-h-36 w-full leading-relaxed text-[18px] text-ink outline-none medium-editor-element'
     surface.setAttribute('role', 'textbox')
     surface.setAttribute('aria-multiline', 'true')
-    surface.setAttribute('aria-label', field.getAttribute('aria-label') || 'Post body')
+    surface.setAttribute('aria-label', field.getAttribute('aria-label') || host.dataset.editorLabel || '')
     surface.setAttribute('data-focus-outline', '')
     renderDraft(surface, field.value)
     host.replaceChildren(surface)
@@ -42,7 +42,7 @@ export function setupRichText(root: HTMLElement): void {
     const teardown = mountMediumEditor({
       element: surface,
       storageKey: false,
-      editorOptions: { placeholder: { text: 'Write the piece…' } },
+      editorOptions: { placeholder: { text: host.dataset.editorPlaceholder } },
       onChange(html: string) {
         if (applyingModel || field.readOnly) return
         field.value = isEmptyHtml(html) ? '' : toMarkdown(html)
