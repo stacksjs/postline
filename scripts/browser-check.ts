@@ -4298,7 +4298,7 @@ async function checkSpanishCampaigns(cdp: Cdp): Promise<void> {
   await waitUntil('The saved campaign shows the Spanish calendar and action names', () => evaluate<boolean>(cdp, `
     ${page}.querySelector('#campaign-picker option:checked')?.textContent === 'Campaña de prueba'
       && [...${page}.querySelectorAll('dt')].some(label => label.innerText === 'Periodo')
-      && ${plan}?.querySelector('[aria-label="Seis semanas anteriores"]')?.getClientRects().length > 0
+      && ${plan}?.querySelector('button[aria-label="Seis semanas anteriores"]')?.getClientRects().length > 0
       && ${add}?.getAttribute('aria-label')?.startsWith('Añadir una publicación el ')
       && ${page}.querySelector('[aria-label="Herramientas de campaña"]')?.innerText.includes('Asistente de campaña')
   `), 5_000)
