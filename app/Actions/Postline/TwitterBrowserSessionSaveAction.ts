@@ -4,6 +4,7 @@ import { response } from '@stacksjs/router'
 import { pauseTwitterBrowserReads, rememberTwitterBrowserHandle, twitterBrowserSession } from '../../Services/Social/TwitterBrowserSession'
 import { isDesktopAgent } from '../../Support/Auth/native'
 import { actionFailure } from '../../Support/Http/action-error'
+import { UserFacingError } from '../../Support/Http/user-error'
 import { workspaceXBrowserErrors } from '../../Support/Localization/workspace'
 
 export default new Action({
@@ -17,9 +18,13 @@ export default new Action({
     try {
       if (request.get('needs_check') === true)
         await pauseTwitterBrowserReads(request.get('needs_layout_check') === true ? 'layout' : 'sign-in')
-      else await rememberTwitterBrowserHandle(request.get('signed_out') === true ? null : request.get('handle'), {
-        checkedLayout: request.get('checked_layout') === true,
-      })
+      else if (request.get('signed_out') === true)
+        await pauseTwitterBrowserReads('signed-out')
+      else {
+        const handle = request.get('handle')
+        if (typeof handle !== 'string') throw new UserFacingError(workspaceXBrowserErrors.invalidHandle)
+        await rememberTwitterBrowserHandle(handle, { checkedLayout: request.get('checked_layout') === true })
+      }
       return response.json({ ok: true, data: await twitterBrowserSession() })
     }
     catch (error) {

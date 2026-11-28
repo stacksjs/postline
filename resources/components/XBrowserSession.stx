@@ -110,7 +110,12 @@ async function checkSignIn() {
     const { data } = await requestJson(xSessionEndpoint, { method: 'POST', body: JSON.stringify(body) }, copy.saveFailed)
     xSession.set(data)
     xSessionNeedsCheck.set(data.needsCheck)
-    xSessionFeedback.set(data.handle ? words.t('signedIn', { handle: data.handle }) : copy.signedOut)
+    if (status.state === 'signed-out') {
+      xSessionFeedback.set(data.needsCheck ? copy.signInFirst : copy.signedOut)
+      if (data.needsCheck) await openXBrowser(windowApi, current.profile).catch(() => {})
+      return
+    }
+    xSessionFeedback.set(words.t('signedIn', { handle: data.handle }))
   }
   catch (error) {
     xSessionFeedback.set(error instanceof Error ? error.message : copy.checkFailed)

@@ -51,9 +51,9 @@ export async function rememberTwitterBrowserHandle(handle: unknown, { checkedLay
   if (!confirmed) throw new UserFacingError(workspaceXBrowserErrors.checkLayout)
 }
 
-export async function pauseTwitterBrowserReads(reason: 'sign-in' | 'layout' = 'sign-in'): Promise<void> {
+export async function pauseTwitterBrowserReads(reason: 'sign-in' | 'layout' | 'signed-out' = 'sign-in'): Promise<void> {
   const layout = reason === 'layout'
-  const account = await db.updateTable('accounts')
+  const pause = db.updateTable('accounts')
     .set({
       twitter_browser_needs_check: true,
       ...(layout ? { twitter_browser_needs_layout_check: true } : {}),
@@ -61,6 +61,8 @@ export async function pauseTwitterBrowserReads(reason: 'sign-in' | 'layout' = 's
     })
     .where('id', '=', await ensureAccount())
     .where(layout ? 'twitter_browser_needs_layout_check' : 'twitter_browser_needs_check', '=', false)
+  // Seeing an ordinary sign-in page is expected before the first connection.
+  const account = await (reason === 'signed-out' ? pause.where('twitter_browser_handle', 'is not', null) : pause)
     .returning(['uuid']).executeTakeFirst()
   if (!account) return
 

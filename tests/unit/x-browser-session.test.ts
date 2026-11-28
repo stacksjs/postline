@@ -240,6 +240,7 @@ describe('X session browser reads', () => {
     }
 
     try {
+      await expect(rememberTwitterBrowserHandle('https://x.com/fixture')).rejects.toThrow('Postline could not identify the signed-in X account.')
       await rememberTwitterBrowserHandle('postline_test')
       const own = await published('Postline_Test', '51', { likes: 9, views: 15 })
       const foreign = await published('other_user', '52', { likes: 8 })

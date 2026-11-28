@@ -1417,17 +1417,17 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
       if (options?.method === 'POST') {
         window.xSessionWrites++
         const { handle, signed_out, needs_check, needs_layout_check, checked_layout } = JSON.parse(options.body)
-        if (needs_check) {
-          localStorage.setItem('test-x-session-needs-check', '1')
+        if (needs_check || signed_out) {
+          if (needs_check || localStorage.getItem('test-x-session-handle'))
+            localStorage.setItem('test-x-session-needs-check', '1')
           if (needs_layout_check) localStorage.setItem('test-x-session-needs-layout-check', '1')
         }
         else {
-          if (!checked_layout && !signed_out && localStorage.getItem('test-x-session-needs-layout-check'))
+          if (!checked_layout && localStorage.getItem('test-x-session-needs-layout-check'))
             return Promise.resolve(Response.json({ ok: false, error: 'Layout check required' }, { status: 422 }))
           localStorage.removeItem('test-x-session-needs-check')
           localStorage.removeItem('test-x-session-needs-layout-check')
-          if (signed_out) localStorage.removeItem('test-x-session-handle')
-          else localStorage.setItem('test-x-session-handle', handle)
+          localStorage.setItem('test-x-session-handle', handle)
         }
       }
       return Promise.resolve(Response.json({ ok: true, data: {
@@ -1498,13 +1498,23 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     await waitUntil('A signed-in page without a timeline cannot lift the hold', () => evaluate<boolean>(cdp, `
       ${section}.querySelectorAll('button')[3].disabled && !${check}.disabled
         && window.xSessionInspections === 1 && window.xSessionWrites === 0`), 5_000)
+    await evaluate(cdp, `window.xSessionState = { state: 'signed-out' }; ${check}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('A sign-in page leaves the layout hold and last account in place', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('Sign in to X, then select Check sign-in')
+        && ${section}.textContent.includes('Last confirmed as @postline_test')
+        && ${section}.querySelectorAll('button')[3].disabled
+        && localStorage.getItem('test-x-session-needs-layout-check') === '1'
+        && window.xSessionWrites === 1 && window.xSessionOpens.length === 1`), 5_000)
     await evaluate(cdp, `(() => {
-      window.xSessionState.posts = [{ id: '4321', authorHandle: 'fixture_author', body: 'Postline launch', postedAt: '2026-11-27T05:00:00.000Z' }]
+      window.xSessionState = { state: 'connected', handle: 'postline_test', posts: [
+        { id: '4321', authorHandle: 'fixture_author', body: 'Postline launch', postedAt: '2026-11-27T05:00:00.000Z' },
+      ] }
       ${check}.focus()
     })()`)
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('A readable timeline and confirmed account resume imports', () => evaluate<boolean>(cdp, `
-      !${section}.querySelectorAll('button')[3].disabled && window.xSessionWrites === 1 && window.xSessionImports === 0`), 5_000)
+      !${section}.querySelectorAll('button')[3].disabled && window.xSessionWrites === 2 && window.xSessionImports === 0`), 5_000)
     await evaluate(cdp, `${section}.querySelectorAll('button')[3].focus()`)
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('The visible X posts are imported into Listening', () => evaluate<boolean>(cdp, `
@@ -1543,10 +1553,11 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
 
     await evaluate(cdp, `${check}.focus()`)
     await pressKey(cdp, 'Enter', 13)
-    await waitUntil('Checking after signing out clears the confirmed handle', () => evaluate<boolean>(cdp, `
-      ${section}.textContent.includes('Signed out of X.')
-        && !${section}.querySelectorAll('button')[2].getClientRects().length
-        && !${section}.querySelectorAll('button')[3].getClientRects().length && window.xSessionWrites === 3`), 5_000)
+    await waitUntil('Checking while signed out keeps both reads paused and shows the sign-in page', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('Sign in to X, then select Check sign-in')
+        && ${section}.textContent.includes('Last confirmed as @postline_test')
+        && ${section}.querySelectorAll('button')[2].disabled && ${section}.querySelectorAll('button')[3].disabled
+        && window.xSessionWrites === 3 && window.xSessionOpens.length === 2`), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })

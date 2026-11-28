@@ -182,8 +182,10 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   const initialProfile = JSON.parse(session.text).data
   check('the native X browser session uses a workspace profile', session.status === 200
     && initialProfile?.handle === null && /^postline-x-[0-9a-f-]{36}$/.test(initialProfile?.profile ?? ''))
-  const invalidHandle = await call('POST', browserSessionPath, { handle: 'https://x.com/fixture' })
-  check('the native session rejects an invalid X handle', invalidHandle.status === 422)
+  const signedOut = JSON.stringify({ signed_out: true })
+  const unconnected = await call('POST', browserSessionPath, signedOut)
+  check('a signed-out page leaves a fresh X profile unconnected without a hold', unconnected.status === 200
+    && JSON.parse(unconnected.text)?.data?.handle === null && JSON.parse(unconnected.text)?.data?.needsCheck === false)
   const connectedBrowser = await call('POST', browserSessionPath, { handle: 'postline_test' })
   const savedBrowser = await call('GET', browserSessionPath)
   const savedProfile = JSON.parse(savedBrowser.text).data
@@ -213,9 +215,7 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   check('the imported X post appears in Listening', savedMentions.status === 200
     && JSON.parse(savedMentions.text)?.data?.mentions?.[0]?.url === 'https://x.com/fixture_author/status/8724')
 
-  const challenge = JSON.stringify({ needs_check: true })
-  await call('POST', browserSessionPath, challenge)
-  await call('POST', browserSessionPath, challenge)
+  await call('POST', browserSessionPath, signedOut)
   const paused = await call('GET', browserSessionPath)
   const pausedSession = JSON.parse(paused.text)?.data
   check('the native agent persists an X sign-in hold and preserves the last confirmed handle', paused.status === 200
@@ -223,9 +223,6 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   const blockedImport = await call('POST', `${browserSessionPath}/listening`, visibleMentions)
   check('the native agent rejects an X browser import while sign-in needs checking', blockedImport.status === 422
     && JSON.parse(blockedImport.text)?.error?.includes('Check the X browser sign-in') === true)
-  const activity = await call('GET', '/api/postline/alerts')
-  const xAlerts = JSON.parse(activity.text)?.data?.alerts?.filter((item: { title: string }) => item.title === 'X browser sign-in needs attention')
-  check('a repeated X sign-in challenge raises one owner alert', activity.status === 200 && xAlerts?.length === 1)
   const confirmedAgain = await call('POST', browserSessionPath, { handle: 'postline_test' })
   check('confirming the X sign-in removes the hold', confirmedAgain.status === 200 && JSON.parse(confirmedAgain.text)?.data?.needsCheck === false)
   const resumedImport = await call('POST', `${browserSessionPath}/listening`, visibleMentions)
@@ -233,12 +230,14 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
 
   const brokenLayout = JSON.stringify({ needs_check: true, needs_layout_check: true })
   const layoutHold = await call('POST', browserSessionPath, brokenLayout)
-  await call('POST', browserSessionPath, brokenLayout)
   check('the native agent persists an X layout hold', layoutHold.status === 200
     && JSON.parse(layoutHold.text)?.data?.needsLayoutCheck === true)
-  const layoutActivity = await call('GET', '/api/postline/alerts')
-  const layoutAlerts = JSON.parse(layoutActivity.text)?.data?.alerts?.filter((item: { title: string }) => item.title === 'X browser reads paused')
-  check('a repeated layout warning raises one separate owner alert', layoutActivity.status === 200 && layoutAlerts?.length === 1)
+  const noHandle = await call('POST', browserSessionPath, JSON.stringify({ handle: null }))
+  check('an empty handle cannot clear a native X session hold', noHandle.status === 422)
+  const signedOutDuringHold = await call('POST', browserSessionPath, signedOut)
+  const heldProfile = JSON.parse(signedOutDuringHold.text)?.data
+  check('checking a signed-out X page preserves the last account and the layout hold', signedOutDuringHold.status === 200
+    && heldProfile?.handle === 'postline_test' && heldProfile?.needsCheck === true && heldProfile?.needsLayoutCheck === true)
   const signInOnly = await call('POST', browserSessionPath, { handle: 'postline_test' })
   const layoutBlocked = await call('POST', `${browserSessionPath}/listening`, visibleMentions)
   check('a sign-in check alone cannot clear the layout hold or allow an import', signInOnly.status === 422
@@ -286,6 +285,11 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
 
   const pendingErasure = await call('POST', browserSessionPath, brokenLayout)
   check('the erasure fixture starts with an X layout hold', JSON.parse(pendingErasure.text).data?.needsLayoutCheck === true)
+  const browserActivity = await call('GET', '/api/postline/alerts')
+  const browserAlerts: Array<{ title: string }> = JSON.parse(browserActivity.text)?.data?.alerts ?? []
+  check('sign-out and repeated layout warnings raise one owner alert per reason', browserActivity.status === 200
+    && browserAlerts.filter(item => item.title === 'X browser sign-in needs attention').length === 1
+    && browserAlerts.filter(item => item.title === 'X browser reads paused').length === 1)
   const system = await call('GET', '/api/postline/system')
   const localProfile: string | null = JSON.parse(system.text).data?.localTwitterProfile
   const canHaveNativeProfile = process.platform === 'darwin' && Number(release().split('.')[0]) >= 23
