@@ -1340,6 +1340,7 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     window.xSessionImports = 0
     window.xSessionOpens = []
     window.xSessionNavigations = []
+    window.xSessionInspections = 0
     window.xSessionState = { state: 'connected', handle: 'postline_test', measurements: [{ id: '4321', counts: { likes: 2 } }] }
     window.craft = { app: { nativePlatformControls: false }, capabilities: { nativePlatformControls: false }, window: {
       async openExternal(options) {
@@ -1355,6 +1356,7 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
         }
         if (action !== 'executeJavaScript' || name !== profile || !input.code.includes('AppTabBar_Profile_Link'))
           throw new Error('Unexpected X window inspection')
+        window.xSessionInspections++
         return JSON.stringify(window.xSessionState)
       },
     } }
@@ -1377,16 +1379,23 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
       if (url.pathname !== '${endpoint}') return send(input, options)
       if (options?.method === 'POST') {
         window.xSessionWrites++
-        const { handle, signed_out, needs_check } = JSON.parse(options.body)
-        if (needs_check) localStorage.setItem('test-x-session-needs-check', '1')
+        const { handle, signed_out, needs_check, needs_layout_check, checked_layout } = JSON.parse(options.body)
+        if (needs_check) {
+          localStorage.setItem('test-x-session-needs-check', '1')
+          if (needs_layout_check) localStorage.setItem('test-x-session-needs-layout-check', '1')
+        }
         else {
+          if (!checked_layout && !signed_out && localStorage.getItem('test-x-session-needs-layout-check'))
+            return Promise.resolve(Response.json({ ok: false, error: 'Layout check required' }, { status: 422 }))
           localStorage.removeItem('test-x-session-needs-check')
+          localStorage.removeItem('test-x-session-needs-layout-check')
           if (signed_out) localStorage.removeItem('test-x-session-handle')
           else localStorage.setItem('test-x-session-handle', handle)
         }
       }
       return Promise.resolve(Response.json({ ok: true, data: {
         profile, handle: localStorage.getItem('test-x-session-handle'), needsCheck: localStorage.getItem('test-x-session-needs-check') === '1',
+        needsLayoutCheck: localStorage.getItem('test-x-session-needs-layout-check') === '1',
       } }))
     }
   ` })
@@ -1432,15 +1441,34 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('Importing requires Search or Mentions', () => evaluate<boolean>(cdp, `
       ${section}.textContent.includes('Open Search or Mentions')`), 5_000)
+    await evaluate(cdp, `window.xSessionState.readIssue = 'loading'; ${section}.querySelectorAll('button')[3].focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('A timeline still loading leaves imports enabled and persists no hold', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('wait for the page to finish loading')
+        && !${section}.querySelectorAll('button')[3].disabled && window.xSessionWrites === 1 && window.xSessionImports === 1`), 5_000)
     await evaluate(cdp, `window.xSessionState.readIssue = 'layout'; ${section}.querySelectorAll('button')[3].focus()`)
     await pressKey(cdp, 'Enter', 13)
-    await waitUntil('Unrecognized X layout reports a retry and writes no imports', () => evaluate<boolean>(cdp, `
-      ${section}.textContent.includes('Postline could not read this X page') && window.xSessionImports === 1`), 5_000)
+    await waitUntil('An unrecognized X layout pauses both imports and records the reason', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('Postline could not read this X timeline')
+        && ${section}.querySelectorAll('button')[2].disabled && ${section}.querySelectorAll('button')[3].disabled
+        && window.xSessionWrites === 2 && window.xSessionImports === 1`), 5_000)
+    await auditPage(`${site}/accounts`, { cdp })
+    await waitUntil('The layout hold survives reloading the document', () => evaluate<boolean>(cdp, `
+      ${section}?.textContent.includes('Postline could not read this X timeline')
+        && ${section}.querySelectorAll('button')[3].disabled && !${check}.disabled`), 5_000)
+    await evaluate(cdp, `${check}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('A signed-in page without a timeline cannot lift the hold', () => evaluate<boolean>(cdp, `
+      ${section}.querySelectorAll('button')[3].disabled && !${check}.disabled
+        && window.xSessionInspections === 1 && window.xSessionWrites === 0`), 5_000)
     await evaluate(cdp, `(() => {
-      delete window.xSessionState.readIssue
       window.xSessionState.posts = [{ id: '4321', authorHandle: 'fixture_author', body: 'Postline launch', postedAt: '2026-11-27T05:00:00.000Z' }]
-      ${section}.querySelectorAll('button')[3].focus()
+      ${check}.focus()
     })()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('A readable timeline and confirmed account resume imports', () => evaluate<boolean>(cdp, `
+      !${section}.querySelectorAll('button')[3].disabled && window.xSessionWrites === 1 && window.xSessionImports === 0`), 5_000)
+    await evaluate(cdp, `${section}.querySelectorAll('button')[3].focus()`)
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('The visible X posts are imported into Listening', () => evaluate<boolean>(cdp, `
       ${section}.textContent.includes('Saved 1 new X mention in Listening.')`), 5_000)
@@ -1485,7 +1513,7 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
-    await evaluate(cdp, `sessionStorage.removeItem('test-x-window-open'); localStorage.removeItem('test-x-session-handle'); localStorage.removeItem('test-x-session-needs-check')`)
+    await evaluate(cdp, `sessionStorage.removeItem('test-x-window-open'); localStorage.removeItem('test-x-session-handle'); localStorage.removeItem('test-x-session-needs-check'); localStorage.removeItem('test-x-session-needs-layout-check')`)
   }
 }
 

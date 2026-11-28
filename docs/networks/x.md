@@ -71,6 +71,9 @@ If X asks you to verify your account during an import, Postline pauses browser
 reads, records an alert in Activity, and brings the X window forward. The pause
 survives a reload. Complete the check there, then
 select **Check sign-in** in Postline.
+If Postline finds visible results it cannot read, it also pauses browser
+imports and records the reason in Activity. Open a loaded Search or Mentions
+page in X, then select **Check sign-in** in Postline to check the layout again.
 X [restricts scripted website use](https://help.x.com/en/rules-and-policies/x-automation).
 
 Choose **Open X profile** to bring up your profile in the X window. Once it loads,

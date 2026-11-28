@@ -106,17 +106,21 @@ describe('X session browser reads', () => {
   })
 
   test('distinguishes an empty X timeline from one that cannot be read', () => {
-    const page = (rows: { getClientRects: () => number[] }[] | null) => ({
+    const page = (rows: { getClientRects: () => number[] }[] | null, empty = false) => ({
       querySelector(selector: string) {
         if (selector.includes('Profile_Link')) return { getAttribute: () => '/postline_test' }
-        return selector.includes('primaryColumn') && rows ? { querySelectorAll: (within: string) => within === 'article' ? rows : [] } : null
+        return selector.includes('primaryColumn') && rows ? {
+          querySelector: (within: string) => empty && within.includes('emptyState') ? { getClientRects: () => [1] } : null,
+          querySelectorAll: (within: string) => within === 'article' ? rows : [],
+        } : null
       },
       querySelectorAll: () => [],
     }) as unknown as Document
     const search = 'https://x.com/search?q=postline'
-    expect(inspectXPage(page(null), search, 'listening')).toMatchObject({ state: 'connected', readIssue: 'layout' })
+    expect(inspectXPage(page(null), search, 'listening')).toMatchObject({ state: 'connected', readIssue: 'loading' })
     expect(inspectXPage(page([{ getClientRects: () => [1] }]), search, 'listening')).toMatchObject({ state: 'connected', readIssue: 'layout' })
-    expect(inspectXPage(page([{ getClientRects: () => [] }]), search, 'listening')).toEqual({
+    expect(inspectXPage(page([]), search, 'listening')).toMatchObject({ state: 'connected', readIssue: 'loading' })
+    expect(inspectXPage(page([{ getClientRects: () => [] }], true), search, 'listening')).toEqual({
       state: 'connected', handle: 'postline_test', measurements: [], posts: [],
     })
   })

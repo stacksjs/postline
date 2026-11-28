@@ -14,15 +14,17 @@ export interface TwitterBrowserSessionSnapshot {
   profile: string
   handle: string | null
   needsCheck: boolean
+  needsLayoutCheck: boolean
 }
 
 export async function twitterBrowserSession(): Promise<TwitterBrowserSessionSnapshot> {
-  const account = await db.selectFrom('accounts').select(['uuid', 'twitter_browser_handle', 'twitter_browser_needs_check'])
+  const account = await db.selectFrom('accounts').select(['uuid', 'twitter_browser_handle', 'twitter_browser_needs_check', 'twitter_browser_needs_layout_check'])
     .where('id', '=', await ensureAccount()).executeTakeFirstOrThrow()
   return {
     profile: `postline-x-${account.uuid}`,
     handle: account.twitter_browser_handle ?? null,
     needsCheck: Boolean(account.twitter_browser_needs_check),
+    needsLayoutCheck: Boolean(account.twitter_browser_needs_layout_check),
   }
 }
 
@@ -33,33 +35,47 @@ export async function localTwitterProfileForErasure(): Promise<string | null> {
   return canHaveLocalProfile ? (await twitterBrowserSession()).profile : null
 }
 
-export async function rememberTwitterBrowserHandle(handle: unknown): Promise<void> {
+export async function rememberTwitterBrowserHandle(handle: unknown, { checkedLayout = false } = {}): Promise<void> {
   if (handle !== null && (typeof handle !== 'string' || !/^[A-Za-z0-9_]{1,15}$/.test(handle)))
     throw new UserFacingError(workspaceXBrowserErrors.invalidHandle)
 
-  await db.updateTable('accounts').set({ twitter_browser_handle: handle, twitter_browser_needs_check: false, updated_at: now() })
-    .where('id', '=', await ensureAccount()).execute()
+  const save = db.updateTable('accounts').set({
+    twitter_browser_handle: handle,
+    twitter_browser_needs_check: false,
+    twitter_browser_needs_layout_check: false,
+    updated_at: now(),
+  }).where('id', '=', await ensureAccount())
+  const confirmed = await (handle !== null && !checkedLayout
+    ? save.where('twitter_browser_needs_layout_check', '=', false)
+    : save).returning(['id']).executeTakeFirst()
+  if (!confirmed) throw new UserFacingError(workspaceXBrowserErrors.checkLayout)
 }
 
-export async function pauseTwitterBrowserReads(): Promise<void> {
+export async function pauseTwitterBrowserReads(reason: 'sign-in' | 'layout' = 'sign-in'): Promise<void> {
+  const layout = reason === 'layout'
   const account = await db.updateTable('accounts')
-    .set({ twitter_browser_needs_check: true, updated_at: now() })
+    .set({
+      twitter_browser_needs_check: true,
+      ...(layout ? { twitter_browser_needs_layout_check: true } : {}),
+      updated_at: now(),
+    })
     .where('id', '=', await ensureAccount())
-    .where('twitter_browser_needs_check', '=', false)
+    .where(layout ? 'twitter_browser_needs_layout_check' : 'twitter_browser_needs_check', '=', false)
     .returning(['uuid']).executeTakeFirst()
   if (!account) return
 
   await alerts.raise({
     kind: 'account-expired',
-    title: workspaceXBrowserSessionText.attentionTitle,
-    body: workspaceXBrowserSessionText.attentionBody,
+    title: layout ? workspaceXBrowserSessionText.layoutTitle : workspaceXBrowserSessionText.attentionTitle,
+    body: layout ? workspaceXBrowserSessionText.layout : workspaceXBrowserSessionText.attentionBody,
     link: '/accounts',
-    key: `x-browser-attention:${account.uuid}:${now().slice(0, 10)}`,
+    key: `x-browser-attention:${account.uuid}:${now().slice(0, 10)}${layout ? ':layout' : ''}`,
   })
 }
 
 export async function requireTwitterBrowserHandle(handle: unknown): Promise<string> {
   const session = await twitterBrowserSession()
+  if (session.needsLayoutCheck) throw new UserFacingError(workspaceXBrowserErrors.checkLayout)
   if (session.needsCheck || !session.handle || typeof handle !== 'string' || handle.toLowerCase() !== session.handle.toLowerCase())
     throw new UserFacingError(workspaceXBrowserErrors.checkSignIn)
   return session.handle

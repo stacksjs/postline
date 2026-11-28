@@ -605,7 +605,8 @@
       "metricsMany": "Updated {count} published posts in Analytics.",
       "noMatches": "No visible counts matched your published X posts. Open your profile in the X window and try again.",
       "readEngagementFailed": "Could not read X engagement.",
-      "layout": "Postline could not read this X page. Let Search or Mentions finish loading, then try again.",
+      "layoutTitle": "X browser reads paused",
+      "layout": "Postline could not read this X timeline. Open a loaded Search or Mentions page in X, then select Check sign-in to resume browser reads.",
       "openMentions": "Open Search or Mentions in the X window first.",
       "importFailed": "Could not import X posts.",
       "mentionsOne": "Saved {count} new X mention in Listening.",
@@ -631,6 +632,7 @@
       "desktopOnly": "X browser sessions are available in the Postline Mac app.",
       "invalidHandle": "Postline could not identify the signed-in X account.",
       "checkSignIn": "Check the X browser sign-in before reading its data.",
+      "checkLayout": "Open a readable X Search or Mentions page and select Check sign-in to resume browser reads.",
       "invalidMetrics": "Postline could not read the visible X post counts.",
       "invalidPosts": "Postline could not read the visible X posts."
     },

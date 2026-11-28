@@ -18,7 +18,7 @@ interface XBrowserPost {
 type XBrowserRead = 'sign-in' | 'listening' | 'metrics'
 
 type XBrowserStatus =
-  | { state: 'connected', handle: string, measurements: Array<{ id: string, counts: EngagementCounts }>, posts?: XBrowserPost[], readIssue?: 'layout' }
+  | { state: 'connected', handle: string, measurements: Array<{ id: string, counts: EngagementCounts }>, posts?: XBrowserPost[], readIssue?: 'layout' | 'loading' }
   | { state: 'signed-out' | 'needs-attention' | 'unavailable' }
 
 export function xBrowserWindow(host: unknown): XBrowserWindow | null {
@@ -78,7 +78,7 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
       const listening = read === 'listening' && ['/search', '/notifications/mentions'].includes(url.pathname)
       const column = listening ? page.querySelector('[data-testid="primaryColumn"]') : null
       if (listening && !column)
-        return { state: 'connected', handle, measurements, readIssue: 'layout' }
+        return { state: 'connected', handle, measurements, readIssue: 'loading' }
 
       const posts: XBrowserPost[] | undefined = listening ? [] : undefined
       let recognizedPost = false
@@ -124,10 +124,14 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
           if (Object.keys(counts).length) measurements.push({ id, counts })
         }
       }
-      // A loaded empty column is a valid result. Visible rows without any
-      // recognizable status links mean the layout has changed.
-      if (column && !recognizedPost && Array.from(column.querySelectorAll('article')).slice(0, 100).some(article => article.getClientRects().length))
-        return { state: 'connected', handle, measurements, readIssue: 'layout' }
+      if (column && !recognizedPost) {
+        // An empty result can confirm the layout only once X has rendered
+        // its empty state. A column without results may still be loading.
+        if (Array.from(column.querySelectorAll('article')).slice(0, 100).some(article => article.getClientRects().length))
+          return { state: 'connected', handle, measurements, readIssue: 'layout' }
+        if (!column.querySelector('[data-testid="emptyState"]')?.getClientRects().length)
+          return { state: 'connected', handle, measurements, readIssue: 'loading' }
+      }
       return { state: 'connected', handle, measurements, ...(posts && { posts }) }
     }
   }

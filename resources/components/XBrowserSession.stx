@@ -31,7 +31,7 @@ async function loadSession() {
     const { data } = await requestJson(xSessionEndpoint, { cache: 'no-store' }, copy.loadFailed)
     xSession.set(data)
     xSessionNeedsCheck.set(data.needsCheck)
-    if (data.needsCheck) xSessionFeedback.set(copy.attentionBody)
+    if (data.needsCheck) xSessionFeedback.set(data.needsLayoutCheck ? copy.layout : copy.attentionBody)
   }
   catch (error) {
     xSessionFeedback.set(error instanceof Error ? error.message : copy.loadFailed)
@@ -52,7 +52,7 @@ async function openSession() {
   xSessionBusy.set(true)
   try {
     await openXBrowser(windowApi, current.profile)
-    xSessionFeedback.set(copy.openHelp)
+    xSessionFeedback.set(current.needsLayoutCheck ? copy.layout : copy.openHelp)
   }
   catch {
     xSessionFeedback.set(copy.openFailed)
@@ -62,11 +62,13 @@ async function openSession() {
   }
 }
 
-async function pauseReads(message: string) {
+async function pauseReads(message: string, layout = false) {
   xSessionNeedsCheck.set(true)
   xSessionFeedback.set(message)
+  const current = xSession()
+  if (layout && current) xSession.set({ ...current, needsCheck: true, needsLayoutCheck: true })
   try {
-    const { data } = await requestJson(xSessionEndpoint, { method: 'POST', body: JSON.stringify({ needs_check: true }) }, copy.saveFailed)
+    const { data } = await requestJson(xSessionEndpoint, { method: 'POST', body: JSON.stringify({ needs_check: true, needs_layout_check: layout }) }, copy.saveFailed)
     xSession.set(data)
   }
   catch {
@@ -88,7 +90,7 @@ async function checkSignIn() {
   if (!windowApi || !current || xSessionBusy()) return
   xSessionBusy.set(true)
   try {
-    const status = await readXBrowserSession(windowApi, current.profile)
+    const status = await readXBrowserSession(windowApi, current.profile, current.needsLayoutCheck ? 'listening' : 'sign-in')
     if (status.state === 'needs-attention') {
       await returnToX(windowApi, current.profile, status.state)
       return
@@ -97,8 +99,14 @@ async function checkSignIn() {
       xSessionFeedback.set(copy.checkReady)
       return
     }
+    if (status.state === 'connected' && current.needsLayoutCheck && (!status.posts || status.readIssue)) {
+      xSessionFeedback.set(copy.layout)
+      return
+    }
 
-    const body = status.state === 'connected' ? { handle: status.handle } : { signed_out: true }
+    const body = status.state === 'connected'
+      ? { handle: status.handle, checked_layout: current.needsLayoutCheck }
+      : { signed_out: true }
     const { data } = await requestJson(xSessionEndpoint, { method: 'POST', body: JSON.stringify(body) }, copy.saveFailed)
     xSession.set(data)
     xSessionNeedsCheck.set(data.needsCheck)
@@ -184,7 +192,11 @@ async function captureListening() {
     const result = await readConfirmedSession(windowApi, current.profile, current.handle, 'listening')
     if (!result) return
     if (result.readIssue === 'layout') {
-      xSessionFeedback.set(copy.layout)
+      await pauseReads(copy.layout, true)
+      return
+    }
+    if (result.readIssue === 'loading') {
+      xSessionFeedback.set(copy.importReady)
       return
     }
     if (!result.posts) {

@@ -18,6 +18,7 @@ declare module '@stacksjs/database' {
       publishing_paused: number
       twitter_browser_handle: string
       twitter_browser_needs_check: number
+      twitter_browser_needs_layout_check: number
       ai_provider: "" | "anthropic" | "openai" | "ollama"
       ai_api_key: string
       ai_model: string

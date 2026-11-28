@@ -605,7 +605,8 @@
       "metricsMany": "Se actualizaron {count} publicaciones en Estadísticas.",
       "noMatches": "Las métricas visibles no coincidieron con tus publicaciones de X. Abre tu perfil en la ventana de X y vuelve a intentarlo.",
       "readEngagementFailed": "No se pudieron leer las interacciones de X.",
-      "layout": "Postline no pudo leer esta página de X. Espera a que termine de cargar la búsqueda o las menciones y vuelve a intentarlo.",
+      "layoutTitle": "Lecturas de X en pausa",
+      "layout": "Postline no pudo leer esta cronología de X. Abre la búsqueda o las menciones en X, espera a que termine de cargar y selecciona Verificar sesión para reanudar las lecturas.",
       "openMentions": "Abre primero la búsqueda o las menciones en la ventana de X.",
       "importFailed": "No se pudieron importar las publicaciones de X.",
       "mentionsOne": "Se guardó {count} mención nueva de X en Monitoreo.",
@@ -631,6 +632,7 @@
       "desktopOnly": "Las sesiones de X en el navegador están disponibles en la app de Postline para Mac.",
       "invalidHandle": "Postline no pudo identificar la cuenta con la que iniciaste sesión en X.",
       "checkSignIn": "Selecciona Verificar sesión antes de leer los datos de X.",
+      "checkLayout": "Abre una página de búsqueda o menciones de X que se pueda leer y selecciona Verificar sesión para reanudar las lecturas.",
       "invalidMetrics": "Postline no pudo leer las métricas visibles de las publicaciones de X.",
       "invalidPosts": "Postline no pudo leer las publicaciones visibles de X."
     },

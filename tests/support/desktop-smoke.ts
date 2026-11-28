@@ -186,7 +186,8 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   const savedProfile = JSON.parse(savedBrowser.text).data
   check('the native session remembers its X handle, profile and confirmation state', connectedBrowser.status === 200
     && savedBrowser.status === 200 && savedProfile?.handle === 'postline_test' && savedProfile?.profile === initialProfile?.profile
-    && savedProfile.needsCheck === false && Object.keys(savedProfile).sort().join(',') === 'handle,needsCheck,profile')
+    && savedProfile.needsCheck === false && savedProfile.needsLayoutCheck === false
+    && Object.keys(savedProfile).sort().join(',') === 'handle,needsCheck,needsLayoutCheck,profile')
   const foreignMetrics = await call('POST', `${browserSessionPath}/metrics`, { handle: 'another_user' })
   check('the native session rejects engagement from a different handle', foreignMetrics.status === 422
     && JSON.parse(foreignMetrics.text)?.error?.includes('Check the X browser sign-in') === true)
@@ -227,6 +228,22 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   const resumedImport = await call('POST', `${browserSessionPath}/listening`, visibleMentions)
   check('the native agent accepts X browser imports after a new sign-in check', resumedImport.status === 200)
 
+  const brokenLayout = JSON.stringify({ needs_check: true, needs_layout_check: true })
+  const layoutHold = await call('POST', browserSessionPath, brokenLayout)
+  await call('POST', browserSessionPath, brokenLayout)
+  check('the native agent persists an X layout hold', layoutHold.status === 200
+    && JSON.parse(layoutHold.text)?.data?.needsLayoutCheck === true)
+  const layoutActivity = await call('GET', '/api/postline/alerts')
+  const layoutAlerts = JSON.parse(layoutActivity.text)?.data?.alerts?.filter((item: { title: string }) => item.title === 'X browser reads paused')
+  check('a repeated layout warning raises one separate owner alert', layoutActivity.status === 200 && layoutAlerts?.length === 1)
+  const signInOnly = await call('POST', browserSessionPath, { handle: 'postline_test' })
+  const layoutBlocked = await call('POST', `${browserSessionPath}/listening`, visibleMentions)
+  check('a sign-in check alone cannot clear the layout hold or allow an import', signInOnly.status === 422
+    && layoutBlocked.status === 422 && JSON.parse(layoutBlocked.text)?.error?.includes('Open a readable X Search or Mentions page') === true)
+  const checkedLayout = await call('POST', browserSessionPath, JSON.stringify({ handle: 'postline_test', checked_layout: true }))
+  check('the verified layout clears both X hold flags', checkedLayout.status === 200
+    && JSON.parse(checkedLayout.text)?.data?.needsCheck === false && JSON.parse(checkedLayout.text)?.data?.needsLayoutCheck === false)
+
   const missingReply = await call('POST', '/api/postline/inbox/mentions/reply', { id: '99999', text: 'A fixture reply' })
   check('the compiled agent rejects a public reply without a saved mention', missingReply.status === 422
     && JSON.parse(missingReply.text)?.error === 'That reply or mention is no longer in Inbox.')
@@ -264,8 +281,8 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   check('the Mac agent runs the webhook job without queuing events when disabled', webhookScheduler?.last_status === 'ok' && webhookOutbox.count === 0)
   check('the blog file is in the data directory', existsSync(join(dataDir, 'content/blog')) && readdirSync(join(dataDir, 'content/blog')).includes('desktop-check.md'))
 
-  const pendingErasure = await call('POST', browserSessionPath, challenge)
-  check('the erasure fixture starts with an X sign-in hold', JSON.parse(pendingErasure.text).data?.needsCheck === true)
+  const pendingErasure = await call('POST', browserSessionPath, brokenLayout)
+  check('the erasure fixture starts with an X layout hold', JSON.parse(pendingErasure.text).data?.needsLayoutCheck === true)
   const system = await call('GET', '/api/postline/system')
   const localProfile: string | null = JSON.parse(system.text).data?.localTwitterProfile
   const canHaveNativeProfile = process.platform === 'darwin' && Number(release().split('.')[0]) >= 23
@@ -290,7 +307,7 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   check('workspace erasure clears X sign-in state and keeps the owner profile identity', erased.status === 200
     && typeof JSON.parse(erased.text).data?.deleted?.posts === 'number'
     && remainingSession?.profile === initialProfile.profile
-    && remainingSession?.handle === null && remainingSession?.needsCheck === false)
+    && remainingSession?.handle === null && remainingSession?.needsCheck === false && remainingSession?.needsLayoutCheck === false)
 
   if (failures.length > 0) {
     console.error(`\n${failures.length} check(s) failed.`)

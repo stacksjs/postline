@@ -453,6 +453,7 @@ export class WorkspaceArchiveService {
       auto_delete_enabled: false,
       twitter_browser_handle: null,
       twitter_browser_needs_check: false,
+      twitter_browser_needs_layout_check: false,
       updated_at: now(),
     }).where('id', '=', accountId).execute()
     await rm(MEDIA_DIR, { recursive: true, force: true })
