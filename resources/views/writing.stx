@@ -88,9 +88,9 @@ export const writingClient = { locale: workspaceLocale, messages: workspaceWriti
         <label class="inline-flex gap-2 items-center px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg cursor-pointer">
           <span class="h-3.5 w-3.5 i-hugeicons-file-import" aria-hidden="true"></span>
           <span :text="importName() || copy.chooseFile">{{ writingText.chooseFile }}</span>
-          <input class="sr-only" type="file" accept=".csv,.json,text/csv,application/json" @change="chooseImport($event)">
+          <input class="sr-only" type="file" accept=".csv,.json,text/csv,application/json" :disabled="importing()" @change="chooseImport($event)">
         </label>
-        <button class="inline-flex items-center px-3 h-8 font-semibold text-on-accent text-xs bg-accent rounded-lg disabled:opacity-50" type="button" x-show="importPreview() && !importPreview().done" :disabled="importing()" @click="runImport" :text="importing() ? copy.importing : copy.importAction">{{ writingText.importAction }}</button>
+        <Button size="sm" :show="importResult()?.report.dryRun" :loading="importing()" :label="importing() ? copy.importing : copy.importAction" @click="runImport">{{ writingText.importAction }}</Button>
       </div>
       <p class="m-0 text-xs" x-show="importMessage()" :class="importTone() === 'error' ? 'text-danger' : 'text-body'" :text="importMessage()" role="status" aria-live="polite"></p>
       <ul class="grid gap-1 m-0 pl-5 list-disc text-muted text-xs" x-show="importSkipped().length">
@@ -100,6 +100,7 @@ export const writingClient = { locale: workspaceLocale, messages: workspaceWriti
   </section>
 
   <script client>
+    import type { ImportReport } from '../../app/Services/ImportService'
     import { createI18n } from '@stacksjs/i18n/client'
     import { showNotification } from '../functions/notification'
 
@@ -132,20 +133,23 @@ export const writingClient = { locale: workspaceLocale, messages: workspaceWriti
         : date.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric', year: 'numeric' })
     }
 
-    // Import (#117): the chosen file's text, a preview report, then the real run.
+    interface ImportFile {
+      name: string
+      text: string
+    }
+
     const importName = state('')
-    const importText = state('')
-    const importPreview = state(null)
+    const importResult = state<{ file: ImportFile, report: ImportReport } | null>(null)
     const importing = state(false)
     const importMessage = state('')
     const importTone = state('neutral')
+    let importSelection = 0
     // At most 20 skipped rows on screen; the count above covers the rest.
-    const importSkipped = derived(() => (importPreview()?.skippedRows || []).slice(0, 20))
+    const importSkipped = derived(() => importResult()?.report.skippedRows.slice(0, 20) ?? [])
 
-    const sendImport = async (dryRun: boolean) => {
+    const sendImport = async ({ name, text }: ImportFile, dryRun: boolean): Promise<ImportReport> => {
       const body = new FormData()
-      const text = importText()
-      if (importName().toLowerCase().endsWith('.json') || text.trim().startsWith('['))
+      if (name.toLowerCase().endsWith('.json') || text.trim().startsWith('['))
         body.set('posts', text)
       else
         body.set('csv', text)
@@ -156,31 +160,39 @@ export const writingClient = { locale: workspaceLocale, messages: workspaceWriti
       return payload.data.report
     }
 
-    const chooseImport = async (event) => {
-      const file = event?.target?.files?.[0]
-      if (!file) return
+    const chooseImport = async (event: Event) => {
+      const input = event.target as HTMLInputElement | null
+      const file = input?.files?.[0]
+      if (!file || importing()) return
+      const selection = ++importSelection
       importName.set(file.name)
-      importPreview.set(null)
+      importResult.set(null)
       importMessage.set(copy.readingFile)
       importTone.set('neutral')
       try {
-        importText.set(await file.text())
-        const report = await sendImport(true)
-        importPreview.set(report)
+        const source = { name: file.name, text: await file.text() }
+        if (selection !== importSelection) return
+        const report = await sendImport(source, true)
+        if (selection !== importSelection) return
+        importResult.set({ file: source, report })
         importMessage.set(words.t('previewReport', report))
       }
       catch (error) {
+        if (selection !== importSelection) return
         importMessage.set(error instanceof Error ? error.message : String(error))
         importTone.set('error')
       }
     }
 
     const runImport = async () => {
-      if (!importPreview() || importing()) return
+      const preview = importResult()
+      if (!preview?.report.dryRun || importing()) return
       importing.set(true)
+      importMessage.set(copy.importing)
+      importTone.set('neutral')
       try {
-        const report = await sendImport(false)
-        importPreview.set({ ...report, done: true })
+        const report = await sendImport(preview.file, false)
+        importResult.set({ file: preview.file, report })
         importMessage.set(words.t('importReport', report))
         await loadPosts()
       }

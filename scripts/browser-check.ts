@@ -4332,15 +4332,52 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
         && ${blogTitle}.getClientRects().length > 0 && ${blogTitle}.value === ''
     `), 5_000)
     await evaluate(cdp, `(() => {
-      const transfer = new DataTransfer()
-      transfer.items.add(new File(['title,body,date\\nOtra entrada,Texto de prueba,\\nFecha inválida,Texto de prueba,martes pasado\\n'], 'entradas.csv', { type: 'text/csv' }))
-      const input = document.querySelector('[aria-labelledby="import-heading"] input[type="file"]')
-      input.files = transfer.files
-      input.dispatchEvent(new Event('change', { bubbles: true }))
+      const fetchImport = window.fetch.bind(window)
+      window.fetch = async (input, options) => {
+        const response = await fetchImport(input, options)
+        const path = new URL(input instanceof Request ? input.url : input, location.href).pathname
+        const body = options?.body
+        if (path !== '/api/postline/import/posts' || !(body instanceof FormData)
+          || !body.has('dry_run') || !String(body.get('csv')).includes('Archivo anterior')) return response
+        const payload = await response.json()
+        response.json = async () => {
+          window.firstBlogPreviewRead = true
+          return payload
+        }
+        return new Promise(resolve => {
+          window.finishFirstBlogPreview = () => resolve(response)
+        })
+      }
+      window.chooseBlogArchive = (name, csv) => {
+        const transfer = new DataTransfer()
+        transfer.items.add(new File([csv], name, { type: 'text/csv' }))
+        const input = document.querySelector('[aria-labelledby="import-heading"] input[type="file"]')
+        input.files = transfer.files
+        input.dispatchEvent(new Event('change', { bubbles: true }))
+      }
+      window.chooseBlogArchive('anterior.csv', 'title,body,date\\nArchivo anterior,Prueba,\\n')
     })()`)
-    await waitUntil('Spanish Blog import preview translates the server report and skipped row', () => evaluate<boolean>(cdp, `
-      document.querySelector('[aria-labelledby="import-heading"] [role="status"]')?.innerText === 'Vista previa: crear 1, actualizar 0, omitir 1.'
-        && document.querySelector('[aria-labelledby="import-heading"] li')?.innerText === 'Fila 2: Postline no reconoce «martes pasado» como fecha'
+    await waitUntil('The first Blog import preview is pending', () => evaluate<boolean>(cdp, 'Boolean(window.finishFirstBlogPreview)'), 5_000)
+    await evaluate(cdp, `window.chooseBlogArchive('entradas.csv', 'title,body,date\\nOtra entrada,Texto de prueba,\\nFecha inválida,Texto de prueba,martes pasado\\n')`)
+    const importPanel = "document.querySelector('[aria-labelledby=import-heading]')"
+    const importStatus = `${importPanel}.querySelector('[role=status]')`
+    const hasCurrentPreview = `
+      ${importStatus}?.innerText === 'Vista previa: crear 1, actualizar 0, omitir 1.'
+        && ${importPanel}.querySelector('li')?.innerText === 'Fila 2: Postline no reconoce «martes pasado» como fecha'
+    `
+    await waitUntil('Spanish Blog import preview translates the server report and skipped row', () => evaluate<boolean>(cdp, hasCurrentPreview), 5_000)
+    await evaluate(cdp, 'window.finishFirstBlogPreview()')
+    await waitUntil('The earlier Blog preview response reaches the page', () => evaluate<boolean>(cdp, 'window.firstBlogPreviewRead === true'), 5_000)
+    if (!await evaluate<boolean>(cdp, hasCurrentPreview))
+      throw new Error('An earlier Blog import preview replaced the selected file’s report.')
+    const importButton = `${importPanel}.querySelector('button')`
+    await evaluate(cdp, `${importButton}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Blog imports only the file whose preview is shown', () => evaluate<boolean>(cdp, `
+      ${importStatus}?.innerText === 'Importación: nuevas 1, actualizadas 0, omitidas 1.'
+        && !${importButton}.getClientRects().length
+        && [...document.querySelectorAll('[data-blog-row] h3')].some(title => title.textContent === 'Otra entrada')
+        && ![...document.querySelectorAll('[data-blog-row] h3')].some(title => title.textContent === 'Archivo anterior')
     `), 5_000)
     await checkSpanishInbox(cdp)
     await checkSpanishListening(cdp)
