@@ -918,6 +918,7 @@
       "deleted": "Deleted."
     },
     "blogErrors": {
+      "eraseFilesFailed": "Could not remove the workspace’s Blog files. Check the Blog folder and try again.",
       "idRequired": "Blog post id is required.",
       "titleRequired": "A blog post needs a title.",
       "bodyRequired": "A blog post needs some text.",

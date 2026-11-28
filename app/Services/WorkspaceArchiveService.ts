@@ -18,11 +18,13 @@ import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { db, sqliteWriteOptions } from '@stacksjs/database'
 import { UserFacingError } from '../Support/Http/user-error'
+import { workspaceBlogErrors } from '../Support/Localization/workspace'
 import { isRealTimestamp } from '../Support/time'
 import type { ArchivedTargetAccount, IdentityLike } from '../Support/Social/accounts'
 import { archivedTargetAccount, matchArchivedTargetAccount } from '../Support/Social/accounts'
 import { xBrowserPostId } from '../Support/Social/x-browser-write'
 import { readBlogAttachments } from '../Support/Social/blog-attachments'
+import { blogFile } from '../Support/Social/blog-files'
 import { checkImageBytes } from '../Support/Social/image-input'
 import { checkVideoBytes } from '../Support/Social/video-input'
 import { MAX_IMAGE_BYTES, MAX_POST_IMAGES, MAX_VIDEO_BYTES } from '../Support/Social/media-rules'
@@ -498,41 +500,49 @@ export class WorkspaceArchiveService {
     if (String(confirmation).trim() !== DELETE_EVERYTHING_PHRASE)
       throw new UserFacingError(`Type ${DELETE_EVERYTHING_PHRASE} to confirm.`)
 
-    const deleted: Record<string, number> = {}
-    const wipe = async (table: string) => {
-      const result = await database.deleteFrom(table).executeTakeFirst()
-      deleted[table] = Number(result?.numDeletedRows ?? result?.changes ?? 0)
-    }
-
-    const blogPosts = await database.selectFrom('blog_posts').select(['id']).execute()
-    for (const post of blogPosts) await blog.remove(Number(post.id)).catch(() => {})
-
-    await database.transaction((tx: typeof database) => {
-      for (const table of ['draft_feed_entries', 'draft_feeds', 'posting_slots', 'recurring_posts']) {
-        const result = tx.deleteFrom(table).executeTakeFirst()
-        deleted[table] = Number(result?.numDeletedRows ?? result?.changes ?? 0)
-      }
-    })
-
-    for (const table of ['campaign_posts', 'launch_campaigns', 'post_targets', 'twitter_browser_dispatches', 'thread_publish_claims', 'social_operation_leases', 'posts', 'post_submissions', 'post_webhook_deliveries', 'keyword_mentions', 'keyword_monitors', 'composer_presets', 'tracked_links', 'inbox_mentions', 'dm_messages', 'dm_conversations', 'timeline_items', 'purge_previews', 'purge_runs', 'alerts', 'social_identities', 'network_apps', 'twitter_read_usage'])
-      await wipe(table)
-
     const accountId = await ensureAccount()
-    await database.updateTable('accounts').set({
-      ai_provider: null,
-      ai_api_key: null,
-      ai_model: null,
-      auto_delete_enabled: false,
-      twitter_browser_handle: null,
-      twitter_browser_needs_check: false,
-      twitter_browser_needs_layout_check: false,
-      twitter_browser_listening_attention: false,
-      twitter_browser_listening_attempted_at: null,
-      twitter_browser_composer_attempted_at: null,
-      twitter_browser_composer_claim: null,
-      twitter_browser_composer_status: null,
-      updated_at: now(),
-    }).where('id', '=', accountId).execute()
+    const deleted = await database.transaction((tx: typeof database) => {
+      const counts: Record<string, number> = {}
+      const posts = tx.selectFrom('blog_posts').select('slug').execute() as Array<{ slug: string }>
+      try {
+        const files = posts.map(post => blogFile(post.slug))
+        for (const file of files) rmSync(file, { force: true })
+      }
+      catch (error) {
+        const failure = new UserFacingError(workspaceBlogErrors.eraseFilesFailed, 'blog_erase_failed')
+        failure.cause = error
+        throw failure
+      }
+
+      for (const table of [
+        'blog_posts', 'draft_feed_entries', 'draft_feeds', 'posting_slots', 'recurring_posts',
+        'campaign_posts', 'launch_campaigns', 'post_targets', 'twitter_browser_dispatches',
+        'thread_publish_claims', 'social_operation_leases', 'posts', 'post_submissions',
+        'post_webhook_deliveries', 'keyword_mentions', 'keyword_monitors', 'composer_presets',
+        'tracked_links', 'inbox_mentions', 'dm_messages', 'dm_conversations', 'timeline_items',
+        'purge_previews', 'purge_runs', 'alerts', 'social_identities', 'network_apps', 'twitter_read_usage',
+      ]) {
+        const result = tx.deleteFrom(table).executeTakeFirst()
+        counts[table] = Number(result?.numDeletedRows ?? result?.changes ?? 0)
+      }
+
+      tx.updateTable('accounts').set({
+        ai_provider: null,
+        ai_api_key: null,
+        ai_model: null,
+        auto_delete_enabled: false,
+        twitter_browser_handle: null,
+        twitter_browser_needs_check: false,
+        twitter_browser_needs_layout_check: false,
+        twitter_browser_listening_attention: false,
+        twitter_browser_listening_attempted_at: null,
+        twitter_browser_composer_attempted_at: null,
+        twitter_browser_composer_claim: null,
+        twitter_browser_composer_status: null,
+        updated_at: now(),
+      }).where('id', '=', accountId).execute()
+      return counts
+    }, sqliteWriteOptions())
     await rm(MEDIA_DIR, { recursive: true, force: true })
     return { deleted }
   }

@@ -918,6 +918,7 @@
       "deleted": "Publicación eliminada."
     },
     "blogErrors": {
+      "eraseFilesFailed": "No se pudieron eliminar los archivos del blog del espacio de trabajo. Revisa la carpeta del blog e inténtalo de nuevo.",
       "idRequired": "Indica el ID de la publicación del blog.",
       "titleRequired": "La publicación del blog necesita un título.",
       "bodyRequired": "La publicación del blog necesita texto.",

@@ -2,7 +2,7 @@
  * An export from one install imports cleanly into another (#209).
  */
 import { describe, expect, test } from 'bun:test'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { db } from '@stacksjs/database'
 import { composerPresets } from '../../app/Services/ComposerPresetService'
@@ -19,6 +19,7 @@ import { DELETE_EVERYTHING_PHRASE, workspaceArchive } from '../../app/Services/W
 import { wallTimeInZone } from '../../app/Support/time'
 import { workspace } from '../../app/Services/WorkspaceService'
 import { MEDIA_DIR, mediaDirectory } from '../../app/Support/Social/uploads'
+import { blogFile } from '../../app/Support/Social/blog-files'
 
 const database = db as any
 const at = '2026-11-20 10:00:00'
@@ -373,5 +374,50 @@ describe('workspace archive', () => {
       posts: [{ uuid, content: JSON.stringify({ media: [{ path: 'nested/image.jpg' }] }) }],
     })).rejects.toThrow('invalid stored attachment reference')
     expect(await database.selectFrom('posts').select(['id']).where('uuid', '=', uuid).executeTakeFirst()).toBeUndefined()
+  })
+
+  test('workspace erasure retries Blog file failures and clears archived articles', async () => {
+    const suffix = crypto.randomUUID()
+    const archived = `archived-${suffix}`
+    const published = `published-${suffix}`
+    const draft = `draft-${suffix}`
+    const manual = blogFile(`manual-${suffix}`)
+    const archivedPath = blogFile(archived)
+    const publishedPath = blogFile(published)
+    const media = join(MEDIA_DIR, `${suffix}.png`)
+    const accountId = await ensureAccount()
+    const queued = await postQueue.save({ text: 'A queued draft to retain until the erase can proceed', providers: ['blog'] })
+    const article = (slug: string, status: 'archived' | 'published' | 'draft') => ({
+      uuid: crypto.randomUUID(), title: slug, slug, body: 'An article from the test workspace',
+      account_id: accountId, status, created_at: at, updated_at: at,
+    })
+
+    try {
+      await database.insertInto('blog_posts').values(article(archived, 'archived')).execute()
+      mkdirSync(archivedPath, { recursive: true })
+      await Bun.write(manual, '# An unrelated Markdown file')
+
+      await expect(workspaceArchive.deleteEverything(DELETE_EVERYTHING_PHRASE)).rejects.toMatchObject({ code: 'blog_erase_failed' })
+      expect(await database.selectFrom('posts').select('id').where('id', '=', queued.postId).executeTakeFirst()).toBeDefined()
+      expect(await database.selectFrom('blog_posts').select('slug').where('slug', '=', archived).executeTakeFirst()).toEqual({ slug: archived })
+
+      rmSync(archivedPath, { recursive: true })
+      await Bun.write(archivedPath, '# Archived article')
+      await Bun.write(publishedPath, '# Published article')
+      await database.insertInto('blog_posts').values([article(published, 'published'), article(draft, 'draft')]).execute()
+      await Bun.write(media, Buffer.from(png, 'base64'))
+
+      const result = await workspaceArchive.deleteEverything(DELETE_EVERYTHING_PHRASE)
+      expect(result.deleted.blog_posts).toBeGreaterThanOrEqual(3)
+      expect(await database.selectFrom('blog_posts').select('slug').execute()).toEqual([])
+      expect(await database.selectFrom('posts').select('id').where('id', '=', queued.postId).executeTakeFirst()).toBeUndefined()
+      expect(existsSync(archivedPath)).toBe(false)
+      expect(existsSync(publishedPath)).toBe(false)
+      expect(existsSync(media)).toBe(false)
+      expect(await Bun.file(manual).text()).toBe('# An unrelated Markdown file')
+    }
+    finally {
+      for (const file of [archivedPath, publishedPath, manual, media]) rmSync(file, { recursive: true, force: true })
+    }
   })
 })
