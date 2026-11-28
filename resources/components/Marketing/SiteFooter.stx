@@ -14,10 +14,10 @@ const year = new Date().getFullYear()
 
     <div class="grid gap-10 lg:gap-12 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))] mx-auto px-5 py-14 sm:px-8 max-w-[1200px]">
       <div class="max-w-[36ch]">
-        <a class="flex gap-2.5 items-center text-ink" href="/" aria-label="Postline home" data-stx-link>
+        <MarketingLink class="flex gap-2.5 items-center text-ink" href="/" aria-label="Postline home">
           <span class="h-7 w-7 brand-mark" aria-hidden="true"></span>
           <span class="font-semibold text-[17px] tracking-tight">Postline</span>
-        </a>
+        </MarketingLink>
         <p class="m-0 mt-4 leading-relaxed text-[14px] text-body">
           Write once, publish to every network. Open source, and it runs with your keys on your machine.
         </p>
@@ -26,14 +26,14 @@ const year = new Date().getFullYear()
       <nav class="grid content-start gap-2.5" aria-label="Features">
         <p class="m-0 pb-1 font-medium text-[13px] text-ink">Features</p>
         @foreach (features as feature)
-          <a class="text-[14px] text-muted hover:text-ink transition-colors" href="/features/{{ feature.slug }}" data-stx-link>{{ feature.nav }}</a>
+          <MarketingLink class="text-[14px] text-muted hover:text-ink transition-colors" href="/features/{{ feature.slug }}">{{ feature.nav }}</MarketingLink>
         @endforeach
       </nav>
 
       <nav class="grid content-start gap-2.5" aria-label="Use cases">
         <p class="m-0 pb-1 font-medium text-[13px] text-ink">Use cases</p>
         @foreach (useCases as useCase)
-          <a class="text-[14px] text-muted hover:text-ink transition-colors" href="/use-cases/{{ useCase.slug }}" data-stx-link>{{ useCase.nav }}</a>
+          <MarketingLink class="text-[14px] text-muted hover:text-ink transition-colors" href="/use-cases/{{ useCase.slug }}">{{ useCase.nav }}</MarketingLink>
         @endforeach
       </nav>
 
@@ -41,12 +41,12 @@ const year = new Date().getFullYear()
         <p class="m-0 pb-1 font-medium text-[13px] text-ink">Project</p>
         <a class="text-[14px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline">Source on GitHub</a>
         <a class="text-[14px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline/releases">Releases</a>
-        <a class="text-[14px] text-muted hover:text-ink transition-colors" href="/changelog" data-stx-link>Changelog</a>
-        <a class="text-[14px] text-muted hover:text-ink transition-colors" href="/roadmap" data-stx-link>Roadmap</a>
+        <MarketingLink class="text-[14px] text-muted hover:text-ink transition-colors" href="/changelog">Changelog</MarketingLink>
+        <MarketingLink class="text-[14px] text-muted hover:text-ink transition-colors" href="/roadmap">Roadmap</MarketingLink>
         <a class="text-[14px] text-muted hover:text-ink transition-colors" href="/docs/" data-no-router>Docs</a>
         <a class="text-[14px] text-muted hover:text-ink transition-colors" href="https://github.com/stacksjs/postline/issues">Report an issue</a>
         <a class="text-[14px] text-muted hover:text-ink transition-colors" href="https://theopentimes.org">The Open Times</a>
-        <a class="text-[14px] text-muted hover:text-ink transition-colors" href="/download" data-stx-link>Download</a>
+        <MarketingLink class="text-[14px] text-muted hover:text-ink transition-colors" href="/download">Download</MarketingLink>
       </nav>
     </div>
 
@@ -54,9 +54,9 @@ const year = new Date().getFullYear()
       <div class="flex flex-wrap gap-x-6 gap-y-2 items-center justify-between mx-auto px-5 py-6 sm:px-8 max-w-[1200px] text-[13px] text-muted">
         <p class="m-0">&copy; {{ year }} Open Web Foundation. Postline is MIT licensed.</p>
         <nav class="flex flex-wrap gap-x-5 gap-y-2" aria-label="Legal">
-          <a class="hover:text-ink transition-colors" href="/privacy" data-stx-link>Privacy</a>
-          <a class="hover:text-ink transition-colors" href="/your-data" data-stx-link>What leaves your machine</a>
-          <a class="hover:text-ink transition-colors" href="/trademarks" data-stx-link>Trademarks</a>
+          <MarketingLink class="hover:text-ink transition-colors" href="/privacy">Privacy</MarketingLink>
+          <MarketingLink class="hover:text-ink transition-colors" href="/your-data">What leaves your machine</MarketingLink>
+          <MarketingLink class="hover:text-ink transition-colors" href="/trademarks">Trademarks</MarketingLink>
         </nav>
         <p class="m-0">Built with <a class="text-body underline underline-offset-4 hover:text-ink" href="https://stacksjs.com">Stacks</a>.</p>
       </div>

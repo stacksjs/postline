@@ -24,6 +24,16 @@ for (const path of paths) {
     return values[0]
   }
 
+  const eagerLinks = new Set<string>()
+  new HTMLRewriter().on('a[data-stx-link]', {
+    element(element) {
+      const href = element.getAttribute('href')
+      if (href && element.getAttribute('data-stx-prefetch') !== 'hover') eagerLinks.add(href)
+    },
+  }).transform(html)
+  if (eagerLinks.size)
+    throw new Error(`${path} must wait for hover or touch before prefetching links: ${[...eagerLinks].join(', ')}`)
+
   const canonical = attribute('link[rel=canonical]', 'href')
   const shareUrl = attribute('meta[property="og:url"]', 'content')
   const card = attribute('meta[property="og:image"]', 'content')
@@ -32,6 +42,13 @@ for (const path of paths) {
     throw new Error(`${path} has inconsistent canonical or share URLs.`)
 
   if (path === '/') {
+    attribute('script[data-stx-router]', 'src')
+    let hasDownloadLink = false
+    new HTMLRewriter().on('main a[href="/download"][data-stx-link]', {
+      element() { hasDownloadLink = true },
+    }).transform(html)
+    if (!hasDownloadLink) throw new Error('The home page must retain its routed Download link.')
+
     for (const view of ['composer', 'queue']) {
       const photo = `picture img[src*="/product/${view}-light"]`
       const alternate = `picture source[srcset*="/product/${view}-dark"]`

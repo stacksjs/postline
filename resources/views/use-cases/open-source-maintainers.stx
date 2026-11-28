@@ -14,15 +14,15 @@ useHead(marketingHead('/use-cases/open-source-maintainers', '/images/og/use-case
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">
     <header class="grid gap-6 pb-14 pt-14 sm:pt-20 max-w-[46rem]">
       <nav class="flex gap-2 items-center text-[13px] text-muted" aria-label="Breadcrumb">
-        <a class="hover:text-ink transition-colors" href="/" data-stx-link>Postline</a>
+        <MarketingLink class="hover:text-ink transition-colors" href="/">Postline</MarketingLink>
         <span aria-hidden="true">/</span>
-        <a class="hover:text-ink transition-colors" href="/use-cases" data-stx-link>Use cases</a>
+        <MarketingLink class="hover:text-ink transition-colors" href="/use-cases">Use cases</MarketingLink>
       </nav>
       <span class="grid place-items-center h-12 w-12 text-ink text-xl bg-panel border border-line rounded-2xl" aria-hidden="true"><span class="i-hugeicons-source-code"></span></span>
       <h1 class="m-0 leading-[1.04] text-4xl text-ink sm:text-6xl">Release notes that travel</h1>
       <p class="m-0 max-w-[60ch] leading-relaxed text-[17px] text-body sm:text-lg">Giving a closed service permission to post as you is a bigger ask than it looks. Postline is MIT licensed and runs on your own machine, so you can read exactly what it does before it gets that permission.</p>
       <div class="flex flex-wrap gap-3 items-center">
-        <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/download" data-stx-link>Get started<span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span></a>
+        <MarketingLink class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/download">Get started<span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span></MarketingLink>
         <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline"><span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>Read the source</a>
       </div>
     </header>
@@ -64,25 +64,25 @@ useHead(marketingHead('/use-cases/open-source-maintainers', '/images/og/use-case
       <h2 class="m-0 text-ink text-xl">More use cases</h2>
       <ul class="grid gap-4 md:grid-cols-3 m-0 mt-6 p-0 list-none">
         <li>
-          <a class="grid content-start gap-3 p-5 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/use-cases/founders" data-stx-link>
+          <MarketingLink class="grid content-start gap-3 p-5 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/use-cases/founders">
             <span class="grid place-items-center h-9 w-9 text-ink bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-rocket-01"></span></span>
             <span class="font-semibold text-[15px] text-ink">Founders</span>
             <span class="leading-relaxed text-[13.5px] text-muted">Post launches, changelogs and build notes to every network without doing it six times.</span>
-          </a>
+          </MarketingLink>
         </li>
         <li>
-          <a class="grid content-start gap-3 p-5 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/use-cases/developer-advocates" data-stx-link>
+          <MarketingLink class="grid content-start gap-3 p-5 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/use-cases/developer-advocates">
             <span class="grid place-items-center h-9 w-9 text-ink bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-user-group"></span></span>
             <span class="font-semibold text-[15px] text-ink">Developer advocates</span>
             <span class="leading-relaxed text-[13.5px] text-muted">Share updates with developer communities on Bluesky, X, and Mastodon.</span>
-          </a>
+          </MarketingLink>
         </li>
         <li>
-          <a class="grid content-start gap-3 p-5 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/use-cases/agencies" data-stx-link>
+          <MarketingLink class="grid content-start gap-3 p-5 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/use-cases/agencies">
             <span class="grid place-items-center h-9 w-9 text-ink bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-building-03"></span></span>
             <span class="font-semibold text-[15px] text-ink">Agencies</span>
             <span class="leading-relaxed text-[13.5px] text-muted">One person posting for several client accounts, without a vendor holding their tokens.</span>
-          </a>
+          </MarketingLink>
         </li>
       </ul>
     </section>

@@ -12,7 +12,7 @@ useHead({ title: post ? `${post.title} · ${blogConfig.title}` : `Post not found
 </script>
 
 @section('content')
-  <a class="inline-block mb-8 text-sm underline underline-offset-4" href="/blog" data-stx-link>{{ blogConfig.title }}</a>
+  <MarketingLink class="inline-block mb-8 text-sm underline underline-offset-4" href="/blog">{{ blogConfig.title }}</MarketingLink>
   @if (post)
     <article>
       <header class="grid gap-3 mb-8">

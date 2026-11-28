@@ -80,10 +80,10 @@ useHead({
       </p>
 
       <div class="flex flex-wrap gap-3 items-center justify-center mt-9">
-        <a class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/download" data-stx-link>
+        <MarketingLink class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/download">
           <span class="h-4 w-4 i-hugeicons-download-04" aria-hidden="true"></span>
           Download for Mac
-        </a>
+        </MarketingLink>
         <a class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">
           <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
           Get the source
@@ -144,7 +144,7 @@ useHead({
     <ul class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 m-0 mt-12 p-0 list-none">
       @foreach (features as feature)
         <li class="reveal">
-          <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors group" href="/features/{{ feature.slug }}" data-stx-link>
+          <MarketingLink class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors group" href="/features/{{ feature.slug }}">
             <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 group-hover:bg-panel border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-{{ feature.icon }}"></span></span>
             <span class="grid gap-2">
               <span class="flex gap-2 items-center font-semibold text-[17px] text-ink tracking-tight">
@@ -153,7 +153,7 @@ useHead({
               </span>
               <span class="leading-relaxed text-[14.5px] text-body">{{ feature.summary }}</span>
             </span>
-          </a>
+          </MarketingLink>
         </li>
       @endforeach
     </ul>
@@ -199,10 +199,10 @@ useHead({
           <li class="flex gap-3 items-start text-[15px] text-white/85"><span class="shrink-0 mt-0.5 h-5 w-5 text-brand i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>MIT licensed, readable end to end</li>
           <li class="flex gap-3 items-start text-[15px] text-white/85"><span class="shrink-0 mt-0.5 h-5 w-5 text-brand i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>Import and export your workspace, including its posting history</li>
         </ul>
-        <a class="inline-flex gap-2 items-center mt-9 font-medium text-[15px] text-white hover:text-white/80 transition-colors" href="/features/own-your-keys" data-stx-link>
+        <MarketingLink class="inline-flex gap-2 items-center mt-9 font-medium text-[15px] text-white hover:text-white/80 transition-colors" href="/features/own-your-keys">
           How your keys are kept
           <span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
-        </a>
+        </MarketingLink>
       </div>
 
       <div class="overflow-hidden bg-white/5 border border-white/10 rounded-2xl">
@@ -231,11 +231,11 @@ useHead({
       <ul class="grid gap-0 m-0 mt-10 p-0 list-none border-line border-t divide-line divide-y">
         @foreach (useCases as useCase)
           <li class="reveal">
-            <a class="grid gap-3 items-center sm:gap-6 sm:grid-cols-[14rem_minmax(0,1fr)_auto] py-6 group" href="/use-cases/{{ useCase.slug }}" data-stx-link>
+            <MarketingLink class="grid gap-3 items-center sm:gap-6 sm:grid-cols-[14rem_minmax(0,1fr)_auto] py-6 group" href="/use-cases/{{ useCase.slug }}">
               <span class="flex gap-3 items-center font-semibold text-[17px] text-ink tracking-tight"><span class="h-5 w-5 text-muted i-hugeicons-{{ useCase.icon }}" aria-hidden="true"></span>{{ useCase.nav }}</span>
               <span class="leading-relaxed text-[15px] text-body">{{ useCase.summary }}</span>
               <span class="hidden sm:block h-5 w-5 text-muted group-hover:text-ink transition-colors i-hugeicons-arrow-right-01" aria-hidden="true"></span>
-            </a>
+            </MarketingLink>
           </li>
         @endforeach
       </ul>
@@ -309,10 +309,10 @@ useHead({
     <h2 id="cta-heading" class="m-0 mx-auto max-w-[18ch] leading-[1.05] text-4xl text-ink sm:text-6xl reveal">Post once. Be everywhere.</h2>
     <p class="m-0 mt-6 mx-auto max-w-[48ch] leading-relaxed text-[17px] text-body reveal">Connect Bluesky or Mastodon and send your first post in a few minutes.</p>
     <div class="flex flex-wrap gap-3 items-center justify-center mt-9 reveal">
-      <a class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/download" data-stx-link>
+      <MarketingLink class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/download">
         Get started
         <span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
-      </a>
+      </MarketingLink>
       <a class="inline-flex gap-2 items-center px-6 h-12 font-medium text-[15px] text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline">
         <span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>
         Star on GitHub

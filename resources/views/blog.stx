@@ -22,7 +22,7 @@ useHead({ title: blogConfig.title, meta: [{ name: 'description', content: blogCo
       @foreach (posts as post)
         <li class="grid gap-2 py-6 border-b border-line">
           <time class="text-muted text-sm" datetime="{{ post.date }}">{{ post.dateLabel }}</time>
-          <h2 class="m-0 text-xl"><a class="underline underline-offset-4" href="{{ post.url }}" data-stx-link>{{ post.title }}</a></h2>
+          <h2 class="m-0 text-xl"><MarketingLink class="underline underline-offset-4" href="{{ post.url }}">{{ post.title }}</MarketingLink></h2>
           @if (post.excerpt)
             <p class="m-0 text-body">{{ post.excerpt }}</p>
           @endif

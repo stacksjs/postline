@@ -20,85 +20,85 @@ useHead(marketingHead('/features', '/images/og/feature-index.png'))
 
     <ul class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 m-0 p-0 pb-20 list-none">
       <li>
-        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/crossposting" data-stx-link>
+        <MarketingLink class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/crossposting">
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-share-08"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">Crossposting</span>
             <span class="leading-relaxed text-[14.5px] text-body">Write once and publish to Bluesky, X, LinkedIn, Instagram, Threads and Mastodon in a single action.</span>
           </span>
-        </a>
+        </MarketingLink>
       </li>
       <li>
-        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/scheduling" data-stx-link>
+        <MarketingLink class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/scheduling">
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-calendar-03"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">Scheduling</span>
             <span class="leading-relaxed text-[14.5px] text-body">Schedule posts in your time zone, or publish them right away.</span>
           </span>
-        </a>
+        </MarketingLink>
       </li>
       <li>
-        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/per-network-variants" data-stx-link>
+        <MarketingLink class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/per-network-variants">
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-text-align-left"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">Per-network variants</span>
             <span class="leading-relaxed text-[14.5px] text-body">Override the text for any single network without maintaining six separate drafts of the same post.</span>
           </span>
-        </a>
+        </MarketingLink>
       </li>
       <li>
-        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/campaigns" data-stx-link>
+        <MarketingLink class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/campaigns">
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-flowchart-01"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">Campaigns</span>
             <span class="leading-relaxed text-[14.5px] text-body">Lay a whole launch out across weeks on a calendar, then move the finished plan into the queue in one step.</span>
           </span>
-        </a>
+        </MarketingLink>
       </li>
       <li>
-        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/inbox" data-stx-link>
+        <MarketingLink class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/inbox">
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-message-01"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">Inbox</span>
             <span class="leading-relaxed text-[14.5px] text-body">Read and reply to direct messages from Bluesky, Mastodon and the opt-in X API.</span>
           </span>
-        </a>
+        </MarketingLink>
       </li>
       <li>
-        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/listening" data-stx-link>
+        <MarketingLink class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/listening">
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-radar-02"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">Listening</span>
             <span class="leading-relaxed text-[14.5px] text-body">Watch brand, product and competitor keywords across Bluesky, X and Mastodon, and read the mentions in one place.</span>
           </span>
-        </a>
+        </MarketingLink>
       </li>
       <li>
-        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/analytics" data-stx-link>
+        <MarketingLink class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/analytics">
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-chart-line-data-01"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">Analytics</span>
             <span class="leading-relaxed text-[14.5px] text-body">Publishing activity across networks, plus engagement on Bluesky and Mastodon posts.</span>
           </span>
-        </a>
+        </MarketingLink>
       </li>
       <li>
-        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/cleanup" data-stx-link>
+        <MarketingLink class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/cleanup">
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-delete-02"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">Cleanup</span>
             <span class="leading-relaxed text-[14.5px] text-body">Delete old posts automatically after a set number of days, or clear a whole account in one run, with a preview first.</span>
           </span>
-        </a>
+        </MarketingLink>
       </li>
       <li>
-        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/own-your-keys" data-stx-link>
+        <MarketingLink class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="/features/own-your-keys">
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-key-01"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">Own your keys</span>
             <span class="leading-relaxed text-[14.5px] text-body">Your posts, your history and your access tokens live in a database you run. There is no vendor in the middle.</span>
           </span>
-        </a>
+        </MarketingLink>
       </li>
     </ul>
   </div>

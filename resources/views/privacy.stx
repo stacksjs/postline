@@ -28,7 +28,7 @@ const contact = String(process.env.PRIVACY_CONTACT_EMAIL || '').trim()
 
     <section class="grid gap-3">
       <h2 class="m-0 text-2xl text-ink">The Postline app</h2>
-      <p class="m-0 leading-relaxed text-[16px] text-body">The app runs on your own computer or server. Your posts, accounts, keys and history are stored there, in its database, and we never receive them. What the app sends, and to whom, is listed on <a class="text-ink underline underline-offset-4" href="/your-data" data-stx-link>What leaves your machine</a>.</p>
+      <p class="m-0 leading-relaxed text-[16px] text-body">The app runs on your own computer or server. Your posts, accounts, keys and history are stored there, in its database, and we never receive them. What the app sends, and to whom, is listed on <MarketingLink class="text-ink underline underline-offset-4" href="/your-data">What leaves your machine</MarketingLink>.</p>
     </section>
 
     <section class="grid gap-3">

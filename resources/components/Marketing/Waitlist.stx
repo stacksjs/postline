@@ -17,6 +17,6 @@
     <input id="waitlist-email" class="px-4 h-11 text-[15px] text-ink placeholder:text-muted bg-panel border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus-ring" type="email" name="email" autocomplete="email" inputmode="email" placeholder="you@company.com" required>
     <button class="inline-flex items-center justify-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl disabled:opacity-50 hover:opacity-90 transition-opacity" type="submit">Notify me</button>
     <p class="sm:col-span-2 m-0 min-h-5 data-[error]:text-danger text-[13px] text-muted" role="status"></p>
-    <p class="sm:col-span-2 m-0 text-[12px] text-muted">One email when it opens, nothing else. <a class="underline underline-offset-4 hover:text-ink" href="/privacy" data-stx-link>Privacy</a></p>
+    <p class="sm:col-span-2 m-0 text-[12px] text-muted">One email when it opens, nothing else. <MarketingLink class="underline underline-offset-4 hover:text-ink" href="/privacy">Privacy</MarketingLink></p>
   </form>
 </template>

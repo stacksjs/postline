@@ -10,10 +10,10 @@ const useCases = USE_CASES
 <template>
   <header class="sticky top-0 z-40 bg-bg/80 border-b border-line backdrop-blur-md">
     <div class="flex gap-6 items-center justify-between mx-auto px-5 sm:px-8 h-16 max-w-[1200px]">
-      <a class="flex gap-2.5 items-center text-ink" href="/" aria-label="Postline home" data-stx-link>
+      <MarketingLink class="flex gap-2.5 items-center text-ink" href="/" aria-label="Postline home">
         <span class="h-7 w-7 brand-mark" aria-hidden="true"></span>
         <span class="font-semibold text-[17px] tracking-tight">Postline</span>
-      </a>
+      </MarketingLink>
 
       <nav class="hidden md:flex gap-1 items-center" aria-label="Primary">
         {{-- Disclosure menus built on <details>: they open with a click or the
@@ -26,13 +26,13 @@ const useCases = USE_CASES
           </summary>
           <div class="grid absolute left-0 top-11 gap-1 lg:grid-cols-2 p-2 w-[22rem] lg:w-[36rem] bg-panel border border-line rounded-2xl shadow-xl">
             @foreach (features as feature)
-              <a class="flex gap-3 items-start p-3 hover:bg-panel-2 rounded-xl transition-colors" href="/features/{{ feature.slug }}" data-stx-link>
+              <MarketingLink class="flex gap-3 items-start p-3 hover:bg-panel-2 rounded-xl transition-colors" href="/features/{{ feature.slug }}">
                 <span class="grid place-items-center shrink-0 mt-0.5 h-8 w-8 text-ink bg-panel-2 border border-line rounded-lg" aria-hidden="true"><span class="i-hugeicons-{{ feature.icon }}"></span></span>
                 <span class="grid gap-0.5">
                   <span class="font-medium text-[14px] text-ink">{{ feature.nav }}</span>
                   <span class="leading-snug text-[12.5px] text-muted">{{ feature.title }}</span>
                 </span>
-              </a>
+              </MarketingLink>
             @endforeach
           </div>
         </details>
@@ -44,13 +44,13 @@ const useCases = USE_CASES
           </summary>
           <div class="grid absolute left-0 top-11 gap-1 p-2 w-[22rem] bg-panel border border-line rounded-2xl shadow-xl">
             @foreach (useCases as useCase)
-              <a class="flex gap-3 items-start p-3 hover:bg-panel-2 rounded-xl transition-colors" href="/use-cases/{{ useCase.slug }}" data-stx-link>
+              <MarketingLink class="flex gap-3 items-start p-3 hover:bg-panel-2 rounded-xl transition-colors" href="/use-cases/{{ useCase.slug }}">
                 <span class="grid place-items-center shrink-0 mt-0.5 h-8 w-8 text-ink bg-panel-2 border border-line rounded-lg" aria-hidden="true"><span class="i-hugeicons-{{ useCase.icon }}"></span></span>
                 <span class="grid gap-0.5">
                   <span class="font-medium text-[14px] text-ink">{{ useCase.nav }}</span>
                   <span class="leading-snug text-[12.5px] text-muted">{{ useCase.title }}</span>
                 </span>
-              </a>
+              </MarketingLink>
             @endforeach
           </div>
         </details>
@@ -64,15 +64,15 @@ const useCases = USE_CASES
       </nav>
 
       <div class="flex gap-2 items-center">
-        <a class="inline-flex items-center px-4 h-9 font-medium text-[14px] text-on-accent whitespace-nowrap bg-accent rounded-lg hover:opacity-90 transition-opacity" href="/download" data-stx-link>Get started</a>
+        <MarketingLink class="inline-flex items-center px-4 h-9 font-medium text-[14px] text-on-accent whitespace-nowrap bg-accent rounded-lg hover:opacity-90 transition-opacity" href="/download">Get started</MarketingLink>
       </div>
     </div>
 
     {{-- Below md the two menus become one row of plain links: a phone has no
         hover and no room for a panel. --}}
     <nav class="flex md:hidden overflow-x-auto gap-1 pb-2.5 px-4" aria-label="Sections">
-      <a class="shrink-0 px-3 py-1.5 text-[13px] text-body bg-panel border border-line rounded-full" href="/features" data-stx-link>Features</a>
-      <a class="shrink-0 px-3 py-1.5 text-[13px] text-body bg-panel border border-line rounded-full" href="/use-cases" data-stx-link>Use cases</a>
+      <MarketingLink class="shrink-0 px-3 py-1.5 text-[13px] text-body bg-panel border border-line rounded-full" href="/features">Features</MarketingLink>
+      <MarketingLink class="shrink-0 px-3 py-1.5 text-[13px] text-body bg-panel border border-line rounded-full" href="/use-cases">Use cases</MarketingLink>
       <a class="shrink-0 px-3 py-1.5 text-[13px] text-body bg-panel border border-line rounded-full" href="/#pricing">Pricing</a>
       <a class="shrink-0 px-3 py-1.5 text-[13px] text-body bg-panel border border-line rounded-full" href="/docs/" data-no-router>Docs</a>
       <a class="shrink-0 px-3 py-1.5 text-[13px] text-body bg-panel border border-line rounded-full" href="https://github.com/stacksjs/postline">GitHub</a>

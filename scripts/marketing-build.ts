@@ -47,15 +47,15 @@ useHead(marketingHead('${base}/${entry.slug}', '/images/og/${kind}-${entry.slug}
   <article class="mx-auto px-5 sm:px-8 max-w-[1200px]">
     <header class="grid gap-6 pb-14 pt-14 sm:pt-20 max-w-[46rem]">
       <nav class="flex gap-2 items-center text-[13px] text-muted" aria-label="Breadcrumb">
-        <a class="hover:text-ink transition-colors" href="/" data-stx-link>Postline</a>
+        <MarketingLink class="hover:text-ink transition-colors" href="/">Postline</MarketingLink>
         <span aria-hidden="true">/</span>
-        <a class="hover:text-ink transition-colors" href="${base}" data-stx-link>${label}</a>
+        <MarketingLink class="hover:text-ink transition-colors" href="${base}">${label}</MarketingLink>
       </nav>
       <span class="grid place-items-center h-12 w-12 text-ink text-xl bg-panel border border-line rounded-2xl" aria-hidden="true"><span class="i-hugeicons-${entry.icon}"></span></span>
       <h1 class="m-0 leading-[1.04] text-4xl text-ink sm:text-6xl">${h(entry.title)}</h1>
       <p class="m-0 max-w-[60ch] leading-relaxed text-[17px] text-body sm:text-lg">${h(entry.intro)}</p>
       <div class="flex flex-wrap gap-3 items-center">
-        <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/download" data-stx-link>Get started<span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span></a>
+        <MarketingLink class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/download">Get started<span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span></MarketingLink>
         <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl transition-colors" href="${REPO}"><span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>Read the source</a>
       </div>
     </header>
@@ -85,11 +85,11 @@ ${entry.points.map(p => `            <li class="flex gap-3 items-start">
       <h2 class="m-0 text-ink text-xl">More ${label.toLowerCase()}</h2>
       <ul class="grid gap-4 md:grid-cols-3 m-0 mt-6 p-0 list-none">
 ${others.map(o => `        <li>
-          <a class="grid content-start gap-3 p-5 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="${base}/${o.slug}" data-stx-link>
+          <MarketingLink class="grid content-start gap-3 p-5 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="${base}/${o.slug}">
             <span class="grid place-items-center h-9 w-9 text-ink bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-${o.icon}"></span></span>
             <span class="font-semibold text-[15px] text-ink">${h(o.nav)}</span>
             <span class="leading-relaxed text-[13.5px] text-muted">${h(o.summary)}</span>
-          </a>
+          </MarketingLink>
         </li>`).join('\n')}
       </ul>
     </section>
@@ -127,13 +127,13 @@ useHead(marketingHead('${base}', '/images/og/${kind}-index.png'))
 
     <ul class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 m-0 p-0 pb-20 list-none">
 ${entries.map(e => `      <li>
-        <a class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="${base}/${e.slug}" data-stx-link>
+        <MarketingLink class="grid content-start gap-4 p-6 h-full bg-panel hover:bg-panel-2 border border-line rounded-2xl transition-colors" href="${base}/${e.slug}">
           <span class="grid place-items-center h-10 w-10 text-ink text-lg bg-panel-2 border border-line rounded-xl" aria-hidden="true"><span class="i-hugeicons-${e.icon}"></span></span>
           <span class="grid gap-2">
             <span class="font-semibold text-[17px] text-ink">${h(e.nav)}</span>
             <span class="leading-relaxed text-[14.5px] text-body">${h(e.summary)}</span>
           </span>
-        </a>
+        </MarketingLink>
       </li>`).join('\n')}
     </ul>
   </div>

@@ -1,0 +1,5 @@
+<script server cache>
+export const linkClass = $props.class || ''
+</script>
+
+<a class="{{ linkClass }}" data-stx-link data-stx-prefetch="hover"><slot /></a>
