@@ -13,6 +13,13 @@ interface TargetInfo {
   url: string
 }
 
+interface PopupState {
+  page: string | null
+  canSubmit: boolean
+  iconWidth: number | null
+  hasStylesheet: boolean
+}
+
 const chromePath = findChrome()
 if (!chromePath) throw new Error('Install Chrome for Testing before checking the browser extension.')
 const extension = resolve(import.meta.dir, '../dist-extension/chrome')
@@ -21,12 +28,13 @@ if (!await Bun.file(join(extension, 'manifest.json')).exists())
 
 const profile = mkdtempSync(join(tmpdir(), 'postline-extension-chrome-'))
 const requests: string[] = []
+const fixtureText = 'Postline browser share fixture'
 const site = Bun.serve({
   hostname: '127.0.0.1',
   port: 0,
   fetch(request) {
     requests.push(request.url)
-    return new Response('Postline browser share fixture')
+    return new Response(fixtureText)
   },
 })
 const source = new URL('/article?q=red+blue#section', site.url).href
@@ -36,6 +44,7 @@ const chrome = spawnOwnedProcess([
   `--user-data-dir=${profile}`, source,
 ], { stdout: 'ignore', stderr: 'ignore' })
 let browser: Cdp | undefined
+let article: Cdp | undefined
 let popup: Cdp | undefined
 try {
   const port = await waitFor(async () => {
@@ -47,18 +56,37 @@ try {
   const targets = async () => (await chromeClient.send<{ targetInfos: TargetInfo[] }>('Target.getTargets', {
     filter: [{ type: 'tab' }, { type: 'other' }, { type: 'page' }],
   })).targetInfos
-  const tab = await waitFor(async () => (await targets()).find(target => target.type === 'tab' && target.url === source))
   const { id } = await browser.send<{ id: string }>('Extensions.loadUnpacked', { path: extension })
+  const page = await waitFor(async () => (await targets()).find(target => target.type === 'page' && target.url === source))
+  const articleClient = article = await connect(`ws://127.0.0.1:${port}/devtools/page/${page.targetId}`)
+  await articleClient.send('Page.bringToFront')
+  // activeTab grants access to the committed page when Chrome opens the toolbar action.
+  await waitFor(() => articleClient.evaluate<boolean>(`
+    document.readyState === 'complete'
+      && document.visibilityState === 'visible'
+      && location.href === ${JSON.stringify(source)}
+      && document.body?.textContent === ${JSON.stringify(fixtureText)}`), undefined, { label: 'the active fixture article' })
+  const tab = await waitFor(async () => (await targets()).find(target => target.type === 'tab' && target.url === source))
   await browser.send('Extensions.triggerAction', { id, targetId: tab.targetId })
 
   const popupUrl = `chrome-extension://${id}/popup.html`
   const target = await waitFor(async () => (await targets()).find(target => target.url === popupUrl))
   const popupClient = popup = await connect(`ws://127.0.0.1:${port}/devtools/page/${target.targetId}`)
-  await waitFor(() => popupClient.evaluate<boolean>(`
-    document.querySelector('#shared-page')?.textContent === ${JSON.stringify(source)}
-      && !document.querySelector('button[type=submit]').disabled
-      && document.querySelector('img').naturalWidth === 32
-      && Boolean(document.querySelector('link[rel=stylesheet]').sheet)`), 6000, { label: 'the rendered extension popup' })
+  let popupState: PopupState | undefined
+  try {
+    await waitFor(async () => {
+      popupState = await popupClient.evaluate<PopupState>(`({
+        page: document.querySelector('#shared-page')?.textContent ?? null,
+        canSubmit: document.querySelector('button[type=submit]')?.disabled === false,
+        iconWidth: document.querySelector('img')?.naturalWidth ?? null,
+        hasStylesheet: Boolean(document.querySelector('link[rel=stylesheet]')?.sheet),
+      })`)
+      return popupState.page === source && popupState.canSubmit && popupState.iconWidth === 32 && popupState.hasStylesheet
+    }, 6000, { label: 'the rendered extension popup' })
+  }
+  catch (error) {
+    throw new Error(`The toolbar popup did not render the expected share controls. Last state: ${JSON.stringify(popupState)}`, { cause: error })
+  }
   await popup.evaluate(`document.querySelector('[name=workspace]').value = ${JSON.stringify(site.url.origin)}`)
   await popup.evaluate("document.querySelector('form').requestSubmit()")
   const opened = await waitFor(async () => (await targets()).find(target => target.url.startsWith(site.url.origin + '/composer#')))
@@ -69,6 +97,7 @@ try {
 }
 finally {
   popup?.disconnect()
+  article?.disconnect()
   browser?.disconnect()
   await chrome.stop()
   site.stop(true)
