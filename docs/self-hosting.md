@@ -35,7 +35,9 @@ Follow the [README setup commands](https://github.com/stacksjs/postline#getting-
 to install dependencies, generate an application key, and apply migrations.
 In `.env`, set `APP_ENV=production`, `DEBUG=false`, and `APP_URL` to the HTTPS
 address where people will open Postline. Set `PORT_API=3008` so the web server
-can find the API. Use the same `.env` and workspace database for each process.
+can find the API. Production startup checks that the application key is usable.
+Use the same `.env` and workspace database for each process. Restore the original
+key when moving an existing workspace.
 
 Start each command in its own service so it can restart after a reboot.
 

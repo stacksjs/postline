@@ -47,6 +47,15 @@ jobs:
 
           docker volume create "$volume"
 
+          if invalid_key_output=$(docker run --rm --env APP_KEY=too-short \
+            --volume "$volume:/var/lib/postline" postline:container-check 2>&1); then
+            printf 'The container started with an invalid application key.\n' >&2
+            exit 1
+          fi
+          [[ "$invalid_key_output" == *"APP_KEY is invalid."* ]]
+          docker run --rm --entrypoint /bin/sh --volume "$volume:/var/lib/postline" \
+            postline:container-check -ec 'test ! -e /var/lib/postline/app-key'
+
           start() {
             docker run --detach --name "$name" --publish 127.0.0.1::3000 \
               --volume "$volume:/var/lib/postline" postline:container-check >/dev/null

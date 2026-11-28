@@ -12,6 +12,7 @@
  * address) and nothing else. Anything a stranger could reach has to say it is
  * production.
  */
+import { workspaceKeyBytes } from '../Security/workspace-key'
 
 export function isProductionMode(mode: string | undefined): boolean {
   const value = String(mode || '').trim().toLowerCase()
@@ -44,12 +45,17 @@ export interface DeploymentEnv {
   APP_ENV?: string
   NODE_ENV?: string
   APP_URL?: string
+  APP_KEY?: string
 }
 
 /** The reason this configuration must not serve requests, or null when it may. */
 export function deploymentProblem(env: DeploymentEnv): string | null {
   const mode = env.APP_ENV ?? env.NODE_ENV
-  if (isProductionMode(mode) || isLocalOnlyAddress(env.APP_URL))
+  if (isProductionMode(mode)) {
+    return workspaceKeyBytes(env.APP_KEY) ? null
+      : 'Production needs a valid APP_KEY. Run `./buddy key:generate` for a new workspace or restore the original key from your backup.'
+  }
+  if (isLocalOnlyAddress(env.APP_URL))
     return null
 
   return `APP_URL is "${env.APP_URL}", which other machines can reach, but APP_ENV is "${mode || 'unset'}". `

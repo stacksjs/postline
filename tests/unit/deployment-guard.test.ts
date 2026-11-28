@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test'
+import { randomBytes } from 'node:crypto'
 import { assertSafeDeployment, deploymentProblem, isLocalOnlyAddress } from '../../app/Support/Http/deployment-guard'
+
+const generatedKey = `base64:${randomBytes(32).toString('base64')}`
 
 describe('isLocalOnlyAddress', () => {
   test.each(['', 'localhost', 'localhost:3000', 'postline.localhost', 'https://postline.localhost', 'app.test', '127.0.0.1', 'http://127.0.0.1:4999', 'http://[::1]:3000'])('%s is local', (url) => {
@@ -17,7 +20,16 @@ describe('deploymentProblem', () => {
   })
 
   test('production on a public address is fine', () => {
-    expect(deploymentProblem({ APP_ENV: 'production', APP_URL: 'https://postline.example.com' })).toBeNull()
+    expect(deploymentProblem({ APP_ENV: 'production', APP_URL: 'https://postline.example.com', APP_KEY: generatedKey })).toBeNull()
+  })
+
+  test('accepts an existing full-length plain passphrase', () => {
+    expect(deploymentProblem({ APP_ENV: 'production', APP_KEY: randomBytes(32).toString('hex') })).toBeNull()
+  })
+
+  test.each([undefined, '', 'base64:1234567890', ` encrypted:${generatedKey}`, `${generatedKey}!`])('production rejects an unusable key', (key) => {
+    expect(deploymentProblem({ APP_ENV: 'production', APP_URL: 'https://postline.example.com', APP_KEY: key }))
+      .toContain('Production needs a valid APP_KEY')
   })
 
   test.each(['development', 'local', 'staging', '', undefined])('APP_ENV=%s on a public address is refused', (mode) => {
@@ -25,7 +37,7 @@ describe('deploymentProblem', () => {
   })
 
   test('falls back to NODE_ENV when APP_ENV is unset', () => {
-    expect(deploymentProblem({ NODE_ENV: 'production', APP_URL: 'https://postline.example.com' })).toBeNull()
+    expect(deploymentProblem({ NODE_ENV: 'production', APP_URL: 'https://postline.example.com', APP_KEY: generatedKey })).toBeNull()
   })
 
   test('the shipped example is accepted as it is', async () => {
@@ -41,7 +53,11 @@ describe('assertSafeDeployment', () => {
     expect(() => assertSafeDeployment({ APP_ENV: 'development', APP_URL: 'https://postline.example.com' })).toThrow(/will not start/)
   })
 
-  test('does nothing for the desktop agent, which runs in production on loopback', () => {
-    expect(() => assertSafeDeployment({ APP_ENV: 'production', APP_URL: 'http://127.0.0.1:4999' })).not.toThrow()
+  test('starts the desktop agent in production with its generated key', () => {
+    expect(() => assertSafeDeployment({ APP_ENV: 'production', APP_URL: 'http://127.0.0.1:4999', APP_KEY: generatedKey })).not.toThrow()
+  })
+
+  test('also checks the production key behind a loopback proxy', () => {
+    expect(() => assertSafeDeployment({ APP_ENV: 'production', APP_URL: 'http://127.0.0.1:4999' })).toThrow(/valid APP_KEY/)
   })
 })

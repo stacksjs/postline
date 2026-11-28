@@ -4,6 +4,7 @@ import { isAbsolute, join, resolve } from 'node:path'
 import process from 'node:process'
 import { isIP } from 'node:net'
 import { isPrivateAddress } from '../Http/safe-fetch'
+import { workspaceKeyBytes } from '../Security/workspace-key'
 import { env } from '@stacksjs/env'
 
 /**
@@ -125,8 +126,8 @@ export async function storedVideoResponse(file: string, range: string | null): P
 
 
 function mediaFetchSignature(filename: string, expires: number, appKey: string | undefined): Buffer | null {
-  const key = appKey?.startsWith('base64:') ? Buffer.from(appKey.slice(7), 'base64') : Buffer.from(appKey ?? '')
-  if (key.byteLength < 32) return null
+  const key = workspaceKeyBytes(appKey)
+  if (!key) return null
   return createHmac('sha256', key).update(`postline:provider-media:v1\n${filename}\n${expires}`).digest()
 }
 

@@ -3,6 +3,7 @@ import { link, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { spawnOwnedProcess } from '@stacksjs/cli/owned-process'
+import { workspaceKeyBytes } from '../app/Support/Security/workspace-key'
 
 const data = '/var/lib/postline'
 const keyPath = join(data, 'app-key')
@@ -10,6 +11,7 @@ const buddy = 'node_modules/@stacksjs/buddy/dist/cli.js'
 
 async function workspaceKey(initialize = true): Promise<string> {
   const configured = process.env.APP_KEY?.trim()
+  if (configured && !workspaceKeyBytes(configured)) throw new Error('APP_KEY is invalid. Supply the original workspace key or let a new volume generate one.')
   const read = () => readFile(keyPath, 'utf8').then(key => key.trim()).catch((error: NodeJS.ErrnoException) => {
     if (error.code !== 'ENOENT') throw error
     return undefined
@@ -31,7 +33,7 @@ async function workspaceKey(initialize = true): Promise<string> {
     }
   }
 
-  if (!saved || saved.startsWith('encrypted:')) throw new Error('The volume needs a valid application key.')
+  if (!saved || !workspaceKeyBytes(saved)) throw new Error('The volume needs a valid application key. Restore the original key from your backup.')
   if (configured && configured !== saved) throw new Error('APP_KEY differs from the existing workspace key in the volume.')
   return saved
 }
