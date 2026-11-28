@@ -1,3 +1,6 @@
+import { createI18n } from '@stacksjs/i18n/client'
+import en from '../../../locales/desktop-alerts/en.json'
+import es from '../../../locales/desktop-alerts/es.json'
 import { requestJson } from '../../functions/postline-client'
 import { xBrowserWindow } from '../../functions/x-browser-session'
 import { checkXComposer } from './x-composer-health'
@@ -53,10 +56,10 @@ interface DesktopStatus {
 const SEEN_KEY = 'postline:alerts:last-seen'
 const POLL_MS = 60_000
 
-function whenText(iso: string): string {
+function whenText(iso: string, locale: string): string {
   const at = new Date(iso)
   const sameDay = at.toDateString() === new Date().toDateString()
-  return at.toLocaleString(undefined, sameDay ? { hour: 'numeric', minute: '2-digit' } : { weekday: 'short', hour: 'numeric', minute: '2-digit' })
+  return at.toLocaleString(locale === 'en' ? undefined : locale, sameDay ? { hour: 'numeric', minute: '2-digit' } : { weekday: 'short', hour: 'numeric', minute: '2-digit' })
 }
 
 function lastSeen(): number | null {
@@ -77,10 +80,11 @@ function remember(id: number): void {
 }
 
 /** Bind notification delivery, the dock badge and menu-bar controls to a Craft workspace. */
-export function bindDesktopAlerts(host: DesktopAlertsBridge): () => void {
+export function bindDesktopAlerts(host: DesktopAlertsBridge, locale: string): () => void {
   const { app, notifications, timers, tray, autoLaunch } = host
   if (!app) return () => {}
 
+  const words = createI18n({ locale, fallbackLocale: 'en', messages: { en, es: es satisfies typeof en } })
   const controller = new AbortController()
   const { signal } = controller
   const xBrowser = xBrowserWindow(host)
@@ -130,16 +134,16 @@ export function bindDesktopAlerts(host: DesktopAlertsBridge): () => void {
     const { paused, nextPostAt, unread } = status
     await tray.setIcon?.(paused ? 'pause.circle' : 'paperplane').catch(() => {})
     await tray.setTitle?.('').catch(() => {})
-    await tray.setTooltip?.(paused ? 'Postline: publishing paused' : unread ? `Postline: ${unread} need${unread === 1 ? 's' : ''} attention` : 'Postline').catch(() => {})
+    await tray.setTooltip?.(paused ? words.t('pausedTooltip') : unread ? words.tc('unreadTooltip', unread) : 'Postline').catch(() => {})
     await tray.setMenu?.([
-      { label: 'Open Postline', action: 'show' },
+      { label: words.t('open'), action: 'show' },
       { type: 'separator' },
-      { label: paused ? 'Publishing is paused' : nextPostAt ? `Next post: ${whenText(nextPostAt)}` : 'Nothing scheduled', enabled: false },
-      ...(unread ? [{ label: `${unread} alert${unread === 1 ? '' : 's'} need${unread === 1 ? 's' : ''} attention`, enabled: false }] : []),
-      { label: paused ? 'Resume Publishing' : 'Pause Publishing', action: 'toggle-publishing' },
-      ...(autoLaunch ? [{ label: 'Open at Login', action: 'toggle-login', type: 'checkbox' as const, checked: openAtLogin }] : []),
+      { label: paused ? words.t('paused') : nextPostAt ? words.t('upcoming', { time: whenText(nextPostAt, locale) }) : words.t('empty'), enabled: false },
+      ...(unread ? [{ label: words.tc('unread', unread), enabled: false }] : []),
+      { label: words.t(paused ? 'resume' : 'pause'), action: 'toggle-publishing' },
+      ...(autoLaunch ? [{ label: words.t('login'), action: 'toggle-login', type: 'checkbox' as const, checked: openAtLogin }] : []),
       { type: 'separator' },
-      { label: 'Quit Postline', action: 'quit' },
+      { label: words.t('quit'), action: 'quit' },
     ]).catch(() => {})
   }
 

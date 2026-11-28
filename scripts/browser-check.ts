@@ -3821,6 +3821,56 @@ async function checkSpanishComposerEditing(cdp: Cdp): Promise<void> {
   })()`), 5_000)
 }
 
+async function checkSpanishShell(cdp: Cdp): Promise<void> {
+  await auditPage(`${site}/queue`, { cdp })
+  await evaluate(cdp, "window.dispatchEvent(new Event('offline')); window.dispatchEvent(new Event('offline'))")
+  const offline = "document.querySelector('[data-stx-toast-key=postline-offline]')"
+  await waitUntil('The workspace announces one Spanish offline notice', () => evaluate<boolean>(cdp, `
+    document.documentElement.lang === 'es'
+      && ${offline}?.getAttribute('role') === 'status'
+      && document.querySelectorAll('[data-stx-toast-key=postline-offline]').length === 1
+      && ${offline}.textContent.includes('Sin conexión')
+      && ${offline}.textContent.includes('Las publicaciones programadas se enviarán a tiempo.')
+  `), 5_000)
+  await evaluate(cdp, "window.dispatchEvent(new Event('online'))")
+  await waitUntil('The Spanish reconnect notice replaces the offline notice', () => evaluate<boolean>(cdp, `
+    !${offline}
+      && document.querySelector('[data-stx-toast-key=postline-online]')?.textContent.includes('Conexión restablecida')
+  `), 5_000)
+
+  await evaluate(cdp, `(() => {
+    const calls = window.spanishShellCalls = { settings: null, menu: [], tooltip: '' }
+    const fetchOriginal = window.fetch.bind(window)
+    window.fetch = (input, init) => {
+      const path = new URL(input instanceof Request ? input.url : input, location.href).pathname
+      if (path === '/api/postline/desktop/status')
+        return Promise.resolve(Response.json({ ok: true, data: { paused: false, nextPostAt: '2026-12-18T11:30:00', unread: 2 } }))
+      return fetchOriginal(input, init)
+    }
+    window.craft = {
+      window: { open: async options => { calls.settings = options } },
+      app: {},
+      tray: {
+        setTooltip: async value => { calls.tooltip = value },
+        setMenu: async items => { calls.menu = items },
+      },
+    }
+    window.dispatchEvent(new Event('craft:ready'))
+  })()`)
+  await waitUntil('The Mac status menu has Spanish actions, next-post time and unread count', () => evaluate<boolean>(cdp, `
+    window.spanishShellCalls.tooltip === 'Postline: 2 avisos requieren atención'
+      && window.spanishShellCalls.menu.some(item => item.label === 'Pausar publicaciones' && item.action === 'toggle-publishing')
+      && window.spanishShellCalls.menu.some(item => item.label === '2 avisos requieren atención' && item.enabled === false)
+      && window.spanishShellCalls.menu.some(item => item.label?.startsWith('Próxima publicación: ') && item.enabled === false)
+  `), 5_000)
+  await evaluate(cdp, "document.querySelector('[data-testid=postline-nav] a[href=\"/settings\"]').click()")
+  await waitUntil('Native Settings opens with the Spanish window title', () => evaluate<boolean>(cdp, `
+    window.spanishShellCalls.settings?.title === 'Configuración'
+      && window.spanishShellCalls.settings.name === 'settings'
+      && window.spanishShellCalls.settings.url === location.origin + '/settings'
+  `), 5_000)
+}
+
 async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
@@ -4273,7 +4323,10 @@ ${migration.stderr.toString()}`)
     await checkFirstRun(cdp)
     if (!marketingScreenshots) await checkRejectedPublishInputs(cdp)
     if (marketingScreenshots) await captureMarketingScreenshots(cdp)
-    else if (spanishWorkspace) await checkSpanishWorkspace(cdp)
+    else if (spanishWorkspace) {
+      await checkSpanishShell(cdp)
+      await checkSpanishWorkspace(cdp)
+    }
     else await checkWorkspace(cdp)
   }
   finally {

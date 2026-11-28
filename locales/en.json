@@ -30,7 +30,11 @@
       "back": "Go back",
       "forward": "Go forward",
       "account": "Workspace account",
-      "workspaceRegion": "Postline workspace"
+      "workspaceRegion": "Postline workspace",
+      "offlineTitle": "You are offline",
+      "offlineBody": "Changes made now will not save until the connection is back. Scheduled posts still go out on time.",
+      "onlineTitle": "Back online",
+      "onlineBody": "Postline is connected again."
     },
     "unread": {
       "inboxOne": "{count} unread message",

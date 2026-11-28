@@ -16,7 +16,7 @@ const workspaceI18n = createI18n({
 
 export const workspaceText = workspaceI18n.t.bind(workspaceI18n)
 
-export const workspaceShellText = workspaceI18n.tm('workspace.shell')
+export const workspaceShellText = workspaceI18n.tm('workspace.shell') as typeof en.workspace.shell
 export const workspaceCommandsText = workspaceI18n.tm('workspace.commands')
 export const unreadText = workspaceI18n.tm('workspace.unread')
 

@@ -1,3 +1,9 @@
+<script server>
+import { workspaceLocale } from '../../app/Support/Localization/workspace'
+
+useHead({ htmlAttrs: { lang: workspaceLocale } })
+</script>
+
 @head
   <meta name="color-scheme" content="light dark">
   {{-- The workspace is private: keep every signed-in page and the sign-in page out of search engines, and out of the sitemap, which skips noindex pages. --}}

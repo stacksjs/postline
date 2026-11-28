@@ -1,0 +1,13 @@
+{
+  "pausedTooltip": "Postline: publishing paused",
+  "unreadTooltip": "Postline: {count} needs attention | Postline: {count} need attention",
+  "open": "Open Postline",
+  "paused": "Publishing is paused",
+  "upcoming": "Next post: {time}",
+  "empty": "Nothing scheduled",
+  "unread": "{count} alert needs attention | {count} alerts need attention",
+  "resume": "Resume Publishing",
+  "pause": "Pause Publishing",
+  "login": "Open at Login",
+  "quit": "Quit Postline"
+}

@@ -30,7 +30,11 @@
       "back": "Atrás",
       "forward": "Adelante",
       "account": "Cuenta del espacio de trabajo",
-      "workspaceRegion": "Espacio de trabajo de Postline"
+      "workspaceRegion": "Espacio de trabajo de Postline",
+      "offlineTitle": "Sin conexión",
+      "offlineBody": "Los cambios se guardarán cuando se restablezca la conexión. Las publicaciones programadas se enviarán a tiempo.",
+      "onlineTitle": "Conexión restablecida",
+      "onlineBody": "Postline vuelve a estar conectado."
     },
     "unread": {
       "inboxOne": "{count} mensaje sin leer",

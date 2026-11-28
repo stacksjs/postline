@@ -1,0 +1,13 @@
+{
+  "pausedTooltip": "Postline: publicaciones en pausa",
+  "unreadTooltip": "Postline: {count} aviso requiere atención | Postline: {count} avisos requieren atención",
+  "open": "Abrir Postline",
+  "paused": "Las publicaciones están en pausa",
+  "upcoming": "Próxima publicación: {time}",
+  "empty": "No hay publicaciones programadas",
+  "unread": "{count} aviso requiere atención | {count} avisos requieren atención",
+  "resume": "Reanudar publicaciones",
+  "pause": "Pausar publicaciones",
+  "login": "Abrir al iniciar sesión",
+  "quit": "Salir de Postline"
+}

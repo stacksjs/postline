@@ -7,6 +7,12 @@ export const routeLabels = Object.fromEntries(workspaceNavigation.map(({ href, l
 const currentPath = workspaceRoutePath(typeof requestContext === 'undefined' ? '/' : requestContext.url())
 export const currentLabel = routeLabels[currentPath] ?? ''
 export const sidebarLabels = { expand: shellText.expandSidebar, collapse: shellText.collapseSidebar }
+export const connectionText = {
+  offlineTitle: shellText.offlineTitle,
+  offlineBody: shellText.offlineBody,
+  onlineTitle: shellText.onlineTitle,
+  onlineBody: shellText.onlineBody,
+}
 export const channelsLabel = workspaceText('workspace.navigation.channels')
 export const settingsLabel = workspaceText('workspace.navigation.settings')
 </script>
@@ -31,6 +37,7 @@ const bridge = () => desktop() as WorkspaceBridge | null
 const colorMode = useColorMode()
 const labels = {{ routeLabels }}
 const sidebar = {{ sidebarLabels }}
+const connection = {{ connectionText }}
 const activeLabel = state({{ currentLabel }})
 const account = workspaceBootstrapQuery()
 const workspaceName = derived(() => account.data()?.workspace.workspaceName || 'Postline')
@@ -46,8 +53,8 @@ let destroyed = false
 const offlineToastId = 'postline-offline'
 
 function showOfflineNotice() {
-  toast.info('Changes made now will not save until the connection is back. Scheduled posts still go out on time.', {
-    title: 'You are offline',
+  toast.info(connection.offlineBody, {
+    title: connection.offlineTitle,
     id: offlineToastId,
     duration: 0,
   })
@@ -56,7 +63,7 @@ function showOfflineNotice() {
 useEventListener('offline', showOfflineNotice)
 useEventListener('online', () => {
   toast.dismiss(offlineToastId)
-  toast.success('Postline is connected again.', { title: 'Back online', id: 'postline-online', duration: 3000 })
+  toast.success(connection.onlineBody, { title: connection.onlineTitle, id: 'postline-online', duration: 3000 })
 })
 
 function toggleSidebar() {
@@ -115,7 +122,7 @@ function openSettings() {
   void windowApi.open({
     name: 'settings',
     url: `${origin}/settings`,
-    title: 'Settings',
+    title: {{ settingsLabel }},
     width: 715,
     height: 640,
     minWidth: 715,
@@ -166,7 +173,7 @@ desktop.onReady((host) => {
   const path = '/assets/scripts/view-code.ts'
   void import(path).then(async ({ loadDesktopAlerts }) => {
     const { bindDesktopAlerts } = await loadDesktopAlerts()
-    if (!destroyed) unbindDesktopAlerts = bindDesktopAlerts(host)
+    if (!destroyed) unbindDesktopAlerts = bindDesktopAlerts(host, {{ language }})
   }).catch(error => console.error('Could not load desktop alerts', error))
 })
 
@@ -259,7 +266,7 @@ onDestroy(() => {
         </div>
       </header>
       <div class="flex flex-1 flex-col min-h-0 min-w-0" data-postline-router>
-        <main id="workspace-content" lang="en" class="lg:overflow-y-auto flex-1 px-3.5 py-4 sm:p-6 min-h-0 min-w-0" tabindex="-1" data-stx-scroll="workspace">
+        <main id="workspace-content" class="lg:overflow-y-auto flex-1 px-3.5 py-4 sm:p-6 min-h-0 min-w-0" tabindex="-1" data-stx-scroll="workspace">
           <slot />
         </main>
       </div>
