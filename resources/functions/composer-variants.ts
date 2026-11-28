@@ -3,6 +3,12 @@ import { providerLabel } from './networks'
 
 export type ComposerVariants = Record<string, { text: string, shared: string }>
 
+interface ComposerVariantCopy {
+  variantCount: string
+  variantShared: string
+  variantTooLong: string
+}
+
 /** Blank overrides inherit the shared post. Keep the editable field separately. */
 export function composerVariantsPayload(variants: ComposerVariants): Record<string, string> {
   return Object.fromEntries(Object.entries(variants)
@@ -10,7 +16,7 @@ export function composerVariantsPayload(variants: ComposerVariants): Record<stri
     .map(([provider, entry]) => [provider, entry.text]))
 }
 
-export function composerVariantRows(targets: ReadonlyArray<{ provider: string, characterLimit: number }>, variants: ComposerVariants, shared: string) {
+export function composerVariantRows(targets: ReadonlyArray<{ provider: string, characterLimit: number }>, variants: ComposerVariants, shared: string, copy: ComposerVariantCopy) {
   return targets.map((target) => {
     const { provider, characterLimit } = target
     const entry = variants[provider]
@@ -20,8 +26,8 @@ export function composerVariantRows(targets: ReadonlyArray<{ provider: string, c
     const name = providerLabel(provider)
     const over = Boolean(characterLimit) && length > characterLimit
     const description = entry
-      ? `${count} characters`
-      : `Uses the shared text${characterLimit ? ` · ${count}` : ''}${over ? ` · Too long for ${name}` : ''}`
+      ? copy.variantCount.replace('{count}', count)
+      : `${copy.variantShared}${characterLimit ? ` · ${count}` : ''}${over ? ` · ${copy.variantTooLong.replace('{network}', name)}` : ''}`
     return { provider, name, text, description, over, custom: Boolean(entry), stale: Boolean(entry && entry.shared !== shared) }
   })
 }

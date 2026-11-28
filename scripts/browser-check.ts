@@ -3794,6 +3794,61 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
     await evaluate(cdp, `if (${blog}.getAttribute('aria-pressed') !== 'true') ${blog}.click()`)
     const rich = `${editor}.querySelector('[data-richtext-host] [contenteditable=true]')`
     await waitUntil('The Spanish Blog editor opens', () => evaluate<boolean>(cdp, `Boolean(${rich}?.getClientRects().length)`), 10_000)
+    const variants = `${editor}.querySelector('[data-variant-toggle]')`
+    await evaluate(cdp, `${variants}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const variant = `${editor}.querySelector('[data-variant-action=fork][data-variant-provider=blog]')`
+    await waitUntil('Spanish per-network text shows its controls and shared text status', () => evaluate<boolean>(cdp, `
+      ${variants}.textContent.trim() === 'Ocultar texto por red'
+        && ${variant}?.textContent.trim() === 'Personalizar'
+        && ${variant}.closest('[data-variant-row]').textContent.includes('Usa el texto compartido')
+    `), 5_000)
+    await evaluate(cdp, `${variant}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const variantField = `${editor}.querySelector('[data-variant-input=blog]')`
+    await waitUntil('The localized Blog variant is named and focused', () => evaluate<boolean>(cdp, `
+      document.activeElement === ${variantField}
+        && ${variantField}?.getAttribute('aria-label') === 'Texto para Blog'
+    `), 5_000)
+    await evaluate(cdp, `${variantField}.select()`)
+    await cdp.send('Input.insertText', { text: 'Texto propio' })
+    const resetVariant = `${editor}.querySelector('[data-variant-action=reset][data-variant-provider=blog]')`
+    await waitUntil('The localized variant has a character count and a reset action', () => evaluate<boolean>(cdp, `
+      ${resetVariant}?.textContent.trim() === 'Usar el texto compartido'
+        && ${resetVariant}.closest('[data-variant-row]').textContent.includes('12 / 10000 caracteres')
+    `), 5_000)
+    await evaluate(cdp, `${resetVariant}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Resetting the variant restores the shared text', () => evaluate<boolean>(cdp, `!${variantField} && Boolean(${variant})`), 5_000)
+
+    const thread = `${editor}.querySelector('[data-stx-segmented-control] button[aria-label=Hilo]')`
+    await evaluate(cdp, `${thread}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const reply = `${editor}.querySelector('[data-bluesky-text][aria-label="Texto de la publicación 2"]')`
+    const removeReply = `${editor}.querySelector('[data-remove-post][aria-label="Quitar la publicación 2"]')`
+    await waitUntil('Spanish thread shows the second post and names its controls', () => evaluate<boolean>(cdp, `
+      ${thread}.getAttribute('aria-pressed') === 'true'
+        && ${reply}?.getClientRects().length > 0 && ${removeReply}?.getClientRects().length > 0
+        && ${reply}.closest('[data-composer-post]').querySelector('[data-select-post]').innerText.trim() === 'Publicación 2'
+    `), 5_000)
+    await evaluate(cdp, `${reply}.focus()`)
+    await cdp.send('Input.insertText', { text: 'Respuesta de prueba' })
+    await evaluate(cdp, `${removeReply}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const removed = "document.querySelector('[data-stx-toast-key=composer-post-removed]:not([data-stx-toast-exiting])')"
+    const undo = `${removed}?.querySelector('[data-stx-toast-action]')`
+    await waitUntil('Removing a Spanish thread post offers a localized Undo', () => evaluate<boolean>(cdp, `
+      !${reply} && ${removed}?.textContent.includes('Se quitó la publicación 2.') && ${undo}?.textContent === 'Deshacer'
+    `), 5_000)
+    await evaluate(cdp, `${undo}.click()`)
+    await waitUntil('Undo restores the Spanish thread post', () => evaluate<boolean>(cdp, `${reply}?.value === 'Respuesta de prueba'`), 5_000)
+    await evaluate(cdp, `${removeReply}.click()`)
+    await evaluate(cdp, `${editor}.querySelector('[data-stx-segmented-control] button[aria-label=Individual]').focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Spanish Composer returns to a single post', () => evaluate<boolean>(cdp, `
+      ${editor}.querySelector('[data-stx-segmented-control] button[aria-label=Individual]').getAttribute('aria-pressed') === 'true'
+    `), 5_000)
+
     const writePost = async (text: string) => {
       await evaluate(cdp, `${rich}.focus()`)
       await cdp.send('Input.insertText', { text })
@@ -3986,7 +4041,7 @@ else {
   // eslint-disable-next-line no-console
   console.log(marketingScreenshots
     ? `Product screenshots written to ${productImages}.`
-    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, Blog, Inbox, Listening, Analytics, Channels, Campaigns, and Settings passed.'
+    : spanishWorkspace ? 'Spanish workspace navigation, Queue, Activity, Timeline, Blog, Inbox, Listening, Analytics, Channels, Campaigns, Settings, and Composer passed.'
     : `Every view opened clean in ${MODES.map(mode => mode.name).join(', ')}. Screenshots in ${out}.`)
 }
 process.exit(exitCode)

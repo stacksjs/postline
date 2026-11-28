@@ -77,16 +77,16 @@ export const composerMessages = workspaceComposerText.client
           <div class="hidden mb-3" :class="{ 'hidden': !variantsAvailable() }" data-variant-section>
             <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg transition-colors" type="button" data-variant-toggle :aria-expanded="variantsOpen()" @click="toggleVariantPanel">
               <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
-              <span :text="variantToggleLabel()">Customize per network</span>
+              <span :text="variantToggleLabel()">{{ composerMessages.showVariants }}</span>
             </button>
             <div :if="variantsOpen() && variantsAvailable()" class="grid gap-2 mt-2" data-variant-panel>
               <div class="grid gap-2 p-3 bg-panel-2 border border-line rounded-xl" x-for="row in variantRows()" :key="row.provider" :data-variant-row="row.provider">
                 <div class="flex gap-2 items-center justify-between">
                   <span class="font-semibold text-ink text-xs" :text="row.name"></span>
-                  <button class="inline-flex items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel hover:bg-raised border border-line rounded-lg transition-colors" type="button" :data-variant-action="row.custom ? 'reset' : 'fork'" :data-variant-provider="row.provider" :text="row.custom ? 'Use shared text' : 'Customize'" @click="toggleVariant(row.provider)"></button>
+                  <button class="inline-flex items-center px-2.5 min-h-7 font-semibold text-muted text-xs bg-panel hover:bg-raised border border-line rounded-lg transition-colors" type="button" :data-variant-action="row.custom ? 'reset' : 'fork'" :data-variant-provider="row.provider" :text="row.custom ? copy.resetVariant : copy.customizeVariant" @click="toggleVariant(row.provider)"></button>
                 </div>
                 <template :if="row.custom">
-                  <ComposerVariantField :provider="row.provider" :label="row.name + ' post body'" :value="row.text" :autoFocus="newVariant() === row.provider" @edit="editVariant(row.provider, $event)" />
+                  <ComposerVariantField :provider="row.provider" :label="copy.variantBody.replace('{network}', row.name)" :value="row.text" :autoFocus="newVariant() === row.provider" @edit="editVariant(row.provider, $event)" />
                 </template>
                 <p class="m-0 text-xs" :class="row.over ? 'text-danger' : 'text-muted'" :text="row.description"></p>
                 <p :if="row.stale" class="m-0 text-warning text-xs" :data-variant-stale="row.provider">{{ composerText.variantStale }}</p>
@@ -103,13 +103,13 @@ export const composerMessages = workspaceComposerText.client
               <header class="flex gap-3 items-center justify-between" x-show="composerFormat() === 'thread'">
                 <button class="inline-flex gap-1.5 items-center px-2.5 min-h-7 font-semibold text-xs rounded-lg" type="button" data-select-post :class="row.id === activeSegmentId() ? 'text-on-accent bg-accent' : 'text-muted bg-panel-3'" :aria-pressed="row.id === activeSegmentId()" @click="activateSegment(row.id)">
                   <span class="h-3.5 w-3.5 i-hugeicons-edit-02" aria-hidden="true"></span>
-                  <span :text="`Post ${row.number}`"></span>
+                  <span :text="numberedPost(copy.postNumber, row.number)"></span>
                 </button>
-                <button :if="row.canRemove" class="inline-flex items-center justify-center h-7 w-7 text-muted hover:text-ink bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" :aria-label="`Remove post ${row.number}`" :disabled="submitting()" @click="removeSegment(row.id)" data-remove-post>
+                <button :if="row.canRemove" class="inline-flex items-center justify-center h-7 w-7 text-muted hover:text-ink bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" type="button" :aria-label="numberedPost(copy.removePost, row.number)" :disabled="submitting()" @click="removeSegment(row.id)" data-remove-post>
                   <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
                 </button>
               </header>
-              <ComposerSegmentField :text="row.text" :label="`Post body ${row.number}`" :placeholder="row.number === 1 ? copy.writePrompt : ''" :focusRequest="segmentFocus().id === row.id ? segmentFocus().revision : 0" :readonly="submitting()" @activate="activateSegment(row.id)" @edit="editSegment(row.id, $event)" />
+              <ComposerSegmentField :text="row.text" :label="numberedPost(copy.postBody, row.number)" :placeholder="row.number === 1 ? copy.writePrompt : ''" :focusRequest="segmentFocus().id === row.id ? segmentFocus().revision : 0" :readonly="submitting()" @activate="activateSegment(row.id)" @edit="editSegment(row.id, $event)" />
               <div :if="row.number === 1" class="hidden" data-richtext-host></div>
             </article>
           </div>
@@ -268,7 +268,7 @@ export const composerMessages = workspaceComposerText.client
           </header>
           <article x-for="(post, index) in card.posts" :key="post.id" class="grid gap-2 p-3 min-w-0 border-b border-line last:border-b-0" data-preview-segment>
             <div class="flex gap-2 items-center justify-between text-xs" :class="post.overflow ? 'text-danger' : 'text-muted'">
-              <span :if="card.posts.length > 1" :text="card.chained && index > 0 ? 'Reply ' + index : 'Post ' + (index + 1)"></span>
+              <span :if="card.posts.length > 1" :text="card.chained && index > 0 ? numberedPost(copy.replyNumber, index) : numberedPost(copy.postNumber, index + 1)"></span>
               <span class="inline-flex gap-1.5 items-center ml-auto tabular-nums">
                 <span class="shrink-0 h-4 w-4" :data-preview-count-ring="post.progress" aria-hidden="true"></span>
                 <span class="sr-only">{{ composerText.characters }}</span>
@@ -319,6 +319,7 @@ export const composerMessages = workspaceComposerText.client
 
     const copy = {{ composerMessages }}
     const locale = {{ composerLocale }}
+    const numberedPost = (label: string, number: number) => label.replace('{number}', String(number))
     const providersFailed = state(false)
     const query = useRoute().query
     const editParam = query.edit || null
@@ -455,11 +456,11 @@ export const composerMessages = workspaceComposerText.client
     const variantsAvailable = derived(() => selectedNetworkIds().length > 0 && composerFormat() === 'single')
     const variantsPayload = derived(() => variantsAvailable() ? composerVariantsPayload(variants()) : {})
     const variantToggleLabel = derived(() => {
-      if (variantsOpen()) return 'Hide per-network text'
+      if (variantsOpen()) return copy.hideVariants
       const count = Object.keys(variantsPayload()).length
-      return count ? `Customize per network (${count})` : 'Customize per network'
+      return count ? `${copy.showVariants} (${count})` : copy.showVariants
     })
-    const variantRows = derived(() => composerVariantRows(selectedNetworks(), variants(), sharedCopy()))
+    const variantRows = derived(() => composerVariantRows(selectedNetworks(), variants(), sharedCopy(), copy))
 
     function toggleVariantPanel() {
       newVariant.set('')
@@ -919,13 +920,13 @@ export const composerMessages = workspaceComposerText.client
       activeSegmentId.set((remaining[index] ?? remaining[index - 1]).id)
       saveDraft()
       if (!removed.text.trim()) return
-      setStatus(`Post ${index + 1} removed.`, 'neutral', {
-        title: 'Removed',
+      setStatus(numberedPost(copy.postRemoved, index + 1), 'neutral', {
+        title: copy.removed,
         id: 'composer-post-removed',
         dedupeMs: 0,
         durationMs: 10000,
         action: {
-          label: 'Undo',
+          label: copy.undo,
           run: () => {
             const restored = [...segments()]
             const at = restored.findIndex(post => post.id === before?.id)
