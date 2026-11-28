@@ -96,9 +96,22 @@ launchctl list | grep org.reviewos.postline-runner
 tail -f ~/.local/share/reviewos/postline/runner.log
 ```
 
-"Waiting for work" is healthy. "Runner capacity hold" names what it is short
-of. The runner needs 8 GB of free disk before it takes a job, and this Mac has
-run close to that.
+"Waiting for work" is healthy. "Runner capacity hold" names the check that
+is holding queued jobs. The runner needs 8 GiB free on the job workspace
+volume and also checks host load before taking work. Check both from the
+runner's Mac account.
+
+```bash
+df -h "$(getconf DARWIN_USER_TEMP_DIR)"
+sysctl -n vm.loadavg
+```
+
+Reclaim space from completed build and test output. Keep the runner registration,
+Keychain, release artifacts, and workspaces for active jobs. See
+[the Mac runner and load](#the-mac-runner-and-load) for the load limit. Watch the
+queued run in ReviewOS as the host recovers. Use the
+[replacement-runner procedure](#bringing-up-a-replacement-mac-runner) if the
+primary cannot sustain the resources needed for a release.
 
 ## Updating the Postline runner
 
