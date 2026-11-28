@@ -1253,17 +1253,21 @@ async function checkWorkspaceErasure(cdp: Cdp): Promise<void> {
     const send = window.fetch.bind(window)
     const profile = 'postline-x-12345678-1234-5678-9012-123456789012'
     window.erasureSteps = []
+    let profileWindowOpen = true
     window.allowProfileErasure = false
     window.allowWorkspaceErasure = false
     window.craft = { app: { nativePlatformControls: false }, capabilities: { nativePlatformControls: false }, window: {
       async _call(action, input, name) {
         if (action !== 'destroy' || name !== profile) throw new Error('Wrong profile window')
         window.erasureSteps.push('destroy')
+        if (!profileWindowOpen) throw Object.assign(new Error('The named X window is absent.'), { code: 'INVALID_PARAMETER' })
+        profileWindowOpen = false
       },
       async removeDataStore(name) {
         if (name !== profile) throw new Error('Wrong data store')
         window.erasureSteps.push('remove')
-        if (!window.allowProfileErasure) throw Object.assign(new Error('WebKit still holds this profile.'), { code: 'BUSY' })
+        if (profileWindowOpen || !window.allowProfileErasure)
+          throw Object.assign(new Error('WebKit still holds this profile.'), { code: 'BUSY' })
       },
     } }
     window.fetch = async (input, options) => {
@@ -1306,17 +1310,17 @@ async function checkWorkspaceErasure(cdp: Cdp): Promise<void> {
     await perform()
     await waitUntil('Profile erasure errors are shown without clearing the workspace', () => evaluate<boolean>(cdp, `
       document.body.innerText.includes('Close any other window using this X profile, then try again.')
-        && window.erasureSteps.join(',') === 'destroy,remove'`), 5_000)
+        && window.erasureSteps.join(',') === 'remove,destroy,remove'`), 5_000)
     await evaluate(cdp, 'window.allowProfileErasure = true')
     await perform()
     await waitUntil('An unsuccessful workspace reset reports a retry after profile removal', () => evaluate<boolean>(cdp, `
       document.body.innerText.includes('The workspace reset can be retried.')
-        && window.erasureSteps.join(',') === 'destroy,remove,destroy,remove,workspace'`), 5_000)
+        && window.erasureSteps.join(',') === 'remove,destroy,remove,remove,workspace'`), 5_000)
     await evaluate(cdp, 'window.allowWorkspaceErasure = true')
     await perform()
-    await waitUntil('Workspace erasure waits for successful profile removal', () => evaluate<boolean>(cdp, `
+    await waitUntil('Workspace erasure retries after the X profile and its window are gone', () => evaluate<boolean>(cdp, `
       document.body.innerText.includes('Workspace data and the X browser profile on this Mac were deleted.')
-        && window.erasureSteps.join(',') === 'destroy,remove,destroy,remove,workspace,destroy,remove,workspace'`), 5_000)
+        && window.erasureSteps.join(',') === 'remove,destroy,remove,remove,workspace,remove,workspace'`), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })

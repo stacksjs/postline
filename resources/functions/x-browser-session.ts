@@ -44,15 +44,36 @@ export async function removeXBrowserProfile(host: unknown, profile: string): Pro
   } } | null)?.window
   if (typeof browser?.removeDataStore !== 'function' || typeof browser._call !== 'function')
     return 'unsupported'
+
+  function hasCode(error: unknown, code: string): boolean {
+    return Boolean(error && typeof error === 'object' && 'code' in error && error.code === code)
+  }
+
+  const removeDataStore = browser.removeDataStore.bind(browser)
+  const remove = async (): Promise<'removed' | 'busy'> => {
+    try {
+      await removeDataStore(profile)
+      return 'removed'
+    }
+    catch (error) {
+      if (hasCode(error, 'BUSY')) return 'busy'
+      throw error
+    }
+  }
+
+  // An unused profile has no named window. Remove it directly and release
+  // our own view only if Craft reports that the data store is still in use.
+  const first = await remove()
+  if (first === 'removed') return first
   try {
     await browser._call('destroy', undefined, profile)
-    await browser.removeDataStore(profile)
-    return 'removed'
   }
   catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'BUSY') return 'busy'
-    throw error
+    // The named view may already be gone. Craft still checks every other
+    // view before reporting that the store has been removed.
+    if (!hasCode(error, 'INVALID_PARAMETER')) throw error
   }
+  return await remove()
 }
 
 /** Read the account and the requested data from the open X page. */

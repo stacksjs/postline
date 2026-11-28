@@ -4,7 +4,35 @@ import { keywordMonitoring } from '../../app/Services/KeywordMonitoringService'
 import { postQueue } from '../../app/Services/Social/QueueService'
 import { rememberTwitterBrowserHandle, saveTwitterBrowserMetrics, twitterBrowserSession } from '../../app/Services/Social/TwitterBrowserSession'
 import { upsertIdentityRow } from '../../app/Services/Social/identities'
-import { inspectXPage } from '../../resources/functions/x-browser-session'
+import { inspectXPage, removeXBrowserProfile } from '../../resources/functions/x-browser-session'
+
+test('profile removal succeeds when no X window has ever opened', async () => {
+  const calls: string[] = []
+  const host = { window: {
+    async _call() { throw Object.assign(new Error('Invalid parameter value'), { code: 'INVALID_PARAMETER' }) },
+    async removeDataStore(name: string) { calls.push(name) },
+  } }
+
+  expect(await removeXBrowserProfile(host, 'unused-x-store')).toBe('removed')
+  expect(calls).toEqual(['unused-x-store'])
+})
+
+test('profile removal still reports busy when another view owns the store', async () => {
+  const calls: string[] = []
+  const host = { window: {
+    async _call(action: string, _input: undefined, name: string) {
+      calls.push(`${action}:${name}`)
+      throw Object.assign(new Error('The named X window is absent.'), { code: 'INVALID_PARAMETER' })
+    },
+    async removeDataStore(name: string) {
+      calls.push(`remove:${name}`)
+      throw Object.assign(new Error('WebKit still holds this profile.'), { code: 'BUSY' })
+    },
+  } }
+
+  expect(await removeXBrowserProfile(host, 'x-store')).toBe('busy')
+  expect(calls).toEqual(['remove:x-store', 'destroy:x-store', 'remove:x-store'])
+})
 
 describe('X session browser reads', () => {
   test('captures measured zero and exact text counts from the owner’s rendered posts', () => {
@@ -152,8 +180,9 @@ describe('X session browser reads', () => {
 
   test('imports matching posts once for active browser watches and skips paid API scans', async () => {
     const ids: number[] = []
-    const tag = 'PostlineBrowserFixture' + crypto.randomUUID().replaceAll('-', '')
-    const input = { name: tag, providers: ['twitter'], keywords: [tag, 'launch'], matchMode: 'all' }
+    const tag = crypto.randomUUID().replaceAll('-', '')
+    const second = crypto.randomUUID().replaceAll('-', '')
+    const input = { name: tag, providers: ['twitter'], keywords: [tag, second], matchMode: 'all' }
     try {
       const browser = await keywordMonitoring.save(0, { ...input, twitterReadSource: 'browser' })
       ids.push(browser.id)
@@ -167,14 +196,14 @@ describe('X session browser reads', () => {
       expect(api.twitterReadSource).toBe('api')
       expect(await keywordMonitoring.scan(browser.id)).toEqual({ scanned: 0, found: 0, created: 0, errors: [] })
 
-      const post = { id: '17482', authorHandle: 'fixture_author', body: `${tag} launch`, postedAt: '2026-11-27T05:00:00.000Z' }
+      const post = { id: '17482', authorHandle: 'fixture_author', body: `${tag} ${second}`, postedAt: '2026-11-27T05:00:00.000Z' }
       const posts = [post, { ...post, id: '17483', body: tag }, { ...post, id: '17484', authorHandle: 'invalid handle' }]
       const imports = await Promise.all([keywordMonitoring.importTwitterBrowserPosts(posts), keywordMonitoring.importTwitterBrowserPosts(posts)])
       expect(imports.reduce((total, item) => total + item.created, 0)).toBe(1)
       const found = (await keywordMonitoring.list(browser.id)).mentions
       expect(found).toHaveLength(1)
       expect(found[0]).toMatchObject({
-        provider: 'twitter', remoteUri: post.id, authorHandle: post.authorHandle, matchedKeywords: [tag, 'launch'],
+        provider: 'twitter', remoteUri: post.id, authorHandle: post.authorHandle, matchedKeywords: [tag, second],
         url: 'https://x.com/fixture_author/status/17482',
       })
       for (const id of [api.id, paused.id, unrelated.id])
