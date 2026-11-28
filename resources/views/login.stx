@@ -184,7 +184,7 @@ const allowsFirstRun = !isMarketingSite()
       errorMessage.set('')
       busy.set(true)
       try {
-        const session = await passkeys.signIn()
+        const session = await passkeys.signIn(copy)
         if (session?.token) enterApp(session.expires_in)
       }
       catch (error) {

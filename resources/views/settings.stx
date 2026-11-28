@@ -660,7 +660,7 @@ export const settingsAppearanceOptions = [
     }
 
     const addPasskey = (): Promise<void> => busyWhile(async () => {
-      if (await passkeys.register()) {
+      if (await passkeys.register(copy)) {
         await loadSecurity()
         saySecurity(copy.passkeyAdded, 'success')
       }

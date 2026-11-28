@@ -2152,6 +2152,15 @@ async function checkDesktopNetworkConsent(cdp: Cdp): Promise<void> {
 }
 
 async function checkBrowserPasskey(cdp: Cdp): Promise<void> {
+  const copy = spanishWorkspace
+    ? {
+        duplicate: 'Este dispositivo ya tiene una llave de acceso para Postline.',
+        rateLimited: 'Demasiados intentos con una llave de acceso. Espera un momento o usa tu contraseña.',
+      }
+    : {
+        duplicate: 'This device already has a passkey for Postline.',
+        rateLimited: 'Too many passkey attempts. Wait a moment or use your password.',
+      }
   await cdp.send('WebAuthn.enable')
   const { authenticatorId } = await cdp.send<{ authenticatorId: string }>('WebAuthn.addVirtualAuthenticator', {
     options: {
@@ -2172,11 +2181,46 @@ async function checkBrowserPasskey(cdp: Cdp): Promise<void> {
     await evaluate(cdp, `${addPasskey}.focus()`)
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('The new passkey in Settings', () => evaluate<boolean>(cdp, "Boolean(document.querySelector('[data-passkey-row]')?.getClientRects().length)"), 10_000)
+    await waitUntil('Add Passkey is available after registration', () => evaluate<boolean>(cdp, `!${addPasskey}.disabled`), 5_000)
+    await evaluate(cdp, `${addPasskey}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The registered authenticator cannot add a duplicate passkey', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-security-message]')?.textContent === ${JSON.stringify(copy.duplicate)}
+        && document.querySelectorAll('[data-passkey-row]').length === 1
+        && !${addPasskey}.disabled`), 10_000)
     await evaluate(cdp, "document.querySelector('[data-setting=sign-out] button').click()")
     const signIn = "document.querySelector('[data-passkey-sign-in]')"
     await waitUntil('The ready passkey sign-in button after signing out', () => evaluate<boolean>(cdp, `
       location.pathname === '/login' && Boolean(${signIn}?.getClientRects().length)
         && ${signIn}.classList.contains('inline-flex') && !${signIn}.disabled`), 15_000)
+    await evaluate(cdp, `(() => {
+      const fetchOptions = window.fetch
+      window.fetch = (input, options) => {
+        if (new URL(input instanceof Request ? input.url : input, location.href).pathname !== '/api/auth/passkeys/authentication/options')
+          return fetchOptions.call(window, input, options)
+        window.fetch = fetchOptions
+        return Promise.resolve(Response.json({ error: 'Too many requests from the API fixture' }, { status: 429 }))
+      }
+    })()`)
+    await evaluate(cdp, `${signIn}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Passkey rate limiting is announced in the workspace language', () => evaluate<boolean>(cdp, `
+      document.querySelector('[data-testid=login-page] [role=alert]')?.textContent === ${JSON.stringify(copy.rateLimited)}
+        && !${signIn}.disabled`), 5_000)
+
+    await evaluate(cdp, `(() => {
+      const get = navigator.credentials.get
+      navigator.credentials.get = () => {
+        navigator.credentials.get = get
+        return Promise.reject(new DOMException('Prompt dismissed by fixture', 'AbortError'))
+      }
+    })()`)
+    await evaluate(cdp, `${signIn}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Cancelling the passkey prompt keeps sign-in available without an error', () => evaluate<boolean>(cdp, `
+      location.pathname === '/login' && !${signIn}.disabled
+        && document.querySelector('[data-testid=login-page] [role=alert]')?.textContent === ''`), 5_000)
+
     await evaluate(cdp, `${signIn}.focus()`)
     await pressKey(cdp, 'Enter', 13)
     try {
@@ -4377,6 +4421,7 @@ ${migration.stderr.toString()}`)
     else if (spanishWorkspace) {
       await checkSpanishShell(cdp)
       await checkSpanishWorkspace(cdp)
+      await checkBrowserPasskey(cdp)
     }
     else await checkWorkspace(cdp)
   }
