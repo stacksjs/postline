@@ -572,6 +572,7 @@
       "addOrReconnect": "Añadir o volver a conectar una cuenta",
       "addAccount": "Conectar otra cuenta",
       "reconnectNetwork": "Volver a conectar {network}",
+      "connect": "Conectar",
       "connectNetwork": "Conectar {network}",
       "expiresSoon": "Caduca pronto",
       "expired": "Caducó",

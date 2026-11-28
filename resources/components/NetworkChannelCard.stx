@@ -18,7 +18,8 @@ const authorizing = useReactiveProp('authorizing', false)
 const emit = defineEmits(['authorize'])
 const bootstrap = workspaceBootstrapQuery()
 const sending = state(false)
-const busyAccount = state(0)
+type AccountAction = 'default' | 'disconnect'
+const busyAccount = state<{ id: number, action: AccountAction } | null>(null)
 const disconnectId = state(0)
 const disconnectDialog = useRef<HTMLDialogElement>('disconnectDialog')
 const message = state('')
@@ -104,11 +105,16 @@ async function connect(event?: SubmitEvent) {
   }
 }
 
-async function updateAccount(id: number, action: 'default' | 'disconnect') {
+function isAccountUpdating(id: number, action: AccountAction): boolean {
+  const pending = busyAccount()
+  return pending?.id === id && pending.action === action
+}
+
+async function updateAccount(id: number, action: AccountAction) {
   if (busyAccount()) return
   const account = accounts().find(item => item.id === id)
   if (!account) return
-  busyAccount.set(id)
+  busyAccount.set({ id, action })
   showMessage('')
   try {
     if (action === 'disconnect') {
@@ -130,13 +136,18 @@ async function updateAccount(id: number, action: 'default' | 'disconnect') {
     showMessage(error instanceof Error ? error.message : String(error), true)
   }
   finally {
-    busyAccount.set(0)
+    busyAccount.set(null)
   }
 }
 
 function confirmDisconnect(id: number) {
+  if (busyAccount()) return
   disconnectId.set(id)
   disconnectDialog.current?.showModal()
+}
+
+function cancelDisconnect(event: Event) {
+  if (busyAccount()) event.preventDefault()
 }
 </script>
 
@@ -160,8 +171,8 @@ function confirmDisconnect(id: number) {
           </div>
           <div class="flex flex-wrap gap-2 justify-end">
             <span class="mr-auto text-muted text-xs" x-show="account.isDefault && accounts().length > 1">{{ channelCardText.default }}</span>
-            <button class="text-muted text-xs underline hover:text-ink disabled:opacity-50" type="button" :disabled="Boolean(busyAccount())" x-show="account.connected && !account.isDefault && accounts().length > 1" :aria-label="words.t('defaultLabel', { handle: channelHandle(account.handle) })" @click="updateAccount(account.id, 'default')">{{ channelCardText.makeDefault }}</button>
-            <button class="text-muted text-xs underline hover:text-danger disabled:opacity-50" type="button" :disabled="Boolean(busyAccount())" :aria-label="words.t('disconnectLabel', { handle: channelHandle(account.handle) })" @click="confirmDisconnect(account.id)">{{ channelCardText.disconnect }}</button>
+            <Button variant="ghost" size="xs" :disabled="Boolean(busyAccount())" :show="account.connected && !account.isDefault && accounts().length > 1" :loading="isAccountUpdating(account.id, 'default')" :ariaLabel="words.t('defaultLabel', { handle: channelHandle(account.handle) })" @click="updateAccount(account.id, 'default')">{{ channelCardText.makeDefault }}</Button>
+            <Button variant="ghost" size="xs" :disabled="Boolean(busyAccount())" :ariaLabel="words.t('disconnectLabel', { handle: channelHandle(account.handle) })" @click="confirmDisconnect(account.id)">{{ channelCardText.disconnect }}</Button>
           </div>
         </li>
       </ul>
@@ -169,9 +180,9 @@ function confirmDisconnect(id: number) {
     <div class="grid gap-2">
       <a class="inline-flex items-center justify-center h-9 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl" href="/writing" data-stx-link x-show="blog()">{{ channelCardText.openBlog }}</a>
       <div class="grid gap-2" x-show="!manual() && !blog()">
-        <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="button" :disabled="!status()?.oauthConfigured || sending() || authorizing()" :text="connectLabel()" @click="emit('authorize', {})"></button>
+        <Button size="sm" fullWidth="true" :disabled="!status()?.oauthConfigured || sending() || authorizing()" :label="connectLabel()" @click="emit('authorize', {})">{{ channelCardText.connect }}</Button>
         <p class="m-0 text-muted text-xs" x-show="!status()?.oauthConfigured">{{ channelCardText.setUpApp }}</p>
-        <button class="text-muted text-xs underline hover:text-ink disabled:opacity-50" type="button" :disabled="sending()" x-show="status()?.configuredFromEnv" @click="connect()">{{ channelCardText.configuredToken }}</button>
+        <Button variant="ghost" size="xs" :loading="sending()" :show="status()?.configuredFromEnv" @click="connect()">{{ channelCardText.configuredToken }}</Button>
       </div>
       <details x-show="manual()">
         <summary class="inline-flex items-center justify-center h-9 w-full font-semibold list-none text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl cursor-pointer" :text="words.t('manage', { network: name() })"></summary>
@@ -182,17 +193,17 @@ function confirmDisconnect(id: number) {
         <form class="grid gap-2 pt-3" @submit.prevent="connect($event)">
           <input class="px-3 h-9 text-ink text-xs bg-raised border border-field-line rounded-xl" :name="provider() === 'bluesky' ? 'identifier' : 'instance'" :placeholder="provider() === 'bluesky' ? 'name.bsky.social' : 'mastodon.social'" :autocomplete="provider() === 'bluesky' ? 'username' : 'url'" :aria-label="provider() === 'bluesky' ? copy.blueskyHandle : copy.mastodonInstance" :value="provider() === 'mastodon' ? status()?.instance : null" required>
           <input class="px-3 h-9 text-ink text-xs bg-raised border border-field-line rounded-xl" type="password" :name="provider() === 'bluesky' ? 'password' : 'access_token'" :placeholder="provider() === 'bluesky' ? copy.password : copy.token" :autocomplete="provider() === 'bluesky' ? 'current-password' : 'off'" :aria-label="provider() === 'bluesky' ? copy.blueskyPassword : copy.mastodonToken" required>
-          <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="submit" :disabled="sending()" :text="sending() ? copy.connecting : connectLabel()"></button>
+          <Button size="sm" type="submit" fullWidth="true" :loading="sending()" :label="sending() ? copy.connecting : connectLabel()">{{ channelCardText.connect }}</Button>
         </form>
       </details>
       <p class="m-0 text-xs" role="status" x-show="message()" :class="failed() ? 'text-danger' : 'text-success'" :text="message()"></p>
     </div>
-    <dialog ref="disconnectDialog" class="p-4 max-w-[22rem] text-ink bg-panel border border-line rounded-xl shadow-xl" :aria-labelledby="'disconnect-' + provider()" data-channel-confirmation>
+    <dialog ref="disconnectDialog" class="p-4 max-w-[22rem] text-ink bg-panel border border-line rounded-xl shadow-xl" :aria-labelledby="'disconnect-' + provider()" @cancel="cancelDisconnect($event)" data-channel-confirmation>
       <h3 class="m-0 font-semibold" :id="'disconnect-' + provider()" :text="disconnectTitle()"></h3>
       <p class="mt-2 text-body text-sm">{{ channelCardText.disconnectWarning }}</p>
       <form method="dialog" class="flex gap-2 justify-end">
-        <button class="px-3 h-9 font-semibold text-ink text-xs bg-panel-2 rounded-lg" type="submit" autofocus>{{ channelCardText.cancel }}</button>
-        <button class="px-3 h-9 font-semibold text-on-accent text-xs bg-danger-solid rounded-lg disabled:opacity-50" type="button" :disabled="Boolean(busyAccount())" @click="updateAccount(disconnectId(), 'disconnect')">{{ channelCardText.disconnect }}</button>
+        <Button variant="secondary" size="sm" type="submit" :disabled="Boolean(busyAccount())">{{ channelCardText.cancel }}</Button>
+        <Button variant="danger" size="sm" :loading="isAccountUpdating(disconnectId(), 'disconnect')" @click="updateAccount(disconnectId(), 'disconnect')">{{ channelCardText.disconnect }}</Button>
       </form>
     </dialog>
   </article>

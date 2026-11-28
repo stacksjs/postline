@@ -2104,8 +2104,15 @@ async function checkChannels(cdp: Cdp): Promise<void> {
       const request = new Request(input, options)
       const path = new URL(request.url).pathname
       if (request.method === 'GET' && (path === '/api/postline/bootstrap' || path === '/api/postline/network-apps' || path.endsWith('/status') && path.startsWith('/api/postline/'))) window.channelReads.push(path)
+      if (path === '/api/postline/bluesky/connect') {
+        const form = await request.formData()
+        window.manualChannelHandle = form.get('identifier')
+        await new Promise(resolve => { window.finishManualChannel = resolve })
+        return Response.json({ ok: false, error: 'Check the app password and try again.' }, { status: 400 })
+      }
       if (path === '/api/postline/accounts/default' || path === '/api/postline/accounts/disconnect') {
         const id = Number((await request.formData()).get('id'))
+        await new Promise(resolve => { window.finishAccountUpdate = resolve })
         accounts = path.endsWith('/default') ? accounts.map(account => ({ ...account, isDefault: account.id === id })) : accounts.filter(account => account.id !== id)
         if (path.endsWith('/disconnect')) channelNeedsReconnect = true
         return Response.json({ ok: true })
@@ -2173,21 +2180,60 @@ async function checkChannels(cdp: Cdp): Promise<void> {
     await waitUntil('Channels shows the Bluesky app password guide', () => evaluate<boolean>(cdp, `
       ${card}.querySelector('ol').innerText.includes('Allow access to your direct messages')
         && ${card}.querySelector('[aria-label="Full Bluesky setup guide"]')?.href.endsWith('/docs/networks/bluesky.md')`), 5_000)
+    const connectForm = `${card}.querySelector('details form')`
+    const connect = `${connectForm}.querySelector('button[type=submit]')`
+    await evaluate(cdp, `
+      ${connectForm}.elements.identifier.value = 'keyboard.example'
+      ${connectForm}.elements.password.value = 'fixture-app-password'
+      ${connect}.focus()
+    `)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Channels announces a pending manual connection', () => evaluate<boolean>(cdp, `
+      Boolean(window.finishManualChannel) && window.manualChannelHandle === 'keyboard.example'
+        && ${connect}.disabled && ${connect}.getAttribute('aria-busy') === 'true'
+        && ${connect}.innerText.trim() === 'Connecting…'
+    `), 5_000)
+    await evaluate(cdp, 'window.finishManualChannel()')
+    await waitUntil('A refused channel connection can be retried', () => evaluate<boolean>(cdp, `
+      ${card}.querySelector('[role=status]')?.innerText === 'Check the app password and try again.'
+        && !${connect}.disabled && ${connect}.getAttribute('aria-busy') === 'false'
+    `), 5_000)
     await evaluate(cdp, `${card}.querySelector('summary').click()`)
 
-    await evaluate(cdp, `${card}.querySelector('[aria-label="Publish to @radio.example by default"]').click()`)
+    const makeDefault = `${card}.querySelector('button[aria-label="Publish to @radio.example by default"]')`
+    await evaluate(cdp, `${makeDefault}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Changing the default account identifies the busy row action', () => evaluate<boolean>(cdp, `
+      Boolean(window.finishAccountUpdate) && ${makeDefault}.disabled
+        && ${makeDefault}.getAttribute('aria-busy') === 'true'
+    `), 5_000)
+    await evaluate(cdp, 'window.finishAccountUpdate(); delete window.finishAccountUpdate')
     await waitUntil('The new default channel account', () => evaluate<boolean>(cdp, `
       [...${card}.querySelectorAll('li')].find(row => row.innerText.includes('@radio.example'))?.innerText.includes('Default')
-      && !${card}.querySelector('[aria-label="Publish to @radio.example by default"]').getClientRects().length`), 5_000)
+      && !${makeDefault}.getClientRects().length`), 5_000)
 
-    const disconnect = `${card}.querySelector('[aria-label="Disconnect @news.example"]')`
-    await evaluate(cdp, `${disconnect}.focus(); ${disconnect}.click()`)
-    await waitUntil('Disconnect confirmation', () => evaluate<boolean>(cdp, `
-      ${card}.querySelector('dialog').open && ${card}.querySelector('dialog h3').innerText.includes('@news.example')`), 5_000)
+    const disconnect = `${card}.querySelector('button[aria-label="Disconnect @news.example"]')`
+    const disconnectDialog = `${card}.querySelector('dialog')`
+    const confirm = `${disconnectDialog}.querySelector('button[type=button]')`
+    await evaluate(cdp, `${disconnect}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Disconnect confirmation puts focus on Cancel', () => evaluate<boolean>(cdp, `
+      ${disconnectDialog}.open && ${disconnectDialog}.querySelector('h3').innerText.includes('@news.example')
+        && document.activeElement === ${disconnectDialog}.querySelector('button[type=submit]')`), 5_000)
     await pressKey(cdp, 'Escape', 27)
-    if (!await evaluate<boolean>(cdp, `!${card}.querySelector('dialog').open && document.activeElement === ${disconnect}`))
+    if (!await evaluate<boolean>(cdp, `!${disconnectDialog}.open && document.activeElement === ${disconnect}`))
       fail('accounts', 'channels', 'closing confirmation did not restore focus')
-    await evaluate(cdp, `${disconnect}.click(); ${card}.querySelector('dialog button[type=button]').click()`)
+    await pressKey(cdp, 'Enter', 13)
+    await evaluate(cdp, `${confirm}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Disconnect confirmation stays busy while the account changes', () => evaluate<boolean>(cdp, `
+      Boolean(window.finishAccountUpdate) && ${disconnectDialog}.open
+        && ${confirm}.disabled && ${confirm}.getAttribute('aria-busy') === 'true'
+    `), 5_000)
+    await pressKey(cdp, 'Escape', 27)
+    if (!await evaluate<boolean>(cdp, `${disconnectDialog}.open`))
+      fail('accounts', 'channels', 'Escape hid the pending disconnect')
+    await evaluate(cdp, 'window.finishAccountUpdate()')
     await waitUntil('The disconnected account is removed from its card', () => evaluate<boolean>(cdp, `
       !${disconnect} && ${card}.innerText.includes('@radio.example') && !${card}.querySelector('dialog').open`), 5_000)
     await waitUntil('A live channel status change updates the badge text and color', () => evaluate<boolean>(cdp, `
