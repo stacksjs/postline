@@ -27,10 +27,7 @@ export const writingClient = { locale: workspaceLocale, messages: workspaceWriti
           <div>
             <h2 class="m-0 font-semibold text-ink text-sm">{{ writingText.posts }}</h2>
           </div>
-          <button class="inline-flex gap-2 items-center justify-center px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg disabled:opacity-50 transition-colors" type="button" :disabled="loading()" @click="loadPosts">
-            <span class="h-3.5 w-3.5 i-hugeicons-refresh" aria-hidden="true"></span>
-            {{ writingText.refresh }}
-          </button>
+          <Button variant="secondary" size="xs" leftIcon="<span class='i-hugeicons-refresh' aria-hidden='true'></span>" :disabled="Boolean(pending()) || importing()" :loading="loading()" :label="loading() ? copy.loading : copy.refresh" @click="loadPosts">{{ writingText.refresh }}</Button>
         </header>
 
         <WorkspaceListSkeleton :show="loading()" label="{{ writingText.loading }}" />
@@ -40,7 +37,7 @@ export const writingClient = { locale: workspaceLocale, messages: workspaceWriti
         </EmptyState>
 
         <div class="divide-line divide-y" x-show="!loading() && items().length">
-          <article class="grid gap-3 p-4" x-for="item in rows()" data-blog-row>
+          <article class="grid gap-3 p-4" x-for="item in rows()" :key="item.id" data-blog-row>
             <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" x-show="!item.editing">
               <div class="min-w-0">
                 <div class="flex gap-2 items-center mb-1.5">
@@ -55,17 +52,17 @@ export const writingClient = { locale: workspaceLocale, messages: workspaceWriti
                   {{ writingText.viewLive }}
                   <span class="h-3.5 w-3.5 i-hugeicons-square-arrow-up-right-02" aria-hidden="true"></span>
                 </a>
-                <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :disabled="busyId() === item.id" @click="startEdit(item.id)">{{ writingText.edit }}</button>
-                <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :disabled="busyId() === item.id" @click="toggleLive(item.id)" :text="item.published ? copy.takeDown : copy.putBack"></button>
-                <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-danger text-xs bg-panel hover:bg-danger-soft border border-line rounded-lg disabled:opacity-50" type="button" :disabled="busyId() === item.id" @click="removePost(item.id)">{{ writingText.deleteAction }}</button>
+                <Button variant="secondary" size="xs" :disabled="actionsLocked()" @click="startEdit(item.id)">{{ writingText.edit }}</Button>
+                <Button variant="secondary" size="xs" :disabled="actionsLocked()" :loading="isUpdating(item.id, 'visibility')" :label="item.published ? copy.takeDown : copy.putBack" @click="toggleLive(item.id)">{{ writingText.takeDown }}</Button>
+                <Button variant="danger" size="xs" :disabled="actionsLocked()" :loading="isUpdating(item.id, 'delete')" @click="removePost(item.id)">{{ writingText.deleteAction }}</Button>
               </div>
             </div>
             <form class="grid gap-2" x-show="item.editing" @submit.prevent="saveEdit(item.id)">
-              <input class="px-3 h-9 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="200" aria-label="{{ writingText.title }}" :value="item.draftTitle" @input="setDraft(item.id, 'title', $event)" data-blog-edit-title>
-              <textarea class="px-3 py-2 min-h-40 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft resize-y" aria-label="{{ writingText.text }}" :value="item.draftBody" @input="setDraft(item.id, 'body', $event)" data-blog-edit-body></textarea>
+              <input class="px-3 h-9 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="200" aria-label="{{ writingText.title }}" :value="item.draftTitle" :readonly="isUpdating(item.id, 'save')" @input="setDraft(item.id, 'title', $event)" data-blog-edit-title>
+              <textarea class="px-3 py-2 min-h-40 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft resize-y" aria-label="{{ writingText.text }}" :value="item.draftBody" :readonly="isUpdating(item.id, 'save')" @input="setDraft(item.id, 'body', $event)" data-blog-edit-body></textarea>
               <div class="flex gap-2 justify-end">
-                <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" type="button" @click="cancelEdit()">{{ writingText.cancel }}</button>
-                <button class="inline-flex items-center justify-center px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="submit" :disabled="busyId() === item.id">{{ writingText.save }}</button>
+                <Button variant="ghost" size="xs" :disabled="actionsLocked()" @click="cancelEdit">{{ writingText.cancel }}</Button>
+                <Button size="xs" type="submit" :disabled="actionsLocked()" :loading="isUpdating(item.id, 'save')" :label="isUpdating(item.id, 'save') ? copy.saving : copy.save">{{ writingText.save }}</Button>
               </div>
             </form>
           </article>
@@ -90,7 +87,7 @@ export const writingClient = { locale: workspaceLocale, messages: workspaceWriti
           <span :text="importName() || copy.chooseFile">{{ writingText.chooseFile }}</span>
           <input class="sr-only" type="file" accept=".csv,.json,text/csv,application/json" :disabled="importing()" @change="chooseImport($event)">
         </label>
-        <Button size="sm" :show="importResult()?.report.dryRun" :loading="importing()" :label="importing() ? copy.importing : copy.importAction" @click="runImport">{{ writingText.importAction }}</Button>
+        <Button size="sm" :show="importResult()?.report.dryRun" :disabled="actionsLocked()" :loading="importing()" :label="importing() ? copy.importing : copy.importAction" @click="runImport">{{ writingText.importAction }}</Button>
       </div>
       <p class="m-0 text-xs" x-show="importMessage()" :class="importTone() === 'error' ? 'text-danger' : 'text-body'" :text="importMessage()" role="status" aria-live="polite"></p>
       <ul class="grid gap-1 m-0 pl-5 list-disc text-muted text-xs" x-show="importSkipped().length">
@@ -113,7 +110,8 @@ export const writingClient = { locale: workspaceLocale, messages: workspaceWriti
     const loaded = state(false)
     const errorMessage = state('')
 
-    const busyId = state(0)
+    type PostOperation = 'save' | 'visibility' | 'delete'
+    const pending = state<{ id: number, operation: PostOperation } | null>(null)
     const editingId = state(0)
     const drafts = state({ title: '', body: '' })
 
@@ -141,6 +139,7 @@ export const writingClient = { locale: workspaceLocale, messages: workspaceWriti
     const importName = state('')
     const importResult = state<{ file: ImportFile, report: ImportReport } | null>(null)
     const importing = state(false)
+    const actionsLocked = derived(() => loading() || importing() || Boolean(pending()))
     const importMessage = state('')
     const importTone = state('neutral')
     let importSelection = 0
@@ -186,7 +185,7 @@ export const writingClient = { locale: workspaceLocale, messages: workspaceWriti
 
     const runImport = async () => {
       const preview = importResult()
-      if (!preview?.report.dryRun || importing()) return
+      if (!preview?.report.dryRun || actionsLocked()) return
       importing.set(true)
       importMessage.set(copy.importing)
       importTone.set('neutral')
@@ -248,65 +247,62 @@ export const writingClient = { locale: workspaceLocale, messages: workspaceWriti
     }
 
     const startEdit = (id: number) => {
+      if (actionsLocked()) return
       const item = items().find(entry => entry.id === id)
       if (!item) return
       drafts.set({ title: item.title, body: item.body })
       editingId.set(id)
     }
-    const cancelEdit = () => editingId.set(0)
+    const cancelEdit = () => {
+      if (!actionsLocked()) editingId.set(0)
+    }
     const setDraft = (id: number, field: 'title' | 'body', event: Event) => {
       if (editingId() !== id) return
       drafts.set({ ...drafts(), [field]: String((event.target as HTMLInputElement | null)?.value || '') })
     }
 
-    const saveEdit = async (id: number) => {
-      busyId.set(id)
-      try {
+    function isUpdating(id: number, operation: PostOperation): boolean {
+      const current = pending()
+      return current?.id === id && current.operation === operation
+    }
+
+    async function mutatePost(id: number, operation: PostOperation, work: () => Promise<void>) {
+      if (actionsLocked()) return
+      pending.set({ id, operation })
+      try { await work() }
+      catch (error) { toast(error instanceof Error ? error.message : String(error), 'error') }
+      finally { pending.set(null) }
+    }
+
+    function saveEdit(id: number) {
+      if (editingId() !== id) return
+      return mutatePost(id, 'save', async () => {
         await send('update', { id: String(id), title: drafts().title, body: drafts().body })
         editingId.set(0)
         await loadPosts()
         toast(copy.saved)
-      }
-      catch (error) {
-        toast(error instanceof Error ? error.message : String(error), 'error')
-      }
-      finally {
-        busyId.set(0)
-      }
+      })
     }
 
-    const toggleLive = async (id: number) => {
+    function toggleLive(id: number) {
       const item = items().find(entry => entry.id === id)
       if (!item) return
-      busyId.set(id)
-      try {
+      return mutatePost(id, 'visibility', async () => {
         await send(item.status === 'published' ? 'unpublish' : 'republish', { id: String(id) })
         await loadPosts()
         toast(item.status === 'published' ? copy.removedFromSite : copy.backOnSite)
-      }
-      catch (error) {
-        toast(error instanceof Error ? error.message : String(error), 'error')
-      }
-      finally {
-        busyId.set(0)
-      }
+      })
     }
 
-    const removePost = async (id: number) => {
+    async function removePost(id: number) {
+      if (actionsLocked()) return
       const item = items().find(entry => entry.id === id)
       if (!item || !await stxConfirm(words.t('confirmMessage', { title: item.title }), { title: copy.confirmTitle, type: 'error', confirmText: copy.confirmAction, cancelText: copy.cancel })) return
-      busyId.set(id)
-      try {
+      await mutatePost(id, 'delete', async () => {
         await send('delete', { id: String(id) })
         await loadPosts()
         toast(copy.deleted)
-      }
-      catch (error) {
-        toast(error instanceof Error ? error.message : String(error), 'error')
-      }
-      finally {
-        busyId.set(0)
-      }
+      })
     }
 
     onMount(() => void loadPosts())

@@ -4324,12 +4324,28 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
     await pressKey(cdp, 'Enter', 13)
     const blogTitle = `${blogRow}.querySelector('[data-blog-edit-title]')`
     await waitUntil('The Spanish Blog edit form opens', () => evaluate<boolean>(cdp, `Boolean(${blogTitle}?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, `(() => {
+      const beforeSave = window.fetch.bind(window)
+      window.fetch = (input, options) => {
+        const response = beforeSave(input, options)
+        if (new URL(input instanceof Request ? input.url : input, location.href).pathname !== '/api/postline/blog/update')
+          return response
+        return new Promise(resolve => { window.finishBlogSave = () => resolve(response) })
+      }
+    })()`)
+    const saveBlog = `${blogRow}.querySelector('button[type=submit]')`
     await evaluate(cdp, `${blogTitle}.select()`)
     await pressKey(cdp, 'Backspace', 8)
     await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Saving the Blog form announces progress and protects the draft', () => evaluate<boolean>(cdp, `
+      Boolean(window.finishBlogSave) && ${saveBlog}.disabled && ${saveBlog}.getAttribute('aria-busy') === 'true'
+        && ${saveBlog}.innerText.trim() === 'Guardando…' && ${blogTitle}.readOnly
+    `), 5_000)
+    await evaluate(cdp, 'window.finishBlogSave()')
     await waitUntil('Saving an empty Blog title gives a Spanish error without closing the edit form', () => evaluate<boolean>(cdp, `
       document.querySelector('#stx-toast-container')?.textContent.includes('La publicación del blog necesita un título.')
-        && ${blogTitle}.getClientRects().length > 0 && ${blogTitle}.value === ''
+        && ${blogTitle}.getClientRects().length > 0 && ${blogTitle}.value === '' && !${blogTitle}.readOnly
+        && !${saveBlog}.disabled && ${saveBlog}.getAttribute('aria-busy') === 'false'
     `), 5_000)
     await evaluate(cdp, `(() => {
       const fetchImport = window.fetch.bind(window)
@@ -4378,6 +4394,30 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
         && !${importButton}.getClientRects().length
         && [...document.querySelectorAll('[data-blog-row] h3')].some(title => title.textContent === 'Otra entrada')
         && ![...document.querySelectorAll('[data-blog-row] h3')].some(title => title.textContent === 'Archivo anterior')
+    `), 5_000)
+    const importedBlog = "[...document.querySelectorAll('[data-blog-row]')].find(row => row.querySelector('h3')?.textContent === 'Otra entrada')"
+    const blogAction = (label: string) => `[...(${importedBlog})?.querySelectorAll('button') ?? []].find(button => button.innerText.trim() === ${JSON.stringify(label)})`
+    for (const [action, next] of [['Retirar', 'Volver a publicar'], ['Volver a publicar', 'Retirar']] as const) {
+      await waitUntil(`The Blog offers ${action}`, () => evaluate<boolean>(cdp, `
+        Boolean(${blogAction(action)}?.getClientRects().length && !${blogAction(action)}.disabled)
+      `), 5_000)
+      await evaluate(cdp, `${blogAction(action)}.focus()`)
+      await pressKey(cdp, 'Enter', 13)
+      await waitUntil(`The Blog action changes to ${next}`, () => evaluate<boolean>(cdp, `
+        Boolean(${blogAction(next)}?.getClientRects().length)
+      `), 5_000)
+    }
+    await waitUntil('The imported Blog post can be deleted', () => evaluate<boolean>(cdp, `${blogAction('Eliminar')}?.disabled === false`), 5_000)
+    await evaluate(cdp, `${blogAction('Eliminar')}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const confirmBlogDelete = "[...document.querySelectorAll('[role=alertdialog] button')].find(button => button.innerText.trim() === 'Eliminar publicación')"
+    await waitUntil('Deleting the Blog post asks for confirmation by title', () => evaluate<boolean>(cdp, `
+      Boolean(${confirmBlogDelete}?.closest('[role=alertdialog]')?.innerText.includes('Otra entrada'))
+    `), 5_000)
+    await evaluate(cdp, `${confirmBlogDelete}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The confirmed Blog post is removed', () => evaluate<boolean>(cdp, `
+      !(${importedBlog}) && document.querySelector('#stx-toast-container')?.textContent.includes('Publicación eliminada.')
     `), 5_000)
     await checkSpanishInbox(cdp)
     await checkSpanishListening(cdp)

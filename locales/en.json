@@ -909,6 +909,7 @@
       "text": "Text",
       "cancel": "Cancel",
       "save": "Save",
+      "saving": "Saving…",
       "importPosts": "Import posts",
       "importDescription": "A CSV export (title, body, and optionally slug and date columns) or a JSON array. Import up to 5,000 posts at a time. Running another import updates existing posts.",
       "chooseFile": "Choose a file",

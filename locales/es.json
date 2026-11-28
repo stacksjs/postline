@@ -909,6 +909,7 @@
       "text": "Texto",
       "cancel": "Cancelar",
       "save": "Guardar",
+      "saving": "Guardando…",
       "importPosts": "Importar publicaciones",
       "importDescription": "Usa un archivo CSV (columnas title y body, con slug y date opcionales) o una lista JSON. Puedes importar hasta 5.000 publicaciones a la vez. Otra importación actualiza las entradas existentes.",
       "chooseFile": "Elegir un archivo",
