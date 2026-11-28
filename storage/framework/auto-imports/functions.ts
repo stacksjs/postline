@@ -14,8 +14,6 @@ export { firstComposerLink, composerLinkPreview } from '../../../resources/funct
 export type { ComposerLinkPreview, ComposerSegment } from '../../../resources/functions/composer-thread'
 export { composerVariantsPayload, composerVariantRows } from '../../../resources/functions/composer-variants'
 export type { ComposerVariants } from '../../../resources/functions/composer-variants'
-export { bindDesktopAlerts } from '../../../resources/functions/desktop-alerts'
-export type { DesktopAlertsBridge } from '../../../resources/functions/desktop-alerts'
 export { providerLabel, providerInitial, providerColor, providerIcon } from '../../../resources/functions/networks'
 export { showNotification } from '../../../resources/functions/notification'
 export { passkeys } from '../../../resources/functions/passkeys'

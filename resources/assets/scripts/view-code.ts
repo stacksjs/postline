@@ -1,8 +1,13 @@
-/** Load Composer’s optional browser modules when the current visit needs them. */
+/** Load optional workspace modules when the current visit needs them. */
 const editorUrl = new URL('/assets/scripts/richtext-editor.ts', import.meta.url)
 let loaded: Promise<typeof import('./richtext-editor')> | undefined
 let composer: HTMLElement | null = null
 let observer: MutationObserver | undefined
+
+export function loadDesktopAlerts(): Promise<typeof import('./desktop-alerts')> {
+  const url = new URL('/assets/scripts/desktop-alerts.ts', import.meta.url)
+  return import(url.href)
+}
 
 function watchComposer(): void {
   const root = document.querySelector<HTMLElement>('[data-postline-page="composer"]')

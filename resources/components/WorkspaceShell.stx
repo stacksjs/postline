@@ -13,8 +13,6 @@ export const settingsLabel = workspaceText('workspace.navigation.settings')
 
 <script client>
 import type { CraftBridgeAPI } from 'craft-native'
-import { bindDesktopAlerts } from '../functions/desktop-alerts'
-import { showNotification } from '../functions/notification'
 
 type WorkspaceBridge = CraftBridgeAPI & {
   window: CraftBridgeAPI['window'] & {
@@ -44,22 +42,21 @@ let settingsChannel: BroadcastChannel | null = null
 let unbindSettingsMenu: (() => void) | undefined
 let unbindWorkspaceChanges: (() => void) | undefined
 let unbindDesktopAlerts: (() => void) | undefined
+let destroyed = false
 const offlineToastId = 'postline-offline'
 
 function showOfflineNotice() {
-  showNotification({
-    id: offlineToastId,
-    tone: 'info',
-    durationMs: 0,
+  toast.info('Changes made now will not save until the connection is back. Scheduled posts still go out on time.', {
     title: 'You are offline',
-    message: 'Changes made now will not save until the connection is back. Scheduled posts still go out on time.',
+    id: offlineToastId,
+    duration: 0,
   })
 }
 
 useEventListener('offline', showOfflineNotice)
 useEventListener('online', () => {
   toast.dismiss(offlineToastId)
-  showNotification({ tone: 'success', durationMs: 3000, title: 'Back online', message: 'Postline is connected again.' })
+  toast.success('Postline is connected again.', { title: 'Back online', id: 'postline-online', duration: 3000 })
 })
 
 function toggleSidebar() {
@@ -166,7 +163,11 @@ function receiveSettings(event: MessageEvent) {
 desktop.onReady((host) => {
   native.set(true)
   unbindSettingsMenu = (host as WorkspaceBridge).settings?.onOpen(openSettings)
-  unbindDesktopAlerts = bindDesktopAlerts(host)
+  const path = '/assets/scripts/view-code.ts'
+  void import(path).then(async ({ loadDesktopAlerts }) => {
+    const { bindDesktopAlerts } = await loadDesktopAlerts()
+    if (!destroyed) unbindDesktopAlerts = bindDesktopAlerts(host)
+  }).catch(error => console.error('Could not load desktop alerts', error))
 })
 
 onMount(() => {
@@ -179,6 +180,7 @@ onMount(() => {
 })
 
 onDestroy(() => {
+  destroyed = true
   unbindWorkspaceChanges?.()
   unbindSettingsMenu?.()
   unbindDesktopAlerts?.()

@@ -1,4 +1,4 @@
-import { requestJson } from './postline-client'
+import { requestJson } from '../../functions/postline-client'
 
 interface AlertView {
   id: number

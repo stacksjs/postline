@@ -39,7 +39,6 @@ declare global {
   const composerLinkPreview: typeof autoImports.composerLinkPreview
   const composerVariantsPayload: typeof autoImports.composerVariantsPayload
   const composerVariantRows: typeof autoImports.composerVariantRows
-  const bindDesktopAlerts: typeof autoImports.bindDesktopAlerts
   const providerLabel: typeof autoImports.providerLabel
   const providerInitial: typeof autoImports.providerInitial
   const providerColor: typeof autoImports.providerColor

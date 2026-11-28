@@ -120,6 +120,9 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
 
   const script = await call('GET', '/assets/scripts/view-code.ts')
   check('a workspace script is served as JavaScript', script.status === 200 && script.type === 'text/javascript' && !/\binterface\s+\w+\s*\{/.test(script.text), `${script.status} ${script.type}`)
+  const alertsScript = await call('GET', '/assets/scripts/desktop-alerts.ts')
+  check('the compiled workspace can load native alerts on demand', alertsScript.status === 200
+    && alertsScript.type === 'text/javascript' && alertsScript.text.includes('bindDesktopAlerts'))
 
   for (const path of ['/api/csrf', '/api/postline/bootstrap', '/api/postline/providers', '/api/postline/queue', '/api/postline/recurring-posts', '/api/postline/draft-feeds', '/api/postline/accounts', '/api/postline/analytics', '/api/postline/campaigns', '/api/postline/listening', '/api/postline/inbox/mentions', '/api/postline/settings/retention']) {
     const read = await call('GET', path)

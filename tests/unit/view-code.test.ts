@@ -31,9 +31,10 @@ describe('code loads only where it is used', () => {
     }
   })
 
-  it('bundles the editor imported by URL, though no page names it', () => {
+  it('bundles the workspace modules imported on demand', () => {
     const referenced = referencedClientScripts(root)
     expect(referenced).not.toContain('richtext-editor.ts')
-    expect(lazyClientScripts(root, referenced)).toEqual(['browser-share.ts', 'richtext-editor.ts'])
+    expect(referenced).not.toContain('desktop-alerts.ts')
+    expect(lazyClientScripts(root, referenced)).toEqual(['browser-share.ts', 'desktop-alerts.ts', 'richtext-editor.ts'])
   })
 })
