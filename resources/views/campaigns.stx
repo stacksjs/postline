@@ -14,7 +14,7 @@ export const campaignClient = { locale: workspaceLocale, messages: campaignCopy 
 
 @section('content')
   @meta('description', campaignText.description)
-  <section class="grid gap-4" data-postline-page="campaigns" data-testid="campaigns-page" lang="{{ campaignLocale }}">
+  <section class="grid gap-4" data-postline-page="campaigns" data-testid="campaigns-page" ref="campaignPage" lang="{{ campaignLocale }}">
     <WorkspacePageHeader titleKey="workspace.navigation.campaigns" descriptionKey="workspace.pages.campaigns.description">
       <template #status>
         <span x-show="campaign()">
@@ -77,7 +77,7 @@ export const campaignClient = { locale: workspaceLocale, messages: campaignCopy 
             <div class="px-2.5 py-2 font-medium text-muted text-right text-xs bg-panel">{{ campaignText.saturday }}</div>
             <div
               class="p-2 min-h-36 bg-panel data-[drop-active=true]:bg-info-soft data-[outside=true]:bg-panel-2 data-[drop-active=true]:ring-2 data-[drop-active=true]:ring-focus data-[drop-active=true]:ring-inset transition-colors group"
-              x-for="cell in calendarCells()"
+              x-for="cell in calendarCells()" :key="cell.key" :data-campaign-day="cell.key"
               :data-outside="cell.outside"
               :data-drop-active="dragOverDay() === cell.key"
               @dragover="allowDrop($event, cell.key)"
@@ -86,7 +86,7 @@ export const campaignClient = { locale: workspaceLocale, messages: campaignCopy 
             >
               <header class="flex items-center justify-between mb-1 font-medium text-muted text-xs">
                 <span class="grid place-items-center size-6 data-[today=true]:text-on-accent data-[today=true]:bg-accent rounded-full" :data-today="cell.today" :aria-current="cell.today ? 'date' : null">{{ cell.day }}</span>
-                <button class="grid place-items-center size-6 text-muted hover:text-ink hover:bg-hover rounded-lg group-focus-within:opacity-100 group-hover:opacity-100 pointer-fine:opacity-0 transition-opacity" type="button" :aria-label="copy.addOn.replace('{date}', cell.label)" @click="openPostForm(null, cell.key)"><span class="size-3.5 i-hugeicons-plus-sign" aria-hidden="true"></span></button>
+                <WorkspaceIconButton label="{{ campaignText.addPost }}" :label="copy.addOn.replace('{date}', cell.label)" icon="i-hugeicons-plus-sign" className="group-focus-within:opacity-100 group-hover:opacity-100 pointer-fine:opacity-0 transition-opacity" @activate="openPostForm(null, cell.key)" />
               </header>
               <div class="grid gap-1.5">
                 <article
@@ -285,7 +285,7 @@ export const campaignClient = { locale: workspaceLocale, messages: campaignCopy 
             <div class="grid gap-3" x-show="!queuedPostId()">
               <label class="grid gap-1.5 font-medium text-body text-ui">
                 <span>{{ campaignText.workingTitle }}</span>
-                <input class="px-2.5 h-9 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus" required maxlength="160" placeholder="{{ campaignText.postTitlePlaceholder }}" x-model="postTitle">
+                <input class="px-2.5 h-9 w-full font-normal text-ink bg-panel border border-field-line rounded-xl focus:ring-2 focus:ring-focus" required maxlength="160" placeholder="{{ campaignText.postTitlePlaceholder }}" x-model="postTitle" ref="postTitleInput">
               </label>
               <label class="grid gap-1.5 font-medium text-body text-ui">
                 <span>{{ campaignText.postBody }}</span>
@@ -625,7 +625,13 @@ export const campaignClient = { locale: workspaceLocale, messages: campaignCopy 
       direction.set(creativeDirection)
     }
 
+    const campaignPage = useRef<HTMLElement>('campaignPage')
+    const postTitleInput = useRef<HTMLInputElement>('postTitleInput')
+    let postOpener: HTMLElement | undefined
+
     async function openPostForm(item, day) {
+      const page = campaignPage.current
+      const active = page?.ownerDocument.activeElement
       if (!await canLeaveForm()) return
       if (!campaign()) return
       const draft = item
@@ -643,6 +649,8 @@ export const campaignClient = { locale: workspaceLocale, messages: campaignCopy 
       postScheduledAt.set(selected?.toISOString() ?? null)
       panelMode.set('post')
       openedWith = formSnapshot()
+      postOpener = active instanceof HTMLElement && page?.contains(active) ? active : undefined
+      if (!queuedPostId()) void nextTick(() => postTitleInput.current?.focus())
     }
 
     // Cards that open a post answer the keyboard as a button does (#160).
@@ -666,7 +674,10 @@ export const campaignClient = { locale: workspaceLocale, messages: campaignCopy 
 
     async function closePanel() {
       if (!await canLeaveForm()) return
+      const opener = panelMode() === 'post' ? postOpener : undefined
+      postOpener = undefined
       panelMode.set(campaign() ? 'planner' : '')
+      if (opener) void nextTick(() => { if (opener.isConnected) opener.focus() })
     }
 
     function retryLoad() {

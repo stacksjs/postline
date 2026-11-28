@@ -5,18 +5,23 @@ export const icon = $props.icon
 export const variant = $props.variant || 'ghost'
 export const size = $props.size || 'xs'
 export const position = $props.position || 'bottom'
+export const className = $props.className || ''
 </script>
 
 <script client>
 const emit = defineEmits(['activate'])
+const fallbackLabel = {{ label }}
+const currentLabel = useReactiveProp('label', fallbackLabel, {
+  parse: value => String(value ?? '').trim() || fallbackLabel,
+})
 
 function activate(event) {
   emit('activate', event)
 }
 </script>
 
-<Tooltip content="{{ label }}" position="{{ position }}">
-  <Button variant="{{ variant }}" size="{{ size }}" aria-label="{{ label }}" @click="activate">
+<Tooltip content="{{ label }}" :content="currentLabel()" position="{{ position }}">
+  <Button variant="{{ variant }}" size="{{ size }}" className="{{ className }}" aria-label="{{ label }}" :ariaLabel="currentLabel()" @click="activate">
     <span class="size-4 {{ icon }}" aria-hidden="true"></span>
   </Button>
 </Tooltip>

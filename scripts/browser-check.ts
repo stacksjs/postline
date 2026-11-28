@@ -3338,9 +3338,29 @@ async function checkAnalytics(cdp: Cdp): Promise<void> {
   }
 }
 
+async function openCampaignDay(cdp: Cdp, trigger: string, title: string, labelPrefix: string) {
+  const describedBy = `document.getElementById(${trigger}?.getAttribute('aria-describedby') || '')`
+  await waitUntil('The calendar day has a dated action name', () => evaluate<boolean>(cdp, `
+    Boolean(${trigger}?.getClientRects().length && ${trigger}.getAttribute('aria-label')?.startsWith(${JSON.stringify(labelPrefix)}))
+  `), 5_000)
+  await evaluate(cdp, `${trigger}.focus()`)
+  await waitUntil('The date in the action name is the date in the visible tooltip', () => evaluate<boolean>(cdp, `
+    Boolean(${describedBy}?.getClientRects().length)
+      && ${describedBy}.textContent.trim() === ${trigger}.getAttribute('aria-label')
+  `), 5_000)
+  await pressKey(cdp, 'Escape', 27)
+  await waitUntil('Escape closes the day tooltip and preserves focus', () => evaluate<boolean>(cdp, `
+    !${describedBy}?.getClientRects().length && document.activeElement === ${trigger}
+  `), 5_000)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Opening the dated post focuses the editor title', () => evaluate<boolean>(cdp, `
+    Boolean(${title}?.getClientRects().length) && document.activeElement === ${title}
+  `), 5_000)
+}
+
 async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false })
-  const fixture = await evaluate<{ campaignId: number, postId: number }>(cdp, `(async () => {
+  const fixture = await evaluate<{ campaignId: number, postId: number, addDay: string }>(cdp, `(async () => {
     const write = async (path, body) => {
       const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       if (!response.ok) throw new Error('Could not create the campaign schedule fixture: ' + await response.text())
@@ -3355,7 +3375,7 @@ async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
       campaign_id: campaign.id, title: 'Plan the scheduling fixture', body: 'Keep the campaign clock time.',
       providers: ['blog'], scheduled_at: day + ' 09:00:00',
     })
-    return { campaignId: campaign.id, postId: post.id }
+    return { campaignId: campaign.id, postId: post.id, addDay: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10) }
   })()`)
   const recommendation = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const send = window.fetch.bind(window)
@@ -3394,6 +3414,8 @@ async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
     const previous = `document.querySelector('button[aria-label="Previous six weeks"]')`
     const calendarTitle = `document.querySelector('[aria-label="Campaign plan"] > header strong').textContent`
     const startWindow = await evaluate<string>(cdp, calendarTitle)
+    const firstDate = "document.querySelector('[data-campaign-day]')"
+    const firstDateKey = await evaluate<string>(cdp, `${firstDate}.dataset.campaignDay`)
     await evaluate(cdp, `${previous}.focus()`)
     const tooltip = `document.getElementById(${previous}.getAttribute('aria-describedby'))`
     await waitUntil('The calendar arrow shows its tooltip on focus', () => evaluate<boolean>(cdp, `
@@ -3404,12 +3426,30 @@ async function checkCampaignScheduling(cdp: Cdp): Promise<void> {
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('The keyboard shifts the campaign calendar', () => evaluate<boolean>(cdp, `
       ${calendarTitle} !== ${JSON.stringify(startWindow)}`), 5_000)
+    await waitUntil('The shifted dates have matching accessible names', () => evaluate<boolean>(cdp, `(() => {
+      const cell = ${firstDate}
+      if (!cell || cell.dataset.campaignDay === ${JSON.stringify(firstDateKey)}) return false
+      const date = new Date(cell.dataset.campaignDay + 'T12:00:00Z')
+      const label = new Intl.DateTimeFormat('en', { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(date)
+      return cell.querySelector('header button')?.getAttribute('aria-label') === 'Add post on ' + label
+    })()`), 5_000)
     await evaluate(cdp, `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Campaign start').click()`)
     await waitUntil('Campaign start restores the calendar window', () => evaluate<boolean>(cdp, `
       ${calendarTitle} === ${JSON.stringify(startWindow)}`), 5_000)
+    const dayButton = `document.querySelector('[data-campaign-day="${fixture.addDay}"] header button')`
+    const titleInput = `document.querySelector('input[placeholder="The first signal"]')`
+    const picker = `document.querySelector('[data-postline-schedule-picker] [data-date-time-trigger]')`
+    await openCampaignDay(cdp, dayButton, titleInput, 'Add post on ')
+    await waitUntil('The blank post starts on the chosen date', () => evaluate<boolean>(cdp, `
+      ${titleInput}.value === '' && ${picker}?.textContent.includes(
+        new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(${JSON.stringify(fixture.addDay + 'T12:00:00Z')})))
+    `), 5_000)
+    await pressKey(cdp, 'Escape', 27)
+    await waitUntil('Closing the blank post returns focus to its day', () => evaluate<boolean>(cdp, `
+      !${titleInput}?.getClientRects().length && document.activeElement === ${dayButton}
+    `), 5_000)
     await evaluate(cdp, `${post}.focus()`)
     await pressKey(cdp, 'Enter', 13)
-    const picker = `document.querySelector('[data-postline-schedule-picker] [data-date-time-trigger]')`
     await waitUntil('The campaign editor opens with the saved post fields', () => evaluate<boolean>(cdp, `
       Boolean(${picker}?.getClientRects().length)
         && document.querySelector('input[placeholder=\"The first signal\"]')?.value === 'Plan the scheduling fixture'
@@ -4262,9 +4302,8 @@ async function checkSpanishCampaigns(cdp: Cdp): Promise<void> {
       && ${add}?.getAttribute('aria-label')?.startsWith('Añadir una publicación el ')
       && ${page}.querySelector('[aria-label="Herramientas de campaña"]')?.innerText.includes('Asistente de campaña')
   `), 5_000)
-  await evaluate(cdp, `(${add}).focus()`)
-  await pressKey(cdp, 'Enter', 13)
   const postTitle = input('Primer anuncio')
+  await openCampaignDay(cdp, add, postTitle, 'Añadir una publicación el ')
   const postBody = input('Escribe la publicación…')
   await waitUntil('The Spanish planned post editor opens from the calendar', () => evaluate<boolean>(cdp, `
     Boolean(${postTitle}?.getClientRects().length)
