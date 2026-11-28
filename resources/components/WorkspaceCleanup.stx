@@ -1,0 +1,309 @@
+<script server cache>
+import { workspaceChannelsText, workspaceLocale } from '../../app/Support/Localization/workspace'
+
+export const channelsText = workspaceChannelsText
+export const channelsClient = { locale: workspaceLocale, messages: channelsText }
+</script>
+
+<script client>
+import type { PurgeProgress, PurgeProviderResult, PurgeResult, PurgeScope } from '../../app/Services/Social/PurgeService'
+import { createI18n } from '@stacksjs/i18n/client'
+import { showNotification } from '../functions/notification'
+import { requestJson } from '../functions/postline-client'
+
+const { locale, messages: copy } = {{ channelsClient }}
+const words = createI18n({ locale, messages: { [locale]: copy } })
+const numbers = new Intl.NumberFormat(locale)
+const plural = new Intl.PluralRules(locale)
+
+interface CleanupPreview {
+  scope: PurgeScope
+  providers: string[]
+  result: PurgeResult
+}
+
+const scope = state<PurgeScope>('tracked')
+const providers = state(['bluesky', 'twitter', 'mastodon', 'linkedin'])
+const preview = state<CleanupPreview | null>(null)
+const previewing = state(false)
+const confirmation = state('')
+const summary = state(copy.noPreview)
+const rows = state<PurgeProviderResult[]>([])
+const startStage = state<'confirming' | 'starting' | null>(null)
+const runId = state('')
+const cancelling = state(false)
+const selectionLocked = derived(() => Boolean(startStage() || runId()))
+let previewRequest: AbortController | undefined
+let statusRequest: AbortController | undefined
+let disposed = false
+
+const mayDelete = derived(() => {
+  const result = preview()?.result
+  return Boolean(result?.previewToken && result.matched > 0 && confirmation() === result.confirmation
+    && !previewing() && !selectionLocked())
+})
+
+const hint = derived(() => {
+  if (!providers().length) return copy.selectAccount
+  const result = preview()?.result
+  if (!result) return copy.previewSelection
+  if (result.matched === 0) return copy.noMatches
+  if (confirmation() !== result.confirmation) return words.t('typeExact', { phrase: result.confirmation })
+  return copy.deletePreviewed
+})
+
+function capNote(row: PurgeProviderResult): string {
+  if (row.dailyLimit) {
+    return words.t(row.truncated ? 'dailyTruncated' : 'dailyLimit', {
+      network: row.provider, limit: numbers.format(row.dailyLimit.limit), remaining: numbers.format(row.dailyLimit.remaining),
+    })
+  }
+  return row.truncated ? copy.capped : ''
+}
+
+const purgeRows = derived(() => rows().map(row => ({
+  heading: row.handle ? `${row.provider} — ${row.handle}` : row.provider,
+  detail: row.skippedReason
+    || (!row.supported || !row.connected
+      ? copy.unavailable
+      : words.t(plural.select(row.matched) === 'one' ? 'wouldDeleteOne' : 'wouldDeleteMany', {
+          count: numbers.format(row.matched), limit: capNote(row),
+        })),
+})))
+
+function clearPreview() {
+  preview.set(null)
+  confirmation.set('')
+}
+
+function invalidatePreview() {
+  previewRequest?.abort()
+  previewRequest = undefined
+  previewing.set(false)
+  clearPreview()
+  summary.set(copy.noPreview)
+  rows.set([])
+}
+
+function setScope(next: PurgeScope) {
+  if (selectionLocked() || next === scope()) return
+  scope.set(next)
+  invalidatePreview()
+}
+
+function setProvider(provider: string, event: Event) {
+  if (selectionLocked()) return
+  const checked = (event.currentTarget as HTMLInputElement).checked
+  if (providers().includes(provider) === checked) return
+  providers.update(values => checked ? [...values, provider] : values.filter(value => value !== provider))
+  invalidatePreview()
+}
+
+onUnmounted(() => {
+  disposed = true
+  previewRequest?.abort()
+  statusRequest?.abort()
+})
+
+async function loadPreview() {
+  const selectedScope = scope()
+  const selectedProviders = [...providers()]
+  if (!selectedProviders.length || previewing() || selectionLocked()) return
+
+  clearPreview()
+  rows.set([])
+  const request = new AbortController()
+  previewRequest = request
+  previewing.set(true)
+  summary.set(copy.counting)
+  try {
+    const query = new URLSearchParams({ scope: selectedScope, providers: selectedProviders.join(',') })
+    const { data: result } = await requestJson(`/api/postline/purge/preview?${query}`, { signal: request.signal }, copy.previewFailed)
+    if (request.signal.aborted) return
+    preview.set({ scope: selectedScope, providers: selectedProviders, result })
+    rows.set(result.providers)
+    summary.set(words.t(plural.select(result.matched) === 'one' ? 'matchesOne' : 'matchesMany', { count: numbers.format(result.matched) }))
+  }
+  catch (error) {
+    if (request.signal.aborted) return
+    summary.set(copy.previewFailed)
+    showNotification({ message: error instanceof Error ? error.message : String(error), tone: 'error', title: copy.dangerZone })
+  }
+  finally {
+    if (previewRequest === request) {
+      previewRequest = undefined
+      previewing.set(false)
+    }
+  }
+}
+
+async function startPurge() {
+  const approved = preview()
+  const token = approved?.result.previewToken
+  if (!approved || !token || !mayDelete()) return
+  startStage.set('confirming')
+  try {
+    const matched = approved.result.matched
+    const where = approved.scope === 'all' ? copy.fromSelected : copy.fromPostline
+    const accepted = await stxConfirm(
+      words.t(plural.select(matched) === 'one' ? 'confirmOne' : 'confirmMany', { count: numbers.format(matched), where }),
+      { title: copy.confirmTitle, type: 'error', confirmText: copy.deletePosts },
+    )
+    if (disposed || !accepted || preview() !== approved || confirmation() !== approved.result.confirmation) return
+
+    startStage.set('starting')
+    const body = new FormData()
+    body.set('scope', approved.scope)
+    body.set('providers', approved.providers.join(','))
+    body.set('confirmation', approved.result.confirmation)
+    body.set('preview_token', token)
+    const { data: run } = await requestJson('/api/postline/purge', { method: 'POST', body }, copy.deletionFailed)
+    if (disposed) return
+    clearPreview()
+    runId.set(run.runId)
+    showProgress(run)
+  }
+  catch (error) {
+    if (!disposed) showNotification({ message: error instanceof Error ? error.message : String(error), tone: 'error', title: copy.deletionFailedTitle })
+  }
+  finally {
+    startStage.set(null)
+  }
+}
+
+function showProgress(run: PurgeProgress) {
+  const failed = run.failed ? words.t('deleteProgressFailed', { failed: numbers.format(run.failed) }) : ''
+  const progress = words.t('deleteProgress', { deleted: numbers.format(run.deleted), limit: numbers.format(run.limit) })
+  summary.set(progress + failed + (run.status === 'running' ? '…' : '.'))
+  if (run.status === 'running') return
+
+  runId.set('')
+  cancelling.set(false)
+  if (run.result) rows.set(run.result.providers)
+  if (run.status === 'failed') {
+    showNotification({ message: run.error || copy.deletionFailed, tone: 'error', title: copy.deletionFailedTitle })
+    return
+  }
+
+  const completed = words.t(plural.select(run.deleted) === 'one' ? 'deletedOne' : 'deletedMany', { count: numbers.format(run.deleted) })
+  const errors = run.failed ? words.t('deletedFailed', { count: numbers.format(run.failed) }) : ''
+  const stopped = run.status === 'cancelled' ? copy.stopped : ''
+  showNotification({ message: completed + errors + stopped, tone: run.failed ? 'error' : 'success', title: copy.dangerZone })
+}
+
+async function readProgress() {
+  const id = runId()
+  if (!id || statusRequest) return
+
+  const request = new AbortController()
+  statusRequest = request
+  try {
+    const { data: run } = await requestJson(`/api/postline/purge/status?run=${encodeURIComponent(id)}`, { signal: request.signal }, copy.lostRun)
+    if (!request.signal.aborted && runId() === id) showProgress(run)
+  }
+  catch (error) {
+    if (request.signal.aborted || runId() !== id) return
+    runId.set('')
+    cancelling.set(false)
+    showNotification({ message: error instanceof Error ? error.message : String(error), tone: 'error', title: copy.deletionFailedTitle })
+  }
+  finally {
+    statusRequest = undefined
+  }
+}
+
+useInterval(readProgress, 1000, { enabled: () => Boolean(runId()) })
+
+async function cancelPurge() {
+  const id = runId()
+  if (!id || cancelling()) return
+  cancelling.set(true)
+  try {
+    const body = new FormData()
+    body.set('run', id)
+    await requestJson('/api/postline/purge/cancel', { method: 'POST', body }, copy.lostRun)
+    if (!disposed && runId() === id) summary.set(copy.stopping)
+  }
+  catch (error) {
+    if (disposed || runId() !== id) return
+    cancelling.set(false)
+    showNotification({ message: error instanceof Error ? error.message : String(error), tone: 'error', title: copy.dangerZone })
+  }
+}
+</script>
+
+<template>
+  <details class="overflow-hidden bg-panel border border-line rounded-2xl open:border-danger-line shadow-sm group" data-purge-card>
+    <summary class="flex gap-3 items-center justify-between p-4 list-none hover:bg-panel-2 transition-colors cursor-pointer">
+      <div class="flex gap-3 items-center"><span class="grid place-items-center h-9 w-9 text-danger text-lg bg-danger-soft rounded-xl" aria-hidden="true"><span class="i-hugeicons-alert-02"></span></span><div>
+        <strong class="text-ink text-ui">{{ channelsText.cleanup }}</strong>
+        <p class="mb-0 mt-1 text-muted text-xs">{{ channelsText.cleanupDescription }}</p>
+      </div></div>
+      <span class="h-4 w-4 text-muted transition-transform group-open:rotate-180 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
+    </summary>
+
+    <div class="grid gap-4 p-4 border-danger-line border-t">
+      <div class="flex gap-2 items-center p-3 text-danger text-xs bg-danger-soft border border-danger-line rounded-xl"><span class="shrink-0 h-4 w-4 i-hugeicons-alert-02" aria-hidden="true"></span><span>{{ channelsText.cleanupWarning }}</span></div>
+      <fieldset class="grid gap-2 m-0 p-0 border-0" :disabled="selectionLocked()">
+        <legend class="mb-1 p-0 font-semibold text-muted text-xs">{{ channelsText.whatToDelete }}</legend>
+        <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
+          <input class="mt-0.5" type="radio" name="purge-scope" value="tracked" checked :checked="scope() === 'tracked'" @change="setScope('tracked')" data-purge-scope>
+          <span>
+            <span class="block font-semibold text-ink text-ui">{{ channelsText.trackedPosts }}</span>
+            <span class="block mt-0.5 text-muted text-xs">{{ channelsText.trackedDescription }}</span>
+          </span>
+        </label>
+        <label class="flex gap-2.5 items-start p-3 border border-line rounded-xl cursor-pointer">
+          <input class="mt-0.5" type="radio" name="purge-scope" value="all" :checked="scope() === 'all'" @change="setScope('all')" data-purge-scope>
+          <span>
+            <span class="block font-semibold text-ink text-ui">{{ channelsText.allPosts }}</span>
+            <span class="block mt-0.5 text-muted text-xs">{{ channelsText.allPostsDescription }}</span>
+          </span>
+        </label>
+      </fieldset>
+
+      <fieldset class="grid gap-2 m-0 p-0 border-0" :disabled="selectionLocked()">
+        <legend class="mb-1 p-0 font-semibold text-muted text-xs">{{ channelsText.accounts }}</legend>
+        <div class="flex flex-wrap gap-3">
+          <label class="inline-flex gap-2 items-center text-ui">
+            <input type="checkbox" value="bluesky" checked :checked="providers().includes('bluesky')" @change="setProvider('bluesky', $event)" data-purge-provider> Bluesky
+          </label>
+          <label class="inline-flex gap-2 items-center text-ui">
+            <input type="checkbox" value="twitter" checked :checked="providers().includes('twitter')" @change="setProvider('twitter', $event)" data-purge-provider> X
+          </label>
+          <label class="inline-flex gap-2 items-center text-ui">
+            <input type="checkbox" value="mastodon" checked :checked="providers().includes('mastodon')" @change="setProvider('mastodon', $event)" data-purge-provider> Mastodon
+          </label>
+          <label class="inline-flex gap-2 items-center text-ui">
+            <input type="checkbox" value="linkedin" checked :checked="providers().includes('linkedin')" @change="setProvider('linkedin', $event)" data-purge-provider> LinkedIn
+          </label>
+        </div>
+        <p class="m-0 text-muted text-xs">{{ channelsText.deletionLimits }}</p>
+      </fieldset>
+
+      <div class="flex flex-wrap gap-3 items-center" data-purge-preview-actions>
+        <Button variant="secondary" size="sm" :disabled="selectionLocked() || !providers().length" :loading="previewing()" :label="previewing() ? copy.counting : copy.preview" @click="loadPreview">{{ channelsText.preview }}</Button>
+        <span class="text-muted text-xs" role="status" :text="summary()" data-purge-summary>{{ channelsText.noPreview }}</span>
+      </div>
+
+      <div class="grid gap-2" :show="purgeRows().length" data-purge-results>
+        <div class="p-3 text-ui border border-line rounded-xl" x-for="row in purgeRows()">
+          <strong :text="row.heading"></strong>
+          <p class="my-1 text-muted" :text="row.detail"></p>
+        </div>
+      </div>
+
+      <div class="grid gap-2 p-3 bg-danger-soft border border-danger-line rounded-xl">
+        <label class="grid gap-1.5">
+          <span class="font-semibold text-danger text-xs">{{ channelsText.type }} <code class="px-1 py-0.5 text-xs bg-panel rounded" :text="preview()?.result.confirmation || copy.thePhrase" data-purge-phrase>{{ channelsText.thePhrase }}</code> {{ channelsText.toConfirm }}</span>
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-danger-line outline-none rounded-xl focus:border-danger-solid focus:ring-2 focus:ring-danger-soft" type="text" autocomplete="off" placeholder="{{ channelsText.previewFirst }}" aria-label="{{ channelsText.confirmationPhrase }}" :placeholder="preview()?.result.confirmation || copy.previewFirst" :disabled="selectionLocked() || previewing()" x-model="confirmation" data-purge-confirmation>
+        </label>
+        <div class="grid gap-2" data-purge-confirmation-actions>
+          <Button variant="danger" size="sm" fullWidth="true" disabled="true" :disabled="!mayDelete()" :loading="startStage() === 'starting' || Boolean(runId())" @click="startPurge">{{ channelsText.deletePermanently }}</Button>
+          <Button variant="secondary" size="sm" fullWidth="true" :show="Boolean(runId())" :loading="cancelling()" :label="cancelling() ? copy.stopping : copy.stopDeleting" @click="cancelPurge">{{ channelsText.stopDeleting }}</Button>
+        </div>
+        <p class="m-0 text-danger text-xs" :text="hint()" data-purge-hint>{{ channelsText.previewHint }}</p>
+      </div>
+    </div>
+  </details>
+</template>

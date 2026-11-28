@@ -110,7 +110,7 @@ export default {
   },
 
   // Surface prohibited DOM access in client scripts as warnings while the
-  // composer, Settings and Channels purge controls still access the DOM.
+  // Composer, Settings and Channels still have direct DOM access.
   strict: {
     enabled: true,
     failOnViolation: false,

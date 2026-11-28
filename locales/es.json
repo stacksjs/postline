@@ -526,7 +526,6 @@
       "noMatches": "La vista previa no encontró publicaciones para eliminar.",
       "typeExact": "Escribe {phrase} tal como aparece para habilitar la eliminación.",
       "deletePreviewed": "Se eliminarán permanentemente las publicaciones de esta lista.",
-      "selectToPreview": "Selecciona al menos una cuenta para generar la vista previa.",
       "dangerZone": "Acciones irreversibles",
       "counting": "Contando…",
       "previewFailed": "No se pudo generar la vista previa.",

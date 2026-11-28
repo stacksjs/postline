@@ -526,7 +526,6 @@
       "noMatches": "The preview matched no posts, so there is nothing to delete.",
       "typeExact": "Type {phrase} exactly to enable deletion.",
       "deletePreviewed": "This permanently deletes the posts listed above.",
-      "selectToPreview": "Pick at least one account to preview.",
       "dangerZone": "Danger zone",
       "counting": "Counting…",
       "previewFailed": "Preview failed.",

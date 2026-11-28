@@ -2246,6 +2246,131 @@ async function checkChannels(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkCleanupPreview(cdp: Cdp): Promise<void> {
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const send = window.fetch.bind(window)
+    const cleanup = { previews: [], cancelled: false, cancels: 0 }
+    window.cleanupTest = cleanup
+    const response = data => Response.json({ ok: true, data })
+    const progress = () => ({ runId: 'cleanup-fixture', status: cleanup.cancelled ? 'cancelled' : 'running',
+      limit: 2, deleted: 0, failed: 0, result: null })
+    window.fetch = async (input, options) => {
+      const url = new URL(input instanceof Request ? input.url : input, location.href)
+      if (url.pathname === '/api/postline/purge/preview') {
+        const entry = { scope: url.searchParams.get('scope'), providers: url.searchParams.get('providers') }
+        return new Promise(resolve => {
+          entry.finish = (matched, previewToken) => {
+            const data = { matched, confirmation: 'DELETE ' + matched + ' POSTS', previewToken,
+              providers: [{ provider: 'bluesky', handle: 'fixture', supported: true, connected: true, matched }] }
+            const reply = response(data)
+            reply.json = async () => { entry.read = true; return { ok: true, data } }
+            resolve(reply)
+          }
+          cleanup.previews.push(entry)
+        })
+      }
+      if (url.pathname === '/api/postline/purge') {
+        cleanup.submitted = Object.fromEntries(options.body)
+        return response(progress())
+      }
+      if (url.pathname === '/api/postline/purge/status') return response(progress())
+      if (url.pathname === '/api/postline/purge/cancel') {
+        cleanup.cancelRun = options.body.get('run')
+        if (++cleanup.cancels === 1)
+          return Response.json({ ok: false, error: 'The stop request was not accepted. Try again.' }, { status: 503 })
+        cleanup.cancelled = true
+        return response(progress())
+      }
+      return send(input, options)
+    }
+  ` })
+  const card = "document.querySelector('[data-purge-card]')"
+  const button = (label: string) => `[...${card}.querySelectorAll('button')].find(button => button.innerText.trim() === ${JSON.stringify(label)})`
+  const preview = button('Preview what would be deleted')
+  const run = button('Delete permanently')
+  const cancel = button('Stop deleting')
+  const phrase = `${card}.querySelector('[data-purge-phrase]')`
+  const confirmation = `${card}.querySelector('[data-purge-confirmation]')`
+  const summary = `${card}.querySelector('[data-purge-summary]')`
+  try {
+    await auditPage(`${site}/accounts`, { cdp })
+    await waitUntil('Cleanup becomes available', () => evaluate<boolean>(cdp, `Boolean(${card}?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, `${card}.querySelector('summary').focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await evaluate(cdp, `${preview}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The first cleanup preview is pending', () => evaluate<boolean>(cdp, 'window.cleanupTest.previews.length === 1'), 5_000)
+    for (const scope of ['all', 'tracked']) {
+      await evaluate(cdp, `${card}.querySelector('[data-purge-scope][value=${scope}]').focus()`)
+      await pressKey(cdp, ' ', 32)
+    }
+    await evaluate(cdp, `${card}.querySelector('[data-purge-provider][value=linkedin]').focus()`)
+    await pressKey(cdp, ' ', 32)
+    await waitUntil('Changed cleanup choices release the preview button and keep deletion locked', () => evaluate<boolean>(cdp, `
+      ${preview}?.disabled === false && ${run}.disabled && !${summary}.innerText.includes('matched')
+    `), 5_000)
+    await evaluate(cdp, `${preview}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Cleanup previews the current selection', () => evaluate<boolean>(cdp, `
+      window.cleanupTest.previews[1]?.scope === 'tracked'
+        && window.cleanupTest.previews[1]?.providers === 'bluesky,twitter,mastodon'
+    `), 5_000)
+    await evaluate(cdp, "window.cleanupTest.previews[1].finish(2, 'current-preview')")
+    await waitUntil('Cleanup shows the current preview results', () => evaluate<boolean>(cdp, `
+      ${summary}.innerText === '2 posts matched.' && ${phrase}.innerText === 'DELETE 2 POSTS'
+    `), 5_000)
+    await evaluate(cdp, "window.cleanupTest.previews[0].finish(5, 'old-preview')")
+    await waitUntil('The delayed response reaches the cleanup controller', () => evaluate<boolean>(cdp, 'window.cleanupTest.previews[0].read === true'), 5_000)
+    if (!await evaluate<boolean>(cdp, `${summary}.innerText === '2 posts matched.' && ${phrase}.innerText === 'DELETE 2 POSTS'`))
+      throw new Error('An earlier cleanup preview replaced the current selection.')
+
+    const authorize = async () => {
+      await evaluate(cdp, `${confirmation}.focus()`)
+      await cdp.send('Input.insertText', { text: 'DELETE 2 POSTS' })
+      await waitUntil('Typing the exact cleanup phrase unlocks confirmation', () => evaluate<boolean>(cdp, `${run}.disabled === false`), 5_000)
+    }
+    await authorize()
+    await evaluate(cdp, `${preview}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('A new cleanup preview is pending', () => evaluate<boolean>(cdp, 'window.cleanupTest.previews.length === 3'), 5_000)
+    await evaluate(cdp, "window.cleanupTest.previews[2].finish(2, 'confirmed-preview')")
+    await waitUntil('A fresh preview requires a new confirmation even if its count is unchanged', () => evaluate<boolean>(cdp, `
+      ${summary}.innerText === '2 posts matched.' && ${confirmation}.value === '' && ${run}.disabled
+    `), 5_000)
+    await authorize()
+    await evaluate(cdp, `${run}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const confirm = "[...document.querySelectorAll('[role=alertdialog] button')].find(button => button.textContent.trim() === 'Delete posts')"
+    await waitUntil('The cleanup dialog identifies the approved count before starting', () => evaluate<boolean>(cdp, `
+      Boolean(${confirm}?.closest('[role=alertdialog]')?.textContent.includes('Delete 2 posts that Postline published'))
+        && !window.cleanupTest.submitted
+    `), 5_000)
+    await evaluate(cdp, `${confirm}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Cleanup starts with the approved selection and preview token', () => evaluate<boolean>(cdp, `
+      window.cleanupTest.submitted?.preview_token === 'confirmed-preview' && window.cleanupTest.submitted?.scope === 'tracked'
+        && window.cleanupTest.submitted?.providers === 'bluesky,twitter,mastodon'
+        && window.cleanupTest.submitted?.confirmation === 'DELETE 2 POSTS'
+        && Boolean(${cancel}?.getClientRects().length) && ${run}.getAttribute('aria-busy') === 'true'
+    `), 5_000)
+    await evaluate(cdp, `${cancel}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('A refused stop request can be retried while cleanup is running', () => evaluate<boolean>(cdp, `
+      window.cleanupTest.cancels === 1 && ${cancel}?.disabled === false
+        && document.querySelector('#stx-toast-container')?.textContent.includes('The stop request was not accepted.')
+    `), 5_000)
+    await evaluate(cdp, `${cancel}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The canceled cleanup finishes and requires a fresh preview', () => evaluate<boolean>(cdp, `
+      window.cleanupTest.cancelRun === 'cleanup-fixture' && ${summary}.innerText === '0 of 2 deleted.'
+        && !${cancel}?.getClientRects().length && ${run}.disabled && ${confirmation}.value === ''
+    `), 5_000)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+  }
+}
+
 async function checkXPublicAppSettings(cdp: Cdp): Promise<void> {
   await auditPage(`${site}/accounts`, { cdp })
   const app = "document.querySelector('[data-network-app=twitter]')"
@@ -3897,12 +4022,12 @@ async function checkSpanishChannels(cdp: Cdp): Promise<void> {
 
   await evaluate(cdp, `document.querySelector('[data-purge-card] summary').focus()`)
   await pressKey(cdp, 'Enter', 13)
-  await evaluate(cdp, `document.querySelector('[data-purge-preview]').focus()`)
+  await evaluate(cdp, `document.querySelector('[data-purge-preview-actions] button').focus()`)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Spanish cleanup preview uses the workspace result and keeps deletion locked', () => evaluate<boolean>(cdp, `
     document.querySelector('[data-purge-summary]')?.innerText === 'Se encontraron 0 publicaciones.'
       && document.querySelector('[data-purge-phrase]')?.innerText === 'DELETE 0 POSTS'
-      && document.querySelector('[data-purge-run]')?.disabled === true
+      && document.querySelector('[data-purge-confirmation-actions] button')?.disabled === true
       && document.querySelector('[data-purge-hint]')?.innerText === 'La vista previa no encontró publicaciones para eliminar.'
   `), 5_000)
 }
@@ -4733,6 +4858,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkWorkspaceBootstrap(cdp)
   await checkChannels(cdp)
   await checkXPublicAppSettings(cdp)
+  await checkCleanupPreview(cdp)
   await checkDesktopNetworkConsent(cdp)
   await checkPublicInbox(cdp)
   await checkInboxRequestOwnership(cdp)
