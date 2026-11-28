@@ -1881,6 +1881,143 @@ async function checkPublicInbox(cdp: Cdp): Promise<void> {
       && !${inbox}?.getClientRects().length`), 5000)
 }
 
+async function checkInboxRequestOwnership(cdp: Cdp): Promise<void> {
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const realFetch = window.fetch.bind(window)
+    const older = {}
+    const input = { older }
+    window.directMessageFixture = input
+    const conversations = [
+      { id: 701, provider: 'bluesky', participantHandle: 'first.example', participantName: 'First conversation', unreadCount: 0 },
+      { id: 702, provider: 'mastodon', participantHandle: 'second.example', participantName: 'Second conversation', unreadCount: 0 },
+    ]
+    const ok = data => Response.json({ ok: true, data })
+    const fresh = (id, number, body, direction = 'incoming') => ({
+      id: id * 10 + number, provider: id === 701 ? 'bluesky' : 'mastodon', direction, body,
+      sentAt: '2026-11-24T12:00:00Z', status: 'sent',
+    })
+    window.fetch = async (target, options) => {
+      const request = new Request(target, options)
+      const url = new URL(request.url)
+      if (url.pathname === '/api/postline/inbox') {
+        const provider = url.searchParams.get('provider')
+        if (provider === 'bluesky')
+          await new Promise(resolve => { input.finishFirstFilter = resolve })
+        return ok({ conversations: conversations.filter(item => item.id !== input.archived && (!provider || item.provider === provider)) })
+      }
+      if (url.pathname === '/api/postline/inbox/thread') {
+        const id = Number(url.searchParams.get('conversation_id'))
+        const person = id === 701 ? 'First' : 'Second'
+        if (url.searchParams.has('offset')) {
+          const failure = await new Promise(resolve => { older[id] = resolve })
+          if (failure) return Response.json({ ok: false, error: 'Could not load older messages. Try again.' }, { status: 503 })
+          return ok({ messages: [fresh(id, 1, person + ' older message')], olderOffset: null })
+        }
+        return ok({ messages: [fresh(id, 2, person + ' latest message')], olderOffset: 1 })
+      }
+      if (url.pathname === '/api/postline/inbox/read') return ok({})
+      if (url.pathname === '/api/postline/inbox/reply') {
+        input.sent = await request.json()
+        await new Promise(resolve => { input.finishReply = resolve })
+        const record = conversations.find(item => item.id === input.sent.conversation_id)
+        record.lastMessagePreview = input.sent.body
+        record.lastMessageOutgoing = true
+        return ok({ message: fresh(record.id, 3, input.sent.body, 'outgoing') })
+      }
+      if (url.pathname === '/api/postline/inbox/archive') {
+        const operation = await request.json()
+        await new Promise(resolve => { input.finishArchive = resolve })
+        input.archived = operation.conversation_id
+        return ok({})
+      }
+      return realFetch(target, options)
+    }
+  ` })
+  const aside = "document.querySelector('[data-testid=inbox-page] aside')"
+  const entry = (name: string) => `[...${aside}.querySelectorAll('button')].find(button => button.innerText.includes(${JSON.stringify(name)}))`
+  const thread = "document.querySelector('[data-inbox-thread]')"
+  const older = `[...${thread}.querySelectorAll('button')].find(button => ['Show older messages', 'Loading…'].includes(button.innerText.trim()) && button.getClientRects().length)`
+  const editor = "document.querySelector('[data-testid=inbox-page] textarea[aria-label=Reply]')"
+  const activate = async (selector: string) => {
+    await waitUntil('The Inbox control is ready', () => evaluate<boolean>(cdp, `Boolean((${selector})?.getClientRects().length && !(${selector}).disabled)`), 5_000)
+    await evaluate(cdp, `(${selector}).focus()`)
+    await pressKey(cdp, 'Enter', 13)
+  }
+  const select = async (name: 'First' | 'Second') => {
+    await activate(entry(`${name} conversation`))
+    await waitUntil(`${name} conversation renders its latest page`, () => evaluate<boolean>(cdp, `
+      ${thread}.innerText.includes('${name} latest message')`), 5_000)
+  }
+  const pressFilter = (provider: string) => evaluate(cdp, `
+    (() => { const chooser = ${aside}.querySelector('select[aria-label=Network]')
+      chooser.value = ${JSON.stringify(provider)}
+      chooser.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+  try {
+    await auditPage(`${site}/inbox`, { cdp })
+    await select('First')
+    await activate(older)
+    await waitUntil('The first conversation requests older messages', () => evaluate<boolean>(cdp, 'Boolean(window.directMessageFixture.older[701])'), 5_000)
+    await select('Second')
+    await activate(older)
+    await waitUntil('The second conversation requests its own older messages', () => evaluate<boolean>(cdp, 'Boolean(window.directMessageFixture.older[702])'), 5_000)
+    await evaluate(cdp, `(async () => {
+      const fixture = window.directMessageFixture
+      fixture.older[701]()
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    })()`)
+    if (!await evaluate<boolean>(cdp, `(${older})?.disabled && !${thread}.innerText.includes('First older message')`))
+      throw new Error('A late page from the first conversation changed the second conversation.')
+    await evaluate(cdp, 'window.directMessageFixture.older[702](true); delete window.directMessageFixture.older[702]')
+    await waitUntil('Older-message errors are announced in the selected conversation', () => evaluate<boolean>(cdp, `
+      (${older})?.disabled === false && [...document.querySelectorAll('[role=alert]')].some(node =>
+        node.innerText.includes('Could not load older messages. Try again.'))`), 5_000)
+    await activate(older)
+    await waitUntil('The same older page can be retried', () => evaluate<boolean>(cdp, 'Boolean(window.directMessageFixture.older[702])'), 5_000)
+    await evaluate(cdp, 'window.directMessageFixture.older[702]()')
+    await waitUntil('Only the selected conversation’s older page is appended', () => evaluate<boolean>(cdp, `
+      ${thread}.innerText.includes('Second older message') && !${thread}.innerText.includes('First older message')`), 5_000)
+
+    await evaluate(cdp, `${editor}.focus()`)
+    await cdp.send('Input.insertText', { text: 'Sent reply' })
+    await activate(`${editor}.closest('form').querySelector('button[type=submit]')`)
+    await waitUntil('The reply is sent to the second conversation', () => evaluate<boolean>(cdp, `
+      window.directMessageFixture.sent?.conversation_id === 702 && window.directMessageFixture.sent?.body === 'Sent reply'`), 5_000)
+    await evaluate(cdp, `${editor}.focus(); ${editor}.select()`)
+    await cdp.send('Input.insertText', { text: 'Next unfinished reply' })
+    await select('First')
+    await evaluate(cdp, 'window.directMessageFixture.finishReply()')
+    await waitUntil('The reply updates the original conversation preview', () => evaluate<boolean>(cdp, `
+      (${entry('Second conversation')})?.innerText.includes('Sent reply')`), 5_000)
+    await select('Second')
+    if (!await evaluate<boolean>(cdp, `${editor}.value === 'Next unfinished reply'`))
+      throw new Error('Completing the previous send erased the next draft.')
+
+    const archive = "[...document.querySelectorAll('section[aria-label=Conversation] header button')].find(button => button.innerText.trim() === 'Archive')"
+    await activate(archive)
+    await waitUntil('The second conversation starts archiving', () => evaluate<boolean>(cdp, 'Boolean(window.directMessageFixture.finishArchive)'), 5_000)
+    await select('First')
+    await evaluate(cdp, 'window.directMessageFixture.finishArchive()')
+    await waitUntil('Archiving an earlier selection preserves the thread currently open', () => evaluate<boolean>(cdp, `
+      !(${entry('Second conversation')}) && ${thread}.innerText.includes('First latest message')`), 5_000)
+
+    await pressFilter('bluesky')
+    await waitUntil('The first filter request is pending', () => evaluate<boolean>(cdp, 'Boolean(window.directMessageFixture.finishFirstFilter)'), 5_000)
+    await pressFilter('mastodon')
+    await waitUntil('The newer filter displays its result', () => evaluate<boolean>(cdp, `
+      !(${entry('First conversation')}) && !${thread}.getClientRects().length`), 5_000)
+    await evaluate(cdp, `(async () => {
+      window.directMessageFixture.finishFirstFilter()
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    })()`)
+    if (await evaluate<boolean>(cdp, `Boolean(${entry('First conversation')})`))
+      throw new Error('An older network filter replaced the current conversation list.')
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+  }
+}
+
 async function checkInstagramPagePicker(cdp: Cdp): Promise<void> {
   const state = 'a'.repeat(64)
   const picker = `document.querySelector('[aria-labelledby="instagram-page-choice-title"]')`
@@ -4394,6 +4531,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkXPublicAppSettings(cdp)
   await checkDesktopNetworkConsent(cdp)
   await checkPublicInbox(cdp)
+  await checkInboxRequestOwnership(cdp)
   await checkTwitterDmControls(cdp)
   await checkXBrowserSession(cdp)
   await checkInstagramPagePicker(cdp)

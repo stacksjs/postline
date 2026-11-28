@@ -156,7 +156,9 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
           </form>
         </div>
 
-        <p class="m-0 px-4 py-3 text-danger text-sm bg-danger-soft border-danger-line border-t" x-show="errorMessage()" :text="errorMessage()"></p>
+        <div role="alert">
+          <p class="m-0 px-4 py-3 text-danger text-sm bg-danger-soft border-danger-line border-t" x-show="errorMessage()" :text="errorMessage()"></p>
+        </div>
       </section>
     </div>
   </section>
@@ -212,6 +214,8 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
     const conversationError = state('')
     const threadError = state('')
     const activeId = state(0)
+    let threadSelection = 0
+    let listRequest = 0
     const statusFilter = state('open')
     const providerFilter = state('')
     const accountFilter = state('')
@@ -239,10 +243,13 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
     const threadList = useRef('threadList')
     /** Within this many pixels of the bottom counts as reading the newest. */
     const NEAR_BOTTOM = 80
-    const scrollToNewest = () => void nextTick(() => {
-      const list = threadList.current
-      if (list) list.scrollTop = list.scrollHeight
-    })
+    const scrollToNewest = () => {
+      const selection = threadSelection
+      void nextTick(() => {
+        const list = threadList.current
+        if (selection === threadSelection && list) list.scrollTop = list.scrollHeight
+      })
+    }
     const activeCharacterLimit = state(1000)
     let pollTimer = 0
 
@@ -280,11 +287,17 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
       requestJson(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, copy.requestFailed)
 
     const loadConversations = async ({ quiet = false } = {}) => {
-      if (!quiet) loading.set(true)
+      if (quiet && (loading() || loadingMore())) return
+      const request = ++listRequest
+      if (!quiet) {
+        loading.set(true)
+        loadingMore.set(false)
+      }
       conversationError.set('')
       try {
         const query = new URLSearchParams({ status: statusFilter(), provider: providerFilter(), identity_id: accountFilter() })
         const payload = await requestJson(`/api/postline/inbox?${query}`, {}, copy.requestFailed)
+        if (request !== listRequest) return
         const first = payload.data?.conversations || []
         // A quiet refresh updates the first page in place and keeps any pages
         // already loaded below it; a full load starts over.
@@ -302,34 +315,40 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
         unavailable.set(payload.data?.providers?.unavailable || [])
         if (payload.data?.providers?.twitter) xInbox.set(payload.data.providers.twitter)
         // A thread that has been archived or filtered away should not stay open.
-        if (activeId() && !conversations().some(item => item.id === activeId())) closeConversation()
+        if (activeId() && !conversations().some(item => item.id === activeId())) selectConversation(0)
       }
       catch (error) {
-        conversationError.set(error instanceof Error ? error.message : String(error))
+        if (request === listRequest) conversationError.set(error instanceof Error ? error.message : String(error))
       }
       finally {
-        loading.set(false)
+        if (request === listRequest) loading.set(false)
       }
     }
 
-    const closeConversation = () => {
+    const selectConversation = (id: number) => {
       keepDraft()
-      activeId.set(0)
+      threadSelection++
+      activeId.set(id)
       messages.set([])
       threadError.set('')
+      errorMessage.set('')
+      threadLoading.set(false)
+      loadingOlder.set(false)
       olderOffset.set(null)
-      draftBody.set('')
+      activeCharacterLimit.set(1000)
+      draftBody.set(drafts.get(id) || '')
     }
 
     const loadThread = async ({ markRead = true, quiet = false } = {}) => {
       const conversationId = activeId()
-      if (!conversationId) return
+      if (!conversationId || (quiet && (threadLoading() || loadingOlder()))) return
+      const selection = threadSelection
       if (!quiet) threadLoading.set(true)
       threadError.set('')
       try {
         const query = new URLSearchParams({ conversation_id: String(conversationId) })
         const payload = await requestJson(`/api/postline/inbox/thread?${query}`, {}, copy.requestFailed)
-        if (conversationId !== activeId()) return
+        if (selection !== threadSelection) return
         // A quiet refresh keeps older messages already loaded above the newest page.
         const newest = payload.data?.messages || []
         // A quiet refresh follows new messages only for someone already at the
@@ -354,57 +373,61 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
         }
       }
       catch (error) {
-        if (conversationId === activeId()) threadError.set(error instanceof Error ? error.message : String(error))
+        if (selection === threadSelection) threadError.set(error instanceof Error ? error.message : String(error))
       }
       finally {
-        if (conversationId === activeId()) threadLoading.set(false)
+        if (selection === threadSelection) threadLoading.set(false)
       }
     }
 
     const loadMoreConversations = async () => {
       const offset = nextOffset()
-      if (offset === null || loadingMore()) return
+      if (offset === null || loading() || loadingMore()) return
+      const request = listRequest
       loadingMore.set(true)
       try {
         const query = new URLSearchParams({ status: statusFilter(), provider: providerFilter(), identity_id: accountFilter(), offset: String(offset) })
         const payload = await requestJson(`/api/postline/inbox?${query}`, {}, copy.requestFailed)
+        if (request !== listRequest) return
         const seen = new Set(conversations().map(item => item.id))
         conversations.set([...conversations(), ...(payload.data?.conversations || []).filter(item => !seen.has(item.id))])
         nextOffset.set(payload.data?.nextOffset ?? null)
       }
       catch (error) {
-        errorMessage.set(error instanceof Error ? error.message : String(error))
+        if (request === listRequest)
+          showNotification({ title: copy.couldNotLoadConversations, message: error instanceof Error ? error.message : String(error), tone: 'error', id: 'inbox-pagination' })
       }
       finally {
-        loadingMore.set(false)
+        if (request === listRequest) loadingMore.set(false)
       }
     }
 
     const loadOlderMessages = async () => {
       const offset = olderOffset()
-      if (offset === null || loadingOlder() || !activeId()) return
+      const conversationId = activeId()
+      if (offset === null || loadingOlder() || !conversationId) return
+      const selection = threadSelection
       loadingOlder.set(true)
+      errorMessage.set('')
       try {
-        const query = new URLSearchParams({ conversation_id: String(activeId()), offset: String(offset) })
+        const query = new URLSearchParams({ conversation_id: String(conversationId), offset: String(offset) })
         const payload = await requestJson(`/api/postline/inbox/thread?${query}`, {}, copy.requestFailed)
+        if (selection !== threadSelection) return
         const seen = new Set(messages().map(item => item.id))
         messages.set([...(payload.data?.messages || []).filter(item => !seen.has(item.id)), ...messages()])
         olderOffset.set(payload.data?.olderOffset ?? null)
       }
       catch (error) {
-        errorMessage.set(error instanceof Error ? error.message : String(error))
+        if (selection === threadSelection) errorMessage.set(error instanceof Error ? error.message : String(error))
       }
       finally {
-        loadingOlder.set(false)
+        if (selection === threadSelection) loadingOlder.set(false)
       }
     }
 
     const openConversation = async (id: number) => {
       if (activeId() === id) return
-      keepDraft()
-      activeId.set(id)
-      messages.set([])
-      draftBody.set(drafts.get(id) || '')
+      selectConversation(id)
       await loadThread()
     }
 
@@ -434,7 +457,7 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
 
     const toggleStatusFilter = async () => {
       statusFilter.set(statusFilter() === 'archived' ? 'open' : 'archived')
-      closeConversation()
+      selectConversation(0)
       await loadConversations()
     }
 
@@ -481,11 +504,13 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
     }
 
     const refreshThread = async () => {
-      if (!activeId()) return
+      const conversationId = activeId()
+      if (!conversationId || refreshing()) return
+      const selection = threadSelection
       refreshing.set(true)
       try {
-        await postJson('/api/postline/inbox/sync', { conversation_id: activeId() })
-        await loadThread({ quiet: true })
+        await postJson('/api/postline/inbox/sync', { conversation_id: conversationId })
+        if (selection === threadSelection) await loadThread({ quiet: true })
         await loadConversations({ quiet: true })
       }
       catch (error) {
@@ -498,17 +523,23 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
 
     const sendReply = async (event: SubmitEvent) => {
       event.preventDefault()
-      const body = draftBody().trim()
+      const submittedDraft = draftBody()
+      const body = submittedDraft.trim()
       const conversationId = activeId()
       const isX = activeProvider() === 'twitter'
       if (!body || !conversationId || !canReply() || sending()) return
       sending.set(true)
       try {
         const payload = await postJson('/api/postline/inbox/reply', { conversation_id: conversationId, body })
-        drafts.delete(conversationId)
-        if (activeId() === conversationId) {
-          if (payload.data?.message) messages.set([...messages(), payload.data.message])
-          draftBody.set('')
+        const stillOpen = activeId() === conversationId
+        const latestDraft = stillOpen ? draftBody() : drafts.get(conversationId)
+        if (latestDraft === submittedDraft) {
+          drafts.delete(conversationId)
+          if (stillOpen) draftBody.set('')
+        }
+        if (stillOpen) {
+          const sent = payload.data?.message
+          if (sent && !messages().some(item => item.id === sent.id)) messages.set([...messages(), sent])
           scrollToNewest()
         }
         await loadConversations({ quiet: true })
@@ -539,11 +570,12 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
     }
 
     const toggleArchive = async () => {
-      if (!activeId()) return
+      const conversationId = activeId()
+      if (!conversationId) return
       const nextStatus = statusFilter() === 'archived' ? 'open' : 'archived'
       try {
-        await postJson('/api/postline/inbox/archive', { conversation_id: activeId(), status: nextStatus })
-        closeConversation()
+        await postJson('/api/postline/inbox/archive', { conversation_id: conversationId, status: nextStatus })
+        if (activeId() === conversationId) selectConversation(0)
         await loadConversations()
         showNotification({
           title: nextStatus === 'archived' ? copy.archivedTitle : copy.restoredTitle,
