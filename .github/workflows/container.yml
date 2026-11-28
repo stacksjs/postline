@@ -29,7 +29,7 @@ jobs:
             test ! -e /app/database/postline.sqlite
           '
 
-      - name: Verify first run and data persistence
+      - name: Verify first run, data persistence, and owner recovery
         run: |
           set -euo pipefail
           name="postline-container-check-$$"
@@ -69,20 +69,35 @@ jobs:
             docker exec "$name" bun -e 'const key = Bun.file("/var/lib/postline/app-key"); console.log(Bun.SHA256.hash(await key.arrayBuffer(), "hex"))'
           }
 
+          read_csrf_cookie() {
+            curl --fail --silent --show-error --dump-header - --output /dev/null "$origin/api/csrf" \
+              | awk 'tolower($1) == "set-cookie:" && $2 ~ /^X-CSRF-Token=/ { sub(/;.*/, "", $2); print $2 }'
+          }
+
+          login_as_owner() {
+            local password="$1" cookie
+            cookie=$(read_csrf_cookie)
+            test -n "$cookie" || return 1
+            curl --fail --silent --show-error "$origin/api/login" \
+              --cookie "$cookie" --header "X-CSRF-Token: ${cookie#*=}" \
+              --data-urlencode 'email=container-check@example.test' \
+              --data-urlencode "password=$password"
+          }
+
           start
           setup=$(curl --fail --silent --show-error "$origin/setup")
           grep -Fq 'data-testid="setup-page"' <<< "$setup"
           curl --fail --silent --show-error "$origin/api/postline/setup/availability" \
             | jq -e '.ok and .data.available == true' >/dev/null
-          csrf_cookie=$(curl --fail --silent --show-error --dump-header - --output /dev/null "$origin/api/csrf" \
-            | awk 'tolower($1) == "set-cookie:" && $2 ~ /^X-CSRF-Token=/ { sub(/;.*/, "", $2); print $2 }')
+          csrf_cookie=$(read_csrf_cookie)
           test -n "$csrf_cookie"
+          original_password=$(openssl rand -hex 24)
           curl --fail --silent --show-error "$origin/api/register" \
             --cookie "$csrf_cookie" --header "X-CSRF-Token: ${csrf_cookie#*=}" \
             --cookie-jar "$session" \
             --data-urlencode 'name=Container Test' \
             --data-urlencode 'email=container-check@example.test' \
-            --data-urlencode "password=$(openssl rand -hex 24)" \
+            --data-urlencode "password=$original_password" \
             | jq -e '.ok and .data.token_type == "Bearer"' >/dev/null
           channels=$(curl --fail --silent --show-error --cookie "$session" "$origin/accounts")
           grep -Fq 'data-testid="accounts-page"' <<< "$channels"
@@ -104,7 +119,16 @@ jobs:
           test "$before" = "$(print_key_digest)"
           docker exec "$name" bun -e '
             import { Database } from "bun:sqlite"
-            using database = new Database(process.env.DB_DATABASE_PATH, { readonly: true })
+            using database = new Database(process.env.DB_DATABASE_PATH)
             if (database.query("SELECT value FROM container_check").get()?.value !== "retained" || await Bun.file("/var/lib/postline/media/check.txt").text() !== "retained")
               throw new Error("The container did not retain the workspace and media.")
+            const fixture = database.query("UPDATE users SET two_factor_enabled = 1, two_factor_secret = ? WHERE email = ?")
+              .run("SYNTHETICFIXTURE", "container-check@example.test")
+            if (fixture.changes !== 1) throw new Error("The container lost the fixture owner.")
           '
+          login_as_owner "$original_password" | jq -e '.requires_two_factor == true' >/dev/null
+          restored_password=$(openssl rand -hex 24)
+          docker exec "$name" ./buddy user:add container-check@example.test --update --without-two-factor \
+            --password "$restored_password" >/dev/null
+          login_as_owner "$restored_password" \
+            | jq -e '.token_type == "Bearer" and .user.email == "container-check@example.test"' >/dev/null

@@ -16,22 +16,8 @@ recovery codes, are there too.
 
 ## If you lose the password
 
-There is no "forgot password" email. Reset it on the machine Postline runs on:
-
-```bash
-./buddy user:add you@example.com --update
-```
-
-It prints a new password once; add `--password` to choose your own. A passkey
-you added still works in the meantime.
-
-If two-factor sign-in is on and you have lost both the authenticator and the
-recovery codes, add `--without-two-factor`: it also turns two-factor sign-in
-off, and you can set it up again under **Settings > Account**.
-
-```bash
-./buddy user:add you@example.com --update --without-two-factor
-```
+A passkey you added still works. To reset the password or recover from losing
+your authenticator and recovery codes, follow the [owner account recovery guide](./account-recovery.md).
 
 ## Your first post
 
@@ -43,6 +29,6 @@ off, and you can set it up again under **Settings > Account**.
    the network and its reason; rate limits and short outages are retried by
    themselves.
 
-On a server the scheduler has to run for scheduled posts to go out:
-`./buddy dev` runs it, and in production run `./buddy schedule:run` beside
-the app. The Queue page says when it has stopped.
+The Mac app, Docker image, and `./buddy dev` start the scheduler. If you run
+Postline from source in production, run `./buddy schedule:run` beside the app.
+The Queue page says when the scheduler has stopped.

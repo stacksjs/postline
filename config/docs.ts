@@ -43,6 +43,7 @@ const config: BunPressOptions = {
             { text: 'Install the Mac app', link: '/install-mac' },
             { text: 'Run it on a server', link: '/self-hosting' },
             { text: 'First run', link: '/first-run' },
+            { text: 'Recover the owner account', link: '/account-recovery' },
             { text: 'Upgrading', link: '/upgrading' },
           ],
         },

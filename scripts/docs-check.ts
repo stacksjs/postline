@@ -30,6 +30,6 @@ for (const [path, html] of pages) {
   }).transform(html)
 }
 
-for (const path of ['compose', 'planning', 'monitoring', 'workspace-data', 'security', 'troubleshooting', 'environment', 'recovery']) {
+for (const path of ['account-recovery', 'compose', 'planning', 'monitoring', 'workspace-data', 'security', 'troubleshooting', 'environment', 'recovery']) {
   if (!overviewLinks.has(path)) throw new Error(`The docs overview does not link to ${path}.`)
 }

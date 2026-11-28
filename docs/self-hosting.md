@@ -23,9 +23,11 @@ key. Reuse that volume when replacing the container. For a restored workspace,
 put the original key in the volume as `app-key` before the first start. If you
 supply `APP_KEY`, it must match the stored key when the volume already has one.
 
-For remote access, set `APP_URL` to the public HTTPS address and use a reverse
-proxy for TLS. Run one Postline container per volume so one scheduler owns the
-queue.
+For remote access, add `--env APP_URL=https://postline.example.com` to `docker run`,
+using your public HTTPS address. Keep the port bound to `127.0.0.1` and use a
+reverse proxy for TLS. Run one Postline container per volume so one scheduler
+owns the queue. Use the [owner recovery guide](./account-recovery.md) if you lose
+access to the account.
 
 ## Run from source
 
@@ -55,7 +57,7 @@ private. The Queue and Activity pages report whether the scheduler is running.
 ## The address it answers on
 
 Set `APP_URL` to the address people type, for example
-`APP_URL=postline.example.com`. Postline uses it for links in emails, for the
+`APP_URL=https://postline.example.com`. Postline uses it for links in emails, for the
 redirect addresses you give each network, and to decide how the sign-in
 cookie is sent.
 
