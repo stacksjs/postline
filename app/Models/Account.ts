@@ -75,6 +75,21 @@ export default defineModel({
       validation: { rule: schema.boolean() },
       factory: () => false,
     },
+    twitterBrowserComposerAttemptedAt: {
+      required: false,
+      hidden: true,
+      validation: { rule: schema.string().max(19).optional() },
+    },
+    twitterBrowserComposerClaim: {
+      required: false,
+      hidden: true,
+      validation: { rule: schema.string().max(36).optional() },
+    },
+    twitterBrowserComposerStatus: {
+      required: false,
+      hidden: true,
+      validation: { rule: schema.enum(['ready', 'layout', 'unavailable', 'attention']).optional() },
+    },
     // The AI provider for campaign planning, chosen in Settings (#138). Empty
     // means the environment's AI_PROVIDER / ANTHROPIC_API_KEY / OPENAI_API_KEY
     // decide, as before; the Mac app has no environment, so it needs these.

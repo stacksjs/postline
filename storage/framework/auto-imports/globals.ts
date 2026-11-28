@@ -65,6 +65,8 @@ declare global {
   const removeXBrowserProfile: typeof autoImports.removeXBrowserProfile
   const readXBrowserSession: typeof autoImports.readXBrowserSession
   const xBrowserWindow: typeof autoImports.xBrowserWindow
+  const xComposerWindowName: typeof autoImports.xComposerWindowName
+  const withXBrowserProfile: typeof autoImports.withXBrowserProfile
   const inspectXPage: typeof autoImports.inspectXPage
 }
 

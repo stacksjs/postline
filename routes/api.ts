@@ -123,6 +123,7 @@ route.group({ prefix: '/postline/twitter' }, () => {
   route.get('/status', 'Actions/Postline/TwitterStatusAction').middleware('auth')
   route.get('/browser-session', 'Actions/Postline/TwitterBrowserSessionAction').middleware('auth')
   route.post('/browser-session', 'Actions/Postline/TwitterBrowserSessionSaveAction').middleware('auth').rateLimit(10, 'minute')
+  route.post('/browser-session/composer-check', 'Actions/Postline/TwitterBrowserComposerCheckAction').middleware('auth').rateLimit(10, 'minute')
   route.post('/browser-session/listening', 'Actions/Postline/TwitterBrowserListeningAction').middleware('auth').rateLimit(10, 'minute')
   route.post('/browser-session/metrics', 'Actions/Postline/TwitterBrowserMetricsAction').middleware('auth').rateLimit(10, 'minute')
   route.post('/connect', 'Actions/Postline/TwitterConnectAction').middleware('auth').rateLimit(10, 'minute')

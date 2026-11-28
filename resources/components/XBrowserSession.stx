@@ -10,7 +10,7 @@ import { createI18n } from '@stacksjs/i18n/client'
 import type { TwitterBrowserSessionSnapshot } from '../../app/Services/Social/TwitterBrowserSession'
 import type { XBrowserWindow } from '../functions/x-browser-session'
 import { requestJson } from '../functions/postline-client'
-import { openXBrowser, readXBrowserSession, xBrowserWindow } from '../functions/x-browser-session'
+import { openXBrowser, readXBrowserSession, xBrowserWindow, xComposerWindowName } from '../functions/x-browser-session'
 
 const { locale: language, messages: copy } = {{ xBrowserSessionClient }}
 const words = createI18n({ locale: language, messages: { [language]: copy } })
@@ -45,13 +45,21 @@ xSessionDesktop.onReady((host) => {
   void loadSession()
 })
 
+useEventListener('postline:x-composer-health', () => {
+  if (xBrowser() && !xSessionBusy()) void loadSession()
+})
+
+function signInWindow(current: TwitterBrowserSessionSnapshot): string {
+  return current.composerHealth === 'attention' ? xComposerWindowName(current.profile) : current.profile
+}
+
 async function openSession() {
   const windowApi = xBrowser()
   const current = xSession()
   if (!windowApi || !current || xSessionBusy()) return
   xSessionBusy.set(true)
   try {
-    await openXBrowser(windowApi, current.profile)
+    await openXBrowser(windowApi, current.profile, undefined, signInWindow(current))
     xSessionFeedback.set(current.needsLayoutCheck ? copy.layout : copy.openHelp)
   }
   catch {
@@ -76,11 +84,11 @@ async function pauseReads(message: string, layout = false) {
   }
 }
 
-async function returnToX(browser: XBrowserWindow, profile: string, reason: 'needs-attention' | 'signed-out') {
+async function returnToX(browser: XBrowserWindow, profile: string, reason: 'needs-attention' | 'signed-out', name = profile) {
   const paused = pauseReads(reason === 'needs-attention'
     ? copy.attention
     : copy.signInFirst)
-  await openXBrowser(browser, profile).catch(() => {})
+  await openXBrowser(browser, profile, undefined, name).catch(() => {})
   await paused
 }
 
@@ -90,9 +98,10 @@ async function checkSignIn() {
   if (!windowApi || !current || xSessionBusy()) return
   xSessionBusy.set(true)
   try {
-    const status = await readXBrowserSession(windowApi, current.profile, current.needsLayoutCheck ? 'listening' : 'sign-in')
+    const name = signInWindow(current)
+    const status = await readXBrowserSession(windowApi, name, current.needsLayoutCheck ? 'listening' : 'sign-in')
     if (status.state === 'needs-attention') {
-      await returnToX(windowApi, current.profile, status.state)
+      await returnToX(windowApi, current.profile, status.state, name)
       return
     }
     if (status.state === 'unavailable') {
@@ -112,9 +121,10 @@ async function checkSignIn() {
     xSessionNeedsCheck.set(data.needsCheck)
     if (status.state === 'signed-out') {
       xSessionFeedback.set(data.needsCheck ? copy.signInFirst : copy.signedOut)
-      if (data.needsCheck) await openXBrowser(windowApi, current.profile).catch(() => {})
+      if (data.needsCheck) await openXBrowser(windowApi, current.profile, undefined, name).catch(() => {})
       return
     }
+    if (name !== current.profile) await windowApi._call('destroy', undefined, name).catch(() => {})
     xSessionFeedback.set(words.t('signedIn', { handle: data.handle }))
   }
   catch (error) {
@@ -242,6 +252,7 @@ async function captureListening() {
           <a class="text-info text-xs underline" href="https://help.x.com/en/rules-and-policies/x-automation" target="_blank" rel="noopener noreferrer">{{ xBrowserSessionText.rules }}</a>
         </div>
         <p class="m-0 text-body text-xs" role="status" :show="xSessionFeedback()" :text="xSessionFeedback()"></p>
+        <p class="m-0 text-body text-xs" role="status" :show="xSession()?.composerHealth === 'layout'">{{ xBrowserSessionText.composerLayout }}</p>
       </div>
     </Card>
   </section>

@@ -78,7 +78,7 @@ describe('workspace archive', () => {
     expect(await twitterBrowserSession()).toEqual(browserSession)
     await workspaceArchive.deleteEverything(DELETE_EVERYTHING_PHRASE)
     expect(await ensureAccount()).toBe(accountId)
-    expect(await twitterBrowserSession()).toEqual({ profile: browserSession.profile, handle: null, needsCheck: false, needsLayoutCheck: false })
+    expect(await twitterBrowserSession()).toEqual({ profile: browserSession.profile, handle: null, needsCheck: false, needsLayoutCheck: false, composerHealth: null })
     expect(await composerPresets.list()).toEqual([])
     expect(await trackedLinks.export(accountId)).toEqual([])
     expect(await draftFeeds.list()).toEqual([])

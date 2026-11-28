@@ -1,10 +1,11 @@
 import type { EngagementCounts } from '../../app/Support/Social/engagement-analytics'
 
 export interface XBrowserWindow {
-  openExternal: (options: { name: string, url: string, title: string, dataStore: string }) => Promise<{ name: string }>
+  openExternal: (options: { name: string, url: string, title: string, dataStore: string, headless?: boolean }) => Promise<{ name: string }>
   _call: {
     (action: 'executeJavaScript', input: { code: string }, name: string): Promise<unknown>
     (action: 'loadURL', input: { url: string }, name: string): void | Promise<unknown>
+    (action: 'show' | 'destroy' | 'getState', input: undefined, name: string): Promise<unknown>
   }
 }
 
@@ -28,9 +29,18 @@ export function xBrowserWindow(host: unknown): XBrowserWindow | null {
     : null
 }
 
-export async function openXBrowser(browser: XBrowserWindow, profile: string, url = 'https://x.com/home'): Promise<void> {
+export function xComposerWindowName(profile: string): string {
+  return `${profile}-composer`
+}
+
+/** The workspace and Settings windows share the same loopback origin. */
+export function withXBrowserProfile<T>(work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  return navigator.locks.request('postline:x-browser-profile', { signal }, work)
+}
+
+export async function openXBrowser(browser: XBrowserWindow, profile: string, url = 'https://x.com/home', name = profile): Promise<void> {
   await browser.openExternal({
-    name: profile,
+    name,
     url,
     title: 'X browser session',
     dataStore: profile,
@@ -40,7 +50,7 @@ export async function openXBrowser(browser: XBrowserWindow, profile: string, url
 export async function removeXBrowserProfile(host: unknown, profile: string): Promise<'removed' | 'unsupported' | 'busy'> {
   const browser = (host as { window?: {
     removeDataStore?: (name: string) => Promise<void>
-    _call?: (action: 'destroy', input: undefined, name: string) => Promise<void>
+    _call?: (action: 'destroy' | 'getState', input: undefined, name: string) => Promise<unknown>
   } } | null)?.window
   if (typeof browser?.removeDataStore !== 'function' || typeof browser._call !== 'function')
     return 'unsupported'
@@ -65,13 +75,15 @@ export async function removeXBrowserProfile(host: unknown, profile: string): Pro
   // our own view only if Craft reports that the data store is still in use.
   const first = await remove()
   if (first === 'removed') return first
-  try {
-    await browser._call('destroy', undefined, profile)
-  }
-  catch (error) {
-    // The named view may already be gone. Craft still checks every other
-    // view before reporting that the store has been removed.
-    if (!hasCode(error, 'INVALID_PARAMETER')) throw error
+  for (const name of [profile, xComposerWindowName(profile)]) {
+    try {
+      await browser._call('getState', undefined, name)
+      await browser._call('destroy', undefined, name)
+    }
+    catch (error) {
+      // Craft still checks every other view before removing the store.
+      if (!hasCode(error, 'INVALID_PARAMETER')) throw error
+    }
   }
   return await remove()
 }

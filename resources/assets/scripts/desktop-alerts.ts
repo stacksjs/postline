@@ -1,4 +1,6 @@
 import { requestJson } from '../../functions/postline-client'
+import { xBrowserWindow } from '../../functions/x-browser-session'
+import { checkXComposer } from './x-composer-health'
 
 interface AlertView {
   id: number
@@ -73,11 +75,15 @@ function remember(id: number): void {
 }
 
 /** Bind notification delivery, the dock badge and menu-bar controls to a Craft workspace. */
-export function bindDesktopAlerts({ app, notifications, timers, tray, autoLaunch }: DesktopAlertsBridge): () => void {
+export function bindDesktopAlerts(host: DesktopAlertsBridge): () => void {
+  const { app, notifications, timers, tray, autoLaunch } = host
   if (!app) return () => {}
 
   const controller = new AbortController()
   const { signal } = controller
+  const xBrowser = xBrowserWindow(host)
+  const sleep = timers?.sleep?.bind(timers)
+  let checkingX = false
   let seen = lastSeen()
   let status: DesktopStatus = { paused: false, nextPostAt: null, unread: 0 }
   let openAtLogin = false
@@ -173,6 +179,12 @@ export function bindDesktopAlerts({ app, notifications, timers, tray, autoLaunch
     }
     if (!changingMenu) await refreshTray()
     if (signal.aborted) return
+    if (xBrowser && sleep && !checkingX) {
+      checkingX = true
+      void checkXComposer(xBrowser, sleep, signal).then((recorded) => {
+        if (recorded && !signal.aborted) window.dispatchEvent(new Event('postline:x-composer-health'))
+      }).catch(() => {}).finally(() => { checkingX = false })
+    }
     // WebKit throttles browser timers when the window is closed to the tray.
     // Craft's native deadline also runs while the workspace is hidden.
     if (timers?.sleep) {

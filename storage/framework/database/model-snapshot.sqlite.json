@@ -195,6 +195,38 @@
             "isNullable": false,
             "hasDefault": true,
             "defaultValue": false
+          },
+          {
+            "name": "twitter_browser_composer_attempted_at",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 19
+          },
+          {
+            "name": "twitter_browser_composer_claim",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 36
+          },
+          {
+            "name": "twitter_browser_composer_status",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "enumValues": [
+              "ready",
+              "layout",
+              "unavailable",
+              "attention"
+            ]
           }
         ],
         "indexes": [
@@ -4055,7 +4087,7 @@
       }
     ]
   },
-  "hash": "ac2094107139cafe4ac00e5d0cdc6894c2be268e128fd6b762b84e1f7f08ad14",
+  "hash": "6c481fd49254a43b385df37e91b680d24a97d8cbec5d7a8078372ff575dae298",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-28T00:46:51.478Z"
+  "updatedAt": "2026-11-28T01:37:58.422Z"
 }

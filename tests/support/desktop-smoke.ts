@@ -178,6 +178,8 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   `${instagramPages.status} ${instagramPages.type}`)
 
   const browserSessionPath = '/api/postline/twitter/browser-session'
+  const composerCheckPath = `${browserSessionPath}/composer-check`
+  const beginComposerCheck = JSON.stringify({ begin: true })
   const session = await call('GET', browserSessionPath)
   const initialProfile = JSON.parse(session.text).data
   check('the native X browser session uses a workspace profile', session.status === 200
@@ -186,13 +188,33 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   const unconnected = await call('POST', browserSessionPath, signedOut)
   check('a signed-out page leaves a fresh X profile unconnected without a hold', unconnected.status === 200
     && JSON.parse(unconnected.text)?.data?.handle === null && JSON.parse(unconnected.text)?.data?.needsCheck === false)
+  const unconnectedCheck = await call('POST', composerCheckPath, beginComposerCheck)
+  check('a fresh workspace has no X Composer check to run', unconnectedCheck.status === 200 && JSON.parse(unconnectedCheck.text)?.data === null)
   const connectedBrowser = await call('POST', browserSessionPath, { handle: 'postline_test' })
   const savedBrowser = await call('GET', browserSessionPath)
   const savedProfile = JSON.parse(savedBrowser.text).data
   check('the native session remembers its X handle, profile and confirmation state', connectedBrowser.status === 200
     && savedBrowser.status === 200 && savedProfile?.handle === 'postline_test' && savedProfile?.profile === initialProfile?.profile
     && savedProfile.needsCheck === false && savedProfile.needsLayoutCheck === false
-    && Object.keys(savedProfile).sort().join(',') === 'handle,needsCheck,needsLayoutCheck,profile')
+    && savedProfile.composerHealth === null
+    && Object.keys(savedProfile).sort().join(',') === 'composerHealth,handle,needsCheck,needsLayoutCheck,profile')
+  const attemptedChecks = await Promise.all([
+    call('POST', composerCheckPath, beginComposerCheck),
+    call('POST', composerCheckPath, beginComposerCheck),
+  ])
+  const checks = attemptedChecks.map(result => JSON.parse(result.text)?.data).filter(Boolean)
+  const composerClaim = checks[0]
+  check('exactly one window claims the daily X Composer check', attemptedChecks.every(result => result.status === 200)
+    && checks.length === 1 && composerClaim.handle === savedProfile?.handle && composerClaim.profile === savedProfile?.profile)
+  const reportLayout = JSON.stringify({ token: composerClaim?.token, health: 'layout' })
+  const composerResult = await call('POST', composerCheckPath, reportLayout)
+  const composerReplay = await call('POST', composerCheckPath, reportLayout)
+  const sameDayCheck = await call('POST', composerCheckPath, beginComposerCheck)
+  const afterComposer = await call('GET', browserSessionPath)
+  check('the X Composer layout warning persists and its claim can be reported once', composerResult.status === 200
+    && JSON.parse(composerResult.text)?.data?.recorded === true
+    && JSON.parse(composerReplay.text)?.data?.recorded === false && JSON.parse(afterComposer.text)?.data?.composerHealth === 'layout'
+    && sameDayCheck.status === 200 && JSON.parse(sameDayCheck.text)?.data === null)
   const foreignMetrics = await call('POST', `${browserSessionPath}/metrics`, { handle: 'another_user' })
   check('the native session rejects engagement from a different handle', foreignMetrics.status === 422
     && JSON.parse(foreignMetrics.text)?.error?.includes('Check the X browser sign-in') === true)
@@ -224,7 +246,9 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   check('the native agent rejects an X browser import while sign-in needs checking', blockedImport.status === 422
     && JSON.parse(blockedImport.text)?.error?.includes('Check the X browser sign-in') === true)
   const confirmedAgain = await call('POST', browserSessionPath, { handle: 'postline_test' })
-  check('confirming the X sign-in removes the hold', confirmedAgain.status === 200 && JSON.parse(confirmedAgain.text)?.data?.needsCheck === false)
+  const confirmedState = JSON.parse(confirmedAgain.text)?.data
+  check('confirming the X sign-in removes the hold and permits a fresh Composer check', confirmedAgain.status === 200
+    && confirmedState?.needsCheck === false && confirmedState?.composerHealth === null)
   const resumedImport = await call('POST', `${browserSessionPath}/listening`, visibleMentions)
   check('the native agent accepts X browser imports after a new sign-in check', resumedImport.status === 200)
 

@@ -361,7 +361,7 @@ export const settingsAppearanceOptions = [
     import { COMPOSER_AUTOSAVE_KEY, COMPOSER_DEFAULT_FORMAT_KEY } from '../functions/composer-draft'
     import { passkeys } from '../functions/passkeys'
     import { fetchProviders } from '../functions/social-client'
-    import { removeXBrowserProfile } from '../functions/x-browser-session'
+    import { removeXBrowserProfile, withXBrowserProfile } from '../functions/x-browser-session'
 
     /**
      * The stored theme preference.
@@ -902,15 +902,19 @@ export const settingsAppearanceOptions = [
         const profile: string | null = data.localTwitterProfile
         const body = new FormData()
         body.set('confirmation', confirmation)
-        if (profile) {
-          const host = desktop()
-          if (!host) throw new Error(copy.openMacForErasure)
-          const result = await removeXBrowserProfile(host, profile)
-          if (result === 'unsupported') throw new Error(copy.updateMacForErasure)
-          if (result === 'busy') throw new Error(copy.profileErasureBusy)
-          body.set('removedTwitterProfile', profile)
+        const erase = async () => {
+          if (profile) {
+            const host = desktop()
+            if (!host) throw new Error(copy.openMacForErasure)
+            const result = await removeXBrowserProfile(host, profile)
+            if (result === 'unsupported') throw new Error(copy.updateMacForErasure)
+            if (result === 'busy') throw new Error(copy.profileErasureBusy)
+            body.set('removedTwitterProfile', profile)
+          }
+          await requestJson('/api/postline/settings/delete-everything', { method: 'POST', body }, copy.deleteDataFailed)
         }
-        await requestJson('/api/postline/settings/delete-everything', { method: 'POST', body }, copy.deleteDataFailed)
+        if (profile) await withXBrowserProfile(erase)
+        else await erase()
         deletePhrase.set('')
         return profile ? copy.deleteDataAndProfileCompleted : copy.deleteDataCompleted
       })

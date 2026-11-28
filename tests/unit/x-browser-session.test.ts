@@ -5,6 +5,7 @@ import { postQueue } from '../../app/Services/Social/QueueService'
 import { rememberTwitterBrowserHandle, saveTwitterBrowserMetrics, twitterBrowserSession } from '../../app/Services/Social/TwitterBrowserSession'
 import { upsertIdentityRow } from '../../app/Services/Social/identities'
 import { inspectXPage, removeXBrowserProfile } from '../../resources/functions/x-browser-session'
+import { inspectXComposer } from '../../resources/assets/scripts/x-composer-health'
 
 test('profile removal succeeds when no X window has ever opened', async () => {
   const calls: string[] = []
@@ -31,7 +32,30 @@ test('profile removal still reports busy when another view owns the store', asyn
   } }
 
   expect(await removeXBrowserProfile(host, 'x-store')).toBe('busy')
-  expect(calls).toEqual(['remove:x-store', 'destroy:x-store', 'remove:x-store'])
+  expect(calls).toEqual(['remove:x-store', 'getState:x-store', 'getState:x-store-composer', 'remove:x-store'])
+})
+
+test('X Composer health verifies the account and supported controls without submitting', () => {
+  const href = 'https://x.com/compose/post'
+  const visible = { getClientRects: () => [1] }
+  const attachment = {}
+  const page = (media: boolean, loading = false) => ({
+    readyState: 'complete',
+    querySelector(selector: string) {
+      if (selector.includes('Profile_Link')) return { getAttribute: () => '/postline_test' }
+      if (selector === '[role="progressbar"]') return loading ? {} : null
+      if (selector === '[role="dialog"]') return {
+        querySelector: (control: string) => control.includes('fileInput') ? (media ? attachment : null) : visible,
+      }
+      return null
+    },
+  }) as unknown as Document
+  expect(inspectXComposer(page(true), href, 'Postline_Test')).toBe('ready')
+  expect(inspectXComposer(page(false), href, 'postline_test')).toBe('layout')
+  expect(inspectXComposer(page(false, true), href, 'postline_test')).toBe('unavailable')
+  expect(inspectXComposer(page(true), href, 'different')).toBe('attention')
+  expect(inspectXComposer(page(true), 'https://x.com/account/access', 'postline_test')).toBe('attention')
+  expect(inspectXComposer(page(true), 'https://example.test/compose/post', 'postline_test')).toBe('unavailable')
 })
 
 describe('X session browser reads', () => {

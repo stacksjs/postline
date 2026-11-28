@@ -454,6 +454,9 @@ export class WorkspaceArchiveService {
       twitter_browser_handle: null,
       twitter_browser_needs_check: false,
       twitter_browser_needs_layout_check: false,
+      twitter_browser_composer_attempted_at: null,
+      twitter_browser_composer_claim: null,
+      twitter_browser_composer_status: null,
       updated_at: now(),
     }).where('id', '=', accountId).execute()
     await rm(MEDIA_DIR, { recursive: true, force: true })

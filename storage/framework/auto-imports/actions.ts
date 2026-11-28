@@ -117,6 +117,7 @@ export const actions = {
   'Actions/Postline/TrackedLinkListAction': '../../../app/Actions/Postline/TrackedLinkListAction.ts',
   'Actions/Postline/TrackedLinkRedirectAction': '../../../app/Actions/Postline/TrackedLinkRedirectAction.ts',
   'Actions/Postline/TwitterAuthAction': '../../../app/Actions/Postline/TwitterAuthAction.ts',
+  'Actions/Postline/TwitterBrowserComposerCheckAction': '../../../app/Actions/Postline/TwitterBrowserComposerCheckAction.ts',
   'Actions/Postline/TwitterBrowserListeningAction': '../../../app/Actions/Postline/TwitterBrowserListeningAction.ts',
   'Actions/Postline/TwitterBrowserMetricsAction': '../../../app/Actions/Postline/TwitterBrowserMetricsAction.ts',
   'Actions/Postline/TwitterBrowserSessionAction': '../../../app/Actions/Postline/TwitterBrowserSessionAction.ts',

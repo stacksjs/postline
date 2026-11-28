@@ -629,7 +629,9 @@
       "mentionsOpened": "Mentions is opening in the X window. When it loads, select Import visible mentions.",
       "pageOpenFailed": "Could not open that page in the X window.",
       "attentionTitle": "X browser sign-in needs attention",
-      "attentionBody": "Open the X browser in Channels, finish signing in, and select Check sign-in to resume browser reads."
+      "attentionBody": "Open the X browser in Channels, finish signing in, and select Check sign-in to resume browser reads.",
+      "composerLayoutTitle": "X Composer needs checking",
+      "composerLayout": "Postline could not verify the X Composer controls. Open X and select Check sign-in to run another check."
     },
     "xBrowserErrors": {
       "desktopOnly": "X browser sessions are available in the Postline Mac app.",
@@ -637,7 +639,8 @@
       "checkSignIn": "Check the X browser sign-in before reading its data.",
       "checkLayout": "Open a readable X Search or Mentions page and select Check sign-in to resume browser reads.",
       "invalidMetrics": "Postline could not read the visible X post counts.",
-      "invalidPosts": "Postline could not read the visible X posts."
+      "invalidPosts": "Postline could not read the visible X posts.",
+      "invalidComposerCheck": "Postline could not record the X Composer check."
     },
     "postOptionsErrors": {
       "invalidLanguage": "\"{language}\" is not a language code Postline knows, such as en or pt-BR.",

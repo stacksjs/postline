@@ -8,23 +8,28 @@ import { workspaceXBrowserErrors, workspaceXBrowserSessionText } from '../../Sup
 import { engagementCounts } from '../../Support/Social/engagement-analytics'
 import { alerts } from '../AlertService'
 import { saveTargetEngagement } from './save-target-engagement'
-import { ensureAccount, now } from './support'
+import { ensureAccount, now, uuid } from './support'
+
+type ComposerHealth = 'ready' | 'layout' | 'unavailable' | 'attention'
 
 export interface TwitterBrowserSessionSnapshot {
   profile: string
   handle: string | null
   needsCheck: boolean
   needsLayoutCheck: boolean
+  composerHealth: ComposerHealth | null
 }
 
 export async function twitterBrowserSession(): Promise<TwitterBrowserSessionSnapshot> {
-  const account = await db.selectFrom('accounts').select(['uuid', 'twitter_browser_handle', 'twitter_browser_needs_check', 'twitter_browser_needs_layout_check'])
+  const account = await db.selectFrom('accounts')
+    .select(['uuid', 'twitter_browser_handle', 'twitter_browser_needs_check', 'twitter_browser_needs_layout_check', 'twitter_browser_composer_status'])
     .where('id', '=', await ensureAccount()).executeTakeFirstOrThrow()
   return {
     profile: `postline-x-${account.uuid}`,
     handle: account.twitter_browser_handle ?? null,
     needsCheck: Boolean(account.twitter_browser_needs_check),
     needsLayoutCheck: Boolean(account.twitter_browser_needs_layout_check),
+    composerHealth: account.twitter_browser_composer_status ?? null,
   }
 }
 
@@ -43,6 +48,9 @@ export async function rememberTwitterBrowserHandle(handle: unknown, { checkedLay
     twitter_browser_handle: handle,
     twitter_browser_needs_check: false,
     twitter_browser_needs_layout_check: false,
+    twitter_browser_composer_attempted_at: null,
+    twitter_browser_composer_claim: null,
+    twitter_browser_composer_status: null,
     updated_at: now(),
   }).where('id', '=', await ensureAccount())
   const confirmed = await (handle !== null && !checkedLayout
@@ -66,13 +74,57 @@ export async function pauseTwitterBrowserReads(reason: 'sign-in' | 'layout' | 's
     .returning(['uuid']).executeTakeFirst()
   if (!account) return
 
+  await raiseBrowserAlert(account.uuid, layout)
+}
+
+async function raiseBrowserAlert(accountUuid: string, layout: boolean): Promise<void> {
   await alerts.raise({
     kind: 'account-expired',
     title: layout ? workspaceXBrowserSessionText.layoutTitle : workspaceXBrowserSessionText.attentionTitle,
     body: layout ? workspaceXBrowserSessionText.layout : workspaceXBrowserSessionText.attentionBody,
     link: '/accounts',
-    key: `x-browser-attention:${account.uuid}:${now().slice(0, 10)}${layout ? ':layout' : ''}`,
+    key: `x-browser-attention:${accountUuid}:${now().slice(0, 10)}${layout ? ':layout' : ''}`,
   })
+}
+
+export async function claimTwitterBrowserComposerCheck(): Promise<{ token: string, profile: string, handle: string } | null> {
+  const token = uuid()
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 19).replace('T', ' ')
+  const [account] = await db.unsafe(`
+    UPDATE accounts
+    SET twitter_browser_composer_attempted_at = ?, twitter_browser_composer_claim = ?
+    WHERE id = ? AND twitter_browser_handle IS NOT NULL AND COALESCE(twitter_browser_needs_check, 0) = 0
+      AND (twitter_browser_composer_attempted_at IS NULL OR twitter_browser_composer_attempted_at <= ?)
+    RETURNING uuid, twitter_browser_handle
+  `, [now(), token, await ensureAccount(), yesterday]) as Array<{ uuid: string, twitter_browser_handle: string }>
+  return account?.twitter_browser_handle
+    ? { token, profile: `postline-x-${account.uuid}`, handle: account.twitter_browser_handle }
+    : null
+}
+
+export async function finishTwitterBrowserComposerCheck(token: unknown, health: unknown): Promise<boolean> {
+  if (typeof token !== 'string' || !/^[0-9a-f-]{36}$/.test(token)
+    || (health !== 'ready' && health !== 'layout' && health !== 'unavailable' && health !== 'attention'))
+    throw new UserFacingError(workspaceXBrowserErrors.invalidComposerCheck)
+
+  const account = await db.updateTable('accounts').set({
+    twitter_browser_composer_claim: null,
+    twitter_browser_composer_status: health,
+    ...(health === 'attention' && { twitter_browser_needs_check: true }),
+  }).where('id', '=', await ensureAccount())
+    .where('twitter_browser_composer_claim', '=', token)
+    .returning(['uuid']).executeTakeFirst()
+  if (!account) return false
+
+  if (health === 'attention') await raiseBrowserAlert(account.uuid, false)
+  if (health === 'layout') await alerts.raise({
+    kind: 'account-expired',
+    title: workspaceXBrowserSessionText.composerLayoutTitle,
+    body: workspaceXBrowserSessionText.composerLayout,
+    link: '/accounts',
+    key: `x-browser-composer:${account.uuid}:${now().slice(0, 10)}`,
+  })
+  return true
 }
 
 export async function requireTwitterBrowserHandle(handle: unknown): Promise<string> {

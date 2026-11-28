@@ -19,6 +19,9 @@ declare module '@stacksjs/database' {
       twitter_browser_handle: string
       twitter_browser_needs_check: number
       twitter_browser_needs_layout_check: number
+      twitter_browser_composer_attempted_at: string
+      twitter_browser_composer_claim: string
+      twitter_browser_composer_status: "ready" | "layout" | "unavailable" | "attention"
       ai_provider: "" | "anthropic" | "openai" | "ollama"
       ai_api_key: string
       ai_model: string

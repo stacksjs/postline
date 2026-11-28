@@ -629,7 +629,9 @@
       "mentionsOpened": "Las menciones se están abriendo en la ventana de X. Cuando carguen, selecciona Importar menciones visibles.",
       "pageOpenFailed": "No se pudo abrir esa página en la ventana de X.",
       "attentionTitle": "El inicio de sesión de X requiere atención",
-      "attentionBody": "Abre el navegador de X en Canales, termina de iniciar sesión y selecciona Verificar sesión para reanudar las lecturas."
+      "attentionBody": "Abre el navegador de X en Canales, termina de iniciar sesión y selecciona Verificar sesión para reanudar las lecturas.",
+      "composerLayoutTitle": "El editor de X requiere una comprobación",
+      "composerLayout": "Postline no pudo comprobar los controles del editor de X. Abre X y selecciona Verificar sesión para comprobarlos de nuevo."
     },
     "xBrowserErrors": {
       "desktopOnly": "Las sesiones de X en el navegador están disponibles en la app de Postline para Mac.",
@@ -637,7 +639,8 @@
       "checkSignIn": "Selecciona Verificar sesión antes de leer los datos de X.",
       "checkLayout": "Abre una página de búsqueda o menciones de X que se pueda leer y selecciona Verificar sesión para reanudar las lecturas.",
       "invalidMetrics": "Postline no pudo leer las métricas visibles de las publicaciones de X.",
-      "invalidPosts": "Postline no pudo leer las publicaciones visibles de X."
+      "invalidPosts": "Postline no pudo leer las publicaciones visibles de X.",
+      "invalidComposerCheck": "Postline no pudo guardar el resultado de la comprobación del editor de X."
     },
     "postOptionsErrors": {
       "invalidLanguage": "\"{language}\" no es un código de idioma que Postline reconozca, como en o pt-BR.",
