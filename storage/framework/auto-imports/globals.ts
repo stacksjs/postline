@@ -66,6 +66,7 @@ declare global {
   const readXBrowserSession: typeof autoImports.readXBrowserSession
   const xBrowserWindow: typeof autoImports.xBrowserWindow
   const xComposerWindowName: typeof autoImports.xComposerWindowName
+  const xListeningWindowName: typeof autoImports.xListeningWindowName
   const withXBrowserProfile: typeof autoImports.withXBrowserProfile
   const inspectXPage: typeof autoImports.inspectXPage
 }

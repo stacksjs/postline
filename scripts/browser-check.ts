@@ -1379,6 +1379,8 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     window.xSessionOpens = []
     window.xSessionNavigations = []
     window.xSessionInspections = 0
+    window.xSessionWatch = null
+    window.xSessionDestroyed = []
     window.xSessionState = { state: 'connected', handle: 'postline_test', measurements: [{ id: '4321', counts: { likes: 2 } }] }
     window.craft = { app: { nativePlatformControls: false }, capabilities: { nativePlatformControls: false }, window: {
       async openExternal(options) {
@@ -1392,7 +1394,11 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
           window.xSessionNavigations.push({ url: input.url, name })
           return
         }
-        if (action !== 'executeJavaScript' || name !== profile || !input.code.includes('AppTabBar_Profile_Link'))
+        if (action === 'destroy' && name === profile + '-listening') {
+          window.xSessionDestroyed.push(name)
+          return
+        }
+        if (action !== 'executeJavaScript' || (name !== profile && name !== profile + '-listening') || !input.code.includes('AppTabBar_Profile_Link'))
           throw new Error('Unexpected X window inspection')
         window.xSessionInspections++
         return JSON.stringify(window.xSessionState)
@@ -1400,6 +1406,10 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     } }
     window.fetch = (input, options) => {
       const url = new URL(input instanceof Request ? input.url : input, location.href)
+      if (url.pathname === '/api/postline/listening' && options?.method === 'POST') {
+        window.xSessionWatch = JSON.parse(options.body)
+        return Promise.resolve(Response.json({ ok: true, data: {} }))
+      }
       if (url.pathname === '${endpoint}/listening') {
         window.xSessionImports++
         const { handle, posts } = JSON.parse(options.body)
@@ -1428,12 +1438,14 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
             return Promise.resolve(Response.json({ ok: false, error: 'Layout check required' }, { status: 422 }))
           localStorage.removeItem('test-x-session-needs-check')
           localStorage.removeItem('test-x-session-needs-layout-check')
+          localStorage.removeItem('test-x-session-listening-attention')
           localStorage.setItem('test-x-session-handle', handle)
         }
       }
       return Promise.resolve(Response.json({ ok: true, data: {
         profile, handle: localStorage.getItem('test-x-session-handle'), needsCheck: localStorage.getItem('test-x-session-needs-check') === '1',
         needsLayoutCheck: localStorage.getItem('test-x-session-needs-layout-check') === '1',
+        listeningNeedsAttention: localStorage.getItem('test-x-session-listening-attention') === '1',
       } }))
     }
   ` })
@@ -1559,10 +1571,48 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
         && ${section}.textContent.includes('Last confirmed as @postline_test')
         && ${section}.querySelectorAll('button')[2].disabled && ${section}.querySelectorAll('button')[3].disabled
         && window.xSessionWrites === 3 && window.xSessionOpens.length === 2`), 5_000)
+
+    await evaluate(cdp, `localStorage.setItem('test-x-session-listening-attention', '1'); ${open}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Open X brings back the isolated Listening challenge window', () => evaluate<boolean>(cdp, `
+      window.xSessionOpens.at(-1)?.name === window.xSessionOpens.at(-1)?.dataStore + '-listening' && !${open}.disabled`), 5_000)
+    await evaluate(cdp, `window.xSessionState = { state: 'connected', handle: 'postline_test' }; ${check}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Check sign-in clears the scheduled Listening challenge', () => evaluate<boolean>(cdp, `
+      ${section}.textContent.includes('Signed in to X as @postline_test.') && window.xSessionDestroyed[0]?.endsWith('-listening')`), 5_000)
+
+    await auditPage(`${site}/listening`, { cdp })
+    const form = "document.querySelector('[data-postline-page=listening] form')"
+    const provider = `Array.from(${form}?.querySelectorAll('fieldset button') ?? []).find(button => button.textContent.trim() === 'X')`
+    const source = `${form}?.querySelector('select:has(option[value=browser])')`
+    const optIn = `Array.from(${form}?.querySelectorAll('label') ?? []).find(label => label.textContent.includes('Check X in the background'))`
+    await waitUntil('The Listening watch network buttons are available', () => evaluate<boolean>(cdp, `Boolean(${provider})`), 5_000)
+    await evaluate(cdp, `${provider}.click()`)
+    await waitUntil('Choosing X defaults to API and keeps browser checks hidden', () => evaluate<boolean>(cdp, `
+      ${source}?.value === 'api' && Boolean(${source}?.getClientRects().length) && !${optIn}?.getClientRects().length`), 5_000)
+    await evaluate(cdp, `(() => {
+      const select = ${source}
+      select.value = 'browser'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    await waitUntil('A watch using the browser offers an unchecked background setting', () => evaluate<boolean>(cdp, `
+      Boolean(${optIn}?.getClientRects().length) && !${optIn}.querySelector('input').checked`), 5_000)
+    await evaluate(cdp, `(() => {
+      ${optIn}.querySelector('input').click()
+      const name = ${form}.querySelector('input[required]')
+      const keyword = ${form}.querySelector('textarea[required]')
+      name.value = 'Paced X fixture'
+      keyword.value = 'quiet research'
+      for (const control of [name, keyword]) control.dispatchEvent(new Event('input', { bubbles: true }))
+      ${form}.requestSubmit()
+    })()`)
+    await waitUntil('Saving the watch persists its explicit browser opt-in', () => evaluate<boolean>(cdp, `
+      window.xSessionWatch?.name === 'Paced X fixture' && window.xSessionWatch.twitter_read_source === 'browser'
+        && window.xSessionWatch.twitter_browser_background === true`), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
-    await evaluate(cdp, `sessionStorage.removeItem('test-x-window-open'); localStorage.removeItem('test-x-session-handle'); localStorage.removeItem('test-x-session-needs-check'); localStorage.removeItem('test-x-session-needs-layout-check')`)
+    await evaluate(cdp, `sessionStorage.removeItem('test-x-window-open'); localStorage.removeItem('test-x-session-handle'); localStorage.removeItem('test-x-session-needs-check'); localStorage.removeItem('test-x-session-needs-layout-check'); localStorage.removeItem('test-x-session-listening-attention')`)
   }
 }
 

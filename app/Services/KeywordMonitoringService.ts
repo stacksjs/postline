@@ -1,4 +1,4 @@
-import { db } from '@stacksjs/database'
+import { db, sqliteWriteOptions } from '@stacksjs/database'
 import { UserFacingError } from '../Support/Http/user-error'
 import { workspaceXBrowserErrors } from '../Support/Localization/workspace'
 import { alerts } from './AlertService'
@@ -8,6 +8,7 @@ import { findIdentityRow } from './Social/identities'
 import { ensureAccount, now, uuid } from './Social/support'
 import { describeNetworkError } from '../Support/Social/network-errors'
 import { TWITTER_READ_PRICE, withTwitterReadBudget } from './Social/TwitterReadBudget'
+import { pauseTwitterBrowserReads } from './Social/TwitterBrowserSession'
 
 const database = db as any
 
@@ -17,6 +18,11 @@ export const LISTENING_MATCH_MODES = ['any', 'all', 'phrase'] as const
 type ListeningProvider = typeof LISTENING_PROVIDERS[number]
 type MatchMode = typeof LISTENING_MATCH_MODES[number]
 type XReadSource = 'api' | 'browser'
+type BrowserScanState = 'captured' | 'layout' | 'attention' | 'unavailable'
+
+// One X navigation per workspace per interval, even across a Mac app restart.
+const BROWSER_SCAN_INTERVAL = 20 * 60_000
+const BROWSER_SCAN_RESULT_WINDOW = 60_000
 
 interface MentionCandidate {
   provider: ListeningProvider
@@ -40,6 +46,7 @@ export interface KeywordMonitorInput {
   providers: unknown
   matchMode?: string
   twitterReadSource?: unknown
+  twitterBrowserBackground?: unknown
   status?: string
 }
 
@@ -74,6 +81,7 @@ function monitorRow(row: any, unreadCount = 0, mentionCount = 0) {
     providers: normalizeListeningProviders(row.providers),
     matchMode: LISTENING_MATCH_MODES.includes(row.match_mode) ? row.match_mode : 'any',
     twitterReadSource: row.twitter_read_source === 'browser' ? 'browser' : 'api',
+    twitterBrowserBackground: Boolean(row.twitter_browser_background),
     status: row.status === 'paused' ? 'paused' : 'active',
     lastCheckedAt: row.last_checked_at || null,
     lastError: row.last_error || null,
@@ -264,6 +272,33 @@ async function searchMastodon(keywords: string[], mode: MatchMode): Promise<Ment
   })
 }
 
+function browserMentionCandidates(reports: unknown): MentionCandidate[] {
+  if (!Array.isArray(reports) || reports.length > 100)
+    throw new UserFacingError(workspaceXBrowserErrors.invalidPosts)
+
+  const candidates = new Map<string, MentionCandidate>()
+  for (const report of reports) {
+    if (typeof report?.id !== 'string' || !/^[0-9]{1,19}$/.test(report.id)
+      || typeof report.authorHandle !== 'string' || !/^[A-Za-z0-9_]{1,15}$/.test(report.authorHandle)
+      || typeof report.body !== 'string' || !report.body.trim() || typeof report.postedAt !== 'string'
+      || !Number.isFinite(Date.parse(report.postedAt))) continue
+    candidates.set(report.id, {
+      provider: 'twitter',
+      remoteUri: report.id,
+      url: `https://x.com/${report.authorHandle}/status/${report.id}`,
+      authorHandle: report.authorHandle,
+      body: report.body.trim().slice(0, 10000),
+      postedAt: report.postedAt,
+    })
+  }
+  return [...candidates.values()]
+}
+
+function browserSearchTerms(keywords: string[], mode: MatchMode): string {
+  if (mode === 'phrase') return JSON.stringify(keywords.join(' '))
+  return keywords.map(keyword => JSON.stringify(keyword)).join(mode === 'all' ? ' ' : ' OR ')
+}
+
 /** Mentions per page in Listening (#105). */
 export const MENTION_PAGE = 50
 
@@ -326,10 +361,16 @@ export class KeywordMonitoringService {
       if (!existing) throw new Error('Listening rule not found.')
       const sourceChanged = twitterReadSource !== undefined && existing.twitter_read_source !== twitterReadSource
       const resetCursor = sourceChanged || existing.keywords !== values.keywords || existing.match_mode !== values.match_mode
+      const browserWatch = (twitterReadSource ?? existing.twitter_read_source) === 'browser' && providers.includes('twitter')
+      const background = browserWatch && (typeof input.twitterBrowserBackground === 'boolean'
+        ? input.twitterBrowserBackground
+        : Boolean(existing.twitter_browser_background))
       await database.updateTable('keyword_monitors')
         .set({
           ...values,
           ...(twitterReadSource && { twitter_read_source: twitterReadSource }),
+          twitter_browser_background: background,
+          twitter_browser_claim: null,
           ...(resetCursor && { twitter_search_cursor: null }),
           ...(sourceChanged && { last_error: null }),
         })
@@ -342,6 +383,7 @@ export class KeywordMonitoringService {
       ...values,
       uuid: monitorUuid,
       twitter_read_source: twitterReadSource ?? 'api',
+      twitter_browser_background: twitterReadSource === 'browser' && providers.includes('twitter') && input.twitterBrowserBackground === true,
       account_id: await ensureAccount(),
       last_checked_at: null,
       last_error: null,
@@ -351,10 +393,12 @@ export class KeywordMonitoringService {
   }
 
   async remove(id: number): Promise<void> {
-    const existing = await database.selectFrom('keyword_monitors').select(['id']).where('id', '=', id).executeTakeFirst()
-    if (!existing) throw new Error('Listening rule not found.')
-    await database.deleteFrom('keyword_mentions').where('keyword_monitor_id', '=', id).execute()
-    await database.deleteFrom('keyword_monitors').where('id', '=', id).execute()
+    await database.transaction((tx: typeof database) => {
+      const existing = tx.selectFrom('keyword_monitors').select(['id']).where('id', '=', id).executeTakeFirst()
+      if (!existing) throw new Error('Listening rule not found.')
+      tx.deleteFrom('keyword_mentions').where('keyword_monitor_id', '=', id).execute()
+      tx.deleteFrom('keyword_monitors').where('id', '=', id).execute()
+    }, sqliteWriteOptions())
   }
 
   async markRead(id = 0, monitorId = 0): Promise<number> {
@@ -365,33 +409,79 @@ export class KeywordMonitoringService {
     return Number(result?.numUpdatedRows || 0)
   }
 
-  async importTwitterBrowserPosts(reports: unknown): Promise<{ watches: number, created: number }> {
-    if (!Array.isArray(reports) || reports.length > 100)
+  async claimTwitterBrowserScan(): Promise<{ token: string, profile: string, handle: string, query: string } | null> {
+    const accountId = await ensureAccount()
+    const cutoff = sqliteTimestamp(new Date(Date.now() - BROWSER_SCAN_INTERVAL))
+    return await database.transaction((tx: typeof database) => {
+      const account = tx.selectFrom('accounts')
+        .select(['uuid', 'twitter_browser_handle', 'twitter_browser_needs_check', 'twitter_browser_needs_layout_check', 'twitter_browser_listening_attempted_at'])
+        .where('id', '=', accountId).executeTakeFirst()
+      if (!account?.twitter_browser_handle || account.twitter_browser_needs_check || account.twitter_browser_needs_layout_check
+        || account.twitter_browser_listening_attempted_at > cutoff) return null
+
+      const eligible = tx.selectFrom('keyword_monitors').selectAll().where('account_id', '=', accountId)
+        .where('status', '=', 'active').where('twitter_read_source', '=', 'browser').where('twitter_browser_background', '=', true)
+        .orderBy('twitter_browser_attempted_at', 'asc').orderBy('id', 'asc').execute()
+      const watch = eligible.find((row: any) => normalizeListeningProviders(row.providers).includes('twitter') && normalizeKeywords(row.keywords).length)
+      if (!watch) return null
+
+      const token = uuid()
+      const at = now()
+      tx.updateTable('accounts').set({ twitter_browser_listening_attempted_at: at }).where('id', '=', accountId).execute()
+      tx.updateTable('keyword_monitors').set({ twitter_browser_attempted_at: at, twitter_browser_claim: token })
+        .where('id', '=', watch.id).execute()
+      return {
+        token,
+        profile: `postline-x-${account.uuid}`,
+        handle: account.twitter_browser_handle,
+        query: browserSearchTerms(normalizeKeywords(watch.keywords), watch.match_mode),
+      }
+    }, sqliteWriteOptions())
+  }
+
+  async finishTwitterBrowserScan(token: unknown, handle: unknown, state: unknown, reports: unknown): Promise<{ recorded: boolean, created: number }> {
+    const results: BrowserScanState[] = ['captured', 'layout', 'attention', 'unavailable']
+    if (typeof token !== 'string' || !/^[0-9a-f-]{36}$/.test(token) || typeof handle !== 'string'
+      || !results.includes(state as BrowserScanState))
       throw new UserFacingError(workspaceXBrowserErrors.invalidPosts)
 
-    const candidates = new Map<string, MentionCandidate>()
-    for (const report of reports) {
-      if (typeof report?.id !== 'string' || !/^[0-9]{1,19}$/.test(report.id)
-        || typeof report.authorHandle !== 'string' || !/^[A-Za-z0-9_]{1,15}$/.test(report.authorHandle)
-        || typeof report.body !== 'string' || !report.body.trim() || typeof report.postedAt !== 'string'
-        || !Number.isFinite(Date.parse(report.postedAt))) continue
-      candidates.set(report.id, {
-        provider: 'twitter',
-        remoteUri: report.id,
-        url: `https://x.com/${report.authorHandle}/status/${report.id}`,
-        authorHandle: report.authorHandle,
-        body: report.body.trim().slice(0, 10000),
-        postedAt: report.postedAt,
-      })
-    }
+    const candidates = state === 'captured' ? browserMentionCandidates(reports) : []
+    const accountId = await ensureAccount()
+    const cutoff = sqliteTimestamp(new Date(Date.now() - BROWSER_SCAN_RESULT_WINDOW))
+    const result = await database.transaction((tx: typeof database) => {
+      const account = tx.selectFrom('accounts').select(['twitter_browser_needs_check', 'twitter_browser_needs_layout_check'])
+        .where('id', '=', accountId).where('twitter_browser_handle', '=', handle).executeTakeFirst()
+      if (!account || account.twitter_browser_needs_check || account.twitter_browser_needs_layout_check) return null
+      const monitor = tx.selectFrom('keyword_monitors').selectAll().where('account_id', '=', accountId)
+        .where('twitter_browser_claim', '=', token).where('twitter_browser_attempted_at', '>', cutoff)
+        .where('status', '=', 'active').where('twitter_read_source', '=', 'browser').where('twitter_browser_background', '=', true)
+        .executeTakeFirst()
+      if (!monitor) return null
 
+      tx.updateTable('keyword_monitors').set({
+        twitter_browser_claim: null,
+        ...(state === 'captured' && { last_checked_at: now() }),
+      }).where('id', '=', monitor.id).execute()
+      const { fresh } = this.insertMatchingMentions(tx, monitor, candidates)
+      return { monitor, fresh }
+    }, sqliteWriteOptions())
+
+    if (!result) return { recorded: false, created: 0 }
+    if (state === 'attention' || state === 'layout')
+      await pauseTwitterBrowserReads(state === 'layout' ? 'layout' : 'listening', handle)
+    await this.alertMatchingMentions(result.monitor, result.fresh, true)
+    return { recorded: true, created: result.fresh.length }
+  }
+
+  async importTwitterBrowserPosts(reports: unknown): Promise<{ watches: number, created: number }> {
+    const candidates = browserMentionCandidates(reports)
     const monitors = (await database.selectFrom('keyword_monitors').selectAll()
       .where('status', '=', 'active').where('twitter_read_source', '=', 'browser')
       .where('account_id', '=', await ensureAccount()).execute())
       .filter((monitor: any) => normalizeListeningProviders(monitor.providers).includes('twitter'))
     let created = 0
     for (const monitor of monitors) {
-      const { count } = await this.saveMatchingMentions(monitor, [...candidates.values()], true)
+      const { count } = await this.saveMatchingMentions(monitor, candidates, true)
       created += count
       await database.updateTable('keyword_monitors').set({ last_checked_at: now() })
         .where('id', '=', monitor.id).where('twitter_read_source', '=', 'browser').execute()
@@ -400,6 +490,12 @@ export class KeywordMonitoringService {
   }
 
   private async saveMatchingMentions(monitor: any, candidates: MentionCandidate[], browser = false): Promise<{ found: number, count: number }> {
+    const { found, fresh } = this.insertMatchingMentions(database, monitor, candidates)
+    await this.alertMatchingMentions(monitor, fresh, browser)
+    return { found, count: fresh.length }
+  }
+
+  private insertMatchingMentions(tx: typeof database, monitor: any, candidates: MentionCandidate[]): { found: number, fresh: MentionCandidate[] } {
     const keywords = normalizeKeywords(monitor.keywords)
     const mode = LISTENING_MATCH_MODES.includes(monitor.match_mode) ? monitor.match_mode as MatchMode : 'any'
     const fresh: MentionCandidate[] = []
@@ -410,7 +506,7 @@ export class KeywordMonitoringService {
       found++
       const timestamp = now()
       // The unique key also deduplicates concurrent imports and scheduled scans.
-      const inserted = await db.unsafe(
+      const inserted = tx.unsafe(
         `INSERT INTO keyword_mentions
           (uuid, keyword_monitor_id, provider, remote_uri, url, author_handle, author_name, body, matched_keywords, status, posted_at, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unread', ?, ?, ?)
@@ -418,14 +514,17 @@ export class KeywordMonitoringService {
         [uuid(), monitor.id, candidate.provider, candidate.remoteUri, candidate.url, candidate.authorHandle,
           candidate.authorName || null, candidate.body.slice(0, 10000), JSON.stringify(matched),
           sqliteTimestamp(candidate.postedAt), timestamp, timestamp],
-      )
+      ).execute()
       if (inserted.length) fresh.push(candidate)
     }
+    return { found, fresh }
+  }
 
+  private async alertMatchingMentions(monitor: any, fresh: MentionCandidate[], browser: boolean): Promise<void> {
     // The browser can render protected posts. Alerts name the watch and keep
     // the post text in the workspace, including when mail or webhooks are set.
     if (fresh.length) {
-      const name = String(monitor.name || keywords.join(', ')).slice(0, 80)
+      const name = String(monitor.name || normalizeKeywords(monitor.keywords).join(', ')).slice(0, 80)
       const first = fresh[0]!
       await alerts.raise({
         kind: 'keyword-match',
@@ -435,7 +534,6 @@ export class KeywordMonitoringService {
         key: `keyword:${monitor.id}:${first.provider}:${first.remoteUri}`,
       })
     }
-    return { found, count: fresh.length }
   }
 
   async scan(monitorId = 0) {

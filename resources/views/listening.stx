@@ -52,6 +52,10 @@ export const listeningClient = { locale: workspaceLocale, messages: workspaceLis
                 {{ listeningText.importX }} <a href="/accounts" data-stx-link class="text-info underline">{{ listeningText.channels }}</a>.
               </small>
             </label>
+            <label class="flex gap-3 items-center p-3 bg-panel-2 border border-line rounded-xl" :show="canReadXInBrowser() && draftProviders().includes('twitter') && draftTwitterReadSource() === 'browser'">
+              <input type="checkbox" :checked="draftTwitterBrowserBackground()" @change="draftTwitterBrowserBackground.set($event.target.checked)">
+              <span><strong class="block text-ink text-xs">{{ listeningText.xBrowserBackground }}</strong><small class="block mt-0.5 text-muted text-xs">{{ listeningText.xBrowserFrequency }}</small></span>
+            </label>
             <label class="flex gap-3 items-center p-3 bg-panel-2 border border-line rounded-xl"><input type="checkbox" :checked="draftStatus() === 'active'" @change="draftStatus.set($event.target.checked ? 'active' : 'paused')"><span><strong class="block text-ink text-xs">{{ listeningText.watchActive }}</strong><small class="block mt-0.5 text-muted text-xs">{{ listeningText.schedulerChecks }}</small></span></label>
             <div class="flex gap-2 items-center pt-1">
               <button class="inline-flex flex-1 items-center justify-center h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="submit" :disabled="saving()"><span :text="saving() ? copy.saving : draftId() ? copy.updateRule : copy.createRule">{{ listeningText.createRule }}</span></button>
@@ -128,6 +132,7 @@ export const listeningClient = { locale: workspaceLocale, messages: workspaceLis
       providers: string[]
       matchMode: string
       twitterReadSource: 'api' | 'browser'
+      twitterBrowserBackground: boolean
       status: string
       lastCheckedAt?: string | null
       lastError?: string | null
@@ -168,6 +173,7 @@ export const listeningClient = { locale: workspaceLocale, messages: workspaceLis
     const draftProviders = state(['bluesky'])
     const draftMatchMode = state('any')
     const draftTwitterReadSource = state<'api' | 'browser'>('api')
+    const draftTwitterBrowserBackground = state(false)
     const canReadXInBrowser = state(false)
     useNativeDesktop().onReady(host => canReadXInBrowser.set(Boolean(xBrowserWindow(host))))
     const draftStatus = state('active')
@@ -246,6 +252,7 @@ export const listeningClient = { locale: workspaceLocale, messages: workspaceLis
       draftProviders.set(['bluesky'])
       draftMatchMode.set('any')
       draftTwitterReadSource.set('api')
+      draftTwitterBrowserBackground.set(false)
       draftStatus.set('active')
     }
 
@@ -256,6 +263,7 @@ export const listeningClient = { locale: workspaceLocale, messages: workspaceLis
       draftProviders.set([...monitor.providers])
       draftMatchMode.set(monitor.matchMode)
       draftTwitterReadSource.set(monitor.twitterReadSource === 'browser' ? 'browser' : 'api')
+      draftTwitterBrowserBackground.set(Boolean(monitor.twitterBrowserBackground))
       draftStatus.set(monitor.status)
       filterMonitorId.set(monitor.id)
     }
@@ -271,7 +279,7 @@ export const listeningClient = { locale: workspaceLocale, messages: workspaceLis
         await requestJson('/api/postline/listening', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ id: draftId(), name: draftName(), keywords: draftKeywords().split(',').map(item => item.trim()).filter(Boolean), providers: draftProviders(), match_mode: draftMatchMode(), status: draftStatus(), twitter_read_source: canReadXInBrowser() ? draftTwitterReadSource() : undefined }),
+          body: JSON.stringify({ id: draftId(), name: draftName(), keywords: draftKeywords().split(',').map(item => item.trim()).filter(Boolean), providers: draftProviders(), match_mode: draftMatchMode(), status: draftStatus(), twitter_read_source: canReadXInBrowser() ? draftTwitterReadSource() : undefined, twitter_browser_background: canReadXInBrowser() ? draftTwitterBrowserBackground() : undefined }),
         })
         showNotification({ title: copy.saved, message: copy.savedDescription, tone: 'success', id: 'listening-save' })
         resetForm()
@@ -352,6 +360,9 @@ export const listeningClient = { locale: workspaceLocale, messages: workspaceLis
         if (visibility.value === 'hidden') return
         void loadData({ quiet: true })
       }, 60_000)
+    })
+    useEventListener('postline:x-listening', () => {
+      if (visibility.value !== 'hidden') void loadData({ quiet: true })
     })
     onUnmounted(() => window.clearInterval(pollTimer))
   </script>

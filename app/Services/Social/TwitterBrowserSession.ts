@@ -20,18 +20,20 @@ export interface TwitterBrowserSessionSnapshot {
   handle: string | null
   needsCheck: boolean
   needsLayoutCheck: boolean
+  listeningNeedsAttention: boolean
   composerHealth: ComposerHealth | null
 }
 
 export async function twitterBrowserSession(): Promise<TwitterBrowserSessionSnapshot> {
   const account = await db.selectFrom('accounts')
-    .select(['uuid', 'twitter_browser_handle', 'twitter_browser_needs_check', 'twitter_browser_needs_layout_check', 'twitter_browser_composer_status', 'twitter_browser_composer_attempted_at', 'twitter_browser_composer_claim'])
+    .select(['uuid', 'twitter_browser_handle', 'twitter_browser_needs_check', 'twitter_browser_needs_layout_check', 'twitter_browser_listening_attention', 'twitter_browser_composer_status', 'twitter_browser_composer_attempted_at', 'twitter_browser_composer_claim'])
     .where('id', '=', await ensureAccount()).executeTakeFirstOrThrow()
   return {
     profile: `postline-x-${account.uuid}`,
     handle: account.twitter_browser_handle ?? null,
     needsCheck: Boolean(account.twitter_browser_needs_check),
     needsLayoutCheck: Boolean(account.twitter_browser_needs_layout_check),
+    listeningNeedsAttention: Boolean(account.twitter_browser_listening_attention),
     composerHealth: account.twitter_browser_composer_status === 'ready'
       && (account.twitter_browser_composer_claim || !account.twitter_browser_composer_attempted_at || account.twitter_browser_composer_attempted_at <= composerCheckCutoff())
       ? null
@@ -75,18 +77,21 @@ export async function rememberTwitterBrowserHandle(handle: unknown, { checkedLay
   const database = db as any
   await database.transaction((tx: typeof database) => {
     const save = tx.updateTable('accounts').set({
-    twitter_browser_handle: handle,
-    twitter_browser_needs_check: false,
-    twitter_browser_needs_layout_check: false,
-    twitter_browser_composer_attempted_at: null,
-    twitter_browser_composer_claim: null,
-    twitter_browser_composer_status: null,
+      twitter_browser_handle: handle,
+      twitter_browser_needs_check: false,
+      twitter_browser_needs_layout_check: false,
+      twitter_browser_listening_attention: false,
+      twitter_browser_composer_attempted_at: null,
+      twitter_browser_composer_claim: null,
+      twitter_browser_composer_status: null,
       updated_at: at,
     }).where('id', '=', accountId)
     const confirmed = (handle !== null && !checkedLayout
       ? save.where('twitter_browser_needs_layout_check', '=', false)
       : save).returning(['id']).executeTakeFirst()
     if (!confirmed) throw new UserFacingError(workspaceXBrowserErrors.checkLayout)
+    tx.updateTable('keyword_monitors').set({ twitter_browser_claim: null }).where('account_id', '=', accountId)
+      .where('twitter_browser_claim', 'is not', null).execute()
     if (!supportsLocalTwitterBrowser()) return
 
     const name = handle?.toLowerCase()
@@ -111,13 +116,14 @@ export async function rememberTwitterBrowserHandle(handle: unknown, { checkedLay
   }, sqliteWriteOptions())
 }
 
-export async function pauseTwitterBrowserReads(reason: 'sign-in' | 'layout' | 'signed-out' | 'composer' = 'sign-in', expectedHandle?: string): Promise<void> {
+export async function pauseTwitterBrowserReads(reason: 'sign-in' | 'layout' | 'signed-out' | 'composer' | 'listening' = 'sign-in', expectedHandle?: string): Promise<void> {
   const layout = reason === 'layout'
   const pause = db.updateTable('accounts')
     .set({
       twitter_browser_needs_check: true,
       ...(layout ? { twitter_browser_needs_layout_check: true } : {}),
       ...(reason === 'composer' ? { twitter_browser_composer_status: 'attention' } : {}),
+      ...(reason === 'listening' ? { twitter_browser_listening_attention: true } : {}),
       updated_at: now(),
     })
     .where('id', '=', await ensureAccount())

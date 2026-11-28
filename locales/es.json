@@ -180,6 +180,8 @@
       "networks": "Redes",
       "xSource": "Fuente de X",
       "browserSession": "Sesión de X en el navegador",
+      "xBrowserBackground": "Consultar X en segundo plano",
+      "xBrowserFrequency": "Postline consulta una alerta habilitada cada 20 minutos mientras la aplicación para Mac está abierta.",
       "importX": "Importa publicaciones desde Búsqueda o Menciones con los controles del navegador de X en",
       "channels": "Canales",
       "watchActive": "Regla activa",

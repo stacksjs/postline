@@ -196,8 +196,8 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   check('the native session remembers its X handle, profile and confirmation state', connectedBrowser.status === 200
     && savedBrowser.status === 200 && savedProfile?.handle === 'postline_test' && savedProfile?.profile === initialProfile?.profile
     && savedProfile.needsCheck === false && savedProfile.needsLayoutCheck === false
-    && savedProfile.composerHealth === null
-    && Object.keys(savedProfile).sort().join(',') === 'composerHealth,handle,needsCheck,needsLayoutCheck,profile')
+    && savedProfile.composerHealth === null && savedProfile.listeningNeedsAttention === false
+    && Object.keys(savedProfile).sort().join(',') === 'composerHealth,handle,listeningNeedsAttention,needsCheck,needsLayoutCheck,profile')
   const attemptedChecks = await Promise.all([
     call('POST', composerCheckPath, beginComposerCheck),
     call('POST', composerCheckPath, beginComposerCheck),
@@ -236,6 +236,34 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   const savedMentions = await call('GET', `/api/postline/listening?monitor_id=${watchResult?.id}`)
   check('the imported X post appears in Listening', savedMentions.status === 200
     && JSON.parse(savedMentions.text)?.data?.mentions?.[0]?.url === 'https://x.com/fixture_author/status/8724')
+
+  if (process.platform === 'darwin' && Number(release().split('.')[0]) >= 23) {
+    const listeningPath = `${browserSessionPath}/listening-check`
+    const scan = (operation: 'claim' | 'finish', details = {}) =>
+      call('POST', listeningPath, JSON.stringify({ operation, ...details }))
+    const manualOnly = await scan('claim')
+    check('manual X browser watches do not start a background search', manualOnly.status === 200 && JSON.parse(manualOnly.text)?.data === null)
+    const scheduledWatch = await call('POST', '/api/postline/listening', JSON.stringify({
+      name: 'Paced browser search', keywords: ['Paced fixture'], providers: ['twitter'],
+      twitter_read_source: 'browser', twitter_browser_background: true,
+    }))
+    const scheduledMonitor = JSON.parse(scheduledWatch.text)?.data?.monitor
+    const searches = await Promise.all([scan('claim'), scan('claim')])
+    const claims = searches.map(search => JSON.parse(search.text)?.data).filter(Boolean)
+    const claimed = claims[0]
+    check('the agent claims one enabled browser watch per interval', scheduledMonitor?.twitterBrowserBackground === true && claims.length === 1
+      && claimed?.profile === savedProfile?.profile && claimed?.handle === 'postline_test' && claimed?.query === '"Paced fixture"')
+    const captured = { token: claimed?.token, handle: claimed?.handle, state: 'captured',
+      posts: [{ id: '8725', authorHandle: 'fixture_author', body: 'Paced fixture from background search', postedAt: '2026-11-27T05:00:00.000Z' }],
+    }
+    const report = await scan('finish', captured)
+    const replay = await scan('finish', captured)
+    const next = await scan('claim')
+    const scheduledMentions = await call('GET', `/api/postline/listening?monitor_id=${scheduledMonitor?.id}`)
+    check('the agent saves a scheduled browser result once and preserves the interval', report.status === 200
+      && JSON.parse(report.text)?.data?.created === 1 && JSON.parse(replay.text)?.data?.recorded === false
+      && JSON.parse(next.text)?.data === null && JSON.parse(scheduledMentions.text)?.data?.mentions?.[0]?.remoteUri === '8725')
+  }
 
   await call('POST', browserSessionPath, signedOut)
   const paused = await call('GET', browserSessionPath)

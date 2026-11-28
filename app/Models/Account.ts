@@ -75,6 +75,18 @@ export default defineModel({
       validation: { rule: schema.boolean() },
       factory: () => false,
     },
+    twitterBrowserListeningAttention: {
+      required: true,
+      default: false,
+      hidden: true,
+      validation: { rule: schema.boolean() },
+      factory: () => false,
+    },
+    twitterBrowserListeningAttemptedAt: {
+      required: false,
+      hidden: true,
+      validation: { rule: schema.string().max(19).optional() },
+    },
     twitterBrowserComposerAttemptedAt: {
       required: false,
       hidden: true,

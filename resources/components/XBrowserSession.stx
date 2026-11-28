@@ -10,7 +10,7 @@ import { createI18n } from '@stacksjs/i18n/client'
 import type { TwitterBrowserSessionSnapshot } from '../../app/Services/Social/TwitterBrowserSession'
 import type { XBrowserWindow } from '../functions/x-browser-session'
 import { requestJson } from '../functions/postline-client'
-import { openXBrowser, readXBrowserSession, xBrowserWindow, xComposerWindowName } from '../functions/x-browser-session'
+import { openXBrowser, readXBrowserSession, withXBrowserProfile, xBrowserWindow, xComposerWindowName, xListeningWindowName } from '../functions/x-browser-session'
 
 const { locale: language, messages: copy } = {{ xBrowserSessionClient }}
 const words = createI18n({ locale: language, messages: { [language]: copy } })
@@ -32,9 +32,11 @@ async function loadSession() {
     xSession.set(data)
     xSessionNeedsCheck.set(data.needsCheck)
     if (data.needsCheck) xSessionFeedback.set(data.needsLayoutCheck ? copy.layout : copy.attentionBody)
+    return true
   }
   catch (error) {
     xSessionFeedback.set(error instanceof Error ? error.message : copy.loadFailed)
+    return false
   }
 }
 
@@ -45,12 +47,22 @@ xSessionDesktop.onReady((host) => {
   void loadSession()
 })
 
-useEventListener('postline:x-composer-health', () => {
+function refreshSession() {
   if (xBrowser() && !xSessionBusy()) void loadSession()
-})
+}
+
+useEventListener('postline:x-composer-health', refreshSession)
+useEventListener('postline:x-listening', refreshSession)
 
 function signInWindow(current: TwitterBrowserSessionSnapshot): string {
+  if (current.listeningNeedsAttention) return xListeningWindowName(current.profile)
   return current.composerHealth === 'attention' ? xComposerWindowName(current.profile) : current.profile
+}
+
+function runSessionAction(work: () => Promise<void>) {
+  return withXBrowserProfile(async () => {
+    if (await loadSession()) await work()
+  }).catch(() => xSessionFeedback.set(copy.checkFailed))
 }
 
 async function openSession() {
@@ -243,12 +255,12 @@ async function captureListening() {
         <p class="m-0 text-body text-xs">{{ xBrowserSessionText.description }}</p>
         <p class="m-0 text-muted text-xs" :show="xSession()?.handle" :text="xSession()?.handle ? words.t('lastConfirmed', { handle: xSession().handle }) : ''"></p>
         <div class="flex flex-wrap gap-2 items-center">
-          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.open }}" :disabled="!xSession() || xSessionBusy()" @click="openSession" />
-          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.check }}" :disabled="!xSession() || xSessionBusy()" @click="checkSignIn" />
-          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.metrics }}" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="captureMetrics" />
-          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.mentions }}" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="captureListening" />
-          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.profile }}" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="openReadPage('profile')" />
-          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.openMentionsPage }}" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="openReadPage('mentions')" />
+          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.open }}" :disabled="!xSession() || xSessionBusy()" @click="runSessionAction(openSession)" />
+          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.check }}" :disabled="!xSession() || xSessionBusy()" @click="runSessionAction(checkSignIn)" />
+          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.metrics }}" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="runSessionAction(captureMetrics)" />
+          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.mentions }}" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="runSessionAction(captureListening)" />
+          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.profile }}" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="runSessionAction(() => openReadPage('profile'))" />
+          <Button variant="secondary" size="xs" label="{{ xBrowserSessionText.openMentionsPage }}" :show="xSession()?.handle" :disabled="xSessionBusy() || xSessionNeedsCheck()" @click="runSessionAction(() => openReadPage('mentions'))" />
           <a class="text-info text-xs underline" href="https://help.x.com/en/rules-and-policies/x-automation" target="_blank" rel="noopener noreferrer">{{ xBrowserSessionText.rules }}</a>
         </div>
         <p class="m-0 text-body text-xs" role="status" :show="xSessionFeedback()" :text="xSessionFeedback()"></p>

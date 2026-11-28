@@ -227,6 +227,24 @@
               "unavailable",
               "attention"
             ]
+          },
+          {
+            "name": "twitter_browser_listening_attempted_at",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 19
+          },
+          {
+            "name": "twitter_browser_listening_attention",
+            "type": "boolean",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": false
           }
         ],
         "indexes": [
@@ -856,6 +874,33 @@
               "api",
               "browser"
             ]
+          },
+          {
+            "name": "twitter_browser_background",
+            "type": "boolean",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": false
+          },
+          {
+            "name": "twitter_browser_attempted_at",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 19
+          },
+          {
+            "name": "twitter_browser_claim",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 36
           }
         ],
         "indexes": [
@@ -4199,7 +4244,7 @@
       }
     ]
   },
-  "hash": "e174321ab9e3e7b6ac66ae46ac4367c3cadfd889014523f98ba504660839aeef",
+  "hash": "52b6391a0da69274a5a3deefbd33d9f662f2316d12f306763df081eef25f6daf",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-28T02:02:50.114Z"
+  "updatedAt": "2026-11-28T02:31:09.994Z"
 }

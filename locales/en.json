@@ -180,6 +180,8 @@
       "networks": "Networks",
       "xSource": "X source",
       "browserSession": "X browser session",
+      "xBrowserBackground": "Check X in the background",
+      "xBrowserFrequency": "Postline checks one enabled watch every 20 minutes while the Mac app is running.",
       "importX": "Import posts from Search or Mentions using the X browser controls in",
       "channels": "Channels",
       "watchActive": "Watch active",

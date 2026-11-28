@@ -1,6 +1,7 @@
 import { requestJson } from '../../functions/postline-client'
 import { xBrowserWindow } from '../../functions/x-browser-session'
 import { checkXComposer } from './x-composer-health'
+import { scanXListening } from './x-browser-listening'
 import { bindXBrowserWrites } from './x-browser-write'
 
 interface AlertView {
@@ -184,7 +185,10 @@ export function bindDesktopAlerts(host: DesktopAlertsBridge): () => void {
       checkingX = true
       void checkXComposer(xBrowser, sleep, signal).then((recorded) => {
         if (recorded && !signal.aborted) window.dispatchEvent(new Event('postline:x-composer-health'))
-      }).catch(() => {}).finally(() => { checkingX = false })
+      }).catch(() => {}).then(() => scanXListening(xBrowser, sleep, signal))
+        .then((recorded) => {
+          if (recorded && !signal.aborted) window.dispatchEvent(new Event('postline:x-listening'))
+        }).catch(() => {}).finally(() => { checkingX = false })
     }
     // WebKit throttles browser timers when the window is closed to the tray.
     // Craft's native deadline also runs while the workspace is hidden.

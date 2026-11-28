@@ -44,7 +44,7 @@ import { readArchivedTrackedLink, trackedLinks } from './TrackedLinkService'
 const database = db as any
 
 export const ARCHIVE_FORMAT = 'postline-workspace'
-export const ARCHIVE_VERSION = 10
+export const ARCHIVE_VERSION = 11
 
 /** Typed to delete everything, so a stray click cannot. */
 export const DELETE_EVERYTHING_PHRASE = 'DELETE EVERYTHING'
@@ -257,7 +257,9 @@ export class WorkspaceArchiveService {
         post: row.post_id ? postUuid.get(Number(row.post_id)) ?? null : null,
       })),
       blogPosts,
-      monitors: monitors.map((row: any) => pick(row, MONITOR_COLUMNS)),
+      monitors: monitors.map((row: any) => ({
+        ...pick(row, MONITOR_COLUMNS), twitter_browser_background: Boolean(row.twitter_browser_background),
+      })),
       composerPresets: await composerPresets.list(accountId),
       trackedLinks: await trackedLinks.export(accountId),
       draftFeeds: feeds,
@@ -307,7 +309,12 @@ export class WorkspaceArchiveService {
       const source = version < 3 ? monitor.twitter_read_source ?? 'api' : monitor.twitter_read_source
       if (source !== 'api' && source !== 'browser')
         throw new UserFacingError('A Listening watch in this export has an invalid X read source.')
-      return { ...pick(monitor, MONITOR_COLUMNS), uuid: monitor.uuid ?? null, twitter_read_source: source }
+      const background = version < 11 ? false : monitor.twitter_browser_background
+      if (typeof background !== 'boolean' || (background && source !== 'browser'))
+        throw new UserFacingError('A Listening watch in this export has an invalid X background check setting.')
+      return {
+        ...pick(monitor, MONITOR_COLUMNS), uuid: monitor.uuid ?? null, twitter_read_source: source, twitter_browser_background: background,
+      }
     })
     const mediaEntries = Object.entries(archive.media || {})
     try {
@@ -498,6 +505,8 @@ export class WorkspaceArchiveService {
       twitter_browser_handle: null,
       twitter_browser_needs_check: false,
       twitter_browser_needs_layout_check: false,
+      twitter_browser_listening_attention: false,
+      twitter_browser_listening_attempted_at: null,
       twitter_browser_composer_attempted_at: null,
       twitter_browser_composer_claim: null,
       twitter_browser_composer_status: null,

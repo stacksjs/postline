@@ -45,7 +45,7 @@ describe('workspace archive', () => {
     await database.insertInto('campaign_posts').values({ uuid: crypto.randomUUID(), title: 'cp', body: 'campaign post', providers: '["bluesky"]', pillar: 'story', status: 'idea', scheduled_at: '2026-12-02 09:00:00', position: 0, launch_campaign_id: campaign.id, post_id: post.id, created_at: at }).execute()
 
     const watch = await keywordMonitoring.save(0, {
-      name: `Browser watch ${tag}`, keywords: ['Postline'], providers: ['twitter'], twitterReadSource: 'browser',
+      name: `Browser watch ${tag}`, keywords: ['Postline'], providers: ['twitter'], twitterReadSource: 'browser', twitterBrowserBackground: true,
     })
     const preset = await composerPresets.save(undefined, { kind: 'snippet', name: `Sign-off ${tag}`, body: 'Thanks for reading.' })
     const link = { code: crypto.randomUUID().replaceAll('-', '').slice(0, 16), name: `Launch ${tag}`, destination: 'https://example.org/launch', visits: 17, disabled: true }
@@ -68,7 +68,7 @@ describe('workspace archive', () => {
       uuid: crypto.randomUUID(), post_id: browserPost.postId, handle: 'archive_x', state: 'submitting', created_at: at,
     }).execute()
     const archive = await workspaceArchive.export()
-    expect(archive.version).toBe(10)
+    expect(archive.version).toBe(11)
     expect(archive.recurringPosts).toContainEqual(expect.objectContaining({ uuid: repeat.uuid, active: false, nextAt: repeat.nextAt }))
     expect(archive.postingSlots).toContainEqual(slot)
     expect(archive.composerPresets).toContainEqual(preset)
@@ -76,6 +76,8 @@ describe('workspace archive', () => {
     expect(archive.draftFeeds).toContainEqual(feed)
     const archivedWatch = archive.monitors.find(row => row.name === watch.name)
     expect(archivedWatch?.twitter_read_source).toBe('browser')
+    expect(archivedWatch?.twitter_browser_background).toBe(true)
+    expect(archivedWatch).not.toHaveProperty('twitter_browser_claim')
     expect(archive.posts.some(row => row.uuid === postUuid)).toBe(true)
     expect(archive.twitterBrowserDispatches).toContainEqual({ post: browserPostUuid, handle: 'archive_x', state: 'submitting', remoteId: null })
     expect(archive.media[`${tag}.png`]).toBe(png)
@@ -87,7 +89,7 @@ describe('workspace archive', () => {
     expect(await twitterBrowserSession()).toEqual(browserSession)
     await workspaceArchive.deleteEverything(DELETE_EVERYTHING_PHRASE)
     expect(await ensureAccount()).toBe(accountId)
-    expect(await twitterBrowserSession()).toEqual({ profile: browserSession.profile, handle: null, needsCheck: false, needsLayoutCheck: false, composerHealth: null })
+    expect(await twitterBrowserSession()).toEqual({ profile: browserSession.profile, handle: null, needsCheck: false, needsLayoutCheck: false, listeningNeedsAttention: false, composerHealth: null })
     expect(await composerPresets.list()).toEqual([])
     expect(await trackedLinks.export(accountId)).toEqual([])
     expect(await draftFeeds.list()).toEqual([])
@@ -123,9 +125,10 @@ describe('workspace archive', () => {
     const cp = await database.selectFrom('campaign_posts').selectAll().where('launch_campaign_id', '=', campaignBack.id).executeTakeFirstOrThrow()
     expect(Number(cp.post_id)).toBe(Number(back.id))
     expect(existsSync(join(MEDIA_DIR, `${tag}.png`))).toBe(true)
-    const restoredWatch = await database.selectFrom('keyword_monitors').select(['id', 'twitter_read_source'])
+    const restoredWatch = await database.selectFrom('keyword_monitors').select(['id', 'twitter_read_source', 'twitter_browser_background'])
       .where('uuid', '=', archivedWatch?.uuid).executeTakeFirstOrThrow()
     expect(restoredWatch.twitter_read_source).toBe('browser')
+    expect(Boolean(restoredWatch.twitter_browser_background)).toBe(true)
     expect(await keywordMonitoring.scan(Number(restoredWatch.id))).toEqual({ scanned: 0, found: 0, created: 0, errors: [] })
 
     // A second import changes nothing.

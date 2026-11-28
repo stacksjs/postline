@@ -33,6 +33,10 @@ export function xComposerWindowName(profile: string): string {
   return `${profile}-composer`
 }
 
+export function xListeningWindowName(profile: string): string {
+  return `${profile}-listening`
+}
+
 /** The workspace and Settings windows share the same loopback origin. */
 export function withXBrowserProfile<T>(work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   return navigator.locks.request('postline:x-browser-profile', { signal }, work)
@@ -75,7 +79,7 @@ export async function removeXBrowserProfile(host: unknown, profile: string): Pro
   // our own view only if Craft reports that the data store is still in use.
   const first = await remove()
   if (first === 'removed') return first
-  for (const name of [profile, xComposerWindowName(profile)]) {
+  for (const name of [profile, xComposerWindowName(profile), xListeningWindowName(profile)]) {
     try {
       await browser._call('getState', undefined, name)
       await browser._call('destroy', undefined, name)
@@ -89,7 +93,7 @@ export async function removeXBrowserProfile(host: unknown, profile: string): Pro
 }
 
 /** Read the account and the requested data from the open X page. */
-export function inspectXPage(page: Document, href: string, read: XBrowserRead = 'sign-in'): XBrowserStatus {
+export function inspectXPage(page: Document, href: string, read: XBrowserRead = 'sign-in', query?: string): XBrowserStatus {
   const url = new URL(href)
   if (!['https://x.com', 'https://twitter.com'].includes(url.origin))
     return { state: 'unavailable' }
@@ -108,6 +112,8 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
     const handle = /^\/([A-Za-z0-9_]{1,15})\/?$/.exec(profile.pathname)?.[1]
     if (profile.origin === url.origin && handle) {
       const measurements: Array<{ id: string, counts: EngagementCounts }> = []
+      if (query !== undefined && (url.pathname !== '/search' || url.searchParams.get('q') !== query || url.searchParams.get('f') !== 'live'))
+        return { state: 'connected', handle, measurements, readIssue: 'layout' }
       const listening = read === 'listening' && ['/search', '/notifications/mentions'].includes(url.pathname)
       const column = listening ? page.querySelector('[data-testid="primaryColumn"]') : null
       if (listening && !column)
@@ -174,11 +180,11 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
   return { state: 'unavailable' }
 }
 
-export async function readXBrowserSession(browser: XBrowserWindow, profile: string, read: XBrowserRead = 'sign-in'): Promise<XBrowserStatus> {
+export async function readXBrowserSession(browser: XBrowserWindow, name: string, read: XBrowserRead = 'sign-in', query?: string): Promise<XBrowserStatus> {
   try {
     const result = await browser._call('executeJavaScript', {
-      code: `JSON.stringify((${inspectXPage.toString()})(document, location.href, ${JSON.stringify(read)}))`,
-    }, profile)
+      code: `JSON.stringify((${inspectXPage.toString()})(document, location.href, ${JSON.stringify(read)}, ${JSON.stringify(query)}))`,
+    }, name)
     if (typeof result !== 'string') return { state: 'unavailable' }
     const status: XBrowserStatus = JSON.parse(result)
     if (status.state === 'connected' && typeof status.handle === 'string' && /^[A-Za-z0-9_]{1,15}$/.test(status.handle)) return status

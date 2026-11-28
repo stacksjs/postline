@@ -17,6 +17,7 @@ export default new Action({
         keywords: request.get('keywords'),
         providers: request.get('providers'),
         twitterReadSource: isDesktopAgent() ? request.get('twitter_read_source') : undefined,
+        twitterBrowserBackground: isDesktopAgent() ? request.get('twitter_browser_background') : undefined,
         matchMode: String(request.get('match_mode') || 'any'),
         status: String(request.get('status') || 'active'),
       })

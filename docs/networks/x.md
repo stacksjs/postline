@@ -86,3 +86,7 @@ browser session** under **X source**. Choose **Open X Mentions** in Channels, or
 open Search in the X window. Once the results load, choose **Import visible mentions**. Posts matching the
 watch appear in Listening. Browser-session watches do not make scheduled X API
 requests. If you also chose other networks, the scheduler still checks those.
+
+Enable **Check X in the background** on a watch to search X while the Mac app
+is running, including when it’s in the menu bar. Postline checks one enabled
+watch every 20 minutes and rotates through the enabled watches in turn. Pausing a watch or turning the option off stops its background checks.

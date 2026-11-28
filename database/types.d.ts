@@ -19,6 +19,8 @@ declare module '@stacksjs/database' {
       twitter_browser_handle: string
       twitter_browser_needs_check: number
       twitter_browser_needs_layout_check: number
+      twitter_browser_listening_attention: number
+      twitter_browser_listening_attempted_at: string
       twitter_browser_composer_attempted_at: string
       twitter_browser_composer_claim: string
       twitter_browser_composer_status: "ready" | "layout" | "unavailable" | "attention"
@@ -991,6 +993,9 @@ declare module '@stacksjs/database' {
       last_checked_at: string
       last_error: string
       twitter_read_source: "api" | "browser"
+      twitter_browser_background: number
+      twitter_browser_attempted_at: string
+      twitter_browser_claim: string
       twitter_search_cursor: unknown
       account_id: number
     }

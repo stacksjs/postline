@@ -4,6 +4,7 @@ import { keywordMonitoring } from '../../app/Services/KeywordMonitoringService'
 import { postQueue } from '../../app/Services/Social/QueueService'
 import { rememberTwitterBrowserHandle, saveTwitterBrowserMetrics, twitterBrowserSession } from '../../app/Services/Social/TwitterBrowserSession'
 import { upsertIdentityRow } from '../../app/Services/Social/identities'
+import { ensureAccount } from '../../app/Services/Social/support'
 import { inspectXPage, removeXBrowserProfile } from '../../resources/functions/x-browser-session'
 import { inspectXComposer } from '../../resources/assets/scripts/x-composer-health'
 
@@ -32,7 +33,7 @@ test('profile removal still reports busy when another view owns the store', asyn
   } }
 
   expect(await removeXBrowserProfile(host, 'x-store')).toBe('busy')
-  expect(calls).toEqual(['remove:x-store', 'getState:x-store', 'getState:x-store-composer', 'remove:x-store'])
+  expect(calls).toEqual(['remove:x-store', 'getState:x-store', 'getState:x-store-composer', 'getState:x-store-listening', 'remove:x-store'])
 })
 
 test('X Composer health verifies the account and supported controls without submitting', () => {
@@ -154,6 +155,9 @@ describe('X session browser reads', () => {
     expect(inspectXPage(document, 'https://x.com/search?q=postline', 'listening')).toMatchObject({ state: 'connected', posts })
     expect(inspectXPage(document, 'https://x.com/notifications/mentions', 'listening')).toMatchObject({ state: 'connected', posts })
     expect(inspectXPage(document, 'https://x.com/home', 'listening')).not.toHaveProperty('posts')
+    expect(inspectXPage(document, 'https://x.com/search?q=postline&f=live', 'listening', 'postline')).toMatchObject({ posts })
+    expect(inspectXPage(document, 'https://x.com/search?q=postline', 'listening', 'postline')).toMatchObject({ readIssue: 'layout' })
+    expect(inspectXPage(document, 'https://x.com/search?q=other&f=live', 'listening', 'postline')).toMatchObject({ readIssue: 'layout' })
     expect(inspectXPage(document, 'https://x.com/account/access', 'listening')).toEqual({ state: 'needs-attention' })
   })
 
@@ -239,6 +243,84 @@ describe('X session browser reads', () => {
       for (const id of ids) {
         await db.unsafe('DELETE FROM alerts WHERE dedupe_key LIKE ?', [`keyword:${id}:%`])
         await keywordMonitoring.remove(id)
+      }
+    }
+  })
+
+  test('paces background searches across runners and stores only results for the claimed watch', async () => {
+    const [savedAccount] = await db.unsafe(`SELECT id, twitter_browser_handle, twitter_browser_needs_check, twitter_browser_needs_layout_check,
+      twitter_browser_listening_attention, twitter_browser_listening_attempted_at, twitter_browser_composer_attempted_at,
+      twitter_browser_composer_claim, twitter_browser_composer_status FROM accounts ORDER BY id LIMIT 1`)
+    const accountId = await ensureAccount()
+    const existingWatches = await db.selectFrom('keyword_monitors').select('id')
+      .where('account_id', '=', accountId).where('twitter_browser_background', '=', true).execute()
+    const ids: number[] = []
+    const input = { name: 'X scheduled search fixture', providers: ['twitter'], keywords: ['browser scan fixture'], matchMode: 'all', twitterReadSource: 'browser' }
+    const fixture = { id: '771701', authorHandle: 'fixture_author', body: 'A browser scan fixture', postedAt: '2026-11-27T05:00:00.000Z' }
+    const resetInterval = () => db.updateTable('accounts').set({ twitter_browser_listening_attempted_at: null }).where('id', '=', accountId).execute()
+    try {
+      for (const { id } of existingWatches)
+        await db.updateTable('keyword_monitors').set({ twitter_browser_background: false }).where('id', '=', id).execute()
+      await rememberTwitterBrowserHandle('listen_fixture', { checkedLayout: true })
+      const account = await twitterBrowserSession()
+      resetInterval()
+      const manual = await keywordMonitoring.save(0, input)
+      ids.push(manual.id)
+      expect(manual.twitterBrowserBackground).toBe(false)
+      const paused = await keywordMonitoring.save(0, { ...input, status: 'paused', twitterBrowserBackground: true })
+      ids.push(paused.id)
+      expect(await keywordMonitoring.claimTwitterBrowserScan()).toBeNull()
+
+      const first = await keywordMonitoring.save(0, { ...input, twitterBrowserBackground: true })
+      const second = await keywordMonitoring.save(0, { ...input, twitterBrowserBackground: true })
+      ids.push(first.id, second.id)
+      const claims = await Promise.all([keywordMonitoring.claimTwitterBrowserScan(), keywordMonitoring.claimTwitterBrowserScan()])
+      const claim = claims.find(work => work !== null)!
+      expect(claims.filter(Boolean)).toHaveLength(1)
+      expect(claim).toMatchObject({ profile: account.profile, handle: 'listen_fixture', query: '"browser scan fixture"' })
+      expect(await keywordMonitoring.finishTwitterBrowserScan(claim.token, 'other_user', 'captured', [fixture])).toEqual({ recorded: false, created: 0 })
+      expect(await keywordMonitoring.finishTwitterBrowserScan(claim.token, claim.handle, 'captured', [fixture])).toEqual({ recorded: true, created: 1 })
+      expect(await keywordMonitoring.finishTwitterBrowserScan(claim.token, claim.handle, 'captured', [fixture])).toEqual({ recorded: false, created: 0 })
+      expect(await keywordMonitoring.claimTwitterBrowserScan()).toBeNull()
+      expect((await keywordMonitoring.list(first.id)).mentions).toHaveLength(1)
+      for (const id of [manual.id, paused.id, second.id])
+        expect((await keywordMonitoring.list(id)).mentions).toHaveLength(0)
+
+      resetInterval()
+      const obsolete = (await keywordMonitoring.claimTwitterBrowserScan())!
+      await keywordMonitoring.save(second.id, { ...input, twitterBrowserBackground: false })
+      expect(await keywordMonitoring.finishTwitterBrowserScan(obsolete.token, obsolete.handle, 'captured', [fixture])).toEqual({ recorded: false, created: 0 })
+      expect((await keywordMonitoring.list(second.id)).mentions).toHaveLength(0)
+
+      resetInterval()
+      const challenged = (await keywordMonitoring.claimTwitterBrowserScan())!
+      expect(await keywordMonitoring.finishTwitterBrowserScan(challenged.token, challenged.handle, 'attention', undefined)).toEqual({ recorded: true, created: 0 })
+      expect(await twitterBrowserSession()).toMatchObject({ needsCheck: true, listeningNeedsAttention: true })
+      resetInterval()
+      expect(await keywordMonitoring.claimTwitterBrowserScan()).toBeNull()
+
+      await rememberTwitterBrowserHandle('listen_fixture')
+      const changedLayout = (await keywordMonitoring.claimTwitterBrowserScan())!
+      expect(await keywordMonitoring.finishTwitterBrowserScan(changedLayout.token, changedLayout.handle, 'layout', undefined)).toEqual({ recorded: true, created: 0 })
+      expect(await twitterBrowserSession()).toMatchObject({ needsCheck: true, needsLayoutCheck: true })
+      expect(await keywordMonitoring.claimTwitterBrowserScan()).toBeNull()
+    }
+    finally {
+      for (const id of ids) {
+        await db.unsafe('DELETE FROM alerts WHERE dedupe_key LIKE ?', [`keyword:${id}:%`])
+        await keywordMonitoring.remove(id)
+      }
+      for (const { id } of existingWatches)
+        await db.updateTable('keyword_monitors').set({ twitter_browser_background: true }).where('id', '=', id).execute()
+      const account = await twitterBrowserSession()
+      await db.unsafe('DELETE FROM alerts WHERE dedupe_key LIKE ?', [`x-browser-attention:${account.profile.slice('postline-x-'.length)}:%`])
+      if (savedAccount) {
+        const { id, ...values } = savedAccount
+        await (db as any).updateTable('accounts').set(values).where('id', '=', id).execute()
+      }
+      else {
+        await rememberTwitterBrowserHandle(null, { checkedLayout: true })
+        resetInterval()
       }
     }
   })

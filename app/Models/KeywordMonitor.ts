@@ -72,6 +72,23 @@ export default defineModel({
       validation: { rule: schema.enum(['api', 'browser']).required() },
       factory: () => 'api',
     },
+    twitterBrowserBackground: {
+      required: true,
+      fillable: true,
+      default: false,
+      validation: { rule: schema.boolean() },
+      factory: () => false,
+    },
+    twitterBrowserAttemptedAt: {
+      required: false,
+      hidden: true,
+      validation: { rule: schema.string().max(19).optional() },
+    },
+    twitterBrowserClaim: {
+      required: false,
+      hidden: true,
+      validation: { rule: schema.string().max(36).optional() },
+    },
     twitterSearchCursor: {
       required: false,
       fillable: false,
