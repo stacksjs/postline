@@ -27,11 +27,13 @@ every driver:
 
 Supporting infrastructure, also already built:
 
-- `MediaServeAction.ts` + `routes/api.ts:29` — unauthenticated, traversal-guarded
-  `GET /postline/media?file=…` with UUID filenames and immutable cache headers.
+- `MediaServeAction.ts` and `routes/api.ts` — the provider image route accepts
+  a signed URL for a single filename. Each URL is valid for 30 minutes, and
+  image responses use private, no-store caching. The API and publishing
+  worker use the same workspace `APP_KEY`.
 - `Support/Social/uploads.ts` — `buildMediaUrl()`, `publicMediaUrl()`,
   `persistTempMedia()` / `removeTempMedia()`.
-- `QueueService.ts:383` — attaches a public URL for scheduled posts.
+- `stored-content.ts` — issues a signed URL at publish time for a stored image.
 - `tests/unit/{linkedin,instagram,threads}-driver.test.ts`, `media-serve.test.ts`,
   `social-publish.test.ts` — **42 tests, all passing.**
 

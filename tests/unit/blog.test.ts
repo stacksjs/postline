@@ -11,7 +11,7 @@ import { postQueue } from '../../app/Services/Social/QueueService'
 import { workspaceArchive } from '../../app/Services/WorkspaceArchiveService'
 import { readBlogAttachments } from '../../app/Support/Social/blog-attachments'
 import { referencedMediaFiles } from '../../app/Support/Social/stored-content'
-import { MEDIA_DIR } from '../../app/Support/Social/uploads'
+import { buildMediaUrl, MEDIA_DIR } from '../../app/Support/Social/uploads'
 import { restorePublishedBlog } from '../../app/Support/Social/blog-files'
 import { publicBlogPost, publicBlogPosts } from '../../app/Support/Social/public-blog'
 
@@ -85,7 +85,8 @@ describe('the blog', () => {
     expect(html.indexOf(names[0]!)).toBeLessThan(html.indexOf(names[1]!))
     const blogImage = `/api/postline/blog/media?slug=${slug}&file=${names[0]}`
     ;(await featureTest().get(blogImage)).assertStatus(200)
-    ;(await featureTest().get(`/api/postline/media?file=${names[0]}`)).assertStatus(404)
+    const providerUrl = new URL(buildMediaUrl('https://posts.example.com', names[0]!, process.env.APP_KEY)!)
+    ;(await featureTest().get(`${providerUrl.pathname}${providerUrl.search}`)).assertStatus(404)
 
     await blog.update(id, { title: 'Updated images', body: 'Replacement article text' })
     expect((await publicBlogPost(slug))?.html).toContain('alt="First photo"')

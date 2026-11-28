@@ -1,8 +1,9 @@
 import type { RequestInstance } from '@stacksjs/types'
+import process from 'node:process'
 import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { isBlogAttachmentFile } from '../../Support/Social/blog-attachments'
-import { isSafeMediaFilename, storedImageResponse } from '../../Support/Social/uploads'
+import { canFetchMedia, isSafeMediaFilename, storedImageResponse } from '../../Support/Social/uploads'
 
 /**
  * Serve a stored post image so a remote platform can fetch it server-side.
@@ -11,11 +12,9 @@ import { isSafeMediaFilename, storedImageResponse } from '../../Support/Social/u
  * `image_url` it downloads itself — an uploaded file sitting on local disk is
  * unreachable to them. This route exposes those files at a stable URL.
  *
- * It is intentionally UNAUTHENTICATED (Meta fetches it with no session), so it
- * is deliberately narrow: only a strictly-validated basename is accepted
- * (`isSafeMediaFilename` rejects any path separator or traversal), the filename
- * is an unguessable per-upload UUID, and nothing outside the media directory
- * can be reached.
+ * The provider fetches it without a workspace session. A publishing request
+ * issues a signature tied to the file and its expiry. The filename must be a
+ * validated basename inside the media directory.
  */
 export default new Action({
   name: 'Postline Media Serve',
@@ -27,8 +26,11 @@ export default new Action({
     if (!isSafeMediaFilename(file))
       return response.json({ ok: false, error: 'Invalid media reference.' }, { status: 400 })
 
+    const expiry = String(request.get('expires') || '')
+    const signature = String(request.get('signature') || '')
     // Blog attachments are public only while their own article is public.
-    const stored = isBlogAttachmentFile(file) ? null : await storedImageResponse(file, 'public, max-age=31536000, immutable')
+    const allowed = !isBlogAttachmentFile(file) && canFetchMedia(file, expiry, signature, process.env.APP_KEY)
+    const stored = allowed ? await storedImageResponse(file, 'private, no-store') : null
     return stored ?? response.json({ ok: false, error: 'Media not found.' }, { status: 404 })
   },
 })

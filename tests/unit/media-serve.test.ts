@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'bun:test'
-import { buildMediaUrl, isSafeMediaFilename, mediaContentType, mediaDirectory } from '../../app/Support/Social/uploads'
+import { randomBytes } from 'node:crypto'
+import process from 'node:process'
+import { featureTest } from '@stacksjs/testing'
+import { removeMediaFiles, storeAttachments } from '../../app/Support/Social/stored-attachments'
+import { hydrateStoredContent } from '../../app/Support/Social/stored-content'
+import { buildMediaUrl, canFetchMedia, isSafeMediaFilename, mediaContentType, mediaDirectory, persistTempMedia, removeTempMedia } from '../../app/Support/Social/uploads'
+
+const appKey = `base64:${randomBytes(32).toString('base64')}`
+const issuedAt = Date.UTC(2026, 10, 28)
 
 describe('isSafeMediaFilename', () => {
   test('accepts the UUID basenames QueueService writes', () => {
@@ -39,31 +47,69 @@ describe('mediaContentType', () => {
 })
 
 describe('buildMediaUrl', () => {
-  test('builds a media URL from an https base', () => {
-    expect(buildMediaUrl('https://posts.example.com', 'a.jpg'))
-      .toBe('https://posts.example.com/api/postline/media?file=a.jpg')
+  test.each([
+    'https://posts.example.com',
+    'https://posts.example.com/api',
+    'posts.example.com',
+    'https://posts.example.com//',
+  ])('builds a signed API URL from %s', (base) => {
+    const url = new URL(buildMediaUrl(base, 'a.jpg', appKey, issuedAt)!)
+    expect(url.origin + url.pathname).toBe('https://posts.example.com/api/postline/media')
+    expect(url.searchParams.get('file')).toBe('a.jpg')
+    const expires = url.searchParams.get('expires')!
+    const signature = url.searchParams.get('signature')!
+    expect(Number(expires) - issuedAt / 1000).toBe(1800)
+    expect(canFetchMedia('a.jpg', expires, signature, appKey, issuedAt)).toBe(true)
   })
 
-  test('does not double the /api prefix when the base already has it', () => {
-    expect(buildMediaUrl('https://posts.example.com/api', 'a.jpg'))
-      .toBe('https://posts.example.com/api/postline/media?file=a.jpg')
+  test('requires a base, safe filename, and a full-length app key', () => {
+    expect(buildMediaUrl('', 'a.jpg', appKey)).toBeNull()
+    expect(buildMediaUrl('   ', 'a.jpg', appKey)).toBeNull()
+    expect(buildMediaUrl('https://posts.example.com', '../../etc/passwd', appKey)).toBeNull()
+    expect(buildMediaUrl('https://posts.example.com', 'sub/dir.jpg', appKey)).toBeNull()
+    expect(buildMediaUrl('https://posts.example.com', 'a.jpg', undefined)).toBeNull()
+    expect(buildMediaUrl('https://posts.example.com', 'a.jpg', 'base64:1234567890')).toBeNull()
+  })
+})
+
+describe('provider media access', () => {
+  test('binds the signature to the image, deadline, and app key', () => {
+    const url = new URL(buildMediaUrl('https://posts.example.com', 'a.jpg', appKey, issuedAt)!)
+    const expires = url.searchParams.get('expires')!
+    const signature = url.searchParams.get('signature')!
+    expect(canFetchMedia('a.jpg', expires, signature, appKey, issuedAt + 1799_000)).toBe(true)
+    expect(canFetchMedia('a.jpg', expires, signature, appKey, issuedAt + 1800_000)).toBe(false)
+    expect(canFetchMedia('b.jpg', expires, signature, appKey, issuedAt)).toBe(false)
+    expect(canFetchMedia('a.jpg', String(Number(expires) + 1), signature, appKey, issuedAt)).toBe(false)
+    expect(canFetchMedia('a.jpg', expires, signature, randomBytes(32).toString('hex'), issuedAt)).toBe(false)
   })
 
-  test('adds https:// when the base has no scheme, and strips trailing slashes', () => {
-    expect(buildMediaUrl('posts.example.com', 'a.jpg'))
-      .toBe('https://posts.example.com/api/postline/media?file=a.jpg')
-    expect(buildMediaUrl('https://posts.example.com//', 'a.jpg'))
-      .toBe('https://posts.example.com/api/postline/media?file=a.jpg')
-  })
-
-  test('returns null when the base is empty', () => {
-    expect(buildMediaUrl('', 'a.jpg')).toBeNull()
-    expect(buildMediaUrl('   ', 'a.jpg')).toBeNull()
-  })
-
-  test('returns null (never a traversing URL) for an unsafe filename', () => {
-    expect(buildMediaUrl('https://posts.example.com', '../../etc/passwd')).toBeNull()
-    expect(buildMediaUrl('https://posts.example.com', 'sub/dir.jpg')).toBeNull()
+  test('serves queued and temporary uploads over their signed publishing URLs', async () => {
+    const bytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD1sAAAAASUVORK5CYII=', 'base64')
+    const media = await storeAttachments(crypto.randomUUID(), [{ bytes, mimeType: 'image/png' }])
+    const previousBase = process.env.STORAGE_PUBLIC_URL
+    let temporary: Awaited<ReturnType<typeof persistTempMedia>> = null
+    process.env.STORAGE_PUBLIC_URL = 'https://posts.example.com'
+    try {
+      const queued = await hydrateStoredContent(JSON.stringify({ media }))
+      temporary = await persistTempMedia(bytes, 'image/png')
+      const client = featureTest()
+      for (const address of [queued?.media?.[0]?.url, temporary?.url]) {
+        expect(address).toBeDefined()
+        const url = new URL(address!)
+        ;(await client.get(`${url.pathname}${url.search}`))
+          .assertStatus(200)
+          .assertHeader('content-type', 'image/png')
+          .assertHeader('cache-control', 'private, no-store')
+        ;(await client.get(`${url.pathname}?file=${url.searchParams.get('file')}`)).assertStatus(404)
+      }
+    }
+    finally {
+      if (previousBase === undefined) delete process.env.STORAGE_PUBLIC_URL
+      else process.env.STORAGE_PUBLIC_URL = previousBase
+      await removeMediaFiles(media)
+      if (temporary) await removeTempMedia(temporary.filename)
+    }
   })
 })
 

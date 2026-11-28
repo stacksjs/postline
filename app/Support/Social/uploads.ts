@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { mkdir, unlink } from 'node:fs/promises'
 import { isAbsolute, join, resolve } from 'node:path'
 import process from 'node:process'
@@ -24,6 +25,7 @@ export function mediaDirectory(env: Record<string, string | undefined> = process
 }
 
 export const MEDIA_DIR: string = mediaDirectory()
+const MEDIA_FETCH_LIFETIME_SECONDS = 30 * 60
 
 /**
  * Read an uploaded file regardless of shape: the router's multipart
@@ -122,24 +124,38 @@ export async function storedVideoResponse(file: string, range: string | null): P
 }
 
 
-/**
- * Pure URL builder: given a public base and a stored filename, produce the
- * media URL a remote platform fetches — or null when the base is empty or the
- * filename is unsafe. Split out from `publicMediaUrl` so the URL shape is
- * unit-testable without touching env.
- */
-export function buildMediaUrl(base: string, filename: string): string | null {
+function mediaFetchSignature(filename: string, expires: number, appKey: string | undefined): Buffer | null {
+  const key = appKey?.startsWith('base64:') ? Buffer.from(appKey.slice(7), 'base64') : Buffer.from(appKey ?? '')
+  if (key.byteLength < 32) return null
+  return createHmac('sha256', key).update(`postline:provider-media:v1\n${filename}\n${expires}`).digest()
+}
+
+export function canFetchMedia(filename: string, expiry: string, signature: string, appKey: string | undefined, now = Date.now()): boolean {
+  if (!isSafeMediaFilename(filename) || !/^\d+$/.test(expiry) || !/^[a-f0-9]{64}$/.test(signature)) return false
+  const expires = Number(expiry)
+  if (!Number.isSafeInteger(expires) || expires <= Math.floor(now / 1000)) return false
+
+  const expected = mediaFetchSignature(filename, expires, appKey)
+  return expected !== null && timingSafeEqual(expected, Buffer.from(signature, 'hex'))
+}
+
+/** Issue a URL that a provider can fetch while publishing an image. */
+export function buildMediaUrl(base: string, filename: string, appKey: string | undefined, now = Date.now()): string | null {
   if (!isSafeMediaFilename(filename)) return null
   const raw = String(base || '').trim()
   if (!raw) return null
 
-  const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
-  const normalized = withScheme.replace(/\/+$/, '')
-  // The route is registered as `/postline/media` in routes/api.ts, which the
-  // router serves under `/api`. A base that already ends in `/api` is left as
-  // it is, so an install that worked around the missing prefix still works.
-  const api = /\/api$/i.test(normalized) ? normalized : `${normalized}/api`
-  return `${api}/postline/media?file=${encodeURIComponent(filename)}`
+  const url = URL.parse(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`)
+  if (!url || url.username || url.password || url.search || url.hash) return null
+  const expires = Math.floor(now / 1000) + MEDIA_FETCH_LIFETIME_SECONDS
+  const signature = mediaFetchSignature(filename, expires, appKey)
+  if (!signature) return null
+
+  const path = url.pathname.replace(/\/+$/, '')
+  const api = /\/api$/i.test(path) ? path : `${path}/api`
+  url.pathname = `${api}/postline/media`
+  url.search = new URLSearchParams({ file: filename, expires: String(expires), signature: signature.toString('hex') }).toString()
+  return url.href
 }
 
 /**
@@ -151,7 +167,7 @@ export function buildMediaUrl(base: string, filename: string): string | null {
  */
 export function publicMediaUrl(filename: string): string | null {
   const base = configuredMediaBase()
-  return isPublicBase(base) ? buildMediaUrl(base, filename) : null
+  return isPublicBase(base) ? buildMediaUrl(base, filename, process.env.APP_KEY) : null
 }
 
 /**
@@ -204,14 +220,10 @@ export async function persistTempMedia(bytes: Uint8Array, mimeType?: string): Pr
 
   const ext = (mimeType || 'image/jpeg').split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'jpg'
   const filename = `tmp-${crypto.randomUUID()}.${ext}`
+  const url = publicMediaUrl(filename)
+  if (!url) return null
   await mkdir(MEDIA_DIR, { recursive: true })
   await Bun.write(join(MEDIA_DIR, filename), bytes)
-
-  const url = publicMediaUrl(filename)
-  if (!url) {
-    await removeTempMedia(filename)
-    return null
-  }
   return { filename, url }
 }
 

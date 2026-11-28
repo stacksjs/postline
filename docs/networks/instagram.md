@@ -23,6 +23,9 @@ Postline asks for `instagram_basic`, `instagram_content_publish`,
 - **Every post needs an image.** Instagram rejects text-only posts. Instagram
   fetches the image from a public address: on a laptop or in the Mac app,
   switch on **Settings > General > Share images through a temporary link**.
+  A public Postline server gives Instagram a signed link during publishing.
+  Keep the same generated `APP_KEY` on the API and publishing worker so the
+  server can verify that link.
 - **App review** is only needed to post for accounts you do not own. Your own
   account works with the app in development mode, with you in an app role.
   Meta asks for a privacy-policy URL before an app can go live.

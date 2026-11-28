@@ -71,9 +71,8 @@ route.get('/csrf', request => csrfSeedResponse(request as unknown as Request))
 if (isMarketingSite())
   route.post('/subscribe', 'Actions/SubscriberEmailAction')
 
-// Public: Instagram/Threads fetch a queued post's image server-side, so this
-// route is intentionally unauthenticated. The filename is an unguessable
-// per-upload UUID and strictly validated against traversal (MediaServeAction).
+// Instagram and Threads fetch over a signed URL during publishing. The
+// signature expires and authorizes only the named image.
 route.get('/postline/media', 'Actions/Postline/MediaServeAction').rateLimit(120, 'minute')
 route.get('/postline/blog/media', 'Actions/Postline/BlogMediaAction').rateLimit(120, 'minute')
 
