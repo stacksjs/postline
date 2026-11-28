@@ -41,6 +41,7 @@ export interface NetworkAppSummary {
   source: NetworkAppCredentials['source']
   clientId: string
   hasSecret: boolean
+  publicClient: boolean
   redirectUrl: string
   organizationPages: boolean
   engagementMetrics: boolean
@@ -98,12 +99,14 @@ export class NetworkAppService {
   async summary(): Promise<NetworkAppSummary[]> {
     return await Promise.all(APP_NETWORKS.map(async (provider) => {
       const credentials = await this.credentials(provider)
+      const publicClient = provider === 'twitter' && Boolean(credentials.clientId) && !credentials.clientSecret
       return {
         provider,
-        configured: Boolean(credentials.clientId && credentials.clientSecret),
+        configured: Boolean(credentials.clientId && (publicClient || credentials.clientSecret)),
         source: credentials.source,
         clientId: credentials.clientId,
         hasSecret: Boolean(credentials.clientSecret),
+        publicClient,
         redirectUrl: credentials.redirectUrl,
         organizationPages: credentials.organizationPages,
         engagementMetrics: credentials.engagementMetrics,
@@ -118,21 +121,25 @@ export class NetworkAppService {
    * Store a network's app. A blank secret keeps the stored one, so the id can
    * be corrected without pasting the secret again.
    */
-  async save(network: AppNetwork, input: { clientId: string, clientSecret?: string, redirectUrl?: string, organizationPages?: boolean, engagementMetrics?: boolean, directMessages?: boolean, firstComments?: boolean }): Promise<NetworkAppSummary> {
+  async save(network: AppNetwork, input: { clientId: string, clientSecret?: string, publicClient?: boolean, redirectUrl?: string, organizationPages?: boolean, engagementMetrics?: boolean, directMessages?: boolean, firstComments?: boolean }): Promise<NetworkAppSummary> {
     if (!APP_NETWORKS.includes(network)) throw new UserFacingError('That network does not use an app of its own.')
     const clientId = input.clientId.trim()
     if (!clientId || clientId.length > 255 || /\s/.test(clientId)) throw new UserFacingError('Paste the client id from the network\'s developer console. It has no spaces.')
     const secret = String(input.clientSecret ?? '').trim()
     if (secret && (secret.length > 1000 || /\s/.test(secret))) throw new UserFacingError('Paste the client secret exactly as the console shows it. It has no spaces.')
+    if (input.publicClient && network !== 'twitter') throw new UserFacingError('Saving a public client is only supported for X.')
+    if (input.publicClient && secret) throw new UserFacingError('For a public X app, omit the client secret.')
     const redirectUrl = String(input.redirectUrl ?? '').trim()
     if (redirectUrl && !/^https?:\/\/[^\s]+$/i.test(redirectUrl)) throw new UserFacingError('The redirect address must start with http:// or https://.')
 
     const existing = await database.selectFrom('network_apps').selectAll().where('provider', '=', network).executeTakeFirst()
-    if (!secret && !existing?.client_secret) throw new UserFacingError('Paste the client secret as well. Postline needs both to connect.')
+    const keepPublicClient = !secret && Boolean(existing?.client_id) && existing.client_secret === null
+    const publicClient = network === 'twitter' && (input.publicClient ?? keepPublicClient)
+    if (!publicClient && !secret && !existing?.client_secret) throw new UserFacingError('Paste the client secret as well. Postline needs both to connect.')
 
     const values = {
       client_id: clientId,
-      ...(secret ? { client_secret: await sealToken(secret) } : {}),
+      ...(publicClient ? { client_secret: null } : secret ? { client_secret: await sealToken(secret) } : {}),
       redirect_url: redirectUrl || null,
       // Left as it is when not given, so a form without the switch keeps it.
       ...(input.organizationPages === undefined ? {} : { organization_pages: network === 'linkedin' && input.organizationPages }),

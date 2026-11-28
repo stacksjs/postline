@@ -2002,6 +2002,42 @@ async function checkChannels(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkXPublicAppSettings(cdp: Cdp): Promise<void> {
+  await auditPage(`${site}/accounts`, { cdp })
+  const app = "document.querySelector('[data-network-app=twitter]')"
+  const secret = `${app}.querySelector('[data-app-client-secret]')`
+  const publicClient = `${app}.querySelector('[data-app-public-client]')`
+  const test = `[...${app}.querySelectorAll('button')].find(button => button.textContent.trim() === 'Test connection')`
+  const setting = `fetch('/api/postline/network-apps').then(async response => (await response.json()).data.apps.find(app => app.provider === 'twitter'))`
+  try {
+    await waitUntil('Channels offers the X developer app form', () => evaluate<boolean>(cdp, `Boolean(${app})`), 5_000)
+    await evaluate(cdp, `(async () => {
+      const response = await fetch('/api/postline/network-apps', {
+        method: 'POST', body: new URLSearchParams({ provider: 'twitter', client_id: 'fixture-web', client_secret: 'fixture-web-secret' }),
+      })
+      if (!response.ok) throw new Error('Could not save the confidential X fixture app.')
+    })()`)
+    await auditPage(`${site}/accounts`, { cdp })
+    await waitUntil('Channels loads the saved X developer app', () => evaluate<boolean>(cdp, `Boolean(${app})`), 5_000)
+    await evaluate(cdp, `${app}.querySelector('summary').click(); ${publicClient}.focus()`)
+    await pressKey(cdp, ' ', 32)
+    await waitUntil('The public-client option hides the secret field and warns that Save removes it', () => evaluate<boolean>(cdp, `
+      ${publicClient}.checked && ${secret}.disabled && !${secret}.getClientRects().length && (${test}).disabled
+        && ${app}.innerText.includes('Saving this option removes the stored client secret.')
+    `), 5_000)
+    await evaluate(cdp, `${app}.querySelector('form button[type=submit]').focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The saved X public app can be tested', () => evaluate<boolean>(cdp, `(${test})?.disabled === false`), 5_000)
+    const stored = await evaluate<{ configured: boolean, hasSecret: boolean, publicClient: boolean }>(cdp, setting)
+    if (!stored.configured || stored.hasSecret || !stored.publicClient) throw new Error('The X app did not persist its public client configuration.')
+  }
+  finally {
+    await evaluate(cdp, `fetch('/api/postline/network-apps/clear', {
+      method: 'POST', body: new URLSearchParams({ provider: 'twitter' }),
+    })`)
+  }
+}
+
 async function checkDesktopNetworkConsent(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     window.craft = {
@@ -4004,6 +4040,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkWorkspaceCommands(cdp)
   await checkWorkspaceBootstrap(cdp)
   await checkChannels(cdp)
+  await checkXPublicAppSettings(cdp)
   await checkDesktopNetworkConsent(cdp)
   await checkPublicInbox(cdp)
   await checkTwitterDmControls(cdp)

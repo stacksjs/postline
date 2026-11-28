@@ -443,6 +443,8 @@
       "copy": "Copiar",
       "clientId": "ID de cliente",
       "clientSecret": "Secreto de cliente",
+      "publicXApp": "Usar una app pública de X con solo el ID de cliente",
+      "publicXAppRemovesSecret": "Al guardar esta opción se elimina el secreto de cliente almacenado.",
       "companyPages": "Conectar también las páginas de empresa que administro. Para iniciar sesión, LinkedIn exige que la aplicación tenga acceso a Community Management API.",
       "paidEngagement": "Permitir consultas de pago sobre interacciones en X al actualizar las estadísticas. Las consultas se descuentan del presupuesto diario.",
       "engagement": "Consultar métricas de interacción. Habilita el permiso en tu aplicación de desarrollador y vuelve a conectar la cuenta.",

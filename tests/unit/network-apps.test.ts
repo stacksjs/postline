@@ -48,6 +48,33 @@ describe('the owner\'s own app on each network', () => {
     await networkApps.clear('twitter')
   })
 
+  test('X public clients are ready with only a client ID and can switch back to a confidential app', async () => {
+    await networkApps.clear('twitter')
+    try {
+      const publicApp = await networkApps.save('twitter', { clientId: 'native-id', publicClient: true })
+      expect(publicApp).toMatchObject({ configured: true, clientId: 'native-id', publicClient: true, hasSecret: false })
+      expect(await networkApps.credentials('twitter')).toMatchObject({ clientId: 'native-id', clientSecret: '' })
+      await networkApps.save('twitter', { clientId: 'native-id', engagementMetrics: true })
+      await expect(networkApps.save('twitter', { clientId: 'web-id', publicClient: false })).rejects.toThrow('Paste the client secret')
+
+      const confidential = await networkApps.save('twitter', { clientId: 'web-id', clientSecret: 'web-secret', publicClient: false })
+      expect(confidential).toMatchObject({ configured: true, publicClient: false, hasSecret: true })
+      const switched = await networkApps.save('twitter', { clientId: 'native-id', publicClient: true })
+      expect(switched).toMatchObject({ configured: true, publicClient: true, hasSecret: false, engagementMetrics: true })
+      expect(await networkApps.credentials('twitter')).toMatchObject({ clientId: 'native-id', clientSecret: '' })
+      expect(await database.selectFrom('network_apps').select('client_secret').where('provider', '=', 'twitter').executeTakeFirstOrThrow())
+        .toEqual({ client_secret: null })
+    }
+    finally {
+      await networkApps.clear('twitter')
+    }
+  })
+
+  test('secret-free setup is explicit and limited to X', async () => {
+    await expect(networkApps.save('threads', { clientId: 'native-id', publicClient: true })).rejects.toThrow('only supported for X')
+    await expect(networkApps.save('twitter', { clientId: 'native-id', clientSecret: 'secret', publicClient: true })).rejects.toThrow('omit the client secret')
+  })
+
   test('Settings win over the environment, and clearing them lets the environment apply again', async () => {
     const before = { id: process.env.LINKEDIN_CLIENT_ID, secret: process.env.LINKEDIN_CLIENT_SECRET }
     process.env.LINKEDIN_CLIENT_ID = 'from-env'

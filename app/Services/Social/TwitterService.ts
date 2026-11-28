@@ -139,7 +139,7 @@ export class TwitterService {
    */
   async prepareAuthorization(): Promise<{ url: string, codeVerifier: string, requestedScopes: string[] }> {
     const cfg = (await this.config())
-    if (!cfg.clientId) throw new UserFacingError('Add your X app under Settings, Channels first: its client id and secret.')
+    if (!cfg.clientId) throw new UserFacingError('Add your X developer app under Settings, Channels first.')
     if (!cfg.redirectUrl) throw new UserFacingError('Postline could not work out its address for the X redirect. Set it under Settings, Channels.')
 
     const authorization = await this.driver.createAuthorization({

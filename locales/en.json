@@ -443,6 +443,8 @@
       "copy": "Copy",
       "clientId": "Client id",
       "clientSecret": "Client secret",
+      "publicXApp": "Use a public X app with a client ID only",
+      "publicXAppRemovesSecret": "Saving this option removes the stored client secret.",
       "companyPages": "Also connect the company Pages I administer. Needs the Community Management API product on this app; without it LinkedIn refuses the sign-in.",
       "paidEngagement": "Allow paid X engagement reads when you refresh from Analytics. Reads count toward the daily budget.",
       "engagement": "Read engagement metrics. Enable the permission in your developer app, then reconnect the account.",

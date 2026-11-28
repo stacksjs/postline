@@ -204,6 +204,12 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
     }
   }
 
+  const publicApp = await call('POST', '/api/postline/network-apps', {
+    provider: 'twitter', client_id: 'postline-desktop-public', public_client: '1',
+  })
+  const publicSettings = JSON.parse(publicApp.text).data
+  check('the Mac can replace a confidential X app with a client ID only', publicApp.status === 200
+    && publicSettings?.configured && publicSettings.publicClient && !publicSettings.hasSecret)
   const tested = await call('POST', consentPath, JSON.stringify({ operation: 'begin', provider: 'twitter', test: true }))
   if (tested.status !== 200) throw new Error('Could not start the desktop X connection test.')
   const testConsent = JSON.parse(tested.text).data
@@ -225,6 +231,8 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
       const proof = createHash('sha256').update(body.get('code_verifier') ?? '').digest('base64url')
       verifiedTokenRequest = request.method === 'POST'
         && body.get('code') === 'fixture-x-code'
+        && body.get('client_id') === 'postline-desktop-public'
+        && !request.headers.has('Authorization') && !body.has('client_secret')
         && body.get('redirect_uri') === `${origin}/api/postline/twitter/callback`
         && proof === testAuthorization.searchParams.get('code_challenge')
       return Response.json({ access_token: 'fixture-x-test-token', expires_in: 3600 })
@@ -240,7 +248,7 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
     const accepted = await fetch(`${origin}/api/postline/twitter/callback?${query}`, { headers: { cookie: testCookie } })
     const result = await call('POST', consentPath, JSON.stringify({ operation: 'result', id: testConsent.id }))
     const accounts = await call('GET', '/api/postline/accounts')
-    check('desktop Test connection exchanges its exact PKCE proof and leaves accounts unchanged', accepted.status === 200
+    check('desktop Test connection uses public-client PKCE and leaves accounts unchanged', accepted.status === 200
       && verifiedTokenRequest && profileRead && JSON.parse(result.text).data?.location === '/accounts?twitter=tested'
       && !accounts.text.includes('fixture_test'))
   }

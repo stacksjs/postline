@@ -7,7 +7,7 @@ import { actionFailure } from '../../Support/Http/action-error'
 
 export default new Action({
   name: 'Postline Network App Save',
-  description: 'Store the client id and secret of the owner app on a network.',
+  description: 'Store the credentials of the owner app on a network.',
   method: 'POST',
 
   async handle(request: RequestInstance) {
@@ -22,6 +22,7 @@ export default new Action({
       const data = await networkApps.save(provider, {
         clientId: String(request.get('client_id') || ''),
         clientSecret: String(request.get('client_secret') || ''),
+        publicClient: flag('public_client'),
         redirectUrl: String(request.get('redirect_url') || ''),
         organizationPages: flag('organization_pages'),
         engagementMetrics: flag('engagement_metrics'),

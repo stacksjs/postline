@@ -3,10 +3,11 @@ import { schema } from '@stacksjs/validation'
 
 /**
  * The owner's own developer app on a network that signs in with OAuth (X,
- * LinkedIn, Instagram, Threads): its client id and secret. Postline brings
+ * LinkedIn, Instagram, Threads): its client id and optional secret. Postline brings
  * no keys of its own; each owner registers an app and enters it here, which
  * is what lets the Mac app, which reads no `.env`, connect these networks.
- * The secret is sealed with the app key, like the account tokens.
+ * The secret is sealed with the app key, like the account tokens. A public X
+ * app stores no client secret.
  */
 export default defineModel({
   name: 'NetworkApp',

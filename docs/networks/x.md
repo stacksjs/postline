@@ -7,12 +7,16 @@ API use per post.
 
 1. Open [developer.x.com](https://developer.x.com), sign in, and open your
    project's app (create one if you have none).
-2. Under **User authentication settings**, choose **Set up**: OAuth 2.0, app
-   type **Web App**. Paste the redirect address from Postline's Settings,
-   Channels as the **Callback URI**, and your site as the **Website URL**.
-3. Under **Keys and tokens**, copy the **OAuth 2.0 Client ID** and **Client
-   Secret** into Postline under **Settings > Channels > Your network apps > X**,
-   save, and connect.
+2. Under **User authentication settings**, set up OAuth 2.0. Choose
+   **Native App** for the Mac or **Web App** for a hosted workspace. Paste
+   the redirect address from **Settings > Channels > Your network apps > X**
+   as the **Callback URI**, and enter your site as the **Website URL**.
+3. Copy the **OAuth 2.0 Client ID** from **Keys and tokens** into Postline.
+   For a Native App, select **Use a public X app with a client ID only**.
+   For a Web App, also enter the **Client Secret**. Save, then use **Test
+   connection** or connect the account from its channel card.
+
+[X OAuth app types and PKCE](https://docs.x.com/fundamentals/authentication/oauth-2-0/authorization-code)
 
 Postline asks for `tweet.read`, `tweet.write`, `media.write` for image uploads,
 `users.read` and `offline.access` (so the sign-in can renew itself). Reconnect
