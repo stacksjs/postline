@@ -49,6 +49,9 @@ the launcher's session check.
 ./buddy build:desktop
 ```
 
+For a Spanish build, run `POSTLINE_WORKSPACE_LOCALE=es ./buddy build:desktop`.
+The app bundles the chosen language for its workspace pages and local API.
+
 ```bash
 open storage/framework/desktop/webview/darwin-arm64/Postline.app
 ```

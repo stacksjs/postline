@@ -5,6 +5,7 @@ import { describe, expect, mock, test } from 'bun:test'
 import { db } from '@stacksjs/database'
 import { oauthFlowDigest } from '@stacksjs/socials'
 import { APP_NETWORKS } from '../../app/Services/NetworkAppService'
+import { workspaceLocale } from '../../app/Support/Localization/workspace'
 import { finishNetworkConsent, redirectToNetworkConsent } from '../../app/Support/Social/network-oauth'
 
 function request(fields: Record<string, string> = {}, cookie = '', ownerId = 7): RequestInstance {
@@ -77,6 +78,19 @@ describe('network OAuth flow state', () => {
     const exchange = mock(async () => {})
     const reply = await finishNetworkConsent(request({ state, error: 'access_denied' }, cookie), 'instagram', exchange)
     expect(reply.headers.get('Location')).toContain('?instagram=error')
+    expect(reply.headers.get('Set-Cookie')).toContain('Max-Age=0')
+    expect(exchange).not.toHaveBeenCalled()
+  })
+
+  test('reports an incomplete response from the provider before attempting an exchange', async () => {
+    const { state, cookie } = await start('linkedin')
+    const exchange = mock(async () => {})
+    const reply = await finishNetworkConsent(request({ state }, cookie), 'linkedin', exchange)
+    const destination = new URL(reply.headers.get('Location')!, 'https://postline.example')
+    expect(destination.searchParams.get('linkedin')).toBe('error')
+    expect(destination.searchParams.get('message')).toBe(workspaceLocale === 'es'
+      ? 'La red no envió un código de autorización. Vuelve a intentarlo desde Canales.'
+      : 'The network did not send an authorization code. Try connecting again from Channels.')
     expect(reply.headers.get('Set-Cookie')).toContain('Max-Age=0')
     expect(exchange).not.toHaveBeenCalled()
   })

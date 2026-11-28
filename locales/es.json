@@ -421,6 +421,20 @@
         "moveFailed": "No se pudo cambiar la fecha de la publicación"
       }
     },
+    "networkConsent": {
+      "startInApp": "Inicia la conexión desde Canales en la aplicación de Postline.",
+      "selectNetwork": "Elige la red que quieres conectar.",
+      "addApp": "Añade primero tu aplicación de desarrollador de {network} en Configuración > Canales.",
+      "addCredentials": "Añade el ID y el secreto de cliente de tu aplicación de desarrollador de {network} en Configuración > Canales.",
+      "redirectRequired": "Postline no pudo determinar la dirección de redirección de {network}. Revisa la aplicación en Configuración > Canales.",
+      "settingsChanged": "Vuelve a iniciar la conexión de LinkedIn desde Canales para usar la configuración actual.",
+      "registerMacRedirect": "Registra la dirección de redirección que muestra Canales en este Mac y vuelve a intentarlo.",
+      "wrongBrowser": "La conexión caducó o se inició en otro navegador. Vuelve a iniciarla desde Canales.",
+      "denied": "La red no autorizó la conexión. Vuelve a intentarlo desde Canales.",
+      "missingCode": "La red no envió un código de autorización. Vuelve a intentarlo desde Canales.",
+      "returnToApp": "Vuelve a Postline para terminar la conexión. Puedes cerrar esta pestaña.",
+      "failed": "Postline no pudo terminar la conexión. Vuelve a intentarlo desde Canales."
+    },
     "channels": {
       "title": "Postline - Configuración - Canales",
       "description": "Conecta y administra los canales de publicación en la configuración de Postline.",

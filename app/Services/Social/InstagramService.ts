@@ -13,6 +13,7 @@ import { ensureAccount, now, uuid } from './support'
 import { explainNetworkError } from '../../Support/Social/network-errors'
 import { networkApps } from '../NetworkAppService'
 import { UserFacingError } from '../../Support/Http/user-error'
+import { workspaceText } from '../../Support/Localization/workspace'
 import { classifyFailure } from '../../Support/Social/retry'
 import { pendingFirstComment } from '../../Support/Social/post-options'
 
@@ -149,10 +150,10 @@ export class InstagramService {
   async prepareAuthorization(): Promise<{ url: string }> {
     const cfg = (await this.config())
     if (!cfg.clientId || !cfg.clientSecret) {
-      throw new UserFacingError('Add your Instagram app under Settings, Channels first: its client id and secret.')
+      throw new UserFacingError(workspaceText('workspace.networkConsent.addCredentials', { network: 'Instagram' }))
     }
     if (!cfg.redirectUrl) {
-      throw new UserFacingError('Postline could not work out its address for the Instagram redirect. Set it under Settings, Channels.')
+      throw new UserFacingError(workspaceText('workspace.networkConsent.redirectRequired', { network: 'Instagram' }))
     }
 
     const url = this.driver.getAuthUrl({

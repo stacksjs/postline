@@ -6,7 +6,8 @@ import es from '../../../locales/es.json'
 const messages = { en, es: es satisfies typeof en }
 
 // The same catalog is used for static builds and live workspace rendering.
-export const workspaceLocale = Bun.env.POSTLINE_WORKSPACE_LOCALE === 'es' ? 'es' : app.locale
+const language = Bun.env.POSTLINE_WORKSPACE_LOCALE
+export const workspaceLocale = language === 'en' || language === 'es' ? language : app.locale === 'es' ? 'es' : 'en'
 
 const workspaceI18n = createI18n({
   locale: workspaceLocale,
@@ -55,6 +56,7 @@ export const workspaceBlogErrors = workspaceI18n.tm('workspace.blogErrors') as t
 export const workspaceInboxText = workspaceI18n.tm('workspace.inbox') as typeof en.workspace.inbox
 export const workspaceInboxPublicText = workspaceI18n.tm('workspace.inboxPublic') as typeof en.workspace.inboxPublic
 export const workspaceChannelsText = workspaceI18n.tm('workspace.channels') as typeof en.workspace.channels
+export const workspaceNetworkConsentText = workspaceI18n.tm('workspace.networkConsent') as typeof en.workspace.networkConsent
 export const workspaceChannelCardText = workspaceI18n.tm('workspace.channelCard') as typeof en.workspace.channelCard
 export const workspaceInstagramPagePickerText = workspaceI18n.tm('workspace.instagramPagePicker') as typeof en.workspace.instagramPagePicker
 export const workspaceXBrowserSessionText = workspaceI18n.tm('workspace.xBrowserSession') as typeof en.workspace.xBrowserSession

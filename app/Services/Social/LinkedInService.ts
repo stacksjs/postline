@@ -16,6 +16,7 @@ import { ensureAccount, expiresAt, now, uuid } from './support'
 import { explainNetworkError } from '../../Support/Social/network-errors'
 import { networkApps } from '../NetworkAppService'
 import { UserFacingError } from '../../Support/Http/user-error'
+import { workspaceNetworkConsentText, workspaceText } from '../../Support/Localization/workspace'
 import { classifyFailure } from '../../Support/Social/retry'
 import { pendingFirstComment } from '../../Support/Social/post-options'
 
@@ -135,10 +136,10 @@ export class LinkedInService {
   async prepareAuthorization(): Promise<NetworkAuthorization> {
     const cfg = (await this.config())
     if (!cfg.clientId || (!cfg.publicClient && !cfg.clientSecret)) {
-      throw new UserFacingError('Add your LinkedIn app under Settings, Channels first.')
+      throw new UserFacingError(workspaceText('workspace.networkConsent.addApp', { network: 'LinkedIn' }))
     }
     if (!cfg.redirectUrl) {
-      throw new UserFacingError('Postline could not work out its address for the LinkedIn redirect. Set it under Settings, Channels.')
+      throw new UserFacingError(workspaceText('workspace.networkConsent.redirectRequired', { network: 'LinkedIn' }))
     }
 
     const input = {
@@ -155,7 +156,7 @@ export class LinkedInService {
     const cfg = (await this.config())
     if (!code) throw new Error('LinkedIn did not return an authorization code.')
     if (cfg.publicClient !== Boolean(codeVerifier))
-      throw new UserFacingError('Start the LinkedIn connection again from Channels to use the current app settings.')
+      throw new UserFacingError(workspaceNetworkConsentText.settingsChanged)
 
     const input = {
       clientId: cfg.clientId,

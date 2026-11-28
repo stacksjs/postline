@@ -126,6 +126,19 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   const channels = await call('GET', '/accounts')
   const language = Bun.env.POSTLINE_SMOKE_LOCALE === 'es' ? 'es' : 'en'
   const spanish = language === 'es'
+  const xBrowser = spanish
+    ? {
+        signIn: 'Selecciona Verificar sesión antes de leer los datos de X.',
+        layout: 'Abre una página de búsqueda o menciones de X que se pueda leer y selecciona Verificar sesión para reanudar las lecturas.',
+        signInAlert: 'El inicio de sesión de X requiere atención',
+        layoutAlert: 'Lecturas de X en pausa',
+      }
+    : {
+        signIn: 'Check the X browser sign-in before reading its data.',
+        layout: 'Open a readable X Search or Mentions page and select Check sign-in to resume browser reads.',
+        signInAlert: 'X browser sign-in needs attention',
+        layoutAlert: 'X browser reads paused',
+      }
   const guidePath = spanish ? '/docs/es/networks/x.md' : '/docs/networks/x.md'
   const guideStep = spanish ? 'Abre developer.x.com' : 'Open developer.x.com'
   check('the compiled Channels view uses its network setup guide', channels.status === 200
@@ -180,6 +193,22 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   check('the desktop reports its actual callback even when the saved app came from a hosted workspace', app.status === 200
     && JSON.parse(app.text).data?.redirectUrl === `${origin}/api/postline/twitter/callback`)
   const consentPath = '/api/postline/desktop-network-consent'
+  const messages = spanish
+    ? {
+        choose: 'Elige la red que quieres conectar.',
+        expired: 'La conexión caducó o se inició en otro navegador. Vuelve a iniciarla desde Canales.',
+        finish: 'Vuelve a Postline para terminar la conexión. Puedes cerrar esta pestaña.',
+        denied: 'La red no autorizó la conexión. Vuelve a intentarlo desde Canales.',
+      }
+    : {
+        choose: 'Choose a network to connect.',
+        expired: 'This connection expired or was started in another browser. Start again from Channels.',
+        finish: 'Return to Postline to finish connecting. You can close this tab.',
+        denied: 'The network did not authorize the connection. Try connecting again from Channels.',
+      }
+  const invalidProvider = await call('POST', consentPath, JSON.stringify({ operation: 'begin' }))
+  check('the consent endpoint uses the bundled workspace language', invalidProvider.status === 422
+    && JSON.parse(invalidProvider.text).error === messages.choose)
   const beginConsent = JSON.stringify({ operation: 'begin', provider: 'twitter' })
   const outside = await fetch(origin + consentPath, {
     method: 'POST', body: beginConsent, headers: { 'Content-Type': 'application/json', 'Origin': origin },
@@ -200,6 +229,8 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
       && /^[a-f0-9]{64}$/.test(state ?? '') && flowCookie?.includes('SameSite=Lax') === true)
     const replayLaunch = await fetch(launchUrl, { redirect: 'manual' })
     check('the browser launch ticket is single-use', replayLaunch.status === 400)
+    check('the expired consent tab uses the bundled workspace language', replayLaunch.headers.get('Content-Language') === language
+      && await replayLaunch.text() === messages.expired)
     if (state && externalCookie) {
       const tail = `?error=access_denied&state=${state}`
       const wrong = await fetch(`${origin}/api/postline/threads/callback${tail}`, { headers: { cookie: externalCookie } })
@@ -208,6 +239,8 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
       const cancel = await fetch(`${origin}/api/postline/twitter/callback${tail}`, { headers: { cookie: externalCookie } })
       check('desktop accepts the verified denial without the workspace cookie', cancel.status === 200
         && cancel.headers.get('Set-Cookie')?.includes('Max-Age=0') === true && !cancel.headers.has('location'))
+      check('the consent return tab uses the bundled workspace language', cancel.headers.get('Content-Language') === language
+        && await cancel.text() === messages.finish)
       const poll = JSON.stringify({ operation: 'result', id })
       const result = await call('POST', consentPath, poll)
       const retried = await call('POST', consentPath, poll)
@@ -217,6 +250,8 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
       check('the result stays available for retries in the Postline window only', result.status === 200
         && JSON.parse(result.text).data?.location?.startsWith('/accounts?twitter=error') === true
         && retried.text === result.text && externalResult.status === 401)
+      const destination = new URL(JSON.parse(result.text).data?.location ?? '/', origin)
+      check('Channels receives the localized reason the connection failed', destination.searchParams.get('message') === messages.denied)
       const replayCallback = await fetch(`${origin}/api/postline/twitter/callback${tail}`, { headers: { cookie: externalCookie } })
       check('the verified browser callback is also single-use', replayCallback.status === 400)
     }
@@ -425,10 +460,10 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
     && sameDayCheck.status === 200 && JSON.parse(sameDayCheck.text)?.data === null)
   const foreignMetrics = await call('POST', `${browserSessionPath}/metrics`, { handle: 'another_user' })
   check('the native session rejects engagement from a different handle', foreignMetrics.status === 422
-    && JSON.parse(foreignMetrics.text)?.error?.includes('Check the X browser sign-in') === true)
+    && JSON.parse(foreignMetrics.text)?.error === xBrowser.signIn)
   const foreignMentions = await call('POST', `${browserSessionPath}/listening`, { handle: 'another_user' })
   check('the native session rejects Listening posts from a different handle', foreignMentions.status === 422
-    && JSON.parse(foreignMentions.text)?.error?.includes('Check the X browser sign-in') === true)
+    && JSON.parse(foreignMentions.text)?.error === xBrowser.signIn)
   const watch = await call('POST', '/api/postline/listening', JSON.stringify({
     name: 'X browser fixture', keywords: ['Postline launch'], providers: ['twitter'], twitter_read_source: 'browser',
   }))
@@ -480,7 +515,7 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
     && pausedSession?.handle === savedProfile?.handle && pausedSession?.needsCheck === true)
   const blockedImport = await call('POST', `${browserSessionPath}/listening`, visibleMentions)
   check('the native agent rejects an X browser import while sign-in needs checking', blockedImport.status === 422
-    && JSON.parse(blockedImport.text)?.error?.includes('Check the X browser sign-in') === true)
+    && JSON.parse(blockedImport.text)?.error === xBrowser.signIn)
   const confirmedAgain = await call('POST', browserSessionPath, { handle: 'postline_test' })
   const confirmedState = JSON.parse(confirmedAgain.text)?.data
   check('confirming the X sign-in removes the hold and permits a fresh Composer check', confirmedAgain.status === 200
@@ -501,7 +536,7 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   const signInOnly = await call('POST', browserSessionPath, { handle: 'postline_test' })
   const layoutBlocked = await call('POST', `${browserSessionPath}/listening`, visibleMentions)
   check('a sign-in check alone cannot clear the layout hold or allow an import', signInOnly.status === 422
-    && layoutBlocked.status === 422 && JSON.parse(layoutBlocked.text)?.error?.includes('Open a readable X Search or Mentions page') === true)
+    && layoutBlocked.status === 422 && JSON.parse(layoutBlocked.text)?.error === xBrowser.layout)
   const checkedLayout = await call('POST', browserSessionPath, JSON.stringify({ handle: 'postline_test', checked_layout: true }))
   check('the verified layout clears both X hold flags', checkedLayout.status === 200
     && JSON.parse(checkedLayout.text)?.data?.needsCheck === false && JSON.parse(checkedLayout.text)?.data?.needsLayoutCheck === false)
@@ -741,8 +776,8 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   const browserActivity = await call('GET', '/api/postline/alerts')
   const browserAlerts: Array<{ title: string }> = JSON.parse(browserActivity.text)?.data?.alerts ?? []
   check('sign-out and repeated layout warnings raise one owner alert per reason', browserActivity.status === 200
-    && browserAlerts.filter(item => item.title === 'X browser sign-in needs attention').length === 1
-    && browserAlerts.filter(item => item.title === 'X browser reads paused').length === 1)
+    && browserAlerts.filter(item => item.title === xBrowser.signInAlert).length === 1
+    && browserAlerts.filter(item => item.title === xBrowser.layoutAlert).length === 1)
   const system = await call('GET', '/api/postline/system')
   const localProfile: string | null = JSON.parse(system.text).data?.localTwitterProfile
   const canHaveNativeProfile = process.platform === 'darwin' && Number(release().split('.')[0]) >= 23

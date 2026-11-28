@@ -421,6 +421,20 @@
         "moveFailed": "Could not move post"
       }
     },
+    "networkConsent": {
+      "startInApp": "Start the connection from Channels in the Postline app.",
+      "selectNetwork": "Choose a network to connect.",
+      "addApp": "Add your {network} developer app in Settings > Channels first.",
+      "addCredentials": "Add the client ID and secret for your {network} developer app in Settings > Channels.",
+      "redirectRequired": "Postline could not determine the redirect address for {network}. Check the app in Settings > Channels.",
+      "settingsChanged": "Start the LinkedIn connection again from Channels to use the current app settings.",
+      "registerMacRedirect": "Register the redirect address shown in Postline Channels for this Mac and try again.",
+      "wrongBrowser": "This connection expired or was started in another browser. Start again from Channels.",
+      "denied": "The network did not authorize the connection. Try connecting again from Channels.",
+      "missingCode": "The network did not send an authorization code. Try connecting again from Channels.",
+      "returnToApp": "Return to Postline to finish connecting. You can close this tab.",
+      "failed": "Postline could not finish connecting. Try again from Channels."
+    },
     "channels": {
       "title": "Postline - Settings - Channels",
       "description": "Connect and manage publishing channels in Postline settings.",

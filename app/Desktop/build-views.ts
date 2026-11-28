@@ -6,9 +6,12 @@
  * bundled pages carry their layout head, including the CSRF fetch bootstrap.
  */
 import { rmSync } from 'node:fs'
+import { join } from 'node:path'
 import process from 'node:process'
 import { generateStaticSite } from '@stacksjs/stx/ssg'
+import { workspaceLocale } from '../Support/Localization/workspace'
 import { marketingPaths } from '../Support/Marketing/site'
+import { WORKSPACE_LANGUAGE_ASSET } from './workspace-language'
 
 const outDir = process.env.DESKTOP_VIEWS_OUT
 if (!outDir)
@@ -32,3 +35,4 @@ const marketing = new Set(marketingPaths())
 for (const page of build.pages) {
   if (marketing.has(page.route)) rmSync(page.outputPath)
 }
+await Bun.write(join(outDir, WORKSPACE_LANGUAGE_ASSET), workspaceLocale)

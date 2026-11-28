@@ -12,6 +12,7 @@ import { ensureAccount, expiresAt, now, uuid } from './support'
 import { explainNetworkError } from '../../Support/Social/network-errors'
 import { networkApps } from '../NetworkAppService'
 import { UserFacingError } from '../../Support/Http/user-error'
+import { workspaceText } from '../../Support/Localization/workspace'
 import { classifyFailure } from '../../Support/Social/retry'
 import { TWITTER_READ_PRICE, withTwitterReadBudget } from './TwitterReadBudget'
 import { syncConnectedMetrics } from './sync-connected-metrics'
@@ -139,8 +140,8 @@ export class TwitterService {
    */
   async prepareAuthorization(): Promise<{ url: string, codeVerifier: string, requestedScopes: string[] }> {
     const cfg = (await this.config())
-    if (!cfg.clientId) throw new UserFacingError('Add your X developer app under Settings, Channels first.')
-    if (!cfg.redirectUrl) throw new UserFacingError('Postline could not work out its address for the X redirect. Set it under Settings, Channels.')
+    if (!cfg.clientId) throw new UserFacingError(workspaceText('workspace.networkConsent.addApp', { network: 'X' }))
+    if (!cfg.redirectUrl) throw new UserFacingError(workspaceText('workspace.networkConsent.redirectRequired', { network: 'X' }))
 
     const authorization = await this.driver.createAuthorization({
       clientId: cfg.clientId,

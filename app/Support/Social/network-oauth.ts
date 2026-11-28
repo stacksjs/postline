@@ -5,6 +5,7 @@ import { response } from '@stacksjs/router'
 import { clearOAuthFlowCookie, consumeOAuthFlow, issueOAuthFlow, readOAuthFlowCookie } from '@stacksjs/socials'
 import { allowsNativeAppWithoutLogin } from '../Auth/native'
 import { publicMessage } from '../Http/action-error'
+import { workspaceNetworkConsentText as copy } from '../Localization/workspace'
 import { finishNativeNetworkConsent, nativeConsentIsActive, nativeNetworkConsentPage, NETWORK_CONSENT_TTL_MS, networkConsentPurpose } from './native-network-consent'
 
 export interface NetworkOAuthExchangeOptions {
@@ -42,7 +43,7 @@ export async function redirectToNetworkConsent(
 ): Promise<Response> {
   const owner = await workspaceOwner(request)
   if (owner === undefined) return response.unauthorized('Unauthorized')
-  if (owner === null) return networkResult(provider, 'error', 'Start the connection from Channels in the Postline app.')
+  if (owner === null) return networkResult(provider, 'error', copy.startInApp)
 
   try {
     const { url, codeVerifier, requestedScopes } = await prepare()
@@ -61,7 +62,7 @@ export async function redirectToNetworkConsent(
     return networkOAuthRedirect(authorization.toString(), flow.cookie)
   }
   catch (error) {
-    return networkResult(provider, 'error', publicMessage(error))
+    return networkResult(provider, 'error', publicMessage(error, copy.failed))
   }
 }
 
@@ -84,7 +85,7 @@ export async function finishNetworkConsent(
       browserSecret: readOAuthFlowCookie(request.headers.get('cookie'), state),
     })
     if (!flow || flow.userId !== owner) {
-      result = networkResult(provider, 'error', 'This connection expired or was started in another browser. Start again from Channels.')
+      result = networkResult(provider, 'error', copy.wrongBrowser)
     }
     else {
       if (native) {
@@ -92,11 +93,14 @@ export async function finishNetworkConsent(
         if (!nativeConsentIsActive(id, provider)) return nativeNetworkConsentPage(400)
         nativeConsentId = id
       }
+      const code = String(request.get('code') || '')
       if (request.get('error')) {
-        result = networkResult(provider, 'error', 'The network did not authorize the connection. Try connecting again from Channels.')
+        result = networkResult(provider, 'error', copy.denied)
+      }
+      else if (!code) {
+        result = networkResult(provider, 'error', copy.missingCode)
       }
       else {
-        const code = String(request.get('code') || '')
         const codeVerifier = typeof flow.data?.codeVerifier === 'string' ? flow.data.codeVerifier : undefined
         const testOnly = flow.data?.testOnly === true
         const requestedScopes = Array.isArray(flow.data?.requestedScopes) ? flow.data.requestedScopes.filter((scope): scope is string => typeof scope === 'string') : undefined
@@ -106,7 +110,7 @@ export async function finishNetworkConsent(
     }
   }
   catch (error) {
-    result = networkResult(provider, 'error', publicMessage(error))
+    result = networkResult(provider, 'error', publicMessage(error, copy.failed))
   }
   if (native) {
     if (nativeConsentId) finishNativeNetworkConsent(nativeConsentId, result)

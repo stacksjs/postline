@@ -8,6 +8,7 @@ import { threads } from '../../Services/Social/ThreadsService'
 import { twitter } from '../../Services/Social/TwitterService'
 import { allowsNativeAppWithoutLogin } from '../../Support/Auth/native'
 import { actionFailure } from '../../Support/Http/action-error'
+import { workspaceNetworkConsentText } from '../../Support/Localization/workspace'
 import { beginNativeNetworkConsent, nativeNetworkConsentResult } from '../../Support/Social/native-network-consent'
 
 const networks = { instagram, linkedin, threads, twitter }
@@ -23,7 +24,7 @@ export default new Action({
     if (operation === 'result') return nativeNetworkConsentResult(request.get('id'))
     const provider = request.get('provider') as AppNetwork
     if (operation !== 'begin' || !APP_NETWORKS.includes(provider))
-      return Response.json({ ok: false, error: 'Choose a network to connect.' }, { status: 422 })
+      return Response.json({ ok: false, error: workspaceNetworkConsentText.selectNetwork }, { status: 422 })
 
     try {
       const authorization = await networks[provider].prepareAuthorization()

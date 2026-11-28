@@ -2086,6 +2086,23 @@ async function checkXPublicAppSettings(cdp: Cdp): Promise<void> {
 }
 
 async function checkDesktopNetworkConsent(cdp: Cdp): Promise<void> {
+  const copy = spanishWorkspace
+    ? {
+        linkedIn: 'Usar el inicio de sesión nativo de LinkedIn con solo el ID de cliente',
+        removesSecret: 'Al guardar esta opción se elimina el secreto de cliente almacenado.',
+        connect: 'Conectar X', test: 'Probar conexión',
+        browser: 'Completa la conexión en tu navegador predeterminado y vuelve a Postline.',
+        denied: 'La red no autorizó la conexión. Vuelve a intentarlo desde Canales.',
+        tested: 'Se verificó el inicio de sesión en X.',
+      }
+    : {
+        linkedIn: 'Use LinkedIn native sign-in with a client ID only',
+        removesSecret: 'Saving this option removes the stored client secret.',
+        connect: 'Connect X', test: 'Test connection',
+        browser: 'Complete the connection in your default browser, then return to Postline.',
+        denied: 'The network did not authorize the connection. Try connecting again from Channels.',
+        tested: 'X sign-in passed.',
+      }
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     window.craft = {
       app: { nativePlatformControls: false },
@@ -2105,9 +2122,10 @@ async function checkDesktopNetworkConsent(cdp: Cdp): Promise<void> {
             id: 'fixture-consent', launchUrl: location.origin + path + '/launch?ticket=fixture-consent',
           } })
         }
-        const status = window.consentStart.test ? 'tested' : 'error'
+        const destination = window.consentStart.test ? '/accounts?twitter=tested'
+          : '/accounts?twitter=error&message=' + encodeURIComponent(${JSON.stringify(copy.denied)})
         return Response.json({ ok: true, data: !window.consentFinished ? { state: 'pending' }
-          : { state: 'complete', location: '/accounts?twitter=' + status } })
+          : { state: 'complete', location: destination } })
       }
       if (path === '/api/postline/network-apps' && request.method === 'POST') {
         const form = await request.clone().formData()
@@ -2142,8 +2160,8 @@ async function checkDesktopNetworkConsent(cdp: Cdp): Promise<void> {
     await pressKey(cdp, ' ', 32)
     await waitUntil('LinkedIn native sign-in hides the secret and describes what saving does', () => evaluate<boolean>(cdp, `
       ${publicLinkedIn}.checked && ${linkedIn}.querySelector('[data-app-client-secret]').disabled
-        && ${linkedIn}.innerText.includes('Use LinkedIn native sign-in with a client ID only')
-        && ${linkedIn}.innerText.includes('Saving this option removes the stored client secret.')
+        && ${linkedIn}.innerText.includes(${JSON.stringify(copy.linkedIn)})
+        && ${linkedIn}.innerText.includes(${JSON.stringify(copy.removesSecret)})
     `), 5_000)
     await evaluate(cdp, `${linkedIn}.querySelector('button[type=submit]').focus()`)
     await pressKey(cdp, 'Enter', 13)
@@ -2151,8 +2169,8 @@ async function checkDesktopNetworkConsent(cdp: Cdp): Promise<void> {
       window.savedLinkedInApp?.client_id === 'fixture-linkedin-app'
         && window.savedLinkedInApp?.public_client === '1' && !('client_secret' in window.savedLinkedInApp)
     `), 5_000)
-    const connect = "[...document.querySelectorAll('[data-channel=twitter] button')].find(button => button.textContent.trim() === 'Connect X')"
-    const test = "[...document.querySelectorAll('[data-network-app=twitter] button')].find(button => button.textContent.trim() === 'Test connection')"
+    const connect = `[...document.querySelectorAll('[data-channel=twitter] button')].find(button => button.textContent.trim() === ${JSON.stringify(copy.connect)})`
+    const test = `[...document.querySelectorAll('[data-network-app=twitter] button')].find(button => button.textContent.trim() === ${JSON.stringify(copy.test)})`
     for (const testOnly of [false, true]) {
       const trigger = testOnly ? test : connect
       if (testOnly) await evaluate(cdp, "document.querySelector('[data-network-app=twitter] summary').click()")
@@ -2163,10 +2181,10 @@ async function checkDesktopNetworkConsent(cdp: Cdp): Promise<void> {
         window.consentBrowser?.includes('/desktop-network-consent/launch?ticket=fixture-consent')
           && window.consentStart?.provider === 'twitter' && window.consentStart?.test === ${testOnly}
           && (${trigger}).disabled
-          && document.querySelector('[data-testid=accounts-page]').textContent.includes('Complete the connection in your default browser')
+          && document.querySelector('[data-testid=accounts-page]').textContent.includes(${JSON.stringify(copy.browser)})
       `), 5_000)
       await evaluate(cdp, 'window.consentFinished = true')
-      const message = testOnly ? 'X sign-in passed.' : 'Could not connect X.'
+      const message = testOnly ? copy.tested : copy.denied
       await waitUntil('The Postline window displays the consent result', () => evaluate<boolean>(cdp, `
         location.pathname === '/accounts' && !location.search && !window.consentStart
           && [...document.querySelectorAll('[role=status]')].some(node => node.textContent.includes(${JSON.stringify(message)}))
@@ -4448,6 +4466,7 @@ ${migration.stderr.toString()}`)
     else if (spanishWorkspace) {
       await checkSpanishShell(cdp)
       await checkSpanishWorkspace(cdp)
+      await checkDesktopNetworkConsent(cdp)
       await checkBrowserPasskey(cdp)
     }
     else await checkWorkspace(cdp)

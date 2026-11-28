@@ -4,6 +4,7 @@ import process from 'node:process'
 import { issueOAuthFlow } from '@stacksjs/socials'
 import { defaultRedirectUrl } from '../../Services/NetworkAppService'
 import { UserFacingError } from '../Http/user-error'
+import { workspaceLocale, workspaceNetworkConsentText as copy } from '../Localization/workspace'
 
 export const NATIVE_NETWORK_CONSENT = '/api/postline/desktop-network-consent'
 export const NETWORK_CONSENT_TTL_MS = 15 * 60_000
@@ -42,7 +43,7 @@ export function beginNativeNetworkConsent(provider: AppNetwork, authorization: N
   const redirect = new URL(authorization.url).searchParams.get('redirect_uri')
   const origin = new URL(process.env.APP_URL || '')
   if (origin.protocol !== 'http:' || origin.hostname !== '127.0.0.1' || redirect !== defaultRedirectUrl(provider, origin.origin))
-    throw new UserFacingError('Register the redirect address shown in Postline Channels for this Mac and try again.')
+    throw new UserFacingError(copy.registerMacRedirect)
 
   const now = Date.now()
   for (const [id, entry] of pending) {
@@ -96,10 +97,13 @@ export function nativeNetworkConsentResult(id: unknown): Response {
 }
 
 export function nativeNetworkConsentPage(status: 200 | 400): Response {
-  return new Response(status === 200
-    ? 'Return to Postline to finish connecting. You can close this tab.'
-    : 'This connection expired or was started in another browser. Start again from Postline Channels.', {
+  return new Response(status === 200 ? copy.returnToApp : copy.wrongBrowser, {
     status,
-    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' },
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Content-Language': workspaceLocale,
+      'Cache-Control': 'no-store',
+      'Referrer-Policy': 'no-referrer',
+    },
   })
 }
