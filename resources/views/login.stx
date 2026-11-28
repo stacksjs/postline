@@ -30,27 +30,24 @@ const allowsFirstRun = !isMarketingSite()
       <form class="grid gap-3" @submit.prevent="onSubmit">
         <label class="grid gap-1.5" x-show="!challenge()">
           <span class="font-semibold text-muted text-xs">{{ loginText.email }}</span>
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="email" type="email" autocomplete="username" placeholder="you@example.com" x-model="email" :required="!challenge()" autofocus>
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="email" type="email" autocomplete="username" placeholder="you@example.com" x-model="email" :required="!challenge()" :readonly="busy()" ref="emailInput" autofocus>
         </label>
         <label class="grid gap-1.5" x-show="!challenge()">
           <span class="font-semibold text-muted text-xs">{{ loginText.password }}</span>
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password" type="password" autocomplete="current-password" placeholder="••••••••" :required="!challenge()" x-model="password">
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password" type="password" autocomplete="current-password" placeholder="••••••••" :required="!challenge()" :readonly="busy()" x-model="password">
         </label>
         {{-- The second step when two-factor sign-in is on (#95). --}}
         <label class="gap-1.5" :class="challenge() ? 'grid' : 'hidden'">
           <span class="font-semibold text-muted text-xs">{{ loginText.authenticatorCode }}</span>
-          <input class="px-3 h-10 text-ink text-sm tracking-widest bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="code" autocomplete="one-time-code" inputmode="text" placeholder="123456" maxlength="64" x-model="code" :required="!!challenge()" ref="codeInput" data-two-factor-code>
+          <input class="px-3 h-10 text-ink text-sm tracking-widest bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="code" autocomplete="one-time-code" inputmode="text" placeholder="123456" maxlength="64" x-model="code" :required="!!challenge()" :readonly="busy()" ref="codeInput" data-two-factor-code>
           <span class="text-muted text-xs">{{ loginText.authenticatorHelp }}</span>
         </label>
         <p class="m-0 text-danger text-xs" :class="{ 'sr-only': !errorMessage() }" :text="errorMessage()" role="alert"></p>
-        <button class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="busy()" :text="submitLabel()">{{ loginText.submit }}</button>
+        <Button size="md" type="submit" fullWidth="true" :disabled="busy()" :loading="pending() === 'password' || pending() === 'code'" :label="submitLabel()">{{ loginText.submit }}</Button>
       </form>
 
-      <button class="hidden gap-2 items-center justify-center px-4 h-10 font-semibold text-ink text-sm bg-panel hover:bg-hover border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :class="{ 'hidden': !passkeysOffered(), 'inline-flex': passkeysOffered() }" :disabled="busy()" @click="signInWithPasskey" data-passkey-sign-in>
-        <span class="h-4 w-4 i-hugeicons-key-01" aria-hidden="true"></span>
-        {{ loginText.passkey }}
-      </button>
-      <button class="text-muted text-xs underline hover:text-body transition-colors" type="button" :class="challenge() ? '' : 'hidden'" @click="cancelChallenge">{{ loginText.otherAccount }}</button>
+      <Button variant="secondary" size="md" fullWidth="true" :show="passkeysOffered()" :disabled="busy()" :loading="pending() === 'passkey'" leftIcon="<span class='i-hugeicons-key-01' aria-hidden='true'></span>" @click="signInWithPasskey">{{ loginText.passkey }}</Button>
+      <Button variant="ghost" size="sm" :show="Boolean(challenge())" :disabled="busy()" @click="cancelChallenge">{{ loginText.otherAccount }}</Button>
       @if(allowsFirstRun)
         <a :if="setupAvailable() && !challenge()" class="justify-self-center text-info text-sm underline" href="/setup" data-stx-link>{{ loginText.setup }}</a>
       @endif
@@ -72,14 +69,16 @@ const allowsFirstRun = !isMarketingSite()
     const returnToSetup = route.query.return === 'setup'
     const pendingShare = sharedPage(route.hash)
     const errorMessage = state('')
-    const busy = state(false)
+    const pending = state<'password' | 'code' | 'passkey' | null>(null)
+    const busy = derived(() => pending() !== null)
 
     const email = state('')
     const password = state('')
     /** The password step's challenge while an authenticator code is due. */
     const challenge = state('')
     const code = state('')
-    const codeInput = useRef('codeInput')
+    const codeInput = useRef<HTMLInputElement>('codeInput')
+    const emailInput = useRef<HTMLInputElement>('emailInput')
     // The code field replaces the ones that had focus: put the cursor in it
     // once stx has shown it, on whichever path asked for the code.
     effect(() => {
@@ -94,7 +93,11 @@ const allowsFirstRun = !isMarketingSite()
       if (challenge()) return copy.verifyHelp
       return pendingShare ? copy.shareHelp : copy.tagline
     })
-    const submitLabel = derived(() => challenge() ? copy.verify : copy.submit)
+    const submitLabel = derived(() => {
+      if (pending() === 'code') return copy.verifying
+      if (pending() === 'password') return copy.signingIn
+      return challenge() ? copy.verify : copy.submit
+    })
 
     onMount(async () => {
       if (!{{ allowsFirstRun }}) return
@@ -132,11 +135,16 @@ const allowsFirstRun = !isMarketingSite()
       navigate(returnToSetup ? '/setup' : shareComposerPath(pendingShare), { reload: true, replace: true })
     }
 
-    const cancelChallenge = () => {
+    function resetChallenge() {
       challenge.set('')
       code.set('')
       password.set('')
       errorMessage.set('')
+      void nextTick(() => { emailInput.current?.focus(); emailInput.current?.select() })
+    }
+
+    function cancelChallenge() {
+      if (!busy()) resetChallenge()
     }
 
     /** The password was right; trade the challenge and a code for the session. */
@@ -158,7 +166,7 @@ const allowsFirstRun = !isMarketingSite()
       // one with the password still in hand, so a typo costs a retry rather
       // than the password. If that fails too, back to the password step.
       if (!await requestChallenge()) {
-        cancelChallenge()
+        resetChallenge()
         throw new Error(copy.restartCode)
       }
       code.set('')
@@ -181,8 +189,9 @@ const allowsFirstRun = !isMarketingSite()
      * Sign in with a passkey. A dismissed prompt leaves the sign-in form open.
      */
     const signInWithPasskey = async () => {
+      if (busy() || !passkeysOffered()) return
       errorMessage.set('')
-      busy.set(true)
+      pending.set('passkey')
       try {
         const session = await passkeys.signIn(copy)
         if (session?.token) enterApp(session.expires_in)
@@ -191,34 +200,24 @@ const allowsFirstRun = !isMarketingSite()
         errorMessage.set(error instanceof Error ? error.message : String(error))
       }
       finally {
-        busy.set(false)
+        pending.set(null)
       }
     }
 
     const onSubmit = async () => {
+      if (busy()) return
+      const verifying = Boolean(challenge())
+      pending.set(verifying ? 'code' : 'password')
       errorMessage.set('')
 
-      if (challenge()) {
-        busy.set(true)
-        try {
-          await verifyCode()
-        }
-        catch (error) {
-          errorMessage.set(error instanceof Error ? error.message : String(error))
-        }
-        finally {
-          busy.set(false)
-        }
-        return
-      }
-
-      busy.set(true)
-
-      const body = new FormData()
-      body.set('email', email().trim())
-      body.set('password', password())
-
       try {
+        if (verifying) {
+          await verifyCode()
+          return
+        }
+        const body = new FormData()
+        body.set('email', email().trim())
+        body.set('password', password())
         const response = await fetch('/api/login', { method: 'POST', body })
         const payload = await response.json().catch(() => ({}))
 
@@ -236,7 +235,7 @@ const allowsFirstRun = !isMarketingSite()
         errorMessage.set(error instanceof Error ? error.message : String(error))
       }
       finally {
-        busy.set(false)
+        pending.set(null)
       }
     }
   </script>

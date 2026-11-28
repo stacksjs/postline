@@ -2603,10 +2603,12 @@ async function checkDesktopNetworkConsent(cdp: Cdp): Promise<void> {
 async function checkBrowserPasskey(cdp: Cdp): Promise<void> {
   const copy = spanishWorkspace
     ? {
+        passkey: 'Iniciar sesión con una llave de acceso',
         duplicate: 'Este dispositivo ya tiene una llave de acceso para Postline.',
         rateLimited: 'Demasiados intentos con una llave de acceso. Espera un momento o usa tu contraseña.',
       }
     : {
+        passkey: 'Sign in with a passkey',
         duplicate: 'This device already has a passkey for Postline.',
         rateLimited: 'Too many passkey attempts. Wait a moment or use your password.',
       }
@@ -2638,7 +2640,7 @@ async function checkBrowserPasskey(cdp: Cdp): Promise<void> {
         && document.querySelectorAll('[data-passkey-row]').length === 1
         && !${addPasskey}.disabled`), 10_000)
     await evaluate(cdp, "document.querySelector('[data-setting=sign-out] button').click()")
-    const signIn = "document.querySelector('[data-passkey-sign-in]')"
+    const signIn = `[...document.querySelectorAll('[data-testid=login-page] button[type=button]')].find(button => button.innerText.trim() === ${JSON.stringify(copy.passkey)})`
     await waitUntil('The ready passkey sign-in button after signing out', () => evaluate<boolean>(cdp, `
       location.pathname === '/login' && Boolean(${signIn}?.getClientRects().length)
         && ${signIn}.classList.contains('inline-flex') && !${signIn}.disabled`), 15_000)
@@ -2648,11 +2650,19 @@ async function checkBrowserPasskey(cdp: Cdp): Promise<void> {
         if (new URL(input instanceof Request ? input.url : input, location.href).pathname !== '/api/auth/passkeys/authentication/options')
           return fetchOptions.call(window, input, options)
         window.fetch = fetchOptions
-        return Promise.resolve(Response.json({ error: 'Too many requests from the API fixture' }, { status: 429 }))
+        return new Promise(resolve => {
+          window.releasePasskeyOptions = () => resolve(Response.json({ error: 'Too many requests from the API fixture' }, { status: 429 }))
+        })
       }
     })()`)
     await evaluate(cdp, `${signIn}.focus()`)
     await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Passkey sign-in announces which action is pending', () => evaluate<boolean>(cdp, `
+      Boolean(window.releasePasskeyOptions) && ${signIn}.disabled && ${signIn}.getAttribute('aria-busy') === 'true'
+        && document.querySelector('[data-testid=login-page] button[type=submit]')?.disabled
+        && document.querySelector('[data-testid=login-page] button[type=submit]')?.getAttribute('aria-busy') === 'false'
+    `), 5_000)
+    await evaluate(cdp, 'window.releasePasskeyOptions()')
     await waitUntil('Passkey rate limiting is announced in the workspace language', () => evaluate<boolean>(cdp, `
       document.querySelector('[data-testid=login-page] [role=alert]')?.textContent === ${JSON.stringify(copy.rateLimited)}
         && !${signIn}.disabled`), 5_000)
@@ -3542,11 +3552,17 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
         account: 'Crea la cuenta del propietario', mismatch: 'Las contraseñas no coinciden.',
         workspace: 'Ponle un nombre a tu espacio de trabajo', channels: 'Elige un canal para publicar',
         complete: 'Tu primera publicación está lista',
+        signingIn: 'Iniciando sesión…', rejected: 'El correo electrónico o la contraseña son incorrectos.',
+        verifying: 'Verificando…', badCode: 'El código no es correcto.', otherAccount: 'Usar otra cuenta',
+        creatingAccount: 'Creando la cuenta…', savingWorkspace: 'Guardando el espacio de trabajo…',
       }
     : {
         login: 'Sign in to Postline', setup: 'Set up a new workspace',
         account: 'Create the owner account', mismatch: 'Passwords do not match.',
         workspace: 'Name your workspace', channels: 'Choose a publishing channel', complete: 'Your first post is ready',
+        signingIn: 'Signing in…', rejected: 'Incorrect email or password.',
+        verifying: 'Verifying…', badCode: 'That code is not right.', otherAccount: 'Use a different account',
+        creatingAccount: 'Creating account…', savingWorkspace: 'Saving workspace…',
       }
   const setup = `document.querySelector('[data-testid="setup-page"]')`
   const input = (name: string): string => `${setup}.querySelector(` + JSON.stringify(`input[name=${name}]`) + ')'
@@ -3556,6 +3572,29 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
     await cdp.send('Input.insertText', { text: value })
   }
   const click = (selector: string): Promise<void> => evaluate(cdp, `${selector}.click()`)
+  const submitFromKeyboard = async (selector: string) => {
+    await evaluate(cdp, `${selector}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+  }
+  const holdPost = (path: string) => evaluate(cdp, `(() => {
+    const previous = window.fetch.bind(window)
+    window.releaseFirstRunRequest = undefined
+    window.fetch = (target, options) => {
+      const response = previous(target, options)
+      if (new URL(target instanceof Request ? target.url : target, location.href).pathname !== ${JSON.stringify(path)}
+        || options?.method !== 'POST') return response
+      window.fetch = previous
+      return new Promise(resolve => { window.releaseFirstRunRequest = () => resolve(response) })
+    }
+  })()`)
+  const waitForPendingForm = (button: string, field: string, label: string) => waitUntil(
+    label,
+    () => evaluate<boolean>(cdp, `
+      Boolean(window.releaseFirstRunRequest) && ${button}.disabled && ${button}.getAttribute('aria-busy') === 'true'
+        && ${button}.innerText.trim() === ${JSON.stringify(label)} && ${field}.readOnly
+    `),
+    5_000,
+  )
   const heading = (title: string): Promise<void> => waitUntil(title, () => evaluate<boolean>(cdp, `${setup}?.querySelector('h1').textContent === ${JSON.stringify(title)}`), 20_000)
 
   await auditPage(`${site}/login`, { cdp })
@@ -3567,13 +3606,59 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
       && Boolean(${setupLink}?.getClientRects().length)
       && ${setupLink}.textContent.trim() === ${JSON.stringify(copy.setup)}
   `), 10_000)
-  if (spanishWorkspace) {
-    await type(`${login}.querySelector('input[name=email]')`, 'check@postline.test')
-    await type(`${login}.querySelector('input[name=password]')`, 'browser-check-password')
-    await click(`${login}.querySelector('button[type=submit]')`)
-    await waitUntil('Rejected credentials show the Spanish sign-in error', () => evaluate<boolean>(cdp, `
-      ${login}.querySelector('[role=alert]')?.textContent === 'El correo electrónico o la contraseña son incorrectos.'
+  const loginEmail = `${login}.querySelector('input[name=email]')`
+  const loginPassword = `${login}.querySelector('input[name=password]')`
+  const loginSubmit = `${login}.querySelector('button[type=submit]')`
+  if (!marketingScreenshots) {
+    await type(loginEmail, 'check@postline.test')
+    await type(loginPassword, 'browser-check-password')
+    await holdPost('/api/login')
+    await submitFromKeyboard(loginSubmit)
+    await waitForPendingForm(loginSubmit, loginPassword, copy.signingIn)
+    await evaluate(cdp, 'window.releaseFirstRunRequest()')
+    await waitUntil('Rejected credentials announce the localized error and unlock the form', () => evaluate<boolean>(cdp, `
+      ${login}.querySelector('[role=alert]')?.textContent === ${JSON.stringify(copy.rejected)}
+        && !${loginSubmit}.disabled && !${loginPassword}.readOnly
     `), 5_000)
+
+    await evaluate(cdp, `(() => {
+      const send = window.fetch.bind(window)
+      window.restoreChallengeFixture = () => { window.fetch = send }
+      window.fetch = (target, options) => {
+        const path = new URL(target instanceof Request ? target.url : target, location.href).pathname
+        if (path === '/api/login' && options?.method === 'POST')
+          return Promise.resolve(Response.json({ requires_two_factor: true, challenge_token: 'fixture-challenge' }))
+        if (path === '/api/auth/two-factor/verify' && options?.method === 'POST')
+          return new Promise(resolve => {
+            window.releaseAuthenticatorForm = () => resolve(Response.json({ error: ${JSON.stringify(copy.badCode)} }, { status: 422 }))
+          })
+        return send(target, options)
+      }
+    })()`)
+    await submitFromKeyboard(loginSubmit)
+    const loginCode = `${login}.querySelector('[data-two-factor-code]')`
+    const switchAccount = `[...${login}.querySelectorAll('button[type=button]')].find(button => button.innerText.trim() === ${JSON.stringify(copy.otherAccount)})`
+    await waitUntil('The authenticator step focuses the code field', () => evaluate<boolean>(cdp, `
+      document.activeElement === ${loginCode} && Boolean(${switchAccount}?.getClientRects().length)
+    `), 5_000)
+    await type(loginCode, '123456')
+    await submitFromKeyboard(loginSubmit)
+    await waitUntil('The pending authenticator check keeps the active sign-in stable', () => evaluate<boolean>(cdp, `
+      Boolean(window.releaseAuthenticatorForm) && ${loginSubmit}.getAttribute('aria-busy') === 'true'
+        && ${loginSubmit}.innerText.trim() === ${JSON.stringify(copy.verifying)}
+        && ${loginCode}.readOnly && ${switchAccount}.disabled
+    `), 5_000)
+    await evaluate(cdp, 'window.releaseAuthenticatorForm()')
+    await waitUntil('A rejected code returns control to the sign-in form', () => evaluate<boolean>(cdp, `
+      ${login}.querySelector('[role=alert]')?.textContent === ${JSON.stringify(copy.badCode)}
+        && !${loginCode}.readOnly && !${switchAccount}.disabled
+    `), 5_000)
+    await submitFromKeyboard(switchAccount)
+    await waitUntil('Choosing another account returns focus to email and clears the password', () => evaluate<boolean>(cdp, `
+      document.activeElement === ${loginEmail} && ${loginPassword}.value === ''
+        && ${login}.querySelector('[role=alert]')?.textContent === ''
+    `), 5_000)
+    await evaluate(cdp, 'window.restoreChallengeFixture()')
   }
   await click(setupLink)
   await heading(copy.account)
@@ -3584,12 +3669,19 @@ async function checkFirstRun(cdp: Cdp): Promise<void> {
   await type(input('password_confirmation'), 'wrong-confirmation')
   await click(`${setup}.querySelector('button[type=submit]')`)
   await waitUntil('Registration confirms the password before creating an account', () => evaluate<boolean>(cdp, `${setup}.querySelector('[role=alert]').textContent === ${JSON.stringify(copy.mismatch)}`), 5_000)
+  const setupSubmit = `${setup}.querySelector('button[type=submit]')`
   await type(input('password_confirmation'), 'browser-check-password')
-  await click(`${setup}.querySelector('button[type=submit]')`)
+  await holdPost('/api/register')
+  await submitFromKeyboard(setupSubmit)
+  await waitForPendingForm(setupSubmit, input('name'), copy.creatingAccount)
+  await evaluate(cdp, 'window.releaseFirstRunRequest()')
   await heading(copy.workspace)
   await type(input('workspaceName'), workspaceName)
   await type(input('timezone'), 'America/New_York')
-  await click(`${setup}.querySelector('button[type=submit]')`)
+  await holdPost('/api/postline/settings/workspace')
+  await submitFromKeyboard(setupSubmit)
+  await waitForPendingForm(setupSubmit, input('workspaceName'), copy.savingWorkspace)
+  await evaluate(cdp, 'window.releaseFirstRunRequest()')
   await heading(copy.channels)
   const profileSaved = await evaluate<boolean>(cdp, `(async () => {
     const { data } = await (await fetch('/api/postline/settings/workspace')).json()

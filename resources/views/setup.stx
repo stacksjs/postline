@@ -16,7 +16,7 @@ const availableHere = !isMarketingSite()
   @meta('description', setupText.description)
   @meta('robots', 'noindex, nofollow')
   <main class="grid place-items-center px-4 py-8 min-h-screen bg-bg" data-testid="setup-page" lang="{{ setupLocale }}">
-    <section class="grid gap-5 p-6 max-w-md w-full bg-panel border border-line rounded-2xl shadow-sm" aria-labelledby="setup-title" :aria-busy="stage() === 'loading' || busy()">
+    <section class="grid gap-5 p-6 max-w-md w-full bg-panel border border-line rounded-2xl shadow-sm" aria-labelledby="setup-title" :aria-busy="stage() === 'loading'">
       <header class="grid gap-2">
         <span class="h-9 w-9 brand-mark" aria-hidden="true"></span>
         <h1 class="m-0 font-semibold text-ink text-xl" id="setup-title" :text="heading()">{{ setupText.heading }}</h1>
@@ -28,41 +28,41 @@ const availableHere = !isMarketingSite()
       </ol>
 
       <p class="m-0 text-danger text-xs" role="alert" :class="{ 'sr-only': !errorMessage() }" :text="errorMessage()"></p>
-      <button :if="stage() === 'unavailable'" class="justify-self-start px-3 h-9 font-semibold text-ink text-sm bg-panel-2 border border-line rounded-lg" type="button" @click="loadSetup">{{ setupText.retry }}</button>
+      <Button :if="stage() === 'unavailable'" variant="secondary" size="sm" className="justify-self-start" @click="loadSetup">{{ setupText.retry }}</Button>
       <a :if="stage() === 'sign-in'" class="inline-flex items-center justify-center px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl" href="/login?return=setup" data-stx-link>{{ setupText.signIn }}</a>
       <a :if="stage() === 'marketing'" class="text-info text-sm underline" href="/download" data-stx-link>{{ setupText.download }}</a>
 
       <form :if="stage() === 'account'" class="grid gap-3" @submit.prevent="createOwner">
         <label class="grid gap-1.5 font-semibold text-muted text-xs">
           {{ setupText.name }}
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="name" autocomplete="name" minlength="2" maxlength="255" required x-model="accountName" ref="ownerNameInput">
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="name" autocomplete="name" minlength="2" maxlength="255" required x-model="accountName" :readonly="busy()" ref="ownerNameInput">
         </label>
         <label class="grid gap-1.5 font-semibold text-muted text-xs">
           {{ setupText.email }}
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="email" type="email" autocomplete="username" maxlength="254" required x-model="email">
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="email" type="email" autocomplete="username" maxlength="254" required x-model="email" :readonly="busy()">
         </label>
         <label class="grid gap-1.5 font-semibold text-muted text-xs">
           {{ setupText.password }}
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="255" required x-model="password">
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="255" required x-model="password" :readonly="busy()">
         </label>
         <label class="grid gap-1.5 font-semibold text-muted text-xs">
           {{ setupText.confirmPassword }}
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password_confirmation" type="password" autocomplete="new-password" minlength="8" maxlength="255" required x-model="confirmation">
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="password_confirmation" type="password" autocomplete="new-password" minlength="8" maxlength="255" required x-model="confirmation" :readonly="busy()">
         </label>
-        <button class="px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="submit" :disabled="busy()">{{ setupText.createAccount }}</button>
+        <Button size="md" type="submit" fullWidth="true" :loading="busy()" :label="busy() ? copy.creatingAccount : ''">{{ setupText.createAccount }}</Button>
       </form>
 
       <form :if="stage() === 'workspace'" class="grid gap-3" @submit.prevent="saveProfile">
         <label class="grid gap-1.5 font-semibold text-muted text-xs">
           {{ setupText.workspaceName }}
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="workspaceName" minlength="2" maxlength="120" required x-model="workspaceName" ref="workspaceNameInput">
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="workspaceName" minlength="2" maxlength="120" required x-model="workspaceName" :readonly="busy()" ref="workspaceNameInput">
         </label>
         <label class="grid gap-1.5 font-semibold text-muted text-xs">
           {{ setupText.timezone }}
-          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="timezone" type="text" list="setup-timezones" autocomplete="off" required x-model="timezone">
+          <input class="px-3 h-10 text-ink text-sm bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" name="timezone" type="text" list="setup-timezones" autocomplete="off" required x-model="timezone" :readonly="busy()">
         </label>
         <datalist id="setup-timezones"><option x-for="zone in zones" :key="zone" :value="zone"></option></datalist>
-        <button class="px-4 h-10 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="submit" :disabled="busy()">{{ setupText.proceed }}</button>
+        <Button size="md" type="submit" fullWidth="true" :loading="busy()" :label="busy() ? copy.savingWorkspace : ''">{{ setupText.proceed }}</Button>
       </form>
 
       <div :if="stage() === 'channels'" class="grid gap-4">
