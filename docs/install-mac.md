@@ -41,7 +41,10 @@ publishing, opens Postline at login, and quits it.
 
 ## Updating and uninstalling
 
-Download the new release and replace the app in Applications; your data
-folder is kept and migrated on first launch, with a copy of the database made
-before each migration. To uninstall, quit Postline, delete it from
-Applications, and delete the data folder and the log if you want nothing left.
+Open **Settings > About > Check for updates** to look for a signed update.
+Postline saves a database snapshot before installing an in-app update. You can
+also download a release and replace the app in Applications. Postline keeps
+your data folder and makes a copy of the database before each migration.
+
+To uninstall, quit Postline and remove it from Applications. To erase the
+local workspace as well, follow [Back up or move a workspace](./workspace-data.md).
