@@ -10,7 +10,7 @@ Run the command inside the running container. Substitute your container name
 if you used a name other than `postline`.
 
 ```bash
-docker exec postline ./buddy user:add owner@example.com --update
+docker exec postline bun scripts/serve-container.ts buddy user:add owner@example.com --update
 ```
 
 ## Source install

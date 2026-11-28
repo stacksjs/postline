@@ -128,7 +128,9 @@ jobs:
           '
           login_as_owner "$original_password" | jq -e '.requires_two_factor == true' >/dev/null
           restored_password=$(openssl rand -hex 24)
-          docker exec "$name" ./buddy user:add container-check@example.test --update --without-two-factor \
+          docker exec "$name" bun scripts/serve-container.ts buddy user:add container-check@example.test --update --without-two-factor \
             --password "$restored_password" >/dev/null
+          docker exec "$name" test ! -e /app/.env
+          test "$before" = "$(print_key_digest)"
           login_as_owner "$restored_password" \
             | jq -e '.token_type == "Bearer" and .user.email == "container-check@example.test"' >/dev/null

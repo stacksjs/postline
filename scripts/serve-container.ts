@@ -8,7 +8,7 @@ const data = '/var/lib/postline'
 const keyPath = join(data, 'app-key')
 const buddy = 'node_modules/@stacksjs/buddy/dist/cli.js'
 
-async function workspaceKey(): Promise<string> {
+async function workspaceKey(initialize = true): Promise<string> {
   const configured = process.env.APP_KEY?.trim()
   const read = () => readFile(keyPath, 'utf8').then(key => key.trim()).catch((error: NodeJS.ErrnoException) => {
     if (error.code !== 'ENOENT') throw error
@@ -16,7 +16,7 @@ async function workspaceKey(): Promise<string> {
   })
 
   let saved = await read()
-  if (saved === undefined) {
+  if (saved === undefined && initialize) {
     const stage = await mkdtemp(join(data, '.key-'))
     try {
       const candidate = join(stage, 'app-key')
@@ -34,6 +34,16 @@ async function workspaceKey(): Promise<string> {
   if (!saved || saved.startsWith('encrypted:')) throw new Error('The volume needs a valid application key.')
   if (configured && configured !== saved) throw new Error('APP_KEY differs from the existing workspace key in the volume.')
   return saved
+}
+
+// docker exec does not inherit the key loaded by the container's entrypoint.
+// Administrative commands use the existing volume key without initializing it.
+if (process.argv[2] === 'buddy') {
+  const cli = Bun.spawn([process.execPath, buddy, ...process.argv.slice(3)], {
+    env: { ...process.env, APP_KEY: await workspaceKey(false) },
+    stdin: 'inherit', stdout: 'inherit', stderr: 'inherit',
+  })
+  process.exit(await cli.exited)
 }
 
 await mkdir(join(data, 'media'), { recursive: true, mode: 0o700 })
