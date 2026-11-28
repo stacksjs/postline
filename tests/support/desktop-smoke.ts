@@ -11,9 +11,10 @@ import { WORKSPACE_KEY_ID_FILE, WORKSPACE_KEY_SERVICE } from '../../app/Desktop/
 export async function runWebviewApp(options: RunWebviewAppOptions): Promise<number> {
   const testHome = process.cwd()
   const paths = desktopAppPaths('Postline Desktop Check', { home: testHome, env: {} })
+  let workspaceExitCode = 1
 
   try {
-    return await launch({
+    const launcherExitCode = await launch({
       ...options,
       paths,
       logWhenDetached: false,
@@ -27,9 +28,18 @@ export async function runWebviewApp(options: RunWebviewAppOptions): Promise<numb
               return 1
             })
           : Promise.resolve(1)
-        return { exited, kill() {} }
+        return {
+          exited: exited.then((code) => {
+            workspaceExitCode = code
+            return code
+          }),
+          kill() {},
+        }
       },
     })
+    // The launcher treats a closed window as a normal exit. CI also needs
+    // the verdict from the assertions that took the window's place.
+    return launcherExitCode || workspaceExitCode
   }
   finally {
     const keyId = join(paths.dataDir, WORKSPACE_KEY_ID_FILE)
