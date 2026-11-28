@@ -126,7 +126,7 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
           <footer class="flex flex-wrap gap-1.5 items-center justify-end" x-show="row.liveUrl || row.actionable || row.partial || row.resumeLabel || row.canRepeat">
             <div class="group-focus-within:opacity-100 group-hover:opacity-100 transition-opacity" :class="row.attention ? '' : 'pointer-fine:opacity-0'">
               <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-ink text-xs bg-panel hover:bg-hover border border-line rounded-lg shadow-sm transition-colors" x-show="row.liveUrl && !row.actionable && !row.partial && !row.resumeLabel" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">{{ queueText.viewPost }}</a>
-              <span x-show="row.resumeLabel">
+              <span x-show="row.resumeLabel && row.retryable">
                 <Button variant="secondary" size="xs" :loading="busyId() === row.id" :label="row.resumeLabel" @click="resumeItem(row.id)" />
               </span>
               <span x-show="row.xBrowserReview">

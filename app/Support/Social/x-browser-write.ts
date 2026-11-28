@@ -10,10 +10,12 @@ export interface XBrowserWrite {
   handle: string
   text: string
   images: XBrowserImage[]
+  replies?: string[]
 }
 
 export type XBrowserWriteResult =
   | { state: 'published', id: string }
+  | { state: 'thread', ids: string[], attention?: true }
   | { state: 'refused' | 'uncertain' | 'attention' | 'layout' | 'unavailable' }
 
 export function xBrowserPostId(value: unknown): value is string {

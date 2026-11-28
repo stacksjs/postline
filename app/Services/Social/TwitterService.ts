@@ -18,6 +18,14 @@ import { syncConnectedMetrics } from './sync-connected-metrics'
 import { supportsLocalTwitterBrowser, twitterBrowserPublishingAccounts } from './TwitterBrowserSession'
 import { twitterBrowserDispatch } from './TwitterBrowserDispatchService'
 
+const browserErrors = {
+  attention: 'Open X in Channels and check sign-in with the original account before publishing.',
+  layout: 'Postline could not verify the X Composer controls. Check sign-in in Channels to run another health check.',
+  refused: 'X declined the post in its Composer.',
+  uncertain: 'X did not confirm whether the post went out. Retries are paused. Open the original X profile to check the result.',
+  unavailable: 'The X browser could not prepare this post. Keep Postline open on this Mac and check the browser in Channels.',
+}
+
 const database = db as any
 
 type SocialIdentityRow = {
@@ -312,10 +320,36 @@ export class TwitterService {
     }
   }
 
-  private async publishThroughBrowser(post: { id: number, body: string }, identity: SocialIdentityRow, content?: PublishContent): Promise<{ uri: string, url: string, cid?: string }> {
-    if (content?.reply || content?.video)
-      throw new UserFacingError('Choose the X API account for replies or videos.')
-    const images = (content?.media ?? []).map((image) => {
+  async publishBrowserThread(
+    posts: Array<{ id: number, body: string }>, identityId: number, handle: string,
+    content: () => Promise<PublishContent | undefined>, allowNewBatch: boolean,
+  ): Promise<CrosspostTargetResult[]> {
+    const target = { provider: 'twitter' as const, identityId, handle, target: `twitter:${identityId}` }
+    const failure = (message: string): CrosspostTargetResult => ({ ...target, ok: false, error: message })
+    const identity = await findIdentityRow<SocialIdentityRow>('twitter', identityId)
+    if (!supportsLocalTwitterBrowser() || identity?.auth_transport !== 'browser' || identity.handle !== handle || identity.auth_status === 'revoked')
+      return posts.map(() => failure('Connect the original X browser account in the Postline Mac app.'))
+    if (posts.some(post => exceedsLimit('twitter', post.body, this.driver.characterLimit)))
+      return posts.map(() => failure(`Every X thread segment must be ${this.driver.characterLimit} characters or fewer.`))
+    try {
+      const delivered = await twitterBrowserDispatch.dispatchThread(posts, handle, async () => {
+        const lead = await content()
+        if (lead?.video) throw new UserFacingError('Choose the X API account to attach a video.')
+        return this.browserImages(lead)
+      }, allowNewBatch)
+      return posts.map((_, index) => {
+        const id = delivered.state === 'thread' ? delivered.ids[index] : undefined
+        if (id) return { ...target, ok: true, uri: id, url: `https://x.com/${handle}/status/${id}` }
+        return failure(browserErrors[delivered.state === 'thread' || delivered.state === 'published' ? 'uncertain' : delivered.state])
+      })
+    }
+    catch (error) {
+      return posts.map(() => failure(error instanceof UserFacingError ? error.message : 'Postline could not prepare this X browser thread.'))
+    }
+  }
+
+  private browserImages(content: PublishContent | undefined) {
+    return (content?.media ?? []).map((image) => {
       if (!image.bytes?.length || !image.mimeType || !/^image\/(jpeg|png|webp|gif)$/.test(image.mimeType))
         throw new UserFacingError('Attach an image file before publishing through the X browser.')
       const altText = image.altText?.trim()
@@ -323,19 +357,17 @@ export class TwitterService {
         throw new UserFacingError('X image descriptions can use up to 1,000 characters.')
       return { type: image.mimeType, base64: Buffer.from(image.bytes).toString('base64'), ...(altText && { altText }) }
     })
+  }
+
+  private async publishThroughBrowser(post: { id: number, body: string }, identity: SocialIdentityRow, content?: PublishContent): Promise<{ uri: string, url: string, cid?: string }> {
+    if (content?.reply || content?.video)
+      throw new UserFacingError('Choose the X API account for replies or videos.')
     const result = await twitterBrowserDispatch.dispatch({
-      postId: post.id, handle: identity.handle, text: post.body, images,
+      postId: post.id, handle: identity.handle, text: post.body, images: this.browserImages(content),
     })
     if (result.state === 'published')
       return { uri: result.id, url: `https://x.com/${identity.handle}/status/${result.id}` }
-    const errors = {
-      attention: 'Open X in Channels and check sign-in with the original account before publishing.',
-      layout: 'Postline could not verify the X Composer controls. Check sign-in in Channels to run another health check.',
-      refused: 'X declined the post in its Composer.',
-      uncertain: 'X did not confirm whether the post went out. Retries are paused. Open the original X profile to check the result.',
-      unavailable: 'The X browser could not prepare this post. Keep Postline open on this Mac and check the browser in Channels.',
-    }
-    throw new UserFacingError(errors[result.state], `x_browser_${result.state}`)
+    throw new UserFacingError(browserErrors[result.state], `x_browser_${result.state}`)
   }
 
   /**

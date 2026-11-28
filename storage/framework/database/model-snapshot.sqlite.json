@@ -4222,6 +4222,15 @@
             "isUnique": true,
             "isNullable": true,
             "hasDefault": false
+          },
+          {
+            "name": "batch_token",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 36
           }
         ],
         "indexes": [
@@ -4244,7 +4253,7 @@
       }
     ]
   },
-  "hash": "52b6391a0da69274a5a3deefbd33d9f662f2316d12f306763df081eef25f6daf",
+  "hash": "007673ef01b8e692b59b1834f4391c1a6efcca4bc0224019d298f95e0c60c548",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-28T02:31:09.994Z"
+  "updatedAt": "2026-11-28T03:06:54.129Z"
 }

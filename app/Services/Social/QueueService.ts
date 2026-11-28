@@ -26,7 +26,7 @@ import { removeMediaFiles, storeAttachments } from '../../Support/Social/stored-
 import { assertVideoAllowed, checkVideoBytes } from '../../Support/Social/video-input'
 import { resolveStoredVariants, resolveVariantBody, sanitizeVariants } from '../../Support/Social/variants'
 import { crosspost, crosspostProviders } from './CrosspostService'
-import { assertThreadTransport, bindRestoredTargets, findIdentityRow, RestoredTargetAccountError, unavailableAccountError } from './identities'
+import { browserThreadAccounts, bindRestoredTargets, findIdentityRow, RestoredTargetAccountError, unavailableAccountError } from './identities'
 import { xBrowserPostId } from '../../Support/Social/x-browser-write'
 import { supportsLocalTwitterBrowser } from './TwitterBrowserSession'
 import { nextPostingSlot } from '../../Support/Social/posting-slots'
@@ -489,8 +489,7 @@ export class QueueService {
     if (draft && Boolean(draft.thread_key) !== Boolean(input.texts))
       throw new UserFacingError('Keep the draft’s post format to add it to the queue.')
     const accountId = draft ? Number(draft.account_id) : await ensureAccount()
-    const targets = await this.validTargets(input.providers)
-    if (input.texts) assertThreadTransport(targets)
+    const targets = input.texts ? await this.threadTargets(input.providers) : await this.validTargets(input.providers)
     assertReplyTarget(parseStoredContent(draft?.[column])?.reply?.target, targets)
     const networks = targetProviders(targets)
     const drafts: any[] = draft?.thread_key ? await this.threadPosts(draft.thread_key) : draft ? [draft] : []
@@ -616,8 +615,7 @@ export class QueueService {
   private async writeThread(input: QueueThreadInput, original?: any): Promise<SavedQueueThread> {
     const segments = input.texts.map(text => String(text).trim()).filter(Boolean)
     if (segments.length < 2) throw new UserFacingError('A thread needs at least two posts.')
-    const targets = await this.validTargets(input.providers)
-    assertThreadTransport(targets)
+    const targets = await this.threadTargets(input.providers)
     const attachments = attachmentsOf(input)
     const providers = targetProviders(targets)
 
@@ -863,7 +861,7 @@ export class QueueService {
             const identityId = Number(target.social_identity_id) || null
             const archived = target.archived_account ? JSON.parse(target.archived_account) : null
             const handle = identityId ? handles.get(identityId) || null : archived?.handle ?? null
-            const review = !post.thread_key && target.status === 'failed' && target.provider === 'twitter'
+            const review = target.status === 'failed' && target.provider === 'twitter'
               && (identityId ? browserIdentities.has(identityId) : archived?.transport === 'browser')
               && uncertain.has(`${post.id}:${handle?.toLowerCase()}`)
             return {
@@ -1184,6 +1182,19 @@ export class QueueService {
     })
   }
 
+  private async threadTargets(raw: readonly string[]): Promise<PublishTarget[]> {
+    const parsed = await this.validTargets(raw)
+    const x = parsed.filter(target => target.provider === 'twitter')
+    const named = x.filter(target => target.identityId)
+    // Pin the API default when it would otherwise run beside another
+    // connection on X. A later default change must not send the thread twice.
+    const targets = named.length && x.length > named.length && browserThreadAccounts(named).size
+      ? [...parsed.filter(target => target.provider !== 'twitter'), ...await crosspost.resolve(x)]
+      : parsed
+    browserThreadAccounts(targets)
+    return targets
+  }
+
   /**
    * Narrow submitted targets to ones that can be queued: known networks, and
    * accounts that exist on that network and are still connected.
@@ -1448,7 +1459,9 @@ export class QueueService {
       const identity = identityId && tx.selectFrom('social_identities').select('id').where('id', '=', identityId)
         .where('provider', '=', 'twitter').where('auth_transport', '=', 'browser').where('handle', '=', handle).executeTakeFirst()
       const post = identity && tx.selectFrom('posts').selectAll().where('id', '=', target.post_id).where('account_id', '=', accountId)
-        .where('thread_key', 'is', null).where('status', 'in', ['failed', 'published']).executeTakeFirst()
+        .where('status', 'in', ['failed', 'published']).executeTakeFirst()
+      if (post?.thread_key && tx.selectFrom('thread_publish_claims').select('id').where('thread_key', '=', post.thread_key).executeTakeFirst())
+        throw new AlreadyPublishingError()
       const receipt = post && tx.selectFrom('twitter_browser_dispatches').select(['uuid'])
         .where('post_id', '=', post.id).where('handle', '=', handle).where('state', '=', 'submitting').executeTakeFirst()
       if (!receipt) throw new UserFacingError('This X target changed. Refresh Queue and check the post again.')

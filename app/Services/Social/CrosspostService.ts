@@ -30,7 +30,7 @@ import { removeMediaFiles, storeAttachments } from '../../Support/Social/stored-
 import { assertVideoAllowed, checkVideoBytes } from '../../Support/Social/video-input'
 import { ensureAccount, now, uuid } from './support'
 import { postFirstComments } from './PostFirstCommentService'
-import { assertThreadTransport, bindRestoredTargets } from './identities'
+import { browserThreadAccounts, bindRestoredTargets } from './identities'
 import { AlreadyPublishingError, claimThread, refreshThreadClaim, runClaimedThread, ThreadRemovalPendingError } from './thread-publish'
 
 const database = db as any
@@ -241,9 +241,19 @@ export class CrosspostService {
     if (selected.length === 0) {
       throw new Error('Select at least one connected provider to publish.')
     }
-    assertThreadTransport(selected)
-
     validateVideo(selected, content)
+    if (segments.length > 1 && browserThreadAccounts(selected).size) {
+      // The browser's single Post all action needs every segment and target
+      // in Queue before X can receive permission to submit.
+      const { QueueService } = await import('./QueueService')
+      const postQueue = new QueueService(this)
+      const { postIds } = await postQueue.saveThread({
+        texts: segments, providers: selected.map(targetKey), title: content?.title, external: content?.external,
+        images: content?.media, video: content?.video, options: content?.options,
+      })
+      const { results } = await postQueue.publishNow(postIds[0]!)
+      return { postIds, results }
+    }
     const accountId = await ensureAccount()
     const threadKey = uuid()
     const claim: ReturnType<typeof claimThread> = await database.transaction((tx: typeof database) => claimThread(tx, threadKey), sqliteWriteOptions())
@@ -352,12 +362,12 @@ export class CrosspostService {
       const rows = bindRestoredTargets(tx, tx.selectFrom('post_targets').selectAll().where('post_id', 'in', posts.map(post => post.id)).execute()) as Array<{
         id: number, post_id: number, provider: SocialProvider, social_identity_id: number | null, status: string, remote_uri: string | null, remote_cid: string | null
       }>
-      assertThreadTransport(rows.map(row => ({ provider: row.provider, identityId: row.social_identity_id })), tx)
+      const browser = browserThreadAccounts(rows.map(row => ({ provider: row.provider, identityId: row.social_identity_id })), tx)
       tx.updateTable('posts').set({ status: 'publishing', updated_at: now() })
         .where('thread_key', '=', threadKey).where('status', 'in', ['scheduled', 'draft']).execute()
-      return { claim, posts, rows }
+      return { claim, posts, rows, browser }
     }
-    const { claim, posts, rows }: ReturnType<typeof prepare> = await database.transaction(prepare, sqliteWriteOptions())
+    const { claim, posts, rows, browser }: ReturnType<typeof prepare> = await database.transaction(prepare, sqliteWriteOptions())
 
     return await runClaimedThread(claim, async () => {
       const keyOf = (row: typeof rows[number]) => targetKey({ provider: row.provider, identityId: Number(row.social_identity_id) || null })
@@ -372,6 +382,38 @@ export class CrosspostService {
         const start = posts.findIndex(post => !forTarget(Number(post.id)).some(row => row.status === 'published'))
         if (start === -1) continue
         resumed++
+        const browserHandle = target.identityId && target.provider === 'twitter' ? browser.get(target.identityId) : undefined
+        if (browserHandle && target.identityId && posts.length > 1) {
+          await refreshThreadClaim(claim)
+          const placeholders: Array<{ postId: number, index: number, ids: number[] }> = await database.transaction((tx: typeof database) => {
+            return posts.flatMap((post, index) => {
+              if (index < start || forTarget(post.id).some(row => row.status === 'published')) return []
+              const ids = forTarget(post.id).map(row => Number(row.id))
+              const at = now()
+              if (ids.length) tx.updateTable('post_targets').set({ status: 'publishing', updated_at: at }).where('id', 'in', ids).execute()
+              else {
+                const row = tx.insertInto('post_targets').values({
+                  uuid: uuid(), post_id: post.id, provider: 'twitter', social_identity_id: target.identityId,
+                  status: 'publishing', created_at: at, updated_at: at,
+                }).returning('id').executeTakeFirstOrThrow()
+                ids.push(Number(row.id))
+              }
+              return [{ postId: post.id, index, ids }]
+            })
+          }, sqliteWriteOptions())
+          const allowNewBatch = !posts.some(post => forTarget(post.id).some(row => row.status === 'published'))
+          const sent = await twitter.publishBrowserThread(posts, target.identityId, browserHandle,
+            () => lead ??= hydrateStoredContent(posts[0]?.content), allowNewBatch)
+          await refreshThreadClaim(claim)
+          for (const placeholder of placeholders) {
+            const result = sent[placeholder.index]!
+            const old = rows.filter(row => row.post_id === placeholder.postId && row.provider === 'twitter').map(row => Number(row.id))
+            await this.finishThreadTarget(placeholder.postId, target, result, placeholder.ids, old)
+            await this.finishAttempt(placeholder.postId, [result], true)
+            results.push(result)
+          }
+          continue
+        }
 
         // The first sent segment is the root and the last sent one is the parent.
         let chain: ThreadChain | undefined

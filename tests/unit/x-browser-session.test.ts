@@ -3,7 +3,7 @@ import { db } from '@stacksjs/database'
 import { keywordMonitoring } from '../../app/Services/KeywordMonitoringService'
 import { postQueue } from '../../app/Services/Social/QueueService'
 import { rememberTwitterBrowserHandle, saveTwitterBrowserMetrics, twitterBrowserSession } from '../../app/Services/Social/TwitterBrowserSession'
-import { upsertIdentityRow } from '../../app/Services/Social/identities'
+import { browserThreadAccounts, upsertIdentityRow } from '../../app/Services/Social/identities'
 import { ensureAccount } from '../../app/Services/Social/support'
 import { inspectXPage, removeXBrowserProfile } from '../../resources/functions/x-browser-session'
 import { inspectXComposer } from '../../resources/assets/scripts/x-composer-health'
@@ -377,16 +377,18 @@ describe('X session browser reads', () => {
         }).returning('id').executeTakeFirstOrThrow()
         ids.push(Number(identity.id))
       }
+      expect(() => browserThreadAccounts(ids.map(identityId => ({ provider: 'twitter', identityId }))))
+        .toThrow('Choose one connection for this X account')
       const post = await db.insertInto('posts').values({
         uuid: crypto.randomUUID(), status: 'failed', body: 'Shared text',
         content: JSON.stringify({ variants: { twitter: 'The X-specific text' } }), account_id: accountId, created_at: stamp,
       }).returning('id').executeTakeFirstOrThrow()
       postId = Number(post.id)
       await db.insertInto('twitter_browser_dispatches').values({
-        uuid: crypto.randomUUID(), post_id: post.id, handle, state: 'submitting', created_at: stamp,
+        uuid: crypto.randomUUID(), post_id: postId, handle, state: 'submitting', created_at: stamp,
       }).execute()
       const target = await db.insertInto('post_targets').values({
-        uuid: crypto.randomUUID(), post_id: post.id, provider: 'twitter', status: 'failed',
+        uuid: crypto.randomUUID(), post_id: postId, provider: 'twitter', status: 'failed',
         archived_account: JSON.stringify({ provider: 'twitter', handle, transport: 'browser' }), created_at: stamp,
       }).returning('id').executeTakeFirstOrThrow()
 
@@ -394,8 +396,10 @@ describe('X session browser reads', () => {
       await expect(postQueue.linkXBrowserPost(Number(target.id), { ...observed, body: 'Shared text' })).rejects.toThrow('does not match')
       expect(await postQueue.linkXBrowserPost(Number(target.id), observed)).toEqual({ url: `https://x.com/${handle}/status/32107814` })
       const settled = await db.selectFrom('post_targets').select(['status', 'social_identity_id', 'archived_account'])
-        .where('id', '=', target.id).executeTakeFirstOrThrow()
-      expect(settled).toEqual({ status: 'published', social_identity_id: ids[1], archived_account: null })
+        .where('id', '=', Number(target.id)).executeTakeFirstOrThrow()
+      expect(settled.status).toBe('published')
+      expect(settled.social_identity_id).toBe(ids[1]!)
+      expect(settled.archived_account).toBeNull()
     }
     finally {
       if (postId) {

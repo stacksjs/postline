@@ -341,7 +341,7 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
     const selected = accounts.find(account => account.transport === 'browser' && account.handle === 'postline_test')
     check('the selected browser account is explicitly available alongside the API', Boolean(selected?.id) && selected?.isDefault === false)
     const path = `${browserSessionPath}/publish`
-    const submit = (operation: string, token?: string, result?: { state: string, id?: string }) =>
+    const submit = (operation: string, token?: string, result?: { state: string, id?: string, ids?: string[] }) =>
       call('POST', path, JSON.stringify({ operation, token, result }))
     const startup = await call('POST', '/api/postline/queue', {
       text: 'A fixture waiting for the browser to start.',
@@ -427,6 +427,66 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
     check('an observed X post can settle its Queue receipt without another submission', linked.status === 200 && replayMatch.status === 422
       && linkedRow?.status === 'published' && linkedRow?.providers?.[0]?.remoteUrl === 'https://x.com/postline_test/status/246811'
       && !linkedRow?.providers?.[0]?.xBrowserReview && JSON.parse((await submit('claim')).text)?.data === null)
+    async function browserThread(texts: string[], ids: string[], schedule: boolean, mixed = false) {
+      const input = { text: texts[0]!, thread: JSON.stringify(texts), providers: `twitter:${selected?.id}${mixed ? ',blog' : ''}` }
+      const saved = schedule ? await call('POST', '/api/postline/queue', {
+        ...input, scheduled_at: new Date(Date.now() + 600_000).toISOString().slice(0, 19).replace('T', ' '),
+      }) : null
+      const scheduleId = saved && JSON.parse(saved.text)?.data?.postIds?.[0]
+      if (schedule && (!scheduleId || saved?.status !== 200)) throw new Error(`Could not schedule the X browser thread: ${saved?.text}`)
+      const pending = schedule
+        ? call('POST', '/api/postline/queue/publish-now', { id: String(scheduleId) })
+        : call('POST', '/api/postline/publish', input)
+      let work
+      for (let attempt = 0; attempt < 30; attempt++) {
+        work = JSON.parse((await submit('claim')).text)?.data
+        if (work) break
+        await Bun.sleep(50)
+      }
+      if (!work) {
+        const result = await pending
+        throw new Error(`The X browser thread was not offered to the renderer: ${result.text}`)
+      }
+      const granted = await submit('authorize', work.token)
+      const duplicate = await submit('authorize', work.token)
+      check('the browser claims the ordered thread and receives one grant for Post all', work.text === texts[0]
+        && JSON.stringify(work.replies) === JSON.stringify(texts.slice(1))
+        && JSON.parse(granted.text)?.data === true && JSON.parse(duplicate.text)?.data === false)
+      if (ids.length > 1) {
+        const duplicateIds = await submit('result', work.token, { state: 'thread', ids: [ids[0]!, ids[0]!] })
+        check('a thread report cannot reuse a post ID', duplicateIds.status === 422)
+      }
+      const report = await submit('result', work.token, { state: 'thread', ids })
+      check('the browser thread report is accepted', JSON.parse(report.text)?.data === true)
+      return { data: JSON.parse((await pending).text)?.data, token: work.token }
+    }
+    const queuedThread = await browserThread(['Scheduled X root', 'Scheduled X reply'], ['346810', '346811'], true)
+    check('the scheduled X thread returns both ordered post URLs', queuedThread.data?.results?.map((result: { url: string }) => result.url).join(',')
+      === 'https://x.com/postline_test/status/346810,https://x.com/postline_test/status/346811')
+    const interrupted = await browserThread(['Interrupted X root', 'Interrupted X reply', 'Interrupted X ending'], ['346820'], false)
+    check('the immediate X thread records the confirmed root and holds both uncertain replies',
+      interrupted.data?.postIds?.length === 3 && interrupted.data?.results?.[0]?.uri === '346820'
+      && interrupted.data?.results?.slice(1).every((result: { ok: boolean, error?: string }) => !result.ok && result.error?.includes('did not confirm')))
+    const firstResume = await call('POST', '/api/postline/queue/publish-now', { id: String(interrupted.data?.postIds?.[1]) })
+    check('a resumed X thread cannot resubmit its uncertain replies', JSON.parse(firstResume.text)?.data?.results?.length === 2
+      && JSON.parse((await submit('claim')).text)?.data === null)
+    const currentQueue = JSON.parse((await call('GET', '/api/postline/queue')).text)?.data?.items ?? []
+    const interruptedReply = currentQueue.find((entry: { id: number }) => entry.id === interrupted.data?.postIds?.[1])
+    const manual = await call('POST', '/api/postline/queue/link-x-browser-post', JSON.stringify({
+      target_id: interruptedReply?.providers?.[0]?.xBrowserReview,
+      post: { ...observed, id: '346821', body: 'Interrupted X reply', postedAt: new Date().toISOString() },
+    }))
+    check('an unresolved X reply can be confirmed from its own profile post', manual.status === 200
+      && JSON.parse(manual.text)?.data?.url === 'https://x.com/postline_test/status/346821')
+    const late = await submit('result', interrupted.token, { state: 'thread', ids: ['346820', '346821', '346822'] })
+    const secondResume = await call('POST', '/api/postline/queue/publish-now', { id: String(interrupted.data?.postIds?.[2]) })
+    check('a late thread response recovers the remaining reply without submitting again', JSON.parse(late.text)?.data === true
+      && JSON.parse(secondResume.text)?.data?.results?.map((result: { uri: string }) => result.uri).join(',') === '346822'
+      && JSON.parse((await submit('claim')).text)?.data === null)
+    const mixed = await browserThread(['Browser and Blog root', 'Browser and Blog reply'], ['346830', '346831'], false, true)
+    const mixedResults: Array<{ ok: boolean, provider: string }> = mixed.data?.results ?? []
+    check('a thread can keep its independent Blog target alongside the browser batch', mixedResults.length === 4
+      && mixedResults.every(result => result.ok) && mixedResults.filter(result => result.provider === 'blog').length === 2)
     const held = await sendThroughBrowser('A scheduled X layout fixture.', 'layout', true)
     const heldState = await call('GET', browserSessionPath)
     check('a changed Composer layout holds the selected X target in the queue', Boolean(held?.postId)

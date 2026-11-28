@@ -19,17 +19,24 @@ import type { PublishTarget } from '../../Support/Social/targets'
 import { db } from '@stacksjs/database'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { alerts } from '../AlertService'
-import { matchArchivedTargetAccount, matchIdentity, pickDefaultIdentity, reconnectArchivedTargetMessage } from '../../Support/Social/accounts'
+import { matchArchivedTargetAccount, matchIdentity, normalizeIdentityHandle, pickDefaultIdentity, reconnectArchivedTargetMessage } from '../../Support/Social/accounts'
 import { isSealed, openToken, sealToken } from '../../Support/Social/token-vault'
 import { now, uuid } from './support'
 
 const database = db as any
 
-export function assertThreadTransport(targets: readonly PublishTarget[], tx = database): void {
+export function browserThreadAccounts(targets: readonly PublishTarget[], tx = database): Map<number, string> {
   const twitterIds = targets.flatMap(target => target.provider === 'twitter' && target.identityId ? [target.identityId] : [])
-  if (twitterIds.length && tx.selectFrom('social_identities').select('id').where('id', 'in', twitterIds)
-    .where('auth_transport', '=', 'browser').executeTakeFirst())
-    throw new UserFacingError('Choose the X API account for a thread. The X browser currently publishes single posts.')
+  const accounts: Array<{ id: number, handle: string, auth_transport: 'api' | 'browser' }> = twitterIds.length
+    ? tx.selectFrom('social_identities').select(['id', 'handle', 'auth_transport']).where('id', 'in', twitterIds).execute()
+    : []
+  const browser = accounts.filter(row => row.auth_transport === 'browser')
+  if (browser.length && targets.some(target => target.provider === 'twitter' && !target.identityId))
+    throw new UserFacingError('Select the named X API account when you also select the X browser connection.')
+  if (browser.some(row => accounts.some(account => account.auth_transport !== 'browser'
+    && normalizeIdentityHandle(row.handle) === normalizeIdentityHandle(account.handle))))
+    throw new UserFacingError('Choose one connection for this X account. Both its API and browser connections are selected.')
+  return new Map(browser.map(row => [Number(row.id), row.handle]))
 }
 
 export class RestoredTargetAccountError extends UserFacingError {

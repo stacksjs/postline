@@ -91,6 +91,11 @@ Enable **Check X in the background** on a watch to search X while the Mac app
 is running, including when it’s in the menu bar. Postline checks one enabled
 watch every 20 minutes and rotates through the enabled watches in turn. Pausing a watch or turning the option off stops its background checks.
 
+Select your **X browser** account in Composer to publish a thread now or
+schedule it from Queue. Postline populates each segment in X’s Composer and
+uses **Post all**. If X confirms only some segments, Queue shows the
+confirmed posts and holds the unresolved segments for review.
+
 If X does not confirm a browser submission, Queue holds that target to prevent
 duplicate sends. Choose **Find on X** to open the original account’s profile.
 Open the matching post in that window, then return to Queue and choose

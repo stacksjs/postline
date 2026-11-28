@@ -20,6 +20,11 @@ export default defineModel({
       required: true,
       validation: { rule: schema.enum(['submitting', 'published', 'refused']).required() },
     },
+    batchToken: {
+      required: false,
+      hidden: true,
+      validation: { rule: schema.string().max(36).optional() },
+    },
     remoteId: {
       required: false,
       validation: { rule: schema.string().max(19).optional() },

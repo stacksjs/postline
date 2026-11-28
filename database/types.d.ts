@@ -2158,6 +2158,7 @@ declare module '@stacksjs/database' {
       updated_at: string | null
       handle: string
       state: "submitting" | "published" | "refused"
+      batch_token: string
       remote_id: string
       post_id: number
     }
