@@ -133,6 +133,7 @@ export const actions = {
   'Actions/Postline/TwitterStatusAction': '../../../app/Actions/Postline/TwitterStatusAction.ts',
   'Actions/Postline/UnreadCountsAction': '../../../app/Actions/Postline/UnreadCountsAction.ts',
   'Actions/Postline/WorkspaceBootstrapAction': '../../../app/Actions/Postline/WorkspaceBootstrapAction.ts',
+  'Actions/Postline/WorkspaceConnectionAction': '../../../app/Actions/Postline/WorkspaceConnectionAction.ts',
   'Actions/Postline/WorkspaceDeleteAction': '../../../app/Actions/Postline/WorkspaceDeleteAction.ts',
   'Actions/Postline/WorkspaceExportAction': '../../../app/Actions/Postline/WorkspaceExportAction.ts',
   'Actions/Postline/WorkspaceGetAction': '../../../app/Actions/Postline/WorkspaceGetAction.ts',
