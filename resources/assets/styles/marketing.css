@@ -107,7 +107,7 @@ html.marketing .product-frame {
   to   { opacity: 1; transform: translateY(0); }
 }
 @supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
+  @media (width >= 640px) and (prefers-reduced-motion: no-preference) {
     html.marketing .reveal {
       opacity: 0;
       animation: reveal-up linear both;
@@ -132,17 +132,26 @@ html.marketing .marquee-mask {
   -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
 }
 
-/* The pulse on a "live" dot. */
+/* Transform and opacity keep the pulse on the compositor. */
 @keyframes live-pulse {
-  0% { box-shadow: 0 0 0 0 rgb(240 68 30 / 0.45); }
-  100% { box-shadow: 0 0 0 8px rgb(240 68 30 / 0); }
+  from { transform: scale(1); opacity: 0.45; }
+  to { transform: scale(3.7); opacity: 0; }
 }
-html.marketing .live-dot { animation: live-pulse 1.8s ease-out infinite; }
+@media (prefers-reduced-motion: no-preference) {
+  html.marketing .live-dot { position: relative; }
+  html.marketing .live-dot::after {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--brand);
+    content: '';
+    animation: live-pulse 1.8s ease-out infinite;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   html.marketing { scroll-behavior: auto; }
-  html.marketing .marquee-track,
-  html.marketing .live-dot { animation: none; }
+  html.marketing .marquee-track { animation: none; }
   html.marketing .marquee-toggle { display: none; }
 }
 }
