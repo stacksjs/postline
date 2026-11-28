@@ -27,6 +27,9 @@
       "openSettings": "Abrir configuración (,)",
       "expandSidebar": "Expandir barra lateral",
       "collapseSidebar": "Contraer barra lateral",
+      "back": "Atrás",
+      "forward": "Adelante",
+      "account": "Cuenta del espacio de trabajo",
       "workspaceRegion": "Espacio de trabajo de Postline"
     },
     "unread": {

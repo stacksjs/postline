@@ -3,6 +3,7 @@ import { workspaceCommandsText, workspaceLocale } from '../../app/Support/Locali
 
 export const language = workspaceLocale
 export const commandText = workspaceCommandsText
+export const compact = $bool($props.compact)
 export const commandModeText = {
   title: commandText.title,
   label: commandText.label,
@@ -117,7 +118,7 @@ useEventListener('keydown', handleShortcut)
 <template>
   <div class="contents" lang="{{ language }}">
     <button
-      class="inline-flex gap-2 items-center justify-center px-3 h-11 min-w-11 sm:h-9 font-medium text-muted text-ui hover:text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl"
+      class="inline-flex items-center justify-center font-medium text-muted text-ui hover:text-ink hover:bg-panel-2 {{ compact ? 'h-9 min-w-9 lg:h-8 lg:min-w-8 rounded-lg' : 'gap-2 px-3 h-11 min-w-11 sm:h-9 bg-panel border border-line rounded-xl' }}"
       type="button"
       aria-label="{{ commandText.open }}"
       aria-controls="workspace-commands"
@@ -129,7 +130,9 @@ useEventListener('keydown', handleShortcut)
       @click="showCommands()"
     >
       <span class="h-4 w-4 i-hugeicons-search-01" aria-hidden="true"></span>
-      <span class="hidden sm:inline">{{ commandText.label }}</span>
+      @if(!compact)
+        <span class="hidden sm:inline">{{ commandText.label }}</span>
+      @endif
     </button>
     <dialog
       id="workspace-commands"

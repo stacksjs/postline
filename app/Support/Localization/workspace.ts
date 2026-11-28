@@ -20,6 +20,28 @@ export const workspaceShellText = workspaceI18n.tm('workspace.shell')
 export const workspaceCommandsText = workspaceI18n.tm('workspace.commands')
 export const unreadText = workspaceI18n.tm('workspace.unread')
 
+export const workspaceNavigation = [
+  { href: '/composer', view: 'composer', shortcut: '1', icon: 'i-hugeicons-edit-02', primary: true, mobile: true },
+  { href: '/queue', view: 'queue', shortcut: '2', icon: 'i-hugeicons-calendar-03', primary: true, mobile: true },
+  { href: '/timeline', view: 'timeline', shortcut: '3', icon: 'i-hugeicons-news', primary: true },
+  { href: '/analytics', view: 'analytics', shortcut: '4', icon: 'i-hugeicons-chart-line-data-01', primary: true },
+  { href: '/campaigns', view: 'campaigns', shortcut: '5', icon: 'i-hugeicons-flowchart-01', primary: true },
+  { href: '/listening', view: 'listening', shortcut: '6', icon: 'i-hugeicons-radar-02', primary: true },
+  { href: '/inbox', view: 'inbox', shortcut: '7', icon: 'i-hugeicons-message-01', primary: true, mobile: true },
+  { href: '/writing', view: 'writing', shortcut: '8', icon: 'i-hugeicons-quill-write-02', primary: true },
+  { href: '/activity', view: 'activity', shortcut: '9', icon: 'i-hugeicons-activity-01' },
+  { href: '/accounts', view: 'channels', icon: 'i-hugeicons-share-08' },
+  { href: '/settings', view: 'settings', shortcut: ',', icon: 'i-hugeicons-settings-02' },
+].map(({ view, ...link }) => ({
+  ...link,
+  label: workspaceText(`workspace.navigation.${view}`),
+  mobileLabel: workspaceText(`workspace.navigation.${view === 'composer' ? 'compose' : view}`),
+}))
+
+export function workspaceRoutePath(url: string): string {
+  return (URL.parse(url, 'http://localhost')?.pathname ?? '/').replace(/\/$/, '') || '/'
+}
+
 export const workspaceQueueText = workspaceI18n.tm('workspace.queue') as typeof en.workspace.queue
 export const workspaceQueuePanelsText = workspaceI18n.tm('workspace.queuePanels') as typeof en.workspace.queuePanels
 

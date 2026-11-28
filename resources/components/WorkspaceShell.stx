@@ -1,8 +1,14 @@
-<script server cache>
-import { workspaceLocale, workspaceShellText } from '../../app/Support/Localization/workspace'
+<script server>
+import { workspaceLocale, workspaceNavigation, workspaceRoutePath, workspaceShellText, workspaceText } from '../../app/Support/Localization/workspace'
 
 export const shellText = workspaceShellText
 export const language = workspaceLocale
+export const routeLabels = Object.fromEntries(workspaceNavigation.map(({ href, label }) => [href, label]))
+const currentPath = workspaceRoutePath(typeof requestContext === 'undefined' ? '/' : requestContext.url())
+export const currentLabel = routeLabels[currentPath] ?? ''
+export const sidebarLabels = { expand: shellText.expandSidebar, collapse: shellText.collapseSidebar }
+export const channelsLabel = workspaceText('workspace.navigation.channels')
+export const settingsLabel = workspaceText('workspace.navigation.settings')
 </script>
 
 <script client>
@@ -12,18 +18,28 @@ import { showNotification } from '../functions/notification'
 
 type WorkspaceBridge = CraftBridgeAPI & {
   window: CraftBridgeAPI['window'] & {
-    setWebSidebarCollapsed?: (collapsed: boolean) => Promise<void>
     setAppearance?: (mode: 'light' | 'dark' | 'system') => Promise<void>
   }
   settings?: { onOpen: (handler: () => void) => () => void }
 }
 
 const shell = useRef('shell')
+const profile = useRef<HTMLDetailsElement>('profile')
+const profileTrigger = useRef<HTMLElement>('profileTrigger')
 const collapsed = useLocalStorage('postline.sidebar.collapsed', false)
 const desktop = useNativeDesktop()
 const native = state(Boolean(desktop()))
 const bridge = () => desktop() as WorkspaceBridge | null
 const colorMode = useColorMode()
+const labels = {{ routeLabels }}
+const sidebar = {{ sidebarLabels }}
+const activeLabel = state({{ currentLabel }})
+const account = workspaceBootstrapQuery()
+const workspaceName = derived(() => account.data()?.workspace.workspaceName || 'Postline')
+const ownerName = derived(() => account.data()?.workspace.name.trim() || '')
+const ownerInitial = derived(() => Array.from(ownerName())[0]?.toLocaleUpperCase() ?? '')
+const historyKey = 'postline.workspace.history'
+const historyPosition = state({ index: 0, end: 0 })
 let settingsChannel: BroadcastChannel | null = null
 let unbindSettingsMenu: (() => void) | undefined
 let unbindWorkspaceChanges: (() => void) | undefined
@@ -47,22 +63,49 @@ useEventListener('online', () => {
 })
 
 function toggleSidebar() {
-  const isCollapsed = collapsed()
-  const root = shell.current
-  const collapseButton = root?.querySelector<HTMLButtonElement>('[data-sidebar-collapse]')
-  const expandButton = root?.querySelector<HTMLButtonElement>('[data-sidebar-expand-fab]')
-  const trigger = isCollapsed ? expandButton : collapseButton
-  const moveFocus = trigger && trigger.ownerDocument.activeElement === trigger && !bridge()
-  collapsed.set(!isCollapsed)
-  if (moveFocus) {
-    const next = isCollapsed ? collapseButton : expandButton
-    nextTick(() => next?.focus())
-  }
+  collapsed.update(value => !value)
 }
 
-effect(() => {
-  const value = collapsed()
-  if (native()) void bridge()?.window?.setWebSidebarCollapsed?.(value).catch(() => {})
+// History entries keep their position through Back, Forward and reload.
+// The STX router writes its own state first, so merge our position into it.
+function syncHistory(event?: Event) {
+  const view = shell.current?.ownerDocument.defaultView
+  if (!view) return
+  const history = view.history
+  const entry = history.state?.[historyKey]
+  const knownEntry = typeof entry === 'number'
+  const direction = event instanceof CustomEvent ? event.detail?.direction : undefined
+  const pushed = !knownEntry && direction === 'push'
+  let index = knownEntry ? entry : 0
+  if (!knownEntry && direction) index = historyPosition().index + Number(pushed)
+  let end = historyPosition().end
+  if (pushed || (!event && !knownEntry)) end = index
+  try {
+    if (!event && knownEntry) end = Number(view.sessionStorage.getItem(historyKey)) || 0
+    if (!knownEntry) history.replaceState({ ...history.state, [historyKey]: index }, '')
+    view.sessionStorage.setItem(historyKey, String(Math.max(index, end)))
+  }
+  catch { /* The toolbar can still track navigation for the open document. */ }
+  historyPosition.set({ index, end: Math.max(index, end) })
+}
+
+function closeProfile(restoreFocus = false) {
+  if (!profile.current?.open) return
+  profile.current.open = false
+  if (restoreFocus) profileTrigger.current?.focus()
+}
+
+function syncRoute(event?: Event) {
+  const path = useRoute().path.replace(/\/$/, '')
+  activeLabel.set(labels[path] ?? '')
+  closeProfile()
+  syncHistory(event)
+}
+
+useEventListener('stx:navigate', syncRoute)
+useEventListener('popstate', syncHistory)
+useEventListener('pointerdown', (event) => {
+  if (event.target instanceof Node && !profile.current?.contains(event.target)) closeProfile()
 })
 
 function openSettings() {
@@ -90,7 +133,8 @@ function handleLink(event: MouseEvent) {
   if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
   const target = event.target instanceof Element ? event.target.closest('a[data-stx-link]') : null
   if (!(target instanceof HTMLAnchorElement) || target.target === '_blank' || target.hasAttribute('download')) return
-  if (target.getAttribute('href') === '/settings' && bridge()?.window?.open) {
+  if (profile.current?.contains(target)) closeProfile()
+  if (target.getAttribute('href') === '/settings') {
     event.preventDefault()
     event.stopPropagation()
     openSettings()
@@ -126,6 +170,7 @@ desktop.onReady((host) => {
 })
 
 onMount(() => {
+  syncRoute()
   if (shell.current?.ownerDocument.defaultView?.navigator.onLine === false) showOfflineNotice()
   unbindWorkspaceChanges = bindWorkspaceChanges()
   if (typeof BroadcastChannel !== 'function') return
@@ -143,7 +188,7 @@ onDestroy(() => {
 
 <template>
   <div
-    class="grid lg:overflow-hidden grid-cols-1 lg:grid-cols-[var(--postline-sidebar-width,286px)_minmax(0,1fr)] min-h-screen min-w-80 lg:h-screen antialiased font-sans text-ink bg-bg"
+    class="grid lg:overflow-hidden grid-cols-1 lg:grid-cols-[var(--postline-sidebar-width)_minmax(0,1fr)] min-h-dvh min-w-80 antialiased font-sans text-ink"
     data-postline-app
     data-postline-shell
     :data-sidebar-collapsed="collapsed() ? 'true' : 'false'"
@@ -151,31 +196,71 @@ onDestroy(() => {
     ref="shell"
     @click.capture="handleLink($event)"
   >
-    <AppSidebar :collapsed="collapsed()" @toggle-sidebar="toggleSidebar" />
+    <AppSidebar :collapsed="collapsed()" />
 
-    <div class="relative lg:overflow-hidden min-w-0 lg:h-screen bg-bg" data-postline-content-shell>
-      <button
-        class="inline-flex fixed left-3.5 top-3.5 z-[90] items-center justify-center h-9 w-9 text-body hover:text-ink bg-glass-strong hover:bg-raised border border-line rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus shadow-lg backdrop-blur-sm"
-        type="button"
-        lang="{{ language }}"
-        aria-label="{{ shellText.expandSidebar }}"
-        aria-controls="workspace-sidebar"
-        aria-expanded="false"
-        title="{{ shellText.expandSidebar }}"
-        data-sidebar-expand-fab
-        data-craft-no-drag
-        @click="toggleSidebar"
-      >
-        <span class="h-[18px] w-[18px] i-hugeicons-sidebar-right" aria-hidden="true"></span>
-      </button>
-      <section class="overflow-hidden lg:overflow-y-auto min-h-screen min-w-0 lg:h-screen bg-bg border-line border-t lg:border-l lg:rounded-tl-[28px] lg:shadow-[-10px_0_36px_var(--workspace-shadow)]" lang="{{ language }}" aria-label="{{ shellText.workspaceRegion }}" data-postline-workspace data-postline-router data-craft-drag>
-        <div class="flex justify-end pt-3.5 px-3.5 sm:pt-4 sm:px-4">
-          <WorkspaceCommands />
+    <section class="flex flex-col min-h-0 min-w-0 bg-bg" lang="{{ language }}" aria-label="{{ shellText.workspaceRegion }}" data-postline-workspace>
+      <header class="grid sticky top-0 z-20 gap-2 grid-cols-[minmax(0,1fr)_auto] items-center shrink-0 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] bg-bg" data-workspace-toolbar data-craft-drag>
+        <div class="hidden lg:flex gap-1 items-center" data-command-ignore>
+          <button
+            class="grid place-items-center size-8 text-muted hover:text-ink hover:bg-panel-2 rounded-lg"
+            type="button"
+            aria-label="{{ shellText.collapseSidebar }}"
+            :aria-label="collapsed() ? sidebar.expand : sidebar.collapse"
+            :title="collapsed() ? sidebar.expand : sidebar.collapse"
+            aria-controls="workspace-sidebar"
+            :aria-expanded="!collapsed()"
+            data-sidebar-collapse
+            data-craft-no-drag
+            @click="toggleSidebar"
+          >
+            <span class="size-[17px] i-hugeicons-sidebar-left" aria-hidden="true"></span>
+          </button>
+          <span class="mx-1 h-3.5 w-px bg-line" aria-hidden="true"></span>
+          <button class="grid place-items-center size-7 text-muted enabled:hover:text-ink enabled:hover:bg-panel-2 rounded-lg disabled:opacity-45" type="button" aria-label="{{ shellText.back }}" title="{{ shellText.back }}" disabled :disabled="historyPosition().index === 0" data-workspace-back data-craft-no-drag @click="goBack()">
+            <span class="size-4 i-hugeicons-arrow-left-01" aria-hidden="true"></span>
+          </button>
+          <button class="grid place-items-center size-7 text-muted enabled:hover:text-ink enabled:hover:bg-panel-2 rounded-lg disabled:opacity-45" type="button" aria-label="{{ shellText.forward }}" title="{{ shellText.forward }}" disabled :disabled="historyPosition().index >= historyPosition().end" data-workspace-forward data-craft-no-drag @click="goForward()">
+            <span class="size-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+          </button>
         </div>
-        <main id="workspace-content" lang="en" class="p-3.5 sm:p-4 min-w-0" tabindex="-1">
+
+        <div class="flex gap-1.5 items-center min-w-0 text-ui" data-workspace-location>
+          <span class="hidden lg:inline text-muted">Postline</span>
+          <span class="hidden lg:inline-block shrink-0 size-3 text-muted i-hugeicons-arrow-right-01" aria-hidden="true"></span>
+          <span class="font-semibold text-ink truncate" :text="activeLabel()">{{ currentLabel }}</span>
+        </div>
+
+        <div class="flex gap-1 items-center justify-end min-w-0" data-craft-no-drag>
+          <WorkspaceCommands compact="true" />
+          <details class="relative min-w-0" ref="profile" data-workspace-profile data-command-ignore @keydown.escape="closeProfile(true)">
+            <summary class="flex gap-1.5 items-center px-1.5 min-h-9 lg:min-h-8 hover:bg-panel-2 rounded-lg cursor-pointer" ref="profileTrigger">
+              <span class="grid place-items-center shrink-0 size-6 font-semibold text-body text-xs bg-panel-3 rounded-full" aria-hidden="true">
+                <span x-show="ownerInitial()" :text="ownerInitial()"></span>
+                <span class="size-3.5 i-hugeicons-user-circle" x-show="!ownerInitial()"></span>
+              </span>
+              <span class="sr-only">{{ shellText.account }}</span>
+              <span class="hidden lg:block w-28 text-body text-ui truncate" :text="ownerName()"></span>
+              <span class="hidden sm:inline-block shrink-0 size-3 text-muted i-hugeicons-arrow-down-01" aria-hidden="true"></span>
+            </summary>
+            <div class="grid absolute right-0 top-full gap-0.5 mt-1 p-1 min-w-40 bg-panel border border-line rounded-xl shadow-lg">
+              <p class="m-0 px-2 py-1 text-muted text-xs truncate" :text="workspaceName()">Postline</p>
+              <a class="flex gap-2 items-center px-2 py-1.5 text-ui hover:bg-panel-2 rounded-lg" href="/accounts" data-stx-link>
+                <span class="size-4 i-hugeicons-share-08" aria-hidden="true"></span>
+                {{ channelsLabel }}
+              </a>
+              <a class="flex gap-2 items-center px-2 py-1.5 text-ui hover:bg-panel-2 rounded-lg" href="/settings" data-stx-link data-no-router>
+                <span class="size-4 i-hugeicons-settings-02" aria-hidden="true"></span>
+                {{ settingsLabel }}
+              </a>
+            </div>
+          </details>
+        </div>
+      </header>
+      <div class="flex flex-1 flex-col min-h-0 min-w-0" data-postline-router>
+        <main id="workspace-content" lang="en" class="lg:overflow-y-auto flex-1 px-3.5 py-4 sm:p-6 min-h-0 min-w-0" tabindex="-1" data-stx-scroll="workspace">
           <slot />
         </main>
-      </section>
-    </div>
+      </div>
+    </section>
   </div>
 </template>

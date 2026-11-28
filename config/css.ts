@@ -46,9 +46,8 @@ import { defaultConfig } from '@cwcss/crosswind'
  * people's content (posts, avatars, link cards, charts), so the palette stays
  * out of its way: nothing here competes with a network's own colours.
  *
- * `--brand` is the one chromatic value, a signal orange. It marks what is live
- * or new (a status dot, a highlighted word, a focus ring) and is never a
- * surface or a button fill, so it keeps meaning something.
+ * `--brand` is the signal orange for the workspace frame, the mark and
+ * accents. The work surfaces and primary actions stay neutral.
  */
 
 /** Light theme. The default. */
@@ -246,72 +245,110 @@ const APP_SHELL: string = `
 @property --postline-sidebar-width {
   syntax: '<length>';
   inherits: true;
-  initial-value: 286px;
+  initial-value: 214px;
 }
 
 [data-postline-shell] {
+  --postline-sidebar-width: 214px;
+  --postline-frame: #131316;
+  --postline-rail-ink: #fafafa;
+  --postline-rail-muted: rgb(250 250 250 / 78%);
+  --postline-rail-line: rgb(255 255 255 / 16%);
+  --postline-rail-hover: rgb(255 255 255 / 10%);
+  --postline-rail-selected: rgb(255 255 255 / 21%);
+  --postline-chrome-band: calc(2 * var(--craft-window-buttons-y, var(--craft-window-controls-inset-y, 8px)) + var(--craft-window-buttons-height, var(--craft-window-controls-height, 16px)));
+  background: var(--bg);
   transition-property: --postline-sidebar-width;
-  transition-duration: 220ms;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-duration: var(--duration-slow);
+  transition-timing-function: var(--ease-out);
 }
 
 ${collapsedWorkspaceShell} { --postline-sidebar-width: 0px; }
+[data-workspace-toolbar] { min-height: 44px; padding-inline: 12px; }
+[data-workspace-profile] summary::-webkit-details-marker { display: none; }
+[data-workspace-profile] summary::marker { content: ''; }
+[data-workspace-location] { max-width: min(32vw, 28rem); justify-self: center; }
+[data-workspace-toolbar] :disabled { opacity: .45; }
 
-html.has-native-sidebar,
-html.has-native-sidebar body {
-  background: transparent !important;
+html[data-craft-web-material="window"]:has([data-postline-shell]),
+html[data-craft-web-material="window"] body:has([data-postline-shell]) {
+  background: transparent;
 }
 
-[data-postline-sidebar] { background-color: var(--panel-2); }
+[data-postline-sidebar] { color: var(--postline-rail-ink); }
+[data-sidebar-window-inset] { height: 16px; }
+[data-shell-native="true"] [data-sidebar-window-inset] {
+  height: calc(var(--craft-window-buttons-y, var(--craft-window-controls-inset-y, 8px)) + var(--craft-window-buttons-height, var(--craft-window-controls-height, 16px)) + 12px);
+}
+[data-sidebar-group] { border-top: 1px solid var(--postline-rail-line); }
+[data-sidebar-brand]:hover, [data-sidebar-row]:hover { background: var(--postline-rail-hover); }
+[data-sidebar-utility] { color: var(--postline-rail-muted); }
+[data-sidebar-row][aria-current="page"] {
+  background: var(--postline-rail-selected);
+  color: var(--postline-rail-ink);
+  font-weight: 600;
+  box-shadow: inset 0 1px rgb(255 255 255 / 12%);
+}
+[data-postline-sidebar] :is([data-sidebar-row], [data-sidebar-brand]):focus-visible {
+  outline-color: var(--postline-rail-ink);
+  outline-offset: -2px;
+}
+[data-sidebar-tile] {
+  background: linear-gradient(155deg, var(--brand), color-mix(in srgb, var(--brand) 48%, var(--postline-frame)));
+  box-shadow: inset 0 1px rgb(255 255 255 / 34%), 0 2px 6px rgb(0 0 0 / 22%);
+}
+[data-sidebar-badge], [data-sidebar-shortcut] { background: var(--postline-rail-hover); }
+[data-sidebar-shortcut] { opacity: 0; color: var(--postline-rail-muted); }
+[data-sidebar-row]:is(:hover, :focus-visible) [data-sidebar-shortcut] { opacity: 1; }
+html[data-craft-window-active="false"] [data-sidebar-tile] { filter: saturate(.45); }
 
-html.has-native-sidebar [data-postline-sidebar] {
-  background-color: var(--glass);
-  -webkit-backdrop-filter: blur(24px) saturate(1.08);
-  backdrop-filter: blur(24px) saturate(1.08);
+@media (min-width: 1024px) {
+  [data-postline-shell] {
+    --postline-frame-inset: 8px;
+    --postline-frame-top: color-mix(in srgb, var(--brand) 60%, var(--postline-frame));
+    --postline-frame-middle: color-mix(in srgb, var(--brand) 35%, var(--postline-frame));
+    height: 100dvh;
+    background: linear-gradient(150deg, var(--postline-frame-top), var(--postline-frame-middle) 58%, var(--postline-frame));
+  }
+
+  html[data-craft-web-material="window"] [data-postline-shell] {
+    background: linear-gradient(150deg,
+      color-mix(in srgb, var(--postline-frame-top) 92%, transparent),
+      color-mix(in srgb, var(--postline-frame-middle) 94%, transparent) 58%,
+      color-mix(in srgb, var(--postline-frame) 95%, transparent));
+  }
+
+  [data-postline-workspace] {
+    margin: var(--postline-frame-inset) var(--postline-frame-inset) var(--postline-frame-inset) 0;
+    overflow: hidden;
+    border-radius: 14px;
+    box-shadow: 0 0 0 1px var(--workspace-shadow), 0 6px 30px rgb(0 0 0 / 22%);
+  }
+
+  [data-workspace-toolbar] { min-height: 38px; padding-inline: 8px 12px; }
+  [data-shell-native="true"] [data-workspace-toolbar] {
+    min-height: max(38px, calc(var(--postline-chrome-band) - 2 * var(--postline-frame-inset)));
+  }
+
+  ${collapsedWorkspaceShell} { --postline-frame-inset: 0px; }
+  ${collapsedWorkspaceShell} [data-postline-workspace] { border-radius: 0; box-shadow: none; }
+  ${collapsedWorkspaceShell} [data-postline-sidebar] { visibility: hidden; }
 }
 
-${collapsedWorkspaceShell} [data-postline-workspace] {
-  border-top-left-radius: 0 !important;
-  border-left-color: transparent !important;
-  box-shadow: none !important;
-}
-
-${collapsedWorkspaceShell} [data-postline-sidebar] {
-  visibility: hidden;
-  pointer-events: none;
-}
-
-${collapsedWorkspaceShell} [data-shell-controls-row],
-html.has-native-sidebar [data-shell-controls-row],
-[data-shell-native="true"] [data-shell-controls-row] {
-  display: none !important;
-}
-
-[data-sidebar-expand-fab] {
-  opacity: 0;
-  visibility: hidden;
-  transform: translate3d(-6px, 0, 0) scale(0.94);
-  pointer-events: none;
-  transition:
-    opacity 220ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-html:not(.has-native-sidebar) ${collapsedWorkspaceShell}:not([data-shell-native="true"]) [data-sidebar-expand-fab] {
-  opacity: 1;
-  visibility: visible;
-  transform: translate3d(0, 0, 0) scale(1);
-  pointer-events: auto;
+${collapsedWorkspaceShell}[data-shell-native="true"] [data-workspace-toolbar] {
+  padding-inline-start: calc(var(--craft-window-controls-width, 76px) + 8px);
 }
 
 @media (max-width: 1023px) {
-  [data-sidebar-expand-fab] { display: none; }
-
   [data-postline-shell] {
     --postline-bottom-nav-height: calc(3.75rem + env(safe-area-inset-bottom, 0px));
   }
 
-  [data-postline-content-shell] { padding-bottom: var(--postline-bottom-nav-height); }
+  [data-postline-workspace] { padding-bottom: var(--postline-bottom-nav-height); }
+  [data-workspace-location] { max-width: 100%; justify-self: start; }
+  [data-shell-native="true"] [data-workspace-toolbar] {
+    padding-inline-start: calc(var(--craft-window-controls-width, 76px) + 8px);
+  }
 
   [data-postline-mobile-nav] {
     height: var(--postline-bottom-nav-height);
@@ -343,7 +380,7 @@ html:not(.has-native-sidebar) ${collapsedWorkspaceShell}:not([data-shell-native=
 
 /* A focus ring every control shows, at 3:1 against the panels (#142). The
    writing surfaces with no border of their own opt in with data-focus-outline. */
-[data-postline-app] :is(a, button, [role='button'], [data-focus-outline]):focus-visible {
+[data-postline-app] :is(a, button, summary, [role='button'], [data-focus-outline]):focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
@@ -362,7 +399,6 @@ const APP_UI: string = `
 }
 
 [data-workspace-page-header] {
-  min-height: 72px;
   padding: 5px 2px 7px;
 }
 
@@ -390,9 +426,8 @@ const APP_UI: string = `
 
 
 @media (max-width: 640px) {
-  [data-postline-router] { padding: 12px; }
   [data-postline-page] { gap: 12px; }
-  [data-workspace-page-header] { min-height: auto; padding: 2px 1px 5px; }
+  [data-workspace-page-header] { padding: 2px 1px 5px; }
   [data-workspace-page-header] h1 { font-size: 21px; }
 }
 `

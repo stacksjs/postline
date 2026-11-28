@@ -212,29 +212,61 @@ async function checkWorkspaceCommands(cdp: Cdp): Promise<void> {
 
 async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
   const shell = "document.querySelector('[data-postline-shell]')"
-  const collapse = "document.querySelector('[data-sidebar-collapse]')"
-  const expand = "document.querySelector('[data-sidebar-expand-fab]')"
+  const toggle = "document.querySelector('[data-sidebar-collapse]')"
+  const back = "document.querySelector('[data-workspace-back]')"
+  const forward = "document.querySelector('[data-workspace-forward]')"
+  const location = "document.querySelector('[data-workspace-location]')"
+  const sidebar = "document.getElementById('workspace-sidebar')"
+  const workspace = "document.querySelector('[data-postline-workspace]')"
+  const toolbar = "document.querySelector('[data-workspace-toolbar]')"
   const width = `Math.round(Number.parseFloat(getComputedStyle(${shell}).getPropertyValue('--postline-sidebar-width')))`
 
   await auditPage(`${site}/queue`, { cdp })
   await waitUntil('Workspace sidebar hydration', () => evaluate<boolean>(cdp, `${shell}?.dataset.sidebarCollapsed === 'false'`), 5_000)
-  await evaluate(cdp, `${collapse}.focus()`)
+  if (!await evaluate<boolean>(cdp, `
+    ${width} === 214 && ${workspace}.getBoundingClientRect().top === 8
+      && getComputedStyle(${workspace}).borderRadius === '14px'
+      && getComputedStyle(document.getElementById('workspace-content')).overflowY === 'auto'
+      && ${location}.innerText.includes('Queue')`))
+    fail('queue', 'shell', 'the desktop toolbar or inset workspace was not rendered')
+  await evaluate(cdp, `${toggle}.focus()`)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('The browser sidebar is collapsed', () => evaluate<boolean>(cdp, `
     ${shell}.dataset.sidebarCollapsed === 'true' && ${width} === 0
-      && getComputedStyle(${expand}).visibility === 'visible'
-      && ${expand}.getAttribute('aria-expanded') === 'false'
-      && document.activeElement === ${expand}`), 5_000)
+      && getComputedStyle(${sidebar}).visibility === 'hidden'
+      && ${toggle}.getAttribute('aria-expanded') === 'false'
+      && document.activeElement === ${toggle}`), 5_000)
   await auditPage(`${site}/queue`, { cdp })
   if (!await evaluate<boolean>(cdp, `${shell}.dataset.sidebarCollapsed === 'true' && ${width} === 0`))
     fail('queue', 'shell', 'a sidebar collapsed before reload was restored expanded')
-  await evaluate(cdp, `${expand}.focus()`)
+  await evaluate(cdp, `${toggle}.focus()`)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('The expanded sidebar is visible again', () => evaluate<boolean>(cdp, `
-    ${shell}.dataset.sidebarCollapsed === 'false' && ${width} === 286
-      && getComputedStyle(${expand}).visibility === 'hidden'
-      && ${collapse}.getAttribute('aria-expanded') === 'true'
-      && document.activeElement === ${collapse}`), 5_000)
+    ${shell}.dataset.sidebarCollapsed === 'false' && ${width} === 214
+      && getComputedStyle(${sidebar}).visibility === 'visible'
+      && ${toggle}.getAttribute('aria-expanded') === 'true'
+      && document.activeElement === ${toggle}`), 5_000)
+
+  const profile = "document.querySelector('[data-workspace-profile]')"
+  await evaluate(cdp, `${profile}.querySelector('summary').focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The workspace account menu opens from the keyboard', () => evaluate<boolean>(cdp, `${profile}.open`), 5_000)
+  await evaluate(cdp, `${profile}.querySelector('a[href="/accounts"]').click()`)
+  await waitUntil('The account menu opens Channels and updates the toolbar', () => evaluate<boolean>(cdp, `
+    window.location.pathname === '/accounts' && !${profile}.open && !${back}.disabled
+      && ${forward}.disabled && ${location}.innerText.includes('Channels')
+      && ${sidebar}.querySelector('[href="/accounts"]').getAttribute('aria-current') === 'page'`), 5_000)
+  await evaluate(cdp, `${back}.click()`)
+  await waitUntil('Toolbar Back returns to the queue', () => evaluate<boolean>(cdp, `
+    window.location.pathname === '/queue' && ${back}.disabled && !${forward}.disabled
+      && ${location}.innerText.includes('Queue')`), 5_000)
+  await evaluate(cdp, `${forward}.click()`)
+  await waitUntil('Toolbar Forward returns to Channels', () => evaluate<boolean>(cdp, `
+    window.location.pathname === '/accounts' && !${back}.disabled && ${forward}.disabled
+      && ${location}.innerText.includes('Channels')`), 5_000)
+  await evaluate(cdp, `${back}.click()`)
+  await waitUntil('The queue is ready for the desktop checks', () => evaluate<boolean>(cdp, `
+    window.location.pathname === '/queue' && ${location}.innerText.includes('Queue')`), 5_000)
 
   const offlineNotice = "document.querySelector('[data-stx-toast-key=postline-offline]')"
   await evaluate(cdp, "window.dispatchEvent(new Event('offline')); window.dispatchEvent(new Event('offline'))")
@@ -304,7 +336,8 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
   })()`)
   await waitUntil('The late native bridge is connected', () => evaluate<boolean>(cdp, `
     ${shell}.dataset.shellNative === 'true'
-      && getComputedStyle(${collapse}.parentElement).display === 'none'
+      && ${toggle}.getClientRects().length > 0
+      && window.postlineShellCalls.collapsed.at(-1) === false
       && Boolean(window.postlineShellCalls.openSettingsFromMenu)`), 5_000)
   await waitUntil('The dock badge, new notification and tray menu', () => evaluate<boolean>(cdp, `
     (() => {
@@ -335,18 +368,18 @@ async function checkWorkspaceShell(cdp: Cdp): Promise<void> {
   await evaluate(cdp, trayAction('toggle-publishing'))
   await waitUntil('Publishing can be resumed from the Craft tray', () => evaluate<boolean>(cdp, `
     window.postlineShellCalls.menu.some(item => item.label === 'Pause Publishing')`), 5_000)
-  await evaluate(cdp, `${collapse}.click()`)
-  await waitUntil('The Craft titlebar toggle collapses the sidebar', () => evaluate<boolean>(cdp, `
+  await evaluate(cdp, `${toggle}.click()`)
+  await waitUntil('The toolbar collapses the Craft sidebar', () => evaluate<boolean>(cdp, `
     ${shell}.dataset.sidebarCollapsed === 'true'
       && window.postlineShellCalls.collapsed.at(-1) === true
-      && getComputedStyle(${expand}).visibility === 'hidden'`), 5_000)
-  await evaluate(cdp, `${collapse}.click()`)
-  await waitUntil('The Craft titlebar toggle expands the sidebar', () => evaluate<boolean>(cdp, `
+      && ${toggle}.getBoundingClientRect().left >= 84`), 5_000)
+  await evaluate(cdp, `${toggle}.click()`)
+  await waitUntil('The toolbar expands the Craft sidebar', () => evaluate<boolean>(cdp, `
     ${shell}.dataset.sidebarCollapsed === 'false' && window.postlineShellCalls.collapsed.at(-1) === false`), 5_000)
   if (!await evaluate<boolean>(cdp, `
-    Boolean(document.querySelector('[data-postline-workspace][data-craft-drag]'))
-      && Boolean(document.querySelector('[data-postline-sidebar][data-craft-drag]'))
-      && ${collapse}.hasAttribute('data-craft-no-drag')
+    ${toolbar}.hasAttribute('data-craft-drag')
+      && ${sidebar}.hasAttribute('data-craft-drag')
+      && ${toggle}.hasAttribute('data-craft-no-drag')
       && document.querySelector('a[data-command-destination="Settings"]').hasAttribute('data-craft-no-drag')`))
     fail('queue', 'shell', 'Craft drag regions or interactive exclusions are missing')
 

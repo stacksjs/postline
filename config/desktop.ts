@@ -43,7 +43,9 @@ export default {
       // A menu-bar item, and the app stays running when its window closes
       // (#195): the agent and the scheduler live as long as Craft does, so a
       // post scheduled for later still goes out with the window closed.
-      arguments: ['--persistent-storage', '--system-tray', '--keep-running'],
+      // Craft supplies the window material and traffic lights. The STX toolbar
+      // supplies the sidebar and history controls within the inset workspace.
+      arguments: ['--persistent-storage', '--system-tray', '--keep-running', '--web-window-material', '--no-web-chrome-controls'],
     },
     agent: {
       entry: 'app/Desktop/Agent.ts',

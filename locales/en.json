@@ -27,6 +27,9 @@
       "openSettings": "Open Settings (,)",
       "expandSidebar": "Expand sidebar",
       "collapseSidebar": "Collapse sidebar",
+      "back": "Go back",
+      "forward": "Go forward",
+      "account": "Workspace account",
       "workspaceRegion": "Postline workspace"
     },
     "unread": {
