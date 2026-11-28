@@ -120,6 +120,10 @@ await withServices('source server', command('serve').split(/\r?\n/), async (sign
     return Boolean(login?.ok && (await login.text()).includes('Sign in to Postline'))
   })
   await waitUntil('standalone scheduler and API', signal, async () => publishRuns() > previousRuns && await healthy())
+  const connection = await page('/api/postline/workspace/connection')
+  const identity = connection?.ok ? await connection.json() : null
+  if (identity?.product !== 'postline' || identity.protocol !== 1)
+    throw new Error('A phone could not verify the workspace started from the README.')
   console.log('The README started the web server, API and a separate scheduler.')
 }, { APP_ENV: 'production', APP_URL: 'localhost' })
 
@@ -127,6 +131,13 @@ await withServices('marketing dev', [command('marketing-start')], async (signal)
   await waitUntil('marketing landing page', signal, async () => {
     const landing = await page('/')
     return Boolean(landing?.ok && (await landing.text()).includes('Write it once. Publish it'))
+  })
+  await waitUntil('marketing workspace verification', signal, async () => {
+    const connection = await page('/api/postline/workspace/connection')
+    if (!connection || connection.status >= 500) return false
+    if (connection.status !== 404)
+      throw new Error('The marketing site offered a workspace connection.')
+    return true
   })
   console.log('The README marketing command served the public landing page.')
 }, { APP_URL: 'localhost' })

@@ -103,6 +103,8 @@ jobs:
           }
 
           start
+          curl --fail --silent --show-error "$origin/api/postline/workspace/connection" \
+            | jq -e '. == {product: "postline", protocol: 1}' >/dev/null
           setup=$(curl --fail --silent --show-error "$origin/setup")
           grep -Fq 'data-testid="setup-page"' <<< "$setup"
           curl --fail --silent --show-error "$origin/api/postline/setup/availability" \

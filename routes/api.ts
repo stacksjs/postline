@@ -84,6 +84,8 @@ route.match(['GET', 'HEAD'], '/r/{code}', 'Actions/Postline/TrackedLinkRedirectA
 // stopped, which the framework's own health check cannot see.
 route.get('/postline/health', 'Actions/Postline/HealthAction').rateLimit(120, 'minute')
 route.get('/postline/setup/availability', 'Actions/Postline/SetupAvailabilityAction').rateLimit(60, 'minute')
+// A phone identifies a server workspace before opening its sign-in page.
+route.get('/postline/workspace/connection', 'Actions/Postline/WorkspaceConnectionAction').rateLimit(60, 'minute')
 
 route.post('/postline/v1/posts', 'Actions/Postline/ApiPostCreateAction').middleware('postline-automation').rateLimit(30, 'minute')
 

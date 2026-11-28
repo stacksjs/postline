@@ -37,6 +37,8 @@ const APP_PUBLIC = [
   'HEAD /api/r/{code}',
   // One boolean for the first-run and sign-in pages, with no account details.
   'GET /api/postline/setup/availability',
+  // A native app verifies a workspace address before opening sign-in.
+  'GET /api/postline/workspace/connection',
   // Health for a load balancer: database and scheduler state, nothing else.
   'GET /api/postline/health',
   // The waitlist, 'POST /api/subscribe', is mounted only on the marketing
@@ -84,6 +86,35 @@ describe('public routes', () => {
     const open = routes.filter(route => !route.middleware?.some(name => name === 'auth' || name === 'postline-automation')).map(key).sort()
 
     expect(open).toEqual([...APP_PUBLIC, ...FRAMEWORK_PUBLIC].sort())
+  })
+
+  test('the workspace connection response identifies only the public protocol', async () => {
+    const connection = await featureTest().get('/api/postline/workspace/connection')
+
+    expect(connection.status).toBe(200)
+    expect(await connection.json()).toEqual({ product: 'postline', protocol: 1 })
+    expect(connection.headers.get('cache-control')).toBe('no-store')
+    expect(connection.headers.getSetCookie().every(cookie => cookie.startsWith('X-CSRF-Token='))).toBe(true)
+
+    const bootstrap = await featureTest().get('/api/postline/bootstrap')
+    expect(bootstrap.status).toBe(401)
+  })
+
+  test.each([
+    ['POSTLINE_SITE', 'marketing'],
+    ['POSTLINE_DESKTOP_AGENT', '1'],
+  ])('workspace connection is unavailable with %s=%s', async (name, value) => {
+    const previous = process.env[name]
+    process.env[name] = value
+    try {
+      const connection = await featureTest().get('/api/postline/workspace/connection')
+      expect(connection.status).toBe(404)
+      expect(connection.headers.getSetCookie().every(cookie => cookie.startsWith('X-CSRF-Token='))).toBe(true)
+    }
+    finally {
+      if (previous === undefined) delete process.env[name]
+      else process.env[name] = previous
+    }
   })
 
   test('every network connection route needs a session', async () => {
