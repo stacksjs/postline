@@ -93,11 +93,10 @@ describe('X session browser reads', () => {
     const document = {
       querySelector(selector: string) {
         if (selector.includes('Profile_Link')) return { getAttribute: () => '/postline_test' }
-        return selector.includes('primaryColumn') ? { querySelectorAll: () => [] } : null
+        return selector.includes('primaryColumn') ? {
+          querySelectorAll: () => [article('/another_user/status/42'), article('/hidden/status/43', false), article('https://example.test/foreign/status/44')],
+        } : null
       },
-      querySelectorAll: (selector: string) => selector.includes('primaryColumn')
-        ? [article('/another_user/status/42'), article('/hidden/status/43', false), article('https://example.test/foreign/status/44')]
-        : [],
     } as unknown as Document
     const posts = [{ id: '42', authorHandle: 'another_user', body: 'Postline launch watch', postedAt: stamp }]
     expect(inspectXPage(document, 'https://x.com/search?q=postline', 'listening')).toMatchObject({ state: 'connected', posts })
@@ -110,7 +109,7 @@ describe('X session browser reads', () => {
     const page = (rows: { getClientRects: () => number[] }[] | null) => ({
       querySelector(selector: string) {
         if (selector.includes('Profile_Link')) return { getAttribute: () => '/postline_test' }
-        return selector.includes('primaryColumn') && rows ? { querySelectorAll: () => rows } : null
+        return selector.includes('primaryColumn') && rows ? { querySelectorAll: (within: string) => within === 'article' ? rows : [] } : null
       },
       querySelectorAll: () => [],
     }) as unknown as Document
@@ -119,6 +118,31 @@ describe('X session browser reads', () => {
     expect(inspectXPage(page([{ getClientRects: () => [1] }]), search, 'listening')).toMatchObject({ state: 'connected', readIssue: 'layout' })
     expect(inspectXPage(page([{ getClientRects: () => [] }]), search, 'listening')).toEqual({
       state: 'connected', handle: 'postline_test', measurements: [], posts: [],
+    })
+  })
+
+  test('reads Listening posts with a status link beside the article', () => {
+    const stamp = '2026-11-27T05:00:00.000Z'
+    const article = {
+      parentElement: { querySelector: () => ({ getAttribute: () => '/fixture_author/status/42' }) },
+      getClientRects: () => [1],
+      querySelector(selector: string) {
+        if (selector === 'time') return { getAttribute: () => stamp, closest: () => null }
+        if (selector.includes('tweetText')) return { innerText: 'A visible mention' }
+        return null
+      },
+    }
+    const column = { querySelectorAll: (selector: string) => selector === 'article' || selector.includes('[data-navigation-stop] > article') ? [article] : [] }
+    const document = {
+      querySelector(selector: string) {
+        if (selector.includes('Profile_Link')) return { getAttribute: () => '/postline_test' }
+        return selector.includes('primaryColumn') ? column : null
+      },
+      querySelectorAll: () => [],
+    } as unknown as Document
+
+    expect(inspectXPage(document, 'https://x.com/notifications/mentions', 'listening')).toMatchObject({
+      state: 'connected', posts: [{ id: '42', authorHandle: 'fixture_author', body: 'A visible mention', postedAt: stamp }],
     })
   })
 

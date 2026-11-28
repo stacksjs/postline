@@ -83,10 +83,9 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
       const posts: XBrowserPost[] | undefined = listening ? [] : undefined
       let recognizedPost = false
       if (read === 'metrics' || listening) {
-        const articleSelector = listening
-          ? '[data-testid="primaryColumn"] article[data-testid="tweet"]'
-          : 'article[data-testid="tweet"], [data-navigation-stop] > article'
-        for (const article of Array.from(page.querySelectorAll(articleSelector)).slice(0, 100)) {
+        const timeline = column ?? page
+        const articles = timeline.querySelectorAll('article[data-testid="tweet"], [data-navigation-stop] > article')
+        for (const article of Array.from(articles).slice(0, 100)) {
           if (!article.getClientRects().length) continue
           const time = article.querySelector('time')
           // X's newer timeline puts the canonical status link beside the
