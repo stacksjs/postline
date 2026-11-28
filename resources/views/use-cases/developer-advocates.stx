@@ -53,7 +53,7 @@ useHead(marketingHead('/use-cases/developer-advocates', '/images/og/use-case-dev
             </li>
             <li class="flex gap-3 items-start">
               <span class="shrink-0 mt-0.5 h-5 w-5 text-ink i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-              <span class="text-[15px] text-body">Per-post engagement on Bluesky and Mastodon</span>
+              <span class="text-[15px] text-body">Per-post engagement where the network reports it</span>
             </li>
           </ul>
         </div>

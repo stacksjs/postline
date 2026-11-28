@@ -1,7 +1,7 @@
 @extends('layouts/marketing')
 
 @section('title', 'Analytics: What actually landed - Postline')
-@section('description', 'Publishing activity across networks, plus engagement on Bluesky and Mastodon posts.')
+@section('description', 'Publishing activity and reported engagement across your connected networks.')
 @section('ogImageAlt', 'Postline feature: Analytics. What actually landed.')
 
 <script server>
@@ -20,7 +20,7 @@ useHead(marketingHead('/features/analytics', '/images/og/feature-analytics.png')
       </nav>
       <span class="grid place-items-center h-12 w-12 text-ink text-xl bg-panel border border-line rounded-2xl" aria-hidden="true"><span class="i-hugeicons-chart-line-data-01"></span></span>
       <h1 class="m-0 leading-[1.04] text-4xl text-ink sm:text-6xl">What actually landed</h1>
-      <p class="m-0 max-w-[60ch] leading-relaxed text-[17px] text-body sm:text-lg">Compare publishing activity across the networks you use. Postline syncs likes, reposts, and replies from Bluesky and Mastodon.</p>
+      <p class="m-0 max-w-[60ch] leading-relaxed text-[17px] text-body sm:text-lg">Compare publishing activity and see the engagement each connected network reports for your posts.</p>
       <div class="flex flex-wrap gap-3 items-center">
         <MarketingLink class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-on-accent bg-accent rounded-xl hover:opacity-90 transition-opacity" href="/download">Get started<span class="h-4 w-4 i-hugeicons-arrow-right-01" aria-hidden="true"></span></MarketingLink>
         <a class="inline-flex gap-2 items-center px-5 h-11 font-medium text-[15px] text-ink bg-panel hover:bg-panel-2 border border-line rounded-xl transition-colors" href="https://github.com/stacksjs/postline"><span class="h-4 w-4 i-simple-icons-github" aria-hidden="true"></span>Read the source</a>
@@ -31,7 +31,11 @@ useHead(marketingHead('/features/analytics', '/images/og/feature-analytics.png')
       <div class="grid gap-10">
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">Counts, attached to your posts</h2>
-          <p class="m-0 leading-relaxed text-[16px] text-body">Postline stores interactions with each measured post. Recommendations require enough measured posts and a clear leader.</p>
+          <p class="m-0 leading-relaxed text-[16px] text-body">Postline refreshes Bluesky and Mastodon automatically. LinkedIn, Instagram and Threads require engagement permissions. For X, opt in to paid API reads or import counts from your signed-in X browser session on the Mac. <a class="text-ink underline underline-offset-4" href="/docs/monitoring#analytics" data-no-router>Set up engagement reporting</a>.</p>
+        </div>
+        <div class="grid gap-3 max-w-[62ch]">
+          <h2 class="m-0 text-2xl text-ink">Recommendations based on engagement</h2>
+          <p class="m-0 leading-relaxed text-[16px] text-body">Postline compares the engagement each post receives. A recommendation requires enough measured posts and a clear leader.</p>
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">When and where you publish</h2>
@@ -39,7 +43,7 @@ useHead(marketingHead('/features/analytics', '/images/og/feature-analytics.png')
         </div>
         <div class="grid gap-3 max-w-[62ch]">
           <h2 class="m-0 text-2xl text-ink">Batched and rate-aware</h2>
-          <p class="m-0 leading-relaxed text-[16px] text-body">Postline groups requests by publishing account and uses each network’s batch API where available.</p>
+          <p class="m-0 leading-relaxed text-[16px] text-body">Postline groups API requests by publishing account and batches them where the network supports it.</p>
         </div>
       </div>
 
@@ -49,7 +53,7 @@ useHead(marketingHead('/features/analytics', '/images/og/feature-analytics.png')
           <ul class="grid gap-4 m-0 mt-5 p-0 list-none">
             <li class="flex gap-3 items-start">
               <span class="shrink-0 mt-0.5 h-5 w-5 text-ink i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>
-              <span class="text-[15px] text-body">Likes, reposts and replies from Bluesky and Mastodon</span>
+              <span class="text-[15px] text-body">Reported likes, reactions, reposts and replies</span>
             </li>
             <li class="flex gap-3 items-start">
               <span class="shrink-0 mt-0.5 h-5 w-5 text-ink i-hugeicons-checkmark-circle-02" aria-hidden="true"></span>

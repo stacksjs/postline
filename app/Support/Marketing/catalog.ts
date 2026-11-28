@@ -21,8 +21,8 @@ export interface MarketingEntry {
   icon: string
   /** The opening paragraph. */
   intro: string
-  /** Body sections. Each is a heading plus one paragraph. */
-  sections: Array<{ heading: string, body: string }>
+  /** A heading, paragraph and optional documentation link per section. */
+  sections: Array<{ heading: string, body: string, guide?: { href: `/docs/${string}`, label: string } }>
   /** Three supporting points, rendered as a divided list rather than cards. */
   points: string[]
 }
@@ -138,16 +138,21 @@ export const FEATURES: MarketingEntry[] = [
     slug: 'analytics',
     nav: 'Analytics',
     title: 'What actually landed',
-    summary: 'Publishing activity across networks, plus engagement on Bluesky and Mastodon posts.',
+    summary: 'Publishing activity and reported engagement across your connected networks.',
     icon: 'chart-line-data-01',
-    intro: 'Compare publishing activity across the networks you use. Postline syncs likes, reposts, and replies from Bluesky and Mastodon.',
+    intro: 'Compare publishing activity and see the engagement each connected network reports for your posts.',
     sections: [
-      { heading: 'Counts, attached to your posts', body: 'Postline stores interactions with each measured post. Recommendations require enough measured posts and a clear leader.' },
+      {
+        heading: 'Counts, attached to your posts',
+        body: 'Postline refreshes Bluesky and Mastodon automatically. LinkedIn, Instagram and Threads require engagement permissions. For X, opt in to paid API reads or import counts from your signed-in X browser session on the Mac.',
+        guide: { href: '/docs/monitoring#analytics', label: 'Set up engagement reporting' },
+      },
+      { heading: 'Recommendations based on engagement', body: 'Postline compares the engagement each post receives. A recommendation requires enough measured posts and a clear leader.' },
       { heading: 'When and where you publish', body: 'See how much went out over the last thirty days, which networks carried it, and which posting windows you use.' },
-      { heading: 'Batched and rate-aware', body: 'Postline groups requests by publishing account and uses each network’s batch API where available.' },
+      { heading: 'Batched and rate-aware', body: 'Postline groups API requests by publishing account and batches them where the network supports it.' },
     ],
     points: [
-      'Likes, reposts and replies from Bluesky and Mastodon',
+      'Reported likes, reactions, reposts and replies',
       'Publishing by network and posting window',
       'History survives an account going away',
     ],
@@ -200,7 +205,7 @@ export const USE_CASES: MarketingEntry[] = [
     intro: 'Write an update once and reach the people following your work across networks.',
     sections: [
       { heading: 'Launch days stop being copy and paste', body: 'Plan the launch as a campaign, write each post once, and activate it. Follow-ups through the week are already in the queue.' },
-      { heading: 'Keep the record', body: 'Every published post and its engagement stays in your own database. A year of building in public stays readable even if you stop using a network.' },
+      { heading: 'Keep the record', body: 'Posts sent through Postline and the engagement counts it collects stay in your own database. A year of building in public stays readable even if you stop using a network.' },
     ],
     points: [
       'One draft, every network',
@@ -222,7 +227,7 @@ export const USE_CASES: MarketingEntry[] = [
     points: [
       'Cover fragmented developer communities',
       'Adjust tone per network',
-      'Per-post engagement on Bluesky and Mastodon',
+      'Per-post engagement where the network reports it',
     ],
   },
   {

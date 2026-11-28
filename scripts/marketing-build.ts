@@ -62,10 +62,13 @@ useHead(marketingHead('${base}/${entry.slug}', '/images/og/${kind}-${entry.slug}
 
     <section class="grid gap-10 lg:gap-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] py-14 border-line border-t">
       <div class="grid gap-10">
-${entry.sections.map(s => `        <div class="grid gap-3 max-w-[62ch]">
-          <h2 class="m-0 text-2xl text-ink">${h(s.heading)}</h2>
-          <p class="m-0 leading-relaxed text-[16px] text-body">${h(s.body)}</p>
-        </div>`).join('\n')}
+${entry.sections.map(({ heading, body, guide }) => {
+  const link = guide ? ` <a class="text-ink underline underline-offset-4" href="${h(guide.href).replace(/"/g, '&quot;')}" data-no-router>${h(guide.label)}</a>.` : ''
+  return `        <div class="grid gap-3 max-w-[62ch]">
+          <h2 class="m-0 text-2xl text-ink">${h(heading)}</h2>
+          <p class="m-0 leading-relaxed text-[16px] text-body">${h(body)}${link}</p>
+        </div>`
+}).join('\n')}
       </div>
 
       <aside class="lg:pt-1">
