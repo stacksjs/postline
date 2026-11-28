@@ -716,9 +716,11 @@ html[data-dashboard-theme="system-cleaner"] [data-dashboard-metrics] {
 }
 
 /* Settings uses the same split view in a browser and its own Craft window. */
-html:has([data-dashboard-settings-content]) [data-dashboard-content][data-dashboard-settings-content] {
-  height: auto;
-  min-height: 100dvh;
+.dashboard-settings-outlet {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   margin: 0;
   border-radius: 0;
   background: light-dark(#fff, #1e1e20);
@@ -732,7 +734,9 @@ html:has([data-dashboard-settings][data-settings-native="true"]) [data-dashboard
 }
 
 html:has([data-dashboard-settings-content]) .dashboard-modal-layer {
-  left: 0;
+  inset-inline: 0;
+  /* WebKit gives a top-layer dialog an intrinsic width when this is auto. */
+  width: 100%;
 }
 
 .dashboard-settings {
@@ -768,7 +772,9 @@ html:has([data-dashboard-settings-content]) .dashboard-modal-layer {
 
 .dashboard-settings-sidebar {
   padding: 0 11px 14px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background: var(--stx-mac-sidebar);
   border-inline-end: 1px solid var(--stx-mac-separator);
 }
@@ -779,6 +785,7 @@ html:has([data-dashboard-settings-content]) .dashboard-modal-layer {
 
 .dashboard-settings-sidebar-chrome {
   position: relative;
+  flex: none;
   min-height: 50px;
   margin-inline: -11px;
 }
@@ -803,6 +810,43 @@ html:has([data-dashboard-settings-content]) .dashboard-modal-layer {
 }
 
 [data-settings-native="true"] .dashboard-settings-back { display: none; }
+
+.dashboard-settings-mobile-menu {
+  display: none;
+}
+
+.dashboard-settings-navigation {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.dashboard-settings-nav {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 2px;
+}
+
+.dashboard-settings-nav-group + .dashboard-settings-nav-group {
+  margin-top: 14px;
+}
+
+.dashboard-settings-nav-group > h2 {
+  margin: 0 8px 4px;
+  color: var(--stx-mac-ink-secondary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.dashboard-settings-result-detail {
+  display: block;
+  color: var(--stx-mac-ink-secondary);
+  font-size: 11px;
+}
 
 .dashboard-settings-search {
   display: flex;
@@ -995,35 +1039,226 @@ html:has([data-dashboard-settings-content]) .dashboard-modal-layer {
   white-space: normal;
 }
 
-.dashboard-settings-config-picker > summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: var(--stx-mac-row-height);
-  padding-inline: var(--stx-mac-row-inset);
-  border-radius: var(--stx-mac-card-radius);
-  cursor: pointer;
-  list-style: none;
+.dashboard-config-intro {
+  margin: 0;
+  color: var(--stx-mac-ink-secondary);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
-.dashboard-settings-config-picker > summary::-webkit-details-marker { display: none; }
-.dashboard-settings-config-picker > summary:hover { background: var(--stx-mac-hover); }
+.dashboard-settings-picker {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
 
-.dashboard-settings-config-selection {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+.dashboard-settings-picker-label {
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.dashboard-settings-picker-control {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.dashboard-settings-picker-button {
+  min-height: 26px;
+  max-width: 100%;
+  appearance: none;
+  padding: 3px 25px 3px 8px;
+  border: 1px solid var(--stx-mac-control-line);
+  border-radius: 6px;
+  color: var(--stx-mac-ink);
+  background: var(--stx-mac-window);
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.25;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-settings-picker-button:not(:disabled):hover {
+  border-color: var(--stx-mac-ink-secondary);
+}
+
+.dashboard-settings-picker-button:disabled {
+  opacity: .55;
+}
+
+.dashboard-settings-picker-button[aria-invalid="true"] {
+  border-color: light-dark(#bd293d, #f06e81);
+}
+
+.dashboard-settings-picker-glyph {
+  position: absolute;
+  inset-inline-end: 6px;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  transform: translateY(-50%);
+  pointer-events: none;
   color: var(--stx-mac-ink-secondary);
 }
 
-.dashboard-settings-config-selection > span:last-child {
-  width: .8em;
-  height: .8em;
+.dashboard-settings-picker-hint {
+  color: var(--stx-mac-ink-secondary);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
-.dashboard-settings-config-picker[open] .dashboard-settings-config-selection > span:last-child {
-  transform: rotate(180deg);
+.dashboard-settings-picker-hint[data-invalid="true"] {
+  color: light-dark(#ae2438, #ff8898);
+}
+
+.dashboard-config-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  padding: 12px 14px;
+}
+
+.dashboard-config-header h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.dashboard-config-path {
+  margin: 2px 0 0;
+  color: var(--stx-mac-ink-secondary);
+  font: 11px ui-monospace, monospace;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-config-field-tools {
+  display: grid;
+  gap: 7px;
+  padding: 0 14px 12px;
+}
+
+.dashboard-config-subheading {
+  margin: 0;
+  padding: 8px 14px 4px;
+  border-block-start: 1px solid var(--stx-mac-separator);
+  color: var(--stx-mac-ink-secondary);
+  font-size: 11px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-config-subheading + .dashboard-config-field {
+  border-block-start: 0;
+}
+
+.dashboard-config-field-label,
+.dashboard-config-field-description {
+  overflow-wrap: anywhere;
+}
+
+.dashboard-config-field-label {
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.dashboard-config-field-description {
+  margin: 2px 0 0;
+  color: var(--stx-mac-ink-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.dashboard-settings-picker-button:focus-visible,
+.dashboard-settings-mobile-menu:focus-visible,
+.dashboard-config-input:focus-visible {
+  outline: 2px solid var(--stx-mac-accent);
+  outline-offset: 2px;
+}
+
+.dashboard-config-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-block-start: 1px solid var(--stx-mac-separator);
+}
+
+.dashboard-config-field-tools ~ div > [data-settings-row] {
+  border-block-start: 1px solid var(--stx-mac-separator);
+}
+
+.dashboard-config-subheading + [data-settings-row] {
+  border-block-start: 0;
+}
+
+.dashboard-dns-settings {
+  display: grid;
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+
+.dashboard-dns-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.dashboard-dns-toolbar p {
+  flex: 1 1 230px;
+}
+
+.dashboard-dns-record-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  padding: 10px 0;
+  border-block-start: 1px solid var(--stx-mac-separator);
+}
+
+.dashboard-dns-type {
+  justify-self: start;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: var(--stx-mac-well);
+  font: 11px ui-monospace, monospace;
+}
+
+.dashboard-dns-meta,
+.dashboard-dns-value {
+  color: var(--stx-mac-ink-secondary);
+  font-size: 12px;
+}
+
+.dashboard-dns-value {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 480px) {
+  .dashboard-dns-record-row { grid-template-columns: 44px minmax(0, 1fr); }
+  .dashboard-dns-meta { grid-column: 2; }
+}
+
+.dashboard-config-input {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--stx-mac-control-line);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+@media (max-width: 420px) {
+  .dashboard-config-field { grid-template-columns: minmax(0, 1fr); }
 }
 
 html .dashboard-settings [data-dashboard-field]:not(:disabled) {
@@ -1059,6 +1294,14 @@ html .dashboard-settings [data-dashboard-button="secondary"]:hover {
   background: var(--stx-mac-sidebar);
 }
 
+@media (min-width: 591px) {
+  html:has([data-dashboard-settings-content]),
+  html:has([data-dashboard-settings-content]) body {
+    height: 100%;
+    overflow: hidden;
+  }
+}
+
 @media (max-width: 590px) {
   .dashboard-settings {
     display: block;
@@ -1072,11 +1315,24 @@ html .dashboard-settings [data-dashboard-button="secondary"]:hover {
     border-block-end: 1px solid var(--stx-mac-separator);
   }
 
-  .dashboard-settings-sidebar [data-settings-group] {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 3px;
+  .dashboard-settings-mobile-menu {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-radius: 7px;
+    background: var(--stx-mac-well);
+    font-size: 13px;
+    font-weight: 600;
   }
+
+  .dashboard-settings-navigation {
+    margin-top: 8px;
+  }
+
+  .dashboard-settings-navigation[data-menu-open="false"] { display: none; }
+  .dashboard-settings-nav { max-height: 48dvh; }
 
   .dashboard-settings-pane { overflow: visible; }
 }

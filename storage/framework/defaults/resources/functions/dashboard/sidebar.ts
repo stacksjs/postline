@@ -12,6 +12,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import { dashboardPageAvailable, readDashboardPageAvailability, unavailableDashboardPages } from './page-availability'
+import { dashboardProjectIdentity } from './project-switcher'
 
 type ModelCategory = 'userland' | 'data' | 'commerce' | 'content' | 'marketing' | 'system'
 
@@ -599,17 +600,11 @@ export function buildNavSections(
     sections.push(['management', 'management', managementItems])
   }
 
-  // Utilities section: real paths are flat (`/buddy`, `/environment`,
-  // `/access-tokens`) or under `/settings/*` for billing/mail. The
-  // historical `/utilities/*` URLs were uniformly 404s.
   if (toggles.utilities) {
     sections.push(['utilities', 'utilities', [
       { to: '/buddy', icon: 'terminal', text: 'Buddy CLI' },
-      { to: '/environment', icon: 'settings', text: 'Environment' },
       { to: '/access-tokens', icon: 'lock', text: 'Access Tokens' },
       { to: '/settings', icon: 'settings', text: 'Settings' },
-      { to: '/settings/appearance', icon: 'paintbrush', text: 'Appearance' },
-      { to: '/settings/mail', icon: 'mail', text: 'Mail Settings' },
     ]])
   }
 
@@ -779,7 +774,12 @@ export function buildWebSidebarSections(): WebSidebarSection[] {
     {
       id: 'top',
       label: '',
-      items: [{ id: 'home', label: 'Home', icon: NAV_ICON_CLASSES.home!, iconColor: 'blue', href: '/' }],
+      items: [
+        { id: 'home', label: 'Home', icon: NAV_ICON_CLASSES.home!, iconColor: 'blue', href: '/' },
+        ...(dashboardProjectIdentity().enabled
+          ? [{ id: 'github-issues', label: 'GitHub Issues', icon: 'i-hugeicons-github', iconColor: 'blue', href: '/github-issues' }]
+          : []),
+      ],
     },
     ...sections.map(([key, label, items]) => ({
       id: key,

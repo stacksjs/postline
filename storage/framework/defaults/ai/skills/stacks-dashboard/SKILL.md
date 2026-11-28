@@ -1,6 +1,6 @@
 ---
 name: stacks-dashboard
-description: Use when building or customizing the Stacks admin dashboard, including dashboard pages, model management views, analytics widgets, commerce dashboards, content management, settings panels, deployment monitoring, job/queue management, or the 452 built-in dashboard components. Covers the dashboard system at storage/framework/defaults/.
+description: Use when building or customizing the Stacks admin dashboard, including dashboard pages, model management views, analytics widgets, commerce dashboards, content management, settings panels, deployment monitoring, job/queue management, or the 456 built-in dashboard components. Covers the dashboard system at storage/framework/defaults/.
 license: MIT
 compatibility: Bun >= 1.3.0, TypeScript
 allowed-tools: Read Edit Write Bash Grep Glob
@@ -8,7 +8,7 @@ allowed-tools: Read Edit Write Bash Grep Glob
 
 # Stacks Dashboard
 
-The Stacks admin dashboard provides a full-featured admin panel with 100+ route views, 452 components, and a multi-section layout.
+The Stacks admin dashboard provides a full-featured admin panel with 100+ route views, 456 components, and a multi-section layout.
 
 ## Key Paths
 - Dashboard components: `storage/framework/defaults/resources/components/Dashboard/`
@@ -244,13 +244,14 @@ inject message HTML into the dashboard document.
 - `/packages`, `/dependencies` - package and dependency inspection
 
 ### Settings
-- `/settings` - typed `config/*.ts` browser and editor
+- `/settings` - Command-Comma opens General in the Craft Settings window. Project settings have dedicated panes under `/settings/config/:section` for database, security, networking, and other concerns. The sidebar shows sections with files and searches for individual configs. Unknown project files appear in Custom Configuration. Field forms organize related literal values and use adjacent source comments as help. TypeScript mode edits bindings, named exports, and structure. The dev dashboard loads one selected file at a time and refuses to overwrite newer disk edits.
 - `/settings/appearance` - dashboard appearance
 - `/settings/billing` - account billing
 - `/settings/mail` - mail configuration
-- `/environment` - environment summary
+- `/settings/environment` - edit the env files this project loads
 - `/access-tokens` - access-token management
-- `/cloud`, `/dns`, `/mailboxes` - infrastructure-specific settings
+- `/settings/config/dns` - list and add app DNS declarations for the next deployment
+- `/cloud`, `/dns`, `/mailboxes` - infrastructure views
 
 ### Deployments
 - `/deployments` - deployment history, deployment controls, the custom
@@ -578,6 +579,19 @@ At 1024px and wider, the desktop sidebar keeps its 250px width, fixed
 placement, persisted collapse state, and `--stx-sidebar-width` content-shell
 contract across themes.
 
+The Settings layout keeps the Craft sidebar, search, and toolbar outside the
+routed outlet. Settings links, search results, and history replace the detail
+pane without a view transition. Keep individual Settings views inside that
+outlet so opening a pane preserves the sidebar's focus and scroll position.
+Use `SettingsPicker` for choices in Settings. It opens a Craft system menu
+with the current choice checked and renders an ordinary select in the
+browser. Use the shared Settings group, row, and switch for inline
+preferences. When discarding changes needs confirmation, ask Craft for a
+system dialog and use the shared confirm dialog on the web.
+Use `SettingsCodeEditor` for Settings source. It wraps the shared STX editor
+with incremental `ts-syntax-highlighter` tokenization and Settings keyboard
+shortcuts.
+
 ### Reactive page components
 
 Keep route views thin. Place stateful page implementations under
@@ -854,7 +868,7 @@ or a fake success response.
 - Dashboard runs on port 3002 by default (separate from frontend on 3000)
 - Dashboard components use STX templating with ts-css utilities
 - Dashboard routes are registered from `storage/framework/defaults/routes/`, not from a generated type file
-- Settings panels read/write from the corresponding `config/*.ts` files
+- Project Configuration reads and writes project TypeScript source under `config/`. Environment variables are edited in the Environment pane of the same Settings window.
 - Models with `useApi` get generated REST actions and routes, not bespoke dashboard views
 - `dashboard: { highlight: true }` makes models prominent in the dashboard
 - Dashboard layout uses a sidebar + navbar pattern

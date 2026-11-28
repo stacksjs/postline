@@ -72,16 +72,16 @@
     "typecheck": "bun x --bun tsc --noEmit -p tsconfig.json --pretty false"
   },
   "dependencies": {
-    "@stacksjs/ai": "^0.75.710",
-    "@stacksjs/charts": "0.75.710",
-    "@stacksjs/i18n": "^0.75.710",
+    "@stacksjs/ai": "^0.75.716",
+    "@stacksjs/charts": "0.75.716",
+    "@stacksjs/i18n": "^0.75.716",
     "@stacksjs/sanitizer": "0.2.960",
-    "@stacksjs/socials": "^0.75.710",
+    "@stacksjs/socials": "^0.75.716",
     "@stacksjs/stx": "0.2.960",
     "@stacksjs/ts-cloud": "^0.16.157",
     "@xmldom/xmldom": "0.9.12",
     "marked": "18.3.0",
-    "stacks": "^0.75.710",
+    "stacks": "^0.75.716",
     "ts-backups": "https://github.com/stacksjs/ts-backups/releases/download/v0.1.6/ts-backups-0.1.6.tgz",
     "ts-images": "^0.2.35",
     "ts-medium-editor": "0.2.1"
@@ -89,7 +89,7 @@
   "devDependencies": {
     "@iconify-json/hugeicons": "^1.2.36",
     "@iconify-json/simple-icons": "^1.2.92",
-    "@stacksjs/browser-extension": "0.75.710",
+    "@stacksjs/browser-extension": "0.75.716",
     "@stacksjs/components": "0.2.960",
     "better-dx": "^0.2.22",
     "bun-plugin-stx": "0.2.960",
