@@ -55,9 +55,9 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   if (!sessionCookie || ![302, 303].includes(entry.status))
     throw new Error(`The agent did not issue a window session (HTTP ${entry.status}).`)
 
-  async function call(method: string, path: string, payload?: Record<string, string> | string, cookie?: string): Promise<{ status: number, type: string, text: string, headers: Headers }> {
+  async function call(method: string, path: string, payload?: Record<string, string> | FormData | string, cookie?: string): Promise<{ status: number, type: string, text: string, headers: Headers }> {
     const isJson = typeof payload === 'string'
-    const body = isJson
+    const body = isJson || payload instanceof FormData
       ? payload
       : payload && Object.entries(payload).reduce((data, [key, value]) => (data.set(key, value), data), new FormData())
     const headers: Record<string, string> = { origin, cookie: [sessionCookie, cookie].filter(Boolean).join('; ') }
@@ -331,6 +331,14 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
     check('the local agent accepts a healthy X Composer check', healthy.status === 200 && JSON.parse(healthy.text)?.data?.recorded === true)
     async function sendThroughBrowser(text: string, state: 'published' | 'uncertain' | 'layout', scheduled = false) {
       const input = { text, providers: `twitter:${selected?.id}` }
+      const imageAlt = 'A single pixel for the compiled browser publish check.'
+      const form = new FormData()
+      for (const [key, value] of Object.entries(input)) form.set(key, value)
+      if (state === 'published') {
+        const bytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1gAAAAASUVORK5CYII=', 'base64')
+        form.append('images', new File([bytes], 'pixel.png', { type: 'image/png' }))
+        form.set('image_alts', JSON.stringify([imageAlt]))
+      }
       const at = new Date(Date.now() + 600_000).toISOString().slice(0, 19).replace('T', ' ')
       const saved = scheduled
         ? await call('POST', '/api/postline/queue', { ...input, scheduled_at: at })
@@ -339,7 +347,7 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
       if (scheduled) check('the browser account can be saved as a scheduled target', saved?.status === 200 && savedData?.status === 'scheduled', saved?.text)
       const pending = scheduled
         ? call('POST', '/api/postline/queue/publish-now', { id: String(savedData?.postId) })
-        : call('POST', '/api/postline/publish', input)
+        : call('POST', '/api/postline/publish', form)
       let work
       for (let attempt = 0; attempt < 25; attempt++) {
         const next = await submit('claim')
@@ -350,6 +358,10 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
       if (!work) throw new Error('The local X browser did not receive the queued post.')
       check('the browser receives the post and its exact account without credentials', work.text === text && work.handle === 'postline_test'
         && !Object.keys(work).some(key => /secret|credential|password/.test(key)))
+      if (state === 'published') {
+        check('the browser receives the image and its description on the normal publish route', work.images?.length === 1
+          && work.images[0]?.altText === imageAlt && typeof work.images[0]?.base64 === 'string' && work.images[0]?.base64.length > 0)
+      }
       if (state !== 'layout') {
         const authorized = await submit('authorize', work.token)
         const replay = await submit('authorize', work.token)

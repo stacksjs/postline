@@ -1,6 +1,7 @@
 export interface XBrowserImage {
   type: string
   base64: string
+  altText?: string
 }
 
 export interface XBrowserWrite {

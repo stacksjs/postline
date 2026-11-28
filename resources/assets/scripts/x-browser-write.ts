@@ -3,6 +3,7 @@ import type { XBrowserWindow } from '../../functions/x-browser-session'
 import { requestJson } from '../../functions/postline-client'
 import { inspectXPage, withXBrowserProfile, xComposerWindowName } from '../../functions/x-browser-session'
 import { inspectXComposer } from './x-composer-health'
+import { saveXImageDescriptions } from './x-image-descriptions'
 
 type Stage = 'prepare' | 'ready' | 'submit' | 'result'
 type BrowserResult = XBrowserWriteResult | { state: 'prepared' | 'ready' | 'waiting' }
@@ -11,6 +12,8 @@ interface PublishProbe {
   text: string
   imageCount: number
   submitted: boolean
+  descriptions: string[]
+  descriptionState?: 'editing' | 'saved' | 'failed'
   result?: XBrowserWriteResult
   restore?: () => void
 }
@@ -33,6 +36,7 @@ function runXWrite(
   checkComposer: typeof inspectXComposer,
   checkAccount: typeof inspectXPage,
   postId: typeof publishedId,
+  saveDescriptions: typeof saveXImageDescriptions,
 ): BrowserResult {
   const view = page.defaultView as (Window & { __postlineXPublish?: PublishProbe }) | null
   if (!view) return { state: 'unavailable' }
@@ -47,6 +51,8 @@ function runXWrite(
     return { state: 'attention' }
   }
   if (stage === 'result') return { state: 'waiting' }
+  if (previous?.token === work.token && previous.descriptionState === 'editing') return { state: 'waiting' }
+  if (previous?.token === work.token && previous.descriptionState === 'failed') return { state: 'layout' }
   if (health !== 'ready') return { state: health }
 
   const dialog = page.querySelector('[role="dialog"]')!
@@ -58,7 +64,13 @@ function runXWrite(
     editor.focus()
     page.execCommand('insertText', false, work.text)
     if (editor.innerText.trim() !== work.text.trim()) return { state: 'layout' }
-    view.__postlineXPublish = { token: work.token, text: work.text.trim(), imageCount: work.images?.length ?? 0, submitted: false }
+    view.__postlineXPublish = {
+      token: work.token,
+      text: work.text.trim(),
+      imageCount: work.images?.length ?? 0,
+      submitted: false,
+      descriptions: work.images?.map(image => image.altText ?? '') ?? [],
+    }
     if (work.images?.length) {
       const transfer = new DataTransfer()
       for (const [index, image] of work.images.entries()) {
@@ -77,6 +89,15 @@ function runXWrite(
   if (dialog.querySelector('[role="progressbar"]')) return { state: 'waiting' }
   if (previous.imageCount && dialog.querySelectorAll('[data-testid="attachments"] img').length !== previous.imageCount)
     return { state: 'waiting' }
+  if (previous.descriptions.some(Boolean) && previous.descriptionState !== 'saved') {
+    if (stage !== 'ready') return { state: 'layout' }
+    previous.descriptionState = 'editing'
+    void saveDescriptions(page, dialog, previous.descriptions).then(
+      saved => { previous.descriptionState = saved ? 'saved' : 'failed' },
+      () => { previous.descriptionState = 'failed' },
+    )
+    return { state: 'waiting' }
+  }
   if (stage === 'ready') return { state: 'ready' }
 
   const observe = async (url: string, method: string, status: number, data: () => Promise<unknown>) => {
@@ -120,7 +141,7 @@ export function bindXBrowserWrites(
     const name = xComposerWindowName(work.profile)
     async function run(stage: Stage): Promise<BrowserResult> {
       const input = stage === 'prepare' ? work : { token: work.token, handle: work.handle }
-      const code = `JSON.stringify((${runXWrite.toString()})(document, location.href, ${JSON.stringify(stage)}, ${JSON.stringify(input)}, ${inspectXComposer.toString()}, ${inspectXPage.toString()}, ${publishedId.toString()}))`
+      const code = `JSON.stringify((${runXWrite.toString()})(document, location.href, ${JSON.stringify(stage)}, ${JSON.stringify(input)}, ${inspectXComposer.toString()}, ${inspectXPage.toString()}, ${publishedId.toString()}, ${saveXImageDescriptions.toString()}))`
       const result = await browser._call('executeJavaScript', { code }, name)
       return typeof result === 'string' ? JSON.parse(result) : { state: 'unavailable' }
     }
@@ -138,7 +159,7 @@ export function bindXBrowserWrites(
         if (state.state === 'prepared' || state.state === 'attention') break
       }
       if (state.state === 'prepared') {
-        for (let attempt = 0; attempt < 18; attempt++) {
+        for (let attempt = 0; attempt < 38; attempt++) {
           state = await run('ready')
           if (state.state !== 'waiting') break
           await sleep(500, { signal })

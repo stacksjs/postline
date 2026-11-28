@@ -318,9 +318,10 @@ export class TwitterService {
     const images = (content?.media ?? []).map((image) => {
       if (!image.bytes?.length || !image.mimeType || !/^image\/(jpeg|png|webp|gif)$/.test(image.mimeType))
         throw new UserFacingError('Attach an image file before publishing through the X browser.')
-      if (image.altText?.trim())
-        throw new UserFacingError('Choose the X API account to publish these images with their alternative text.')
-      return { type: image.mimeType, base64: Buffer.from(image.bytes).toString('base64') }
+      const altText = image.altText?.trim()
+      if (altText && altText.length > 1000)
+        throw new UserFacingError('X image descriptions can use up to 1,000 characters.')
+      return { type: image.mimeType, base64: Buffer.from(image.bytes).toString('base64'), ...(altText && { altText }) }
     })
     const result = await twitterBrowserDispatch.dispatch({
       postId: post.id, handle: identity.handle, text: post.body, images,
