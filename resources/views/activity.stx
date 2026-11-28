@@ -33,7 +33,7 @@ export const activityClient = {
     <section class="hidden overflow-hidden bg-panel border border-warning-line rounded-2xl shadow-sm" :class="{ 'hidden': attention().length === 0 }" aria-label="{{ activityText.attention }}" data-activity-attention>
       <div class="flex items-center justify-between px-4 py-3 bg-warning-soft border-b border-warning-line">
         <strong class="font-semibold text-sm text-warning">{{ activityText.attention }}</strong>
-        <button class="text-warning text-xs underline disabled:opacity-50" type="button" :disabled="marking()" @click="markAllRead()">{{ activityText.markRead }}</button>
+        <Button variant="secondary" size="xs" :loading="marking()" @click="markAllRead()">{{ activityText.markRead }}</Button>
       </div>
       <div>
         <article class="grid gap-0.5 px-4 py-3 border-b border-line last:border-b-0" x-for="alert in attention()" :data-command-context="alert.title" data-activity-alert>
@@ -75,7 +75,7 @@ export const activityClient = {
             </article>
           </div>
           <div class="flex justify-center p-3" x-show="nextCursor()">
-            <button class="inline-flex items-center justify-center px-3 h-8 font-medium text-ink text-ui bg-panel hover:bg-hover border border-line rounded-lg shadow-sm disabled:opacity-50 transition-colors" type="button" :disabled="loadingMore()" @click="loadMore()" :text="loadingMore() ? copy.loading : copy.loadOlder">{{ activityText.loadOlder }}</button>
+            <Button variant="secondary" size="sm" :loading="loadingMore()" :label="loadingMore() ? copy.loading : copy.loadOlder" @click="loadMore()">{{ activityText.loadOlder }}</Button>
           </div>
         </Card>
       </section>

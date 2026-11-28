@@ -595,6 +595,8 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
     const actualFetch = window.fetch.bind(window)
     const postedAt = new Date().toISOString()
     const publishGate = new Promise(resolve => { window.finishPublish = resolve })
+    const timelineGate = new Promise(resolve => { window.finishTimelineRefresh = resolve })
+    let timelineLoads = 0
     let inboxUnread = 3
     const conversations = [
       { id: 1, provider: 'bluesky', participantName: 'Alice Example', participantHandle: 'alice.example', lastMessageAt: postedAt, lastMessagePreview: 'Hello' },
@@ -626,7 +628,7 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
       if (path === '/api/postline/inbox') return Promise.resolve(Response.json({ ok: true, data: { conversations } }))
       if (path === '/api/postline/inbox/read') inboxUnread = 2
       if (path === '/api/postline/inbox/thread' || path === '/api/postline/inbox/read') return Promise.resolve(Response.json({ ok: true, data: {} }))
-      if (path === '/api/postline/bluesky/timeline') return Promise.resolve(Response.json({ ok: true, data: {
+      if (path === '/api/postline/bluesky/timeline') return (++timelineLoads === 1 ? Promise.resolve() : timelineGate).then(() => Response.json({ ok: true, data: {
         connected: true,
         items: [
           { uri: 'post-1', authorHandle: 'alice.example', authorName: 'Alice Example', postedAt, body: 'First post <draft> https://example.com/read?value=one&track=two' },
@@ -668,6 +670,18 @@ async function checkNetworkComponents(cdp: Cdp): Promise<void> {
         && !copy.querySelector('draft') && link?.href === 'https://example.com/read?value=one&track=two'
         && link.rel.includes('noopener') && getComputedStyle(link).color !== getComputedStyle(copy).color
     })()`), 5_000)
+
+    const refresh = "document.querySelector('[data-timeline-refresh]')"
+    await waitUntil('Timeline refresh is ready', () => evaluate<boolean>(cdp, `
+      ${refresh}?.innerText.trim() === 'Refresh' && !${refresh}.disabled
+        && Boolean(${refresh}.querySelector('.i-hugeicons-refresh')?.getClientRects().length)`), 5_000)
+    await evaluate(cdp, `${refresh}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Timeline refresh announces its pending request', () => evaluate<boolean>(cdp, `
+      ${refresh}.disabled && ${refresh}.getAttribute('aria-busy') === 'true' && ${refresh}.innerText.trim() === 'Refreshing…'`), 5_000)
+    await evaluate(cdp, 'window.finishTimelineRefresh()')
+    await waitUntil('Timeline refresh is available again when the request finishes', () => evaluate<boolean>(cdp, `
+      !${refresh}.disabled && ${refresh}.getAttribute('aria-busy') === 'false' && ${refresh}.innerText.trim() === 'Refresh'`), 5_000)
 
     await auditPage(`${site}/composer`, { cdp })
     const target = `document.querySelector('[data-provider-toggle="bluesky:101"]')`
@@ -2689,7 +2703,7 @@ async function checkAnalytics(cdp: Cdp): Promise<void> {
       }
       return false
     })()`), 5_000)
-    await evaluate(cdp, "[...document.querySelectorAll('[aria-label=\"Published posts pages\"] button')].find(button => button.textContent === 'Next').focus()")
+    await evaluate(cdp, "[...document.querySelectorAll('[aria-label=\"Published posts pages\"] button')].find(button => button.innerText.trim() === 'Next').focus()")
     await pressKey(cdp, 'Enter', 13)
     await waitUntil('The next page shows its posts and restores keyboard focus', () => evaluate<boolean>(cdp, `
       document.querySelector('[aria-labelledby=published-posts-title] tbody').textContent.includes('Next example')
@@ -3390,6 +3404,19 @@ async function checkSpanishListening(cdp: Cdp): Promise<void> {
       && ${listening}?.querySelector('input[placeholder="Menciones de la marca"]')?.value === 'Marca de prueba'
       && [...${listening}.querySelectorAll('aside button')].some(button => button.innerText === 'Eliminar' && button.getClientRects().length)
   `), 5_000)
+  const clear = `${listening}.querySelector('button[aria-label="Limpiar formulario"]')`
+  const tooltip = `document.getElementById(${clear}.getAttribute('aria-describedby'))`
+  await evaluate(cdp, `${clear}.focus()`)
+  await waitUntil('Listening shows the localized clear tooltip on keyboard focus', () => evaluate<boolean>(cdp, `
+    Boolean(${tooltip}?.getClientRects().length) && ${tooltip}.textContent.includes('Limpiar formulario')`), 5_000)
+  await pressKey(cdp, 'Escape', 27)
+  await waitUntil('Escape hides the clear tooltip and keeps focus', () => evaluate<boolean>(cdp, `
+    !${tooltip}?.getClientRects().length && document.activeElement === ${clear}`), 5_000)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Clearing the watch editor returns focus to its empty name field', () => evaluate<boolean>(cdp, `(() => {
+    const name = ${listening}.querySelector('input[placeholder="Menciones de la marca"]')
+    return name?.value === '' && document.activeElement === name && !${clear}?.getClientRects().length
+  })()`), 5_000)
   const markRead = `[...${mentions}.querySelectorAll('button')].find(button => button.textContent.trim() === 'Marcar todo como leído')`
   await evaluate(cdp, `${markRead}.focus()`)
   await pressKey(cdp, 'Enter', 13)

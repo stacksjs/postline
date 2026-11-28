@@ -151,9 +151,9 @@ export const analyticsClient = { locale: workspaceLocale, messages: workspaceAna
           </table>
         </div>
         <nav class="flex gap-3 items-center justify-between px-3 py-2.5 border-line border-t" aria-label="{{ analyticsText.postsPages }}" :show="pageCount() > 1">
-          <button class="px-2.5 h-9 text-ui bg-panel-2 border border-line rounded-lg disabled:opacity-50" type="button" :disabled="page() <= 1" @click="loadAnalytics(page() - 1, { focusPosts: true })">{{ analyticsText.previous }}</button>
+          <Button variant="secondary" size="sm" :disabled="page() <= 1" @click="loadAnalytics(page() - 1, { focusPosts: true })">{{ analyticsText.previous }}</Button>
           <span class="text-muted text-xs" :text="words.t('page', { page: numbers.format(page()), total: numbers.format(pageCount()) })"></span>
-          <button class="px-2.5 h-9 text-ui bg-panel-2 border border-line rounded-lg disabled:opacity-50" type="button" :disabled="page() >= pageCount()" @click="loadAnalytics(page() + 1, { focusPosts: true })">{{ analyticsText.next }}</button>
+          <Button variant="secondary" size="sm" :disabled="page() >= pageCount()" @click="loadAnalytics(page() + 1, { focusPosts: true })">{{ analyticsText.next }}</Button>
         </nav>
       </Card>
     </section>

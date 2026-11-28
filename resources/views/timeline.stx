@@ -16,10 +16,7 @@ export const timelineClient = { locale: workspaceLocale, messages: workspaceTime
     <WorkspacePageHeader titleKey="workspace.pages.timeline.title" descriptionKey="workspace.pages.timeline.description">
       <div class="grid sm:flex gap-2 grid-cols-2 items-center">
         <a class="inline-flex items-center justify-center px-4 h-9 font-semibold text-ink text-sm bg-panel hover:bg-hover border border-line rounded-xl shadow-sm transition-colors" href="/composer" data-stx-link>{{ timelineText.compose }}</a>
-        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="busy()" @click="refreshManual">
-          <span class="h-4 w-4 i-hugeicons-refresh" aria-hidden="true"></span>
-          <span :text="refreshLabel()">{{ timelineText.refresh }}</span>
-        </button>
+        <Button size="sm" leftIcon="<span class='i-hugeicons-refresh' aria-hidden='true'></span>" data-timeline-refresh :loading="busy()" :label="refreshLabel()" @click="refreshManual">{{ timelineText.refresh }}</Button>
       </div>
     </WorkspacePageHeader>
 
@@ -36,7 +33,7 @@ export const timelineClient = { locale: workspaceLocale, messages: workspaceTime
           <WorkspaceListSkeleton :show="busy()" label="{{ timelineText.loadingTimeline }}" />
           <ErrorState :show="feedError()" title="{{ timelineText.loadError }}" :message="feedError()" @retry="refresh()" />
           <EmptyState :show="showEmpty() && !busy()" variant="bare" title="{{ timelineText.emptyFeed }}" description="{{ timelineText.emptyDescription }}">
-            <button class="text-info text-ui underline" type="button" @click="refresh()">{{ timelineText.refresh }}</button>
+            <Button variant="secondary" size="sm" @click="refresh()">{{ timelineText.refresh }}</Button>
           </EmptyState>
           <EmptyState :show="notConnected() && !busy() && !feedError()" variant="bare" title="{{ timelineText.connectBluesky }}">
             <StxLink class="text-info text-ui underline" to="/accounts">{{ timelineText.openChannels }}</StxLink>
