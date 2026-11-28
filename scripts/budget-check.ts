@@ -3,12 +3,11 @@
  *
  *   bun scripts/budget-check.ts [dist]
  *
- * Run after `bun run build:frontend`. For each app page it adds up what the
- * browser must fetch before the page works, gzipped: the page's own inline
- * scripts plus the local scripts it loads, the stylesheets it links or
- * inlines, and the fonts it names. It fails when a page is over budget, or
- * when any page loads a script, stylesheet, font or image from another
- * origin, and prints the offenders. The CI site job runs it.
+ * Run after `bun run build:frontend`. It measures the gzip size of the
+ * page's inline scripts, including inert island setup, and its initial
+ * local script assets. It also counts linked and inline stylesheets and
+ * preloaded fonts. The CI site job uses it to enforce budgets and flag
+ * scripts, stylesheets, fonts, and images loaded from another origin.
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -18,6 +17,7 @@ import { gzipSync } from 'node:zlib'
 const dist = resolve(import.meta.dir, '..', process.argv[2] || 'dist')
 const KB = 1024
 export const BUDGETS = { script: 150 * KB, css: 30 * KB, fonts: 60 * KB }
+const SCRIPT_TYPES = new Set(['module', 'text/javascript', 'application/javascript', 'stx/island'])
 
 /** The workspace pages, which carry the app's scripts. */
 const APP_PAGES = ['composer', 'queue', 'timeline', 'analytics', 'campaigns', 'listening', 'inbox', 'accounts', 'activity', 'writing', 'settings', 'login', 'setup']
@@ -43,13 +43,14 @@ for (const page of APP_PAGES) {
   const inlineScripts: string[] = []
   for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
     const attrs = match[1]!
-    if (/type\s*=\s*["'](?!module|text\/javascript)[^"']*["']/i.test(attrs)) continue
-    const src = attrs.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1]
+    const type = attrs.match(/(?:^|\s)type\s*=\s*["']([^"']*)["']/i)?.[1]?.trim().toLowerCase()
+    if (type && !SCRIPT_TYPES.has(type)) continue
+    const src = attrs.match(/(?:^|\s)src\s*=\s*["']([^"']+)["']/i)?.[1]
     if (src) {
       const path = local(src)
       if (path) script += gz(readFileSync(path))
     }
-    else inlineScripts.push(match[2]!)
+    else if (match[2]!.trim()) inlineScripts.push(match[2]!)
   }
   // Inline blocks share the HTML response's compression dictionary. Linked
   // assets are separate responses, each with a dictionary of its own.
