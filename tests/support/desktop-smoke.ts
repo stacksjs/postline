@@ -408,6 +408,25 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
     check('the durable X receipt prevents an uncertain target from clicking again', retry.status < 500
       && JSON.parse(retry.text)?.data?.results?.[0]?.error?.includes('X did not confirm')
       && JSON.parse(waitingAgain.text)?.data === null, retry.text)
+    const reviewQueue = JSON.parse((await call('GET', '/api/postline/queue')).text)?.data?.items ?? []
+    const uncertainRow = reviewQueue.find((row: { id: number }) => row.id === uncertain?.postId)
+    const reviewId = uncertainRow?.providers?.[0]?.xBrowserReview
+    check('the unresolved X receipt offers a profile review in Queue', Number.isSafeInteger(reviewId))
+    const observed = { id: '246811', authorHandle: 'postline_test', body: 'An uncertain browser delivery fixture.', postedAt: new Date().toISOString() }
+    const link = (post: typeof observed) => call('POST', '/api/postline/queue/link-x-browser-post', JSON.stringify({ target_id: reviewId, post }))
+    const wrongAuthor = await link({ ...observed, authorHandle: 'another_user' })
+    const wrongText = await link({ ...observed, body: 'A different post.' })
+    const older = await link({ ...observed, postedAt: '2020-01-01T00:00:00.000Z' })
+    const duplicate = await link({ ...observed, id: '246810' })
+    check('linking rejects a different account, different content, an old post, or an already linked ID',
+      [wrongAuthor, wrongText, older, duplicate].every(response => response.status === 422))
+    const linked = await link(observed)
+    const replayMatch = await link(observed)
+    const afterLink = JSON.parse((await call('GET', '/api/postline/queue')).text)?.data?.items
+    const linkedRow = afterLink?.find((row: { id: number }) => row.id === uncertain?.postId)
+    check('an observed X post can settle its Queue receipt without another submission', linked.status === 200 && replayMatch.status === 422
+      && linkedRow?.status === 'published' && linkedRow?.providers?.[0]?.remoteUrl === 'https://x.com/postline_test/status/246811'
+      && !linkedRow?.providers?.[0]?.xBrowserReview && JSON.parse((await submit('claim')).text)?.data === null)
     const held = await sendThroughBrowser('A scheduled X layout fixture.', 'layout', true)
     const heldState = await call('GET', browserSessionPath)
     check('a changed Composer layout holds the selected X target in the queue', Boolean(held?.postId)

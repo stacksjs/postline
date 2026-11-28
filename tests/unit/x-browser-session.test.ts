@@ -161,6 +161,39 @@ describe('X session browser reads', () => {
     expect(inspectXPage(document, 'https://x.com/account/access', 'listening')).toEqual({ state: 'needs-attention' })
   })
 
+  test('reads the exact open post from the signed-in profile for reconciliation', () => {
+    const postedAt = '2026-11-27T05:00:00.000Z'
+    const detail = (id: string, author = 'postline_test', inner = false) => {
+      const article = {
+        getClientRects: () => [1],
+        querySelector(selector: string) {
+          if (selector === 'time') return {
+            closest: (name: string) => name === 'article' ? inner ? {} : article : { getAttribute: () => `/${author}/status/${id}` },
+            getAttribute: () => postedAt,
+          }
+          if (selector.includes('tweetText')) return {
+            innerText: 'Postline example.org/hi…',
+            closest: () => article,
+            getClientRects: () => [1],
+            querySelectorAll: () => [{ innerText: 'example.org/hi…', title: 'https://example.org/highlights' }],
+          }
+          return null
+        },
+      }
+      return article
+    }
+    const page = {
+      querySelector: (selector: string) => selector.includes('Profile_Link') ? { getAttribute: () => '/postline_test' } : null,
+      querySelectorAll: () => [detail('42', 'other_user'), detail('42', 'postline_test', true), detail('43'), detail('42')],
+    } as unknown as Document
+    expect(inspectXPage(page, 'https://x.com/postline_test/status/42', 'post')).toMatchObject({
+      state: 'connected', posts: [{ id: '42', authorHandle: 'postline_test', body: 'Postline https://example.org/highlights', postedAt }],
+    })
+    expect(inspectXPage(page, 'https://x.com/other_user/status/42', 'post')).not.toHaveProperty('posts')
+    expect(inspectXPage(page, 'https://x.com/postline_test', 'post')).not.toHaveProperty('posts')
+    expect(inspectXPage(page, 'https://x.com/postline_test/status/44', 'post')).toMatchObject({ posts: [] })
+  })
+
   test('distinguishes an empty X timeline from one that cannot be read', () => {
     const page = (rows: { getClientRects: () => number[] }[] | null, empty = false) => ({
       querySelector(selector: string) {
@@ -322,6 +355,55 @@ describe('X session browser reads', () => {
         await rememberTwitterBrowserHandle(null, { checkedLayout: true })
         resetInterval()
       }
+    }
+  })
+
+  test('settles a restored X receipt for its saved browser connection and variant', async () => {
+    const accountId = await ensureAccount()
+    const previous = await db.selectFrom('accounts').where('id', '=', accountId)
+      .select(['twitter_browser_handle', 'twitter_browser_needs_check', 'twitter_browser_needs_layout_check']).executeTakeFirstOrThrow()
+    const handle = 'restored_review'
+    const stamp = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 19).replace('T', ' ')
+    const postedAt = new Date(Date.now() - 86_400_000).toISOString()
+    const ids: number[] = []
+    let postId = 0
+    try {
+      await db.updateTable('accounts').set({
+        twitter_browser_handle: handle, twitter_browser_needs_check: false, twitter_browser_needs_layout_check: false,
+      }).where('id', '=', accountId).execute()
+      for (const auth_transport of ['api', 'browser'] as const) {
+        const identity = await db.insertInto('social_identities').values({
+          uuid: crypto.randomUUID(), provider: 'twitter', handle, auth_transport, auth_status: 'connected', account_id: accountId,
+        }).returning('id').executeTakeFirstOrThrow()
+        ids.push(Number(identity.id))
+      }
+      const post = await db.insertInto('posts').values({
+        uuid: crypto.randomUUID(), status: 'failed', body: 'Shared text',
+        content: JSON.stringify({ variants: { twitter: 'The X-specific text' } }), account_id: accountId, created_at: stamp,
+      }).returning('id').executeTakeFirstOrThrow()
+      postId = Number(post.id)
+      await db.insertInto('twitter_browser_dispatches').values({
+        uuid: crypto.randomUUID(), post_id: post.id, handle, state: 'submitting', created_at: stamp,
+      }).execute()
+      const target = await db.insertInto('post_targets').values({
+        uuid: crypto.randomUUID(), post_id: post.id, provider: 'twitter', status: 'failed',
+        archived_account: JSON.stringify({ provider: 'twitter', handle, transport: 'browser' }), created_at: stamp,
+      }).returning('id').executeTakeFirstOrThrow()
+
+      const observed = { id: '32107814', authorHandle: handle, body: 'The X-specific text', postedAt }
+      await expect(postQueue.linkXBrowserPost(Number(target.id), { ...observed, body: 'Shared text' })).rejects.toThrow('does not match')
+      expect(await postQueue.linkXBrowserPost(Number(target.id), observed)).toEqual({ url: `https://x.com/${handle}/status/32107814` })
+      const settled = await db.selectFrom('post_targets').select(['status', 'social_identity_id', 'archived_account'])
+        .where('id', '=', target.id).executeTakeFirstOrThrow()
+      expect(settled).toEqual({ status: 'published', social_identity_id: ids[1], archived_account: null })
+    }
+    finally {
+      if (postId) {
+        await db.deleteFrom('post_targets').where('post_id', '=', postId).execute()
+        await db.deleteFrom('posts').where('id', '=', postId).execute()
+      }
+      for (const id of ids) await db.deleteFrom('social_identities').where('id', '=', id).execute()
+      await db.updateTable('accounts').set(previous).where('id', '=', accountId).execute()
     }
   })
 

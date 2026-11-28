@@ -16,7 +16,7 @@ interface XBrowserPost {
   postedAt: string
 }
 
-type XBrowserRead = 'sign-in' | 'listening' | 'metrics'
+type XBrowserRead = 'sign-in' | 'listening' | 'metrics' | 'post'
 
 type XBrowserStatus =
   | { state: 'connected', handle: string, measurements: Array<{ id: string, counts: EngagementCounts }>, posts?: XBrowserPost[], readIssue?: 'layout' | 'loading' }
@@ -119,9 +119,11 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
       if (listening && !column)
         return { state: 'connected', handle, measurements, readIssue: 'loading' }
 
-      const posts: XBrowserPost[] | undefined = listening ? [] : undefined
+      const status = read === 'post' ? /^\/([A-Za-z0-9_]{1,15})\/status\/([1-9][0-9]{0,18})\/?$/.exec(url.pathname) : null
+      const ownPost = status?.[1]?.toLowerCase() === handle.toLowerCase() ? status?.[2] : undefined
+      const posts: XBrowserPost[] | undefined = listening || ownPost ? [] : undefined
       let recognizedPost = false
-      if (read === 'metrics' || listening) {
+      if (read === 'metrics' || posts) {
         const timeline = column ?? page
         const articles = timeline.querySelectorAll('article[data-testid="tweet"], [data-navigation-stop] > article')
         for (const article of Array.from(articles).slice(0, 100)) {
@@ -136,8 +138,19 @@ export function inspectXPage(page: Document, href: string, read: XBrowserRead = 
           if (!post || post.origin !== url.origin || !match?.[1] || !match[2]) continue
           const [, authorHandle, id] = match
           if (posts) {
+            if (ownPost && (id !== ownPost || authorHandle.toLowerCase() !== handle.toLowerCase() || time?.closest('article') !== article)) continue
             recognizedPost = true
-            const body = article.querySelector<HTMLElement>('[data-testid="tweetText"]')?.innerText.trim()
+            const content = article.querySelector<HTMLElement>('[data-testid="tweetText"]')
+            let body = content?.innerText.trim()
+            if (ownPost && content && body) {
+              if (content.closest('article') !== article || !content.getClientRects().length) continue
+              // X displays shortened labels for links. The full address is in the title.
+              for (const link of content.querySelectorAll<HTMLAnchorElement>('a[title]')) {
+                const label = link.innerText.trim()
+                const address = link.title
+                if (label && /^https?:\/\//.test(address)) body = body.replace(label, () => address)
+              }
+            }
             const postedAt = time?.getAttribute('datetime')
             if (body && postedAt) posts.push({ id, authorHandle, body: body.slice(0, 10000), postedAt })
             continue

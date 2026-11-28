@@ -129,10 +129,14 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
               <span x-show="row.resumeLabel">
                 <Button variant="secondary" size="xs" :loading="busyId() === row.id" :label="row.resumeLabel" @click="resumeItem(row.id)" />
               </span>
-              <span x-show="row.partial && !row.resumeLabel">
+              <span x-show="row.xBrowserReview">
+                <Button variant="secondary" size="xs" :loading="busyId() === row.id" @click="reviewXBrowser(row, false)">{{ queueText.findOnX }}</Button>
+                <Button variant="secondary" size="xs" :disabled="busyId() === row.id" @click="reviewXBrowser(row, true)">{{ queueText.linkOpenX }}</Button>
+              </span>
+              <span x-show="row.partial && !row.resumeLabel && row.retryable">
                 <Button variant="secondary" size="xs" :loading="busyId() === row.id" @click="retryItem(row.id)">{{ queueText.retryNetworks }}</Button>
               </span>
-              <span x-show="row.actionable && row.targets.length && !row.partial && !row.resumeLabel">
+              <span x-show="row.actionable && row.targets.length && !row.partial && !row.resumeLabel && row.retryable">
                 <Button variant="ghost" size="xs" :loading="busyId() === row.id" :label="row.status === 'failed' ? queueCopy.tryAgain : queueCopy.publishNow" @click="publishItem(row.id)" />
               </span>
               <a class="inline-flex items-center justify-center px-2.5 h-7 font-semibold text-info text-xs" x-show="row.actionable && !row.targets.length" :href="row.editUrl" data-stx-link>{{ queueText.chooseChannels }}</a>
@@ -225,10 +229,14 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
     import { showNotification } from '../functions/notification'
     import { fetchWorkspace, targetLabel } from '../functions/social-client'
     import { postStatusVariant } from '../functions/status-badge'
+    import { openXBrowser, readXBrowserSession, withXBrowserProfile, xBrowserWindow } from '../functions/x-browser-session'
 
     const { locale: language, messages: queueCopy, activity: activityLabel } = {{ queueClient }}
     const queueWords = createI18n({ locale: language, messages: { [language]: queueCopy } })
     const dateLocale = language === 'en' ? undefined : language
+    const native = useNativeDesktop()
+    const xBrowser = state<ReturnType<typeof xBrowserWindow>>(null)
+    native.onReady(host => xBrowser.set(xBrowserWindow(host)))
 
     /**
      * Wire shapes for `/api/postline/queue/*`, declared where they are used.
@@ -249,6 +257,7 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
       remoteUri?: string | null
       remoteUrl?: string | null
       nextAttemptAt?: string | null
+      xBrowserReview?: number
       firstComment?: { targetId: number, status: 'pending' | 'sending' | 'sent' | 'failed' | 'uncertain', error: string | null }
     }
 
@@ -285,6 +294,8 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
       liveUrl: string
       editUrl: string
       actionable: boolean
+      retryable: boolean
+      xBrowserReview: { id: number, handle: string } | null
       canRepeat: boolean
       hasImages: boolean
       /** Went out on some networks and failed on others. */
@@ -456,6 +467,7 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
         const url = status === 'uncertain' ? liveUrlFor(remoteUrl) : ''
         return [{ targetId, message: queueWords.t('firstComment', { network: targets[index].label, detail }), needsAttention, canRetry, url }]
       })
+      const review = item.providers.find(target => target.xBrowserReview && target.handle)
       const statusLabel = item.partial ? 'partly sent' : isMissed(item) ? 'missed' : item.status
       return {
         id: item.id,
@@ -470,6 +482,8 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
         liveUrl: item.providers.map(target => liveUrlFor(target.remoteUrl || target.remoteUri)).find(Boolean) || '',
         editUrl: `/composer?edit=${item.id}`,
         actionable: ACTIONABLE.has(item.status),
+        retryable: !review || item.providers.some(target => target.status === 'failed' && !target.xBrowserReview),
+        xBrowserReview: review && xBrowser() ? { id: review.xBrowserReview!, handle: review.handle! } : null,
         canRepeat: targets.length > 0 && (ACTIONABLE.has(item.status) || item.status === 'published'),
         hasImages: Boolean(item.hasImage || item.hasVideo || item.thread),
         partial: Boolean(item.partial),
@@ -948,6 +962,51 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
       { title: queueCopy.published, message: queueCopy.postPublished },
       queueCopy.publishFailed,
     )
+
+    async function reviewXBrowser(row: QueueRow, confirmPost: boolean) {
+      const browser = xBrowser()
+      const target = row.xBrowserReview
+      if (!browser || !target || busyId()) return
+      busyId.set(row.id)
+      try {
+        const found = await withXBrowserProfile(async () => {
+          const { data: session } = await requestJson('/api/postline/twitter/browser-session')
+          if (session.needsCheck || session.handle?.toLowerCase() !== target.handle.toLowerCase())
+            throw new Error(queueCopy.checkXSignIn)
+          const profile = session.profile
+          if (!confirmPost) {
+            const url = 'https://x.com/' + encodeURIComponent(target.handle)
+            const current = await readXBrowserSession(browser, profile)
+            await openXBrowser(browser, profile, url)
+            if (current.state === 'unavailable') return null
+            if (current.state !== 'connected' || current.handle.toLowerCase() !== target.handle.toLowerCase())
+              throw new Error(queueCopy.checkXSignIn)
+            await browser._call('loadURL', { url }, profile)
+            return null
+          }
+          const current = await readXBrowserSession(browser, profile, 'post')
+          if (current.state !== 'connected' || current.handle.toLowerCase() !== target.handle.toLowerCase()
+            || current.posts?.length !== 1) throw new Error(queueCopy.openMatchingXPost)
+          return current.posts[0]
+        })
+        if (!found) {
+          showNotification({ title: queueCopy.findOnX, message: queueCopy.openMatchingXPost, tone: 'success' })
+          return
+        }
+        if (!await stxConfirm(queueCopy.confirmXMatch, { title: queueCopy.linkOpenX, confirmText: queueCopy.linkXPost, cancelText: queueCopy.cancel })) return
+        await requestJson('/api/postline/queue/link-x-browser-post', {
+          method: 'POST', body: JSON.stringify({ target_id: target.id, post: found }),
+        })
+        showNotification({ title: queueCopy.xPostLinked, tone: 'success' })
+        await refresh()
+      }
+      catch (error) {
+        showNotification({ title: queueCopy.couldNotLinkX, message: error instanceof Error ? error.message : String(error), tone: 'error' })
+      }
+      finally {
+        busyId.set(0)
+      }
+    }
 
     async function retryFirstComment(id: number): Promise<void> {
       if (commentBusy()) return

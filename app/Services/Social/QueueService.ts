@@ -24,9 +24,11 @@ import { hydrateStoredContent, MissingMediaError, parseStoredContent } from '../
 import { storedImageResponse, storedVideoResponse } from '../../Support/Social/uploads'
 import { removeMediaFiles, storeAttachments } from '../../Support/Social/stored-attachments'
 import { assertVideoAllowed, checkVideoBytes } from '../../Support/Social/video-input'
-import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/variants'
+import { resolveStoredVariants, resolveVariantBody, sanitizeVariants } from '../../Support/Social/variants'
 import { crosspost, crosspostProviders } from './CrosspostService'
 import { assertThreadTransport, bindRestoredTargets, findIdentityRow, RestoredTargetAccountError, unavailableAccountError } from './identities'
+import { xBrowserPostId } from '../../Support/Social/x-browser-write'
+import { supportsLocalTwitterBrowser } from './TwitterBrowserSession'
 import { nextPostingSlot } from '../../Support/Social/posting-slots'
 import { isRealTimestamp, isValidTimeZone } from '../../Support/time'
 import { listPostingSlots } from '../PostingSlotService'
@@ -208,6 +210,7 @@ export interface QueueTargetView {
   attempts: number
   /** When Postline sends it again by itself, as an ISO time; null when it will not. */
   nextAttemptAt: string | null
+  xBrowserReview?: number
   firstComment?: {
     targetId: number
     status: FirstCommentOutcome['status']
@@ -803,9 +806,16 @@ export class QueueService {
     // since a published post still went out through them.
     const identityIds = [...new Set(targets.map((target: any) => Number(target.social_identity_id)).filter(Boolean))]
     const identities = identityIds.length
-      ? await database.selectFrom('social_identities').select(['id', 'handle']).where('id', 'in', identityIds).execute()
+      ? await database.selectFrom('social_identities').select(['id', 'handle', 'auth_transport']).where('id', 'in', identityIds).execute()
       : []
     const handles = new Map<number, string>(identities.map((row: any) => [Number(row.id), String(row.handle)]))
+    const browserIdentities = new Set(identities.filter((row: any) => row.auth_transport === 'browser').map((row: any) => Number(row.id)))
+    const checkable = supportsLocalTwitterBrowser() && targets.some((target: any) => target.provider === 'twitter'
+      && target.status === 'failed' && (target.archived_account || browserIdentities.has(Number(target.social_identity_id))))
+    const receipts = checkable ? await database.selectFrom('twitter_browser_dispatches').select(['post_id', 'handle'])
+      .where('post_id', 'in', posts.map((post: any) => post.id)).where('state', '=', 'submitting').execute() : []
+    const uncertain = new Set(receipts.map((receipt: any) => `${receipt.post_id}:${receipt.handle}`))
+
 
     // Threads on this page: each segment's position, and where a resume
     // would start, from every segment of the thread (not only this page's).
@@ -852,10 +862,15 @@ export class QueueService {
           .map((target: any): QueueTargetView => {
             const identityId = Number(target.social_identity_id) || null
             const archived = target.archived_account ? JSON.parse(target.archived_account) : null
+            const handle = identityId ? handles.get(identityId) || null : archived?.handle ?? null
+            const review = !post.thread_key && target.status === 'failed' && target.provider === 'twitter'
+              && (identityId ? browserIdentities.has(identityId) : archived?.transport === 'browser')
+              && uncertain.has(`${post.id}:${handle?.toLowerCase()}`)
             return {
               provider: target.provider,
               identityId,
-              handle: identityId ? handles.get(identityId) || null : archived?.handle ?? null,
+              handle,
+              ...(review && { xBrowserReview: Number(target.id) }),
               target: targetKey({ provider: target.provider, identityId }),
               status: String(target.status),
               remoteUri: target.remote_uri || null,
@@ -1404,6 +1419,71 @@ export class QueueService {
     if (published && stillFailed.length === 0) await this.removePublishedImages(post)
 
     return { postId: Number(post.id), results }
+  }
+
+  async linkXBrowserPost(targetId: number, observation: unknown): Promise<{ url: string }> {
+    const observed = observation as { id?: unknown, authorHandle?: unknown, body?: unknown, postedAt?: unknown } | null
+    if (!Number.isSafeInteger(targetId) || targetId < 1 || !observed || !xBrowserPostId(observed.id)
+      || typeof observed.authorHandle !== 'string' || !/^[A-Za-z0-9_]{1,15}$/.test(observed.authorHandle)
+      || typeof observed.body !== 'string' || observed.body.length > 10000 || typeof observed.postedAt !== 'string')
+      throw new UserFacingError('Open the original post in the X window before linking it.')
+    const { id, authorHandle, body, postedAt } = observed
+    const time = Date.parse(postedAt)
+    if (!Number.isFinite(time) || time > Date.now() + 60_000)
+      throw new UserFacingError('Postline could not verify the date on the open X post.')
+    const handle = authorHandle.toLowerCase()
+    const url = `https://x.com/${handle}/status/${id}`
+    const accountId = await ensureAccount()
+    await contentColumn()
+
+    const settled = await database.transaction((tx: typeof database) => {
+      const account = tx.selectFrom('accounts').select(['twitter_browser_handle', 'twitter_browser_needs_check', 'twitter_browser_needs_layout_check'])
+        .where('id', '=', accountId).executeTakeFirst()
+      if (account?.twitter_browser_handle?.toLowerCase() !== handle || account.twitter_browser_needs_check || account.twitter_browser_needs_layout_check)
+        throw new UserFacingError('Check sign-in with the original X account in Channels.')
+      const row = tx.selectFrom('post_targets').selectAll().where('id', '=', targetId)
+        .where('provider', '=', 'twitter').where('status', '=', 'failed').executeTakeFirst()
+      const [target] = row ? bindRestoredTargets(tx, [row]) : []
+      const identityId = target?.social_identity_id
+      const identity = identityId && tx.selectFrom('social_identities').select('id').where('id', '=', identityId)
+        .where('provider', '=', 'twitter').where('auth_transport', '=', 'browser').where('handle', '=', handle).executeTakeFirst()
+      const post = identity && tx.selectFrom('posts').selectAll().where('id', '=', target.post_id).where('account_id', '=', accountId)
+        .where('thread_key', 'is', null).where('status', 'in', ['failed', 'published']).executeTakeFirst()
+      const receipt = post && tx.selectFrom('twitter_browser_dispatches').select(['uuid'])
+        .where('post_id', '=', post.id).where('handle', '=', handle).where('state', '=', 'submitting').executeTakeFirst()
+      if (!receipt) throw new UserFacingError('This X target changed. Refresh Queue and check the post again.')
+
+      const variants = parseStoredContent(post.content)?.variants
+      const original = resolveVariantBody(String(post.body), 'twitter', { variants })
+      const created = String(post.created_at).replace(' ', 'T')
+      const earliest = Date.parse(/(?:Z|[+-]\d{2}:\d{2})$/.test(created) ? created : `${created}Z`)
+      if (body.normalize('NFC').replace(/\s+/g, ' ').trim() !== original.normalize('NFC').replace(/\s+/g, ' ').trim()
+        || !Number.isFinite(earliest) || time + 1000 < earliest)
+        throw new UserFacingError('The open X post does not match this Queue entry.')
+      const linked = tx.selectFrom('post_targets').select('id').where('provider', '=', 'twitter')
+        .where('remote_uri', '=', id).where('post_id', '!=', post.id).executeTakeFirst()
+      const recorded = tx.selectFrom('twitter_browser_dispatches').select('id')
+        .where('remote_id', '=', id).where('post_id', '!=', post.id).executeTakeFirst()
+      if (linked || recorded) throw new UserFacingError('This X post is already linked to another Queue entry.')
+
+      const at = now()
+      tx.updateTable('twitter_browser_dispatches').set({ state: 'published', remote_id: id, updated_at: at })
+        .where('uuid', '=', receipt.uuid).execute()
+      tx.updateTable('post_targets').set({ status: 'published', remote_uri: id, remote_url: url, failure_reason: null, next_attempt_at: null, updated_at: at })
+        .where('id', '=', targetId).execute()
+      tx.updateTable('posts').set({
+        status: 'published', published_at: post.published_at ?? new Date(time).toISOString().slice(0, 19).replace('T', ' '), updated_at: at,
+      }).where('id', '=', post.id).execute()
+      postWebhooks.enqueueAttempt(tx, Number(post.id), [{
+        ok: true, provider: 'twitter', target: targetKey({ provider: 'twitter', identityId: Number(identityId) }),
+        identityId: Number(identityId), uri: id, url,
+      }])
+      return post
+    }, sqliteWriteOptions())
+    const pending = await database.selectFrom('post_targets').select('id').where('post_id', '=', settled.id)
+      .where('status', 'in', ['draft', 'scheduled', 'publishing', 'failed']).executeTakeFirst()
+    if (!pending) await this.removePublishedImages(settled)
+    return { url }
   }
 
   private async removePublishedImages(post: any): Promise<void> {

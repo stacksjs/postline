@@ -1380,6 +1380,7 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     window.xSessionNavigations = []
     window.xSessionInspections = 0
     window.xSessionWatch = null
+    window.xSessionLinkedPost = null
     window.xSessionDestroyed = []
     window.xSessionState = { state: 'connected', handle: 'postline_test', measurements: [{ id: '4321', counts: { likes: 2 } }] }
     window.craft = { app: { nativePlatformControls: false }, capabilities: { nativePlatformControls: false }, window: {
@@ -1406,6 +1407,18 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     } }
     window.fetch = (input, options) => {
       const url = new URL(input instanceof Request ? input.url : input, location.href)
+      if (sessionStorage.getItem('test-x-review-queue') && url.pathname === '/api/postline/queue' && options?.method !== 'POST') {
+        const linked = Boolean(window.xSessionLinkedPost)
+        return Promise.resolve(Response.json({ ok: true, data: { nextCursor: null, items: [{
+          id: 711, status: linked ? 'published' : 'failed', body: 'A reviewed X post', createdAt: new Date().toISOString(),
+          providers: [{ provider: 'twitter', handle: 'postline_test', status: linked ? 'published' : 'failed',
+            ...(linked ? { remoteUrl: 'https://x.com/postline_test/status/246811' } : { xBrowserReview: 712, failureReason: 'X did not confirm the post.' }) }],
+        }] } }))
+      }
+      if (url.pathname === '/api/postline/queue/link-x-browser-post') {
+        window.xSessionLinkedPost = JSON.parse(options.body)
+        return Promise.resolve(Response.json({ ok: true, data: { url: 'https://x.com/postline_test/status/246811' } }))
+      }
       if (url.pathname === '/api/postline/listening' && options?.method === 'POST') {
         window.xSessionWatch = JSON.parse(options.body)
         return Promise.resolve(Response.json({ ok: true, data: {} }))
@@ -1453,6 +1466,8 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
   const section = `document.querySelector('[aria-labelledby="x-browser-session-title"]')`
   const open = `${section}?.querySelector('button')`
   const check = `${section}?.querySelectorAll('button')[1]`
+  const queuePrefs = await evaluate<Array<[string, string | null]>>(cdp, `
+    ['postline.queue.view.v2', 'postline.queue.tab'].map(key => [key, localStorage.getItem(key)])`)
   try {
     await auditPage(`${site}/accounts`, { cdp })
     await waitUntil('The isolated X browser controls are ready', () => evaluate<boolean>(cdp, `Boolean(${open}?.getClientRects().length && !${open}.disabled)`), 5_000)
@@ -1609,10 +1624,42 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     await waitUntil('Saving the watch persists its explicit browser opt-in', () => evaluate<boolean>(cdp, `
       window.xSessionWatch?.name === 'Paced X fixture' && window.xSessionWatch.twitter_read_source === 'browser'
         && window.xSessionWatch.twitter_browser_background === true`), 5_000)
+
+    await evaluate(cdp, `sessionStorage.setItem('test-x-review-queue', '1');
+      localStorage.setItem('postline.queue.view.v2', JSON.stringify('list'));
+      localStorage.setItem('postline.queue.tab', JSON.stringify('attention'))`)
+    await auditPage(`${site}/queue`, { cdp })
+    const queue = "document.querySelector('[data-postline-page=queue]')"
+    const button = (label: string, scope = queue) => `[...${scope}.querySelectorAll('button')].find(button => button.textContent.trim() === ${JSON.stringify(label)})`
+    const findOnX = button('Find on X')
+    const linkPost = button('Link open X post')
+    await waitUntil('An uncertain X target offers profile review and keeps Retry hidden', () => evaluate<boolean>(cdp, `
+      Boolean(${findOnX}?.getClientRects().length) && !${button('Try again now')}?.getClientRects().length`), 5_000)
+    await evaluate(cdp, `${findOnX}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Queue opens the original X account profile', () => evaluate<boolean>(cdp, `
+      window.xSessionNavigations.at(-1)?.url === 'https://x.com/postline_test' && !${findOnX}.disabled`), 5_000)
+
+    await evaluate(cdp, `window.xSessionState.posts = [
+      { id: '246811', authorHandle: 'postline_test', body: 'A reviewed X post', postedAt: new Date().toISOString() },
+    ]; ${linkPost}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const verifyDialog = "document.querySelector('[role=alertdialog]')"
+    await waitUntil('The open X post needs explicit confirmation', () => evaluate<boolean>(cdp, `
+      ${verifyDialog}?.textContent.includes('including any images') && window.xSessionLinkedPost === null`), 5_000)
+    await evaluate(cdp, `${button('Link this post', verifyDialog)}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Queue records only the verified X observation', () => evaluate<boolean>(cdp, `
+      window.xSessionLinkedPost?.target_id === 712 && window.xSessionLinkedPost.post?.id === '246811'
+        && !${findOnX}?.getClientRects().length`), 5_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
-    await evaluate(cdp, `sessionStorage.removeItem('test-x-window-open'); localStorage.removeItem('test-x-session-handle'); localStorage.removeItem('test-x-session-needs-check'); localStorage.removeItem('test-x-session-needs-layout-check'); localStorage.removeItem('test-x-session-listening-attention')`)
+    await evaluate(cdp, `for (const [key, value] of ${JSON.stringify(queuePrefs)}) {
+      if (value === null) localStorage.removeItem(key)
+      else localStorage.setItem(key, value)
+    }`)
+    await evaluate(cdp, `sessionStorage.removeItem('test-x-window-open'); sessionStorage.removeItem('test-x-review-queue'); localStorage.removeItem('test-x-session-handle'); localStorage.removeItem('test-x-session-needs-check'); localStorage.removeItem('test-x-session-needs-layout-check'); localStorage.removeItem('test-x-session-listening-attention')`)
   }
 }
 

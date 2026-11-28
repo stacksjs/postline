@@ -90,3 +90,9 @@ requests. If you also chose other networks, the scheduler still checks those.
 Enable **Check X in the background** on a watch to search X while the Mac app
 is running, including when it’s in the menu bar. Postline checks one enabled
 watch every 20 minutes and rotates through the enabled watches in turn. Pausing a watch or turning the option off stops its background checks.
+
+If X does not confirm a browser submission, Queue holds that target to prevent
+duplicate sends. Choose **Find on X** to open the original account’s profile.
+Open the matching post in that window, then return to Queue and choose
+**Link open X post**. Check the text and any images before confirming. A verified
+match appears as published in Queue.
