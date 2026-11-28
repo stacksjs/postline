@@ -17,11 +17,8 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
       <template #description><span :show="inboxSection() === 'messages' && !loading()" :text="inboxOverview()"></span>
         <span :show="inboxSection() === 'public'">{{ inboxText.publicDescription }}</span></template>
       <div class="flex flex-wrap gap-2 items-center" :show="inboxSection() === 'messages'">
-        <button class="inline-flex gap-2 items-center justify-center px-3 h-9 font-semibold text-ink text-xs bg-panel hover:bg-raised border border-line rounded-xl disabled:opacity-50 transition-colors" type="button" :disabled="unreadCount() === 0" @click="markAllRead">{{ inboxText.markAllRead }}</button>
-        <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="button" :show="providerFilter() !== 'twitter'" :disabled="syncing() || connectedCount() === 0" @click="runSync">
-          <span class="h-4 w-4 i-hugeicons-refresh" :class="syncing() ? 'animate-spin' : ''" aria-hidden="true"></span>
-          <span :text="syncing() ? copy.syncing : copy.sync">{{ inboxText.sync }}</span>
-        </button>
+        <Button variant="secondary" size="sm" :disabled="unreadCount() === 0" @click="markAllRead">{{ inboxText.markAllRead }}</Button>
+        <Button size="sm" :show="providerFilter() !== 'twitter'" :disabled="connectedCount() === 0" :loading="syncing()" :label="syncing() ? copy.syncing : copy.sync" leftIcon="<span class='i-hugeicons-refresh' aria-hidden='true'></span>" @click="runSync">{{ inboxText.sync }}</Button>
       </div>
     </WorkspacePageHeader>
 
@@ -41,7 +38,7 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
             <p class="m-0 font-medium text-body text-xs" :text="'@' + account.handle"></p>
             <div class="flex flex-wrap gap-1.5">
               <Button variant="secondary" size="xs" :disabled="Boolean(xSyncing())" @click="runXSync(account.id)">{{ inboxText.syncX }}</Button>
-              <Button variant="quiet" size="xs" :show="account.older" :disabled="Boolean(xSyncing())" @click="runXSync(account.id, true)">{{ inboxText.olderX }}</Button>
+              <Button variant="ghost" size="xs" :show="account.older" :disabled="Boolean(xSyncing())" @click="runXSync(account.id, true)">{{ inboxText.olderX }}</Button>
             </div>
           </div>
         </section>
@@ -49,7 +46,7 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
           <header class="grid gap-2.5 px-4 py-3 border-b border-line">
             <div class="flex gap-2 items-center justify-between">
               <h2 class="m-0 font-semibold text-ink text-sm" :text="statusFilter() === 'archived' ? copy.archived : copy.title">{{ inboxText.title }}</h2>
-              <button class="px-2.5 h-7 font-semibold text-muted text-xs hover:text-ink bg-panel-2 hover:bg-raised border border-line rounded-lg transition-colors" type="button" @click="toggleStatusFilter" :text="statusFilter() === 'archived' ? copy.showInbox : copy.showArchived">{{ inboxText.showArchived }}</button>
+              <Button variant="secondary" size="xs" :label="statusFilter() === 'archived' ? copy.showInbox : copy.showArchived" @click="toggleStatusFilter">{{ inboxText.showArchived }}</Button>
             </div>
             <select class="px-3 h-8 text-ink text-xs bg-panel-2 border border-field-line rounded-lg" aria-label="{{ inboxText.network }}" @change="setProviderFilter($event.target.value)">
               <option value="">{{ inboxText.allNetworks }}</option>
@@ -66,7 +63,7 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
           <ErrorState :show="conversationError() && !loading()" title="{{ inboxText.couldNotLoadConversations }}" :message="conversationError()" @retry="loadConversations()" />
           <EmptyState :show="showEmptyList()" variant="bare" :title="connectedCount() || xInbox().accounts.length ? copy.noConversations : copy.connectNetwork" :description="connectedCount() || xInbox().accounts.length ? copy.syncLatest : copy.supportedNetworks">
             <StxLink class="text-info text-ui underline" to="/accounts" :show="!connectedCount() && !xInbox().accounts.length">{{ inboxText.openChannels }}</StxLink>
-            <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="connectedCount() && providerFilter() !== 'twitter'" :disabled="syncing()" @click="runSync">{{ inboxText.sync }}</button>
+            <Button variant="secondary" size="sm" :show="connectedCount() && providerFilter() !== 'twitter'" :loading="syncing()" :label="syncing() ? copy.syncing : copy.sync" @click="runSync">{{ inboxText.sync }}</Button>
           </EmptyState>
 
           <div class="overflow-y-auto max-h-80 lg:max-h-[32rem] divide-line divide-y" x-show="!loading() && conversations().length">
@@ -83,7 +80,9 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
                 <span class="grid place-items-center shrink-0 px-1.5 h-5 min-w-5 font-semibold text-on-solid text-xs bg-net-bluesky rounded-full" x-show="conversation.unreadCount > 0" :text="String(conversation.unreadCount)"></span>
               </div>
             </button>
-            <button class="p-3 w-full text-center text-muted text-ui hover:text-ink hover:bg-panel-2 transition-colors" type="button" x-show="nextOffset() !== null" :disabled="loadingMore()" @click="loadMoreConversations" :text="loadingMore() ? copy.loading : copy.moreConversations">{{ inboxText.moreConversations }}</button>
+            <div :show="nextOffset() !== null">
+              <Button variant="ghost" size="sm" fullWidth="true" :loading="loadingMore()" :label="loadingMore() ? copy.loading : copy.moreConversations" @click="loadMoreConversations">{{ inboxText.moreConversations }}</Button>
+            </div>
           </div>
         </Card>
 
@@ -118,8 +117,9 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
               </div>
             </div>
             <div class="flex gap-2 items-center">
-              <button class="px-3 h-8 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-lg disabled:opacity-50" type="button" :show="activeProvider() !== 'twitter'" :disabled="refreshing()" @click="refreshThread" :text="refreshing() ? copy.refreshing : copy.refresh">{{ inboxText.refresh }}</button>
-              <button class="px-3 h-8 font-semibold text-xs border rounded-lg transition-colors" type="button" @click="toggleArchive" :class="statusFilter() === 'archived' ? 'text-ink bg-panel-2 border-line hover:bg-raised' : 'text-danger border-danger-line hover:bg-danger-soft'" :text="statusFilter() === 'archived' ? copy.restore : copy.archive">{{ inboxText.archive }}</button>
+              <Button variant="secondary" size="sm" :show="activeProvider() !== 'twitter'" :loading="refreshing()" :label="refreshing() ? copy.refreshing : copy.refresh" @click="refreshThread">{{ inboxText.refresh }}</Button>
+              <Button variant="secondary" size="sm" :show="statusFilter() === 'archived'" @click="toggleArchive">{{ inboxText.restore }}</Button>
+              <Button variant="danger" size="sm" :show="statusFilter() !== 'archived'" @click="toggleArchive">{{ inboxText.archive }}</Button>
             </div>
           </header>
 
@@ -127,9 +127,9 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
             <WorkspaceListSkeleton :show="threadLoading()" label="{{ inboxText.loadingMessages }}" />
             <ErrorState :show="threadError() && !threadLoading()" title="{{ inboxText.couldNotLoadMessages }}" :message="threadError()" @retry="loadThread()" />
             <EmptyState :show="!threadLoading() && !threadError() && !messages().length" variant="bare" title="{{ inboxText.noSyncedMessages }}" description="{{ inboxText.syncHistory }}">
-              <button class="text-info text-ui underline disabled:opacity-50" type="button" :show="activeProvider() !== 'twitter'" :disabled="syncing()" @click="runSync">{{ inboxText.sync }}</button>
+              <Button variant="secondary" size="sm" :show="activeProvider() !== 'twitter'" :loading="syncing()" :label="syncing() ? copy.syncing : copy.sync" @click="runSync">{{ inboxText.sync }}</Button>
             </EmptyState>
-            <button class="justify-self-center px-3 py-1 text-muted text-xs hover:text-ink rounded-lg" type="button" x-show="olderOffset() !== null" :disabled="loadingOlder()" @click="loadOlderMessages" :text="loadingOlder() ? copy.loading : copy.olderMessages">{{ inboxText.olderMessages }}</button>
+            <Button variant="ghost" size="xs" className="justify-self-center" :show="olderOffset() !== null" :loading="loadingOlder()" :label="loadingOlder() ? copy.loading : copy.olderMessages" @click="loadOlderMessages">{{ inboxText.olderMessages }}</Button>
             <article class="flex" x-for="message in messages()" :class="message.direction === 'outgoing' ? 'justify-end' : 'justify-start'">
               <div class="grid gap-1 max-w-[80%]">
                 <div class="px-3.5 py-2.5 rounded-2xl" :class="message.direction === 'outgoing' ? 'bg-accent text-on-accent' : 'bg-panel-2 text-body border border-line'">
@@ -148,10 +148,7 @@ export const inboxClient = { locale: workspaceLocale, messages: inboxText }
             <textarea class="px-3 py-2.5 min-h-20 text-ink text-sm bg-bg border border-field-line outline-none rounded-xl focus:ring-2 focus:ring-focus resize-y" placeholder="{{ inboxText.writeReply }}" aria-label="{{ inboxText.reply }}" x-model="draftBody" :maxlength="String(characterLimit())" @keydown="maybeSend($event)"></textarea>
             <div class="flex flex-wrap gap-2 items-center justify-between">
               <span class="text-muted text-xs" :text="words.tc('replyCharacters', remaining())"></span>
-              <button class="inline-flex gap-2 items-center justify-center px-4 h-9 font-semibold text-on-accent text-sm bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50 transition-colors" type="submit" :disabled="sending() || !canReply() || !draftBody().trim()">
-                <span class="h-4 w-4 i-hugeicons-sent" aria-hidden="true"></span>
-                <span :text="sending() ? copy.sending : replyLabel()">{{ inboxText.send }}</span>
-              </button>
+              <Button size="sm" type="submit" :disabled="!canReply() || !draftBody().trim()" :loading="sending()" :label="sending() ? copy.sending : replyLabel()" leftIcon="<span class='i-hugeicons-sent' aria-hidden='true'></span>">{{ inboxText.send }}</Button>
             </div>
           </form>
         </div>

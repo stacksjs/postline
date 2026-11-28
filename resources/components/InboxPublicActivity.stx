@@ -134,7 +134,7 @@ onMount(() => { void load() })
     <Card padding="none" className="shadow-sm">
       <header class="flex flex-wrap gap-3 items-center justify-between px-4 py-3 border-b border-line">
         <h2 class="m-0 font-semibold text-ink text-sm" id="public-inbox-title">{{ publicInboxText.publicActivity }}</h2>
-        <Button size="sm" variant="secondary" :disabled="syncing() || loading()" @click="sync"><span :text="syncing() ? copy.syncing : copy.syncPublic"></span></Button>
+        <Button size="sm" variant="secondary" :disabled="loading()" :loading="syncing()" :label="syncing() ? copy.syncing : copy.syncPublic" @click="sync">{{ publicInboxText.syncPublic }}</Button>
       </header>
       <div class="px-4 py-3" :show="loadError() || syncFeedback() || syncErrors().length">
         <p class="m-0 text-danger text-ui" role="alert" :show="loadError()" :text="loadError()"></p>
@@ -168,7 +168,7 @@ onMount(() => { void load() })
           </div>
         </article>
       </div>
-      <button class="p-3 w-full text-center text-muted text-ui hover:text-ink hover:bg-panel-2" type="button" :show="nextOffset() !== null" :disabled="loading()" @click="load(nextOffset() ?? 0)">{{ publicInboxText.morePublic }}</button>
+      <Button variant="ghost" size="sm" fullWidth="true" :show="nextOffset() !== null" :loading="loading()" :disabled="syncing()" @click="load(nextOffset() ?? 0)">{{ publicInboxText.morePublic }}</Button>
     </Card>
     <dialog ref="replyDialog" class="p-0 max-w-lg w-[calc(100%_-_2rem)] text-ink bg-panel border border-line rounded-2xl shadow-xl" aria-labelledby="public-reply-title" aria-describedby="public-reply-account" @cancel.prevent="closeReply">
       <form class="grid gap-3 p-4" @submit.prevent="sendReply">
@@ -180,8 +180,8 @@ onMount(() => { void load() })
         </label>
         <p class="m-0 text-danger text-ui" role="alert" :show="replyError()" :text="replyError()"></p>
         <div class="flex gap-2 justify-end">
-          <Button size="sm" variant="quiet" type="button" :disabled="sendingReply()" @click="closeReply">{{ publicInboxText.cancel }}</Button>
-          <Button size="sm" type="submit" :disabled="sendingReply() || !replyText().trim()"><span :text="sendingReply() ? copy.sending : copy.sendPublicReply">{{ publicInboxText.sendPublicReply }}</span></Button>
+          <Button size="sm" variant="ghost" type="button" :disabled="sendingReply()" @click="closeReply">{{ publicInboxText.cancel }}</Button>
+          <Button size="sm" type="submit" :disabled="!replyText().trim()" :loading="sendingReply()" :label="sendingReply() ? copy.sending : copy.sendPublicReply">{{ publicInboxText.sendPublicReply }}</Button>
         </div>
       </form>
     </dialog>

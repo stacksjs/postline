@@ -1843,12 +1843,17 @@ async function checkPublicInbox(cdp: Cdp): Promise<void> {
       if (new URL(input instanceof Request ? input.url : input, location.href).pathname !== '/api/postline/inbox/mentions/reply')
         return original(input, options)
       window.publicReplyAttempts.push(JSON.parse(options.body))
-      return Promise.resolve(window.publicReplyAttempts.length === 1
-        ? Response.json({ ok: false, error: 'The original post is unavailable.' }, { status: 422 })
-        : Response.json({ ok: true, data: { postId: 42, status: 'sent' } }))
+      if (window.publicReplyAttempts.length === 1)
+        return new Promise(resolve => {
+          window.rejectPublicReply = () => resolve(Response.json({
+            ok: false, error: 'The original post is unavailable.',
+          }, { status: 422 }))
+        })
+      return Promise.resolve(Response.json({ ok: true, data: { postId: 42, status: 'sent' } }))
     }
   })()`)
   const reply = `${inbox}.querySelector('dialog')`
+  const submit = `${reply}.querySelector('button[type=submit]')`
   await evaluate(cdp, `${inbox}.querySelector('[data-open-public-reply]').focus()`)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Inbox opens the public reply editor and names the receiving account', () => evaluate<boolean>(cdp, `
@@ -1859,14 +1864,18 @@ async function checkPublicInbox(cdp: Cdp): Promise<void> {
     text.value = 'Reply from the browser fixture'
     text.dispatchEvent(new Event('input', { bubbles: true }))
   })()`)
-  await waitUntil('The public reply can be sent', () => evaluate<boolean>(cdp, `!${reply}.querySelector('button[type=submit]').disabled`), 5000)
-  await evaluate(cdp, `${reply}.querySelector('button[type=submit]').focus()`)
+  await waitUntil('The public reply can be sent', () => evaluate<boolean>(cdp, `!${submit}.disabled`), 5000)
+  await evaluate(cdp, `${submit}.focus()`)
   await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The public reply button announces the pending send', () => evaluate<boolean>(cdp, `
+    Boolean(window.rejectPublicReply) && ${submit}.disabled && ${submit}.getAttribute('aria-busy') === 'true'
+      && ${submit}.innerText.trim() === 'Sending…'`), 5000)
+  await evaluate(cdp, 'window.rejectPublicReply()')
   await waitUntil('A rejected public reply keeps the authored text', () => evaluate<boolean>(cdp, `
     ${reply}.open && ${reply}.querySelector('[role=alert]').textContent === 'The original post is unavailable.'
       && ${reply}.querySelector('textarea').value === 'Reply from the browser fixture'
-      && !${reply}.querySelector('button[type=submit]').disabled`), 5000)
-  await evaluate(cdp, `${reply}.querySelector('button[type=submit]').focus()`)
+      && !${submit}.disabled && ${submit}.getAttribute('aria-busy') === 'false'`), 5000)
+  await evaluate(cdp, `${submit}.focus()`)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Inbox confirms the public reply and restores focus', () => evaluate<boolean>(cdp, `
     !${reply}.open && document.activeElement === ${inbox}.querySelector('[data-open-public-reply]')
@@ -1938,6 +1947,7 @@ async function checkInboxRequestOwnership(cdp: Cdp): Promise<void> {
   const thread = "document.querySelector('[data-inbox-thread]')"
   const older = `[...${thread}.querySelectorAll('button')].find(button => ['Show older messages', 'Loading…'].includes(button.innerText.trim()) && button.getClientRects().length)`
   const editor = "document.querySelector('[data-testid=inbox-page] textarea[aria-label=Reply]')"
+  const submit = `${editor}.closest('form').querySelector('button[type=submit]')`
   const activate = async (selector: string) => {
     await waitUntil('The Inbox control is ready', () => evaluate<boolean>(cdp, `Boolean((${selector})?.getClientRects().length && !(${selector}).disabled)`), 5_000)
     await evaluate(cdp, `(${selector}).focus()`)
@@ -1960,7 +1970,9 @@ async function checkInboxRequestOwnership(cdp: Cdp): Promise<void> {
     await waitUntil('The first conversation requests older messages', () => evaluate<boolean>(cdp, 'Boolean(window.directMessageFixture.older[701])'), 5_000)
     await select('Second')
     await activate(older)
-    await waitUntil('The second conversation requests its own older messages', () => evaluate<boolean>(cdp, 'Boolean(window.directMessageFixture.older[702])'), 5_000)
+    await waitUntil('The second conversation announces its pending history request', () => evaluate<boolean>(cdp, `
+      Boolean(window.directMessageFixture.older[702]) && (${older})?.disabled
+        && (${older})?.getAttribute('aria-busy') === 'true' && (${older})?.innerText.trim() === 'Loading…'`), 5_000)
     await evaluate(cdp, `(async () => {
       const fixture = window.directMessageFixture
       fixture.older[701]()
@@ -1970,8 +1982,9 @@ async function checkInboxRequestOwnership(cdp: Cdp): Promise<void> {
       throw new Error('A late page from the first conversation changed the second conversation.')
     await evaluate(cdp, 'window.directMessageFixture.older[702](true); delete window.directMessageFixture.older[702]')
     await waitUntil('Older-message errors are announced in the selected conversation', () => evaluate<boolean>(cdp, `
-      (${older})?.disabled === false && [...document.querySelectorAll('[role=alert]')].some(node =>
-        node.innerText.includes('Could not load older messages. Try again.'))`), 5_000)
+      (${older})?.disabled === false && (${older})?.getAttribute('aria-busy') === 'false'
+        && [...document.querySelectorAll('[role=alert]')].some(node =>
+          node.innerText.includes('Could not load older messages. Try again.'))`), 5_000)
     await activate(older)
     await waitUntil('The same older page can be retried', () => evaluate<boolean>(cdp, 'Boolean(window.directMessageFixture.older[702])'), 5_000)
     await evaluate(cdp, 'window.directMessageFixture.older[702]()')
@@ -1980,9 +1993,10 @@ async function checkInboxRequestOwnership(cdp: Cdp): Promise<void> {
 
     await evaluate(cdp, `${editor}.focus()`)
     await cdp.send('Input.insertText', { text: 'Sent reply' })
-    await activate(`${editor}.closest('form').querySelector('button[type=submit]')`)
-    await waitUntil('The reply is sent to the second conversation', () => evaluate<boolean>(cdp, `
-      window.directMessageFixture.sent?.conversation_id === 702 && window.directMessageFixture.sent?.body === 'Sent reply'`), 5_000)
+    await activate(submit)
+    await waitUntil('The reply is sent to the second conversation and the button announces it is busy', () => evaluate<boolean>(cdp, `
+      window.directMessageFixture.sent?.conversation_id === 702 && window.directMessageFixture.sent?.body === 'Sent reply'
+        && ${submit}.disabled && ${submit}.getAttribute('aria-busy') === 'true' && ${submit}.innerText.trim() === 'Sending…'`), 5_000)
     await evaluate(cdp, `${editor}.focus(); ${editor}.select()`)
     await cdp.send('Input.insertText', { text: 'Next unfinished reply' })
     await select('First')
