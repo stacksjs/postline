@@ -4,7 +4,7 @@
 import { workspaceChannelsText, workspaceLocale } from '../../app/Support/Localization/workspace'
 import { loadNetworkSetupGuides } from '../../app/Support/Social/network-setup-guides'
 
-const networkSetupGuides = await loadNetworkSetupGuides()
+const networkSetupGuides = await loadNetworkSetupGuides(workspaceLocale)
 export const channelsLocale = workspaceLocale
 export const channelsText = workspaceChannelsText
 export const channelsClient = { locale: workspaceLocale, messages: workspaceChannelsText }
@@ -86,7 +86,7 @@ export const channelsClient = { locale: workspaceLocale, messages: workspaceChan
               </span>
             </summary>
             <div class="grid gap-3 pb-4 px-4">
-              <ol class="grid gap-1 m-0 pl-5 text-body text-xs" lang="en">
+              <ol class="grid gap-1 m-0 pl-5 text-body text-xs" :lang="app.guideLanguage">
                 <li x-for="step in app.steps" :text="step"></li>
               </ol>
               <a class="w-fit text-info text-xs underline" :href="app.guideUrl" :aria-label="words.t('networkGuide', { network: app.label })" target="_blank" rel="noopener noreferrer" x-show="app.guideUrl">{{ channelsText.fullGuide }}</a>
@@ -305,6 +305,7 @@ export const channelsClient = { locale: workspaceLocale, messages: workspaceChan
         label: guide?.label ?? app.provider,
         steps: guide?.steps ?? [],
         guideUrl: guide?.url ?? '',
+        guideLanguage: guide?.language ?? language,
         configured: app.configured,
         readUsage: app.readUsage
           ? words.t('readUsage', { used: usd.format(app.readUsage.estimatedUsd), limit: usd.format(app.readUsage.limitUsd) })

@@ -29,6 +29,15 @@ jobs:
             test ! -e /app/database/postline.sqlite
           '
 
+      - name: Read the Spanish network guides from the image
+        run: |
+          docker run --rm --entrypoint bun postline:container-check -e '
+            import { loadNetworkSetupGuides } from "./app/Support/Social/network-setup-guides"
+            const guides = Object.values(await loadNetworkSetupGuides("es"))
+            if (guides.length !== 6 || guides.some(guide => guide.language !== "es" || !guide.steps.length))
+              throw new Error("The container needs all six Spanish setup guides.")
+          '
+
       - name: Verify first run, data persistence, and owner recovery
         run: |
           set -euo pipefail

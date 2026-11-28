@@ -12,9 +12,12 @@ const guideSlugs = {
   threads: 'threads',
 }
 
-export async function loadNetworkSetupGuides() {
+export async function loadNetworkSetupGuides(locale = 'en') {
+  const language = locale === 'es' ? 'es' : 'en'
+  const directory = language === 'es' ? 'docs/es/networks' : 'docs/networks'
   return Object.fromEntries(await Promise.all(Object.entries(guideSlugs).map(async ([provider, slug]) => {
-    const markdown = await readFile(join(import.meta.dir, '../../../docs/networks', `${slug}.md`), 'utf8')
+    const path = `${directory}/${slug}.md`
+    const markdown = await readFile(join(import.meta.dir, '../../..', path), 'utf8')
     const tokens = marked.lexer(markdown)
     const heading = tokens.find((token): token is Tokens.Heading => token.type === 'heading' && token.depth === 1)
     const list = tokens.find((token): token is Tokens.List => token.type === 'list' && token.ordered)
@@ -28,7 +31,8 @@ export async function loadNetworkSetupGuides() {
     return [provider, {
       label: heading.text,
       steps,
-      url: `https://github.com/stacksjs/postline/blob/main/docs/networks/${slug}.md`,
+      language,
+      url: `https://github.com/stacksjs/postline/blob/main/${path}`,
     }]
   })))
 }

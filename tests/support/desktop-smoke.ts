@@ -123,6 +123,14 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   check('Settings bootstraps CSRF protection', await bootstrapsCsrf(settings.text))
   const analytics = await call('GET', '/analytics')
   check('the desktop Analytics view survives its marketing namesake', analytics.status === 200 && analytics.text.includes('data-testid="analytics-page"'))
+  const channels = await call('GET', '/accounts')
+  const language = Bun.env.POSTLINE_SMOKE_LOCALE === 'es' ? 'es' : 'en'
+  const spanish = language === 'es'
+  const guidePath = spanish ? '/docs/es/networks/x.md' : '/docs/networks/x.md'
+  const guideStep = spanish ? 'Abre developer.x.com' : 'Open developer.x.com'
+  check('the compiled Channels view uses its network setup guide', channels.status === 200
+    && channels.text.includes(`<html lang="${language}">`)
+    && channels.text.includes(guidePath) && channels.text.includes(guideStep))
   const marketing = await call('GET', '/features/analytics')
   check('the desktop does not serve the marketing Analytics page', marketing.status !== 200)
 

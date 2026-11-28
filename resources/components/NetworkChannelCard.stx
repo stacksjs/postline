@@ -175,7 +175,7 @@ function confirmDisconnect(id: number) {
       </div>
       <details x-show="manual()">
         <summary class="inline-flex items-center justify-center h-9 w-full font-semibold list-none text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl cursor-pointer" :text="words.t('manage', { network: name() })"></summary>
-        <ol class="grid gap-1 mb-0 mt-3 pl-5 text-body text-xs" lang="en">
+        <ol class="grid gap-1 mb-0 mt-3 pl-5 text-body text-xs" :lang="guide()?.language ?? language">
           <li x-for="step in guide()?.steps ?? []" :text="step"></li>
         </ol>
         <a class="inline-block mt-2 text-info text-xs underline" :href="guide()?.url" :aria-label="words.t('guideLabel', { network: name() })" target="_blank" rel="noopener noreferrer" x-show="guide()">{{ channelCardText.guide }}</a>

@@ -57,7 +57,10 @@ try {
   // The launcher sets its own workspace and keys. A checkout's OAuth
   // redirects and other application settings must not leak into the fixture.
   const run = Bun.spawn([outfile], {
-    cwd: scratch, env: { PATH: process.env.PATH }, stdout: 'inherit', stderr: 'inherit',
+    cwd: scratch,
+    env: { PATH: process.env.PATH, POSTLINE_SMOKE_LOCALE: process.env.POSTLINE_WORKSPACE_LOCALE === 'es' ? 'es' : 'en' },
+    stdout: 'inherit',
+    stderr: 'inherit',
   })
   if (await run.exited !== 0) throw new Error('The compiled desktop check failed.')
 }

@@ -1,5 +1,7 @@
 # Connecting networks
 
+[<span lang="es">Guías de conexión en español</span>](../es/networks/index.md)
+
 Postline posts as you through each network's own API. It has no keys of its
 own: for the networks that sign in with OAuth you register a small developer
 app of your own and enter its id and secret under **Settings > Channels**.

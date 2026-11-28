@@ -3488,8 +3488,32 @@ async function checkSpanishChannels(cdp: Cdp): Promise<void> {
       && document.querySelector('[data-network-app=twitter] [data-app-client-id]')?.closest('label')?.innerText === 'ID de cliente'
       && document.querySelector('[data-network-app=twitter] [data-app-client-secret]')?.placeholder === 'Pega el secreto de cliente'
       && document.querySelector('[data-network-app=twitter] [data-app-direct-messages]')?.closest('label')?.innerText.includes('mensajes directos de pago')
-      && document.querySelector('[data-network-app=twitter] ol')?.lang === 'en'
+
   `), 5_000)
+
+  const guides = [
+    { provider: 'twitter', slug: 'x', firstStep: 'Abre developer.x.com' },
+    { provider: 'linkedin', slug: 'linkedin', firstStep: 'Abre linkedin.com/developers/apps' },
+    { provider: 'instagram', slug: 'instagram', firstStep: 'En Instagram, cambia a una cuenta profesional' },
+    { provider: 'threads', slug: 'threads', firstStep: 'Abre developers.facebook.com/apps' },
+    { provider: 'bluesky', slug: 'bluesky', firstStep: 'En Bluesky, abre Settings' },
+    { provider: 'mastodon', slug: 'mastodon', firstStep: 'En tu instancia, abre Preferences' },
+  ]
+  for (const { provider, slug, firstStep } of guides) {
+    const details = ['bluesky', 'mastodon'].includes(provider)
+      ? `document.querySelector('[data-channel=${provider}] details')`
+      : `document.querySelector('[data-network-app=${provider}]')`
+    if (provider !== 'twitter') {
+      await evaluate(cdp, `${details}.querySelector('summary').focus()`)
+      await pressKey(cdp, 'Enter', 13)
+    }
+    await waitUntil(`Spanish setup guide for ${provider}`, () => evaluate<boolean>(cdp, `
+      ${details}?.open
+        && ${details}.querySelector('ol')?.closest('[lang]')?.lang === 'es'
+        && ${details}.querySelector('ol li')?.textContent.startsWith(${JSON.stringify(firstStep)})
+        && ${details}.querySelector('a[href*="/docs/es/networks/"]')?.href.endsWith('/docs/es/networks/${slug}.md')
+    `), 5_000)
+  }
 
   await evaluate(cdp, `document.querySelector('[data-purge-card] summary').focus()`)
   await pressKey(cdp, 'Enter', 13)
