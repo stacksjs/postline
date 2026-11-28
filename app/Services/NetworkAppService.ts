@@ -8,6 +8,7 @@
  */
 import process from 'node:process'
 import { db } from '@stacksjs/database'
+import { isDesktopAgent } from '../Support/Auth/native'
 import { UserFacingError } from '../Support/Http/user-error'
 import { openToken, sealToken } from '../Support/Social/token-vault'
 import { now } from './Social/support'
@@ -64,12 +65,16 @@ export class NetworkAppService {
   async credentials(network: AppNetwork): Promise<NetworkAppCredentials> {
     const row = await database.selectFrom('network_apps').selectAll().where('provider', '=', network).executeTakeFirst()
     const env = (name: string): string => String(process.env[`${ENV_PREFIX[network]}_${name}`] || '').trim()
+    // An imported workspace may carry the callback of its previous host.
+    // OAuth on the Mac always returns to this agent's own listener.
+    const savedRedirect = row?.client_id ? String(row.redirect_url || '').trim() : ''
+    const redirectUrl = isDesktopAgent() ? defaultRedirectUrl(network) : savedRedirect || env('REDIRECT_URL') || defaultRedirectUrl(network)
 
     if (row?.client_id) {
       return {
         clientId: String(row.client_id),
         clientSecret: (await openToken(row.client_secret)) || '',
-        redirectUrl: String(row.redirect_url || '').trim() || env('REDIRECT_URL') || defaultRedirectUrl(network),
+        redirectUrl,
         organizationPages: network === 'linkedin' && Boolean(Number(row.organization_pages ?? 0)),
         engagementMetrics: Boolean(Number(row.engagement_metrics ?? 0)),
         directMessages: network === 'twitter' && Boolean(Number(row.direct_messages ?? 0)),
@@ -81,7 +86,7 @@ export class NetworkAppService {
     return {
       clientId,
       clientSecret: env('CLIENT_SECRET'),
-      redirectUrl: env('REDIRECT_URL') || defaultRedirectUrl(network),
+      redirectUrl,
       organizationPages: network === 'linkedin' && env('PAGES').toLowerCase() === 'true',
       engagementMetrics: env('ENGAGEMENT_METRICS').toLowerCase() === 'true',
       directMessages: network === 'twitter' && env('DIRECT_MESSAGES').toLowerCase() === 'true',

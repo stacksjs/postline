@@ -83,6 +83,14 @@ the alert webhook are configured. **Open Activity** takes you to the alerts
 in the workspace window.
 Open **About** for the installed version, updates, and the log in Finder.
 
+For a network that accepts a loopback OAuth callback, copy the address in
+**Channels > Your network apps** into that app's developer console. Postline
+remembers the agent port between launches. If the displayed address changes
+because the port was in use, update the registered callback before connecting.
+**Connect** and **Test connection** open consent in your default browser.
+Return to Postline to see the result and, for Instagram, choose a Facebook Page.
+Each network guide covers the required developer-app settings.
+
 To start over as a new install, quit the app and move
 `~/Library/Application Support/Postline` aside.
 

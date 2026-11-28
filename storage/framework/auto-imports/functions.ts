@@ -14,6 +14,7 @@ export { firstComposerLink, composerLinkPreview } from '../../../resources/funct
 export type { ComposerLinkPreview, ComposerSegment } from '../../../resources/functions/composer-thread'
 export { composerVariantsPayload, composerVariantRows } from '../../../resources/functions/composer-variants'
 export type { ComposerVariants } from '../../../resources/functions/composer-variants'
+export { openNativeNetworkConsent } from '../../../resources/functions/native-network-consent'
 export { providerLabel, providerInitial, providerColor, providerIcon } from '../../../resources/functions/networks'
 export { showNotification } from '../../../resources/functions/notification'
 export { passkeys } from '../../../resources/functions/passkeys'

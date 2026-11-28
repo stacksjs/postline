@@ -50,6 +50,13 @@ export default {
     agent: {
       entry: 'app/Desktop/Agent.ts',
       prepare: 'app/Desktop/Prepare.ts',
+      publicPaths: [
+        '/api/postline/desktop-network-consent/launch',
+        '/api/postline/twitter/callback',
+        '/api/postline/linkedin/callback',
+        '/api/postline/instagram/callback',
+        '/api/postline/threads/callback',
+      ],
       database: { filename: 'postline.sqlite' },
       config: true,
       appRoutes: true,

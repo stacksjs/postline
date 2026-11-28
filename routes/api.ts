@@ -139,6 +139,8 @@ route.group({ prefix: '/postline/mastodon' }, () => {
 })
 
 route.group({ prefix: '/postline' }, () => {
+  route.get('/desktop-network-consent/launch', 'Actions/Postline/NativeNetworkConsentLaunchAction').middleware('auth').rateLimit(20, 'minute')
+  route.post('/desktop-network-consent', 'Actions/Postline/NativeNetworkConsentAction').middleware('auth').rateLimit(60, 'minute')
   route.get('/bootstrap', 'Actions/Postline/WorkspaceBootstrapAction').middleware('auth')
   route.get('/setup/post-status', 'Actions/Postline/SetupPostStatusAction').middleware('auth')
   route.get('/providers', 'Actions/Postline/ProvidersStatusAction').middleware('auth')

@@ -14,6 +14,8 @@ const plural = new Intl.PluralRules(language)
 
 const provider = useReactiveProp('provider', '')
 const guide = useReactiveProp('guide', null, { parse: value => value })
+const authorizing = useReactiveProp('authorizing', false)
+const emit = defineEmits(['authorize'])
 const bootstrap = workspaceBootstrapQuery()
 const sending = state(false)
 const busyAccount = state(0)
@@ -167,7 +169,7 @@ function confirmDisconnect(id: number) {
     <div class="grid gap-2">
       <a class="inline-flex items-center justify-center h-9 font-semibold text-ink text-xs bg-panel-2 hover:bg-raised border border-line rounded-xl" href="/writing" data-stx-link x-show="blog()">{{ channelCardText.openBlog }}</a>
       <div class="grid gap-2" x-show="!manual() && !blog()">
-        <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="button" :disabled="!status()?.oauthConfigured || sending()" :text="connectLabel()" @click="navigate('/api/postline/' + provider() + '/auth', { reload: true })"></button>
+        <button class="inline-flex items-center justify-center px-3 h-9 w-full font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-xl disabled:opacity-50" type="button" :disabled="!status()?.oauthConfigured || sending() || authorizing()" :text="connectLabel()" @click="emit('authorize', {})"></button>
         <p class="m-0 text-muted text-xs" x-show="!status()?.oauthConfigured">{{ channelCardText.setUpApp }}</p>
         <button class="text-muted text-xs underline hover:text-ink disabled:opacity-50" type="button" :disabled="sending()" x-show="status()?.configuredFromEnv" @click="connect()">{{ channelCardText.configuredToken }}</button>
       </div>

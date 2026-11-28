@@ -36,6 +36,7 @@ try {
       runtime: process.execPath,
       window: { title: appName, ...window },
       startPath: agent.startPath,
+      publicPaths: agent.publicPaths,
     },
     agentEntry,
     prepareEntry: join(root, agent.prepare),

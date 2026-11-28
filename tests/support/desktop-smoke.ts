@@ -1,5 +1,6 @@
 import type { RunWebviewAppOptions } from '@stacksjs/desktop-build'
 import { Database } from 'bun:sqlite'
+import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
 import { release } from 'node:os'
 import { join } from 'node:path'
@@ -156,26 +157,153 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
     provider: 'twitter',
     client_id: 'postline-desktop-test',
     client_secret: 'test-only',
+    redirect_url: 'https://previous-workspace.example/api/postline/twitter/callback',
   })
-  check('saving a network app from the desktop workspace', app.status === 200)
-  const consent = await call('GET', '/api/postline/twitter/auth')
-  const location = new URL(consent.headers.get('Location') ?? '/', origin)
-  const state = location.searchParams.get('state')
-  const flowCookie = consent.headers.get('Set-Cookie')?.split(';')[0]
-  check('desktop opens X consent with a loopback callback and browser-bound state', consent.status === 302
-    && location.searchParams.get('redirect_uri') === `${origin}/api/postline/twitter/callback`
-    && /^[a-f0-9]{64}$/.test(state ?? '') && Boolean(flowCookie))
-  if (state && flowCookie) {
-    const cancel = await call('GET', `/api/postline/twitter/callback?error=access_denied&state=${state}`, undefined, flowCookie)
-    check('desktop clears the flow when consent is cancelled', cancel.status === 302
-      && cancel.headers.get('Location')?.startsWith('/accounts?twitter=error') === true
-      && cancel.headers.get('Set-Cookie')?.includes('Max-Age=0') === true)
+  check('the desktop reports its actual callback even when the saved app came from a hosted workspace', app.status === 200
+    && JSON.parse(app.text).data?.redirectUrl === `${origin}/api/postline/twitter/callback`)
+  const consentPath = '/api/postline/desktop-network-consent'
+  const beginConsent = JSON.stringify({ operation: 'begin', provider: 'twitter' })
+  const outside = await fetch(origin + consentPath, {
+    method: 'POST', body: beginConsent, headers: { 'Content-Type': 'application/json', 'Origin': origin },
+  })
+  check('the default browser cannot start a connection outside the Postline window', outside.status === 401)
+  const initiated = await call('POST', consentPath, beginConsent)
+  check('the desktop initiates consent for the default browser', initiated.status === 200, initiated.text)
+  if (initiated.status === 200) {
+    const { launchUrl, id } = JSON.parse(initiated.text).data
+    const external = await fetch(launchUrl, { redirect: 'manual' })
+    const location = new URL(external.headers.get('Location') ?? '/', origin)
+    const state = location.searchParams.get('state')
+    const flowCookie = external.headers.getSetCookie().find(cookie => cookie.startsWith('stacks_oauth_'))
+    const externalCookie = flowCookie?.split(';')[0]
+    check('the default browser gets a loopback callback, PKCE and its own Lax cookie', external.status === 302
+      && location.searchParams.get('redirect_uri') === `${origin}/api/postline/twitter/callback`
+      && location.searchParams.get('code_challenge_method') === 'S256'
+      && /^[a-f0-9]{64}$/.test(state ?? '') && flowCookie?.includes('SameSite=Lax') === true)
+    const replayLaunch = await fetch(launchUrl, { redirect: 'manual' })
+    check('the browser launch ticket is single-use', replayLaunch.status === 400)
+    if (state && externalCookie) {
+      const tail = `?error=access_denied&state=${state}`
+      const wrong = await fetch(`${origin}/api/postline/threads/callback${tail}`, { headers: { cookie: externalCookie } })
+      const missing = await fetch(`${origin}/api/postline/twitter/callback${tail}`)
+      check('callback requires the original network and browser proof', wrong.status === 400 && missing.status === 400)
+      const cancel = await fetch(`${origin}/api/postline/twitter/callback${tail}`, { headers: { cookie: externalCookie } })
+      check('desktop accepts the verified denial without the workspace cookie', cancel.status === 200
+        && cancel.headers.get('Set-Cookie')?.includes('Max-Age=0') === true && !cancel.headers.has('location'))
+      const poll = JSON.stringify({ operation: 'result', id })
+      const result = await call('POST', consentPath, poll)
+      const retried = await call('POST', consentPath, poll)
+      const externalResult = await fetch(origin + consentPath, {
+        method: 'POST', body: poll, headers: { 'Content-Type': 'application/json', 'Origin': origin },
+      })
+      check('the result stays available for retries in the Postline window only', result.status === 200
+        && JSON.parse(result.text).data?.location?.startsWith('/accounts?twitter=error') === true
+        && retried.text === result.text && externalResult.status === 401)
+      const replayCallback = await fetch(`${origin}/api/postline/twitter/callback${tail}`, { headers: { cookie: externalCookie } })
+      check('the verified browser callback is also single-use', replayCallback.status === 400)
+    }
+  }
+
+  const tested = await call('POST', consentPath, JSON.stringify({ operation: 'begin', provider: 'twitter', test: true }))
+  if (tested.status !== 200) throw new Error('Could not start the desktop X connection test.')
+  const testConsent = JSON.parse(tested.text).data
+  const testLaunch = await fetch(testConsent.launchUrl, { redirect: 'manual' })
+  const testAuthorization = new URL(testLaunch.headers.get('Location') ?? '/', origin)
+  const testState = testAuthorization.searchParams.get('state')
+  const testCookie = testLaunch.headers.getSetCookie().find(cookie => cookie.startsWith('stacks_oauth_'))?.split(';')[0]
+  if (!testState || !testCookie) throw new Error('The system browser did not receive the X test flow.')
+
+  const realFetch = globalThis.fetch
+  let verifiedTokenRequest = false
+  let profileRead = false
+  globalThis.fetch = (async (input, options) => {
+    const request = new Request(input, options)
+    const url = new URL(request.url)
+    if (url.origin !== 'https://api.twitter.com') return realFetch(input, options)
+    if (url.pathname === '/2/oauth2/token') {
+      const body = new URLSearchParams(await request.text())
+      const proof = createHash('sha256').update(body.get('code_verifier') ?? '').digest('base64url')
+      verifiedTokenRequest = request.method === 'POST'
+        && body.get('code') === 'fixture-x-code'
+        && body.get('redirect_uri') === `${origin}/api/postline/twitter/callback`
+        && proof === testAuthorization.searchParams.get('code_challenge')
+      return Response.json({ access_token: 'fixture-x-test-token', expires_in: 3600 })
+    }
+    if (url.pathname === '/2/users/me') {
+      profileRead = request.headers.get('Authorization') === 'Bearer fixture-x-test-token'
+      return Response.json({ data: { id: '123', username: 'fixture_test', name: 'Fixture' } })
+    }
+    throw new Error('Unexpected X fixture endpoint.')
+  }) as typeof fetch
+  try {
+    const query = new URLSearchParams({ state: testState, code: 'fixture-x-code' })
+    const accepted = await fetch(`${origin}/api/postline/twitter/callback?${query}`, { headers: { cookie: testCookie } })
+    const result = await call('POST', consentPath, JSON.stringify({ operation: 'result', id: testConsent.id }))
+    const accounts = await call('GET', '/api/postline/accounts')
+    check('desktop Test connection exchanges its exact PKCE proof and leaves accounts unchanged', accepted.status === 200
+      && verifiedTokenRequest && profileRead && JSON.parse(result.text).data?.location === '/accounts?twitter=tested'
+      && !accounts.text.includes('fixture_test'))
+  }
+  finally {
+    globalThis.fetch = realFetch
   }
 
   const instagramPages = await call('GET', '/api/postline/instagram/pages')
   check('the compiled agent requires a bound Instagram Page selection', instagramPages.status === 422
     && JSON.parse(instagramPages.text)?.error?.includes('Connect Instagram again from Channels') === true,
   `${instagramPages.status} ${instagramPages.type}`)
+
+  const instagramApp = await call('POST', '/api/postline/network-apps', {
+    provider: 'instagram', client_id: 'postline-instagram-fixture', client_secret: 'test-only',
+  })
+  if (instagramApp.status !== 200) throw new Error('Could not save the Instagram fixture app.')
+  const beginInstagram = await call('POST', consentPath, JSON.stringify({ operation: 'begin', provider: 'instagram' }))
+  if (beginInstagram.status !== 200) throw new Error('Could not start the desktop Instagram flow.')
+  const instagramConsent = JSON.parse(beginInstagram.text).data
+  const instagramLaunch = await fetch(instagramConsent.launchUrl, { redirect: 'manual' })
+  const instagramState = new URL(instagramLaunch.headers.get('Location') ?? '/', origin).searchParams.get('state')
+  const instagramCookie = instagramLaunch.headers.getSetCookie().find(cookie => cookie.startsWith('stacks_oauth_'))?.split(';')[0]
+  if (!instagramState || !instagramCookie) throw new Error('The system browser did not receive the Instagram fixture flow.')
+
+  globalThis.fetch = (async (input, options) => {
+    const request = new Request(input, options)
+    const url = new URL(request.url)
+    if (url.origin !== 'https://graph.facebook.com') return realFetch(input, options)
+    if (url.pathname.endsWith('/oauth/access_token'))
+      return Response.json({ access_token: 'fixture-meta-user-token', expires_in: 1_000 })
+    if (url.pathname.endsWith('/me/accounts'))
+      return Response.json({ data: [{
+        id: '34', name: 'Fixture Page', access_token: 'fixture-meta-page-token',
+        instagram_business_account: { id: '1234', username: 'fixture_ig' },
+      }] })
+    throw new Error('Unexpected Meta fixture endpoint.')
+  }) as typeof fetch
+  try {
+    const query = new URLSearchParams({ state: instagramState, code: 'fixture-meta-code' })
+    const external = await fetch(`${origin}/api/postline/instagram/callback?${query}`, { headers: { cookie: instagramCookie } })
+    const result = await call('POST', consentPath, JSON.stringify({ operation: 'result', id: instagramConsent.id }))
+    const destination = new URL(JSON.parse(result.text).data?.location ?? '/', origin)
+    const state = destination.searchParams.get('instagram_state')
+    const selectionCookie = result.headers.getSetCookie().find(cookie => cookie.startsWith('stacks_oauth_'))?.split(';')[0]
+    check('Instagram hands the Page-selection cookie only to Postline', external.status === 200
+      && !external.headers.get('Set-Cookie')?.includes('/api/postline/instagram/pages')
+      && destination.searchParams.get('instagram') === 'choose'
+      && Boolean(state && selectionCookie))
+    if (state && selectionCookie) {
+      const pagesPath = '/api/postline/instagram/pages'
+      const params = new URLSearchParams({ state })
+      const unbound = await call('GET', `${pagesPath}?${params}`)
+      const bound = await call('GET', `${pagesPath}?${params}`, undefined, selectionCookie)
+      const selected = await call('POST', pagesPath, JSON.stringify({ state, page_id: '34' }), selectionCookie)
+      check('the Postline window can select the authorized Page using the issued cookie', unbound.status === 422
+        && bound.status === 200 && bound.text.includes('Fixture Page') && !bound.text.includes('fixture-meta-page-token')
+        && selected.status === 200 && selected.text.includes('fixture_ig'),
+      `unbound HTTP ${unbound.status}; list HTTP ${bound.status}; select HTTP ${selected.status}`)
+    }
+  }
+  finally {
+    globalThis.fetch = realFetch
+  }
 
   const browserSessionPath = '/api/postline/twitter/browser-session'
   const composerCheckPath = `${browserSessionPath}/composer-check`

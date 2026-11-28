@@ -39,7 +39,7 @@ export const channelsClient = { locale: workspaceLocale, messages: workspaceChan
             <p class="m-0 mt-1 text-muted text-xs">{{ channelsText.credentialStorage }}</p>
           </div>
         </header>
-        <p class="m-0 pt-3 px-4 text-sm" role="status" x-cloak x-show="oauthFeedback()" :class="oauthFailed() ? 'text-danger' : 'text-success'" :text="oauthFeedback()"></p>
+        <p class="m-0 pt-3 px-4 text-sm" role="status" x-cloak x-show="oauthFeedback()" :class="oauthFailed() ? 'text-danger' : nativeConsentPending() ? 'text-muted' : 'text-success'" :text="oauthFeedback()"></p>
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" x-show="!channelsReady() && !bootstrap.error()" data-channels-loading>
           <span class="sr-only" role="status">{{ channelsText.loading }}</span>
           @for(i = 0; i < 3; i++)
@@ -56,7 +56,7 @@ export const channelsClient = { locale: workspaceLocale, messages: workspaceChan
         </EmptyState>
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" x-cloak x-show="channelsReady()" data-publishing-channels>
           <div class="min-w-0" x-for="provider in channelProviders()" :key="provider">
-            <NetworkChannelCard :provider="provider" :guide="guides[provider]" />
+            <NetworkChannelCard :provider="provider" :guide="guides[provider]" :authorizing="nativeConsentPending()" @authorize="startConsent(provider, false)" />
           </div>
         </div>
       </Card>
@@ -127,7 +127,7 @@ export const channelsClient = { locale: workspaceLocale, messages: workspaceChan
                 <div class="flex flex-wrap gap-2 items-center sm:col-span-2">
                   <p class="m-0 mr-auto text-muted text-xs" :text="app.note"></p>
                   <button class="px-3 h-8 font-medium text-danger text-xs bg-panel hover:bg-danger-soft border border-line rounded-lg disabled:opacity-50" type="button" x-show="app.removable" :disabled="appBusy() === app.provider" @click="clearApp(app.provider)">{{ channelsText.remove }}</button>
-                  <Button variant="secondary" size="xs" :disabled="!app.testReady || appBusy() === app.provider" @click="navigate('/api/postline/' + app.provider + '/auth?test=1', { reload: true })">{{ channelsText.testConnection }}</Button>
+                  <Button variant="secondary" size="xs" :disabled="!app.testReady || appBusy() === app.provider || nativeConsentPending()" @click="startConsent(app.provider, true)">{{ channelsText.testConnection }}</Button>
                   <button class="px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="submit" :disabled="appBusy() === app.provider">{{ channelsText.save }}</button>
                 </div>
               </form>
@@ -215,6 +215,7 @@ export const channelsClient = { locale: workspaceLocale, messages: workspaceChan
 
   <script client>
     import { createI18n } from '@stacksjs/i18n/client'
+    import { openNativeNetworkConsent } from '../functions/native-network-consent'
     import { showNotification } from '../functions/notification'
 
     const { locale: language, messages: copy } = {{ channelsClient }}
@@ -232,6 +233,41 @@ export const channelsClient = { locale: workspaceLocale, messages: workspaceChan
     const networkApps = derived(() => bootstrap.data()?.networkApps ?? [])
     const oauthFeedback = state('')
     const oauthFailed = state(false)
+    const desktop = useNativeDesktop()
+    const nativeConsentPending = state(false)
+    let consent: AbortController | undefined
+
+    onUnmounted(() => consent?.abort())
+
+    async function startConsent(provider: string, test: boolean) {
+      const host = desktop()
+      if (!host) {
+        navigate('/api/postline/' + provider + '/auth' + (test ? '?test=1' : ''), { reload: true })
+        return
+      }
+      if (nativeConsentPending()) return
+      consent = new AbortController()
+      const { signal } = consent
+      nativeConsentPending.set(true)
+      oauthFailed.set(false)
+      oauthFeedback.set('')
+      try {
+        const destination = await openNativeNetworkConsent(host, provider, test, signal, copy, () => oauthFeedback.set(copy.completeInBrowser))
+        navigate(destination, { reload: true })
+      }
+      catch (error) {
+        if (!signal.aborted) {
+          oauthFailed.set(true)
+          oauthFeedback.set(error instanceof Error ? error.message : copy.browserUnavailable)
+        }
+      }
+      finally {
+        if (consent?.signal === signal) {
+          nativeConsentPending.set(false)
+          consent = undefined
+        }
+      }
+    }
 
     const setupInProgress = useSessionStorage('postline.setup.in-progress', false)
     const setupRequested = useRoute().query.setup === '1'

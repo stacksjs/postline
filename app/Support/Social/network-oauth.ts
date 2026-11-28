@@ -1,11 +1,11 @@
 import type { RequestInstance } from '@stacksjs/types'
 import type { AppNetwork } from '../../Services/NetworkAppService'
+import type { NetworkAuthorization } from './native-network-consent'
 import { response } from '@stacksjs/router'
 import { clearOAuthFlowCookie, consumeOAuthFlow, issueOAuthFlow, readOAuthFlowCookie } from '@stacksjs/socials'
 import { allowsNativeAppWithoutLogin } from '../Auth/native'
 import { publicMessage } from '../Http/action-error'
-
-const FLOW_TTL_MS = 15 * 60_000
+import { finishNativeNetworkConsent, nativeConsentIsActive, nativeNetworkConsentPage, NETWORK_CONSENT_TTL_MS, networkConsentPurpose } from './native-network-consent'
 
 export interface NetworkOAuthExchangeOptions {
   codeVerifier?: string
@@ -38,19 +38,20 @@ export async function workspaceOwner(request: RequestInstance): Promise<number |
 export async function redirectToNetworkConsent(
   request: RequestInstance,
   provider: AppNetwork,
-  prepare: () => Promise<{ url: string, codeVerifier?: string, requestedScopes?: string[] }>,
+  prepare: () => Promise<NetworkAuthorization>,
 ): Promise<Response> {
   const owner = await workspaceOwner(request)
   if (owner === undefined) return response.unauthorized('Unauthorized')
+  if (owner === null) return networkResult(provider, 'error', 'Start the connection from Channels in the Postline app.')
 
   try {
     const { url, codeVerifier, requestedScopes } = await prepare()
     const testOnly = request.get('test') === '1'
     const authorization = new URL(url)
     const flow = await issueOAuthFlow({
-      purpose: `postline-connect:${provider}`,
+      purpose: networkConsentPurpose(provider, false),
       userId: owner,
-      ttlMs: FLOW_TTL_MS,
+      ttlMs: NETWORK_CONSENT_TTL_MS,
       data: { ...(testOnly && { testOnly }), ...(codeVerifier && { codeVerifier }), ...(requestedScopes && { requestedScopes }) },
       cookie: { path: `/api/postline/${provider}/callback` },
     })
@@ -73,30 +74,44 @@ export async function finishNetworkConsent(
   if (owner === undefined) return response.unauthorized('Unauthorized')
 
   const state = String(request.get('state') || '')
+  const native = owner === null
+  const cookie = { path: `/api/postline/${provider}/callback`, ...(native && { secure: false }) }
+  let nativeConsentId: string | undefined
   let result: Response
   try {
     const flow = await consumeOAuthFlow(state, {
-      purpose: `postline-connect:${provider}`,
+      purpose: networkConsentPurpose(provider, native),
       browserSecret: readOAuthFlowCookie(request.headers.get('cookie'), state),
     })
     if (!flow || flow.userId !== owner) {
       result = networkResult(provider, 'error', 'This connection expired or was started in another browser. Start again from Channels.')
     }
-    else if (request.get('error')) {
-      result = networkResult(provider, 'error', 'The network did not authorize the connection. Try connecting again from Channels.')
-    }
     else {
-      const code = String(request.get('code') || '')
-      const codeVerifier = typeof flow.data?.codeVerifier === 'string' ? flow.data.codeVerifier : undefined
-      const testOnly = flow.data?.testOnly === true
-      const requestedScopes = Array.isArray(flow.data?.requestedScopes) ? flow.data.requestedScopes.filter((scope): scope is string => typeof scope === 'string') : undefined
-      const exchanged = await exchange(code, { codeVerifier, testOnly, ...(requestedScopes && { requestedScopes }) }, owner)
-      result = exchanged instanceof Response ? exchanged : networkResult(provider, testOnly ? 'tested' : 'connected')
+      if (native) {
+        const id = flow.data?.nativeConsentId
+        if (!nativeConsentIsActive(id, provider)) return nativeNetworkConsentPage(400)
+        nativeConsentId = id
+      }
+      if (request.get('error')) {
+        result = networkResult(provider, 'error', 'The network did not authorize the connection. Try connecting again from Channels.')
+      }
+      else {
+        const code = String(request.get('code') || '')
+        const codeVerifier = typeof flow.data?.codeVerifier === 'string' ? flow.data.codeVerifier : undefined
+        const testOnly = flow.data?.testOnly === true
+        const requestedScopes = Array.isArray(flow.data?.requestedScopes) ? flow.data.requestedScopes.filter((scope): scope is string => typeof scope === 'string') : undefined
+        const exchanged = await exchange(code, { codeVerifier, testOnly, ...(requestedScopes && { requestedScopes }) }, owner)
+        result = exchanged instanceof Response ? exchanged : networkResult(provider, testOnly ? 'tested' : 'connected')
+      }
     }
   }
   catch (error) {
     result = networkResult(provider, 'error', publicMessage(error))
   }
-  if (state) result.headers.append('Set-Cookie', await clearOAuthFlowCookie(state, { path: `/api/postline/${provider}/callback` }))
+  if (native) {
+    if (nativeConsentId) finishNativeNetworkConsent(nativeConsentId, result)
+    result = nativeNetworkConsentPage(nativeConsentId ? 200 : 400)
+  }
+  if (/^[a-f0-9]{64}$/.test(state)) result.headers.append('Set-Cookie', await clearOAuthFlowCookie(state, cookie))
   return result
 }

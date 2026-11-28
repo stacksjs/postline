@@ -73,6 +73,8 @@ export const actions = {
   'Actions/Postline/MastodonStatusAction': '../../../app/Actions/Postline/MastodonStatusAction.ts',
   'Actions/Postline/MediaServeAction': '../../../app/Actions/Postline/MediaServeAction.ts',
   'Actions/Postline/MetricsSyncAction': '../../../app/Actions/Postline/MetricsSyncAction.ts',
+  'Actions/Postline/NativeNetworkConsentAction': '../../../app/Actions/Postline/NativeNetworkConsentAction.ts',
+  'Actions/Postline/NativeNetworkConsentLaunchAction': '../../../app/Actions/Postline/NativeNetworkConsentLaunchAction.ts',
   'Actions/Postline/NetworkAppClearAction': '../../../app/Actions/Postline/NetworkAppClearAction.ts',
   'Actions/Postline/NetworkAppListAction': '../../../app/Actions/Postline/NetworkAppListAction.ts',
   'Actions/Postline/NetworkAppSaveAction': '../../../app/Actions/Postline/NetworkAppSaveAction.ts',

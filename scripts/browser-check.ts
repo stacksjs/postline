@@ -2002,6 +2002,72 @@ async function checkChannels(cdp: Cdp): Promise<void> {
   }
 }
 
+async function checkDesktopNetworkConsent(cdp: Cdp): Promise<void> {
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    window.craft = {
+      app: { nativePlatformControls: false },
+      capabilities: { nativePlatformControls: false },
+      shell: { openExternal: async url => { window.consentBrowser = url } },
+    }
+    const send = window.fetch.bind(window)
+    window.fetch = async (input, options) => {
+      const request = new Request(input, options)
+      const path = new URL(request.url).pathname
+      if (path === '/api/postline/desktop-network-consent') {
+        const body = await request.json()
+        if (body.operation === 'begin') {
+          window.consentStart = body
+          window.consentBrowser = ''
+          return Response.json({ ok: true, data: {
+            id: 'fixture-consent', launchUrl: location.origin + path + '/launch?ticket=fixture-consent',
+          } })
+        }
+        const status = window.consentStart.test ? 'tested' : 'error'
+        return Response.json({ ok: true, data: !window.consentFinished ? { state: 'pending' }
+          : { state: 'complete', location: '/accounts?twitter=' + status } })
+      }
+      const response = await send(input, options)
+      if (path !== '/api/postline/bootstrap' || !response.ok) return response
+      const payload = await response.json()
+      for (const provider of payload.data.providers) {
+        if (provider.provider === 'twitter') provider.oauthConfigured = true
+      }
+      for (const app of payload.data.networkApps) {
+        if (app.provider === 'twitter') Object.assign(app, { configured: true, source: 'settings', clientId: 'fixture-app', hasSecret: true })
+      }
+      return Response.json(payload)
+    }
+  ` })
+  try {
+    const report = await auditPage(`${site}/accounts`, { cdp })
+    for (const error of [...report.errors, ...report.failed]) fail('accounts', 'desktop consent', error)
+    const connect = "[...document.querySelectorAll('[data-channel=twitter] button')].find(button => button.textContent.trim() === 'Connect X')"
+    const test = "[...document.querySelectorAll('[data-network-app=twitter] button')].find(button => button.textContent.trim() === 'Test connection')"
+    for (const testOnly of [false, true]) {
+      const trigger = testOnly ? test : connect
+      if (testOnly) await evaluate(cdp, "document.querySelector('[data-network-app=twitter] summary').click()")
+      await waitUntil('The X consent control is enabled', () => evaluate<boolean>(cdp, `!${trigger}?.disabled && Boolean(${trigger}?.getClientRects().length)`), 5_000)
+      await evaluate(cdp, `(${trigger}).focus()`)
+      await pressKey(cdp, 'Enter', 13)
+      await waitUntil('The Mac opens consent in the system browser', () => evaluate<boolean>(cdp, `
+        window.consentBrowser?.includes('/desktop-network-consent/launch?ticket=fixture-consent')
+          && window.consentStart?.provider === 'twitter' && window.consentStart?.test === ${testOnly}
+          && (${trigger}).disabled
+          && document.querySelector('[data-testid=accounts-page]').textContent.includes('Complete the connection in your default browser')
+      `), 5_000)
+      await evaluate(cdp, 'window.consentFinished = true')
+      const message = testOnly ? 'X sign-in passed.' : 'Could not connect X.'
+      await waitUntil('The Postline window displays the consent result', () => evaluate<boolean>(cdp, `
+        location.pathname === '/accounts' && !location.search && !window.consentStart
+          && [...document.querySelectorAll('[role=status]')].some(node => node.textContent.includes(${JSON.stringify(message)}))
+      `), 8_000)
+    }
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+  }
+}
+
 async function checkBrowserPasskey(cdp: Cdp): Promise<void> {
   await cdp.send('WebAuthn.enable')
   const { authenticatorId } = await cdp.send<{ authenticatorId: string }>('WebAuthn.addVirtualAuthenticator', {
@@ -3938,6 +4004,7 @@ async function checkWorkspace(cdp: Cdp): Promise<void> {
   await checkWorkspaceCommands(cdp)
   await checkWorkspaceBootstrap(cdp)
   await checkChannels(cdp)
+  await checkDesktopNetworkConsent(cdp)
   await checkPublicInbox(cdp)
   await checkTwitterDmControls(cdp)
   await checkXBrowserSession(cdp)
