@@ -4231,6 +4231,23 @@
             "isNullable": true,
             "hasDefault": false,
             "maxLength": 36
+          },
+          {
+            "name": "delete_token",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 36
+          },
+          {
+            "name": "deleted_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
           }
         ],
         "indexes": [
@@ -4253,7 +4270,7 @@
       }
     ]
   },
-  "hash": "007673ef01b8e692b59b1834f4391c1a6efcca4bc0224019d298f95e0c60c548",
+  "hash": "0a0e3976475386510d616e629eeda5c44e873f23fd463d3778cf659679116c95",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-28T03:06:54.129Z"
+  "updatedAt": "2026-11-28T03:19:36.659Z"
 }

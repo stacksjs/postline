@@ -18,6 +18,7 @@ import { readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { db, sqliteWriteOptions } from '@stacksjs/database'
 import { UserFacingError } from '../Support/Http/user-error'
+import { isRealTimestamp } from '../Support/time'
 import type { ArchivedTargetAccount, IdentityLike } from '../Support/Social/accounts'
 import { archivedTargetAccount, matchArchivedTargetAccount } from '../Support/Social/accounts'
 import { xBrowserPostId } from '../Support/Social/x-browser-write'
@@ -44,7 +45,7 @@ import { readArchivedTrackedLink, trackedLinks } from './TrackedLinkService'
 const database = db as any
 
 export const ARCHIVE_FORMAT = 'postline-workspace'
-export const ARCHIVE_VERSION = 11
+export const ARCHIVE_VERSION = 12
 
 /** Typed to delete everything, so a stray click cannot. */
 export const DELETE_EVERYTHING_PHRASE = 'DELETE EVERYTHING'
@@ -74,6 +75,8 @@ interface ArchivedBrowserDispatch {
   handle: string
   state: 'submitting' | 'published'
   remoteId: string | null
+  deletedAt?: string
+  deletionPending?: true
 }
 
 export interface WorkspaceArchive {
@@ -137,7 +140,15 @@ function readBrowserDispatch(value: unknown): ArchivedBrowserDispatch {
     || !((receipt.state === 'submitting' && receipt.remoteId === null)
       || (receipt.state === 'published' && xBrowserPostId(receipt.remoteId))))
     throw new UserFacingError('That export contains an invalid X browser publish receipt.')
-  return { post: receipt.post, handle: receipt.handle.toLowerCase(), state: receipt.state, remoteId: receipt.remoteId }
+  const { deletedAt, deletionPending } = receipt
+  if ((deletedAt !== undefined && (typeof deletedAt !== 'string' || deletedAt.length !== 19 || !isRealTimestamp(deletedAt)))
+    || (deletionPending !== undefined && deletionPending !== true)
+    || ((deletedAt || deletionPending) && receipt.state !== 'published') || (deletedAt && deletionPending))
+    throw new UserFacingError('That export contains an invalid X browser deletion receipt.')
+  return {
+    post: receipt.post, handle: receipt.handle.toLowerCase(), state: receipt.state, remoteId: receipt.remoteId,
+    ...(deletedAt && { deletedAt }), ...(deletionPending && { deletionPending }),
+  }
 }
 
 function readArchivedImage(data: unknown, message: string) {
@@ -198,7 +209,7 @@ export class WorkspaceArchiveService {
       return {
         posts,
         targets: postIds.length ? tx.selectFrom('post_targets').selectAll().where('post_id', 'in', postIds).execute() : [],
-        dispatches: postIds.length ? tx.selectFrom('twitter_browser_dispatches').select(['post_id', 'handle', 'state', 'remote_id'])
+        dispatches: postIds.length ? tx.selectFrom('twitter_browser_dispatches').select(['post_id', 'handle', 'state', 'remote_id', 'deleted_at', 'delete_token'])
           .where('post_id', 'in', postIds).where('state', 'in', ['submitting', 'published']).execute() : [],
         identities: tx.selectFrom('social_identities').select(['id', 'provider', 'handle', 'external_id', 'auth_transport']).execute(),
         feeds: draftFeeds.export(accountId, tx),
@@ -249,6 +260,8 @@ export class WorkspaceArchiveService {
       })),
       twitterBrowserDispatches: dispatches.map((row: any) => ({
         post: postUuid.get(Number(row.post_id))!, handle: row.handle, state: row.state, remoteId: row.remote_id,
+        ...(row.deleted_at && { deletedAt: row.deleted_at }),
+        ...(!row.deleted_at && row.delete_token && { deletionPending: true }),
       })),
       campaigns: campaigns.map((row: any) => pick(row, CAMPAIGN_COLUMNS)),
       campaignPosts: campaignPosts.filter((row: any) => campaignUuid.has(Number(row.launch_campaign_id))).map((row: any) => ({
@@ -365,9 +378,13 @@ export class WorkspaceArchiveService {
       for (const dispatch of dispatches) {
         const postId = idOf('posts', dispatch.post, tx)
         if (!postId) continue
-        const existing = tx.selectFrom('twitter_browser_dispatches').select(['id', 'state'])
+        const existing = tx.selectFrom('twitter_browser_dispatches').select(['id', 'state', 'remote_id', 'deleted_at', 'delete_token'])
           .where('post_id', '=', postId).where('handle', '=', dispatch.handle).executeTakeFirst()
-        const values = { uuid: uuid(), state: dispatch.state, remote_id: dispatch.remoteId, updated_at: now() }
+        const deletion = {
+          deleted_at: dispatch.deletedAt ?? null,
+          delete_token: dispatch.deletionPending ? uuid() : null,
+        }
+        const values = { uuid: uuid(), state: dispatch.state, remote_id: dispatch.remoteId, updated_at: now(), ...deletion }
         if (!existing) {
           tx.insertInto('twitter_browser_dispatches').values({
             ...values, post_id: postId, handle: dispatch.handle, created_at: now(),
@@ -375,6 +392,10 @@ export class WorkspaceArchiveService {
         }
         else if (existing.state === 'refused') {
           tx.updateTable('twitter_browser_dispatches').set(values).where('id', '=', existing.id).execute()
+        }
+        else if (existing.state === 'published' && existing.remote_id === dispatch.remoteId && !existing.deleted_at
+          && (dispatch.deletedAt || (dispatch.deletionPending && !existing.delete_token))) {
+          tx.updateTable('twitter_browser_dispatches').set(deletion).where('id', '=', existing.id).execute()
         }
       }
 

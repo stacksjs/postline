@@ -1381,6 +1381,8 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     window.xSessionInspections = 0
     window.xSessionWatch = null
     window.xSessionLinkedPost = null
+    window.xDeleteOperations = []
+    window.xDeleteRecorded = false
     window.xSessionDestroyed = []
     window.xSessionState = { state: 'connected', handle: 'postline_test', measurements: [{ id: '4321', counts: { likes: 2 } }] }
     window.craft = { app: { nativePlatformControls: false }, capabilities: { nativePlatformControls: false }, window: {
@@ -1391,6 +1393,13 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
       },
       async _call(action, input, name) {
         if (!sessionStorage.getItem('test-x-window-open')) throw new Error('Window not found')
+        if (name === profile + '-composer' && window.xDeleteOperations.length) {
+          if (action === 'destroy') return
+          for (const [stage, result] of [['open', 'open'], ['ready', 'ready'], ['select', 'waiting'], ['result', 'deleted']]) {
+            if (input?.code.includes('location.href, ' + JSON.stringify(stage))) return result
+          }
+          throw new Error('Unexpected X deletion stage')
+        }
         if (action === 'loadURL' && name === profile) {
           window.xSessionNavigations.push({ url: input.url, name })
           return
@@ -1412,8 +1421,23 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
         return Promise.resolve(Response.json({ ok: true, data: { nextCursor: null, items: [{
           id: 711, status: linked ? 'published' : 'failed', body: 'A reviewed X post', createdAt: new Date().toISOString(),
           providers: [{ provider: 'twitter', handle: 'postline_test', status: linked ? 'published' : 'failed',
-            ...(linked ? { remoteUrl: 'https://x.com/postline_test/status/246811' } : { xBrowserReview: 712, failureReason: 'X did not confirm the post.' }) }],
+            ...(linked ? window.xDeleteRecorded ? { xBrowserDeleted: true }
+              : { remoteUrl: 'https://x.com/postline_test/status/246811', xBrowserDelete: 712 }
+              : { xBrowserReview: 712, failureReason: 'X did not confirm the post.' }) }],
         }] } }))
+      }
+      if (url.pathname === '/api/postline/queue/delete-x-browser-post') {
+        const body = JSON.parse(options.body)
+        window.xDeleteOperations.push(body)
+        if (body.target_id !== 712) return Promise.resolve(Response.json({ ok: false, error: 'Unexpected X target' }, { status: 422 }))
+        let data
+        if (body.operation === 'prepare') data = { profile, handle: 'postline_test', id: '246811', receipt: 'fixture-receipt' }
+        if (body.operation === 'authorize') data = body.receipt === 'fixture-receipt' ? 'fixture-grant' : null
+        if (body.operation === 'result') {
+          window.xDeleteRecorded = body.token === 'fixture-grant' && body.state === 'deleted'
+          data = window.xDeleteRecorded
+        }
+        return Promise.resolve(Response.json({ ok: true, data }))
       }
       if (url.pathname === '/api/postline/queue/link-x-browser-post') {
         window.xSessionLinkedPost = JSON.parse(options.body)
@@ -1652,6 +1676,29 @@ async function checkXBrowserSession(cdp: Cdp): Promise<void> {
     await waitUntil('Queue records only the verified X observation', () => evaluate<boolean>(cdp, `
       window.xSessionLinkedPost?.target_id === 712 && window.xSessionLinkedPost.post?.id === '246811'
         && !${findOnX}?.getClientRects().length`), 5_000)
+
+    const published = `[...${queue}.querySelectorAll('[role=tab]')].find(tab => tab.textContent.trim().startsWith('Published'))`
+    await evaluate(cdp, `${published}.click()`)
+    const removeOnX = button('Delete from X')
+    await waitUntil('The published X row has its Delete from X action', () => evaluate<boolean>(cdp, `
+      Boolean(${removeOnX} && ${removeOnX}.closest('details'))`), 5_000)
+    await evaluate(cdp, `${removeOnX}.closest('details').open = true; ${removeOnX}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Deleting on X requires an explicit account confirmation', () => evaluate<boolean>(cdp, `
+      ${verifyDialog}?.textContent.includes('@postline_test') && window.xDeleteOperations.length === 0`), 5_000)
+    await evaluate(cdp, `${button('Cancel', verifyDialog)}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Cancel leaves the X post alone', () => evaluate<boolean>(cdp, `
+      !${verifyDialog} && window.xDeleteOperations.length === 0 && !${removeOnX}.disabled`), 5_000)
+    await evaluate(cdp, `${removeOnX}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The reopened X confirmation is ready', () => evaluate<boolean>(cdp, `Boolean(${verifyDialog})`), 5_000)
+    await evaluate(cdp, `${button('Delete from X', verifyDialog)}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('A confirmed browser deletion preserves Queue history and removes the live link', () => evaluate<boolean>(cdp, `
+      window.xDeleteOperations.map(item => item.operation).join(',') === 'prepare,authorize,result'
+        && ${queue}.textContent.includes('A reviewed X post') && ${queue}.textContent.includes('Deleted from X')
+        && !${queue}.querySelector('a[href="https://x.com/postline_test/status/246811"]')`), 8_000)
   }
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })

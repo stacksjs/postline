@@ -101,3 +101,9 @@ duplicate sends. Choose **Find on X** to open the original account’s profile.
 Open the matching post in that window, then return to Queue and choose
 **Link open X post**. Check the text and any images before confirming. A verified
 match appears as published in Queue.
+
+To remove a published browser post, open the post’s **More actions** menu in
+Queue and choose **Delete from X**. Confirm the account and post in the dialog.
+Postline uses that post’s menu in the isolated X window. A confirmed deletion
+keeps the Queue history and removes the live link. If X does not confirm the
+deletion, open the post on X to check whether it is still available.

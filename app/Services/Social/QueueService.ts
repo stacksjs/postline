@@ -211,6 +211,9 @@ export interface QueueTargetView {
   /** When Postline sends it again by itself, as an ISO time; null when it will not. */
   nextAttemptAt: string | null
   xBrowserReview?: number
+  xBrowserDelete?: number
+  xBrowserDeleted?: boolean
+  xBrowserDeletionPending?: boolean
   firstComment?: {
     targetId: number
     status: FirstCommentOutcome['status']
@@ -808,12 +811,14 @@ export class QueueService {
       : []
     const handles = new Map<number, string>(identities.map((row: any) => [Number(row.id), String(row.handle)]))
     const browserIdentities = new Set(identities.filter((row: any) => row.auth_transport === 'browser').map((row: any) => Number(row.id)))
-    const checkable = supportsLocalTwitterBrowser() && targets.some((target: any) => target.provider === 'twitter'
-      && target.status === 'failed' && (target.archived_account || browserIdentities.has(Number(target.social_identity_id))))
-    const receipts = checkable ? await database.selectFrom('twitter_browser_dispatches').select(['post_id', 'handle'])
-      .where('post_id', 'in', posts.map((post: any) => post.id)).where('state', '=', 'submitting').execute() : []
-    const uncertain = new Set(receipts.map((receipt: any) => `${receipt.post_id}:${receipt.handle}`))
-
+    const nativeX = supportsLocalTwitterBrowser()
+    const checkable = targets.some((target: any) => target.provider === 'twitter'
+      && (target.status === 'published' || (nativeX && target.status === 'failed'))
+      && (target.archived_account || browserIdentities.has(Number(target.social_identity_id))))
+    const receipts: Array<{ post_id: number, handle: string, state: string, remote_id: string | null, deleted_at: string | null, delete_token: string | null }> =
+      checkable ? await database.selectFrom('twitter_browser_dispatches').select(['post_id', 'handle', 'state', 'remote_id', 'deleted_at', 'delete_token'])
+        .where('post_id', 'in', posts.map((post: any) => post.id)).where('state', 'in', ['submitting', 'published']).execute() : []
+    const browserReceipts = new Map(receipts.map(receipt => [`${receipt.post_id}:${receipt.handle}`, receipt]))
 
     // Threads on this page: each segment's position, and where a resume
     // would start, from every segment of the thread (not only this page's).
@@ -861,18 +866,25 @@ export class QueueService {
             const identityId = Number(target.social_identity_id) || null
             const archived = target.archived_account ? JSON.parse(target.archived_account) : null
             const handle = identityId ? handles.get(identityId) || null : archived?.handle ?? null
-            const review = target.status === 'failed' && target.provider === 'twitter'
+            const browser = target.provider === 'twitter'
               && (identityId ? browserIdentities.has(identityId) : archived?.transport === 'browser')
-              && uncertain.has(`${post.id}:${handle?.toLowerCase()}`)
+            const receipt = browser ? browserReceipts.get(`${post.id}:${handle?.toLowerCase()}`) : undefined
+            const review = nativeX && target.status === 'failed' && receipt?.state === 'submitting'
+            const published = target.status === 'published' && receipt?.state === 'published' && receipt.remote_id === target.remote_uri
+            const deleted = published && Boolean(receipt.deleted_at)
+            const deletePending = published && !deleted && Boolean(receipt.delete_token)
             return {
               provider: target.provider,
               identityId,
               handle,
               ...(review && { xBrowserReview: Number(target.id) }),
+              ...(nativeX && published && !deleted && !deletePending && { xBrowserDelete: Number(target.id) }),
+              ...(deleted && { xBrowserDeleted: true }),
+              ...(deletePending && { xBrowserDeletionPending: true }),
               target: targetKey({ provider: target.provider, identityId }),
               status: String(target.status),
               remoteUri: target.remote_uri || null,
-              remoteUrl: target.remote_url || null,
+              remoteUrl: deleted ? null : target.remote_url || (published ? `https://x.com/${handle}/status/${target.remote_uri}` : null),
               failureReason: archived && target.status !== 'published' ? reconnectArchivedTargetMessage(archived) : target.failure_reason || null,
               attempts: Number(target.attempts) || 0,
               ...(target.first_comment_status && { firstComment: {

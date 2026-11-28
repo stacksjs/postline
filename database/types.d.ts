@@ -2159,6 +2159,8 @@ declare module '@stacksjs/database' {
       handle: string
       state: "submitting" | "published" | "refused"
       batch_token: string
+      delete_token: string
+      deleted_at: string
       remote_id: string
       post_id: number
     }

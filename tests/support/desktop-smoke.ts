@@ -487,6 +487,40 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
     const mixedResults: Array<{ ok: boolean, provider: string }> = mixed.data?.results ?? []
     check('a thread can keep its independent Blog target alongside the browser batch', mixedResults.length === 4
       && mixedResults.every(result => result.ok) && mixedResults.filter(result => result.provider === 'blog').length === 2)
+    const deletePath = '/api/postline/queue/delete-x-browser-post'
+    const queued = JSON.parse((await call('GET', '/api/postline/queue')).text)?.data?.items ?? []
+    const publishedRow = queued.find((row: { id: number }) => row.id === delivered?.postId)
+    const deleteId = publishedRow?.providers?.[0]?.xBrowserDelete
+    const deleteOperation = (operation: string, input = {}) =>
+      call('POST', deletePath, JSON.stringify({ target_id: deleteId, operation, ...input }))
+    const prepared = await deleteOperation('prepare')
+    const deleteWork = JSON.parse(prepared.text)?.data
+    check('published Queue targets prepare deletion for their exact X browser receipt', prepared.status === 200
+      && deleteWork?.handle === 'postline_test' && deleteWork?.id === '246810' && deleteWork?.profile === savedProfile?.profile,
+      `HTTP ${prepared.status} ${prepared.text}`)
+    const stale = await deleteOperation('authorize', { receipt: crypto.randomUUID() })
+    const firstGrant = await deleteOperation('authorize', { receipt: deleteWork?.receipt })
+    const refusedDelete = await deleteOperation('result', { token: JSON.parse(firstGrant.text)?.data, state: 'refused' })
+    const authorized = await deleteOperation('authorize', { receipt: deleteWork?.receipt })
+    const token = JSON.parse(authorized.text)?.data
+    check('a definitive X refusal can be tried again with separate authorization', JSON.parse(refusedDelete.text)?.data === true
+      && typeof token === 'string' && token !== JSON.parse(firstGrant.text)?.data)
+    const uncertainDelete = await deleteOperation('result', { token, state: 'uncertain' })
+    const blockedDelete = await deleteOperation('prepare')
+    const heldDelete = (JSON.parse((await call('GET', '/api/postline/queue')).text)?.data?.items ?? [])
+      .find((row: { id: number }) => row.id === delivered?.postId)?.providers?.[0]
+    check('an unconfirmed delete keeps the post link, persists its hold, and cannot be authorized again',
+      stale.status === 422 && typeof token === 'string' && JSON.parse(uncertainDelete.text)?.data === true
+      && blockedDelete.status === 422 && heldDelete?.xBrowserDeletionPending === true && !heldDelete?.xBrowserDelete
+      && heldDelete?.remoteUrl === 'https://x.com/postline_test/status/246810')
+    const confirmedDelete = await deleteOperation('result', { token, state: 'deleted' })
+    const repeatedDelete = await deleteOperation('result', { token, state: 'deleted' })
+    const deletedRow = (JSON.parse((await call('GET', '/api/postline/queue')).text)?.data?.items ?? [])
+      .find((row: { id: number }) => row.id === delivered?.postId)
+    check('a confirmed X deletion hides the link and retains the published history', JSON.parse(confirmedDelete.text)?.data === true
+      && JSON.parse(repeatedDelete.text)?.data === false && deletedRow?.status === 'published'
+      && deletedRow?.providers?.[0]?.xBrowserDeleted === true && deletedRow.providers[0].remoteUrl === null
+      && !deletedRow?.providers?.[0]?.xBrowserDelete)
     const held = await sendThroughBrowser('A scheduled X layout fixture.', 'layout', true)
     const heldState = await call('GET', browserSessionPath)
     check('a changed Composer layout holds the selected X target in the queue', Boolean(held?.postId)

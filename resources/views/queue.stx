@@ -149,6 +149,7 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
                 <a class="block px-2 py-1 text-ink hover:bg-hover rounded-md" x-show="row.liveUrl" :href="row.liveUrl" target="_blank" rel="noopener noreferrer">{{ queueText.viewPost }}</a>
                 <a class="block px-2 py-1 text-ink hover:bg-hover rounded-md" x-show="row.actionable" :href="row.editUrl" data-stx-link>{{ queueText.edit }}</a>
                 <button class="px-2 py-1 text-left hover:bg-hover rounded-md" type="button" x-show="row.canRepeat" @click="chooseRepeat(row, $event)">{{ queueText.repeat }}</button>
+                <button class="px-2 py-1 text-danger text-left hover:bg-danger-soft rounded-md disabled:opacity-50" type="button" x-show="row.xBrowserDelete" :disabled="Boolean(busyId())" @click="deleteFromX(row, $event)">{{ queueText.deleteFromX }}</button>
                 <button class="px-2 py-1 text-danger text-left hover:bg-danger-soft rounded-md disabled:opacity-50" type="button" x-show="row.actionable" :disabled="queueChanging() || busyId() === row.id" @click="deleteItem(row.id)">{{ queueText.deleteAction }}</button>
               </div>
             </details>
@@ -258,6 +259,9 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
       remoteUrl?: string | null
       nextAttemptAt?: string | null
       xBrowserReview?: number
+      xBrowserDelete?: number
+      xBrowserDeleted?: boolean
+      xBrowserDeletionPending?: boolean
       firstComment?: { targetId: number, status: 'pending' | 'sending' | 'sent' | 'failed' | 'uncertain', error: string | null }
     }
 
@@ -284,7 +288,7 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
       body: string
       when: string
       /** One chip per network the post went to, or will go to. */
-      targets: Array<{ label: string, state: 'sent' | 'failed' | 'waiting', title: string }>
+      targets: Array<{ label: string, state: 'sent' | 'failed' | 'waiting' | 'deleted', title: string }>
       /** "image · link card · thread · post 2 of 3", or ''. */
       meta: string
       /** Failed outright or on some networks: the "Needs attention" tab. */
@@ -296,6 +300,7 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
       actionable: boolean
       retryable: boolean
       xBrowserReview: { id: number, handle: string } | null
+      xBrowserDelete: { id: number, handle: string } | null
       canRepeat: boolean
       hasImages: boolean
       /** Went out on some networks and failed on others. */
@@ -427,9 +432,10 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
 
     const failureText = (item: QueueApiItem): string => {
       const failed = item.providers.filter(target => target.status === 'failed' || target.failureReason)
-      if (failed.length === 0) return ''
       const lines = failed.map(target => `${channelLabels([target])[0] || target.provider}: ${target.failureReason || queueCopy.failed}${retryNote(target)}`)
-      return item.partial ? queueWords.t('sentToOthers', { errors: lines.join(' ') }) : lines.join(' ')
+      const errors = lines.length && item.partial ? queueWords.t('sentToOthers', { errors: lines.join(' ') }) : lines.join(' ')
+      const deletion = item.providers.some(target => target.xBrowserDeletionPending) ? queueCopy.xDeletePending : ''
+      return [errors, deletion].filter(Boolean).join(' ')
     }
 
     /** Held back because it was due while Postline was not running. Nothing was sent. */
@@ -452,6 +458,7 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
         const failed = target.status === 'failed' || Boolean(target.failureReason)
         const sent = !failed && (target.status === 'published' || Boolean(target.remoteUri))
         const label = labels[index] || target.provider
+        if (target.xBrowserDeleted) return { label: queueCopy.deletedFromX, state: 'deleted' as const, title: label }
         return {
           label,
           state: failed ? 'failed' as const : sent ? 'sent' as const : 'waiting' as const,
@@ -468,6 +475,7 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
         return [{ targetId, message: queueWords.t('firstComment', { network: targets[index].label, detail }), needsAttention, canRetry, url }]
       })
       const review = item.providers.find(target => target.xBrowserReview && target.handle)
+      const deletion = item.providers.find(target => target.xBrowserDelete && target.handle)
       const statusLabel = item.partial ? 'partly sent' : isMissed(item) ? 'missed' : item.status
       return {
         id: item.id,
@@ -476,14 +484,16 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
         when,
         targets,
         meta: [extras, thread].filter(Boolean).join(' · '),
-        attention: item.status === 'failed' || Boolean(item.partial) || comments.some(comment => comment.needsAttention),
+        attention: item.status === 'failed' || Boolean(item.partial) || comments.some(comment => comment.needsAttention)
+          || item.providers.some(target => target.xBrowserDeletionPending),
         comments,
         failure: failureText(item),
-        liveUrl: item.providers.map(target => liveUrlFor(target.remoteUrl || target.remoteUri)).find(Boolean) || '',
+        liveUrl: item.providers.map(target => target.xBrowserDeleted ? '' : liveUrlFor(target.remoteUrl || target.remoteUri)).find(Boolean) || '',
         editUrl: `/composer?edit=${item.id}`,
         actionable: ACTIONABLE.has(item.status),
         retryable: !review || item.providers.some(target => target.status === 'failed' && !target.xBrowserReview),
         xBrowserReview: review && xBrowser() ? { id: review.xBrowserReview!, handle: review.handle! } : null,
+        xBrowserDelete: deletion && xBrowser() ? { id: deletion.xBrowserDelete!, handle: deletion.handle! } : null,
         canRepeat: targets.length > 0 && (ACTIONABLE.has(item.status) || item.status === 'published'),
         hasImages: Boolean(item.hasImage || item.hasVideo || item.thread),
         partial: Boolean(item.partial),
@@ -1004,6 +1014,36 @@ export const queueClient = { locale: workspaceLocale, messages: workspaceQueueTe
         showNotification({ title: queueCopy.couldNotLinkX, message: error instanceof Error ? error.message : String(error), tone: 'error' })
       }
       finally {
+        busyId.set(0)
+      }
+    }
+
+    async function deleteFromX(row: QueueRow, event: Event) {
+      const browser = xBrowser()
+      const target = row.xBrowserDelete
+      if (!browser || !target || busyId()) return
+      const menu = (event.currentTarget as HTMLElement | null)?.closest('details')
+      busyId.set(row.id)
+      try {
+        if (!await stxConfirm(queueWords.t('confirmDeleteX', { handle: target.handle }), {
+          title: queueCopy.deleteFromX, type: 'error', confirmText: queueCopy.deleteFromX, cancelText: queueCopy.cancel,
+        })) return
+        menu?.removeAttribute('open')
+        const module = '/assets/scripts/x-browser-delete.ts'
+        const { deleteXBrowserPost } = await import(module)
+        const state = await deleteXBrowserPost(browser, target.id)
+        if (state === 'deleted') showNotification({ title: queueCopy.deletedFromX, tone: 'success' })
+        else showNotification({
+          title: queueCopy.xDeleteFailed,
+          message: state === 'attention' ? queueCopy.checkXSignIn : state === 'uncertain' ? queueCopy.xDeletePending : queueCopy.xDeleteMenuUnavailable,
+          tone: 'error',
+        })
+      }
+      catch (error) {
+        showNotification({ title: queueCopy.xDeleteFailed, message: error instanceof Error ? error.message : String(error), tone: 'error' })
+      }
+      finally {
+        await refresh()
         busyId.set(0)
       }
     }

@@ -67,8 +67,16 @@ describe('workspace archive', () => {
     await database.insertInto('twitter_browser_dispatches').values({
       uuid: crypto.randomUUID(), post_id: browserPost.postId, handle: 'archive_x', state: 'submitting', created_at: at,
     }).execute()
+    const deleteToken = crypto.randomUUID()
+    await database.insertInto('twitter_browser_dispatches').values([
+      { uuid: crypto.randomUUID(), post_id: browserPost.postId, handle: 'archive_removed', state: 'published', remote_id: '81230', deleted_at: at, created_at: at },
+      { uuid: crypto.randomUUID(), post_id: browserPost.postId, handle: 'archive_pending', state: 'published', remote_id: '81231', delete_token: deleteToken, created_at: at },
+    ]).execute()
     const archive = await workspaceArchive.export()
-    expect(archive.version).toBe(11)
+    expect(archive.version).toBe(12)
+    expect(archive.twitterBrowserDispatches).toContainEqual({ post: browserPostUuid, handle: 'archive_removed', state: 'published', remoteId: '81230', deletedAt: at })
+    expect(archive.twitterBrowserDispatches).toContainEqual({ post: browserPostUuid, handle: 'archive_pending', state: 'published', remoteId: '81231', deletionPending: true })
+    expect(JSON.stringify(archive)).not.toContain(deleteToken)
     expect(archive.recurringPosts).toContainEqual(expect.objectContaining({ uuid: repeat.uuid, active: false, nextAt: repeat.nextAt }))
     expect(archive.postingSlots).toContainEqual(slot)
     expect(archive.composerPresets).toContainEqual(preset)
@@ -103,7 +111,13 @@ describe('workspace archive', () => {
     const report = await workspaceArchive.import(JSON.parse(JSON.stringify(archive)))
     const restoredBrowserPost = await database.selectFrom('posts').select('id').where('uuid', '=', browserPostUuid).executeTakeFirstOrThrow()
     expect(await database.selectFrom('twitter_browser_dispatches').select(['handle', 'state', 'remote_id'])
-      .where('post_id', '=', restoredBrowserPost.id).executeTakeFirst()).toEqual({ handle: 'archive_x', state: 'submitting', remote_id: null })
+      .where('post_id', '=', restoredBrowserPost.id).where('handle', '=', 'archive_x').executeTakeFirst()).toEqual({ handle: 'archive_x', state: 'submitting', remote_id: null })
+    const restoredDeletion = await database.selectFrom('twitter_browser_dispatches').select(['handle', 'deleted_at', 'delete_token'])
+      .where('post_id', '=', restoredBrowserPost.id).where('handle', 'in', ['archive_pending', 'archive_removed']).execute()
+    expect(restoredDeletion.find((row: { handle: string }) => row.handle === 'archive_removed')).toMatchObject({ deleted_at: at, delete_token: null })
+    const pendingDeletion = restoredDeletion.find((row: { handle: string }) => row.handle === 'archive_pending')
+    expect(typeof pendingDeletion?.delete_token).toBe('string')
+    expect(pendingDeletion?.delete_token).not.toBe(deleteToken)
     expect(report.posts).toBeGreaterThanOrEqual(1)
     expect(report.media).toBeGreaterThanOrEqual(1)
     expect(report.composerPresets).toBe(1)
