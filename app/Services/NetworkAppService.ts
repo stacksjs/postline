@@ -24,6 +24,7 @@ const ENV_PREFIX: Record<AppNetwork, string> = { twitter: 'TWITTER', linkedin: '
 export interface NetworkAppCredentials {
   clientId: string
   clientSecret: string
+  publicClient: boolean
   redirectUrl: string
   /** LinkedIn: connect the owner's company Pages as well (`LINKEDIN_PAGES=true` from the environment). */
   organizationPages: boolean
@@ -41,6 +42,7 @@ export interface NetworkAppSummary {
   source: NetworkAppCredentials['source']
   clientId: string
   hasSecret: boolean
+  allowsPublicClient: boolean
   publicClient: boolean
   redirectUrl: string
   organizationPages: boolean
@@ -62,6 +64,10 @@ export function defaultRedirectUrl(network: AppNetwork, origin: string = appOrig
   return `${origin.replace(/\/+$/, '')}/api/postline/${network}/callback`
 }
 
+function allowsPublicClient(network: AppNetwork): boolean {
+  return network === 'twitter' || (network === 'linkedin' && isDesktopAgent())
+}
+
 export class NetworkAppService {
   async credentials(network: AppNetwork): Promise<NetworkAppCredentials> {
     const row = await database.selectFrom('network_apps').selectAll().where('provider', '=', network).executeTakeFirst()
@@ -72,9 +78,11 @@ export class NetworkAppService {
     const redirectUrl = isDesktopAgent() ? defaultRedirectUrl(network) : savedRedirect || env('REDIRECT_URL') || defaultRedirectUrl(network)
 
     if (row?.client_id) {
+      const clientSecret = (await openToken(row.client_secret)) || ''
       return {
         clientId: String(row.client_id),
-        clientSecret: (await openToken(row.client_secret)) || '',
+        clientSecret,
+        publicClient: allowsPublicClient(network) && !clientSecret,
         redirectUrl,
         organizationPages: network === 'linkedin' && Boolean(Number(row.organization_pages ?? 0)),
         engagementMetrics: Boolean(Number(row.engagement_metrics ?? 0)),
@@ -84,9 +92,11 @@ export class NetworkAppService {
       }
     }
     const clientId = env('CLIENT_ID')
+    const clientSecret = env('CLIENT_SECRET')
     return {
       clientId,
-      clientSecret: env('CLIENT_SECRET'),
+      clientSecret,
+      publicClient: allowsPublicClient(network) && Boolean(clientId) && !clientSecret,
       redirectUrl,
       organizationPages: network === 'linkedin' && env('PAGES').toLowerCase() === 'true',
       engagementMetrics: env('ENGAGEMENT_METRICS').toLowerCase() === 'true',
@@ -99,14 +109,14 @@ export class NetworkAppService {
   async summary(): Promise<NetworkAppSummary[]> {
     return await Promise.all(APP_NETWORKS.map(async (provider) => {
       const credentials = await this.credentials(provider)
-      const publicClient = provider === 'twitter' && Boolean(credentials.clientId) && !credentials.clientSecret
       return {
         provider,
-        configured: Boolean(credentials.clientId && (publicClient || credentials.clientSecret)),
+        configured: Boolean(credentials.clientId && (credentials.publicClient || credentials.clientSecret)),
         source: credentials.source,
         clientId: credentials.clientId,
         hasSecret: Boolean(credentials.clientSecret),
-        publicClient,
+        allowsPublicClient: allowsPublicClient(provider),
+        publicClient: credentials.publicClient,
         redirectUrl: credentials.redirectUrl,
         organizationPages: credentials.organizationPages,
         engagementMetrics: credentials.engagementMetrics,
@@ -127,14 +137,15 @@ export class NetworkAppService {
     if (!clientId || clientId.length > 255 || /\s/.test(clientId)) throw new UserFacingError('Paste the client id from the network\'s developer console. It has no spaces.')
     const secret = String(input.clientSecret ?? '').trim()
     if (secret && (secret.length > 1000 || /\s/.test(secret))) throw new UserFacingError('Paste the client secret exactly as the console shows it. It has no spaces.')
-    if (input.publicClient && network !== 'twitter') throw new UserFacingError('Saving a public client is only supported for X.')
-    if (input.publicClient && secret) throw new UserFacingError('For a public X app, omit the client secret.')
+    const allowsPublic = allowsPublicClient(network)
+    if (input.publicClient && !allowsPublic) throw new UserFacingError('Public clients are supported for X and for LinkedIn in the Mac app.')
+    if (input.publicClient && secret) throw new UserFacingError('For a public app, omit the client secret.')
     const redirectUrl = String(input.redirectUrl ?? '').trim()
     if (redirectUrl && !/^https?:\/\/[^\s]+$/i.test(redirectUrl)) throw new UserFacingError('The redirect address must start with http:// or https://.')
 
     const existing = await database.selectFrom('network_apps').selectAll().where('provider', '=', network).executeTakeFirst()
     const keepPublicClient = !secret && Boolean(existing?.client_id) && existing.client_secret === null
-    const publicClient = network === 'twitter' && (input.publicClient ?? keepPublicClient)
+    const publicClient = allowsPublic && (input.publicClient ?? keepPublicClient)
     if (!publicClient && !secret && !existing?.client_secret) throw new UserFacingError('Paste the client secret as well. Postline needs both to connect.')
 
     const values = {

@@ -1,4 +1,5 @@
 import type { NetworkOAuthExchangeOptions } from '../../Support/Social/network-oauth'
+import type { NetworkAuthorization } from '../../Support/Social/native-network-consent'
 import type { PublicAccount } from '../../Support/Social/accounts'
 import type { CrosspostTargetResult, ProviderPurgeAdapter, PublishContent } from '../../Support/Social/types'
 import { db } from '@stacksjs/database'
@@ -45,6 +46,7 @@ type SocialDriverRow = {
 interface LinkedInConfig {
   clientId: string
   clientSecret: string
+  publicClient: boolean
   redirectUrl: string
   apiVersion: string
   accessToken: string
@@ -78,6 +80,7 @@ export class LinkedInService {
     return {
       clientId: app.clientId,
       clientSecret: app.clientSecret,
+      publicClient: app.publicClient,
       redirectUrl: app.redirectUrl,
       apiVersion: resolveLinkedInVersion(env.LINKEDIN_API_VERSION),
       accessToken: String(env.LINKEDIN_ACCESS_TOKEN || '').trim(),
@@ -108,7 +111,7 @@ export class LinkedInService {
       characterLimit: this.driver.characterLimit,
       canPublish: connected,
       configuredFromEnv: Boolean(cfg.accessToken),
-      oauthConfigured: Boolean(cfg.clientId && cfg.clientSecret && cfg.redirectUrl),
+      oauthConfigured: Boolean(cfg.clientId && (cfg.publicClient || cfg.clientSecret) && cfg.redirectUrl),
       accounts: rows.map(row => toPublicAccount(row, { isDefault: Number(row.id) === Number(identity?.id) })),
     }
   }
@@ -129,35 +132,39 @@ export class LinkedInService {
   }
 
   /** Prepare the LinkedIn consent URL before the action binds it to the browser. */
-  async prepareAuthorization(): Promise<{ url: string }> {
+  async prepareAuthorization(): Promise<NetworkAuthorization> {
     const cfg = (await this.config())
-    if (!cfg.clientId || !cfg.clientSecret) {
-      throw new UserFacingError('Add your LinkedIn app under Settings, Channels first: its client id and secret.')
+    if (!cfg.clientId || (!cfg.publicClient && !cfg.clientSecret)) {
+      throw new UserFacingError('Add your LinkedIn app under Settings, Channels first.')
     }
     if (!cfg.redirectUrl) {
       throw new UserFacingError('Postline could not work out its address for the LinkedIn redirect. Set it under Settings, Channels.')
     }
 
-    const url = this.driver.getAuthUrl({
+    const input = {
       clientId: cfg.clientId,
       redirectUrl: cfg.redirectUrl,
       scopes: cfg.scopes,
       state: '',
-    })
-    return { url }
+    }
+    return cfg.publicClient ? await this.driver.createNativeAuthorization(input) : { url: this.driver.getAuthUrl(input) }
   }
 
   /** Handle the OAuth redirect: exchange the code and store the token. */
-  async exchangeAuthorizationCode(code: string, { testOnly }: NetworkOAuthExchangeOptions = {}) {
+  async exchangeAuthorizationCode(code: string, { codeVerifier, testOnly }: NetworkOAuthExchangeOptions = {}) {
     const cfg = (await this.config())
     if (!code) throw new Error('LinkedIn did not return an authorization code.')
+    if (cfg.publicClient !== Boolean(codeVerifier))
+      throw new UserFacingError('Start the LinkedIn connection again from Channels to use the current app settings.')
 
-    const token = await this.driver.exchangeCode({
+    const input = {
       clientId: cfg.clientId,
-      clientSecret: cfg.clientSecret,
       redirectUrl: cfg.redirectUrl,
       code,
-    })
+    }
+    const token = codeVerifier
+      ? await this.driver.exchangeNativeCode({ ...input, codeVerifier })
+      : await this.driver.exchangeCode({ ...input, clientSecret: cfg.clientSecret })
 
     const profile = await this.driver.getProfile(token.accessToken).catch(() => undefined)
     if (testOnly) {

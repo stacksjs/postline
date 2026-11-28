@@ -8,14 +8,20 @@ to a LinkedIn Page you manage. Free.
    for the app).
 2. Under **Products**, add **Sign In with LinkedIn using OpenID Connect** and
    **Share on LinkedIn**. Both are granted at once.
-3. Under **Auth**, add the redirect address from Postline's Settings,
-   Channels as an **Authorized redirect URL**.
-4. Copy the **Client ID** and **Primary Client Secret** into Postline under
-   **Settings > Channels > Your network apps > LinkedIn**, save, then choose
-   **Connect with LinkedIn**.
+3. For a hosted workspace, add the redirect address shown in Postline's Channels
+   as an **Authorized redirect URL** under **Auth**. For native sign-in on Mac,
+   ask LinkedIn to enable native PKCE for your app and use the loopback address
+   shown in Channels.
+4. In **Settings > Channels > Your network apps > LinkedIn**, enter the **Client
+   ID**. With native PKCE enabled, select **Use LinkedIn native sign-in with a
+   client ID only**. For a confidential app, enter the **Primary Client Secret**.
+   Save and choose **Connect with LinkedIn**.
 
 Postline asks for `openid`, `profile` and `w_member_social`: who you are, and
 permission to post as you.
+
+On Mac, native sign-in opens your default browser and returns to Postline.
+To renew a native connection, connect again in Channels. [LinkedIn's native OAuth instructions](https://learn.microsoft.com/en-us/linkedin/shared/authentication/authorization-code-flow-native).
 
 ## Posting as a company Page
 

@@ -6,10 +6,12 @@
 
 1. Abre [linkedin.com/developers/apps](https://www.linkedin.com/developers/apps) y crea una aplicación asociada a una página que administres. Cualquier página de la que seas administrador puede validar la aplicación.
 2. En **Products**, añade **Sign In with LinkedIn using OpenID Connect** y **Share on LinkedIn**. Ambos productos se conceden de inmediato.
-3. En **Auth**, añade como **Authorized redirect URL** la dirección que aparece en **Configuración > Canales** de Postline.
-4. Copia **Client ID** y **Primary Client Secret** en **Configuración > Canales > Tus aplicaciones de redes sociales > LinkedIn**. Guarda y elige **Conectar LinkedIn**.
+3. Si alojas el espacio de trabajo en un servidor, añade en **Auth** la dirección que aparece en **Canales** como **Authorized redirect URL**. Para el inicio de sesión nativo en Mac, pide a LinkedIn que habilite PKCE para tu aplicación y usa la dirección local que aparece en **Canales**.
+4. En **Configuración > Canales > Tus aplicaciones de redes sociales > LinkedIn**, introduce el **Client ID**. Si LinkedIn ha habilitado PKCE nativo, marca **Usar el inicio de sesión nativo de LinkedIn con solo el ID de cliente**. Para una aplicación confidencial, introduce el **Primary Client Secret**. Guarda y elige **Conectar LinkedIn**.
 
 Postline solicita `openid`, `profile` y `w_member_social` para identificarte y publicar desde tu perfil.
+
+En Mac, el inicio de sesión nativo abre tu navegador predeterminado y vuelve a Postline. Para renovar una conexión nativa, vuelve a conectarla en **Canales**. [Guía de OAuth nativo de LinkedIn](https://learn.microsoft.com/en-us/linkedin/shared/authentication/authorization-code-flow-native).
 
 ## Publicar como página de empresa
 

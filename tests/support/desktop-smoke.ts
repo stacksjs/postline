@@ -274,6 +274,60 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
     globalThis.fetch = realFetch
   }
 
+  const linkedInApp = await call('POST', '/api/postline/network-apps', {
+    provider: 'linkedin', client_id: 'postline-linkedin-fixture', public_client: '1',
+  })
+  const linkedInSettings = JSON.parse(linkedInApp.text).data
+  check('the Mac can save a LinkedIn app without a client secret', linkedInApp.status === 200
+    && linkedInSettings?.configured && linkedInSettings.allowsPublicClient && linkedInSettings.publicClient && !linkedInSettings.hasSecret)
+  const beginLinkedIn = await call('POST', consentPath, JSON.stringify({ operation: 'begin', provider: 'linkedin' }))
+  if (beginLinkedIn.status !== 200) throw new Error('Could not start the desktop LinkedIn flow.')
+  const linkedInConsent = JSON.parse(beginLinkedIn.text).data
+  const linkedInLaunch = await fetch(linkedInConsent.launchUrl, { redirect: 'manual' })
+  const linkedInAuthorization = new URL(linkedInLaunch.headers.get('Location') ?? '/', origin)
+  const linkedInState = linkedInAuthorization.searchParams.get('state')
+  const linkedInCookie = linkedInLaunch.headers.getSetCookie().find(cookie => cookie.startsWith('stacks_oauth_'))?.split(';')[0]
+  if (!linkedInState || !linkedInCookie) throw new Error('The system browser did not receive the LinkedIn flow.')
+  const linkedInCallback = `${origin}/api/postline/linkedin/callback`
+  check('LinkedIn native consent uses its PKCE endpoint and this agent’s loopback callback', linkedInLaunch.status === 302
+    && linkedInAuthorization.origin === 'https://www.linkedin.com'
+    && linkedInAuthorization.pathname === '/oauth/native-pkce/authorization'
+    && linkedInAuthorization.searchParams.get('redirect_uri') === linkedInCallback
+    && linkedInAuthorization.searchParams.get('code_challenge_method') === 'S256')
+
+  let linkedInTokenVerified = false
+  globalThis.fetch = (async (input, options) => {
+    const request = new Request(input, options)
+    const url = new URL(request.url)
+    if (url.origin === 'https://www.linkedin.com' && url.pathname === '/oauth/v2/accessToken') {
+      const body = new URLSearchParams(await request.text())
+      const proof = createHash('sha256').update(body.get('code_verifier') ?? '').digest('base64url')
+      linkedInTokenVerified = request.method === 'POST'
+        && body.get('code') === 'fixture-linkedin-code' && body.get('client_id') === 'postline-linkedin-fixture'
+        && body.get('redirect_uri') === linkedInCallback && !body.has('client_secret')
+        && proof === linkedInAuthorization.searchParams.get('code_challenge')
+      return Response.json({ access_token: 'fixture-linkedin-token', expires_in: 3600 })
+    }
+    if (url.origin === 'https://api.linkedin.com' && url.pathname === '/v2/userinfo'
+      && request.headers.get('Authorization') === 'Bearer fixture-linkedin-token') {
+      return Response.json({ sub: 'fixture-linkedin-member', name: 'LinkedIn member fixture' })
+    }
+    if (url.hostname.endsWith('.linkedin.com')) throw new Error('Unexpected LinkedIn fixture endpoint.')
+    return realFetch(input, options)
+  }) as typeof fetch
+  try {
+    const query = new URLSearchParams({ state: linkedInState, code: 'fixture-linkedin-code' })
+    const accepted = await fetch(`${linkedInCallback}?${query}`, { headers: { cookie: linkedInCookie } })
+    const result = await call('POST', consentPath, JSON.stringify({ operation: 'result', id: linkedInConsent.id }))
+    const accounts = await call('GET', '/api/postline/accounts')
+    check('the Mac exchanges the LinkedIn code with its bound verifier and saves the member', accepted.status === 200
+      && linkedInTokenVerified && JSON.parse(result.text).data?.location === '/accounts?linkedin=connected'
+      && accounts.text.includes('LinkedIn member fixture') && !accounts.text.includes('fixture-linkedin-token'))
+  }
+  finally {
+    globalThis.fetch = realFetch
+  }
+
   const instagramPages = await call('GET', '/api/postline/instagram/pages')
   check('the compiled agent requires a bound Instagram Page selection', instagramPages.status === 422
     && JSON.parse(instagramPages.text)?.error?.includes('Connect Instagram again from Channels') === true,

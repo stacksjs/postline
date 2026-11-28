@@ -2109,6 +2109,13 @@ async function checkDesktopNetworkConsent(cdp: Cdp): Promise<void> {
         return Response.json({ ok: true, data: !window.consentFinished ? { state: 'pending' }
           : { state: 'complete', location: '/accounts?twitter=' + status } })
       }
+      if (path === '/api/postline/network-apps' && request.method === 'POST') {
+        const form = await request.clone().formData()
+        if (form.get('provider') === 'linkedin') {
+          window.savedLinkedInApp = Object.fromEntries(form)
+          return Response.json({ ok: true, data: {} })
+        }
+      }
       const response = await send(input, options)
       if (path !== '/api/postline/bootstrap' || !response.ok) return response
       const payload = await response.json()
@@ -2117,6 +2124,10 @@ async function checkDesktopNetworkConsent(cdp: Cdp): Promise<void> {
       }
       for (const app of payload.data.networkApps) {
         if (app.provider === 'twitter') Object.assign(app, { configured: true, source: 'settings', clientId: 'fixture-app', hasSecret: true })
+        if (app.provider === 'linkedin') Object.assign(app, {
+          configured: true, source: 'settings', clientId: 'fixture-linkedin-app',
+          allowsPublicClient: true, publicClient: Boolean(window.savedLinkedInApp), hasSecret: !window.savedLinkedInApp,
+        })
       }
       return Response.json(payload)
     }
@@ -2124,6 +2135,22 @@ async function checkDesktopNetworkConsent(cdp: Cdp): Promise<void> {
   try {
     const report = await auditPage(`${site}/accounts`, { cdp })
     for (const error of [...report.errors, ...report.failed]) fail('accounts', 'desktop consent', error)
+    const linkedIn = "document.querySelector('[data-network-app=linkedin]')"
+    const publicLinkedIn = `${linkedIn}.querySelector('[data-app-public-client]')`
+    await waitUntil('The Mac shows the LinkedIn developer app', () => evaluate<boolean>(cdp, `Boolean(${linkedIn})`), 5_000)
+    await evaluate(cdp, `${linkedIn}.querySelector('summary').click(); ${publicLinkedIn}.focus()`)
+    await pressKey(cdp, ' ', 32)
+    await waitUntil('LinkedIn native sign-in hides the secret and describes what saving does', () => evaluate<boolean>(cdp, `
+      ${publicLinkedIn}.checked && ${linkedIn}.querySelector('[data-app-client-secret]').disabled
+        && ${linkedIn}.innerText.includes('Use LinkedIn native sign-in with a client ID only')
+        && ${linkedIn}.innerText.includes('Saving this option removes the stored client secret.')
+    `), 5_000)
+    await evaluate(cdp, `${linkedIn}.querySelector('button[type=submit]').focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Mac Channels saves the public LinkedIn app using its client ID', () => evaluate<boolean>(cdp, `
+      window.savedLinkedInApp?.client_id === 'fixture-linkedin-app'
+        && window.savedLinkedInApp?.public_client === '1' && !('client_secret' in window.savedLinkedInApp)
+    `), 5_000)
     const connect = "[...document.querySelectorAll('[data-channel=twitter] button')].find(button => button.textContent.trim() === 'Connect X')"
     const test = "[...document.querySelectorAll('[data-network-app=twitter] button')].find(button => button.textContent.trim() === 'Test connection')"
     for (const testOnly of [false, true]) {

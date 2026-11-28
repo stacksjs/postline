@@ -70,8 +70,9 @@ describe('the owner\'s own app on each network', () => {
     }
   })
 
-  test('secret-free setup is explicit and limited to X', async () => {
-    await expect(networkApps.save('threads', { clientId: 'native-id', publicClient: true })).rejects.toThrow('only supported for X')
+  test('hosted workspaces allow secret-free setup only for X', async () => {
+    await expect(networkApps.save('threads', { clientId: 'native-id', publicClient: true })).rejects.toThrow('Public clients are supported for X')
+    await expect(networkApps.save('linkedin', { clientId: 'native-id', publicClient: true })).rejects.toThrow('LinkedIn in the Mac app')
     await expect(networkApps.save('twitter', { clientId: 'native-id', clientSecret: 'secret', publicClient: true })).rejects.toThrow('omit the client secret')
   })
 
