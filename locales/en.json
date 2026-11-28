@@ -472,6 +472,7 @@
       "remove": "Remove",
       "testConnection": "Test connection",
       "save": "Save",
+      "saving": "Saving…",
       "readUsage": "Estimated X API reads today: {used} of {limit}. Resets at midnight UTC.",
       "environment": "Set in .env",
       "configured": "Set up",

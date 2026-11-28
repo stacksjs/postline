@@ -472,6 +472,7 @@
       "remove": "Quitar",
       "testConnection": "Probar conexión",
       "save": "Guardar",
+      "saving": "Guardando…",
       "readUsage": "Costo estimado de las consultas de la API de X hoy, {used} de {limit}. El presupuesto se restablece a medianoche UTC.",
       "environment": "Configurada en .env",
       "configured": "Configurada",

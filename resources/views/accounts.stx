@@ -52,7 +52,7 @@ export const channelsClient = { locale: workspaceLocale, messages: workspaceChan
         </div>
         <ErrorState :show="bootstrap.error() && !channelsReady()" title="{{ channelsText.loadFailed }}" :message="bootstrap.error()" @retry="bootstrap.refresh()" testID="channels-error" />
         <EmptyState :show="channelsReady() && !channelProviders().length" variant="bare" title="{{ channelsText.empty }}" description="{{ channelsText.emptyDescription }}">
-          <button class="text-info text-ui underline" type="button" @click="bootstrap.refresh()">{{ channelsText.refresh }}</button>
+          <Button variant="secondary" size="xs" @click="bootstrap.refresh()">{{ channelsText.refresh }}</Button>
         </EmptyState>
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 p-3" x-cloak x-show="channelsReady()" data-publishing-channels>
           <div class="min-w-0" x-for="provider in channelProviders()" :key="provider">
@@ -77,7 +77,7 @@ export const channelsClient = { locale: workspaceLocale, messages: workspaceChan
           <p class="m-0 mt-1 text-muted text-xs">{{ channelsText.appsDescription }}</p>
         </header>
         <div class="divide-line divide-y">
-          <details class="group" x-for="app in appRows()" :data-network-app="app.provider">
+          <details class="group" x-for="app in appRows()" :key="app.provider" :data-network-app="app.provider">
             <summary class="flex gap-3 items-center justify-between px-4 py-3 list-none hover:bg-panel-2 cursor-pointer">
               <span class="font-medium text-ink text-ui" :text="app.label"></span>
               <span class="flex gap-2 items-center">
@@ -95,46 +95,48 @@ export const channelsClient = { locale: workspaceLocale, messages: workspaceChan
                 <span class="font-medium text-muted text-xs">{{ channelsText.redirectAddress }}</span>
                 <div class="flex gap-2 items-center">
                   <code class="flex-1 px-2.5 py-1.5 min-w-0 text-ink text-xs truncate bg-panel-2 border border-line rounded-lg" :text="app.redirectUrl" :title="app.redirectUrl"></code>
-                  <button class="shrink-0 px-2.5 h-8 font-medium text-ink text-xs bg-panel hover:bg-raised border border-line rounded-lg" type="button" @click="copyRedirect(app.provider)">{{ channelsText.copy }}</button>
+                  <Button variant="secondary" size="xs" className="shrink-0" @click="copyRedirect(app.provider)">{{ channelsText.copy }}</Button>
                 </div>
               </div>
-              <form class="grid gap-2 sm:grid-cols-2" @submit.prevent="saveApp(app.provider)">
-                <label class="grid gap-1 text-muted text-xs">
-                  <span>{{ channelsText.clientId }}</span>
-                  <input class="px-3 h-9 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" autocomplete="off" spellcheck="false" :value="app.clientId" @input="setAppField(app.provider, 'clientId', $event)" data-app-client-id>
-                </label>
-                <label class="grid gap-1 text-muted text-xs" x-show="!app.publicClient">
-                  <span>{{ channelsText.clientSecret }}</span>
-                  <input class="px-3 h-9 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="password" autocomplete="off" :disabled="app.publicClient" :placeholder="app.secretPlaceholder" :value="app.clientSecret" @input="setAppField(app.provider, 'clientSecret', $event)" data-app-client-secret>
-                </label>
-                <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.allowsPublicClient ? 'flex' : 'hidden'">
-                  <input class="mt-0.5" type="checkbox" :checked="app.publicClient" @change="setAppFlag(app.provider, 'publicClient', $event)" data-app-public-client>
-                  <span :text="app.provider === 'linkedin' ? copy.publicLinkedInApp : copy.publicXApp"></span>
-                </label>
-                <p class="sm:col-span-2 m-0 text-muted text-xs" x-show="app.removesSecret">{{ channelsText.publicAppRemovesSecret }}</p>
-                {{-- LinkedIn company Pages (#130): opt-in, since the scopes need a product the app may not have. --}}
-                <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'linkedin' ? 'flex' : 'hidden'">
-                  <input class="mt-0.5" type="checkbox" :checked="app.organizationPages" @change="setAppFlag(app.provider, 'organizationPages', $event)" data-app-organization-pages>
-                  <span>{{ channelsText.companyPages }}</span>
-                </label>
-                <label class="flex gap-2 items-start sm:col-span-2 text-body text-xs">
-                  <input class="mt-0.5" type="checkbox" :checked="app.engagementMetrics" @change="setAppFlag(app.provider, 'engagementMetrics', $event)">
-                  <span :text="app.provider === 'twitter' ? copy.paidEngagement : copy.engagement"></span>
-                </label>
-                <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'twitter' ? 'flex' : 'hidden'">
-                  <input class="mt-0.5" type="checkbox" :checked="app.directMessages" @change="setAppFlag(app.provider, 'directMessages', $event)" data-app-direct-messages>
-                  <span>{{ channelsText.paidMessages }}</span>
-                </label>
-                <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'instagram' ? 'flex' : 'hidden'">
-                  <input class="mt-0.5" type="checkbox" :checked="app.firstComments" @change="setAppFlag(app.provider, 'firstComments', $event)">
-                  <span>{{ channelsText.firstComments }}</span>
-                </label>
-                <div class="flex flex-wrap gap-2 items-center sm:col-span-2">
-                  <p class="m-0 mr-auto text-muted text-xs" :text="app.note"></p>
-                  <button class="px-3 h-8 font-medium text-danger text-xs bg-panel hover:bg-danger-soft border border-line rounded-lg disabled:opacity-50" type="button" x-show="app.removable" :disabled="appBusy() === app.provider" @click="clearApp(app.provider)">{{ channelsText.remove }}</button>
-                  <Button variant="secondary" size="xs" :disabled="!app.testReady || appBusy() === app.provider || nativeConsentPending()" @click="startConsent(app.provider, true)">{{ channelsText.testConnection }}</Button>
-                  <button class="px-3 h-8 font-semibold text-on-accent text-xs bg-accent hover:bg-accent-hover rounded-lg disabled:opacity-50" type="submit" :disabled="appBusy() === app.provider">{{ channelsText.save }}</button>
-                </div>
+              <form @submit.prevent="changeApp(app.provider, 'save')">
+                <fieldset class="grid gap-2 sm:grid-cols-2 m-0 p-0 min-w-0 border-0" :disabled="Boolean(appBusy()[app.provider])">
+                  <label class="grid gap-1 text-muted text-xs">
+                    <span>{{ channelsText.clientId }}</span>
+                    <input class="px-3 h-9 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" autocomplete="off" spellcheck="false" :value="app.clientId" @input="setAppField(app.provider, 'clientId', $event)" data-app-client-id>
+                  </label>
+                  <label class="grid gap-1 text-muted text-xs" x-show="!app.publicClient">
+                    <span>{{ channelsText.clientSecret }}</span>
+                    <input class="px-3 h-9 text-ink text-ui bg-panel border border-field-line outline-none rounded-xl focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="password" autocomplete="off" :disabled="app.publicClient" :placeholder="app.secretPlaceholder" :value="app.clientSecret" @input="setAppField(app.provider, 'clientSecret', $event)" data-app-client-secret>
+                  </label>
+                  <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.allowsPublicClient ? 'flex' : 'hidden'">
+                    <input class="mt-0.5" type="checkbox" :checked="app.publicClient" @change="setAppFlag(app.provider, 'publicClient', $event)" data-app-public-client>
+                    <span :text="app.provider === 'linkedin' ? copy.publicLinkedInApp : copy.publicXApp"></span>
+                  </label>
+                  <p class="sm:col-span-2 m-0 text-muted text-xs" x-show="app.removesSecret">{{ channelsText.publicAppRemovesSecret }}</p>
+                  {{-- LinkedIn company Pages (#130): opt-in, since the scopes need a product the app may not have. --}}
+                  <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'linkedin' ? 'flex' : 'hidden'">
+                    <input class="mt-0.5" type="checkbox" :checked="app.organizationPages" @change="setAppFlag(app.provider, 'organizationPages', $event)" data-app-organization-pages>
+                    <span>{{ channelsText.companyPages }}</span>
+                  </label>
+                  <label class="flex gap-2 items-start sm:col-span-2 text-body text-xs">
+                    <input class="mt-0.5" type="checkbox" :checked="app.engagementMetrics" @change="setAppFlag(app.provider, 'engagementMetrics', $event)">
+                    <span :text="app.provider === 'twitter' ? copy.paidEngagement : copy.engagement"></span>
+                  </label>
+                  <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'twitter' ? 'flex' : 'hidden'">
+                    <input class="mt-0.5" type="checkbox" :checked="app.directMessages" @change="setAppFlag(app.provider, 'directMessages', $event)" data-app-direct-messages>
+                    <span>{{ channelsText.paidMessages }}</span>
+                  </label>
+                  <label class="gap-2 items-start sm:col-span-2 text-body text-xs" :class="app.provider === 'instagram' ? 'flex' : 'hidden'">
+                    <input class="mt-0.5" type="checkbox" :checked="app.firstComments" @change="setAppFlag(app.provider, 'firstComments', $event)">
+                    <span>{{ channelsText.firstComments }}</span>
+                  </label>
+                  <div class="flex flex-wrap gap-2 items-center sm:col-span-2">
+                    <p class="m-0 mr-auto text-muted text-xs" :text="app.note"></p>
+                    <Button variant="danger" size="xs" :show="app.removable" :disabled="Boolean(appBusy()[app.provider])" :loading="appBusy()[app.provider] === 'clear'" @click="changeApp(app.provider, 'clear')">{{ channelsText.remove }}</Button>
+                    <Button variant="secondary" size="xs" :disabled="!app.testReady || Boolean(appBusy()[app.provider]) || nativeConsentPending()" @click="startConsent(app.provider, true)">{{ channelsText.testConnection }}</Button>
+                    <Button size="xs" type="submit" :disabled="Boolean(appBusy()[app.provider])" :loading="appBusy()[app.provider] === 'save'" :label="appBusy()[app.provider] === 'save' ? copy.saving : copy.save">{{ channelsText.save }}</Button>
+                  </div>
+                </fieldset>
               </form>
             </div>
           </details>
@@ -282,7 +284,8 @@ export const channelsClient = { locale: workspaceLocale, messages: workspaceChan
 
     // Network app forms keep unsaved credentials in this view only.
     const appDrafts = state({})
-    const appBusy = state('')
+    type AppAction = 'save' | 'clear'
+    const appBusy = state<Partial<Record<string, AppAction>>>({})
     const guides = {{ networkSetupGuides }}
     const usd = new Intl.NumberFormat(language, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 3 })
     const appRows = derived(() => networkApps().map((app) => {
@@ -337,10 +340,58 @@ export const channelsClient = { locale: workspaceLocale, messages: workspaceChan
       drafts[provider] = { ...(drafts[provider] || {}), [field]: Boolean(event?.target?.checked) }
       appDrafts.set(drafts)
     }
-    const appHandlers = { save: null, clear: null, copy: null }
-    const saveApp = provider => appHandlers.save?.(provider)
-    const clearApp = provider => appHandlers.clear?.(provider)
-    const copyRedirect = provider => appHandlers.copy?.(provider)
+    async function changeApp(provider: string, action: AppAction) {
+      if (appBusy()[provider]) return
+      const row = appRows().find(entry => entry.provider === provider)
+      if (!row) return
+      if (action === 'clear') {
+        if (!row.removable || !await stxConfirm(words.t('removeWarning', { network: row.label }), { title: words.t('removeTitle', { network: row.label }), type: 'error', confirmText: copy.removeApp })) return
+        if (appBusy()[provider]) return
+      }
+      appBusy.update(actions => ({ ...actions, [provider]: action }))
+      try {
+        const body = new FormData()
+        body.set('provider', provider)
+        if (action === 'save') {
+          body.set('client_id', row.clientId || '')
+          if (!row.publicClient) body.set('client_secret', row.clientSecret || '')
+          if (provider === 'linkedin') body.set('organization_pages', row.organizationPages ? '1' : '0')
+          body.set('engagement_metrics', row.engagementMetrics ? '1' : '0')
+          if (row.allowsPublicClient) body.set('public_client', row.publicClient ? '1' : '0')
+          if (provider === 'twitter') body.set('direct_messages', row.directMessages ? '1' : '0')
+          if (provider === 'instagram') body.set('first_comments', row.firstComments ? '1' : '0')
+          await requestJson('/api/postline/network-apps', { method: 'POST', body }, copy.saveFailed)
+          const drafts = { ...appDrafts() }
+          delete drafts[provider]
+          appDrafts.set(drafts)
+        }
+        else {
+          await requestJson('/api/postline/network-apps/clear', { method: 'POST', body }, copy.removeFailed)
+        }
+        await bootstrap.load()
+        if (action === 'save') showNotification({ message: words.t('appSaved', { network: row.label }), tone: 'success', title: row.label })
+      }
+      catch (error) {
+        showNotification({ message: error instanceof Error ? error.message : String(error), tone: 'error', title: row.label })
+      }
+      finally {
+        const pending = { ...appBusy() }
+        delete pending[provider]
+        appBusy.set(pending)
+      }
+    }
+
+    async function copyRedirect(provider: string) {
+      const row = appRows().find(entry => entry.provider === provider)
+      if (!row) return
+      try {
+        await navigator.clipboard.writeText(row.redirectUrl)
+        showNotification({ message: copy.copied, tone: 'success', title: row.label })
+      }
+      catch {
+        showNotification({ message: row.redirectUrl, tone: 'info', title: copy.copyManually })
+      }
+    }
 
     const purgeResultRows = state([])
 
@@ -397,63 +448,6 @@ export const channelsClient = { locale: workspaceLocale, messages: workspaceChan
           onMount(() => announceWorkspaceChange())
         }
         break
-      }
-
-      appHandlers.save = async (provider) => {
-        const row = appRows().find(entry => entry.provider === provider)
-        if (!row) return
-        appBusy.set(provider)
-        try {
-          const body = new FormData()
-          body.set('provider', provider)
-          body.set('client_id', row.clientId || '')
-          if (!row.publicClient) body.set('client_secret', row.clientSecret || '')
-          if (provider === 'linkedin') body.set('organization_pages', row.organizationPages ? '1' : '0')
-          body.set('engagement_metrics', row.engagementMetrics ? '1' : '0')
-          if (row.allowsPublicClient) body.set('public_client', row.publicClient ? '1' : '0')
-          if (provider === 'twitter') body.set('direct_messages', row.directMessages ? '1' : '0')
-          if (provider === 'instagram') body.set('first_comments', row.firstComments ? '1' : '0')
-          await requestJson('/api/postline/network-apps', { method: 'POST', body }, copy.saveFailed)
-          const drafts = { ...appDrafts() }
-          delete drafts[provider]
-          appDrafts.set(drafts)
-          await bootstrap.load()
-          notify(words.t('appSaved', { network: row.label }), 'success', { title: row.label })
-        }
-        catch (error) {
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: row.label })
-        }
-        finally {
-          appBusy.set('')
-        }
-      }
-      appHandlers.clear = async (provider) => {
-        const row = appRows().find(entry => entry.provider === provider)
-        if (!row || !await stxConfirm(words.t('removeWarning', { network: row.label }), { title: words.t('removeTitle', { network: row.label }), type: 'error', confirmText: copy.removeApp })) return
-        appBusy.set(provider)
-        try {
-          const body = new FormData()
-          body.set('provider', provider)
-          await requestJson('/api/postline/network-apps/clear', { method: 'POST', body }, copy.removeFailed)
-          await bootstrap.load()
-        }
-        catch (error) {
-          notify(error instanceof Error ? error.message : String(error), 'error', { title: row.label })
-        }
-        finally {
-          appBusy.set('')
-        }
-      }
-      appHandlers.copy = async (provider) => {
-        const row = appRows().find(entry => entry.provider === provider)
-        if (!row) return
-        try {
-          await navigator.clipboard.writeText(row.redirectUrl)
-          notify(copy.copied, 'success', { title: row.label })
-        }
-        catch {
-          notify(row.redirectUrl, 'info', { title: copy.copyManually })
-        }
       }
 
       // --- Danger zone: bulk post deletion ---

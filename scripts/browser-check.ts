@@ -2252,6 +2252,10 @@ async function checkXPublicAppSettings(cdp: Cdp): Promise<void> {
   const secret = `${app}.querySelector('[data-app-client-secret]')`
   const publicClient = `${app}.querySelector('[data-app-public-client]')`
   const test = `[...${app}.querySelectorAll('button')].find(button => button.textContent.trim() === 'Test connection')`
+  const save = `${app}.querySelector('form button[type=submit]')`
+  const remove = `[...${app}.querySelectorAll('form button')].find(button => button.textContent.trim() === 'Remove')`
+  const linkedIn = "document.querySelector('[data-network-app=linkedin]')"
+  const linkedInId = `${linkedIn}.querySelector('[data-app-client-id]')`
   const setting = `fetch('/api/postline/network-apps').then(async response => (await response.json()).data.apps.find(app => app.provider === 'twitter'))`
   try {
     await waitUntil('Channels offers the X developer app form', () => evaluate<boolean>(cdp, `Boolean(${app})`), 5_000)
@@ -2269,11 +2273,74 @@ async function checkXPublicAppSettings(cdp: Cdp): Promise<void> {
       ${publicClient}.checked && ${secret}.disabled && !${secret}.getClientRects().length && (${test}).disabled
         && ${app}.innerText.includes('Saving this option removes the stored client secret.')
     `), 5_000)
-    await evaluate(cdp, `${app}.querySelector('form button[type=submit]').focus()`)
+    await evaluate(cdp, `(() => {
+      const send = window.fetch.bind(window)
+      let refused = false
+      window.fetch = async (target, options) => {
+        const path = new URL(target instanceof Request ? target.url : target, location.href).pathname
+        const body = options?.body
+        if (!(body instanceof FormData) || body.get('provider') !== 'twitter') return send(target, options)
+        if (path === '/api/postline/network-apps' && !refused) {
+          refused = true
+          await new Promise(resolve => { window.releaseAppSave = resolve })
+          return Response.json({ ok: false, error: 'The app could not be saved. Try again.' }, { status: 422 })
+        }
+        if (path === '/api/postline/network-apps/clear')
+          await new Promise(resolve => { window.releaseAppRemoval = resolve })
+        return send(target, options)
+      }
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+        writeText: async address => { window.copiedRedirect = address },
+      } })
+    })()`)
+    const copy = `[...${app}.querySelectorAll('button')].find(button => button.textContent.trim() === 'Copy')`
+    await evaluate(cdp, `${copy}.focus()`)
     await pressKey(cdp, 'Enter', 13)
-    await waitUntil('The saved X public app can be tested', () => evaluate<boolean>(cdp, `(${test})?.disabled === false`), 5_000)
+    await waitUntil('Copy sends the displayed redirect address to the clipboard service', () => evaluate<boolean>(cdp, `
+      Boolean(window.copiedRedirect) && window.copiedRedirect === ${app}.querySelector('code')?.textContent
+    `), 5_000)
+
+    await evaluate(cdp, `${save}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The pending X app save protects its own form', () => evaluate<boolean>(cdp, `
+      Boolean(window.releaseAppSave) && ${save}.disabled && ${save}.getAttribute('aria-busy') === 'true'
+        && ${save}.innerText.trim() === 'Saving…' && ${publicClient}.matches(':disabled')
+        && !${linkedInId}.matches(':disabled')
+    `), 5_000)
+    await evaluate(cdp, `${linkedIn}.querySelector('summary').click(); ${linkedInId}.focus()`)
+    await cdp.send('Input.insertText', { text: 'another-provider-draft' })
+    await evaluate(cdp, 'window.releaseAppSave()')
+    await waitUntil('A refused app save preserves both forms and can be retried', () => evaluate<boolean>(cdp, `
+      document.querySelector('#stx-toast-container')?.textContent.includes('The app could not be saved. Try again.')
+        && ${publicClient}.checked && !${publicClient}.matches(':disabled')
+        && !${save}.disabled && ${save}.getAttribute('aria-busy') === 'false'
+        && ${linkedInId}.value === 'another-provider-draft'
+    `), 5_000)
+    await evaluate(cdp, `${save}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The saved X public app can be tested', () => evaluate<boolean>(cdp, `
+      (${test})?.disabled === false && ${linkedInId}.value === 'another-provider-draft'
+    `), 5_000)
     const stored = await evaluate<{ configured: boolean, hasSecret: boolean, publicClient: boolean }>(cdp, setting)
     if (!stored.configured || stored.hasSecret || !stored.publicClient) throw new Error('The X app did not persist its public client configuration.')
+
+    await evaluate(cdp, `${remove}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const confirm = "[...document.querySelectorAll('[role=alertdialog] button')].find(button => button.textContent.trim() === 'Remove app')"
+    await waitUntil('Removing the developer app asks for confirmation', () => evaluate<boolean>(cdp, `
+      Boolean(${confirm}?.closest('[role=alertdialog]')?.textContent.includes('Remove your X app?'))
+    `), 5_000)
+    await evaluate(cdp, `${confirm}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The pending removal identifies its own action', () => evaluate<boolean>(cdp, `
+      Boolean(window.releaseAppRemoval) && ${remove}.disabled && ${remove}.getAttribute('aria-busy') === 'true'
+    `), 5_000)
+    await evaluate(cdp, 'window.releaseAppRemoval()')
+    await waitUntil('The removed developer app can no longer be tested', () => evaluate<boolean>(cdp, `
+      !${remove}?.getClientRects().length && (${test})?.disabled === true
+    `), 5_000)
+    if ((await evaluate<{ configured: boolean }>(cdp, setting)).configured)
+      throw new Error('The removed X app remains configured.')
   }
   finally {
     await evaluate(cdp, `fetch('/api/postline/network-apps/clear', {
