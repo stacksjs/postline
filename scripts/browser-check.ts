@@ -103,6 +103,7 @@ interface AccessibleControl {
   ignored: boolean
   role?: { value?: string }
   name?: { value?: string }
+  description?: { value?: string }
   backendDOMNodeId?: number
 }
 
@@ -958,6 +959,9 @@ async function checkSavedComposerText(cdp: Cdp): Promise<void> {
   const select = `${library}.querySelector('[data-saved-text-select]')`
   const editor = "document.querySelector('[data-bluesky-text]')"
   const button = (name: string) => `${library}.querySelector('[data-saved-text-${name}]')`
+  const cancelEdit = `${library}.querySelector('[data-saved-text-form] button[type=button]')`
+  const save = `${library}.querySelector('[data-saved-text-form] button[type=submit]')`
+  const cancelDelete = `${button('confirm-delete')}.nextElementSibling`
   const click = async (name: string) => {
     await evaluate(cdp, `${button(name)}.focus()`)
     await pressKey(cdp, 'Enter', 13)
@@ -978,7 +982,7 @@ async function checkSavedComposerText(cdp: Cdp): Promise<void> {
     field.dispatchEvent(new Event('change', { bubbles: true }))
   })()`)
   const submit = async () => {
-    await evaluate(cdp, `${library}.querySelector('[data-saved-text-form] button[type=submit]').focus()`)
+    await evaluate(cdp, `${save}.focus()`)
     await pressKey(cdp, 'Enter', 13)
   }
 
@@ -992,18 +996,31 @@ async function checkSavedComposerText(cdp: Cdp): Promise<void> {
   `), 5_000)
   await click('new')
   await waitUntil('Creating saved text focuses its name', () => evaluate<boolean>(cdp, `document.activeElement === ${field('name')}`), 5_000)
+  await evaluate(cdp, `${cancelEdit}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Canceling a new saved item returns focus to New', () => evaluate<boolean>(cdp, `document.activeElement === ${button('new')}`), 5_000)
+  await click('new')
+  await waitUntil('Reopening the new item focuses its name', () => evaluate<boolean>(cdp, `document.activeElement === ${field('name')}`), 5_000)
   await fill('kind', 'hashtags')
   await fill('name', 'Build tags')
   await fill('body', '#Invalid-tag')
   await submit()
   await waitUntil('Saved text shows the server validation in the workspace language', () => evaluate<boolean>(cdp, `
     ${library}.querySelector('[role=alert]').innerText === ${JSON.stringify(invalidTags)}
+      && document.activeElement === ${save}
   `), 5_000)
   await fill('body', '#Postline, OpenSource')
   await submit()
   await waitUntil('The saved hashtag set is selected', () => evaluate<boolean>(cdp, `
     ${select}.selectedOptions[0]?.textContent === ${JSON.stringify(label)}
-      && ${library}.textContent.includes('#Postline #OpenSource') && !${button('insert')}.disabled`), 5_000)
+      && ${library}.textContent.includes('#Postline #OpenSource') && !${button('insert')}.disabled
+      && document.activeElement === ${select}`), 5_000)
+  await click('edit')
+  await waitUntil('Editing the saved item focuses its current name', () => evaluate<boolean>(cdp, `
+    document.activeElement === ${field('name')} && ${field('name')}.value === 'Build tags'`), 5_000)
+  await evaluate(cdp, `${cancelEdit}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Canceling an edit returns focus to Edit', () => evaluate<boolean>(cdp, `document.activeElement === ${button('edit')}`), 5_000)
 
   await auditPage(`${site}/composer`, { cdp })
   await evaluate(cdp, `${editor}.value = 'Update copy'; ${editor}.dispatchEvent(new Event('input', { bubbles: true }))`)
@@ -1014,18 +1031,30 @@ async function checkSavedComposerText(cdp: Cdp): Promise<void> {
     !${library}.open && ${editor}.value === 'Update copy\\n#Postline #OpenSource'
       && (document.activeElement === ${editor} || Boolean(document.activeElement?.closest('[data-richtext-host]')))`), 5_000)
 
-  await evaluate(cdp, `${trigger}.click()`)
+  await evaluate(cdp, `${trigger}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
   await waitUntil('The saved text can be removed independently', () => evaluate<boolean>(cdp, `
     !${button('delete')}.disabled && ${button('delete')}.textContent.trim() === ${JSON.stringify(deleteLabel)}
   `), 5_000)
   await click('delete')
-  await waitUntil('The delete confirmation names the saved item in the workspace language', () => evaluate<boolean>(cdp, `
-    ${button('confirm-delete')}.parentElement.previousElementSibling.innerText === ${JSON.stringify(confirmation)}
+  await waitUntil('The delete confirmation focuses Cancel and describes the saved item', () => evaluate<boolean>(cdp, `
+    document.activeElement === ${cancelDelete}
+      && document.getElementById(${cancelDelete}.getAttribute('aria-describedby'))?.innerText === ${JSON.stringify(confirmation)}
   `), 5_000)
+  const tree = await cdp.send<{ nodes: AccessibleControl[] }>('Accessibility.getFullAXTree')
+  const cancel = spanishWorkspace ? 'Cancelar' : 'Cancel'
+  if (!tree.nodes.some(node => !node.ignored && node.role?.value === 'button' && node.name?.value === cancel && node.description?.value === confirmation))
+    fail('composer', 'saved text', 'the delete confirmation is missing from the accessibility tree')
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Canceling deletion returns focus to Delete', () => evaluate<boolean>(cdp, `document.activeElement === ${button('delete')}`), 5_000)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('Reopening the delete confirmation focuses Cancel', () => evaluate<boolean>(cdp, `document.activeElement === ${cancelDelete}`), 5_000)
   await click('confirm-delete')
   await waitUntil('Deleting saved text preserves the post copy', () => evaluate<boolean>(cdp, `
-    !${select}.options.length && ${editor}.value.endsWith('#Postline #OpenSource')`), 5_000)
+    !${select}.options.length && ${editor}.value.endsWith('#Postline #OpenSource')
+      && document.activeElement === ${button('new')}`), 5_000)
   await pressKey(cdp, 'Escape', 27)
+  await waitUntil('Closing Saved text returns focus to its opener', () => evaluate<boolean>(cdp, `!${library}.open && document.activeElement === ${trigger}`), 5_000)
   await evaluate(cdp, `localStorage.removeItem('postline:composer-draft:v1')`)
 }
 

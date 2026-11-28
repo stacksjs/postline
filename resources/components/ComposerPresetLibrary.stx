@@ -12,6 +12,11 @@ import type { ComposerPreset, ComposerPresetKind } from '../../app/Services/Comp
 const disabled = useReactiveProp('disabled', false)
 const dialog = useRef<HTMLDialogElement>('library')
 const nameInput = useRef<HTMLInputElement>('nameInput')
+const selection = useRef<HTMLSelectElement>('selection')
+const newButton = useRef<HTMLButtonElement>('newButton')
+const editButton = useRef<HTMLButtonElement>('editButton')
+const deleteButton = useRef<HTMLButtonElement>('deleteButton')
+const cancelDelete = useRef<HTMLButtonElement>('cancelDelete')
 const title = useId('saved-text')
 const emit = defineEmits(['insert'])
 const items = state<ComposerPreset[]>([])
@@ -29,15 +34,31 @@ const locale = {{ savedTextLocale }}
 
 type SavedText = typeof import('../assets/scripts/composer-saved-text')
 async function run(work: (api: SavedText) => Promise<void>) {
-  if (busy()) return
+  if (busy()) return false
   message.set('')
   busy.set(true)
   try {
     const path = '/assets/scripts/composer-saved-text.ts'
     await work(await import(path))
+    return true
   }
-  catch (error) { message.set(error instanceof Error ? error.message : String(error)) }
+  catch (error) {
+    message.set(error instanceof Error ? error.message : String(error))
+    return false
+  }
   finally { busy.set(false) }
+}
+
+function focusControl(control: HTMLElement | null | undefined) {
+  void nextTick(() => {
+    if (dialog.current?.open) control?.focus()
+  })
+}
+
+function browse(control: HTMLElement | null | undefined) {
+  message.set('')
+  mode.set('browse')
+  focusControl(control)
 }
 
 function open() {
@@ -58,26 +79,36 @@ function edit(item?: ComposerPreset) {
   body.set(item?.body || '')
   message.set('')
   mode.set('edit')
-  void nextTick(() => nameInput.current?.focus())
+  focusControl(nameInput.current)
 }
 
-function save() {
-  void run(async (api) => {
+async function save(submitter: HTMLElement | null) {
+  const stored = await run(async (api) => {
     const saved = await api.storeSavedText({ uuid: id(), name: name(), kind: kind(), body: body() }, items(), locale)
     items.set(saved.items)
     selectedId.set(saved.uuid)
-    mode.set('browse')
   })
+  if (mode() !== 'edit') return
+  if (stored) browse(selection.current)
+  else focusControl(submitter)
 }
 
-function remove() {
+function confirmDelete() {
+  message.set('')
+  mode.set('delete')
+  focusControl(cancelDelete.current)
+}
+
+async function remove() {
   const item = selected()
   if (!item) return
-  void run(async (api) => {
+  const removed = await run(async (api) => {
     items.set(await api.deleteSavedText(item.uuid, items(), locale))
     selectedId.set(items()[0]?.uuid || '')
-    mode.set('browse')
   })
+  if (mode() !== 'delete') return
+  if (removed) browse(selected() ? selection.current : newButton.current)
+  else focusControl(cancelDelete.current)
 }
 
 function insert() {
@@ -103,7 +134,7 @@ function insert() {
       <div class="grid gap-3" x-show="mode() === 'browse'">
         <label class="grid gap-1 text-ui" x-show="items().length">
           {{ savedText.savedItem }}
-          <select class="px-2 h-9 min-w-0 text-ink bg-panel-2 border border-line rounded-lg" x-model="selectedId" :disabled="busy()" data-saved-text-select>
+          <select class="px-2 h-9 min-w-0 text-ink bg-panel-2 border border-line rounded-lg" x-model="selectedId" :disabled="busy()" ref="selection" data-saved-text-select>
             <option x-for="item in items()" :key="item.uuid" :value="item.uuid" :text="item.name + ' · ' + copy.kinds[item.kind]"></option>
           </select>
         </label>
@@ -111,13 +142,13 @@ function insert() {
         <p class="overflow-auto m-0 p-2 max-h-32 break-words text-ui whitespace-pre-wrap bg-panel-2 rounded-lg" x-show="selected()" :text="selected()?.body || ''"></p>
         <div class="flex flex-wrap gap-3 items-center text-ui">
           <button class="px-3 h-8 font-semibold text-on-accent bg-accent rounded-lg" type="button" :disabled="busy() || !selected()" x-show="selected()" @click="insert" data-saved-text-insert>{{ savedText.insert }}</button>
-          <button class="text-info" type="button" :disabled="busy()" @click="edit()" data-saved-text-new>{{ savedText.newItem }}</button>
-          <button class="text-info" type="button" :disabled="busy() || !selected()" x-show="selected()" @click="edit(selected())" data-saved-text-edit>{{ savedText.edit }}</button>
-          <button class="text-danger" type="button" :disabled="busy() || !selected()" x-show="selected()" @click="mode.set('delete')" data-saved-text-delete>{{ savedText.deleteLabel }}</button>
+          <button class="text-info" type="button" :disabled="busy()" ref="newButton" @click="edit()" data-saved-text-new>{{ savedText.newItem }}</button>
+          <button class="text-info" type="button" :disabled="busy() || !selected()" x-show="selected()" ref="editButton" @click="edit(selected())" data-saved-text-edit>{{ savedText.edit }}</button>
+          <button class="text-danger" type="button" :disabled="busy() || !selected()" x-show="selected()" ref="deleteButton" @click="confirmDelete" data-saved-text-delete>{{ savedText.deleteLabel }}</button>
         </div>
       </div>
 
-      <form class="grid gap-3 text-ui" x-show="mode() === 'edit'" @submit.prevent="save" data-saved-text-form>
+      <form class="grid gap-3 text-ui" x-show="mode() === 'edit'" @submit.prevent="save($event.submitter)" data-saved-text-form>
         <label class="grid gap-1">
           {{ savedText.type }}
           <select class="px-2 h-9 text-ink bg-panel-2 border border-line rounded-lg" x-model="kind" name="kind">
@@ -131,15 +162,15 @@ function insert() {
         <p class="m-0 text-muted text-xs" x-show="kind() === 'hashtags'">{{ savedText.hashtagHelp }}</p>
         <div class="flex gap-3 items-center">
           <button class="px-3 h-8 font-semibold text-on-accent bg-accent rounded-lg" type="submit" :disabled="busy()">{{ savedText.save }}</button>
-          <button class="text-info" type="button" :disabled="busy()" @click="mode.set('browse')">{{ savedText.cancel }}</button>
+          <button class="text-info" type="button" :disabled="busy()" @click="browse(id() ? editButton.current : newButton.current)">{{ savedText.cancel }}</button>
         </div>
       </form>
 
       <div class="grid gap-3 text-ui" x-show="mode() === 'delete'">
-        <p class="m-0" :text="copy.confirmDelete.replace('{name}', () => selected()?.name || '')"></p>
+        <p class="m-0" :id="title + '-delete'" :text="copy.confirmDelete.replace('{name}', () => selected()?.name || '')"></p>
         <div class="flex gap-3 items-center">
           <button class="text-danger" type="button" :disabled="busy()" @click="remove" data-saved-text-confirm-delete>{{ savedText.deleteItem }}</button>
-          <button class="text-info" type="button" :disabled="busy()" @click="mode.set('browse')">{{ savedText.cancel }}</button>
+          <button class="text-info" type="button" :disabled="busy()" :aria-describedby="title + '-delete'" ref="cancelDelete" @click="browse(deleteButton.current)">{{ savedText.cancel }}</button>
         </div>
       </div>
     </dialog>
