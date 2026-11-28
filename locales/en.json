@@ -1527,6 +1527,42 @@
         "saveProfileFailed": "Could not save workspace details."
       }
     },
+    "savedText": {
+      "title": "Saved text",
+      "close": "Close",
+      "working": "Working…",
+      "savedItem": "Saved item",
+      "empty": "Save a snippet, template, or hashtag set to reuse it in a post.",
+      "insert": "Insert in post",
+      "newItem": "New item",
+      "edit": "Edit",
+      "deleteLabel": "Delete…",
+      "type": "Type",
+      "name": "Name",
+      "text": "Text",
+      "hashtagHelp": "Separate tags with spaces or commas.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "deleteItem": "Delete item",
+      "client": {
+        "kinds": {
+          "snippet": "Snippet",
+          "template": "Template",
+          "hashtags": "Hashtag set"
+        },
+        "confirmDelete": "Delete “{name}” from saved text?"
+      },
+      "errors": {
+        "chooseItem": "Choose a saved item.",
+        "chooseKind": "Choose a snippet, template, or hashtag set.",
+        "nameLength": "Enter a name of up to 80 characters.",
+        "textLength": "Enter text of up to 10,000 characters.",
+        "invalidTags": "Separate hashtags with spaces or commas. Use letters, numbers, and underscores.",
+        "tagsLength": "Use up to 10,000 characters of hashtags.",
+        "invalidItem": "There is an invalid saved Composer item.",
+        "missingItem": "This saved item no longer exists."
+      }
+    },
     "composerErrors": {
       "invalidThread": "Could not read the thread.",
       "invalidVariants": "Could not read the per-network text.",

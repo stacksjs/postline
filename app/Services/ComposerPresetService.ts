@@ -1,5 +1,6 @@
 import { db } from '@stacksjs/database'
 import { UserFacingError } from '../Support/Http/user-error'
+import { workspaceSavedText } from '../Support/Localization/workspace'
 import { ensureAccount, now, uuid } from './Social/support'
 
 export type ComposerPresetKind = 'snippet' | 'template' | 'hashtags'
@@ -21,36 +22,36 @@ const fields = ['uuid', 'kind', 'name', 'body'] as const
 
 function presetId(value: unknown): string {
   if (typeof value !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value))
-    throw new UserFacingError('Choose a saved item.')
+    throw new UserFacingError(workspaceSavedText.errors.chooseItem)
   return value.toLowerCase()
 }
 
 function validatePreset({ kind, name: rawName, body: rawBody }: PresetInput): Omit<ComposerPreset, 'uuid'> {
   if (kind !== 'snippet' && kind !== 'template' && kind !== 'hashtags')
-    throw new UserFacingError('Choose a snippet, template, or hashtag set.')
+    throw new UserFacingError(workspaceSavedText.errors.chooseKind)
 
   const name = typeof rawName === 'string' ? rawName.trim() : ''
-  if (!name || name.length > 80) throw new UserFacingError('Enter a name of up to 80 characters.')
+  if (!name || name.length > 80) throw new UserFacingError(workspaceSavedText.errors.nameLength)
 
   let body = typeof rawBody === 'string' ? rawBody.trim() : ''
-  if (!body || body.length > 10000) throw new UserFacingError('Enter text of up to 10,000 characters.')
+  if (!body || body.length > 10000) throw new UserFacingError(workspaceSavedText.errors.textLength)
   if (kind === 'hashtags') {
     const tags = body.split(/[\s,]+/u).filter(Boolean).map(tag => tag.replace(/^#/, '').normalize('NFC'))
     if (!tags.length || tags.some(tag => !/^[\p{L}\p{N}_][\p{L}\p{M}\p{N}_]*$/u.test(tag)))
-      throw new UserFacingError('Separate hashtags with spaces or commas. Use letters, numbers, and underscores.')
+      throw new UserFacingError(workspaceSavedText.errors.invalidTags)
     const unique = new Map<string, string>()
     for (const tag of tags) {
       const key = tag.toLowerCase()
       if (!unique.has(key)) unique.set(key, `#${tag}`)
     }
     body = [...unique.values()].join(' ')
-    if (body.length > 10000) throw new UserFacingError('Use up to 10,000 characters of hashtags.')
+    if (body.length > 10000) throw new UserFacingError(workspaceSavedText.errors.tagsLength)
   }
   return { kind, name, body }
 }
 
 export function readComposerPreset(input: unknown): ComposerPreset {
-  if (!input || typeof input !== 'object') throw new UserFacingError('There is an invalid saved Composer item.')
+  if (!input || typeof input !== 'object') throw new UserFacingError(workspaceSavedText.errors.invalidItem)
   const row = input as PresetInput & { uuid: unknown }
   return { uuid: presetId(row.uuid), ...validatePreset(row) }
 }
@@ -71,7 +72,7 @@ export class ComposerPresetService {
       const uuid = presetId(id)
       const preset = await db.updateTable('composer_presets').set({ ...values, updated_at: updatedAt })
         .where('uuid', '=', uuid).where('account_id', '=', accountId).returning('uuid').executeTakeFirst()
-      if (!preset) throw new UserFacingError('This saved item no longer exists.')
+      if (!preset) throw new UserFacingError(workspaceSavedText.errors.missingItem)
       return { uuid, ...values }
     }
 

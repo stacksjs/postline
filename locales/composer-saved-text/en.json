@@ -1,0 +1,5 @@
+{
+  "loadFailed": "Could not load saved text.",
+  "saveFailed": "Could not save the text.",
+  "deleteFailed": "Could not delete the saved text."
+}

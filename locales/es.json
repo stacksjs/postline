@@ -1527,6 +1527,42 @@
         "saveProfileFailed": "No se pudieron guardar los datos del espacio de trabajo."
       }
     },
+    "savedText": {
+      "title": "Textos guardados",
+      "close": "Cerrar",
+      "working": "Procesando…",
+      "savedItem": "Elemento guardado",
+      "empty": "Guarda un fragmento, una plantilla o un conjunto de etiquetas para reutilizarlo en una publicación.",
+      "insert": "Insertar en la publicación",
+      "newItem": "Nuevo elemento",
+      "edit": "Editar",
+      "deleteLabel": "Eliminar…",
+      "type": "Tipo",
+      "name": "Nombre",
+      "text": "Texto",
+      "hashtagHelp": "Separa las etiquetas con espacios o comas.",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "deleteItem": "Eliminar elemento",
+      "client": {
+        "kinds": {
+          "snippet": "Fragmento",
+          "template": "Plantilla",
+          "hashtags": "Conjunto de etiquetas"
+        },
+        "confirmDelete": "¿Eliminar «{name}» de los textos guardados?"
+      },
+      "errors": {
+        "chooseItem": "Elige un elemento guardado.",
+        "chooseKind": "Elige un fragmento, una plantilla o un conjunto de etiquetas.",
+        "nameLength": "Escribe un nombre de hasta 80 caracteres.",
+        "textLength": "Escribe un texto de hasta 10.000 caracteres.",
+        "invalidTags": "Separa las etiquetas con espacios o comas. Usa letras, números y guiones bajos.",
+        "tagsLength": "Usa hasta 10.000 caracteres de etiquetas.",
+        "invalidItem": "Hay un elemento no válido en los textos guardados.",
+        "missingItem": "Este elemento guardado ya no existe."
+      }
+    },
     "composerErrors": {
       "invalidThread": "No se pudo leer el hilo.",
       "invalidVariants": "No se pudo leer el texto por canal.",

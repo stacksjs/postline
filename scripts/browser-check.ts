@@ -944,37 +944,70 @@ async function checkSavedComposerText(cdp: Cdp): Promise<void> {
   const select = `${library}.querySelector('[data-saved-text-select]')`
   const editor = "document.querySelector('[data-bluesky-text]')"
   const button = (name: string) => `${library}.querySelector('[data-saved-text-${name}]')`
-  const click = (name: string) => evaluate(cdp, `${button(name)}.click()`)
+  const click = async (name: string) => {
+    await evaluate(cdp, `${button(name)}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+  }
+  const title = spanishWorkspace ? 'Textos guardados' : 'Saved text'
+  const deleteLabel = spanishWorkspace ? 'Eliminar…' : 'Delete…'
+  const label = spanishWorkspace ? 'Build tags · Conjunto de etiquetas' : 'Build tags · Hashtag set'
+  const invalidTags = spanishWorkspace
+    ? 'Separa las etiquetas con espacios o comas. Usa letras, números y guiones bajos.'
+    : 'Separate hashtags with spaces or commas. Use letters, numbers, and underscores.'
+  const confirmation = spanishWorkspace
+    ? '¿Eliminar «Build tags» de los textos guardados?'
+    : 'Delete “Build tags” from saved text?'
+  const fill = (name: string, value: string) => evaluate(cdp, `(() => {
+    const field = ${field(name)}
+    field.value = ${JSON.stringify(value)}
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+    field.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  const submit = async () => {
+    await evaluate(cdp, `${library}.querySelector('[data-saved-text-form] button[type=submit]').focus()`)
+    await pressKey(cdp, 'Enter', 13)
+  }
 
   await auditPage(`${site}/composer`, { cdp })
   await evaluate(cdp, `${trigger}.focus()`)
   await pressKey(cdp, 'Enter', 13)
-  await waitUntil('The saved Composer text dialog opens', () => evaluate<boolean>(cdp, `${library}.open && !${button('new')}.disabled`), 5_000)
+  await waitUntil('The saved Composer text dialog opens in the workspace language', () => evaluate<boolean>(cdp, `
+    ${library}.open && !${button('new')}.disabled
+      && ${trigger}.textContent.trim() === ${JSON.stringify(title)}
+      && document.getElementById(${library}.getAttribute('aria-labelledby'))?.textContent.trim() === ${JSON.stringify(title)}
+  `), 5_000)
   await click('new')
   await waitUntil('Creating saved text focuses its name', () => evaluate<boolean>(cdp, `document.activeElement === ${field('name')}`), 5_000)
-  await evaluate(cdp, `(() => {
-    const fill = (field, value) => { field.value = value; field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true })) }
-    fill(${field('kind')}, 'hashtags')
-    fill(${field('name')}, 'Build tags')
-    fill(${field('body')}, '#Postline, OpenSource')
-    ${library}.querySelector('[data-saved-text-form]').requestSubmit()
-  })()`)
+  await fill('kind', 'hashtags')
+  await fill('name', 'Build tags')
+  await fill('body', '#Invalid-tag')
+  await submit()
+  await waitUntil('Saved text shows the server validation in the workspace language', () => evaluate<boolean>(cdp, `
+    ${library}.querySelector('[role=alert]').innerText === ${JSON.stringify(invalidTags)}
+  `), 5_000)
+  await fill('body', '#Postline, OpenSource')
+  await submit()
   await waitUntil('The saved hashtag set is selected', () => evaluate<boolean>(cdp, `
-    ${select}.selectedOptions[0]?.textContent === 'Build tags · Hashtag set'
+    ${select}.selectedOptions[0]?.textContent === ${JSON.stringify(label)}
       && ${library}.textContent.includes('#Postline #OpenSource') && !${button('insert')}.disabled`), 5_000)
 
   await auditPage(`${site}/composer`, { cdp })
   await evaluate(cdp, `${editor}.value = 'Update copy'; ${editor}.dispatchEvent(new Event('input', { bubbles: true }))`)
   await evaluate(cdp, `${trigger}.click()`)
-  await waitUntil('Saved text is available after a reload', () => evaluate<boolean>(cdp, `${select}.selectedOptions[0]?.textContent === 'Build tags · Hashtag set'`), 5_000)
+  await waitUntil('Saved text is available after a reload', () => evaluate<boolean>(cdp, `${select}.selectedOptions[0]?.textContent === ${JSON.stringify(label)}`), 5_000)
   await click('insert')
   await waitUntil('Inserting saved text returns focus to the post', () => evaluate<boolean>(cdp, `
     !${library}.open && ${editor}.value === 'Update copy\\n#Postline #OpenSource'
       && (document.activeElement === ${editor} || Boolean(document.activeElement?.closest('[data-richtext-host]')))`), 5_000)
 
   await evaluate(cdp, `${trigger}.click()`)
-  await waitUntil('The saved text can be removed independently', () => evaluate<boolean>(cdp, `!${button('delete')}.disabled`), 5_000)
+  await waitUntil('The saved text can be removed independently', () => evaluate<boolean>(cdp, `
+    !${button('delete')}.disabled && ${button('delete')}.textContent.trim() === ${JSON.stringify(deleteLabel)}
+  `), 5_000)
   await click('delete')
+  await waitUntil('The delete confirmation names the saved item in the workspace language', () => evaluate<boolean>(cdp, `
+    ${button('confirm-delete')}.parentElement.previousElementSibling.innerText === ${JSON.stringify(confirmation)}
+  `), 5_000)
   await click('confirm-delete')
   await waitUntil('Deleting saved text preserves the post copy', () => evaluate<boolean>(cdp, `
     !${select}.options.length && ${editor}.value.endsWith('#Postline #OpenSource')`), 5_000)
@@ -3992,6 +4025,7 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
   finally {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
   }
+  await checkSavedComposerText(cdp)
 }
 
 async function checkWorkspace(cdp: Cdp): Promise<void> {

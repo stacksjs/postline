@@ -1,0 +1,5 @@
+{
+  "loadFailed": "No se pudieron cargar los textos guardados.",
+  "saveFailed": "No se pudo guardar el texto.",
+  "deleteFailed": "No se pudo eliminar el texto guardado."
+}
