@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { mediaObjections, tightestImageBytes } from '../../app/Support/Social/media-rules'
+import { mediaObjections, tightestImageBytes, videoObjection } from '../../app/Support/Social/media-rules'
 
 const MB = 1024 * 1024
 
@@ -46,5 +46,14 @@ describe('which network objects to an image, and why', () => {
     expect(tightestImageBytes(['twitter', 'bluesky'])).toBe(1_000_000)
     expect(tightestImageBytes(['twitter', 'mastodon'])).toBe(5 * MB)
     expect(tightestImageBytes(['blog'])).toBeNull()
+  })
+
+  test('formats network objections in the workspace locale', () => {
+    expect(mediaObjections(['bluesky'], [{ bytes: 1.5 * MB, mimeType: 'image/gif' }], 'es')).toEqual([
+      'Esta imagen ocupa 1,5 MB. Bluesky admite hasta 1 MB.',
+    ])
+    expect(videoObjection(['instagram', 'blog', 'blog'], 'es')).toBe(
+      'No se pueden publicar videos en Instagram o Blog. Elige Bluesky o Mastodon para esta publicación.',
+    )
   })
 })

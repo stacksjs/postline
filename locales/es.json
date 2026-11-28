@@ -1643,6 +1643,7 @@
         "resetVariant": "Usar el texto compartido",
         "variantBody": "Texto para {network}",
         "variantCount": "{count} caracteres",
+        "attachmentFailed": "No se pudo preparar el archivo. Vuelve a seleccionarlo.",
         "variantShared": "Usa el texto compartido",
         "variantTooLong": "Demasiado largo para {network}",
         "postNumber": "Publicación {number}",

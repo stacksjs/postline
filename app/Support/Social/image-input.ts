@@ -7,9 +7,13 @@
  * moment it is submitted, so a post never sits in the queue pointing somewhere
  * a driver must not be sent.
  */
+import { workspaceLocale } from '../Localization/workspace'
+import { composerMediaText } from './media-messages'
 import { assertPublicHttpUrl, safeFetch, UnsafeUrlError } from '../Http/safe-fetch'
 import { MAX_IMAGE_BYTES, MAX_POST_IMAGES } from './media-rules'
 import { readUploadedMedia } from './uploads'
+
+const text = composerMediaText(workspaceLocale)
 
 export { MAX_IMAGE_BYTES } from './media-rules'
 
@@ -36,11 +40,11 @@ export type ImageCheck
 
 export function checkImageBytes(bytes: Uint8Array): ImageCheck {
   if (bytes.byteLength > MAX_IMAGE_BYTES)
-    return { ok: false, error: `That image is larger than ${MAX_IMAGE_BYTES / 1024 / 1024} MB.` }
+    return { ok: false, error: text('imageTooLarge', { limit: MAX_IMAGE_BYTES / 1024 / 1024 }) }
 
   const mimeType = sniffImageType(bytes)
   if (!mimeType)
-    return { ok: false, error: 'That file is not a JPEG, PNG, GIF or WebP image.' }
+    return { ok: false, error: text('invalidImage') }
 
   return { ok: true, bytes, mimeType }
 }
@@ -122,7 +126,7 @@ export async function readImagesInput(request: ImagesRequest): Promise<ImagesInp
     if (!raw) continue
     const checked = checkImageBytes(raw.bytes)
     if (!checked.ok)
-      return { ok: false, error: files.length > 1 ? `Image ${index + 1}: ${checked.error}` : checked.error }
+      return { ok: false, error: files.length > 1 ? text('numberedImageError', { number: index + 1, error: checked.error }) : checked.error }
     images.push({ bytes: checked.bytes, mimeType: checked.mimeType, altText: alts[index] || undefined })
   }
 
@@ -133,7 +137,7 @@ export async function readImagesInput(request: ImagesRequest): Promise<ImagesInp
   if (single.url) images.push({ url: single.url, altText: singleAlt })
 
   if (images.length > MAX_POST_IMAGES)
-    return { ok: false, error: `A post can carry up to ${MAX_POST_IMAGES} images; this one has ${images.length}.` }
+    return { ok: false, error: text('imageCount', { limit: MAX_POST_IMAGES, count: images.length }) }
   return { ok: true, images }
 }
 

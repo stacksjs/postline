@@ -1643,6 +1643,7 @@
         "resetVariant": "Use shared text",
         "variantBody": "{network} post body",
         "variantCount": "{count} characters",
+        "attachmentFailed": "Could not prepare the attachment. Try choosing the file again.",
         "variantShared": "Uses the shared text",
         "variantTooLong": "Too long for {network}",
         "postNumber": "Post {number}",

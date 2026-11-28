@@ -14,8 +14,13 @@
  * many images Postline sends there, which is four everywhere: the most the
  * composer attaches, and within what each network allows.
  *
- * No imports, so the composer can run the same check before uploading.
+ * The composer and the server use these same checks.
  */
+
+import { POST_IMAGE_FORMATS } from './media-limits'
+import { composerMediaText } from './media-messages'
+
+export { MAX_IMAGE_BYTES, MAX_POST_IMAGES, MAX_VIDEO_BYTES, POST_IMAGE_FORMATS } from './media-limits'
 
 export interface MediaRule {
   /** Images per post that Postline sends to this network. */
@@ -33,37 +38,39 @@ export interface MediaRule {
 }
 
 const MB = 1024 * 1024
-const COMMON = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const
-
-export const POST_IMAGE_FORMATS: readonly string[] = COMMON
-export const MAX_POST_IMAGES = 4
-export const MAX_IMAGE_BYTES = 10 * MB
-export const MAX_VIDEO_BYTES = MAX_POST_IMAGES * MAX_IMAGE_BYTES
 
 export const MEDIA_RULES: Record<string, MediaRule> = {
-  bluesky: { count: 4, converts: true, maxBytes: 1_000_000, formats: COMMON },
-  twitter: { count: 4, converts: true, maxBytes: 5 * MB, formats: COMMON },
-  mastodon: { count: 4, converts: true, maxBytes: 16 * MB, formats: COMMON },
+  bluesky: { count: 4, converts: true, maxBytes: 1_000_000, formats: POST_IMAGE_FORMATS },
+  twitter: { count: 4, converts: true, maxBytes: 5 * MB, formats: POST_IMAGE_FORMATS },
+  mastodon: { count: 4, converts: true, maxBytes: 16 * MB, formats: POST_IMAGE_FORMATS },
   linkedin: { count: 4, converts: true, maxBytes: 8 * MB, formats: ['image/jpeg', 'image/png', 'image/gif'] },
   instagram: { count: 4, converts: true, maxBytes: 8 * MB, formats: ['image/jpeg'] },
   threads: { count: 4, converts: true, maxBytes: 8 * MB, formats: ['image/jpeg', 'image/png'] },
 }
 
-const NAMES: Record<string, string> = { bluesky: 'Bluesky', twitter: 'X', mastodon: 'Mastodon', linkedin: 'LinkedIn', instagram: 'Instagram', threads: 'Threads' }
-export function videoObjection(providers: readonly string[]): string | undefined {
+const NAMES: Record<string, string> = { bluesky: 'Bluesky', twitter: 'X', mastodon: 'Mastodon', linkedin: 'LinkedIn', instagram: 'Instagram', threads: 'Threads', blog: 'Blog' }
+export function videoObjection(providers: readonly string[], locale = 'en'): string | undefined {
   const unsupported = [...new Set(providers)].filter(provider => provider !== 'bluesky' && provider !== 'mastodon')
-  if (unsupported.length) return `Video publishing is unavailable on ${list(unsupported.map(provider => NAMES[provider] || provider))}. Choose Bluesky or Mastodon for this post.`
+  if (unsupported.length) {
+    const text = composerMediaText(locale)
+    return text('videoUnavailable', { networks: list(unsupported.map(provider => NAMES[provider] || provider), text('or')) })
+  }
 }
 
 const FORMATS: Record<string, string> = { 'image/jpeg': 'JPEG', 'image/png': 'PNG', 'image/webp': 'WebP', 'image/gif': 'GIF' }
 
-function megabytes(bytes: number): string {
+function megabytes(bytes: number, locale: string): string {
   const value = bytes / (bytes === 1_000_000 ? 1_000_000 : MB)
-  return `${Number.isInteger(value) ? value : value.toFixed(1)} MB`
+  const formatted = value.toLocaleString(locale, {
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 1,
+    maximumFractionDigits: 1,
+    useGrouping: false,
+  })
+  return `${formatted} MB`
 }
 
-function list(values: readonly string[]): string {
-  return values.length <= 1 ? values.join('') : `${values.slice(0, -1).join(', ')} or ${values[values.length - 1]}`
+function list(values: readonly string[], conjunction: string): string {
+  return values.length <= 1 ? values.join('') : `${values.slice(0, -1).join(', ')} ${conjunction} ${values[values.length - 1]}`
 }
 
 export interface MediaItem {
@@ -77,27 +84,32 @@ export interface MediaItem {
  * each, naming the network. Empty when all of them will take the post.
  * A network with no rule (the blog) accepts anything.
  */
-export function mediaObjections(providers: readonly string[], media: readonly MediaItem[]): string[] {
+export function mediaObjections(providers: readonly string[], media: readonly MediaItem[], locale = 'en'): string[] {
   if (media.length === 0) return []
   const objections: string[] = []
+  const text = composerMediaText(locale)
 
   for (const provider of [...new Set(providers)]) {
     const rule = MEDIA_RULES[provider]
     if (!rule) continue
     const name = NAMES[provider] || provider
 
-    if (media.length > rule.count)
-      objections.push(`${name} takes ${rule.count === 1 ? 'one image' : `up to ${rule.count} images`} per post; this post has ${media.length}.`)
+    if (media.length > rule.count) {
+      const limit = rule.count === 1 ? text('oneImage') : text('severalImages', { limit: rule.count })
+      objections.push(text('networkImageCount', { network: name, limit, count: media.length }))
+    }
 
     media.slice(0, rule.count).forEach((item, index) => {
       // A still image that is too large or the wrong kind is converted for
       // this network at publish. A GIF is not: converting loses its animation.
       if (rule.converts && item.mimeType !== 'image/gif') return
-      const which = media.length > 1 ? `Image ${index + 1}` : 'This image'
-      if (item.mimeType && !rule.formats.includes(item.mimeType))
-        objections.push(`${name} takes ${list(rule.formats.map(format => FORMATS[format] || format))} only; ${which.toLowerCase()} is a ${FORMATS[item.mimeType] || item.mimeType}.`)
+      const image = media.length > 1 ? text('numberedImage', { number: index + 1 }) : text('thisImage')
+      if (item.mimeType && !rule.formats.includes(item.mimeType)) {
+        const formats = list(rule.formats.map(format => FORMATS[format] || format), text('or'))
+        objections.push(text('networkImageFormat', { network: name, formats, image: image.toLowerCase(), actual: FORMATS[item.mimeType] || item.mimeType }))
+      }
       if (item.bytes !== undefined && item.bytes > rule.maxBytes)
-        objections.push(`${which} is ${megabytes(item.bytes)}; ${name} takes up to ${megabytes(rule.maxBytes)}.`)
+        objections.push(text('networkImageSize', { image, size: megabytes(item.bytes, locale), network: name, limit: megabytes(rule.maxBytes, locale) }))
     })
   }
 

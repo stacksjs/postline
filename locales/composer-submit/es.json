@@ -22,5 +22,8 @@
   "commentAttentionNotice": "Consulta la pestaña Requieren atención de la Cola.",
   "publishError": "No se pudo publicar.",
   "updateError": "No se pudo actualizar la publicación.",
-  "queueError": "No se pudo guardar en la cola."
+  "queueError": "No se pudo guardar en la cola.",
+  "savedVideo": "Video guardado",
+  "savedImage": "1 imagen guardada",
+  "savedImages": "{count} imágenes guardadas"
 }

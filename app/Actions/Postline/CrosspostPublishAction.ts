@@ -3,15 +3,18 @@ import { Action } from '@stacksjs/actions'
 import { response } from '@stacksjs/router'
 import { actionFailure } from '../../Support/Http/action-error'
 import { UserFacingError } from '../../Support/Http/user-error'
-import { workspaceComposerErrors } from '../../Support/Localization/workspace'
+import { workspaceComposerErrors, workspaceLocale } from '../../Support/Localization/workspace'
 import { crosspost, crosspostProviders } from '../../Services/Social/CrosspostService'
 import { parseTargets } from '../../Support/Social/targets'
 import { readPostAttachments } from '../../Support/Social/attachment-input'
+import { composerMediaText } from '../../Support/Social/media-messages'
 import { mediaObjections } from '../../Support/Social/media-rules'
 import { readPostOptions } from '../../Support/Social/post-options'
 import { readThreadInput } from '../../Support/Social/threads'
 import { persistTempMedia, removeTempMedia } from '../../Support/Social/uploads'
 import { parseVariantsField } from '../../Support/Social/variants'
+
+const mediaText = composerMediaText(workspaceLocale)
 
 export default new Action({
   name: 'Postline Crosspost Publish',
@@ -42,9 +45,9 @@ export default new Action({
       return response.json({ ok: false, error: attachments.error }, { status: 422 })
 
     // Refused before anything is sent, naming the network that objects.
-    const objections = mediaObjections(providers.map(target => target.provider), attachments.images.map(image => image.bytes?.length ? { bytes: image.bytes.length, mimeType: image.mimeType } : {}))
+    const objections = mediaObjections(providers.map(target => target.provider), attachments.images.map(image => image.bytes?.length ? { bytes: image.bytes.length, mimeType: image.mimeType } : {}), workspaceLocale)
     if (objections.length)
-      return response.json({ ok: false, error: `${objections.join(' ')} Use a different image, or leave that network out.` }, { status: 422 })
+      return response.json({ ok: false, error: `${objections.join(' ')} ${mediaText('chooseOtherImage')}` }, { status: 422 })
 
     const tempMediaFiles: string[] = []
     try {

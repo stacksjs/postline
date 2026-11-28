@@ -169,15 +169,16 @@ export function readQueuedVariants(item: Pick<QueueEditView, 'variants' | 'text'
     typeof text === 'string' && text.trim() ? [[provider, { text, shared: item.text || '' }]] : []))
 }
 
-export function readQueuedAttachments(item: Pick<QueueEditView, 'image' | 'images' | 'video'>): {
+export function readQueuedAttachments(item: Pick<QueueEditView, 'image' | 'images' | 'video'>, locale = 'en'): {
   images: ComposerImage[]
   previews: ComposerPreviewImage[]
 } {
+  const copy = composerSubmitCopy(locale)
   const saved = item.images?.length || (item.image ? 1 : 0)
   return {
     images: item.video
-      ? [{ id: 'saved-video', file: null, name: 'Saved video', alt: item.video.altText || '', preview: item.video.previewUrl, video: true, kept: true }]
-      : saved ? [{ id: 'saved', file: null, name: saved === 1 ? '1 saved image' : `${saved} saved images`, alt: '', kept: true }] : [],
+      ? [{ id: 'saved-video', file: null, name: copy.savedVideo, alt: item.video.altText || '', preview: item.video.previewUrl, video: true, kept: true }]
+      : saved ? [{ id: 'saved', file: null, name: saved === 1 ? copy.savedImage : copy.savedImages.replace('{count}', String(saved)), alt: '', kept: true }] : [],
     previews: (item.images || []).flatMap((image, index) => {
       const src = image.previewUrl || previewImageUrl(image.url || '')
       return src ? [{ id: `saved-${index}`, src, alt: image.altText || '' }] : []

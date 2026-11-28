@@ -78,7 +78,7 @@ test('a failed video send keeps its bytes for retry and for a workspace restore'
   const service = new CrosspostService({ mastodon: publisher })
   const queue = new QueueService(service)
   const video = await sampleVideo()
-  await expect(queue.save({ text: 'Wrong network', providers: ['mastodon', 'blog'], video })).rejects.toThrow(/unavailable on blog/)
+  await expect(queue.save({ text: 'Wrong network', providers: ['mastodon', 'blog'], video })).rejects.toThrow(/unavailable on Blog/)
   await expect(queue.save({ text: 'Poll video', providers: ['mastodon'], video, options: { mastodon: { poll: { options: ['A', 'B'], expiresIn: 600 } } } })).rejects.toThrow(/poll or a quote/)
   const { postId } = await service.publish('A video to send', ['mastodon'], { video })
   const post = await database.selectFrom('posts').select(['content', 'uuid']).where('id', '=', postId).executeTakeFirstOrThrow()

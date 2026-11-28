@@ -2,7 +2,7 @@
 
 export { readComposerDraft, writeComposerDraft, COMPOSER_DRAFT_KEY, COMPOSER_DEFAULT_FORMAT_KEY, COMPOSER_AUTOSAVE_KEY } from '../../../resources/functions/composer-draft'
 export type { ComposerFormat, ComposerAction, ComposerDraft } from '../../../resources/functions/composer-draft'
-export { isComposerVideo, composerVideoError, composerFileError, composerMediaWarnings, composerImageFiles, composerAttachmentTypes } from '../../../resources/functions/composer-media'
+export { composerImageFiles, composerAttachmentTypes } from '../../../resources/functions/composer-media'
 export type { ComposerImage } from '../../../resources/functions/composer-media'
 export { composerPreviewCards, previewImageUrl } from '../../../resources/functions/composer-preview'
 export type { ComposerPreviewImage } from '../../../resources/functions/composer-preview'

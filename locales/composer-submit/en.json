@@ -22,5 +22,8 @@
   "commentAttentionNotice": "Check Needs attention in Queue.",
   "publishError": "Publish failed.",
   "updateError": "Could not update the post.",
-  "queueError": "Could not save to the queue."
+  "queueError": "Could not save to the queue.",
+  "savedVideo": "Saved video",
+  "savedImage": "1 saved image",
+  "savedImages": "{count} saved images"
 }

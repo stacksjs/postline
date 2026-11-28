@@ -3713,6 +3713,69 @@ async function checkSpanishSettings(cdp: Cdp): Promise<void> {
   `), 5_000)
 }
 
+async function checkSpanishComposerAttachments(cdp: Cdp): Promise<void> {
+  await auditPage(`${site}/composer`, { cdp })
+  await evaluate(cdp, "localStorage.removeItem('postline:composer-draft:v1')")
+  const warnings = "document.querySelector('[data-image-warnings]')"
+  const rows = "document.querySelectorAll('[data-attached-image]')"
+  const blog = "document.querySelector('[data-provider-toggle=blog]')"
+  const video = "document.querySelector('[data-attached-video]')"
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/dL8AAAAASUVORK5CYII='
+  const clip = readFileSync(join(root, 'tests/fixtures/postline-video.mp4')).toString('base64')
+  const files = (names: string[], data: string, type: string) => evaluate(cdp, `(() => {
+    const transfer = new DataTransfer()
+    const bytes = Uint8Array.from(atob(${JSON.stringify(data)}), character => character.charCodeAt(0))
+    for (const name of ${JSON.stringify(names)}) transfer.items.add(new File([bytes], name, { type: ${JSON.stringify(type)} }))
+    const input = document.querySelector('[data-attach-input]')
+    input.files = transfer.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+
+  await waitUntil('Blog is ready for the Spanish attachment check', () => evaluate<boolean>(cdp, `Boolean(${blog})`), 5_000)
+  await evaluate(cdp, `if (${blog}.getAttribute('aria-pressed') !== 'true') ${blog}.click()`)
+  await files(['nota.txt'], 'YQ==', 'text/plain')
+  await waitUntil('The file picker reports a Spanish validation error', () => evaluate<boolean>(cdp, `
+    ${warnings}.innerText.trim() === 'No se pudo adjuntar nota.txt. Elige una imagen JPEG, PNG, WebP o GIF.'
+  `), 5_000)
+  await files(['primera.png', 'segunda.png'], png, 'image/png')
+  const move = "document.querySelector('[aria-label=\"Subir segunda.png\"]')"
+  await waitUntil('Spanish image controls are named by file and position', () => evaluate<boolean>(cdp, `
+    !${warnings}.innerText.trim() && ${rows}.length === 2
+      && Boolean(${move}?.getClientRects().length)
+      && Boolean(${rows}[1].querySelector('[aria-label="Texto alternativo de la imagen 2"]'))
+  `), 5_000)
+  await evaluate(cdp, `${move}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The Spanish Move up control reorders images', () => evaluate<boolean>(cdp, `
+    ${rows}[0]?.querySelector('[data-image-name]')?.textContent === 'segunda.png'
+  `), 5_000)
+  const remove = "document.querySelector('[aria-label=\"Quitar segunda.png\"]')"
+  await evaluate(cdp, `${remove}.focus()`)
+  await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The Spanish Remove control preserves the other image', () => evaluate<boolean>(cdp, `
+    ${rows}.length === 1 && ${rows}[0].querySelector('[data-image-name]')?.textContent === 'primera.png'
+  `), 5_000)
+
+  await files(['prueba.mp4'], clip, 'video/mp4')
+  await waitUntil('Spanish video preview names its controls and the unsupported channel', () => evaluate<boolean>(cdp, `
+    ${video}?.videoWidth === 32 && ${video}.getAttribute('aria-label') === 'Vista previa del video'
+      && Boolean(document.querySelector('[data-image-alt][aria-label="Texto alternativo del video"]'))
+      && ${warnings}.innerText.includes('No se pueden publicar videos en Blog.')
+      && document.querySelector('[data-bluesky-publish]').disabled
+  `), 5_000)
+  const invalid = await evaluate<{ status: number, error: string }>(cdp, `(async () => {
+    const body = new FormData()
+    body.set('providers', 'blog')
+    body.set('text', 'Validación de archivo')
+    body.set('video', new File(['uno'], 'prueba.mp4', { type: 'video/mp4' }))
+    const response = await fetch('/api/postline/queue', { method: 'POST', body })
+    return { status: response.status, error: (await response.json()).error }
+  })()`)
+  if (invalid.status !== 422 || invalid.error !== 'Adjunta un archivo MP4 que contenga una pista de video.')
+    throw new Error('The Queue API did not return the Spanish video validation message.')
+  await evaluate(cdp, "localStorage.removeItem('postline:composer-draft:v1')")
+}
+
 async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
   const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
     const actualFetch = window.fetch.bind(window)
@@ -4026,6 +4089,7 @@ async function checkSpanishWorkspace(cdp: Cdp): Promise<void> {
     await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
   }
   await checkSavedComposerText(cdp)
+  await checkSpanishComposerAttachments(cdp)
 }
 
 async function checkWorkspace(cdp: Cdp): Promise<void> {

@@ -1,3 +1,5 @@
+import { workspaceLocale } from '../../Support/Localization/workspace'
+import { composerMediaText } from '../../Support/Social/media-messages'
 import { log } from '@stacksjs/logging'
 import { MAX_POST_IMAGES, mediaObjections } from '../../Support/Social/media-rules'
 import type { PostOptions } from '../../Support/Social/post-options'
@@ -126,6 +128,8 @@ export const LATE_GRACE_MINUTES = Number(process.env.POSTLINE_LATE_GRACE_MINUTES
   ? Number(process.env.POSTLINE_LATE_GRACE_MINUTES)
   : 30
 
+const mediaText = composerMediaText(workspaceLocale)
+
 export const MISSED_PREFIX = 'Missed:'
 
 function missedReason(scheduledAt: string): string {
@@ -143,9 +147,9 @@ function assertMediaAllowed(providers: readonly string[], media: QueueImage[] | 
     assertVideoAllowed(providers, media.length > 1, options)
     return
   }
-  const objections = mediaObjections(providers, media.map(image => image.bytes?.length ? { bytes: image.bytes.length, mimeType: image.mimeType } : {}))
+  const objections = mediaObjections(providers, media.map(image => image.bytes?.length ? { bytes: image.bytes.length, mimeType: image.mimeType } : {}), workspaceLocale)
   if (objections.length)
-    throw new UserFacingError(`${objections.join(' ')} Use a different image, or leave that network out.`)
+    throw new UserFacingError(`${objections.join(' ')} ${mediaText('chooseOtherImage')}`)
 }
 
 /**
@@ -334,7 +338,7 @@ function imagesOf(input: { image?: QueueImage | null, images?: QueueImage[] | nu
   if (input.images !== undefined) {
     const images = (input.images ?? []).filter(usable)
     if (images.length > MAX_POST_IMAGES)
-      throw new UserFacingError(`A post can carry up to ${MAX_POST_IMAGES} images; this one has ${images.length}.`)
+      throw new UserFacingError(mediaText('imageCount', { limit: MAX_POST_IMAGES, count: images.length }))
     return images
   }
   if (input.image === undefined) return undefined

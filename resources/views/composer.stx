@@ -130,17 +130,17 @@ export const composerMessages = workspaceComposerText.client
               <span class="text-ink text-xs truncate" :text="image.name" :title="image.name" data-image-name></span>
             </div>
             <div class="flex gap-0.5">
-              <button class="inline-grid place-items-center h-8 w-8 text-muted hover:text-ink rounded-md disabled:opacity-40" type="button" :if="image.editable && imageRows().length > 1" :disabled="!image.canMoveEarlier || submitting()" :aria-label="'Move ' + image.name + ' earlier'" @click="moveImage(image.id, -1)">
+              <button class="inline-grid place-items-center h-8 w-8 text-muted hover:text-ink rounded-md disabled:opacity-40" type="button" :if="image.editable && imageRows().length > 1" :disabled="!image.canMoveEarlier || submitting()" :aria-label="image.earlierLabel" @click="moveImage(image.id, -1)">
                 <span class="h-4 w-4 i-hugeicons-arrow-up-01" aria-hidden="true"></span>
               </button>
-              <button class="inline-grid place-items-center h-8 w-8 text-muted hover:text-ink rounded-md disabled:opacity-40" type="button" :if="image.editable && imageRows().length > 1" :disabled="!image.canMoveLater || submitting()" :aria-label="'Move ' + image.name + ' later'" @click="moveImage(image.id, 1)">
+              <button class="inline-grid place-items-center h-8 w-8 text-muted hover:text-ink rounded-md disabled:opacity-40" type="button" :if="image.editable && imageRows().length > 1" :disabled="!image.canMoveLater || submitting()" :aria-label="image.laterLabel" @click="moveImage(image.id, 1)">
                 <span class="h-4 w-4 i-hugeicons-arrow-down-01" aria-hidden="true"></span>
               </button>
               <button class="inline-grid place-items-center h-8 w-8 text-muted hover:text-ink rounded-md" type="button" :disabled="submitting()" :aria-label="image.removeLabel" @click="removeImage(image.id)">
                 <span class="h-3.5 w-3.5 i-hugeicons-cancel-01" aria-hidden="true"></span>
               </button>
             </div>
-            <video :if="image.video" class="block col-span-2 max-h-72 w-full bg-panel rounded-lg" :src="image.preview" :aria-label="image.alt || 'Video preview'" controls preload="metadata" playsinline data-attached-video></video>
+            <video :if="image.video" class="block col-span-2 max-h-72 w-full bg-panel rounded-lg" :src="image.preview" :aria-label="image.videoLabel" controls preload="metadata" playsinline data-attached-video></video>
             <input class="col-span-2 px-2.5 h-8 min-w-0 text-ink text-ui bg-panel border border-field-line outline-none rounded-lg focus:border-info-solid focus:ring-2 focus:ring-info-soft" type="text" maxlength="1000" placeholder="{{ composerText.attachmentDescription }}" x-show="image.editable" :disabled="submitting()" :value="image.alt" :aria-label="image.altLabel" @input="setImageAlt(image.id, $event)" data-image-alt>
             <span class="col-span-2 text-muted text-xs" x-show="!image.editable">{{ composerText.replaceMedia }}</span>
           </div>
@@ -502,17 +502,10 @@ export const composerMessages = workspaceComposerText.client
       attachmentRules.set(rules)
       return rules
     }
-    const mediaWarnings = derived(() => attachmentRules()?.composerMediaWarnings(selectedNetworkIds(), attachedImages()) ?? [])
+    const mediaWarnings = derived(() => attachmentRules()?.composerMediaWarnings(selectedNetworkIds(), attachedImages(), locale) ?? [])
     const imageWarnings = derived(() => imageError() ? [imageError(), ...mediaWarnings()] : mediaWarnings())
 
-    const imageRows = derived(() => attachedImages().map((image, index, images) => ({
-      ...image,
-      editable: !image.kept,
-      canMoveEarlier: index > 0,
-      canMoveLater: index < images.length - 1,
-      altLabel: image.video ? 'Video alt text' : `Alt text for image ${index + 1}`,
-      removeLabel: image.video ? 'Remove video' : image.kept ? 'Remove the saved images' : `Remove ${image.name}`,
-    })))
+    const imageRows = derived(() => attachmentRules()?.attachmentImageRows(attachedImages(), locale) ?? [])
 
     function setImageAlt(id: string, event: Event) {
       const alt = (event.target as HTMLInputElement).value
@@ -556,7 +549,7 @@ export const composerMessages = workspaceComposerText.client
       try {
         const rules = await loadAttachmentRules()
         const previous = attachedImages()
-        const { error, items } = rules.prepareAttachments(picked, previous)
+        const { error, items } = rules.prepareAttachments(picked, previous, locale)
         imageError.set(error)
         if (!items) return
         for (const item of previous) {
@@ -569,7 +562,7 @@ export const composerMessages = workspaceComposerText.client
         markEdited()
       }
       catch {
-        imageError.set('Could not prepare the attachment. Try choosing the file again.')
+        imageError.set(copy.attachmentFailed)
       }
       finally {
         attaching.set(false)
@@ -981,6 +974,9 @@ export const composerMessages = workspaceComposerText.client
     })
 
     const enterEditMode = async (item) => {
+      const { readQueuedAttachments, readQueuedVariants } = await loadSubmission()
+      const { images, previews } = readQueuedAttachments(item, locale)
+      if (images.length) await loadAttachmentRules()
       if (item.options?.mastodon || item.options?.bluesky)
         (await loadNetworkOptions()).restoreNetworkOptions(networkOptionsForm.current, item.options)
       editingId.set(item.id)
@@ -996,7 +992,6 @@ export const composerMessages = workspaceComposerText.client
       }
       postTitle.set(item.title || '')
 
-      const { readQueuedAttachments, readQueuedVariants } = await loadSubmission()
       variants.set(readQueuedVariants(item))
       selectedList.set([...new Set<string>((item.targets || item.providers || [])
         .map(spec => composerKeyForSpec(publishTargets(), String(spec)))
@@ -1009,8 +1004,6 @@ export const composerMessages = workspaceComposerText.client
         segments.update(([lead, ...rest]) => [{ ...lead, preview }, ...rest])
       }
 
-      const { images, previews } = readQueuedAttachments(item)
-      if (images[0]?.video) await loadAttachmentRules()
       editRemoveImage = false
       savedPreviewImages.set(previews)
       attachedImages.set(images)

@@ -15,10 +15,6 @@ declare global {
   const COMPOSER_DRAFT_KEY: typeof autoImports.COMPOSER_DRAFT_KEY
   const COMPOSER_DEFAULT_FORMAT_KEY: typeof autoImports.COMPOSER_DEFAULT_FORMAT_KEY
   const COMPOSER_AUTOSAVE_KEY: typeof autoImports.COMPOSER_AUTOSAVE_KEY
-  const isComposerVideo: typeof autoImports.isComposerVideo
-  const composerVideoError: typeof autoImports.composerVideoError
-  const composerFileError: typeof autoImports.composerFileError
-  const composerMediaWarnings: typeof autoImports.composerMediaWarnings
   const composerImageFiles: typeof autoImports.composerImageFiles
   const composerAttachmentTypes: typeof autoImports.composerAttachmentTypes
   const composerPreviewCards: typeof autoImports.composerPreviewCards

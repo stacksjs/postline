@@ -1,8 +1,12 @@
+import { workspaceLocale } from '../Localization/workspace'
+import { composerMediaText } from './media-messages'
 import type { PostVideo } from '@stacksjs/socials'
 import type { PostOptions } from './post-options'
 import { UserFacingError } from '../Http/user-error'
 import { MAX_VIDEO_BYTES, videoObjection } from './media-rules'
 import { readUploadedMedia } from './uploads'
+
+const text = composerMediaText(workspaceLocale)
 
 interface VideoRequest {
   get: (key: string) => unknown
@@ -57,7 +61,7 @@ export type VideoCheck = { ok: true, video: PostVideo } | { ok: false, error: st
 
 export function checkVideoBytes(bytes: Uint8Array, altText?: string): VideoCheck {
   if (bytes.byteLength > MAX_VIDEO_BYTES)
-    return { ok: false, error: `That video is larger than ${MAX_VIDEO_BYTES / 1024 / 1024} MB.` }
+    return { ok: false, error: text('videoTooLarge', { limit: MAX_VIDEO_BYTES / 1024 / 1024 }) }
 
   let compatible = false
   let media = false
@@ -81,7 +85,7 @@ export function checkVideoBytes(bytes: Uint8Array, altText?: string): VideoCheck
     if (box.type === 'mdat' && box.end > box.data) media = true
   }
   if (!compatible || !media || !videoTrack)
-    return { ok: false, error: 'Attach an MP4 file containing a video track.' }
+    return { ok: false, error: text('invalidVideo') }
 
   return { ok: true, video: { bytes, mimeType: 'video/mp4', ...(altText && { altText }) } }
 }
@@ -89,23 +93,23 @@ export function checkVideoBytes(bytes: Uint8Array, altText?: string): VideoCheck
 export async function readVideoInput(request: VideoRequest): Promise<VideoCheck | { ok: true, video: null }> {
   const files = request.getFiles?.('video') ?? []
   if (files.length > 1)
-    return { ok: false, error: 'Attach one video per post.' }
+    return { ok: false, error: text('oneVideo') }
   const file = (files[0] ?? request.file?.('video')) as { size?: number, buffer?: ArrayBuffer } | null
   if (!file) return { ok: true, video: null }
   if ((file.size ?? file.buffer?.byteLength ?? 0) > MAX_VIDEO_BYTES)
-    return { ok: false, error: `That video is larger than ${MAX_VIDEO_BYTES / 1024 / 1024} MB.` }
+    return { ok: false, error: text('videoTooLarge', { limit: MAX_VIDEO_BYTES / 1024 / 1024 }) }
 
   const raw = await readUploadedMedia(file)
-  if (!raw) return { ok: false, error: 'Attach a non-empty MP4 video.' }
+  if (!raw) return { ok: false, error: text('emptyVideo') }
   const altText = String(request.get('video_alt') ?? '').trim().slice(0, 1000)
   return checkVideoBytes(raw.bytes, altText)
 }
 
 /** Validate combinations before any selected network can publish. */
 export function assertVideoAllowed(providers: readonly string[], hasImages: boolean, options?: PostOptions | null): void {
-  if (hasImages) throw new UserFacingError('Attach images or one video per post.')
-  const unsupported = videoObjection(providers)
+  if (hasImages) throw new UserFacingError(text('mixedAttachments'))
+  const unsupported = videoObjection(providers, workspaceLocale)
   if (unsupported) throw new UserFacingError(unsupported)
   if (providers.includes('mastodon') && (options?.mastodon?.poll || options?.mastodon?.quote))
-    throw new UserFacingError('Mastodon does not allow a video with a poll or a quote.')
+    throw new UserFacingError(text('mastodonVideoOptions'))
 }
