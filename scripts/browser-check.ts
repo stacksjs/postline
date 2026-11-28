@@ -1829,11 +1829,26 @@ async function checkPublicInbox(cdp: Cdp): Promise<void> {
       && ${inbox}?.querySelector('article p')?.textContent === 'A public reply fixture'
       && ${inbox}?.querySelector('article a')?.href === 'https://bsky.app/profile/fixture-author.example/post/abc'
       && Boolean(${inbox}?.querySelector('article time')?.textContent)`), 5000)
-  await evaluate(cdp, `${inbox}.querySelector('[data-public-mark-read]').focus()`)
+  const mark = `${inbox}.querySelector('button[aria-label="Mark as read, activity by fixture-author.example"]')`
+  const openReply = `${inbox}.querySelector('button[aria-label="Reply to fixture-author.example"]')`
+  await evaluate(cdp, `(() => {
+    const original = window.fetch.bind(window)
+    window.fetch = (target, options) => {
+      const response = original(target, options)
+      if (new URL(target instanceof Request ? target.url : target, location.href).pathname !== '/api/postline/inbox/mentions/read')
+        return response
+      return new Promise(resolve => { window.finishPublicMark = () => resolve(response) })
+    }
+  })()`)
+  await evaluate(cdp, `${mark}.focus()`)
   await pressKey(cdp, 'Enter', 13)
+  await waitUntil('The selected public activity action announces its pending update', () => evaluate<boolean>(cdp, `
+    Boolean(window.finishPublicMark) && ${mark}.disabled && ${mark}.getAttribute('aria-busy') === 'true'
+  `), 5_000)
+  await evaluate(cdp, 'window.finishPublicMark()')
   await waitUntil('Inbox marks the reply as read in the database', () => evaluate<boolean>(cdp, `(async () => {
     const payload = await fetch('/api/postline/inbox/mentions').then(response => response.json())
-    return !${inbox}?.querySelector('[data-public-mark-read]')?.getClientRects().length
+    return !${mark}?.getClientRects().length
       && payload.data?.entries?.some(entry => entry.author === 'fixture-author.example' && entry.read)
   })()`), 5000)
   await evaluate(cdp, `(() => {
@@ -1854,7 +1869,7 @@ async function checkPublicInbox(cdp: Cdp): Promise<void> {
   })()`)
   const reply = `${inbox}.querySelector('dialog')`
   const submit = `${reply}.querySelector('button[type=submit]')`
-  await evaluate(cdp, `${inbox}.querySelector('[data-open-public-reply]').focus()`)
+  await evaluate(cdp, `${openReply}.focus()`)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Inbox opens the public reply editor and names the receiving account', () => evaluate<boolean>(cdp, `
     ${reply}.open && document.activeElement === ${reply}.querySelector('textarea')
@@ -1878,7 +1893,7 @@ async function checkPublicInbox(cdp: Cdp): Promise<void> {
   await evaluate(cdp, `${submit}.focus()`)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Inbox confirms the public reply and restores focus', () => evaluate<boolean>(cdp, `
-    !${reply}.open && document.activeElement === ${inbox}.querySelector('[data-open-public-reply]')
+    !${reply}.open && document.activeElement === ${openReply}
       && [...${inbox}.querySelectorAll('[role=status]')].some(el => el.innerText === 'Public reply sent.')
       && window.publicReplyAttempts.length === 2 && window.publicReplyAttempts.every(attempt =>
         Number.isInteger(attempt.id) && attempt.text === 'Reply from the browser fixture')`), 5000)
@@ -3114,17 +3129,108 @@ async function checkTrackedLinks(cdp: Cdp): Promise<void> {
   const result = "document.querySelector('[data-tracked-link-result]')"
   await waitUntil('Tracking can build a tagged URL on a local install', () => evaluate<boolean>(cdp, `
     ${form}?.textContent.includes('Short links need a public HTTPS Postline server.')
-      && !${form}.querySelector('button[value=shorten]').getClientRects().length
-      && !${form}.querySelector('button[value=tag]').disabled`), 5_000)
+      && !${form}.querySelector('button[type=button]').getClientRects().length
+      && !${form}.querySelector('button[type=submit]').disabled`), 5_000)
   await evaluate(cdp, `
     ${form}.elements.destination.value = 'https://example.org/story?edition=1#more'
     ${form}.elements.source.value = 'Mastodon'
     ${form}.elements.campaign.value = 'Product news'
-    ${form}.querySelector('button[value=tag]').focus()
+    ${form}.querySelector('button[type=submit]').focus()
   `)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('The builder preserves the destination query and fragment', () => evaluate<boolean>(cdp, `
     ${result}?.value === 'https://example.org/story?edition=1&utm_source=Mastodon&utm_campaign=Product+news#more'`), 5_000)
+
+  const fixture = await cdp.send<{ identifier: string }>('Page.addScriptToEvaluateOnNewDocument', { source: `
+    const send = window.fetch.bind(window)
+    const tracked = { creates: [], disables: [] }
+    window.testTrackedLinks = tracked
+    const response = data => Response.json({ ok: true, data })
+    window.fetch = async (input, options) => {
+      const url = new URL(input instanceof Request ? input.url : input, location.href)
+      if (url.pathname === '/api/postline/analytics/links') {
+        if (options?.method !== 'POST') return response({ enabled: true, links: [] })
+        const fields = JSON.parse(options.body)
+        tracked.creates.push(fields)
+        await new Promise(resolve => { tracked.finishCreate = resolve })
+        return response({ name: fields.name, destination: fields.destination, code: 'fixture',
+          visits: 0, disabled: false, shortUrl: 'https://postline.example/s/fixture' })
+      }
+      if (url.pathname === '/api/postline/analytics/links/disable') {
+        tracked.disables.push(JSON.parse(options.body))
+        await new Promise(resolve => { tracked.finishDisable = resolve })
+        return response({})
+      }
+      return send(input, options)
+    }
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: async address => { tracked.copied = address },
+    } })
+  ` })
+  const destination = `${form}.elements.destination`
+  const shorten = `${form}.querySelector('button[type=button]')`
+  const disable = `document.querySelector('button[aria-label="Disable Test link"]')`
+  const copy = `document.querySelector('button[aria-label="Copy short link for Test link"]')`
+  try {
+    await auditPage(`${site}/analytics`, { cdp })
+    await waitUntil('The short-link action is available on a public workspace', () => evaluate<boolean>(cdp, `
+      Boolean(${shorten}?.getClientRects().length && !${shorten}.disabled)
+    `), 5_000)
+    await evaluate(cdp, `${shorten}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    if (!await evaluate<boolean>(cdp, `document.activeElement === ${destination} && window.testTrackedLinks.creates.length === 0`))
+      throw new Error('Shortening an empty destination did not use the form’s validation.')
+
+    await evaluate(cdp, `
+      ${destination}.value = 'https://example.org/story'
+      ${form}.elements.name.value = 'Test link'
+      ${destination}.focus()
+    `)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Enter in a field still builds a tagged URL without creating a short link', () => evaluate<boolean>(cdp, `
+      ${result}.value === 'https://example.org/story' && window.testTrackedLinks.creates.length === 0
+    `), 5_000)
+    await evaluate(cdp, `${shorten}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Shortening announces progress and keeps the submitted fields stable', () => evaluate<boolean>(cdp, `
+      Boolean(window.testTrackedLinks.finishCreate) && ${shorten}.disabled
+        && ${shorten}.getAttribute('aria-busy') === 'true' && ${destination}.matches(':disabled')
+        && window.testTrackedLinks.creates[0].destination === 'https://example.org/story'
+    `), 5_000)
+    await evaluate(cdp, 'window.testTrackedLinks.finishCreate()')
+    await waitUntil('The saved short link and its named actions are available', () => evaluate<boolean>(cdp, `
+      ${result}.value === 'https://postline.example/s/fixture' && !${destination}.matches(':disabled')
+        && ${shorten}.getAttribute('aria-busy') === 'false'
+        && Boolean(${copy}?.getClientRects().length && ${disable}?.getClientRects().length)
+    `), 5_000)
+    await evaluate(cdp, `${copy}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('Copy uses the short link from its own row', () => evaluate<boolean>(cdp, `
+      window.testTrackedLinks.copied === 'https://postline.example/s/fixture'
+    `), 5_000)
+    await evaluate(cdp, `${disable}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    const confirm = "[...document.querySelectorAll('[role=alertdialog] button')].find(button => button.textContent.trim() === 'Disable link')"
+    await waitUntil('Link disabling asks for confirmation by name', () => evaluate<boolean>(cdp, `
+      ${confirm}?.closest('[role=alertdialog]')?.innerText.includes('Disable Test link?')
+        && window.testTrackedLinks.disables.length === 0
+    `), 5_000)
+    await evaluate(cdp, `${confirm}.focus()`)
+    await pressKey(cdp, 'Enter', 13)
+    await waitUntil('The disable action announces progress for the chosen link', () => evaluate<boolean>(cdp, `
+      Boolean(window.testTrackedLinks.finishDisable) && ${disable}.getAttribute('aria-busy') === 'true'
+        && window.testTrackedLinks.disables[0].code === 'fixture'
+    `), 5_000)
+    await evaluate(cdp, 'window.testTrackedLinks.finishDisable()')
+    await waitUntil('A disabled short link is removed from the share controls', () => evaluate<boolean>(cdp, `
+      !${copy}?.getClientRects().length && !${disable}?.getClientRects().length
+        && ${result}.value === '' && window.testTrackedLinks.disables.length === 1
+    `), 5_000)
+  }
+  finally {
+    await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixture.identifier })
+    await auditPage(`${site}/analytics`, { cdp })
+  }
 }
 
 async function checkAnalytics(cdp: Cdp): Promise<void> {
@@ -3837,7 +3943,7 @@ async function checkSpanishInbox(cdp: Cdp): Promise<void> {
       && ${publicInbox}?.querySelector('article')?.innerText.includes('Mención')
       && ${publicInbox}?.querySelector('article p')?.textContent === 'Una mención pública'
   `), 5_000)
-  await evaluate(cdp, `${publicInbox}.querySelector('[data-open-public-reply]').focus()`)
+  await evaluate(cdp, `${publicInbox}.querySelector('button[aria-label="Responder a autora.example"]').focus()`)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('The public reply dialog has Spanish labels', () => evaluate<boolean>(cdp, `
     ${publicInbox}?.querySelector('dialog[open] h2')?.textContent === 'Respuesta pública'
@@ -3956,7 +4062,7 @@ async function checkSpanishAnalytics(cdp: Cdp): Promise<void> {
   await cdp.send('Input.insertText', { text: 'https://example.org/articulo' })
   await evaluate(cdp, `${links}.querySelector('input[name=source]').focus()`)
   await cdp.send('Input.insertText', { text: 'boletin' })
-  await evaluate(cdp, `${links}.querySelector('button[value=tag]').focus()`)
+  await evaluate(cdp, `${links}.querySelector('button[type=submit]').focus()`)
   await pressKey(cdp, 'Enter', 13)
   await waitUntil('Spanish tracked links builds the tagged URL', () => evaluate<boolean>(cdp, `
     ${links}.querySelector('h2')?.textContent === 'Enlaces con seguimiento'

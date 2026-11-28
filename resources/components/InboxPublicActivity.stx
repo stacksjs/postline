@@ -79,6 +79,7 @@ async function sync() {
 }
 
 async function markRead(id: number) {
+  if (marking()) return
   marking.set(id)
   loadError.set('')
   try {
@@ -162,9 +163,9 @@ onMount(() => { void load() })
           </div>
           <p class="m-0 break-words text-body text-ui whitespace-pre-line" :show="item.body" :text="item.body"></p>
           <div class="flex flex-wrap gap-3 items-center">
-            <button class="text-info text-ui underline" type="button" data-open-public-reply @click="openReply(item)">{{ publicInboxText.reply }}</button>
+            <Button variant="ghost" size="xs" :ariaLabel="words.t('replyToAuthor', { author: item.author })" @click="openReply(item)">{{ publicInboxText.reply }}</Button>
             <a class="text-info text-ui underline" :href="item.url" target="_blank" rel="noopener noreferrer">{{ publicInboxText.openOriginal }}</a>
-            <button class="text-muted text-ui underline" type="button" data-public-mark-read :show="!item.read" :disabled="marking() !== 0" @click="markRead(item.id)">{{ publicInboxText.markRead }}</button>
+            <Button variant="ghost" size="xs" :show="!item.read" :disabled="marking() !== 0" :loading="marking() === item.id" :ariaLabel="words.t('markAuthorRead', { author: item.author })" @click="markRead(item.id)">{{ publicInboxText.markRead }}</Button>
           </div>
         </article>
       </div>

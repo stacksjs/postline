@@ -20,24 +20,27 @@ const endpoint = '/api/postline/analytics/links'
 const links = state<LinkRow[]>([])
 const enabled = state(false)
 const loaded = state(false)
-const busy = state(false)
+type LinkAction = 'load' | 'tag' | 'shorten' | 'disable'
+const pending = state<{ action: LinkAction, code?: string } | null>(null)
+const busy = derived(() => pending() !== null)
 const error = state('')
 const status = state('')
 const result = state('')
 const resultField = useRef<HTMLInputElement>('trackedLinkResult')
+const linkForm = useRef<HTMLFormElement>('linkForm')
 
-async function run(work: () => Promise<void>) {
+async function run(operation: { action: LinkAction, code?: string }, work: () => Promise<void>) {
   if (busy()) return
-  busy.set(true)
+  pending.set(operation)
   error.set('')
   status.set('')
   try { await work() }
   catch (problem) { error.set(problem instanceof Error ? problem.message : String(problem)) }
-  finally { busy.set(false) }
+  finally { pending.set(null) }
 }
 
 function load() {
-  return run(async () => {
+  return run({ action: 'load' }, async () => {
     const { data } = await requestJson(endpoint, { cache: 'no-store' }, copyText.loadFailed)
     links.set(data.links)
     enabled.set(data.enabled)
@@ -45,13 +48,21 @@ function load() {
   })
 }
 
-function build(event: SubmitEvent) {
-  const form = new FormData(event.currentTarget as HTMLFormElement)
-  const shorten = (event.submitter as HTMLButtonElement | null)?.value === 'shorten'
-  const fields = Object.fromEntries(form.entries())
-  void run(async () => {
+function submitTagged(event: SubmitEvent) {
+  build(event.currentTarget as HTMLFormElement, 'tag')
+}
+
+function shortenLink() {
+  const form = linkForm.current
+  if (enabled() && !busy() && form?.reportValidity()) build(form, 'shorten')
+}
+
+function build(form: HTMLFormElement, action: 'tag' | 'shorten') {
+  if (busy()) return
+  const fields = Object.fromEntries(new FormData(form).entries())
+  void run({ action }, async () => {
     const tagged = addUtmParameters(fields.destination, fields)
-    if (shorten) {
+    if (action === 'shorten') {
       const { data } = await requestJson(endpoint, { method: 'POST', body: JSON.stringify(fields) }, copyText.createFailed)
       links.update(rows => [data, ...rows])
       result.set(data.shortUrl)
@@ -75,8 +86,8 @@ async function copy(url: string) {
 }
 
 async function disable(link: LinkRow) {
-  if (!await stxConfirm(copyText.disableWarning, { title: words.t('confirmDisable', { name: link.name }), type: 'warning', confirmText: copyText.disableLink, cancelText: copyText.cancel })) return
-  await run(async () => {
+  if (busy() || !await stxConfirm(copyText.disableWarning, { title: words.t('confirmDisable', { name: link.name }), type: 'warning', confirmText: copyText.disableLink, cancelText: copyText.cancel })) return
+  await run({ action: 'disable', code: link.code }, async () => {
     await requestJson(`${endpoint}/disable`, { method: 'POST', body: JSON.stringify({ code: link.code }) }, copyText.disableFailed)
     links.update(rows => rows.map(row => row.code === link.code ? { ...row, disabled: true } : row))
     if (result() === link.shortUrl) result.set('')
@@ -93,31 +104,33 @@ onMount(load)
     <p class="m-0 mt-1 text-muted text-ui">{{ analyticsLinksText.description }}</p>
   </div>
 
-  <form class="grid gap-3 text-ui" @submit.prevent="build" data-tracked-link-form>
-    <label class="grid gap-1">{{ analyticsLinksText.destination }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" type="url" name="destination" placeholder="https://example.com/article" maxlength="4096" required></label>
-    <div class="grid gap-3 sm:grid-cols-3">
-      <label class="grid gap-1">{{ analyticsLinksText.source }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="source" maxlength="120" placeholder="bluesky"></label>
-      <label class="grid gap-1">{{ analyticsLinksText.medium }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="medium" maxlength="120" placeholder="social"></label>
-      <label class="grid gap-1">{{ analyticsLinksText.campaign }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="campaign" maxlength="120"></label>
-    </div>
-    <details>
-      <summary class="w-fit text-info cursor-pointer">{{ analyticsLinksText.moreUtm }}</summary>
-      <div class="grid gap-3 sm:grid-cols-2 mt-2">
-        <label class="grid gap-1">{{ analyticsLinksText.content }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="content" maxlength="120"></label>
-        <label class="grid gap-1">{{ analyticsLinksText.term }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="term" maxlength="120"></label>
+  <form class="grid gap-3 text-ui" ref="linkForm" @submit.prevent="submitTagged" data-tracked-link-form>
+    <fieldset class="grid gap-3 m-0 p-0 min-w-0 border-0" :disabled="pending()?.action === 'shorten'">
+      <label class="grid gap-1">{{ analyticsLinksText.destination }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" type="url" name="destination" placeholder="https://example.com/article" maxlength="4096" required></label>
+      <div class="grid gap-3 sm:grid-cols-3">
+        <label class="grid gap-1">{{ analyticsLinksText.source }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="source" maxlength="120" placeholder="bluesky"></label>
+        <label class="grid gap-1">{{ analyticsLinksText.medium }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="medium" maxlength="120" placeholder="social"></label>
+        <label class="grid gap-1">{{ analyticsLinksText.campaign }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="campaign" maxlength="120"></label>
       </div>
-    </details>
-    <label class="grid gap-1" x-show="enabled()">{{ analyticsLinksText.shortName }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="name" maxlength="100"></label>
+      <details>
+        <summary class="w-fit text-info cursor-pointer">{{ analyticsLinksText.moreUtm }}</summary>
+        <div class="grid gap-3 sm:grid-cols-2 mt-2">
+          <label class="grid gap-1">{{ analyticsLinksText.content }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="content" maxlength="120"></label>
+          <label class="grid gap-1">{{ analyticsLinksText.term }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="term" maxlength="120"></label>
+        </div>
+      </details>
+      <label class="grid gap-1" x-show="enabled()">{{ analyticsLinksText.shortName }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" name="name" maxlength="100"></label>
+    </fieldset>
     <div class="flex flex-wrap gap-2">
-      <button class="px-3 h-8 font-medium text-ink bg-panel-2 border border-line rounded-lg disabled:opacity-50" type="submit" value="tag" :disabled="busy()">{{ analyticsLinksText.tagged }}</button>
-      <button class="px-3 h-8 font-semibold text-on-accent bg-accent rounded-lg disabled:opacity-50" type="submit" value="shorten" x-show="enabled()" :disabled="busy()">{{ analyticsLinksText.shorten }}</button>
+      <Button variant="secondary" size="sm" type="submit" :disabled="busy()">{{ analyticsLinksText.tagged }}</Button>
+      <Button size="sm" :show="enabled()" :disabled="busy()" :loading="pending()?.action === 'shorten'" @click="shortenLink">{{ analyticsLinksText.shorten }}</Button>
     </div>
     <p class="m-0 text-muted text-xs" x-show="loaded() && !enabled()">{{ analyticsLinksText.requiresPublic }}</p>
   </form>
 
   <div class="flex gap-2 items-end" x-show="result()">
     <label class="grid flex-1 gap-1 min-w-0 text-ui">{{ analyticsLinksText.linkToShare }} <input class="px-2 h-9 min-w-0 bg-panel-2 border border-line rounded-lg" :value="result()" readonly ref="trackedLinkResult" data-tracked-link-result></label>
-    <button class="px-2 h-9 text-info text-ui" type="button" @click="copy(result())">{{ analyticsLinksText.copy }}</button>
+    <Button variant="secondary" size="sm" @click="copy(result())">{{ analyticsLinksText.copy }}</Button>
   </div>
   <p class="m-0 text-success text-ui" role="status" x-show="status()" :text="status()"></p>
   <p class="m-0 text-danger text-ui" role="alert" x-show="error()" :text="error()"></p>
@@ -125,7 +138,7 @@ onMount(load)
   <div class="grid gap-2 pt-3 border-line border-t">
     <div class="flex gap-3 items-center justify-between">
       <h3 class="m-0 font-semibold text-ui">{{ analyticsLinksText.report }}</h3>
-      <button class="text-info text-ui disabled:opacity-50" type="button" :disabled="busy()" @click="load()">{{ analyticsLinksText.refresh }}</button>
+      <Button variant="ghost" size="xs" :disabled="busy()" :loading="pending()?.action === 'load'" @click="load">{{ analyticsLinksText.refresh }}</Button>
     </div>
     <p class="m-0 text-muted text-xs">{{ analyticsLinksText.countIncludes }}</p>
     <p class="m-0 text-muted text-ui" x-show="loaded() && !links().length">{{ analyticsLinksText.empty }}</p>
@@ -135,8 +148,8 @@ onMount(load)
         <span class="break-words text-muted" :text="link.destination"></span>
         <div class="flex gap-3 items-center">
           <span class="text-muted" x-show="link.disabled">{{ analyticsLinksText.disabled }}</span>
-          <button class="text-info" type="button" x-show="!link.disabled && link.shortUrl" @click="copy(link.shortUrl)">{{ analyticsLinksText.copyShort }}</button>
-          <button class="text-danger" type="button" x-show="!link.disabled" :disabled="busy()" @click="disable(link)">{{ analyticsLinksText.disable }}</button>
+          <Button variant="ghost" size="xs" :show="!link.disabled && link.shortUrl" :ariaLabel="words.t('copyNamedLink', { name: link.name })" @click="copy(link.shortUrl)">{{ analyticsLinksText.copyShort }}</Button>
+          <Button variant="danger" size="xs" :show="!link.disabled" :disabled="busy()" :loading="pending()?.action === 'disable' && pending()?.code === link.code" :ariaLabel="words.t('disableNamedLink', { name: link.name })" @click="disable(link)">{{ analyticsLinksText.disable }}</Button>
         </div>
       </li>
     </ul>
