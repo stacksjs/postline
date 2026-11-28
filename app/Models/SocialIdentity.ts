@@ -47,6 +47,12 @@ export default defineModel({
       validation: { rule: schema.string().max(255).optional() },
       factory: faker => `did:plc:${faker.string.alphanumeric(24).toLowerCase()}`,
     },
+    authTransport: {
+      required: true,
+      default: 'api',
+      validation: { rule: schema.enum(['api', 'browser']).required() },
+      factory: () => 'api',
+    },
     // The account a plain network target (`bluesky`, not `bluesky:12`)
     // publishes through. Set by the owner; the first account connected on a
     // network gets it. It used to be "whichever row was updated last", and a

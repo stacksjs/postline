@@ -59,8 +59,16 @@ describe('workspace archive', () => {
     const startsAt = wallTimeInZone(new Date(Date.now() + 86_400_000), await workspace.timezone()).replace(' ', 'T')
     const repeat = await recurringPosts.create({ id: draft.postId, interval: 'monthly', startAt: startsAt })
     await recurringPosts.change(repeat.uuid, 'pause')
+    const browserIdentity = await database.insertInto('social_identities').values({
+      uuid: crypto.randomUUID(), provider: 'twitter', handle: 'archive_x', auth_transport: 'browser', auth_status: 'connected', created_at: at,
+    }).returning('id').executeTakeFirstOrThrow()
+    const browserPost = await postQueue.save({ text: `An uncertain X write ${tag}`, providers: [`twitter:${browserIdentity.id}`] })
+    const browserPostUuid = (await database.selectFrom('posts').select('uuid').where('id', '=', browserPost.postId).executeTakeFirstOrThrow()).uuid
+    await database.insertInto('twitter_browser_dispatches').values({
+      uuid: crypto.randomUUID(), post_id: browserPost.postId, handle: 'archive_x', state: 'submitting', created_at: at,
+    }).execute()
     const archive = await workspaceArchive.export()
-    expect(archive.version).toBe(9)
+    expect(archive.version).toBe(10)
     expect(archive.recurringPosts).toContainEqual(expect.objectContaining({ uuid: repeat.uuid, active: false, nextAt: repeat.nextAt }))
     expect(archive.postingSlots).toContainEqual(slot)
     expect(archive.composerPresets).toContainEqual(preset)
@@ -69,6 +77,7 @@ describe('workspace archive', () => {
     const archivedWatch = archive.monitors.find(row => row.name === watch.name)
     expect(archivedWatch?.twitter_read_source).toBe('browser')
     expect(archive.posts.some(row => row.uuid === postUuid)).toBe(true)
+    expect(archive.twitterBrowserDispatches).toContainEqual({ post: browserPostUuid, handle: 'archive_x', state: 'submitting', remoteId: null })
     expect(archive.media[`${tag}.png`]).toBe(png)
     expect(JSON.stringify(archive)).not.toContain('access_token')
 
@@ -90,6 +99,9 @@ describe('workspace archive', () => {
     // The account is connected again on the new install, then the archive comes in.
     await database.insertInto('social_identities').values({ uuid: crypto.randomUUID(), provider: 'bluesky', handle: `${tag}.bsky.social`, auth_status: 'connected', created_at: at }).execute()
     const report = await workspaceArchive.import(JSON.parse(JSON.stringify(archive)))
+    const restoredBrowserPost = await database.selectFrom('posts').select('id').where('uuid', '=', browserPostUuid).executeTakeFirstOrThrow()
+    expect(await database.selectFrom('twitter_browser_dispatches').select(['handle', 'state', 'remote_id'])
+      .where('post_id', '=', restoredBrowserPost.id).executeTakeFirst()).toEqual({ handle: 'archive_x', state: 'submitting', remote_id: null })
     expect(report.posts).toBeGreaterThanOrEqual(1)
     expect(report.media).toBeGreaterThanOrEqual(1)
     expect(report.composerPresets).toBe(1)

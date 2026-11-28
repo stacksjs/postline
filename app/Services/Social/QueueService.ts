@@ -26,7 +26,7 @@ import { removeMediaFiles, storeAttachments } from '../../Support/Social/stored-
 import { assertVideoAllowed, checkVideoBytes } from '../../Support/Social/video-input'
 import { resolveStoredVariants, sanitizeVariants } from '../../Support/Social/variants'
 import { crosspost, crosspostProviders } from './CrosspostService'
-import { bindRestoredTargets, findIdentityRow, RestoredTargetAccountError, unavailableAccountError } from './identities'
+import { assertThreadTransport, bindRestoredTargets, findIdentityRow, RestoredTargetAccountError, unavailableAccountError } from './identities'
 import { nextPostingSlot } from '../../Support/Social/posting-slots'
 import { isRealTimestamp, isValidTimeZone } from '../../Support/time'
 import { listPostingSlots } from '../PostingSlotService'
@@ -487,6 +487,7 @@ export class QueueService {
       throw new UserFacingError('Keep the draft’s post format to add it to the queue.')
     const accountId = draft ? Number(draft.account_id) : await ensureAccount()
     const targets = await this.validTargets(input.providers)
+    if (input.texts) assertThreadTransport(targets)
     assertReplyTarget(parseStoredContent(draft?.[column])?.reply?.target, targets)
     const networks = targetProviders(targets)
     const drafts: any[] = draft?.thread_key ? await this.threadPosts(draft.thread_key) : draft ? [draft] : []
@@ -613,6 +614,7 @@ export class QueueService {
     const segments = input.texts.map(text => String(text).trim()).filter(Boolean)
     if (segments.length < 2) throw new UserFacingError('A thread needs at least two posts.')
     const targets = await this.validTargets(input.providers)
+    assertThreadTransport(targets)
     const attachments = attachmentsOf(input)
     const providers = targetProviders(targets)
 

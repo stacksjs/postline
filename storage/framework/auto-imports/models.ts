@@ -29,6 +29,7 @@ export { default as SocialOperationLease } from '../../../app/Models/SocialOpera
 export { default as ThreadPublishClaim } from '../../../app/Models/ThreadPublishClaim'
 export { default as TimelineItem } from '../../../app/Models/TimelineItem'
 export { default as TrackedLink } from '../../../app/Models/TrackedLink'
+export { default as TwitterBrowserDispatch } from '../../../app/Models/TwitterBrowserDispatch'
 export { default as TwitterReadUsage } from '../../../app/Models/TwitterReadUsage'
 export { default as Activity } from '@stacksjs/defaults/app/Models/Activity.ts'
 export { default as AnalyticsEvent } from '@stacksjs/defaults/app/Models/AnalyticsEvent.ts'

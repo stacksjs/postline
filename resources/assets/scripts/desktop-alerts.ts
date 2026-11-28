@@ -1,6 +1,7 @@
 import { requestJson } from '../../functions/postline-client'
 import { xBrowserWindow } from '../../functions/x-browser-session'
 import { checkXComposer } from './x-composer-health'
+import { bindXBrowserWrites } from './x-browser-write'
 
 interface AlertView {
   id: number
@@ -196,6 +197,7 @@ export function bindDesktopAlerts(host: DesktopAlertsBridge): () => void {
   }
 
   window.addEventListener('craft:tray:menuAction', (event) => void onTrayAction(event), { signal })
+  if (xBrowser && sleep) bindXBrowserWrites(xBrowser, sleep, signal)
   void poll()
   return () => {
     controller.abort()

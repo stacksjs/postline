@@ -6,6 +6,7 @@ import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../.
 import { db, sqliteWriteOptions } from '@stacksjs/database'
 import { log } from '@stacksjs/logging'
 import { parseTarget, resolveTargets, targetKey } from '../../Support/Social/targets'
+import { normalizeIdentityHandle } from '../../Support/Social/accounts'
 import { advanceChain, threadPostOptions, threadSegmentContent } from '../../Support/Social/threads'
 import { resolveVariantBody } from '../../Support/Social/variants'
 import { blog } from './BlogService'
@@ -29,7 +30,7 @@ import { removeMediaFiles, storeAttachments } from '../../Support/Social/stored-
 import { assertVideoAllowed, checkVideoBytes } from '../../Support/Social/video-input'
 import { ensureAccount, now, uuid } from './support'
 import { postFirstComments } from './PostFirstCommentService'
-import { bindRestoredTargets } from './identities'
+import { assertThreadTransport, bindRestoredTargets } from './identities'
 import { AlreadyPublishingError, claimThread, refreshThreadClaim, runClaimedThread, ThreadRemovalPendingError } from './thread-publish'
 
 const database = db as any
@@ -240,6 +241,7 @@ export class CrosspostService {
     if (selected.length === 0) {
       throw new Error('Select at least one connected provider to publish.')
     }
+    assertThreadTransport(selected)
 
     validateVideo(selected, content)
     const accountId = await ensureAccount()
@@ -350,6 +352,7 @@ export class CrosspostService {
       const rows = bindRestoredTargets(tx, tx.selectFrom('post_targets').selectAll().where('post_id', 'in', posts.map(post => post.id)).execute()) as Array<{
         id: number, post_id: number, provider: SocialProvider, social_identity_id: number | null, status: string, remote_uri: string | null, remote_cid: string | null
       }>
+      assertThreadTransport(rows.map(row => ({ provider: row.provider, identityId: row.social_identity_id })), tx)
       tx.updateTable('posts').set({ status: 'publishing', updated_at: now() })
         .where('thread_key', '=', threadKey).where('status', 'in', ['scheduled', 'draft']).execute()
       return { claim, posts, rows }
@@ -410,7 +413,7 @@ export class CrosspostService {
             }
             catch (error) {
               if (!(error instanceof MissingMediaError || error instanceof InvalidStoredPostOptionsError)) throw error
-              result = await this.recordThreadFailure(target, Number(post.id), error.message)
+              result = await this.recordTargetFailure(target, Number(post.id), error.message)
             }
             if (!result.ok) halted = index
             const advanced = advanceChain(chain, result)
@@ -472,10 +475,10 @@ export class CrosspostService {
     failedIndex: number,
     total: number,
   ): Promise<CrosspostTargetResult> {
-    return this.recordThreadFailure(target, postId, `Not sent: post ${failedIndex + 1} of ${total} in this thread failed here, so the rest were held back.`)
+    return this.recordTargetFailure(target, postId, `Not sent: post ${failedIndex + 1} of ${total} in this thread failed here, so the rest were held back.`)
   }
 
-  private async recordThreadFailure(target: PublishTarget, postId: number, error: string): Promise<CrosspostTargetResult> {
+  private async recordTargetFailure(target: PublishTarget, postId: number, error: string): Promise<CrosspostTargetResult> {
     const at = now()
     await database.insertInto('post_targets').values({
       uuid: uuid(),
@@ -513,7 +516,25 @@ export class CrosspostService {
     }
     const selected = await this.resolve(targets)
     validateVideo(selected, content)
+    const twitterIds = selected.flatMap(target => target.provider === 'twitter' && target.identityId ? [target.identityId] : [])
+    const conflicting = new Set<number>()
+    if (twitterIds.length > 1) {
+      const accounts: Array<{ id: number, handle: string, auth_transport: string }> = await database
+        .selectFrom('social_identities').select(['id', 'handle', 'auth_transport']).where('id', 'in', twitterIds).execute()
+      for (const browser of accounts.filter(account => account.auth_transport === 'browser')) {
+        const repeated = accounts.filter(account => account.auth_transport === 'api'
+          && normalizeIdentityHandle(account.handle) === normalizeIdentityHandle(browser.handle))
+        if (repeated.length) {
+          conflicting.add(Number(browser.id))
+          for (const account of repeated) conflicting.add(Number(account.id))
+        }
+      }
+    }
     for (const target of selected) {
+      if (target.provider === 'twitter' && target.identityId && conflicting.has(target.identityId)) {
+        results.push(await this.recordTargetFailure(target, post.id, 'Choose one connection for this X account. Both its API and browser connections are selected.'))
+        continue
+      }
       const body = resolveVariantBody(post.body, target.provider, content)
       results.push(await this.publishTarget(target, { id: post.id, body }, content))
     }

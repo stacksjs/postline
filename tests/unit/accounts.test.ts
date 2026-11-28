@@ -1,9 +1,11 @@
 import type { IdentityLike } from '../../app/Support/Social/accounts'
 import type { CrosspostTargetResult, PublishContent, SocialProvider } from '../../app/Support/Social/types'
 import { describe, expect, test } from 'bun:test'
+import { db } from '@stacksjs/database'
 import { CrosspostService } from '../../app/Services/Social/CrosspostService'
-import { matchIdentity, pickDefaultIdentity, toPublicAccount } from '../../app/Support/Social/accounts'
+import { matchArchivedTargetAccount, matchIdentity, pickDefaultIdentity, toPublicAccount } from '../../app/Support/Social/accounts'
 import { dedupeTargets, parseTarget, parseTargets, resolveTargets, targetKey, targetProviders } from '../../app/Support/Social/targets'
+import { composerKeyForSpec, composerSelection, composerTargets } from '../../resources/functions/composer-targets'
 
 /**
  * Several accounts per network. Three rules carry the feature, and each is
@@ -227,6 +229,59 @@ function fakePublisher(provider: SocialProvider, defaultId: number | null) {
 }
 
 describe('crossposting to several accounts on one network', () => {
+  test('requires one transport when the same X account is selected twice', async () => {
+    const handle = `p${crypto.randomUUID().slice(0, 8)}`
+    const accounts: number[] = []
+    let postId: number | undefined
+    const addAccount = async (transport: 'api' | 'browser') => {
+      const [row] = await db.unsafe(
+        'INSERT INTO social_identities (uuid, provider, handle, auth_status, auth_transport) VALUES (?, ?, ?, ?, ?) RETURNING id',
+        [crypto.randomUUID(), 'twitter', handle, 'connected', transport],
+      ) as Array<{ id: number }>
+      accounts.push(row!.id)
+      return row!.id
+    }
+    try {
+      const api = await addAccount('api')
+      const browser = await addAccount('browser')
+      const publisher = fakePublisher('twitter', api)
+      const result = await new CrosspostService({ twitter: publisher })
+        .publish('An isolated X transport selection fixture.', ['twitter', `twitter:${browser}`])
+      postId = result.postId
+      expect(publisher.calls).toEqual([])
+      expect(result.results.map(row => row.identityId)).toEqual([api, browser])
+      expect(result.results.every(row => !row.ok && row.error?.includes('Choose one connection'))).toBe(true)
+    }
+    finally {
+      if (postId) {
+        await db.unsafe('DELETE FROM post_targets WHERE post_id = ?', [postId])
+        await db.unsafe('DELETE FROM posts WHERE id = ?', [postId])
+      }
+      for (const id of accounts) await db.unsafe('DELETE FROM social_identities WHERE id = ?', [id])
+    }
+  })
+
+  test('keeps X browser selection and archive matching explicit', () => {
+    const api = row({ id: 1, provider: 'twitter', handle: 'account', auth_transport: 'api' })
+    const browser = row({ ...api, id: 2, auth_transport: 'browser', access_token: null })
+    const apiView = toPublicAccount(api, { isDefault: true })
+    const browserView = { ...toPublicAccount(browser), id: 2, connected: true, canPublish: true, transport: 'browser' as const }
+    const [onlyBrowser] = composerTargets([{
+      provider: 'twitter', connected: false, canPublish: false, handle: null, characterLimit: 280,
+      authStatus: 'missing', accounts: [browserView],
+    }])
+    expect(onlyBrowser?.canPublish).toBe(true)
+    expect(composerSelection([onlyBrowser!], [])).toEqual([])
+    expect(composerKeyForSpec([onlyBrowser!], 'twitter')).toBeNull()
+    const apiTargets = composerTargets([{
+      provider: 'twitter', connected: true, canPublish: true, handle: 'account', characterLimit: 280,
+      authStatus: 'connected', accounts: [apiView],
+    }])
+    expect(composerKeyForSpec(apiTargets, 'twitter:2')).toBeNull()
+    expect(matchArchivedTargetAccount([api, browser], { provider: 'twitter', handle: 'account' })).toBe(api)
+    expect(matchArchivedTargetAccount([api], { provider: 'twitter', handle: 'account', transport: 'browser' })).toBeUndefined()
+  })
+
   test('publishes once per selected account, through that account', async () => {
     const bsky = fakePublisher('bluesky', 1)
     const service = new CrosspostService({ bluesky: bsky })

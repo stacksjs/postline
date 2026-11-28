@@ -1,16 +1,19 @@
 import type { EngagementCounts } from '../../Support/Social/engagement-analytics'
 import { release } from 'node:os'
 import process from 'node:process'
-import { db } from '@stacksjs/database'
+import { db, sqliteWriteOptions } from '@stacksjs/database'
 import { isDesktopAgent } from '../../Support/Auth/native'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { workspaceXBrowserErrors, workspaceXBrowserSessionText } from '../../Support/Localization/workspace'
+import type { PublicAccount } from '../../Support/Social/accounts'
+import { toPublicAccount } from '../../Support/Social/accounts'
 import { engagementCounts } from '../../Support/Social/engagement-analytics'
 import { alerts } from '../AlertService'
 import { saveTargetEngagement } from './save-target-engagement'
 import { ensureAccount, now, uuid } from './support'
 
 type ComposerHealth = 'ready' | 'layout' | 'unavailable' | 'attention'
+const COMPOSER_CHECK_INTERVAL = 86_400_000
 
 export interface TwitterBrowserSessionSnapshot {
   profile: string
@@ -22,56 +25,107 @@ export interface TwitterBrowserSessionSnapshot {
 
 export async function twitterBrowserSession(): Promise<TwitterBrowserSessionSnapshot> {
   const account = await db.selectFrom('accounts')
-    .select(['uuid', 'twitter_browser_handle', 'twitter_browser_needs_check', 'twitter_browser_needs_layout_check', 'twitter_browser_composer_status'])
+    .select(['uuid', 'twitter_browser_handle', 'twitter_browser_needs_check', 'twitter_browser_needs_layout_check', 'twitter_browser_composer_status', 'twitter_browser_composer_attempted_at', 'twitter_browser_composer_claim'])
     .where('id', '=', await ensureAccount()).executeTakeFirstOrThrow()
   return {
     profile: `postline-x-${account.uuid}`,
     handle: account.twitter_browser_handle ?? null,
     needsCheck: Boolean(account.twitter_browser_needs_check),
     needsLayoutCheck: Boolean(account.twitter_browser_needs_layout_check),
-    composerHealth: account.twitter_browser_composer_status ?? null,
+    composerHealth: account.twitter_browser_composer_status === 'ready'
+      && (account.twitter_browser_composer_claim || !account.twitter_browser_composer_attempted_at || account.twitter_browser_composer_attempted_at <= composerCheckCutoff())
+      ? null
+      : account.twitter_browser_composer_status ?? null,
   }
 }
 
 export async function localTwitterProfileForErasure(): Promise<string | null> {
   // Named WKWebsiteDataStore profiles were introduced with macOS 14 (Darwin 23).
-  const canHaveLocalProfile = isDesktopAgent() && process.platform === 'darwin'
-    && Number(release().split('.')[0]) >= 23
-  return canHaveLocalProfile ? (await twitterBrowserSession()).profile : null
+  return supportsLocalTwitterBrowser() ? (await twitterBrowserSession()).profile : null
+}
+
+export function supportsLocalTwitterBrowser(): boolean {
+  return isDesktopAgent() && process.platform === 'darwin' && Number(release().split('.')[0]) >= 23
+}
+
+export async function twitterBrowserPublishingAccounts(): Promise<PublicAccount[]> {
+  if (!supportsLocalTwitterBrowser()) return []
+  const session = await twitterBrowserSession()
+  if (!session.handle) return []
+  const selected = await db.selectFrom('social_identities')
+    .select(['id', 'provider', 'handle', 'auth_status', 'display_name'])
+    .where('account_id', '=', await ensureAccount()).where('provider', '=', 'twitter').where('auth_transport', '=', 'browser')
+    .where('handle', '=', session.handle.toLowerCase()).where('auth_status', '=', 'connected').executeTakeFirst()
+  if (!selected) return []
+  return [{
+    ...toPublicAccount({ ...selected, id: Number(selected.id) }),
+    authStatus: 'connected',
+    connected: true,
+    canPublish: true,
+    transport: 'browser',
+  }]
 }
 
 export async function rememberTwitterBrowserHandle(handle: unknown, { checkedLayout = false } = {}): Promise<void> {
   if (handle !== null && (typeof handle !== 'string' || !/^[A-Za-z0-9_]{1,15}$/.test(handle)))
     throw new UserFacingError(workspaceXBrowserErrors.invalidHandle)
 
-  const save = db.updateTable('accounts').set({
+  const accountId = await ensureAccount()
+  const at = now()
+  const database = db as any
+  await database.transaction((tx: typeof database) => {
+    const save = tx.updateTable('accounts').set({
     twitter_browser_handle: handle,
     twitter_browser_needs_check: false,
     twitter_browser_needs_layout_check: false,
     twitter_browser_composer_attempted_at: null,
     twitter_browser_composer_claim: null,
     twitter_browser_composer_status: null,
-    updated_at: now(),
-  }).where('id', '=', await ensureAccount())
-  const confirmed = await (handle !== null && !checkedLayout
-    ? save.where('twitter_browser_needs_layout_check', '=', false)
-    : save).returning(['id']).executeTakeFirst()
-  if (!confirmed) throw new UserFacingError(workspaceXBrowserErrors.checkLayout)
+      updated_at: at,
+    }).where('id', '=', accountId)
+    const confirmed = (handle !== null && !checkedLayout
+      ? save.where('twitter_browser_needs_layout_check', '=', false)
+      : save).returning(['id']).executeTakeFirst()
+    if (!confirmed) throw new UserFacingError(workspaceXBrowserErrors.checkLayout)
+    if (!supportsLocalTwitterBrowser()) return
+
+    const name = handle?.toLowerCase()
+    const identities = () => tx.selectFrom('social_identities').select('id')
+      .where('account_id', '=', accountId).where('provider', '=', 'twitter').where('auth_transport', '=', 'browser')
+    const expire = tx.updateTable('social_identities').set({ auth_status: 'expired', updated_at: at })
+      .where('account_id', '=', accountId).where('provider', '=', 'twitter').where('auth_transport', '=', 'browser')
+      .where('auth_status', '=', 'connected')
+    const oldIdentities = name ? expire.where('handle', '!=', name) : expire
+    oldIdentities.execute()
+    if (!name) return
+    const existing = identities().where('handle', '=', name).executeTakeFirst()
+    if (existing) {
+      tx.updateTable('social_identities').set({ auth_status: 'connected', updated_at: at }).where('id', '=', existing.id).execute()
+    }
+    else {
+      tx.insertInto('social_identities').values({
+        uuid: uuid(), provider: 'twitter', handle: name, auth_transport: 'browser', auth_status: 'connected', is_default: false,
+        account_id: accountId, created_at: at, updated_at: at,
+      }).execute()
+    }
+  }, sqliteWriteOptions())
 }
 
-export async function pauseTwitterBrowserReads(reason: 'sign-in' | 'layout' | 'signed-out' = 'sign-in'): Promise<void> {
+export async function pauseTwitterBrowserReads(reason: 'sign-in' | 'layout' | 'signed-out' | 'composer' = 'sign-in', expectedHandle?: string): Promise<void> {
   const layout = reason === 'layout'
   const pause = db.updateTable('accounts')
     .set({
       twitter_browser_needs_check: true,
       ...(layout ? { twitter_browser_needs_layout_check: true } : {}),
+      ...(reason === 'composer' ? { twitter_browser_composer_status: 'attention' } : {}),
       updated_at: now(),
     })
     .where('id', '=', await ensureAccount())
     .where(layout ? 'twitter_browser_needs_layout_check' : 'twitter_browser_needs_check', '=', false)
   // Seeing an ordinary sign-in page is expected before the first connection.
-  const account = await (reason === 'signed-out' ? pause.where('twitter_browser_handle', 'is not', null) : pause)
-    .returning(['uuid']).executeTakeFirst()
+  const scope = expectedHandle ? pause.where('twitter_browser_handle', '=', expectedHandle)
+    : reason === 'signed-out' ? pause.where('twitter_browser_handle', 'is not', null) : pause
+  const account = await scope.returning(['uuid']).executeTakeFirst()
   if (!account) return
 
   await raiseBrowserAlert(account.uuid, layout)
@@ -87,16 +141,19 @@ async function raiseBrowserAlert(accountUuid: string, layout: boolean): Promise<
   })
 }
 
+function composerCheckCutoff(): string {
+  return new Date(Date.now() - COMPOSER_CHECK_INTERVAL).toISOString().slice(0, 19).replace('T', ' ')
+}
+
 export async function claimTwitterBrowserComposerCheck(): Promise<{ token: string, profile: string, handle: string } | null> {
   const token = uuid()
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 19).replace('T', ' ')
   const [account] = await db.unsafe(`
     UPDATE accounts
     SET twitter_browser_composer_attempted_at = ?, twitter_browser_composer_claim = ?
     WHERE id = ? AND twitter_browser_handle IS NOT NULL AND COALESCE(twitter_browser_needs_check, 0) = 0
       AND (twitter_browser_composer_attempted_at IS NULL OR twitter_browser_composer_attempted_at <= ?)
     RETURNING uuid, twitter_browser_handle
-  `, [now(), token, await ensureAccount(), yesterday]) as Array<{ uuid: string, twitter_browser_handle: string }>
+  `, [now(), token, await ensureAccount(), composerCheckCutoff()]) as Array<{ uuid: string, twitter_browser_handle: string }>
   return account?.twitter_browser_handle
     ? { token, profile: `postline-x-${account.uuid}`, handle: account.twitter_browser_handle }
     : null
@@ -117,14 +174,27 @@ export async function finishTwitterBrowserComposerCheck(token: unknown, health: 
   if (!account) return false
 
   if (health === 'attention') await raiseBrowserAlert(account.uuid, false)
-  if (health === 'layout') await alerts.raise({
+  if (health === 'layout') await raiseComposerLayoutAlert(account.uuid)
+  return true
+}
+
+export async function recordTwitterBrowserComposerMismatch(handle: string): Promise<void> {
+  const account = await db.updateTable('accounts').set({
+    twitter_browser_composer_status: 'layout',
+  }).where('id', '=', await ensureAccount())
+    .where('twitter_browser_handle', '=', handle)
+    .returning(['uuid']).executeTakeFirst()
+  if (account) await raiseComposerLayoutAlert(account.uuid)
+}
+
+async function raiseComposerLayoutAlert(accountUuid: string): Promise<void> {
+  await alerts.raise({
     kind: 'account-expired',
     title: workspaceXBrowserSessionText.composerLayoutTitle,
     body: workspaceXBrowserSessionText.composerLayout,
     link: '/accounts',
-    key: `x-browser-composer:${account.uuid}:${now().slice(0, 10)}`,
+    key: `x-browser-composer:${accountUuid}:${now().slice(0, 10)}`,
   })
-  return true
 }
 
 export async function requireTwitterBrowserHandle(handle: unknown): Promise<string> {

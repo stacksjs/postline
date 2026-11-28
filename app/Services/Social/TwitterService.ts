@@ -15,6 +15,8 @@ import { UserFacingError } from '../../Support/Http/user-error'
 import { classifyFailure } from '../../Support/Social/retry'
 import { TWITTER_READ_PRICE, withTwitterReadBudget } from './TwitterReadBudget'
 import { syncConnectedMetrics } from './sync-connected-metrics'
+import { supportsLocalTwitterBrowser, twitterBrowserPublishingAccounts } from './TwitterBrowserSession'
+import { twitterBrowserDispatch } from './TwitterBrowserDispatchService'
 
 const database = db as any
 
@@ -24,6 +26,7 @@ type SocialIdentityRow = {
   display_name?: string | null
   provider: 'twitter'
   external_id?: string | null
+  auth_transport?: 'api' | 'browser' | null
   auth_status: 'connected' | 'expired' | 'revoked' | 'missing'
   access_token?: string | null
   refresh_token?: string | null
@@ -97,7 +100,10 @@ export class TwitterService {
       canPublish: connected,
       configuredFromEnv: Boolean(cfg.accessToken),
       oauthConfigured: Boolean(cfg.clientId && cfg.redirectUrl),
-      accounts: rows.map(row => toPublicAccount(row, { isDefault: Number(row.id) === Number(identity?.id) })),
+      accounts: [
+        ...rows.map(row => toPublicAccount(row, { isDefault: Number(row.id) === Number(identity?.id) })),
+        ...await twitterBrowserPublishingAccounts(),
+      ],
     }
   }
 
@@ -208,7 +214,15 @@ export class TwitterService {
 
     let identity: SocialIdentityRow
     try {
-      identity = await this.requireIdentity(identityId)
+      const chosen = identityId ? await findIdentityRow<SocialIdentityRow>('twitter', identityId) : null
+      if (chosen?.auth_transport === 'browser') {
+        if (!supportsLocalTwitterBrowser() || chosen.auth_status === 'revoked')
+          throw new UserFacingError('Publish through this X browser account in the Postline Mac app.')
+        identity = chosen
+      }
+      else {
+        identity = await this.requireIdentity(identityId)
+      }
     }
     catch (error) {
       return { provider: 'twitter', ok: false, error: messageOf(error), identityId: identityId || undefined }
@@ -244,15 +258,17 @@ export class TwitterService {
       .executeTakeFirstOrThrow()
 
     try {
-      const published = await this.driver.publish({
-        handle: identity.handle,
-        did: identity.external_id || undefined,
-        accessToken: identity.access_token || undefined,
-      }, {
-        text: post.body,
-        ...(content?.media?.length ? { media: content.media } : {}),
-        ...(content?.reply ? { reply: content.reply } : {}),
-      })
+      const published = identity.auth_transport === 'browser'
+        ? await this.publishThroughBrowser(post, identity, content)
+        : await this.driver.publish({
+            handle: identity.handle,
+            did: identity.external_id || undefined,
+            accessToken: identity.access_token || undefined,
+          }, {
+            text: post.body,
+            ...(content?.media?.length ? { media: content.media } : {}),
+            ...(content?.reply ? { reply: content.reply } : {}),
+          })
 
       await database.updateTable('post_targets').set({
         status: 'published',
@@ -277,7 +293,10 @@ export class TwitterService {
       // a sign-in the network no longer accepts marks the account: a 403 is
       // usually one refused post (a duplicate, a missing permission), and
       // treating it as signed out disconnected accounts that were working.
-      const explained = explainNetworkError('twitter', error)
+      const browser = identity.auth_transport === 'browser'
+      const explained = browser
+        ? { kind: 'browser', message: error instanceof UserFacingError ? error.message : 'Postline could not send the post through the X browser.' }
+        : explainNetworkError('twitter', error)
       const message = explained.message
       if (explained.kind === 'expired')
         await markIdentityExpired(identity)
@@ -287,8 +306,35 @@ export class TwitterService {
         updated_at: now(),
       }).where('id', '=', target.id).execute()
 
-      return { provider: 'twitter', ok: false, error: message, targetId: Number(target.id), retry: classifyFailure(error), ...account }
+      let retry = classifyFailure(error)
+      if (browser) retry = { kind: error instanceof UserFacingError && error.code === 'x_browser_unavailable' ? 'transient' : 'permanent' }
+      return { provider: 'twitter', ok: false, error: message, targetId: Number(target.id), retry, ...account }
     }
+  }
+
+  private async publishThroughBrowser(post: { id: number, body: string }, identity: SocialIdentityRow, content?: PublishContent): Promise<{ uri: string, url: string, cid?: string }> {
+    if (content?.reply || content?.video)
+      throw new UserFacingError('Choose the X API account for replies or videos.')
+    const images = (content?.media ?? []).map((image) => {
+      if (!image.bytes?.length || !image.mimeType || !/^image\/(jpeg|png|webp|gif)$/.test(image.mimeType))
+        throw new UserFacingError('Attach an image file before publishing through the X browser.')
+      if (image.altText?.trim())
+        throw new UserFacingError('Choose the X API account to publish these images with their alternative text.')
+      return { type: image.mimeType, base64: Buffer.from(image.bytes).toString('base64') }
+    })
+    const result = await twitterBrowserDispatch.dispatch({
+      postId: post.id, handle: identity.handle, text: post.body, images,
+    })
+    if (result.state === 'published')
+      return { uri: result.id, url: `https://x.com/${identity.handle}/status/${result.id}` }
+    const errors = {
+      attention: 'Open X in Channels and check sign-in with the original account before publishing.',
+      layout: 'Postline could not verify the X Composer controls. Check sign-in in Channels to run another health check.',
+      refused: 'X declined the post in its Composer.',
+      uncertain: 'X did not confirm whether the post went out. Retries are paused. Open the original X profile to check the result.',
+      unavailable: 'The X browser could not prepare this post. Keep Postline open on this Mac and check the browser in Channels.',
+    }
+    throw new UserFacingError(errors[result.state], `x_browser_${result.state}`)
   }
 
   /**

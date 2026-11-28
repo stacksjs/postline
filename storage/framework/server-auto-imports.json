@@ -169,6 +169,7 @@
     "TrackedLink": true,
     "Transaction": true,
     "TranscodeStorageVideoJob": true,
+    "TwitterBrowserDispatch": true,
     "TwitterReadUsage": true,
     "UsageEvent": true,
     "User": true,

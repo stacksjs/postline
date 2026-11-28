@@ -15,6 +15,7 @@
  */
 
 import type { ArchivedTargetAccount, IdentityKey, IdentityLike } from '../../Support/Social/accounts'
+import type { PublishTarget } from '../../Support/Social/targets'
 import { db } from '@stacksjs/database'
 import { UserFacingError } from '../../Support/Http/user-error'
 import { alerts } from '../AlertService'
@@ -23,6 +24,13 @@ import { isSealed, openToken, sealToken } from '../../Support/Social/token-vault
 import { now, uuid } from './support'
 
 const database = db as any
+
+export function assertThreadTransport(targets: readonly PublishTarget[], tx = database): void {
+  const twitterIds = targets.flatMap(target => target.provider === 'twitter' && target.identityId ? [target.identityId] : [])
+  if (twitterIds.length && tx.selectFrom('social_identities').select('id').where('id', 'in', twitterIds)
+    .where('auth_transport', '=', 'browser').executeTakeFirst())
+    throw new UserFacingError('Choose the X API account for a thread. The X browser currently publishes single posts.')
+}
 
 export class RestoredTargetAccountError extends UserFacingError {
   constructor(account: ArchivedTargetAccount) {
@@ -41,7 +49,7 @@ export function bindRestoredTargets<T extends RestoredTargetRow>(tx: typeof data
   if (!rows.some(row => row.archived_account)) return rows
 
   const identities: IdentityLike[] = tx.selectFrom('social_identities')
-    .select(['id', 'provider', 'handle', 'external_id', 'auth_status']).execute()
+    .select(['id', 'provider', 'handle', 'external_id', 'auth_status', 'auth_transport']).execute()
   return rows.map((row) => {
     if (!row.archived_account) return row
     const account: ArchivedTargetAccount = JSON.parse(row.archived_account)
@@ -184,6 +192,7 @@ export async function listIdentityRows<T extends IdentityLike>(
     .selectFrom('social_identities')
     .selectAll()
     .where('provider', '=', provider)
+  if (provider === 'twitter') query = query.where('auth_transport', '=', 'api')
   if (!options.includeRevoked) query = query.where('auth_status', '!=', 'revoked')
 
   await sealStoredTokens()
@@ -306,6 +315,7 @@ export async function setDefaultIdentityRow(identityId: number): Promise<Identit
     .where('id', '=', identityId)
     .executeTakeFirst() as IdentityLike | undefined
   if (!row || row.auth_status === 'revoked') throw new UserFacingError('That account is not connected.')
+  if (row.auth_transport === 'browser') throw new UserFacingError('Select the X browser account explicitly when you want to publish through it.')
 
   await database.updateTable('social_identities').set({ is_default: false }).where('provider', '=', row.provider).execute()
   await database.updateTable('social_identities').set({ is_default: true }).where('id', '=', row.id).execute()

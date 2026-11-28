@@ -25,6 +25,7 @@ export interface IdentityLike {
   handle: string
   display_name?: string | null
   external_id?: string | null
+  auth_transport?: 'api' | 'browser' | null
   auth_status: IdentityAuthStatus
   access_token?: string | null
   insights_access_token?: string | null
@@ -87,18 +88,19 @@ export interface ArchivedTargetAccount {
   provider: string
   handle: string
   externalId?: string
+  transport?: 'browser'
 }
 
-export function archivedTargetAccount(row: Pick<IdentityLike, 'provider' | 'handle' | 'external_id'>): ArchivedTargetAccount {
+export function archivedTargetAccount(row: Pick<IdentityLike, 'provider' | 'handle' | 'external_id' | 'auth_transport'>): ArchivedTargetAccount {
   const externalId = row.provider === 'mastodon' ? '' : String(row.external_id || '').trim()
-  return { provider: row.provider, handle: row.handle, ...(externalId && { externalId }) }
+  return { provider: row.provider, handle: row.handle, ...(externalId && { externalId }), ...(row.auth_transport === 'browser' && { transport: 'browser' }) }
 }
 
 /** A portable target must identify exactly one account on the destination. */
 export function matchArchivedTargetAccount(rows: readonly IdentityLike[], account: ArchivedTargetAccount): IdentityLike | undefined {
   const handle = normalizeIdentityHandle(account.handle)
   const matches = rows.filter((row) => {
-    if (row.provider !== account.provider) return false
+    if (row.provider !== account.provider || (row.auth_transport === 'browser') !== (account.transport === 'browser')) return false
     if (account.externalId) return String(row.external_id || '').trim() === account.externalId
     return Boolean(handle) && normalizeIdentityHandle(row.handle) === handle
   })
@@ -146,6 +148,7 @@ export interface PublicAccount {
   authStatus: IdentityAuthStatus
   connected: boolean
   canPublish: boolean
+  transport?: 'browser'
   /** True for the account a bare network target publishes through. */
   isDefault: boolean
   /** Mastodon only: the instance base URL. */

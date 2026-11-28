@@ -10,6 +10,7 @@ export interface AccountStatus {
   authStatus: string
   connected: boolean
   canPublish: boolean
+  transport?: 'browser'
   /** The account a bare network target (`bluesky`) publishes through. */
   isDefault: boolean
   instance?: string | null

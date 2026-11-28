@@ -88,6 +88,7 @@ declare global {
   const ThreadPublishClaim: typeof import('../../../app/Models/ThreadPublishClaim')['default']
   const TimelineItem: typeof import('../../../app/Models/TimelineItem')['default']
   const TrackedLink: typeof import('../../../app/Models/TrackedLink')['default']
+  const TwitterBrowserDispatch: typeof import('../../../app/Models/TwitterBrowserDispatch')['default']
   const TwitterReadUsage: typeof import('../../../app/Models/TwitterReadUsage')['default']
   const Activity: typeof import('@stacksjs/defaults/app/Models/Activity.ts')['default']
   const AnalyticsEvent: typeof import('@stacksjs/defaults/app/Models/AnalyticsEvent.ts')['default']

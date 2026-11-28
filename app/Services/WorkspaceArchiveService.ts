@@ -20,6 +20,7 @@ import { db, sqliteWriteOptions } from '@stacksjs/database'
 import { UserFacingError } from '../Support/Http/user-error'
 import type { ArchivedTargetAccount, IdentityLike } from '../Support/Social/accounts'
 import { archivedTargetAccount, matchArchivedTargetAccount } from '../Support/Social/accounts'
+import { xBrowserPostId } from '../Support/Social/x-browser-write'
 import { readBlogAttachments } from '../Support/Social/blog-attachments'
 import { checkImageBytes } from '../Support/Social/image-input'
 import { checkVideoBytes } from '../Support/Social/video-input'
@@ -37,13 +38,13 @@ import { draftFeeds, readArchivedDraftFeed } from './DraftFeedService'
 import { addPostingSlot, listPostingSlots, readPostingSlot } from './PostingSlotService'
 import { readArchivedRecurringPost, recurringPosts } from './RecurringPostService'
 import { blog } from './Social/BlogService'
-import { ensureAccount, now } from './Social/support'
+import { ensureAccount, now, uuid } from './Social/support'
 import { readArchivedTrackedLink, trackedLinks } from './TrackedLinkService'
 
 const database = db as any
 
 export const ARCHIVE_FORMAT = 'postline-workspace'
-export const ARCHIVE_VERSION = 9
+export const ARCHIVE_VERSION = 10
 
 /** Typed to delete everything, so a stray click cannot. */
 export const DELETE_EVERYTHING_PHRASE = 'DELETE EVERYTHING'
@@ -68,6 +69,13 @@ interface ArchivedBlogPost {
   attachments?: Array<{ data: string, alt: string }>
 }
 
+interface ArchivedBrowserDispatch {
+  post: string
+  handle: string
+  state: 'submitting' | 'published'
+  remoteId: string | null
+}
+
 export interface WorkspaceArchive {
   format: typeof ARCHIVE_FORMAT
   version: number
@@ -75,6 +83,7 @@ export interface WorkspaceArchive {
   settings: Record<string, unknown>
   posts: Array<Record<string, unknown>>
   targets: Array<Record<string, unknown> & { post: string, account: ArchivedTargetAccount | null }>
+  twitterBrowserDispatches: ArchivedBrowserDispatch[]
   campaigns: Array<Record<string, unknown>>
   campaignPosts: Array<Record<string, unknown> & { campaign: string, post: string | null }>
   blogPosts: ArchivedBlogPost[]
@@ -114,10 +123,21 @@ function readTargetAccount(provider: unknown, value: unknown): ArchivedTargetAcc
   const account = value as Partial<ArchivedTargetAccount>
   if (typeof provider !== 'string' || !isAccountProvider(provider) || account.provider !== provider
     || typeof account.handle !== 'string' || !account.handle.trim()
+    || (account.transport !== undefined && (provider !== 'twitter' || account.transport !== 'browser'))
     || (account.externalId !== undefined && (typeof account.externalId !== 'string' || !account.externalId.trim() || provider === 'mastodon')))
     throw new UserFacingError('A publishing target in this export has an invalid account reference.')
 
-  return { provider, handle: account.handle.trim(), ...(account.externalId && { externalId: account.externalId.trim() }) }
+  return { provider, handle: account.handle.trim(), ...(account.externalId && { externalId: account.externalId.trim() }), ...(account.transport && { transport: account.transport }) }
+}
+
+function readBrowserDispatch(value: unknown): ArchivedBrowserDispatch {
+  const receipt = value as Partial<ArchivedBrowserDispatch> | null
+  if (!receipt || typeof receipt.post !== 'string' || !receipt.post
+    || typeof receipt.handle !== 'string' || !/^[A-Za-z0-9_]{1,15}$/.test(receipt.handle)
+    || !((receipt.state === 'submitting' && receipt.remoteId === null)
+      || (receipt.state === 'published' && xBrowserPostId(receipt.remoteId))))
+    throw new UserFacingError('That export contains an invalid X browser publish receipt.')
+  return { post: receipt.post, handle: receipt.handle.toLowerCase(), state: receipt.state, remoteId: receipt.remoteId }
 }
 
 function readArchivedImage(data: unknown, message: string) {
@@ -172,12 +192,15 @@ export class WorkspaceArchiveService {
     const accountId = await ensureAccount()
     const account = await database.selectFrom('accounts').selectAll().where('id', '=', accountId).executeTakeFirst()
     // Read posts with their targets and feed receipts from one snapshot.
-    const { posts, targets, identities, feeds, slots, repeats } = await database.transaction((tx: typeof database) => {
+    const { posts, targets, dispatches, identities, feeds, slots, repeats } = await database.transaction((tx: typeof database) => {
       const posts = tx.selectFrom('posts').selectAll().where('status', '!=', 'archived').orderBy('id', 'asc').execute()
+      const postIds = posts.map((post: any) => post.id)
       return {
         posts,
-        targets: posts.length ? tx.selectFrom('post_targets').selectAll().where('post_id', 'in', posts.map((post: any) => post.id)).execute() : [],
-        identities: tx.selectFrom('social_identities').select(['id', 'provider', 'handle', 'external_id']).execute(),
+        targets: postIds.length ? tx.selectFrom('post_targets').selectAll().where('post_id', 'in', postIds).execute() : [],
+        dispatches: postIds.length ? tx.selectFrom('twitter_browser_dispatches').select(['post_id', 'handle', 'state', 'remote_id'])
+          .where('post_id', 'in', postIds).where('state', 'in', ['submitting', 'published']).execute() : [],
+        identities: tx.selectFrom('social_identities').select(['id', 'provider', 'handle', 'external_id', 'auth_transport']).execute(),
         feeds: draftFeeds.export(accountId, tx),
         slots: listPostingSlots(accountId, tx),
         repeats: recurringPosts.export(accountId, tx),
@@ -224,6 +247,9 @@ export class WorkspaceArchiveService {
         post: postUuid.get(Number(row.post_id))!,
         account: row.archived_account ? JSON.parse(row.archived_account) : identityOf.get(Number(row.social_identity_id)) ?? null,
       })),
+      twitterBrowserDispatches: dispatches.map((row: any) => ({
+        post: postUuid.get(Number(row.post_id))!, handle: row.handle, state: row.state, remoteId: row.remote_id,
+      })),
       campaigns: campaigns.map((row: any) => pick(row, CAMPAIGN_COLUMNS)),
       campaignPosts: campaignPosts.filter((row: any) => campaignUuid.has(Number(row.launch_campaign_id))).map((row: any) => ({
         ...pick(row, CAMPAIGN_POST_COLUMNS),
@@ -266,6 +292,9 @@ export class WorkspaceArchiveService {
     if (version >= 8 && !Array.isArray(archive.recurringPosts))
       throw new UserFacingError('That export is missing its recurring posts.')
     const repeats = version >= 8 ? archive.recurringPosts.map(readArchivedRecurringPost) : []
+    if (version >= 10 && !Array.isArray(archive.twitterBrowserDispatches))
+      throw new UserFacingError('That export is missing its X browser publish receipts.')
+    const dispatches = version >= 10 ? archive.twitterBrowserDispatches.map(readBrowserDispatch) : []
 
     const targets: WorkspaceArchive['targets'] = (archive.targets || []).map(target => ({
       ...target,
@@ -326,9 +355,24 @@ export class WorkspaceArchiveService {
         tx.insertInto('posts').values({ ...pick(post, POST_COLUMNS), account_id: accountId }).execute()
         report.posts++
       }
+      for (const dispatch of dispatches) {
+        const postId = idOf('posts', dispatch.post, tx)
+        if (!postId) continue
+        const existing = tx.selectFrom('twitter_browser_dispatches').select(['id', 'state'])
+          .where('post_id', '=', postId).where('handle', '=', dispatch.handle).executeTakeFirst()
+        const values = { uuid: uuid(), state: dispatch.state, remote_id: dispatch.remoteId, updated_at: now() }
+        if (!existing) {
+          tx.insertInto('twitter_browser_dispatches').values({
+            ...values, post_id: postId, handle: dispatch.handle, created_at: now(),
+          }).execute()
+        }
+        else if (existing.state === 'refused') {
+          tx.updateTable('twitter_browser_dispatches').set(values).where('id', '=', existing.id).execute()
+        }
+      }
 
       const identities: IdentityLike[] = tx.selectFrom('social_identities')
-        .select(['id', 'provider', 'handle', 'external_id', 'auth_status']).execute()
+        .select(['id', 'provider', 'handle', 'external_id', 'auth_status', 'auth_transport']).execute()
       for (const target of targets) {
         if (exists('post_targets', target.uuid, tx)) { report.skipped++; continue }
         const postId = idOf('posts', target.post, tx)
@@ -442,7 +486,7 @@ export class WorkspaceArchiveService {
       }
     })
 
-    for (const table of ['campaign_posts', 'launch_campaigns', 'post_targets', 'thread_publish_claims', 'social_operation_leases', 'posts', 'post_submissions', 'post_webhook_deliveries', 'keyword_mentions', 'keyword_monitors', 'composer_presets', 'tracked_links', 'inbox_mentions', 'dm_messages', 'dm_conversations', 'timeline_items', 'purge_previews', 'purge_runs', 'alerts', 'social_identities', 'network_apps', 'twitter_read_usage'])
+    for (const table of ['campaign_posts', 'launch_campaigns', 'post_targets', 'twitter_browser_dispatches', 'thread_publish_claims', 'social_operation_leases', 'posts', 'post_submissions', 'post_webhook_deliveries', 'keyword_mentions', 'keyword_monitors', 'composer_presets', 'tracked_links', 'inbox_mentions', 'dm_messages', 'dm_conversations', 'timeline_items', 'purge_previews', 'purge_runs', 'alerts', 'social_identities', 'network_apps', 'twitter_read_usage'])
       await wipe(table)
 
     const accountId = await ensureAccount()

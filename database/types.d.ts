@@ -1906,6 +1906,7 @@ declare module '@stacksjs/database' {
       display_name: string
       provider: "bluesky" | "twitter" | "mastodon" | "facebook" | "instagram" | "tiktok" | "linkedin" | "threads"
       external_id: string
+      auth_transport: "api" | "browser"
       is_default: number
       auth_status: "connected" | "expired" | "revoked" | "missing"
       access_token: string
@@ -2143,6 +2144,17 @@ declare module '@stacksjs/database' {
       loyalty_points_earned: number
       loyalty_points_redeemed: number
       order_id: number
+    }
+    twitter_browser_dispatches: {
+      // columns
+      id: number
+      uuid: string
+      created_at: string
+      updated_at: string | null
+      handle: string
+      state: "submitting" | "published" | "refused"
+      remote_id: string
+      post_id: number
     }
     twitter_read_usage: {
       // columns

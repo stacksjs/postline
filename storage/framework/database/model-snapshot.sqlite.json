@@ -2113,6 +2113,19 @@
             "isUnique": false,
             "isNullable": true,
             "hasDefault": false
+          },
+          {
+            "name": "auth_transport",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "api",
+            "enumValues": [
+              "api",
+              "browser"
+            ]
           }
         ],
         "indexes": [
@@ -4084,10 +4097,109 @@
             "type": "unique"
           }
         ]
+      },
+      {
+        "table": "twitter_browser_dispatches",
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "isPrimaryKey": true,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false
+          },
+          {
+            "name": "handle",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "maxLength": 15
+          },
+          {
+            "name": "state",
+            "type": "enum",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": false,
+            "enumValues": [
+              "submitting",
+              "published",
+              "refused"
+            ]
+          },
+          {
+            "name": "remote_id",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "maxLength": 19
+          },
+          {
+            "name": "post_id",
+            "type": "bigint",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false,
+            "references": {
+              "table": "posts",
+              "column": "id",
+              "onDelete": "cascade"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": false,
+            "hasDefault": true,
+            "defaultValue": "UTC_TIMESTAMP"
+          },
+          {
+            "name": "updated_at",
+            "type": "datetime",
+            "isPrimaryKey": false,
+            "isUnique": false,
+            "isNullable": true,
+            "hasDefault": false
+          },
+          {
+            "name": "uuid",
+            "type": "string",
+            "isPrimaryKey": false,
+            "isUnique": true,
+            "isNullable": true,
+            "hasDefault": false
+          }
+        ],
+        "indexes": [
+          {
+            "name": "twitter_browser_dispatches_post_handle_unique",
+            "columns": [
+              "post_id",
+              "handle"
+            ],
+            "type": "unique"
+          },
+          {
+            "name": "twitter_browser_dispatches_uuid_unique",
+            "columns": [
+              "uuid"
+            ],
+            "type": "unique"
+          }
+        ]
       }
     ]
   },
-  "hash": "6c481fd49254a43b385df37e91b680d24a97d8cbec5d7a8078372ff575dae298",
+  "hash": "e174321ab9e3e7b6ac66ae46ac4367c3cadfd889014523f98ba504660839aeef",
   "dialect": "sqlite",
-  "updatedAt": "2026-11-28T01:37:58.422Z"
+  "updatedAt": "2026-11-28T02:02:50.114Z"
 }

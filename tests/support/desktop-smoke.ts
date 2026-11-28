@@ -307,6 +307,74 @@ async function checkWorkspace(launchUrl: string, dataDir: string): Promise<numbe
   check('the Mac agent runs the webhook job without queuing events when disabled', webhookScheduler?.last_status === 'ok' && webhookOutbox.count === 0)
   check('the blog file is in the data directory', existsSync(join(dataDir, 'content/blog')) && readdirSync(join(dataDir, 'content/blog')).includes('desktop-check.md'))
 
+  if (process.platform === 'darwin' && Number(release().split('.')[0]) >= 23) {
+    const available = await call('GET', '/api/postline/bootstrap')
+    const accounts: Array<{ id: number, handle: string, isDefault: boolean, transport?: string }> = JSON.parse(available.text).data?.accounts ?? []
+    const selected = accounts.find(account => account.transport === 'browser' && account.handle === 'postline_test')
+    check('the selected browser account is explicitly available alongside the API', Boolean(selected?.id) && selected?.isDefault === false)
+    const path = `${browserSessionPath}/publish`
+    const submit = (operation: string, token?: string, result?: { state: string, id?: string }) =>
+      call('POST', path, JSON.stringify({ operation, token, result }))
+    const startup = await call('POST', '/api/postline/queue', {
+      text: 'A fixture waiting for the browser to start.',
+      providers: `twitter:${selected?.id}`,
+      scheduled_at: new Date(Date.now() + 600_000).toISOString().slice(0, 19).replace('T', ' '),
+    })
+    const startupId = JSON.parse(startup.text)?.data?.postId
+    const waiting = await call('POST', '/api/postline/queue/publish-now', { id: String(startupId) })
+    const beforeReady = await submit('claim')
+    check('the queue may retry when the browser never had permission to submit', startup.status === 200
+      && JSON.parse(waiting.text)?.data?.results?.[0]?.retry?.kind === 'transient'
+      && JSON.parse(beforeReady.text)?.data === null)
+    const claim = JSON.parse((await call('POST', composerCheckPath, beginComposerCheck)).text)?.data
+    const healthy = await call('POST', composerCheckPath, JSON.stringify({ token: claim?.token, health: 'ready' }))
+    check('the local agent accepts a healthy X Composer check', healthy.status === 200 && JSON.parse(healthy.text)?.data?.recorded === true)
+    async function sendThroughBrowser(text: string, state: 'published' | 'uncertain' | 'layout', scheduled = false) {
+      const input = { text, providers: `twitter:${selected?.id}` }
+      const at = new Date(Date.now() + 600_000).toISOString().slice(0, 19).replace('T', ' ')
+      const saved = scheduled
+        ? await call('POST', '/api/postline/queue', { ...input, scheduled_at: at })
+        : null
+      const savedData = saved ? JSON.parse(saved.text)?.data : null
+      if (scheduled) check('the browser account can be saved as a scheduled target', saved?.status === 200 && savedData?.status === 'scheduled', saved?.text)
+      const pending = scheduled
+        ? call('POST', '/api/postline/queue/publish-now', { id: String(savedData?.postId) })
+        : call('POST', '/api/postline/publish', input)
+      let work
+      for (let attempt = 0; attempt < 25; attempt++) {
+        const next = await submit('claim')
+        work = JSON.parse(next.text)?.data
+        if (work) break
+        await Bun.sleep(40)
+      }
+      if (!work) throw new Error('The local X browser did not receive the queued post.')
+      check('the browser receives the post and its exact account without credentials', work.text === text && work.handle === 'postline_test'
+        && !Object.keys(work).some(key => /secret|credential|password/.test(key)))
+      if (state !== 'layout') {
+        const authorized = await submit('authorize', work.token)
+        const replay = await submit('authorize', work.token)
+        check('the browser receives one permission to click Post', authorized.status === 200 && JSON.parse(authorized.text)?.data === true
+          && replay.status === 200 && JSON.parse(replay.text)?.data === false)
+      }
+      const report = await submit('result', work.token, state === 'published' ? { state, id: '246810' } : { state })
+      check('the local agent settles the X browser result', report.status === 200 && JSON.parse(report.text)?.data === true)
+      return JSON.parse((await pending).text).data
+    }
+    const delivered = await sendThroughBrowser('A successful browser delivery fixture.', 'published')
+    check('the normal Publish API uses the browser’s X receipt', delivered?.results?.[0]?.url === 'https://x.com/postline_test/status/246810')
+    const uncertain = await sendThroughBrowser('An uncertain browser delivery fixture.', 'uncertain')
+    const retry = await call('POST', '/api/postline/queue/publish-now', { id: String(uncertain?.postId) })
+    const waitingAgain = await submit('claim')
+    check('the durable X receipt prevents an uncertain target from clicking again', retry.status < 500
+      && JSON.parse(retry.text)?.data?.results?.[0]?.error?.includes('X did not confirm')
+      && JSON.parse(waitingAgain.text)?.data === null, retry.text)
+    const held = await sendThroughBrowser('A scheduled X layout fixture.', 'layout', true)
+    const heldState = await call('GET', browserSessionPath)
+    check('a changed Composer layout holds the selected X target in the queue', Boolean(held?.postId)
+      && held.results?.[0]?.ok === false && held.results?.[0]?.error?.includes('could not verify the X Composer')
+      && JSON.parse(heldState.text)?.data?.composerHealth === 'layout')
+  }
+
   const pendingErasure = await call('POST', browserSessionPath, brokenLayout)
   check('the erasure fixture starts with an X layout hold', JSON.parse(pendingErasure.text).data?.needsLayoutCheck === true)
   const browserActivity = await call('GET', '/api/postline/alerts')

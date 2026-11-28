@@ -120,6 +120,7 @@ export const actions = {
   'Actions/Postline/TwitterBrowserComposerCheckAction': '../../../app/Actions/Postline/TwitterBrowserComposerCheckAction.ts',
   'Actions/Postline/TwitterBrowserListeningAction': '../../../app/Actions/Postline/TwitterBrowserListeningAction.ts',
   'Actions/Postline/TwitterBrowserMetricsAction': '../../../app/Actions/Postline/TwitterBrowserMetricsAction.ts',
+  'Actions/Postline/TwitterBrowserPublishAction': '../../../app/Actions/Postline/TwitterBrowserPublishAction.ts',
   'Actions/Postline/TwitterBrowserSessionAction': '../../../app/Actions/Postline/TwitterBrowserSessionAction.ts',
   'Actions/Postline/TwitterBrowserSessionSaveAction': '../../../app/Actions/Postline/TwitterBrowserSessionSaveAction.ts',
   'Actions/Postline/TwitterCallbackAction': '../../../app/Actions/Postline/TwitterCallbackAction.ts',

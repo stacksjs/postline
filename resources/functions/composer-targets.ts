@@ -12,7 +12,7 @@ export interface ComposerTarget extends ProviderStatus {
 export function composerTargets(providers: readonly ProviderStatus[]): ComposerTarget[] {
   return providers.flatMap<ComposerTarget>((status) => {
     const live = (status.accounts || []).filter(account => account.connected)
-    if (live.length <= 1) {
+    if (live.length <= 1 && live[0]?.transport !== 'browser') {
       const account = live[0] ?? null
       return [{ ...status, key: account ? `${status.provider}:${account.id}` : status.provider, account, multi: false }]
     }
@@ -42,8 +42,8 @@ export function composerSelection(connected: readonly ComposerTarget[], selected
 export function composerKeyForSpec(targets: readonly ComposerTarget[], spec: string): string | null {
   const exact = targets.find(target => target.key === spec)
   if (exact) return exact.key
-  const network = spec.split(':')[0]
-  const candidates = targets.filter(target => target.provider === network)
+  if (spec.includes(':')) return null
+  const candidates = targets.filter(target => target.provider === spec && target.account?.transport !== 'browser')
   return (candidates.find(target => target.account?.isDefault) ?? candidates[0])?.key ?? null
 }
 
@@ -57,7 +57,7 @@ export function composerTargetRows(targets: readonly ComposerTarget[], selected:
     return {
       key: target.key,
       icon: target.multi ? providerIcon(target.provider) : '',
-      label: target.multi ? formatHandle(target.provider, target.account?.handle) : network,
+      label: target.account?.transport === 'browser' ? `X browser ${formatHandle(target.provider, target.account.handle)}` : target.multi ? formatHandle(target.provider, target.account?.handle) : network,
       connected,
       selected: isSelected,
       over,
